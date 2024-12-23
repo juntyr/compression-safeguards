@@ -125,6 +125,11 @@ class GuardrailCodec(numcodecs.abc.Codec):
         else:
             correction = self._guardrail.encode_correction(data, decoded)
 
+            corrected = self._guardrail.apply_correction(decoded, correction)
+            assert self._guardrail.check(
+                data, corrected
+            ), "guardrail correction must pass the check"
+
         # TODO: return metadata, encoded, optional correction
         return encoded + correction
 
