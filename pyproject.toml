@@ -1,0 +1,10 @@
+[project]
+name = "numcodecs-guardrail"
+version = "0.0.1"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numcodecs~=0.13",
+    "numpy~=2.2",
+]
