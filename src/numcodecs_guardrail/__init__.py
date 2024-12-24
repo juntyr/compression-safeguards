@@ -11,10 +11,19 @@ import numpy as np
 
 from .guardrail import Guardrail
 from .guardrail.abs import AbsoluteErrorBoundGuardrail
+from .guardrail.rel_or_abs import RelativeOrAbsoluteErrorBoundGuardrail
 
 
-class GuardrailKind(Enum):
-    ABSOLUTE = AbsoluteErrorBoundGuardrail.kind
+GuardrailKind = Enum(
+    "GuardrailKind",
+    {
+        kind.kind: kind
+        for kind in [
+            AbsoluteErrorBoundGuardrail,
+            RelativeOrAbsoluteErrorBoundGuardrail,
+        ]
+    },
+)
 
 
 class GuardrailCodec(numcodecs.abc.Codec):

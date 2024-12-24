@@ -9,13 +9,12 @@ from . import Guardrail
 
 
 class AbsoluteErrorBoundGuardrail(Guardrail):
-    __slots__ = "_eb_abs"
+    __slots__ = ("_eb_abs",)
     _eb_abs: float
 
     kind = "abs"
 
     def __init__(self, eb_abs: float):
-        assert eb_abs is not None, "eb_abs must not be None"
         assert eb_abs > 0.0, "eb_abs must be positive"
 
         self._eb_abs = eb_abs
