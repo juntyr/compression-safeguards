@@ -1,6 +1,7 @@
 __all__ = ["GuardrailCodec", "GuardrailKind"]
 
 from enum import Enum
+from io import BytesIO
 
 import numcodecs
 import numcodecs.abc
@@ -8,6 +9,7 @@ import numcodecs.compat
 import numcodecs.registry
 import numcodecs.zlib
 import numpy as np
+import varint
 
 from .guardrail import Guardrail
 from .guardrail.abs import AbsoluteErrorBoundGuardrail
@@ -74,7 +76,6 @@ class GuardrailCodec(numcodecs.abc.Codec):
         assert decoded.shape == data.shape, "codec must roundtrip shape"
 
         if self._guardrail.check(data, decoded):
-            # TODO: less metadata
             correction = bytes()
         else:
             correction = self._guardrail.encode_correction(data, decoded)
@@ -84,19 +85,35 @@ class GuardrailCodec(numcodecs.abc.Codec):
                 data, corrected
             ), "guardrail correction must pass the check"
 
-        # TODO: return metadata, encoded, optional correction
-        return encoded + correction
+        correction_len = varint.encode(len(correction))
+
+        return correction_len + encoded + correction
 
     def decode(self, buf, out=None):
         assert out is not None, "can only decode into known dtype and shape"
         out = numcodecs.compat.ensure_ndarray(out)
 
-        # TODO: decode the metadata into encoded and optional correction
-        encoded, correction = buf
+        buf = numcodecs.compat.ensure_ndarray(buf)
+        assert buf.dtype == np.dtype("uint8"), "codec must decode from bytes"
+        assert len(buf.shape) <= 1, "codec must decode from 1D bytes"
+        buf = numcodecs.compat.ensure_bytes(buf)
+
+        buf_io = BytesIO(buf)
+        correction_len = varint.decode_stream(buf_io)
+
+        if correction_len > 0:
+            encoded = buf[buf_io.tell() : -correction_len]
+            correction = buf[-correction_len:]
+        else:
+            encoded = buf[buf_io.tell() :]
+            correction = bytes()
 
         decoded = self._codec.decode(encoded)
 
-        corrected = self._guardrail.apply_correction(decoded, correction)
+        if correction_len > 0:
+            corrected = self._guardrail.apply_correction(decoded, correction)
+        else:
+            corrected = decoded
 
         return numcodecs.compat.ndarray_copy(corrected, out)
 

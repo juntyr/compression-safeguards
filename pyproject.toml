@@ -7,4 +7,5 @@ requires-python = ">=3.10"
 dependencies = [
     "numcodecs~=0.13",
     "numpy~=2.2",
+    "varint~=1.0",
 ]
