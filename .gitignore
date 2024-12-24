@@ -3,5 +3,7 @@
 /.ruff_cache
 /uv.lock
 
+/build
+
 **/__pycache__
 **/*.egg-info
