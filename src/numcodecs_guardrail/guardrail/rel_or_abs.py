@@ -31,6 +31,7 @@ class RelativeOrAbsoluteErrorBoundGuardrail(Guardrail):
 
         return np.sign(x) * np.exp(np.abs(x)) * a
 
+    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
         return np.all(
             (
@@ -38,8 +39,10 @@ class RelativeOrAbsoluteErrorBoundGuardrail(Guardrail):
                 <= np.log(1.0 + self._eb_rel)
             )
             | (np.abs(data - decoded) <= self._eb_abs)
+            | (self.as_bits(data) == self.as_bits(decoded))
         )
 
+    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def encode_correction(
         self, data: np.ndarray, decoded: np.ndarray, *, lossless: Codec
     ) -> bytes:
@@ -49,26 +52,49 @@ class RelativeOrAbsoluteErrorBoundGuardrail(Guardrail):
         decoded_log = self.my_log(decoded)
 
         error_log = decoded_log - data_log
-        correction_log = np.round(error_log / (log_eb_rel * 2.0))
+        correction_log = np.round(error_log / (log_eb_rel * 2.0)) * (log_eb_rel * 2.0)
 
-        correction = lossless.encode(correction_log)
+        corrected_log = decoded_log - correction_log
+        corrected = self.my_exp(corrected_log)
+
+        corrected = np.where(
+            (
+                np.abs(data_log - corrected_log)
+                <= np.log(1.0 + self._eb_rel)
+            )
+            | (np.abs(data - corrected) <= self._eb_abs),
+            corrected,
+            data,
+        )
+
+        decoded_bits = self.as_bits(decoded)
+        corrected_bits = self.as_bits(corrected, like=decoded)
+        correction_bits = decoded_bits - corrected_bits
+
+        correction = lossless.encode(correction_bits)
 
         return numcodecs.compat.ensure_bytes(correction)
 
     def apply_correction(
         self, decoded: np.ndarray, correction: bytes, *, lossless: Codec
     ) -> np.ndarray:
-        log_eb_rel = np.log(1.0 + self._eb_rel)
-
         correction = lossless.decode(correction)
         correction = numcodecs.compat.ensure_bytes(correction)
-        correction = np.frombuffer(correction, np.int64).reshape(decoded.shape)
-        correction_log = correction.astype(decoded.dtype) * (log_eb_rel * 2.0)
 
-        decoded_log = self.my_log(decoded)
-        corrected_log = decoded_log - correction_log
+        decoded_bits = self.as_bits(decoded)
+        correction_bits = self.as_bits(correction, like=decoded).reshape(decoded.shape)
 
-        return self.my_exp(corrected_log)
+        return (decoded_bits - correction_bits).view(decoded.dtype)
 
     def get_config(self):
         return dict(eb_rel=self._eb_rel, eb_abs=self._eb_abs)
+
+    def as_bits(self, a, *, like=None):
+        return np.frombuffer(
+            a,
+            dtype=np.dtype(
+                (a if like is None else like)
+                .dtype.str.replace("f", "u")
+                .replace("i", "u")
+            ),
+        )
