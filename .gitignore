@@ -1,5 +1,6 @@
 /.venv
 /.python-version
+/.pytest_cache
 /.ruff_cache
 /uv.lock
 

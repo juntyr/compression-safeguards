@@ -9,3 +9,8 @@ dependencies = [
     "numpy~=2.2",
     "varint~=1.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest~=8.3",
+]

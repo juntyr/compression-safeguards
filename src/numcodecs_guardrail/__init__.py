@@ -4,19 +4,20 @@ from enum import Enum
 from io import BytesIO
 
 import numcodecs
-import numcodecs.abc
 import numcodecs.compat
 import numcodecs.registry
 import numcodecs.zlib
 import numpy as np
 import varint
 
+from numcodecs.abc import Codec
+
 from .guardrail import Guardrail
 from .guardrail.abs import AbsoluteErrorBoundGuardrail
 from .guardrail.rel_or_abs import RelativeOrAbsoluteErrorBoundGuardrail
 
 
-GuardrailKind = Enum(
+GuardrailKind: type = Enum(
     "GuardrailKind",
     {
         kind.kind: kind
@@ -28,21 +29,23 @@ GuardrailKind = Enum(
 )
 
 
-class GuardrailCodec(numcodecs.abc.Codec):
+class GuardrailCodec(Codec):
     __slots__ = ("_codec", "_lossless", "_guardrail")
-    _codec: numcodecs.abc.Codec
-    _lossless: numcodecs.abc.Codec
+    _codec: Codec
+    _lossless: Codec
     _guardrail: Guardrail
 
     codec_id = "guardrail"
 
     def __init__(
         self,
-        codec: dict,
-        guardrail: str | GuardrailKind,
+        codec: dict | Codec,
+        guardrail: str | GuardrailKind,  # type: ignore
         **kwargs,
     ):
-        self._codec = numcodecs.registry.get_codec(codec)
+        self._codec = (
+            codec if isinstance(codec, Codec) else numcodecs.registry.get_codec(codec)
+        )
         self._lossless = numcodecs.zlib.Zlib(level=9)
 
         guardrail = (
@@ -78,9 +81,13 @@ class GuardrailCodec(numcodecs.abc.Codec):
         if self._guardrail.check(data, decoded):
             correction = bytes()
         else:
-            correction = self._guardrail.encode_correction(data, decoded)
+            correction = self._guardrail.encode_correction(
+                data, decoded, lossless=self._lossless
+            )
 
-            corrected = self._guardrail.apply_correction(decoded, correction)
+            corrected = self._guardrail.apply_correction(
+                decoded, correction, lossless=self._lossless
+            )
             assert self._guardrail.check(
                 data, corrected
             ), "guardrail correction must pass the check"
@@ -108,10 +115,12 @@ class GuardrailCodec(numcodecs.abc.Codec):
             encoded = buf[buf_io.tell() :]
             correction = bytes()
 
-        decoded = self._codec.decode(encoded)
+        decoded = self._codec.decode(encoded, out=out)
 
         if correction_len > 0:
-            corrected = self._guardrail.apply_correction(decoded, correction)
+            corrected = self._guardrail.apply_correction(
+                decoded, correction, lossless=self._lossless
+            )
         else:
             corrected = decoded
 
@@ -135,3 +144,6 @@ class GuardrailCodec(numcodecs.abc.Codec):
         repr = ", ".join(f"{p}={v!r}" for p, v in config.items())
 
         return f"{type(self).__name__}({repr})"
+
+
+numcodecs.registry.register_codec(GuardrailCodec)
