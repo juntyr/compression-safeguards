@@ -58,10 +58,7 @@ class RelativeOrAbsoluteErrorBoundGuardrail(Guardrail):
         corrected = self.my_exp(corrected_log)
 
         corrected = np.where(
-            (
-                np.abs(data_log - corrected_log)
-                <= np.log(1.0 + self._eb_rel)
-            )
+            (np.abs(data_log - corrected_log) <= np.log(1.0 + self._eb_rel))
             | (np.abs(data - corrected) <= self._eb_abs),
             corrected,
             data,

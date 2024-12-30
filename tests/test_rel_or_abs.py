@@ -52,20 +52,28 @@ def encode_decode_neg(data: np.ndarray, **kwargs) -> np.ndarray:
 def test_arange():
     data = np.arange(100, dtype=float)
 
-    decoded = encode_decode_neg(data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1)
+    decoded = encode_decode_neg(
+        data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1
+    )
     np.testing.assert_allclose(decoded, data, rtol=0.1, atol=0.1)
 
-    decoded = encode_decode_zero(data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1)
+    decoded = encode_decode_zero(
+        data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1
+    )
     np.testing.assert_allclose(decoded, data, rtol=0.1, atol=0.1)
 
 
 def test_linspace():
     data = np.linspace(-1024, 1024, 2831)
 
-    decoded = encode_decode_neg(data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1)
+    decoded = encode_decode_neg(
+        data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1
+    )
     np.testing.assert_allclose(decoded, data, rtol=0.1, atol=0.1)
 
-    decoded = encode_decode_zero(data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1)
+    decoded = encode_decode_zero(
+        data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1
+    )
     np.testing.assert_allclose(decoded, data, rtol=0.1, atol=0.1)
 
 
@@ -74,8 +82,12 @@ def test_edge_cases():
         [np.inf, np.nan, -np.inf, -np.nan, np.finfo(float).min, np.finfo(float).max]
     )
 
-    decoded = encode_decode_neg(data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1)
+    decoded = encode_decode_neg(
+        data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1
+    )
     np.testing.assert_allclose(decoded, data, rtol=0.1, atol=0.1)
 
-    decoded = encode_decode_zero(data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1)
+    decoded = encode_decode_zero(
+        data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1
+    )
     np.testing.assert_allclose(decoded, data, rtol=0.1, atol=0.1)
