@@ -16,7 +16,9 @@ class RelativeOrAbsoluteErrorBoundGuardrail(Guardrail):
 
     def __init__(self, eb_rel: float, eb_abs: float):
         assert eb_rel > 0.0, "eb_rel must be positive"
+        assert np.isfinite(eb_rel), "eb_rel must be finite"
         assert eb_abs > 0.0, "eb_abs must be positive"
+        assert np.isfinite(eb_abs), "eb_abs must be finite"
 
         self._eb_rel = eb_rel
         self._eb_abs = eb_abs
@@ -55,7 +57,7 @@ class RelativeOrAbsoluteErrorBoundGuardrail(Guardrail):
         correction_log = np.round(error_log / (log_eb_rel * 2.0)) * (log_eb_rel * 2.0)
 
         corrected_log = decoded_log - correction_log
-        corrected = self.my_exp(corrected_log)
+        corrected = self.my_exp(corrected_log).astype(data.dtype)
 
         corrected = np.where(
             (np.abs(data_log - corrected_log) <= np.log(1.0 + self._eb_rel))

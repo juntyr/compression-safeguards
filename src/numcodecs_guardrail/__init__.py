@@ -29,6 +29,20 @@ GuardrailKind: type = Enum(
 )
 
 
+SUPPORTED_DTYPES: set[np.dtype] = {
+    np.dtype("int8"),
+    np.dtype("int16"),
+    np.dtype("int32"),
+    np.dtype("int64"),
+    np.dtype("uint8"),
+    np.dtype("uint16"),
+    np.dtype("uint32"),
+    np.dtype("uint64"),
+    np.dtype("float32"),
+    np.dtype("float64"),
+}
+
+
 class GuardrailCodec(Codec):
     __slots__ = ("_codec", "_lossless", "_guardrail")
     _codec: Codec
@@ -59,10 +73,9 @@ class GuardrailCodec(Codec):
     def encode(self, buf):
         data = numcodecs.compat.ensure_ndarray(buf)
 
-        assert data.dtype in (
-            np.dtype("float32"),
-            np.dtype("float64"),
-        ), "can only encode f32 and f64 arrays"
+        assert (
+            data.dtype in SUPPORTED_DTYPES
+        ), f"can only encode arrays of dtype {', '.join(d.str for d in SUPPORTED_DTYPES)}"
 
         encoded = self._codec.encode(np.copy(data))
         encoded = numcodecs.compat.ensure_ndarray(encoded)

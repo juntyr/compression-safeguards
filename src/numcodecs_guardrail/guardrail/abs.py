@@ -15,6 +15,7 @@ class AbsoluteErrorBoundGuardrail(Guardrail):
 
     def __init__(self, eb_abs: float):
         assert eb_abs > 0.0, "eb_abs must be positive"
+        assert np.isfinite(eb_abs), "eb_abs must be finite"
 
         self._eb_abs = eb_abs
 
@@ -30,7 +31,9 @@ class AbsoluteErrorBoundGuardrail(Guardrail):
         self, data: np.ndarray, decoded: np.ndarray, *, lossless: Codec
     ) -> bytes:
         error = decoded - data
-        correction = np.round(error / (self._eb_abs * 2.0)) * (self._eb_abs * 2.0)
+        correction = (
+            np.round(error / (self._eb_abs * 2.0)) * (self._eb_abs * 2.0)
+        ).astype(data.dtype)
         corrected = decoded - correction
 
         corrected = np.where(
