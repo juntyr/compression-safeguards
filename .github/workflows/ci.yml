@@ -47,13 +47,13 @@ jobs:
         run: uv python install
 
       - name: Install numcodecs-guardrail
-        run: uv sync --group test && uv pip install .
+        run: uv sync --only-group test && uv pip install .
 
       - name: Run tests
         run: uv run pytest
 
   fuzz:
-    name: Test
+    name: Fuzz
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the Repository
@@ -66,7 +66,7 @@ jobs:
         run: uv python install 3.11
 
       - name: Install numcodecs-guardrail
-        run: uv sync --group fuzz && uv pip install .
+        run: uv sync --only-group fuzz && uv pip install .
 
       - name: Run the fuzzer
         run: python3 tests/fuzz.py -max_total_time=60
