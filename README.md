@@ -2,15 +2,29 @@
 
 Lossy compression can be scary as valuable information may be lost. This package provides several guardrail adapters that can be applied to *any* existing (lossy) compressor to *guarantee* that certain properties about the compression error are upheld. By using these adapters, badly behaving lossy compressors become safe to use, at the cost of potentially less efficient compression, and lossy compression can be applied without fear.
 
+## Design and Guarantees
+
 The guardrails implemented in this package are designed to be convenient to apply to any lossy compression task:
 
 1. They are *guaranteed* to *always* uphold the property they provide.
+
 2. They are designed to minimise the overhead in compressed message size for elements where the properties were already satisfied by the wrapped compressor.
 
 If applied to a
 
 - safe compressor that (by chance or design) already satisfies the properties, the overhead is a constant one byte overhead
+
 - unsafe compressor that violates any of the properties, the properties are restored at a byte overhead that scales linearly with the number of elements that had to be corrected
+
+## Provided guardrails
+
+This package currently implements the following guardrails
+
+- abs (absolute error bound): The absolute elementwise error is guarantees to be less than or equal to the provided bound. In cases where the arithmetic evaluation of the error bound not well-defined, e.g. for infinite or NaN values, producing the exact same bitpattern is defined to satisfy the error bound.
+
+- rel-or-abs (relative [or absolute] error bound): The absolute elementwise error between the *logarithms* of the values is guaranteed to be less than or equal to log(1+rel) where rel is e.g. 2%. The logarithm is modified here to support positive, negative, and zero values. For values close to zero, where the relative error is not well defined, the absolute elementwise error is guaranteed to be less than or equal to the absolute error bound. Put simply, each element satisfies the relative or absolute error bound or both. In cases where the arithmetic evaluation of the error bound is not well-defined, e.g. for infinite or NaN values, producing the exact same bitpattern is defined to satisfy the error bound.
+
+## Usage
 
 The GuardrailCodec adapter provided by this package can wrap any existing codec[^1] implementing the numcodecs API[^2] that encodes a buffer (e.g. an ndarray or bytes) to bytes. It is desirable to perform lossless compression after applying the guardrails (rather than before).
 
