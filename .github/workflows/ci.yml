@@ -69,5 +69,4 @@ jobs:
         run: uv sync --group fuzz && uv pip install .
 
       - name: Run the fuzzer
-        run: - name: Install numcodecs-guardrail
         run: python3 tests/fuzz.py -max_total_time=60
