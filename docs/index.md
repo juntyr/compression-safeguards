@@ -35,15 +35,10 @@ This package currently implements the following guardrails
 
 ## Usage
 
-The `GuardrailsCodec` adapter provided by this package can wrap any existing [`Codec`] [^1] implementing the [`numcodecs`] API [^2] that encodes a buffer (e.g. an ndarray or bytes) to bytes. It is desirable to perform lossless compression after applying the guardrails (rather than before).
+The [`GuardrailsCodec`][numcodecs_guardrails.GuardrailsCodec] adapter provided by this package can wrap any existing [`Codec`][numcodecs.abc.Codec] [^1] implementing the [`numcodecs`][numcodecs] API [^2] that encodes a buffer (e.g. an ndarray or bytes) to bytes. It is desirable to perform lossless compression after applying the guardrails (rather than before).
 
-[^1]: If you want to wrap a sequence or stack of codecs, you can use the [`CodecStack`] combinator from the [`numcodecs-combinators`] package.
-[^2]: The method implemented in this package is not specific to the [`numcodecs`] API. Please reach out if you'd like to help bring the guardrails to a different compression API or language.
-
-[`Codec`]: https://numcodecs.readthedocs.io/en/stable/abc.html#numcodecs.abc.Codec
-[`numcodecs`]: https://numcodecs.readthedocs.io/en/stable/
-[`CodecStack`]: https://numcodecs-combinators.readthedocs.io/en/stable/api/#numcodecs_combinators.CodecStack
-[`numcodecs-combinators`]: https://numcodecs-combinators.readthedocs.io/en/stable/
+[^1]: If you want to wrap a sequence or stack of codecs, you can use the [`CodecStack`](https://numcodecs-combinators.readthedocs.io/en/stable/api/#numcodecs_combinators.CodecStack) combinator from the [`numcodecs-combinators`](https://numcodecs-combinators.readthedocs.io/en/stable/) package.
+[^2]: The method implemented in this package is not specific to the [`numcodecs`][numcodecs] API. Please reach out if you'd like to help bring the guardrails to a different compression API or language.
 
 
 ## Funding
