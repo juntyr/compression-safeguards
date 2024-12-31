@@ -1,79 +1,9 @@
 import numpy as np
 
-from numcodecs_guardrail import GuardrailCodec, GuardrailKind
-from numcodecs.abc import Codec
+from numcodecs_guardrail import GuardrailKind
 
 
-class ZeroCodec(Codec):
-    codec_id = "zero"
-
-    def __init__(self):
-        pass
-
-    def encode(self, buf):
-        return b""
-
-    def decode(self, buf, out=None):
-        assert out is not None
-        out[:] = 0
-        return out
-
-
-class NegCodec(Codec):
-    codec_id = "neg"
-
-    def encode(self, buf):
-        return np.array(buf).tobytes()
-
-    def decode(self, buf, out=None):
-        assert out is not None
-        if out.size > 0:
-            out[:] = -np.frombuffer(buf, like=out)
-        return out
-
-
-class IdentityCodec(Codec):
-    codec_id = "identity"
-
-    def encode(self, buf):
-        return np.array(buf).tobytes()
-
-    def decode(self, buf, out=None):
-        assert out is not None
-        if out.size > 0:
-            out[:] = np.frombuffer(buf, like=out)
-        return out
-
-
-def encode_decode_zero(data: np.ndarray, **kwargs) -> np.ndarray:
-    codec = GuardrailCodec(ZeroCodec(), **kwargs)
-
-    encoded = codec.encode(data)
-    decoded = codec.decode(encoded, out=np.empty_like(data))
-
-    return decoded
-
-
-def encode_decode_neg(data: np.ndarray, **kwargs) -> np.ndarray:
-    codec = GuardrailCodec(NegCodec(), **kwargs)
-
-    encoded = codec.encode(data)
-    decoded = codec.decode(encoded, out=np.empty_like(data))
-
-    return decoded
-
-
-def encode_decode_identity(data: np.ndarray, **kwargs) -> np.ndarray:
-    codec = GuardrailCodec(IdentityCodec(), **kwargs)
-
-    encoded = codec.encode(data)
-
-    assert isinstance(encoded, bytes)
-    assert len(encoded) == (1 + data.size * data.dtype.itemsize)
-
-    decoded = codec.decode(encoded, out=np.empty_like(data))
-
-    return decoded
+from .codecs import encode_decode_zero, encode_decode_neg, encode_decode_identity
 
 
 def check_all_codecs(data: np.ndarray):
