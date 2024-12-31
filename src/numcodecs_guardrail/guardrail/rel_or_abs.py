@@ -4,7 +4,7 @@ import numpy as np
 
 from numcodecs.abc import Codec
 
-from . import Guardrail
+from . import Guardrail, as_bits, runlength_decode, runlength_encode
 
 
 class RelativeOrAbsoluteErrorBoundGuardrail(Guardrail):
@@ -34,14 +34,14 @@ class RelativeOrAbsoluteErrorBoundGuardrail(Guardrail):
         return np.sign(x) * np.exp(np.abs(x)) * a
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
-        return np.all(
+    def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
+        return (
             (
                 np.abs(self.my_log(data) - self.my_log(decoded))
                 <= np.log(1.0 + self._eb_rel)
             )
             | (np.abs(data - decoded) <= self._eb_abs)
-            | (self.as_bits(data) == self.as_bits(decoded))
+            | (as_bits(data) == as_bits(decoded))
         )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -60,40 +60,31 @@ class RelativeOrAbsoluteErrorBoundGuardrail(Guardrail):
         corrected = self.my_exp(corrected_log).astype(data.dtype)
 
         corrected = np.where(
-            (np.abs(data_log - corrected_log) <= np.log(1.0 + self._eb_rel))
-            | (np.abs(data - corrected) <= self._eb_abs),
+            self.check_elementwise(data, corrected),
             corrected,
             data,
         )
 
-        decoded_bits = self.as_bits(decoded)
-        corrected_bits = self.as_bits(corrected, like=decoded)
+        decoded_bits = as_bits(decoded)
+        corrected_bits = as_bits(corrected, like=decoded)
         correction_bits = decoded_bits - corrected_bits
 
-        correction = lossless.encode(correction_bits)
+        correction = runlength_encode(correction_bits)
+        correction = lossless.encode(correction)
 
         return numcodecs.compat.ensure_bytes(correction)
 
     def apply_correction(
         self, decoded: np.ndarray, correction: bytes, *, lossless: Codec
     ) -> np.ndarray:
+        decoded_bits = as_bits(decoded)
+
         correction = lossless.decode(correction)
         correction = numcodecs.compat.ensure_bytes(correction)
 
-        decoded_bits = self.as_bits(decoded)
-        correction_bits = self.as_bits(correction, like=decoded).reshape(decoded.shape)
+        correction_bits = runlength_decode(correction, like=decoded_bits)
 
         return (decoded_bits - correction_bits).view(decoded.dtype)
 
     def get_config(self):
         return dict(eb_rel=self._eb_rel, eb_abs=self._eb_abs)
-
-    def as_bits(self, a, *, like=None):
-        return np.frombuffer(
-            a,
-            dtype=np.dtype(
-                (a if like is None else like)
-                .dtype.str.replace("f", "u")
-                .replace("i", "u")
-            ),
-        )

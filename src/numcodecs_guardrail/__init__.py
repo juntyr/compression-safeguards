@@ -120,6 +120,7 @@ class GuardrailCodec(Codec):
 
         buf_io = BytesIO(buf)
         correction_len = varint.decode_stream(buf_io)
+        assert correction_len >= 0
 
         if correction_len > 0:
             encoded = buf[buf_io.tell() : -correction_len]

@@ -27,7 +27,8 @@ class NegCodec(Codec):
 
     def decode(self, buf, out=None):
         assert out is not None
-        out[:] = -np.frombuffer(buf, like=out)
+        if out.size > 0:
+            out[:] = -np.frombuffer(buf, like=out)
         return out
 
 
@@ -39,7 +40,8 @@ class IdentityCodec(Codec):
 
     def decode(self, buf, out=None):
         assert out is not None
-        out[:] = np.frombuffer(buf, like=out)
+        if out.size > 0:
+            out[:] = np.frombuffer(buf, like=out)
         return out
 
 
@@ -74,9 +76,7 @@ def encode_decode_identity(data: np.ndarray, **kwargs) -> np.ndarray:
     return decoded
 
 
-def test_arange():
-    data = np.arange(100, dtype=float)
-
+def check_all_codecs(data: np.ndarray):
     decoded = encode_decode_zero(
         data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1
     )
@@ -91,43 +91,23 @@ def test_arange():
         data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1
     )
     np.testing.assert_allclose(decoded, data, rtol=0.0, atol=0.0)
+
+
+def test_empty():
+    check_all_codecs(np.empty(0))
+
+
+def test_arange():
+    check_all_codecs(np.arange(100, dtype=float))
 
 
 def test_linspace():
-    data = np.linspace(-1024, 1024, 2831)
-
-    decoded = encode_decode_zero(
-        data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1
-    )
-    np.testing.assert_allclose(decoded, data, rtol=0.1, atol=0.1)
-
-    decoded = encode_decode_neg(
-        data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1
-    )
-    np.testing.assert_allclose(decoded, data, rtol=0.1, atol=0.1)
-
-    decoded = encode_decode_identity(
-        data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1
-    )
-    np.testing.assert_allclose(decoded, data, rtol=0.0, atol=0.0)
+    check_all_codecs(np.linspace(-1024, 1024, 2831))
 
 
 def test_edge_cases():
-    data = np.array(
-        [np.inf, np.nan, -np.inf, -np.nan, np.finfo(float).min, np.finfo(float).max]
+    check_all_codecs(
+        np.array(
+            [np.inf, np.nan, -np.inf, -np.nan, np.finfo(float).min, np.finfo(float).max]
+        )
     )
-
-    decoded = encode_decode_zero(
-        data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1
-    )
-    np.testing.assert_allclose(decoded, data, rtol=0.1, atol=0.1)
-
-    decoded = encode_decode_neg(
-        data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1
-    )
-    np.testing.assert_allclose(decoded, data, rtol=0.1, atol=0.1)
-
-    decoded = encode_decode_identity(
-        data, guardrail=GuardrailKind.rel_or_abs, eb_rel=0.1, eb_abs=0.1
-    )
-    np.testing.assert_allclose(decoded, data, rtol=0.0, atol=0.0)
