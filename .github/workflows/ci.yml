@@ -46,7 +46,7 @@ jobs:
       - name: Setup Python
         run: uv python install
 
-      - name: Install numcodecs-guardrail
+      - name: Install numcodecs-guardrails
         run: uv sync --only-group test && uv pip install .
 
       - name: Run tests
@@ -65,7 +65,7 @@ jobs:
       - name: Setup Python
         run: uv python install 3.11
 
-      - name: Install numcodecs-guardrail
+      - name: Install numcodecs-guardrails
         run: uv sync --only-group fuzz && uv pip install .
 
       - name: Run the fuzzer

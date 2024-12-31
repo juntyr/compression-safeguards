@@ -1,6 +1,6 @@
 import numpy as np
 
-from numcodecs_guardrail import GuardrailKind
+from numcodecs_guardrails import GuardrailKind
 
 
 from .codecs import encode_decode_zero, encode_decode_neg, encode_decode_identity

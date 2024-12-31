@@ -1,4 +1,4 @@
-__all__ = ["GuardrailCodec", "GuardrailKind"]
+__all__ = ["GuardrailsCodec", "GuardrailKind"]
 
 from enum import Enum
 from io import BytesIO
@@ -12,9 +12,9 @@ import varint
 
 from numcodecs.abc import Codec
 
-from .guardrail import Guardrail
-from .guardrail.abs import AbsoluteErrorBoundGuardrail
-from .guardrail.rel_or_abs import RelativeOrAbsoluteErrorBoundGuardrail
+from .guardrails import Guardrail
+from .guardrails.abs import AbsoluteErrorBoundGuardrail
+from .guardrails.rel_or_abs import RelativeOrAbsoluteErrorBoundGuardrail
 
 
 GuardrailKind: type = Enum(
@@ -43,13 +43,13 @@ SUPPORTED_DTYPES: set[np.dtype] = {
 }
 
 
-class GuardrailCodec(Codec):
+class GuardrailsCodec(Codec):
     __slots__ = ("_codec", "_lossless", "_guardrail")
     _codec: Codec
     _lossless: Codec
     _guardrail: Guardrail
 
-    codec_id = "guardrail"
+    codec_id = "guardrails"
 
     def __init__(
         self,
@@ -160,4 +160,4 @@ class GuardrailCodec(Codec):
         return f"{type(self).__name__}({repr})"
 
 
-numcodecs.registry.register_codec(GuardrailCodec)
+numcodecs.registry.register_codec(GuardrailsCodec)

@@ -1,6 +1,6 @@
 import numpy as np
 
-from numcodecs_guardrail import GuardrailCodec
+from numcodecs_guardrails import GuardrailsCodec
 from numcodecs.abc import Codec
 
 
@@ -46,7 +46,7 @@ class IdentityCodec(Codec):
 
 
 def encode_decode_zero(data: np.ndarray, **kwargs) -> np.ndarray:
-    codec = GuardrailCodec(ZeroCodec(), **kwargs)
+    codec = GuardrailsCodec(ZeroCodec(), **kwargs)
 
     encoded = codec.encode(data)
     decoded = codec.decode(encoded, out=np.empty_like(data))
@@ -55,7 +55,7 @@ def encode_decode_zero(data: np.ndarray, **kwargs) -> np.ndarray:
 
 
 def encode_decode_neg(data: np.ndarray, **kwargs) -> np.ndarray:
-    codec = GuardrailCodec(NegCodec(), **kwargs)
+    codec = GuardrailsCodec(NegCodec(), **kwargs)
 
     encoded = codec.encode(data)
     decoded = codec.decode(encoded, out=np.empty_like(data))
@@ -64,7 +64,7 @@ def encode_decode_neg(data: np.ndarray, **kwargs) -> np.ndarray:
 
 
 def encode_decode_identity(data: np.ndarray, **kwargs) -> np.ndarray:
-    codec = GuardrailCodec(IdentityCodec(), **kwargs)
+    codec = GuardrailsCodec(IdentityCodec(), **kwargs)
 
     encoded = codec.encode(data)
 

@@ -8,8 +8,8 @@ with atheris.instrument_imports():
     import numpy as np
 
     from numcodecs.abc import Codec
-    from numcodecs_guardrail import (
-        GuardrailCodec,
+    from numcodecs_guardrails import (
+        GuardrailsCodec,
         GuardrailKind,
         SUPPORTED_DTYPES,
     )
@@ -60,7 +60,7 @@ def check_one_input(data):
     decoded = np.frombuffer(decoded, dtype=dtype)
 
     try:
-        guardrail = GuardrailCodec(
+        guardrail = GuardrailsCodec(
             FuzzCodec(raw, decoded), guardrail=kind, **parameters
         )
     except AssertionError:
