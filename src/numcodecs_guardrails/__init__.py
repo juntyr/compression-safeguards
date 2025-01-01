@@ -21,7 +21,7 @@ from .guardrails.rel_or_abs import RelativeOrAbsoluteErrorBoundGuardrail
 
 class GuardrailKind(Enum):
     abs = AbsoluteErrorBoundGuardrail
-    abs_or_rel = RelativeOrAbsoluteErrorBoundGuardrail
+    rel_or_abs = RelativeOrAbsoluteErrorBoundGuardrail
 
 
 SUPPORTED_DTYPES: set[np.dtype] = {
