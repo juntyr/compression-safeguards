@@ -1,5 +1,6 @@
 __all__ = ["GuardrailsCodec", "GuardrailKind"]
 
+from collections.abc import Buffer
 from enum import Enum
 from io import BytesIO
 from typing import Optional
@@ -71,8 +72,8 @@ class GuardrailsCodec(Codec):
 
         self._guardrail = (guardrail.value)(**kwargs)
 
-    def encode(self, buf: "Buffer") -> "Buffer":
-        """Encode data in `buf`.
+    def encode(self, buf: Buffer) -> Buffer:
+        """Encode the data in `buf`.
 
         Parameters
         ----------
@@ -125,8 +126,8 @@ class GuardrailsCodec(Codec):
 
         return correction_len + encoded + correction
 
-    def decode(self, buf: "Buffer", out: Optional["Buffer"] = None) -> "Buffer":
-        """Decode data in `buf`.
+    def decode(self, buf: Buffer, out: Optional[Buffer] = None) -> Buffer:
+        """Decode the data in `buf`.
 
         Parameters
         ----------

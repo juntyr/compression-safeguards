@@ -54,6 +54,6 @@ plugins:
               show_root_toc_entry: false
               merge_init_into_class: true
           import:
-            - https://docs.python.org/3.10/objects.inv
+            - https://docs.python.org/3.12/objects.inv
             - https://numpy.org/doc/2.2/objects.inv
             - https://numcodecs.readthedocs.io/en/v0.13.0/objects.inv
