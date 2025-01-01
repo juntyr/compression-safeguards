@@ -62,7 +62,7 @@ jobs:
       - name: Fake compatibility with Python 3.11
         run: |
           sed -i 's/requires-python = ">=3.12"/requires-python = ">=3.11"/g' pyproject.toml
-          find . -type f -name "*.py" -print0 | xargs -0 sed -i 's/from collections.abc import Buffer/from collections.abc import Any as Buffer/g'
+          find . -type f -name "*.py" -print0 | xargs -0 sed -i 's/from collections.abc import Buffer/from typing import Any as Buffer/g'
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
