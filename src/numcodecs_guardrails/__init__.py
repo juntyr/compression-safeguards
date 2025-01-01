@@ -2,6 +2,7 @@ __all__ = ["GuardrailsCodec", "GuardrailKind"]
 
 from enum import Enum
 from io import BytesIO
+from typing import Optional
 
 import numcodecs
 import numcodecs.compat
@@ -70,7 +71,22 @@ class GuardrailsCodec(Codec):
 
         self._guardrail = (guardrail.value)(**kwargs)
 
-    def encode(self, buf):
+    def encode(self, buf: "Buffer") -> "Buffer":
+        """Encode data in `buf`.
+
+        Parameters
+        ----------
+        buf : Buffer
+            Data to be encoded. May be any object supporting the new-style
+            buffer protocol.
+
+        Returns
+        -------
+        enc : Buffer
+            Encoded data. May be any object supporting the new-style buffer
+            protocol.
+        """
+
         data = numcodecs.compat.ensure_ndarray(buf)
 
         assert (
@@ -109,7 +125,25 @@ class GuardrailsCodec(Codec):
 
         return correction_len + encoded + correction
 
-    def decode(self, buf, out=None):
+    def decode(self, buf: "Buffer", out: Optional["Buffer"] = None) -> "Buffer":
+        """Decode data in `buf`.
+
+        Parameters
+        ----------
+        buf : Buffer
+            Encoded data. May be any object supporting the new-style buffer
+            protocol.
+        out : Buffer, optional
+            Writeable buffer to store decoded data. N.B. if provided, this buffer must
+            be exactly the right size to store the decoded data.
+
+        Returns
+        -------
+        dec : Buffer
+            Decoded data. May be any object supporting the new-style
+            buffer protocol.
+        """
+
         assert out is not None, "can only decode into known dtype and shape"
         out = numcodecs.compat.ensure_ndarray(out)
 
@@ -140,7 +174,19 @@ class GuardrailsCodec(Codec):
 
         return numcodecs.compat.ndarray_copy(corrected, out)
 
-    def get_config(self):
+    def get_config(self) -> dict:
+        """
+        Returns the configuration of the codec with guardrails.
+
+        [`numcodecs.registry.get_codec(config)`][numcodecs.registry.get_codec]
+        can be used to reconstruct this stack from the returned config.
+
+        Returns
+        -------
+        config : dict
+            Configuration of the codec with guardrails.
+        """
+
         return dict(
             id=type(self).codec_id,
             codec=self._codec.get_config(),
