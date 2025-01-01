@@ -11,8 +11,8 @@ markdown_extensions:
   - codehilite
 
 theme:
-  name: readthedocs
-  highlightjs: true
+    name: readthedocs
+    highlightjs: false
 
 nav:
   - Home: index.md
@@ -30,7 +30,6 @@ plugins:
   - exclude:
       glob:
         - generate_api.py
-        - mkdocs.yml
         - requirements.txt
   - search
   - include-markdown
@@ -39,6 +38,7 @@ plugins:
       handlers:
         python:
           options:
+              docstring_section_style: list
               docstring_style: numpy
               show_if_no_docstring: true
               filters: [
@@ -48,11 +48,15 @@ plugins:
               group_by_category: false
               show_source: false
               separate_signature: true
-              show_signature: true
               show_signature_annotations: true
               signature_crossrefs: true
               show_root_toc_entry: false
               merge_init_into_class: true
+              summary:
+                  attributes: false
+                  classes: true
+                  functions: true
+                  modules: true
           import:
             - https://docs.python.org/3.12/objects.inv
             - https://numpy.org/doc/2.2/objects.inv

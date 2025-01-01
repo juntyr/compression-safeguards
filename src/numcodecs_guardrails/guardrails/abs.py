@@ -1,3 +1,5 @@
+__all__ = ["AbsoluteErrorBoundGuardrail"]
+
 import numcodecs
 import numcodecs.compat
 import numpy as np
@@ -62,5 +64,5 @@ class AbsoluteErrorBoundGuardrail(Guardrail):
 
         return (decoded_bits - correction_bits).view(decoded.dtype)
 
-    def get_config(self):
+    def get_config(self) -> dict:
         return dict(eb_abs=self._eb_abs)

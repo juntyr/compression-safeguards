@@ -35,7 +35,7 @@ class FuzzCodec(Codec):
 def check_one_input(data):
     data = atheris.FuzzedDataProvider(data)
 
-    kind: GuardrailKind = list(GuardrailKind)[  # type: ignore
+    kind: GuardrailKind = list(GuardrailKind)[
         data.ConsumeIntInRange(0, len(GuardrailKind) - 1)
     ]
     dtype: np.ndtype = list(SUPPORTED_DTYPES)[

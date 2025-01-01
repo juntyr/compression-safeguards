@@ -1,3 +1,5 @@
+__all__ = ["RelativeOrAbsoluteErrorBoundGuardrail"]
+
 import numcodecs
 import numcodecs.compat
 import numpy as np
@@ -86,5 +88,5 @@ class RelativeOrAbsoluteErrorBoundGuardrail(Guardrail):
 
         return (decoded_bits - correction_bits).view(decoded.dtype)
 
-    def get_config(self):
+    def get_config(self) -> dict:
         return dict(eb_rel=self._eb_rel, eb_abs=self._eb_abs)

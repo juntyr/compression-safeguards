@@ -19,16 +19,9 @@ from .guardrails.abs import AbsoluteErrorBoundGuardrail
 from .guardrails.rel_or_abs import RelativeOrAbsoluteErrorBoundGuardrail
 
 
-GuardrailKind: type = Enum(
-    "GuardrailKind",
-    {
-        kind.kind: kind
-        for kind in [
-            AbsoluteErrorBoundGuardrail,
-            RelativeOrAbsoluteErrorBoundGuardrail,
-        ]
-    },
-)
+class GuardrailKind(Enum):
+    abs = AbsoluteErrorBoundGuardrail
+    abs_or_rel = RelativeOrAbsoluteErrorBoundGuardrail
 
 
 SUPPORTED_DTYPES: set[np.dtype] = {
@@ -56,7 +49,7 @@ class GuardrailsCodec(Codec):
     def __init__(
         self,
         codec: dict | Codec,
-        guardrail: str | GuardrailKind,  # type: ignore
+        guardrail: str | GuardrailKind,
         **kwargs,
     ):
         self._codec = (
