@@ -28,7 +28,7 @@ This package currently implements the following guardrails
 
 - `rel-or-abs` (relative [or absolute] error bound):
 
-    The absolute elementwise error between the *logarithms** of the values is guaranteed to be less than or equal to $\log(1 + eb_{rel})$ where $eb_{rel}$ is e.g. 2%. The logarithm* here is adapted to support positive, negative, and zero values. For values close to zero, where the relative error is not well defined, the absolute elementwise error is guaranteed to be less than or equal to the absolute error bound.
+    The absolute elementwise error between the *logarithms*\* of the values is guaranteed to be less than or equal to $\log(1 + eb_{rel})$ where $eb_{rel}$ is e.g. 2%. The logarithm* here is adapted to support positive, negative, and zero values. For values close to zero, where the relative error is not well defined, the absolute elementwise error is guaranteed to be less than or equal to the absolute error bound.
     
     Put simply, each element satisfies the relative or the absolute error bound (or both). In cases where the arithmetic evaluation of the error bound is not well-defined, e.g. for infinite or NaN values, producing the exact same bitpattern is defined to satisfy the error bound.
 

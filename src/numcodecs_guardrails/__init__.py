@@ -24,6 +24,9 @@ class GuardrailKind(Enum):
     rel_or_abs = RelativeOrAbsoluteErrorBoundGuardrail
 
 
+FORMAT_VERSION: str = "0.1.x"
+
+
 SUPPORTED_DTYPES: set[np.dtype] = {
     np.dtype("int8"),
     np.dtype("int16"),
@@ -39,7 +42,8 @@ SUPPORTED_DTYPES: set[np.dtype] = {
 
 
 class GuardrailsCodec(Codec):
-    __slots__ = ("_codec", "_lossless", "_guardrail")
+    __slots__ = ("_version", "_codec", "_lossless", "_guardrail")
+    _version: str
     _codec: Codec
     _lossless: Codec
     _guardrail: Guardrail
@@ -50,8 +54,13 @@ class GuardrailsCodec(Codec):
         self,
         codec: dict | Codec,
         guardrail: str | GuardrailKind,
+        *,
+        version: Optional[str] = None,
         **kwargs,
     ):
+        if version is not None:
+            assert version == FORMAT_VERSION
+
         self._codec = (
             codec if isinstance(codec, Codec) else numcodecs.registry.get_codec(codec)
         )
@@ -183,6 +192,7 @@ class GuardrailsCodec(Codec):
 
         return dict(
             id=type(self).codec_id,
+            version=FORMAT_VERSION,
             codec=self._codec.get_config(),
             guardrail=self._guardrail.kind,
             **self._guardrail.get_config(),

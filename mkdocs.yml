@@ -9,6 +9,16 @@ markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
   - codehilite
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - js/katex.js
+  - https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/katex.min.js
+  - https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/contrib/auto-render.min.js
+
+extra_css:
+  - https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/katex.min.css
 
 theme:
     name: readthedocs
