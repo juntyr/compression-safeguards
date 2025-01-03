@@ -5,6 +5,7 @@ with atheris.instrument_imports():
 
     from inspect import signature
 
+    import numcodecs.registry
     import numpy as np
 
     from numcodecs.abc import Codec
@@ -79,11 +80,17 @@ def check_one_input(data):
     except AssertionError:
         return
 
+    grepr = repr(guardrail)
+    gconfig = guardrail.get_config()
+
+    guardrail = numcodecs.registry.get_codec(gconfig)
+    assert guardrail.get_config() == gconfig
+
     try:
         encoded = guardrail.encode(raw)
         guardrail.decode(encoded, out=np.empty_like(raw))
     except Exception as err:
-        print(f"\n===\n\ncodec = {guardrail!r}\n\n===\n")
+        print(f"\n===\n\ncodec = {grepr}\n\n===\n")
         raise err
 
 

@@ -47,7 +47,7 @@ class MonotonicGuardrail(ElementwiseGuardrail):
             # TODO
             needs_correction |= True
 
-        return needs_correction
+        return ~needs_correction
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def compute_correction(
