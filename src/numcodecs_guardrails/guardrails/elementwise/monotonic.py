@@ -32,11 +32,13 @@ class MonotonicGuardrail(ElementwiseGuardrail):
             data_windows = sliding_window_view(data, window, axis=axis)
             decoded_windows = sliding_window_view(decoded, window, axis=axis)
 
-            data_monotonic = np.all(np.diff(data_windows, axis=-1) > 0) - np.all(
-                np.diff(data_windows, axis=-1) < 0
+            data_monotonic = (
+                np.all(np.diff(data_windows, axis=-1) > 0) * 1
+                - np.all(np.diff(data_windows, axis=-1) < 0) * 1
             )
-            decoded_monotonic = np.all(np.diff(decoded_windows, axis=-1) > 0) - np.all(
-                np.diff(decoded_windows, axis=-1) < 0
+            decoded_monotonic = (
+                np.all(np.diff(decoded_windows, axis=-1) > 0) * 1
+                - np.all(np.diff(decoded_windows, axis=-1) < 0) * 1
             )
 
             if np.all(
