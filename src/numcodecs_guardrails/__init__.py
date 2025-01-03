@@ -69,7 +69,7 @@ class GuardrailsCodec(Codec):
         guardrails = [
             guardrail
             if isinstance(guardrail, Guardrail)
-            else GuardrailKind[guardrail["kind"]](
+            else GuardrailKind[guardrail["kind"]].value(
                 **{p: v for p, v in guardrail.items() if p != "kind"}
             )
             for guardrail in guardrails
