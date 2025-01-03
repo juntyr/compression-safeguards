@@ -3,6 +3,7 @@ import atheris
 with atheris.instrument_imports():
     import sys
 
+    from functools import partial
     from inspect import signature
 
     import numcodecs.registry
@@ -64,11 +65,13 @@ def check_one_input(data):
         {
             "kind": kind.name,
             **{
-                p: ({
-                    float: data.ConsumeFloat,
-                    int: data.ConsumeInt(1),
-                    bool: data.ConsumeBool,
-                }[v.annotation])()
+                p: (
+                    {
+                        float: data.ConsumeFloat,
+                        int: partial(data.ConsumeInt, 1),
+                        bool: data.ConsumeBool,
+                    }[v.annotation]
+                )()
                 for p, v in signature(kind.value).parameters.items()
             },
         }
