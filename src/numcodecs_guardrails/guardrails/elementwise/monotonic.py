@@ -59,4 +59,4 @@ class MonotonicGuardrail(ElementwiseGuardrail):
         return data
 
     def get_config(self) -> dict:
-        return dict(window=self._window)
+        return dict(kind=type(self).kind, window=self._window)

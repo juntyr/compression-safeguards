@@ -54,7 +54,7 @@ class RelativeOrAbsoluteErrorBoundGuardrail(ElementwiseGuardrail):
         )
 
     def get_config(self) -> dict:
-        return dict(eb_rel=self._eb_rel, eb_abs=self._eb_abs)
+        return dict(kind=type(self).kind, eb_rel=self._eb_rel, eb_abs=self._eb_abs)
 
     def _log(self, x: np.ndarray) -> np.ndarray:
         a = 0.5 * self._eb_abs / (1.0 + self._eb_rel)

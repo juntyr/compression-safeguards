@@ -43,4 +43,4 @@ class AbsoluteErrorBoundGuardrail(ElementwiseGuardrail):
         )
 
     def get_config(self) -> dict:
-        return dict(eb_abs=self._eb_abs)
+        return dict(kind=type(self).kind, eb_abs=self._eb_abs)
