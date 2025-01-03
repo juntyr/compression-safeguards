@@ -1,19 +1,17 @@
 import numpy as np
 
-from numcodecs_guardrails import GuardrailKind
-
 
 from .codecs import encode_decode_zero, encode_decode_neg, encode_decode_identity
 
 
 def check_all_codecs(data: np.ndarray):
-    decoded = encode_decode_zero(data, guardrail=GuardrailKind.abs, eb_abs=0.1)
+    decoded = encode_decode_zero(data, guardrails=[dict(kind="abs", eb_abs=0.1)])
     np.testing.assert_allclose(decoded, data, rtol=0.0, atol=0.1)
 
-    decoded = encode_decode_neg(data, guardrail=GuardrailKind.abs, eb_abs=0.1)
+    decoded = encode_decode_neg(data, guardrails=[dict(kind="abs", eb_abs=0.1)])
     np.testing.assert_allclose(decoded, data, rtol=0.0, atol=0.1)
 
-    decoded = encode_decode_identity(data, guardrail=GuardrailKind.abs, eb_abs=0.1)
+    decoded = encode_decode_identity(data, guardrails=[dict(kind="abs", eb_abs=0.1)])
     np.testing.assert_allclose(decoded, data, rtol=0.0, atol=0.0)
 
 

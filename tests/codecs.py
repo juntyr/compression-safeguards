@@ -46,7 +46,7 @@ class IdentityCodec(Codec):
 
 
 def encode_decode_zero(data: np.ndarray, **kwargs) -> np.ndarray:
-    codec = GuardrailsCodec(ZeroCodec(), **kwargs)
+    codec = GuardrailsCodec(codec=ZeroCodec(), **kwargs)
 
     encoded = codec.encode(data)
     decoded = codec.decode(encoded, out=np.empty_like(data))
@@ -55,7 +55,7 @@ def encode_decode_zero(data: np.ndarray, **kwargs) -> np.ndarray:
 
 
 def encode_decode_neg(data: np.ndarray, **kwargs) -> np.ndarray:
-    codec = GuardrailsCodec(NegCodec(), **kwargs)
+    codec = GuardrailsCodec(codec=NegCodec(), **kwargs)
 
     encoded = codec.encode(data)
     decoded = codec.decode(encoded, out=np.empty_like(data))
@@ -64,7 +64,7 @@ def encode_decode_neg(data: np.ndarray, **kwargs) -> np.ndarray:
 
 
 def encode_decode_identity(data: np.ndarray, **kwargs) -> np.ndarray:
-    codec = GuardrailsCodec(IdentityCodec(), **kwargs)
+    codec = GuardrailsCodec(codec=IdentityCodec(), **kwargs)
 
     encoded = codec.encode(data)
 

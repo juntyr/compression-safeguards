@@ -15,8 +15,9 @@ import varint
 from numcodecs.abc import Codec
 
 from .guardrails import Guardrail
-from .guardrails.abs import AbsoluteErrorBoundGuardrail
-from .guardrails.rel_or_abs import RelativeOrAbsoluteErrorBoundGuardrail
+from .guardrails.elementwise import ElementwiseGuardrail
+from .guardrails.elementwise.abs import AbsoluteErrorBoundGuardrail
+from .guardrails.elementwise.rel_or_abs import RelativeOrAbsoluteErrorBoundGuardrail
 
 
 class GuardrailKind(Enum):
@@ -42,21 +43,20 @@ SUPPORTED_DTYPES: set[np.dtype] = {
 
 
 class GuardrailsCodec(Codec):
-    __slots__ = ("_version", "_codec", "_lossless", "_guardrail")
+    __slots__ = ("_version", "_codec", "_lossless", "_guardrails")
     _version: str
     _codec: Codec
     _lossless: Codec
-    _guardrail: Guardrail
+    _elementwise_guardrails: tuple[ElementwiseGuardrail]
 
     codec_id = "guardrails"
 
     def __init__(
         self,
-        codec: dict | Codec,
-        guardrail: str | GuardrailKind,
         *,
+        codec: dict | Codec,
+        guardrails: tuple[dict | Guardrail],
         version: Optional[str] = None,
-        **kwargs,
     ):
         if version is not None:
             assert version == FORMAT_VERSION
@@ -66,13 +66,30 @@ class GuardrailsCodec(Codec):
         )
         self._lossless = numcodecs.zlib.Zlib(level=9)
 
-        guardrail = (
+        guardrails = [
             guardrail
-            if isinstance(guardrail, GuardrailKind)
-            else GuardrailKind[guardrail]
-        )
+            if isinstance(Guardrail)
+            else GuardrailKind[guardrail["kind"]](
+                **{p: v for p, v in guardrail.items() if p != "kind"}
+            )
+            for guardrail in guardrails
+        ]
 
-        self._guardrail = (guardrail.value)(**kwargs)
+        self._elementwise_guardrails = tuple(
+            sorted(
+                guardrail
+                for guardrail in guardrails
+                if isinstance(guardrail, ElementwiseGuardrail)
+            ),
+            key=lambda guardrail: guardrail._priority,
+        )
+        guardrails = [
+            guardrail
+            for guardrail in guardrails
+            if not isinstance(guardrail, ElementwiseGuardrail)
+        ]
+
+        assert len(guardrails) == 0, f"unsupported guardrails {guardrails:!r}"
 
     def encode(self, buf: Buffer) -> Buffer:
         """Encode the data in `buf`.
@@ -110,19 +127,23 @@ class GuardrailsCodec(Codec):
         assert decoded.dtype == data.dtype, "codec must roundtrip dtype"
         assert decoded.shape == data.shape, "codec must roundtrip shape"
 
-        if self._guardrail.check(data, decoded):
+        correction = None
+        for guardrail in self._elementwise_guardrails:
+            if not guardrail.check(data, decoded if correction is None else correction):
+                correction = guardrail.compute_correction(data, decoded)
+                assert guardrail.check(
+                    data,
+                    correction,
+                ), "guardrail correction must pass the check"
+
+        if correction is None:
             correction = bytes()
         else:
-            correction = self._guardrail.encode_correction(
-                data, decoded, lossless=self._lossless
+            correction = ElementwiseGuardrail.encode_correction(
+                decoded,
+                correction,
+                self._lossless,
             )
-
-            corrected = self._guardrail.apply_correction(
-                decoded, correction, lossless=self._lossless
-            )
-            assert self._guardrail.check(
-                data, corrected
-            ), "guardrail correction must pass the check"
 
         correction_len = varint.encode(len(correction))
 
@@ -169,8 +190,10 @@ class GuardrailsCodec(Codec):
         decoded = self._codec.decode(encoded, out=out)
 
         if correction_len > 0:
-            corrected = self._guardrail.apply_correction(
-                decoded, correction, lossless=self._lossless
+            corrected = ElementwiseGuardrail.apply_correction(
+                decoded,
+                correction,
+                self._lossless,
             )
         else:
             corrected = decoded
@@ -194,8 +217,7 @@ class GuardrailsCodec(Codec):
             id=type(self).codec_id,
             version=FORMAT_VERSION,
             codec=self._codec.get_config(),
-            guardrail=self._guardrail.kind,
-            **self._guardrail.get_config(),
+            guardrails=self._guardrails,
         )
 
     def __repr__(self):
