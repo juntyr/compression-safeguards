@@ -11,7 +11,7 @@ class Guardrail(ABC):
 
     @abstractmethod
     def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
-        return np.all(self.check_elementwise(data, decoded))
+        pass
 
     @abstractmethod
     def get_config(self) -> dict:

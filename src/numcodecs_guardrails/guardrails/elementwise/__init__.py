@@ -2,7 +2,7 @@ __all__ = ["ElementwiseGuardrail"]
 
 from abc import ABC, abstractmethod
 from io import BytesIO
-from typing import Optional, final
+from typing import Optional
 
 import numcodecs.compat
 import numpy as np
@@ -14,7 +14,6 @@ from .. import Guardrail
 
 
 class ElementwiseGuardrail(Guardrail, ABC):
-    @final
     def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
         return np.all(self.check_elementwise(data, decoded))
 
