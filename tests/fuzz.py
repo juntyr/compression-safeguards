@@ -66,7 +66,7 @@ def check_one_input(data):
             **{
                 p: {
                     float: data.ConsumeFloat,
-                    int: data.ConsumeInt,
+                    int: data.ConsumeInt(1),
                     bool: data.ConsumeBool,
                 }[v.annotation]()
                 for p, v in signature(kind.value).parameters.items()
