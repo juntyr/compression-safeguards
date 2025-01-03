@@ -1,8 +1,6 @@
 mkdocs
 mkdocstrings[python]
-mkdocs-include-markdown-plugin
-mkdocs-gen-files
-mkdocs-literate-nav
 mkdocs-exclude
+mkdocstrings-python-generator==1.0.0rc1
 
 ruff
