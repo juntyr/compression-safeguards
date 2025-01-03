@@ -48,35 +48,51 @@ class MonotonicGuardrail(ElementwiseGuardrail):
 
         needs_correction = np.zeros_like(decoded, dtype=bool)
 
+        flat = np.arange(data.size).reshape(data.shape)
+        indices = np.stack(np.meshgrid(*[np.arange(a) for a in data.shape], indexing="ij"), axis=-1).reshape(-1, data.ndim)
+
         for axis, alen in enumerate(data.shape):
             if alen < window:
                 continue
 
             data_windows = sliding_window_view(data, window, axis=axis)
             decoded_windows = sliding_window_view(decoded, window, axis=axis)
-            correction_windows = sliding_window_view(
-                needs_correction, window, axis=axis, writeable=True
-            )
+
+            flat_windows = sliding_window_view(flat, window, axis=axis)
+            indices_windows = indices[flat_windows]
+
+            # TODO: this is UB as we alias mutable locations
+            # TODO: find a way to "undo" the sliding window
+            # correction_windows = sliding_window_view(
+            #     needs_correction, window, axis=axis, writeable=True
+            # )
 
             data_monotonic = self._strictly_monotonic_sign(data_windows)
 
             # for strictly monotonic windows, check that
             #  decoded[i-1] ? decoded[i] ? decoded[i+1]
             # has the correct sign, otherwise mark for correction
-            correction_windows[..., :-1] |= (
+            needs_correction[indices_windows[..., :-1, :][(
                 (
                     (decoded_windows[..., 1:] > decoded_windows[..., :-1]) * 1
                     - (decoded_windows[..., 1:] < decoded_windows[..., :-1]) * 1
                 )
                 != data_monotonic
-            ) & (data_monotonic != 0)
-            correction_windows[..., 1:] |= (
-                (
-                    (decoded_windows[..., 1:] > decoded_windows[..., :-1]) * 1
-                    - (decoded_windows[..., 1:] < decoded_windows[..., :-1]) * 1
-                )
-                != data_monotonic
-            ) & (data_monotonic != 0)
+            ) & (data_monotonic != 0)]] = True
+            # correction_windows[..., :-1] |= (
+            #     (
+            #         (decoded_windows[..., 1:] > decoded_windows[..., :-1]) * 1
+            #         - (decoded_windows[..., 1:] < decoded_windows[..., :-1]) * 1
+            #     )
+            #     != data_monotonic
+            # ) & (data_monotonic != 0)
+            # correction_windows[..., 1:] |= (
+            #     (
+            #         (decoded_windows[..., 1:] > decoded_windows[..., :-1]) * 1
+            #         - (decoded_windows[..., 1:] < decoded_windows[..., :-1]) * 1
+            #     )
+            #     != data_monotonic
+            # ) & (data_monotonic != 0)
 
             # for strictly monotonic windows, check that
             #  data[i-1] ? decoded[i] ? data[i+1]
@@ -85,20 +101,20 @@ class MonotonicGuardrail(ElementwiseGuardrail):
             # note: this check is excessively strict but ensures that correcting
             #       to the original data is always possible without affecting
             #       the monotonicity of the corrected output
-            correction_windows[..., :-1] |= (
-                (
-                    (data_windows[..., 1:] > decoded_windows[..., :-1]) * 1
-                    - (data_windows[..., 1:] < decoded_windows[..., :-1]) * 1
-                )
-                != data_monotonic
-            ) & (data_monotonic != 0)
-            correction_windows[..., 1:] |= (
-                (
-                    (decoded_windows[..., 1:] > data_windows[..., :-1]) * 1
-                    - (decoded_windows[..., 1:] < data_windows[..., :-1]) * 1
-                )
-                != data_monotonic
-            ) & (data_monotonic != 0)
+            # correction_windows[..., :-1] |= (
+            #     (
+            #         (data_windows[..., 1:] > decoded_windows[..., :-1]) * 1
+            #         - (data_windows[..., 1:] < decoded_windows[..., :-1]) * 1
+            #     )
+            #     != data_monotonic
+            # ) & (data_monotonic != 0)
+            # correction_windows[..., 1:] |= (
+            #     (
+            #         (decoded_windows[..., 1:] > data_windows[..., :-1]) * 1
+            #         - (decoded_windows[..., 1:] < data_windows[..., :-1]) * 1
+            #     )
+            #     != data_monotonic
+            # ) & (data_monotonic != 0)
 
         return ~needs_correction
 
