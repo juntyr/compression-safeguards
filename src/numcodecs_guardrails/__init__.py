@@ -68,7 +68,7 @@ class GuardrailsCodec(Codec):
 
         guardrails = [
             guardrail
-            if isinstance(Guardrail)
+            if isinstance(guardrail, Guardrail)
             else GuardrailKind[guardrail["kind"]](
                 **{p: v for p, v in guardrail.items() if p != "kind"}
             )
@@ -221,15 +221,7 @@ class GuardrailsCodec(Codec):
         )
 
     def __repr__(self):
-        config = dict(
-            codec=self._codec,
-            guardrail=self._guardrail.kind,
-            **self._guardrail.get_config(),
-        )
-
-        repr = ", ".join(f"{p}={v!r}" for p, v in config.items())
-
-        return f"{type(self).__name__}({repr})"
+        return f"{type(self).__name__}(codec={self._codec:!r}, guardrails={self._guardrails:!r})"
 
 
 numcodecs.registry.register_codec(GuardrailsCodec)
