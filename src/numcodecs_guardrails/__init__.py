@@ -227,7 +227,7 @@ class GuardrailsCodec(Codec):
         )
 
     def __repr__(self):
-        return f"{type(self).__name__}(codec={self._codec:!r}, guardrails={self._guardrails:!r})"
+        return f"{type(self).__name__}(codec={self._codec!r}, guardrails={self._guardrails!r})"
 
 
 numcodecs.registry.register_codec(GuardrailsCodec)
