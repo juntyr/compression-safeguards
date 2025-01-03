@@ -21,13 +21,16 @@ class MonotonicGuardrail(ElementwiseGuardrail):
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
+        window = 1 + self._window * 2
+
         needs_correction = np.zeros_like(decoded, dtype=bool)
 
-        for axis in range(data.ndim):
-            data_windows = sliding_window_view(data, 1 + self._window * 2, axis=axis)
-            decoded_windows = sliding_window_view(
-                decoded, 1 + self._window * 2, axis=axis
-            )
+        for axis, alen in enumerate(data.shape):
+            if alen < window:
+                continue
+
+            data_windows = sliding_window_view(data, window, axis=axis)
+            decoded_windows = sliding_window_view(decoded, window, axis=axis)
 
             data_monotonic = np.all(np.diff(data_windows, axis=-1) > 0) - np.all(
                 np.diff(data_windows, axis=-1) < 0
