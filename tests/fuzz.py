@@ -33,6 +33,9 @@ class FuzzCodec(Codec):
         return out
 
 
+numcodecs.registry.register_codec(FuzzCodec)
+
+
 def check_one_input(data):
     data = atheris.FuzzedDataProvider(data)
 
