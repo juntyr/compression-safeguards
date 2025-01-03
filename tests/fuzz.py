@@ -64,11 +64,11 @@ def check_one_input(data):
         {
             "kind": kind.name,
             **{
-                p: {
+                p: ({
                     float: data.ConsumeFloat,
                     int: data.ConsumeInt(1),
                     bool: data.ConsumeBool,
-                }[v.annotation]()
+                }[v.annotation])()
                 for p, v in signature(kind.value).parameters.items()
             },
         }
