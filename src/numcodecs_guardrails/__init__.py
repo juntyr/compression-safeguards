@@ -1,6 +1,6 @@
 __all__ = ["GuardrailsCodec", "GuardrailKind"]
 
-from collections.abc import Buffer
+from collections.abc import Buffer, Sequence
 from enum import Enum
 from io import BytesIO
 from typing import Optional
@@ -55,7 +55,7 @@ class GuardrailsCodec(Codec):
         self,
         *,
         codec: dict | Codec,
-        guardrails: tuple[dict | Guardrail],
+        guardrails: Sequence[dict | Guardrail],
         version: Optional[str] = None,
     ):
         if version is not None:

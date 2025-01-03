@@ -35,18 +35,14 @@ class FuzzCodec(Codec):
 def check_one_input(data):
     data = atheris.FuzzedDataProvider(data)
 
-    kind: GuardrailKind = list(GuardrailKind)[
-        data.ConsumeIntInRange(0, len(GuardrailKind) - 1)
-    ]
+    # top-level metadata: which guardrails and what type of data
+    kinds: list[GuardrailKind] = [kind for kind in GuardrailKind if data.ConsumeBool()]
     dtype: np.ndtype = list(SUPPORTED_DTYPES)[
         data.ConsumeIntInRange(0, len(GuardrailKind) - 1)
     ]
     size: int = data.ConsumeIntInRange(0, 10)
 
-    parameters = {
-        p: data.ConsumeFloat() for p, v in signature(kind.value).parameters.items()
-    }
-
+    # input data and the decoded data
     raw = data.ConsumeBytes(size * dtype.itemsize)
     decoded = data.ConsumeBytes(size * dtype.itemsize)
 
@@ -59,9 +55,22 @@ def check_one_input(data):
     raw = np.frombuffer(raw, dtype=dtype)
     decoded = np.frombuffer(decoded, dtype=dtype)
 
+    # guardrail parameters
+    guardrails = [
+        {
+            "kind": kind.name,
+            **{
+                p: data.ConsumeFloat()
+                for p, v in signature(kind.value).parameters.items()
+            },
+        }
+        for kind in kinds
+    ]
+
     try:
         guardrail = GuardrailsCodec(
-            FuzzCodec(raw, decoded), guardrail=kind, **parameters
+            codec=FuzzCodec(raw, decoded),
+            guardrails=guardrails,
         )
     except AssertionError:
         return
