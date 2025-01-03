@@ -133,10 +133,12 @@ class GuardrailsCodec(Codec):
         assert decoded.dtype == data.dtype, "codec must roundtrip dtype"
         assert decoded.shape == data.shape, "codec must roundtrip shape"
 
+        prev_correction = decoded
         correction = None
         for guardrail in self._elementwise_guardrails:
-            if not guardrail.check(data, decoded if correction is None else correction):
-                correction = guardrail.compute_correction(data, decoded)
+            if not guardrail.check(data, prev_correction):
+                correction = guardrail.compute_correction(data, prev_correction)
+                prev_correction = correction
 
         if correction is None:
             correction = bytes()
