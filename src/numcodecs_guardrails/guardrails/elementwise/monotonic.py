@@ -23,7 +23,7 @@ class MonotonicGuardrail(ElementwiseGuardrail):
     def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
         needs_correction = np.zeros_like(decoded, dtype=bool)
 
-        for axis in range(len(data.ndim)):
+        for axis in range(data.ndim):
             data_windows = sliding_window_view(data, 1 + self._window * 2, axis=axis)
             decoded_windows = sliding_window_view(
                 decoded, 1 + self._window * 2, axis=axis
