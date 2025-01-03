@@ -60,7 +60,11 @@ def check_one_input(data):
         {
             "kind": kind.name,
             **{
-                p: data.ConsumeFloat()
+                p: {
+                    float: data.ConsumeFloat,
+                    int: data.ConsumeFloat,
+                    bool: data.ConsumeBool,
+                }[v.annotation]()
                 for p, v in signature(kind.value).parameters.items()
             },
         }

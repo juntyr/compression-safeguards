@@ -17,12 +17,16 @@ from numcodecs.abc import Codec
 from .guardrails import Guardrail
 from .guardrails.elementwise import ElementwiseGuardrail
 from .guardrails.elementwise.abs import AbsoluteErrorBoundGuardrail
+from .guardrails.elementwise.monotonic import MonotonicGuardrail
 from .guardrails.elementwise.rel_or_abs import RelativeOrAbsoluteErrorBoundGuardrail
 
 
 class GuardrailKind(Enum):
+    # error bounds
     abs = AbsoluteErrorBoundGuardrail
     rel_or_abs = RelativeOrAbsoluteErrorBoundGuardrail
+    # monotonic
+    monotonic = MonotonicGuardrail
 
 
 FORMAT_VERSION: str = "0.1.x"
