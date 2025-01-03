@@ -223,11 +223,11 @@ class GuardrailsCodec(Codec):
             id=type(self).codec_id,
             version=FORMAT_VERSION,
             codec=self._codec.get_config(),
-            guardrails=self._guardrails,
+            guardrails=self._elementwise_guardrails,
         )
 
     def __repr__(self):
-        return f"{type(self).__name__}(codec={self._codec!r}, guardrails={self._guardrails!r})"
+        return f"{type(self).__name__}(codec={self._codec!r}, guardrails={self._elementwise_guardrails!r})"
 
 
 numcodecs.registry.register_codec(GuardrailsCodec)
