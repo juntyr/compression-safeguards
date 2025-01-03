@@ -77,11 +77,13 @@ class GuardrailsCodec(Codec):
 
         self._elementwise_guardrails = tuple(
             sorted(
-                guardrail
-                for guardrail in guardrails
-                if isinstance(guardrail, ElementwiseGuardrail)
-            ),
-            key=lambda guardrail: guardrail._priority,
+                (
+                    guardrail
+                    for guardrail in guardrails
+                    if isinstance(guardrail, ElementwiseGuardrail)
+                ),
+                key=lambda guardrail: guardrail._priority,
+            )
         )
         guardrails = [
             guardrail
