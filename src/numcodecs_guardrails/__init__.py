@@ -137,14 +137,16 @@ class GuardrailsCodec(Codec):
         for guardrail in self._elementwise_guardrails:
             if not guardrail.check(data, decoded if correction is None else correction):
                 correction = guardrail.compute_correction(data, decoded)
-                assert guardrail.check(
-                    data,
-                    correction,
-                ), "guardrail correction must pass the check"
 
         if correction is None:
             correction = bytes()
         else:
+            for guardrail in self._elementwise_guardrails:
+                assert guardrail.check(
+                    data,
+                    correction,
+                ), f"{guardrail!r} check fails after correction"
+
             correction = ElementwiseGuardrail.encode_correction(
                 decoded,
                 correction,

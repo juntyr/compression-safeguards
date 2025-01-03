@@ -116,7 +116,7 @@ class MonotonicGuardrail(ElementwiseGuardrail):
     def get_config(self) -> dict:
         return dict(kind=type(self).kind, window=self._window)
 
-    def _strictly_monotonic_sign(x: np.ndarray) -> np.ndarray:
+    def _strictly_monotonic_sign(self, x: np.ndarray) -> np.ndarray:
         # use comparison instead of diff to account for uints
         monotonic = (
             np.all(x[..., 1:] > x[..., :-1], axis=-1) * 1
