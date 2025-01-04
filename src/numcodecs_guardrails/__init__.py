@@ -1,4 +1,4 @@
-__all__ = ["GuardrailsCodec", "GuardrailKind"]
+__all__ = ["GuardrailsCodec", "Guardrails"]
 
 from collections.abc import Buffer, Sequence
 from enum import Enum
@@ -21,18 +21,27 @@ from .guardrails.elementwise.monotonic import MonotonicGuardrail
 from .guardrails.elementwise.rel_or_abs import RelativeOrAbsoluteErrorBoundGuardrail
 
 
-class GuardrailKind(Enum):
+class Guardrails(Enum):
+    """
+    Enumeration of all supported guardrails:
+    """
+
     # error bounds
     abs = AbsoluteErrorBoundGuardrail
+    """Enforce an absolute error bound"""
+
     rel_or_abs = RelativeOrAbsoluteErrorBoundGuardrail
+    """Enforce a relative error bound, fall back to an absolute error bound close to zero"""
+
     # monotonic
     monotonic = MonotonicGuardrail
+    """Enforce that monotonic sequences remain monotonic"""
 
 
-FORMAT_VERSION: str = "0.1.x"
+_FORMAT_VERSION: str = "0.1.x"
 
 
-SUPPORTED_DTYPES: set[np.dtype] = {
+_SUPPORTED_DTYPES: set[np.dtype] = {
     np.dtype("int8"),
     np.dtype("int16"),
     np.dtype("int32"),
@@ -47,6 +56,32 @@ SUPPORTED_DTYPES: set[np.dtype] = {
 
 
 class GuardrailsCodec(Codec):
+    """
+    An adaptor codec that uses guardrails to guarantee certain properties are
+    upheld by the wrapped codec.
+
+    Parameters
+    ----------
+    codec : dict | Codec
+        The codec to wrap with guardrails. It can either be passed as a codec
+        configuration [`dict`][dict], which is passed to
+        [`numcodecs.registry.get_codec(config)`][numcodecs.registry.get_codec],
+        or an already initialized [`Codec`][numcodecs.abc.Codec].
+
+        The codec must encode to a 1D buffer of bytes. It is desirable to
+        perform lossless compression after applying the guardrails (rather than
+        before).
+    guardrails : Sequence[dict | Guardrail]
+        The guardrails that will be applied to the codec. They can either be
+        passed as a guardrail configuration [`dict`][dict] or an already
+        initialized [`Guardrail`][numcodecs_guardrails.guardrails.Guardrail].
+
+        Please refer to [`Guardrails`][numcodecs_guardrails.Guardrails] for an
+        enumeration of all supported guardrails.
+    _version : Optional[str]
+        Internal, do not provide this paramter explicitly.
+    """
+
     __slots__ = ("_version", "_codec", "_lossless", "_guardrails")
     _version: str
     _codec: Codec
@@ -60,10 +95,10 @@ class GuardrailsCodec(Codec):
         *,
         codec: dict | Codec,
         guardrails: Sequence[dict | Guardrail],
-        version: Optional[str] = None,
+        _version: Optional[str] = None,
     ):
-        if version is not None:
-            assert version == FORMAT_VERSION
+        if _version is not None:
+            assert _version == _FORMAT_VERSION
 
         self._codec = (
             codec if isinstance(codec, Codec) else numcodecs.registry.get_codec(codec)
@@ -73,7 +108,7 @@ class GuardrailsCodec(Codec):
         guardrails = [
             guardrail
             if isinstance(guardrail, Guardrail)
-            else GuardrailKind[guardrail["kind"]].value(
+            else Guardrails[guardrail["kind"]].value(
                 **{p: v for p, v in guardrail.items() if p != "kind"}
             )
             for guardrail in guardrails
@@ -116,8 +151,8 @@ class GuardrailsCodec(Codec):
         data = numcodecs.compat.ensure_ndarray(buf)
 
         assert (
-            data.dtype in SUPPORTED_DTYPES
-        ), f"can only encode arrays of dtype {', '.join(d.str for d in SUPPORTED_DTYPES)}"
+            data.dtype in _SUPPORTED_DTYPES
+        ), f"can only encode arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
 
         encoded = self._codec.encode(np.copy(data))
         encoded = numcodecs.compat.ensure_ndarray(encoded)
@@ -137,7 +172,7 @@ class GuardrailsCodec(Codec):
         correction = None
         for guardrail in self._elementwise_guardrails:
             if not guardrail.check(data, prev_correction):
-                correction = guardrail.compute_correction(data, prev_correction)
+                correction = guardrail._compute_correction(data, prev_correction)
                 prev_correction = correction
 
         if correction is None:
@@ -149,7 +184,7 @@ class GuardrailsCodec(Codec):
                     correction,
                 ), f"{guardrail!r} check fails after correction"
 
-            correction = ElementwiseGuardrail.encode_correction(
+            correction = ElementwiseGuardrail._encode_correction(
                 decoded,
                 correction,
                 self._lossless,
@@ -167,7 +202,7 @@ class GuardrailsCodec(Codec):
         buf : Buffer
             Encoded data. May be any object supporting the new-style buffer
             protocol.
-        out : Buffer, optional
+        out : Optional[Buffer]
             Writeable buffer to store decoded data. N.B. if provided, this buffer must
             be exactly the right size to store the decoded data.
 
@@ -200,7 +235,7 @@ class GuardrailsCodec(Codec):
         decoded = self._codec.decode(encoded, out=out)
 
         if correction_len > 0:
-            corrected = ElementwiseGuardrail.apply_correction(
+            corrected = ElementwiseGuardrail._apply_correction(
                 decoded,
                 correction,
                 self._lossless,
@@ -225,7 +260,7 @@ class GuardrailsCodec(Codec):
 
         return dict(
             id=type(self).codec_id,
-            version=FORMAT_VERSION,
+            _version=_FORMAT_VERSION,
             codec=self._codec.get_config(),
             guardrails=[
                 guardrail.get_config() for guardrail in self._elementwise_guardrails

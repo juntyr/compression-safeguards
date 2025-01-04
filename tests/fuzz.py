@@ -12,8 +12,8 @@ with atheris.instrument_imports():
     from numcodecs.abc import Codec
     from numcodecs_guardrails import (
         GuardrailsCodec,
-        GuardrailKind,
-        SUPPORTED_DTYPES,
+        Guardrails,
+        _SUPPORTED_DTYPES,
     )
 
 
@@ -41,9 +41,9 @@ def check_one_input(data):
     data = atheris.FuzzedDataProvider(data)
 
     # top-level metadata: which guardrails and what type of data
-    kinds: list[GuardrailKind] = [kind for kind in GuardrailKind if data.ConsumeBool()]
-    dtype: np.ndtype = list(SUPPORTED_DTYPES)[
-        data.ConsumeIntInRange(0, len(GuardrailKind) - 1)
+    kinds: list[Guardrails] = [kind for kind in Guardrails if data.ConsumeBool()]
+    dtype: np.ndtype = list(_SUPPORTED_DTYPES)[
+        data.ConsumeIntInRange(0, len(Guardrails) - 1)
     ]
     size: int = data.ConsumeIntInRange(0, 10)
 

@@ -36,7 +36,6 @@ plugins:
         - generate_api.py
         - requirements.txt
   - search
-  - include-markdown
   - mkdocstrings-python-generator:
       source_dirs:
         - nav_heading: [Documentation]

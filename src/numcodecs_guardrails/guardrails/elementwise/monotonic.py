@@ -127,7 +127,7 @@ class MonotonicGuardrail(ElementwiseGuardrail):
 
         return ~needs_correction
 
-    def compute_correction(
+    def _compute_correction(
         self,
         data: np.ndarray,
         decoded: np.ndarray,
@@ -139,6 +139,15 @@ class MonotonicGuardrail(ElementwiseGuardrail):
         )
 
     def get_config(self) -> dict:
+        """
+        Returns the configuration of the guardrail.
+
+        Returns
+        -------
+        config : dict
+            Configuration of the guardrail.
+        """
+
         return dict(kind=type(self).kind, window=self._window)
 
     def _strictly_monotonic_sign(self, x: np.ndarray) -> np.ndarray:

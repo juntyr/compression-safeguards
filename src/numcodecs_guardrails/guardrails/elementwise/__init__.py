@@ -14,29 +14,109 @@ from .. import Guardrail
 
 
 class ElementwiseGuardrail(Guardrail, ABC):
+    """
+    Elementwise guardrail abstract base class.
+
+    Elementwise guardrails can identitfy individual elements that violate the
+    property enforced by the guardrail.
+    """
+
     def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
+        """
+        Check if the `decoded` array upholds the property enforced by this
+        guardrail.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data to be encoded.
+        decoded : np.ndarray
+            Decoded data.
+
+        Returns
+        -------
+        ok : bool
+            `True` if the check succeeded.
+        """
+
         return np.all(self.check_elementwise(data, decoded))
 
     @abstractmethod
     def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
+        """
+        Check which elements in the `decoded` array uphold the property
+        enforced by this guardrail.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data to be encoded.
+        decoded : np.ndarray
+            Decoded data.
+
+        Returns
+        -------
+        ok : np.ndarray
+            Per-element, `True` if the check succeeded for this element.
+        """
+
         pass
 
     @abstractmethod
-    def compute_correction(
+    def _compute_correction(
         self,
         data: np.ndarray,
         decoded: np.ndarray,
     ) -> np.ndarray:
+        """
+        Compute the correction for the `decoded` array to uphold the property
+        enforced by this guardrail.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data to be encoded.
+        decoded : np.ndarray
+            Decoded data.
+
+        Returns
+        -------
+        corrected : np.ndarray
+            Corrected decoded data.
+
+            If the `decoded` array already upholds the property, it can be
+            returned. It is always valid to return elements of the `data`.
+        """
+
         pass
 
     @staticmethod
-    def encode_correction(
+    def _encode_correction(
         decoded: np.ndarray, correction: np.ndarray, lossless: Codec
     ) -> bytes:
-        decoded_bits = _as_bits(decoded)
-        correction_bits = _as_bits(correction, like=decoded)
+        """
+        Encode the combined correction from one or more elementwise guardrails
+        to [`bytes`][bytes].
 
-        correction_bits = decoded_bits - correction_bits
+        Parameters
+        ----------
+        decoded : np.ndarray
+            Decoded data.
+        corrected : np.ndarray
+            Corrected decoded data.
+        lossless : Codec
+            Lossless codec to compress the correction with.
+
+        Returns
+        -------
+        correction : bytes
+            Encoded correction for the `decoded` array.
+        """
+
+        decoded_bits = _as_bits(decoded)
+        corrected_bits = _as_bits(correction, like=decoded)
+
+        correction_bits = decoded_bits - corrected_bits
 
         correction = _runlength_encode(correction_bits)
         correction = lossless.encode(correction)
@@ -44,9 +124,27 @@ class ElementwiseGuardrail(Guardrail, ABC):
         return numcodecs.compat.ensure_bytes(correction)
 
     @staticmethod
-    def apply_correction(
+    def _apply_correction(
         decoded: np.ndarray, correction: bytes, lossless: Codec
     ) -> np.ndarray:
+        """
+        Apply the encoded `correction` to the `decoded` array.
+
+        Parameters
+        ----------
+        decoded : np.ndarray
+            Decoded data.
+        correction : bytes
+            Encoded correction for the `decoded` array.
+        lossless : Codec
+            Lossless codec to decompress the correction with.
+
+        Returns
+        -------
+        corrected : np.ndarray
+            Corrected decoded data.
+        """
+
         decoded_bits = _as_bits(decoded)
 
         correction = lossless.decode(correction)
@@ -58,6 +156,21 @@ class ElementwiseGuardrail(Guardrail, ABC):
 
 
 def _as_bits(a: np.ndarray, *, like: Optional[np.ndarray] = None) -> np.ndarray:
+    """
+    Reinterpret the array `a` to an array of equal-sized uints (bits).
+
+    Parameters
+    ----------
+    a : np.ndarray
+        Input array.
+    like : Optional[np.ndarray]
+        Optional array whose `dtype` should be used to derive the uint type.
+
+    Returns
+    -------
+    bits : np.ndarray
+        Binary representation of the input data.
+    """
     return np.frombuffer(
         a,
         dtype=np.dtype(
@@ -72,6 +185,16 @@ def _runlength_encode(a: np.ndarray) -> bytes:
 
     Currently, only zero-runs are RL-encoded and non-zero values are stored
     verbatim in non-zero runs.
+
+    Parameters
+    ----------
+    a : np.ndarray
+        Input array.
+
+    Returns
+    -------
+    rle : bytes
+        Run-length encoded bytes.
     """
 
     a = a.flatten()
@@ -97,6 +220,18 @@ def _runlength_decode(b: bytes, *, like: np.ndarray) -> np.ndarray:
 
     Currently, only zero-runs are RL-encoded and non-zero values are stored
     verbatim in non-zero runs.
+
+    Parameters
+    ----------
+    rle : bytes
+        Run-length encoded bytes.
+    like : Optional[np.ndarray]
+        Optional array whose `dtype` and shape determine the output's.
+
+    Returns
+    -------
+    decoded : np.ndarray
+        Run-length decoded array.
     """
 
     lengths = []

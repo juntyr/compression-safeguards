@@ -20,12 +20,29 @@ class AbsoluteErrorBoundGuardrail(ElementwiseGuardrail):
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
+        """
+        Check which elements in the `decoded` array satisfy the absolute error
+        bound.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data to be encoded.
+        decoded : np.ndarray
+            Decoded data.
+
+        Returns
+        -------
+        ok : np.ndarray
+            Per-element, `True` if the check succeeded for this element.
+        """
+
         return (np.abs(data - decoded) <= self._eb_abs) | (
             _as_bits(data) == _as_bits(decoded)
         )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def compute_correction(
+    def _compute_correction(
         self,
         data: np.ndarray,
         decoded: np.ndarray,
@@ -43,4 +60,13 @@ class AbsoluteErrorBoundGuardrail(ElementwiseGuardrail):
         )
 
     def get_config(self) -> dict:
+        """
+        Returns the configuration of the guardrail.
+
+        Returns
+        -------
+        config : dict
+            Configuration of the guardrail.
+        """
+
         return dict(kind=type(self).kind, eb_abs=self._eb_abs)
