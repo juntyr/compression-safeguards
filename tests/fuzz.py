@@ -2,6 +2,7 @@ import atheris
 
 with atheris.instrument_imports():
     import sys
+    import types
     import typing
 
     from enum import Enum
@@ -46,12 +47,12 @@ def generate_parameter(data: atheris.FuzzedDataProvider, p: Parameter):
     if p.annotation is bool:
         return data.ConsumeBool()
 
-    if typing.get_origin(p.annotation) is typing.Union:
+    if typing.get_origin(p.annotation) in (typing.Union, types.UnionType):
         tys = typing.get_args(p.annotation)
         if len(tys) == 2 and tys[0] is str and issubclass(tys[1], Enum):
             return list(tys[1])[data.ConsumeIntInRange(0, len(tys[1]) - 1)]
 
-    assert False, f"unknown parameter type {p.annotation!r} {typing.get_origin(p.annotation)!r} {typing.get_args(p.annotation)!r}"
+    assert False, f"unknown parameter type {p.annotation!r}"
 
 
 def check_one_input(data):
