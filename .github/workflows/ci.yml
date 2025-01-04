@@ -55,6 +55,9 @@ jobs:
   fuzz:
     name: Fuzz
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the Repository
         uses: actions/checkout@v4
