@@ -86,6 +86,12 @@ jobs:
       - name: Run the fuzzer
         run: uv run tests/fuzz.py ./corpus -max_total_time=60
 
+      - name: Delete the previous fuzzer corpus
+        if: always() && steps.fuzzer-corpus-restore.outputs.cache-hit == 'true'
+        run: gh cache delete fuzzer-corpus
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Save the fuzzer corpus
         if: always()
         uses: actions/cache/save@v4
