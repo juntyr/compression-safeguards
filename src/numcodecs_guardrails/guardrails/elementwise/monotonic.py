@@ -1,4 +1,4 @@
-__all__ = ["MonotonicGuardrail"]
+__all__ = ["Monotonicity", "MonotonicGuardrail"]
 
 from enum import Enum
 from operator import le, lt, ge, gt
@@ -11,11 +11,55 @@ from numpy.lib.stride_tricks import sliding_window_view
 from . import ElementwiseGuardrail
 
 
+_STRICT = ((lt, gt, False),) * 2
+_STRICT_WITH_CONSTS = ((lt, gt, True),) * 2
+_STRICT_TO_WEAK = ((lt, gt, False), (le, ge, True))
+_WEAK = ((le, ge, False), (le, ge, True))
+
+
 class Monotonicity(Enum):
-    strict = ((lt, gt, False),) * 2
-    strict_with_consts = ((lt, gt, True),) * 2
-    strict_to_weak = ((lt, gt, False), (le, ge, True))
-    weak = ((le, ge, False), (le, ge, True))
+    """
+    Different levels of monotonicity that can be enforced by the
+    [`MonotonicGuardrail`][numcodecs_guardrails.guardrails.elementwise.monotonic.MonotonicGuardrail].
+    """
+
+    strict = _STRICT
+    """
+    Strictly increasing/decreasing sequences in the input array are guaranteed
+    to be strictly increasing/decreasing in the decoded array.
+
+    Sequences that are not strictly increasing/decreasing or contain non-finite
+    values are not affected.
+    """
+
+    strict_with_consts = _STRICT_WITH_CONSTS
+    """
+    Strictly increasing/decreasing/constant sequences in the input array are
+    guaranteed to be strictly increasing/decreasing/constant in the decoded
+    array.
+
+    Sequences that are not strictly increasing/decreasing/constant or contain
+    non-finite values are not affected.
+    """
+
+    strict_to_weak = _STRICT_TO_WEAK
+    """
+    Strictly increasing/decreasing sequences in the input array are guaranteed
+    to be *weakly* increasing/decreasing (or constant) in the decoded array.
+
+    Sequences that are not strictly increasing/decreasing or contain non-finite
+    values are not affected.
+    """
+
+    weak = _WEAK
+    """
+    Weakly increasing/decreasing (but not constant) sequences in the input
+    array are guaranteed to be weakly increasing/decreasing (or constant) in
+    the decoded array.
+
+    Sequences that are not weakly increasing/decreasing or are constant or
+    contain non-finite values are not affected.
+    """
 
 
 class MonotonicGuardrail(ElementwiseGuardrail):
