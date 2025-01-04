@@ -1,7 +1,7 @@
 __all__ = ["MonotonicGuardrail"]
 
 from enum import Enum
-from operator import le, lt, ge, gt
+from operator import lt, gt  # , le, ge
 from typing import Optional
 
 import numpy as np
@@ -13,7 +13,9 @@ from . import ElementwiseGuardrail
 
 class Monotonicity(Enum):
     strict = (lt, gt)
-    weak = (le, ge)
+    strict_with_consts = (lt, gt)
+    # strict_to_weak = ()
+    # weak = (le, ge)
 
 
 class MonotonicGuardrail(ElementwiseGuardrail):
@@ -51,7 +53,9 @@ class MonotonicGuardrail(ElementwiseGuardrail):
             # matches
             if np.any(
                 np.where(
-                    data_monotonic == 0, False, data_monotonic != decoded_monotonic
+                    np.isfinite(data_monotonic),
+                    data_monotonic != decoded_monotonic,
+                    False,
                 )
             ):
                 return False
@@ -89,7 +93,7 @@ class MonotonicGuardrail(ElementwiseGuardrail):
                         self._strictly_monotonic_sign_elementwise(decoded_windows)
                         != data_monotonic
                     )
-                    & (data_monotonic != 0)
+                    & np.isfinite(data_monotonic)
                 ]
             ] = True
             needs_correction[
@@ -98,7 +102,7 @@ class MonotonicGuardrail(ElementwiseGuardrail):
                         self._strictly_monotonic_sign_elementwise(decoded_windows)
                         != data_monotonic
                     )
-                    & (data_monotonic != 0)
+                    & np.isfinite(data_monotonic)
                 ]
             ] = True
 
@@ -117,7 +121,7 @@ class MonotonicGuardrail(ElementwiseGuardrail):
                         )
                         != data_monotonic
                     )
-                    & (data_monotonic != 0)
+                    & np.isfinite(data_monotonic)
                 ]
             ] = True
             needs_correction[
@@ -128,7 +132,7 @@ class MonotonicGuardrail(ElementwiseGuardrail):
                         )
                         != data_monotonic
                     )
-                    & (data_monotonic != 0)
+                    & np.isfinite(data_monotonic)
                 ]
             ] = True
 
@@ -161,29 +165,71 @@ class MonotonicGuardrail(ElementwiseGuardrail):
             window=self._window,
         )
 
-    def _strictly_monotonic_sign(self, x: np.ndarray) -> np.ndarray:
-        (lt, gt) = self._monotonicity.value
+    def _strictly_monotonic_sign(
+        self, x: np.ndarray, *, monotonicity: Optional[Monotonicity] = None
+    ) -> np.ndarray:
+        monotonicity = self._monotonicity if monotonicity is None else monotonicity
+        (lt, gt) = monotonicity.value
+
+        # default to NaN
+        monotonic = np.empty(x.shape[:-1])
+        monotonic.fill(np.nan)
 
         # use comparison instead of diff to account for uints
-        monotonic = (
-            np.all(gt(x[..., 1:], x[..., :-1]), axis=-1) * 1
-            - np.all(lt(x[..., 1:], x[..., :-1]), axis=-1) * 1
+
+        # +1: all(x[i+1] > x[i])
+        monotonic = np.where(
+            np.all(gt(x[..., 1:], x[..., :-1]), axis=-1), +1, monotonic
         )
+        # -1: all(x[i+1] < x[i])
+        monotonic = np.where(
+            np.all(lt(x[..., 1:], x[..., :-1]), axis=-1), -1, monotonic
+        )
+
+        # 0: all(x[i+1] == x[i])
+        if monotonicity in (Monotonicity.strict_with_consts,):  # Monotonicity.weak):
+            monotonic = np.where(
+                np.all(x[..., 1:] == x[..., :-1], axis=-1), 0, monotonic
+            )
+
         # non-finite values cannot participate in monotonic sequences
-        monotonic *= np.all(np.isfinite(x), axis=-1)
+        # NaN: any(!isfinite(x[i]))
+        monotonic = np.where(np.all(np.isfinite(x), axis=-1), monotonic, np.nan)
 
         # return the result in a shape that's broadcastable to x
         return monotonic[..., np.newaxis]
 
     def _strictly_monotonic_sign_elementwise(
-        self, left: np.ndarray, right: Optional[np.ndarray] = None
+        self,
+        left: np.ndarray,
+        right: Optional[np.ndarray] = None,
+        *,
+        monotonicity: Optional[Monotonicity] = None,
     ) -> np.ndarray:
         right = left if right is None else right
 
-        (lt, gt) = self._monotonicity.value
+        monotonicity = self._monotonicity if monotonicity is None else monotonicity
+        (lt, gt) = monotonicity.value
+
+        # default to NaN
+        monotonic = np.empty(list(left.shape[:-1]) + [left.shape[-1] - 1])
+        monotonic.fill(np.nan)
 
         # use comparison instead of diff to account for uints
-        return (
-            gt(right[..., 1:], left[..., :-1]) * 1
-            - lt(right[..., 1:], left[..., :-1]) * 1
+
+        # +1: right[i+1] > left[i]
+        monotonic = np.where(gt(right[..., 1:], left[..., :-1]), +1, monotonic)
+        # -1: right[i+1] < left[i]
+        monotonic = np.where(lt(right[..., 1:], left[..., :-1]), -1, monotonic)
+
+        # 0: right[i+1] == left[i]
+        if monotonicity in (Monotonicity.strict_with_consts,):  # Monotonicity.weak):
+            monotonic = np.where(right[..., 1:] == left[..., :-1], 0, monotonic)
+
+        # non-finite values cannot participate in monotonic sequences
+        # NaN: !(isfinite(right[i+1]) && isfinite(lift[i]))
+        monotonic = np.where(
+            np.isfinite(right[..., 1:]) & np.isfinite(left[..., :-1]), monotonic, np.nan
         )
+
+        return monotonic
