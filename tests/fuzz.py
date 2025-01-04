@@ -51,7 +51,7 @@ def generate_parameter(data: atheris.FuzzedDataProvider, p: Parameter):
         if len(tys) == 2 and tys[0] is str and issubclass(tys[1], Enum):
             return list(tys[1])[data.ConsumeIntInRange(0, len(tys[1]) - 1)]
 
-    assert False, "unknown parameter type"
+    assert False, f"unknown parameter type {p.annotation!r}"
 
 
 def check_one_input(data):
