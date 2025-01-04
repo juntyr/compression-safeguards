@@ -15,7 +15,7 @@ class ZeroCodec(Codec):
 
     def decode(self, buf, out=None):
         assert out is not None
-        out[:] = 0
+        np.copyto(out, 0)
         return out
 
 
@@ -28,7 +28,8 @@ class NegCodec(Codec):
     def decode(self, buf, out=None):
         assert out is not None
         if out.size > 0:
-            out[:] = -np.frombuffer(buf, like=out)
+            np.copyto(out, np.frombuffer(buf, dtype=out.dtype).reshape(out.shape))
+            out *= -1
         return out
 
 
@@ -41,7 +42,20 @@ class IdentityCodec(Codec):
     def decode(self, buf, out=None):
         assert out is not None
         if out.size > 0:
-            out[:] = np.frombuffer(buf, like=out)
+            np.copyto(out, np.frombuffer(buf, dtype=out.dtype).reshape(out.shape))
+        return out
+
+
+class NoiseCodec(Codec):
+    codec_id = "noise"
+
+    def encode(self, buf):
+        return (np.array(buf) + np.random.normal(scale=0.1, size=buf.shape)).tobytes()
+
+    def decode(self, buf, out=None):
+        assert out is not None
+        if out.size > 0:
+            np.copyto(out, np.frombuffer(buf, dtype=out.dtype).reshape(out.shape))
         return out
 
 
@@ -73,6 +87,15 @@ def encode_decode_identity(data: np.ndarray, **kwargs) -> np.ndarray:
     #  single-byte overhead
     assert len(encoded) == (1 + data.size * data.dtype.itemsize)
 
+    decoded = codec.decode(encoded, out=np.empty_like(data))
+
+    return decoded
+
+
+def encode_decode_noise(data: np.ndarray, **kwargs) -> np.ndarray:
+    codec = GuardrailsCodec(codec=NoiseCodec(), **kwargs)
+
+    encoded = codec.encode(data)
     decoded = codec.decode(encoded, out=np.empty_like(data))
 
     return decoded

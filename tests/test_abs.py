@@ -1,7 +1,12 @@
 import numpy as np
 
 
-from .codecs import encode_decode_zero, encode_decode_neg, encode_decode_identity
+from .codecs import (
+    encode_decode_zero,
+    encode_decode_neg,
+    encode_decode_identity,
+    encode_decode_noise,
+)
 
 
 def check_all_codecs(data: np.ndarray):
@@ -13,6 +18,9 @@ def check_all_codecs(data: np.ndarray):
 
     decoded = encode_decode_identity(data, guardrails=[dict(kind="abs", eb_abs=0.1)])
     np.testing.assert_allclose(decoded, data, rtol=0.0, atol=0.0)
+
+    decoded = encode_decode_noise(data, guardrails=[dict(kind="abs", eb_abs=0.1)])
+    np.testing.assert_allclose(decoded, data, rtol=0.0, atol=0.1)
 
 
 def test_empty():
