@@ -1,5 +1,7 @@
 __all__ = ["MonotonicGuardrail"]
 
+from typing import Optional
+
 import numpy as np
 
 from numpy.lib.stride_tricks import sliding_window_view
@@ -71,10 +73,7 @@ class MonotonicGuardrail(ElementwiseGuardrail):
             needs_correction[
                 indices_windows[..., :-1, :][
                     (
-                        (
-                            (decoded_windows[..., 1:] > decoded_windows[..., :-1]) * 1
-                            - (decoded_windows[..., 1:] < decoded_windows[..., :-1]) * 1
-                        )
+                        self._strictly_monotonic_sign_elementwise(decoded_windows)
                         != data_monotonic
                     )
                     & (data_monotonic != 0)
@@ -83,10 +82,7 @@ class MonotonicGuardrail(ElementwiseGuardrail):
             needs_correction[
                 indices_windows[..., 1:, :][
                     (
-                        (
-                            (decoded_windows[..., 1:] > decoded_windows[..., :-1]) * 1
-                            - (decoded_windows[..., 1:] < decoded_windows[..., :-1]) * 1
-                        )
+                        self._strictly_monotonic_sign_elementwise(decoded_windows)
                         != data_monotonic
                     )
                     & (data_monotonic != 0)
@@ -103,9 +99,8 @@ class MonotonicGuardrail(ElementwiseGuardrail):
             needs_correction[
                 indices_windows[..., :-1, :][
                     (
-                        (
-                            (data_windows[..., 1:] > decoded_windows[..., :-1]) * 1
-                            - (data_windows[..., 1:] < decoded_windows[..., :-1]) * 1
+                        self._strictly_monotonic_sign_elementwise(
+                            decoded_windows, data_windows
                         )
                         != data_monotonic
                     )
@@ -115,9 +110,8 @@ class MonotonicGuardrail(ElementwiseGuardrail):
             needs_correction[
                 indices_windows[..., 1:, :][
                     (
-                        (
-                            (decoded_windows[..., 1:] > data_windows[..., :-1]) * 1
-                            - (decoded_windows[..., 1:] < data_windows[..., :-1]) * 1
+                        self._strictly_monotonic_sign_elementwise(
+                            data_windows, decoded_windows
                         )
                         != data_monotonic
                     )
@@ -161,3 +155,12 @@ class MonotonicGuardrail(ElementwiseGuardrail):
 
         # return the result in a shape that's broadcastable to x
         return monotonic[..., np.newaxis]
+
+    def _strictly_monotonic_sign_elementwise(
+        self, left: np.ndarray, right: Optional[np.ndarray] = None
+    ) -> np.ndarray:
+        right = left if right is None else right
+
+        return (right[..., 1:] > left[..., :-1]) * 1 - (
+            right[..., 1:] < left[..., :-1]
+        ) * 1

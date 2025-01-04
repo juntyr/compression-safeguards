@@ -37,6 +37,13 @@ def test_edge_cases():
     )
 
 
+def test_rounded_cos():
+    x = np.linspace(0.0, np.pi * 4.0, 100)
+    data = np.round(np.cos(x) / 0.1) * 0.1
+
+    check_all_codecs(data)
+
+
 def test_cos_sin():
     x = np.linspace(0.0, np.pi * 4.0, 100)
     x, y = np.meshgrid(x, x)
