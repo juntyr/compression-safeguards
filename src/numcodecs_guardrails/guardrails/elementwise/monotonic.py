@@ -1,5 +1,7 @@
 __all__ = ["MonotonicGuardrail"]
 
+from enum import Enum
+from operator import le, lt, ge, gt
 from typing import Optional
 
 import numpy as np
@@ -9,16 +11,27 @@ from numpy.lib.stride_tricks import sliding_window_view
 from . import ElementwiseGuardrail
 
 
+class Monotonicity(Enum):
+    strict = (lt, gt)
+    weak = (le, ge)
+
+
 class MonotonicGuardrail(ElementwiseGuardrail):
     __slots__ = "_window"
     _window: int
+    _monotonicity: Monotonicity
 
     kind = "monotonic"
     _priority = 1
 
-    def __init__(self, window: int):
-        assert window > 0, "window size must be positive"
+    def __init__(self, monotonicity: str | Monotonicity, window: int):
+        self._monotonicity = (
+            monotonicity
+            if isinstance(monotonicity, Monotonicity)
+            else Monotonicity[monotonicity]
+        )
 
+        assert window > 0, "window size must be positive"
         self._window = window
 
     def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
@@ -142,13 +155,19 @@ class MonotonicGuardrail(ElementwiseGuardrail):
             Configuration of the guardrail.
         """
 
-        return dict(kind=type(self).kind, window=self._window)
+        return dict(
+            kind=type(self).kind,
+            monotonicity=self._monotonicity.name,
+            window=self._window,
+        )
 
     def _strictly_monotonic_sign(self, x: np.ndarray) -> np.ndarray:
+        (lt, gt) = self._monotonicity.value
+
         # use comparison instead of diff to account for uints
         monotonic = (
-            np.all(x[..., 1:] > x[..., :-1], axis=-1) * 1
-            - np.all(x[..., 1:] < x[..., :-1], axis=-1) * 1
+            np.all(gt(x[..., 1:], x[..., :-1]), axis=-1) * 1
+            - np.all(lt(x[..., 1:], x[..., :-1]), axis=-1) * 1
         )
         # non-finite values cannot participate in monotonic sequences
         monotonic *= np.all(np.isfinite(x), axis=-1)
@@ -161,6 +180,10 @@ class MonotonicGuardrail(ElementwiseGuardrail):
     ) -> np.ndarray:
         right = left if right is None else right
 
-        return (right[..., 1:] > left[..., :-1]) * 1 - (
-            right[..., 1:] < left[..., :-1]
-        ) * 1
+        (lt, gt) = self._monotonicity.value
+
+        # use comparison instead of diff to account for uints
+        return (
+            gt(right[..., 1:], left[..., :-1]) * 1
+            - lt(right[..., 1:], left[..., :-1]) * 1
+        )

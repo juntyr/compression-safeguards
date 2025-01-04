@@ -1,4 +1,8 @@
+from itertools import product
+
 import numpy as np
+
+from numcodecs_guardrails.guardrails.elementwise.monotonic import Monotonicity
 
 
 from .codecs import (
@@ -10,11 +14,31 @@ from .codecs import (
 
 
 def check_all_codecs(data: np.ndarray):
-    for window in range(1, 3 + 1):
-        encode_decode_zero(data, guardrails=[dict(kind="monotonic", window=window)])
-        encode_decode_neg(data, guardrails=[dict(kind="monotonic", window=window)])
-        encode_decode_identity(data, guardrails=[dict(kind="monotonic", window=window)])
-        encode_decode_noise(data, guardrails=[dict(kind="monotonic", window=window)])
+    for monotonicity, window in product(Monotonicity, range(1, 3 + 1)):
+        encode_decode_zero(
+            data,
+            guardrails=[
+                dict(kind="monotonic", monotonicity=monotonicity, window=window)
+            ],
+        )
+        encode_decode_neg(
+            data,
+            guardrails=[
+                dict(kind="monotonic", monotonicity=monotonicity, window=window)
+            ],
+        )
+        encode_decode_identity(
+            data,
+            guardrails=[
+                dict(kind="monotonic", monotonicity=monotonicity, window=window)
+            ],
+        )
+        encode_decode_noise(
+            data,
+            guardrails=[
+                dict(kind="monotonic", monotonicity=monotonicity, window=window)
+            ],
+        )
 
 
 def test_empty():

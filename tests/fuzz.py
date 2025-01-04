@@ -2,9 +2,10 @@ import atheris
 
 with atheris.instrument_imports():
     import sys
+    import typing
 
-    from functools import partial
-    from inspect import signature
+    from enum import Enum
+    from inspect import signature, Parameter
 
     import numcodecs.registry
     import numpy as np
@@ -37,6 +38,22 @@ class FuzzCodec(Codec):
 numcodecs.registry.register_codec(FuzzCodec)
 
 
+def generate_parameter(data: atheris.FuzzedDataProvider, p: Parameter):
+    if p.annotation is float:
+        return data.ConsumeFloat()
+    if p.annotation is int:
+        return data.ConsumeInt(1)
+    if p.annotation is bool:
+        return data.ConsumeBool()
+
+    if typing.get_origin(p.annotation) is typing.Union:
+        tys = typing.get_args(p.annotation)
+        if len(tys) == 2 and tys[0] is str and issubclass(tys[1], Enum):
+            return list(tys[1])[data.ConsumeIntInRange(0, len(tys[1]) - 1)]
+
+    assert False, "unknown parameter type"
+
+
 def check_one_input(data):
     data = atheris.FuzzedDataProvider(data)
 
@@ -65,13 +82,7 @@ def check_one_input(data):
         {
             "kind": kind.name,
             **{
-                p: (
-                    {
-                        float: data.ConsumeFloat,
-                        int: partial(data.ConsumeInt, 1),
-                        bool: data.ConsumeBool,
-                    }[v.annotation]
-                )()
+                p: generate_parameter(data, v)
                 for p, v in signature(kind.value).parameters.items()
             },
         }
