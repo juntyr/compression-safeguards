@@ -26,7 +26,7 @@ This package currently implements the following guardrails
 
     The absolute elementwise error is guarantees to be less than or equal to the provided bound. In cases where the arithmetic evaluation of the error bound not well-defined, e.g. for infinite or NaN values, producing the exact same bitpattern is defined to satisfy the error bound.
 
-- `rel-or-abs` (relative [or absolute] error bound):
+- `rel_or_abs` (relative [or absolute] error bound):
 
     The absolute elementwise error between the *logarithms*\* of the values is guaranteed to be less than or equal to $\log(1 + eb_{rel})$ where $eb_{rel}$ is e.g. 2%. The logarithm* here is adapted to support positive, negative, and zero values. For values close to zero, where the relative error is not well defined, the absolute elementwise error is guaranteed to be less than or equal to the absolute error bound.
     
@@ -36,6 +36,37 @@ This package currently implements the following guardrails
 ## Usage
 
 The `GuardrailsCodec` adapter provided by this package can wrap any existing [`Codec`] [^1] implementing the [`numcodecs`] API [^2] that encodes a buffer (e.g. an ndarray or bytes) to bytes. It is desirable to perform lossless compression after applying the guardrails (rather than before).
+
+You can wrap an existing codec with e.g. an absolute error bound of $eb_{abs} = 0.1$  as follows:
+
+```python
+from numcodecs_guardrails import Guardrails, GuardrailsCodec
+
+GuardrailsCodec(codec=codec, guardrails=[Guardrails.abs.value(eb_abs=0.1)])
+```
+
+You can also provide just the configuration for the codec or any of the guardrails:
+
+```python
+from numcodecs_guardrails import GuardrailsCodec
+
+GuardrailsCodec(
+    codec=dict(id="my-codec", ...),
+    guardrails=[dict(kind="abs", eb_abs=0.1)],
+)
+```
+
+Finally, you can also use `numcodecs.registry.get_codec(config)` to instantiate the codec with guardrails from one combined configuration:
+
+```python
+import numcodecs
+
+numcodecs.registry.get_codec(dict(
+    id="guardrails",
+    codec=dict(id="my-codec", ...),
+    guardrails=[dict(kind="abs", eb_abs=0.1)],
+))
+```
 
 [^1]: If you want to wrap a sequence or stack of codecs, you can use the [`CodecStack`] combinator from the [`numcodecs-combinators`] package.
 [^2]: The method implemented in this package is not specific to the [`numcodecs`] API. Please reach out if you'd like to help bring the guardrails to a different compression API or language.

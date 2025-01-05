@@ -5,6 +5,7 @@
 /uv.lock
 
 /build
+/site
 
 **/__pycache__
 **/*.egg-info
