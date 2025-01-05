@@ -1,6 +1,6 @@
 # Fearless lossy compression with `numcodecs-guardrails`
 
-Lossy compression can be scary as valuable information may be lost. This package provides several guardrail adapters that can be applied to *any* existing (lossy) compressor to *guarantee* that certain properties about the compression error are upheld. By using these adapters, badly behaving lossy compressors become safe to use, at the cost of potentially less efficient compression, and lossy compression can be applied without fear.
+Lossy compression can be scary as valuable information may be lost. This package provides the [`GuardrailsCodec`][numcodecs_guardrails.GuardrailsCodec] adapter and several [`Guardrails`][numcodecs_guardrails.Guardrails] that can be applied to *any* existing (lossy) compressor to *guarantee* that certain properties about the compression error are upheld. By using these adapters, badly behaving lossy compressors become safe to use, at the cost of potentially less efficient compression, and lossy compression can be applied without fear.
 
 
 ## Design and Guarantees
@@ -24,11 +24,11 @@ This package currently implements the following [guardrails][numcodecs_guardrail
 
 - [`abs`][numcodecs_guardrails.guardrails.elementwise.abs.AbsoluteErrorBoundGuardrail] (absolute error bound):
 
-    The absolute elementwise error is guarantees to be less than or equal to the provided bound. In cases where the arithmetic evaluation of the error bound not well-defined, e.g. for infinite or NaN values, producing the exact same bitpattern is defined to satisfy the error bound.
+    The absolute elementwise error is guaranteed to be less than or equal to the provided bound. In cases where the arithmetic evaluation of the error bound not well-defined, e.g. for infinite or NaN values, producing the exact same bitpattern is defined to satisfy the error bound.
 
 - [`rel_or_abs`][numcodecs_guardrails.guardrails.elementwise.rel_or_abs.RelativeOrAbsoluteErrorBoundGuardrail] (relative [or absolute] error bound):
 
-    The absolute elementwise error between the *logarithms*\* of the values is guaranteed to be less than or equal to $\log(1 + eb_{rel})$ where $eb_{rel}$ is e.g. 2%. The logarithm* here is adapted to support positive, negative, and zero values. For values close to zero, where the relative error is not well defined, the absolute elementwise error is guaranteed to be less than or equal to the absolute error bound.
+    The absolute elementwise error between the *logarithms*\* of the values is guaranteed to be less than or equal to $\log(1 + eb_{rel})$ where $eb_{rel}$ is e.g. 2%. The logarithm* here is adapted to support positive, negative, and zero values. For values close to zero, where the relative error is not well-defined, the absolute elementwise error is guaranteed to be less than or equal to the absolute error bound.
     
     Put simply, each element satisfies the relative or the absolute error bound (or both). In cases where the arithmetic evaluation of the error bound is not well-defined, e.g. for infinite or NaN values, producing the exact same bitpattern is defined to satisfy the error bound.
 

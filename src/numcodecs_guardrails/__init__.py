@@ -1,3 +1,19 @@
+"""
+# Fearless lossy compression with `numcodecs-guardrails`
+
+Lossy compression can be scary as valuable information may be lost.
+
+This package provides the
+[`GuardrailsCodec`][numcodecs_guardrails.GuardrailsCodec] adapter and several
+[`Guardrails`][numcodecs_guardrails.Guardrails] that can be applied to *any*
+existing (lossy) compressor to *guarantee* that certain properties about the
+compression error are upheld.
+
+By using these adapters, badly behaving lossy compressors become safe to use,
+at the cost of potentially less efficient compression, and lossy compression
+can be applied without fear.
+"""
+
 __all__ = ["GuardrailsCodec", "Guardrails"]
 
 from collections.abc import Buffer, Sequence
@@ -28,14 +44,14 @@ class Guardrails(Enum):
 
     # error bounds
     abs = AbsoluteErrorBoundGuardrail
-    """Enforce an absolute error bound"""
+    """Enforce an absolute error bound."""
 
     rel_or_abs = RelativeOrAbsoluteErrorBoundGuardrail
-    """Enforce a relative error bound, fall back to an absolute error bound close to zero"""
+    """Enforce a relative error bound, fall back to an absolute error bound close to zero."""
 
     # monotonic
     monotonic = MonotonicGuardrail
-    """Enforce that monotonic sequences remain monotonic"""
+    """Enforce that monotonic sequences remain monotonic."""
 
 
 _FORMAT_VERSION: str = "0.1.x"

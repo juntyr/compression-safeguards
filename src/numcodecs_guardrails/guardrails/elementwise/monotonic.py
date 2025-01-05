@@ -1,3 +1,7 @@
+"""
+Monotonicity-preserving guardrail.
+"""
+
 __all__ = ["Monotonicity", "MonotonicGuardrail"]
 
 from enum import Enum
