@@ -46,6 +46,17 @@ The `GuardrailsCodec` adapter provided by this package can wrap any existing [`C
 [`numcodecs-combinators`]: https://numcodecs-combinators.readthedocs.io/en/stable/
 
 
+## Related Projects
+
+### SZ3 error compression
+
+[SZ3](https://github.com/szcompressor/SZ3) >=3.2.0 provides the `CmprAlgo=ALGO_NOPRED` option, with which the compression error $error = decompressed - data$ of another lossy compressor can itself be lossy-compressed with e.g. an absolute error bound. Using this option, any compressor can be transformed into an error bounded compressor.
+
+SZ3's error compression can provide higher compression ratios if most data elements are expected to violate the error bound, e.g. when wrapping a lossy compressor that does *not* bound its errors. However, SZ3 has a higher byte overhead than `numcodecs-guardrails` if all elements already satisfy the bound.
+
+**TLDR:** You can SZ3 to transform a *known* *unbounded* lossy compressor into an (absolute) error-bound compressor. Use `numcodecs-guardrails` to wrap *any* compressor (unbounded, best-effort bounded, or strictly bounded) to guarantee it is error bounded.
+
+
 ## Citation
 
 Please cite this work as follows:
