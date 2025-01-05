@@ -2,7 +2,11 @@ from itertools import product
 
 import numpy as np
 
-from numcodecs_guardrails.guardrails.elementwise.monotonic import Monotonicity
+from numcodecs_guardrails.guardrails.elementwise.monotonic import (
+    Monotonicity,
+    MonotonicGuardrail,
+)
+from numcodecs_guardrails.guardrails.elementwise import _as_bits
 
 
 from .codecs import (
@@ -83,3 +87,83 @@ def test_cos_sin_cos():
     data = np.stack([np.cos(x), np.sin(y), np.cos(z)], axis=-1)
 
     check_all_codecs(data)
+
+
+def test_monotonicity():
+    windows = dict(
+        si=np.array([1.0, 2, 3]),  # strictly increasing
+        sd=np.array([3.0, 2, 1]),  # strictly decreasing
+        co=np.array([2.0, 2, 2]),  # constant
+        wi=np.array([1.0, 1, 3]),  # weakly increasing
+        wd=np.array([3.0, 1, 1]),  # weakly decreasing
+        ns=np.array([3.0, 1, 2]),  # noise
+        nf=np.array([1.0, np.nan, 3]),  # non-finite
+    )
+
+    # mapping for each monotonicity
+    # - keys: which windows activate the guardrail
+    # - values: which windows validate without correction
+    monotonicities = {
+        Monotonicity.strict: dict(
+            si=("si",),
+            sd=("sd",),
+        ),
+        Monotonicity.strict_with_consts: dict(
+            si=("si",),
+            sd=("sd",),
+            co=("co",),
+        ),
+        Monotonicity.strict_to_weak: dict(
+            si=("si", "wi", "co"),
+            sd=("sd", "wd", "co"),
+        ),
+        Monotonicity.weak: dict(
+            si=("si", "wi", "co"),
+            sd=("sd", "wd", "co"),
+            wi=("si", "wi", "co"),
+            wd=("sd", "wd", "co"),
+        ),
+    }
+
+    # test for all monotonicities
+    for monotonicity, active_allowed in monotonicities.items():
+        guardrail = MonotonicGuardrail(monotonicity, window=1)
+
+        # test for all possible window combinations
+        for data_window, decoded_window in product(windows, windows):
+            data = windows[data_window]
+            decoded = windows[decoded_window]
+
+            # the constant window needs to adjusted for the weak monotonicities
+            #  since the implementation also checks that no overlap with
+            #  adjacent elements occurs, which the weak windows have for 1.0
+            if decoded_window == "co" and data_window in ("wi", "wd"):
+                decoded = np.array([1.0, 1, 1])
+
+            # if the window activates the guardrail ...
+            if data_window in active_allowed:
+                # the check has to return the expected result
+                assert guardrail.check(data, decoded) == (
+                    decoded_window in active_allowed[data_window]
+                )
+                # the elementwise check has to return the expected result
+                assert np.all(guardrail.check_elementwise(data, decoded)) == (
+                    decoded_window in active_allowed[data_window]
+                )
+
+                # correcting the data must pass both checks
+                corrected = guardrail._compute_correction(data, decoded)
+                assert guardrail.check(data, corrected)
+                assert np.all(guardrail.check_elementwise(data, corrected))
+            else:
+                # the window doesn't activate the guardrail so the checks must
+                #  succeed
+                assert guardrail.check(data, decoded)
+                assert np.all(guardrail.check_elementwise(data, decoded))
+
+                # the window doesn't activate the guardrail so the corrected
+                #  array should be bit-equivalent to the decoded array
+                assert np.array_equal(
+                    _as_bits(guardrail._compute_correction(data, decoded)),
+                    _as_bits(decoded),
+                )

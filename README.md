@@ -11,6 +11,8 @@ The guardrails implemented in this package are designed to be convenient to appl
 
 2. They are designed to minimise the overhead in compressed message size for elements where the properties were already satisfied by the wrapped compressor.
 
+3. Their implementations are prioritise correctness in all cases and simplicity of verification over performance (and byte ratio overhead when the properties are violated by many data elements). Please refer to the [related projects](#related-projects) section for alternatives with different design considerations.
+
 If applied to
 
 - a safe compressor that (by chance or design) already satisfies the properties, there is a constant single-byte overhead

@@ -2,7 +2,6 @@
 
 Lossy compression can be scary as valuable information may be lost. This package provides the [`GuardrailsCodec`][numcodecs_guardrails.GuardrailsCodec] adapter and several [`Guardrails`][numcodecs_guardrails.Guardrails] that can be applied to *any* existing (lossy) compressor to *guarantee* that certain properties about the compression error are upheld. By using these adapters, badly behaving lossy compressors become safe to use, at the cost of potentially less efficient compression, and lossy compression can be applied without fear.
 
-
 ## Design and Guarantees
 
 The guardrails implemented in this package are designed to be convenient to apply to any lossy compression task:
@@ -10,6 +9,8 @@ The guardrails implemented in this package are designed to be convenient to appl
 1. They are *guaranteed* to *always* uphold the property they provide.
 
 2. They are designed to minimise the overhead in compressed message size for elements where the properties were already satisfied by the wrapped compressor.
+
+3. Their implementations are prioritise correctness in all cases and simplicity of verification over performance (and byte ratio overhead when the properties are violated by many data elements). Please refer to the [related projects](#related-projects) section for alternatives with different design considerations.
 
 If applied to
 

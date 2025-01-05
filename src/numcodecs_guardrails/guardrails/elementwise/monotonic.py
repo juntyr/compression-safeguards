@@ -248,7 +248,7 @@ class MonotonicGuardrail(ElementwiseGuardrail):
         left: np.ndarray,
         right: Optional[np.ndarray] = None,
         *,
-        is_decoded: bool = True,
+        is_decoded: bool,
     ) -> np.ndarray:
         right = left if right is None else right
 
@@ -291,6 +291,8 @@ class MonotonicGuardrail(ElementwiseGuardrail):
             case Monotonicity.strict_to_weak | Monotonicity.weak:
                 return np.where(
                     np.isfinite(data_monotonic),
-                    decoded_monotonic == -data_monotonic,
+                    # having the opposite sign or no sign are both not equal
+                    (decoded_monotonic == -data_monotonic)
+                    | np.isnan(decoded_monotonic),
                     False,
                 )
