@@ -1,6 +1,6 @@
-from numcodecs_guardrails import GuardrailKind
+from numcodecs_guardrails import Guardrails
 
 
 def test_guardrail_kinds():
-    for kind in GuardrailKind:
+    for kind in Guardrails:
         assert kind.name == kind.value.kind

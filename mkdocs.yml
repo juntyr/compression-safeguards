@@ -5,10 +5,9 @@ strict: true
 markdown_extensions:
   - footnotes
   - pymdownx.superfences
-  - toc
   - pymdownx.highlight:
-      anchor_linenums: true
-  - codehilite
+      use_pygments: true
+      noclasses: true
   - pymdownx.arithmatex:
       generic: true
 
@@ -36,7 +35,6 @@ plugins:
         - generate_api.py
         - requirements.txt
   - search
-  - include-markdown
   - mkdocstrings-python-generator:
       source_dirs:
         - nav_heading: [Documentation]

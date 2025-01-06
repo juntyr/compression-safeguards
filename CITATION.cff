@@ -1,0 +1,26 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: numcodecs-guardrails
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Juniper
+    family-names: Tyree
+    email: juniper.tyree@helsinki.fi
+    affiliation: University of Helsinki
+    orcid: 'https://orcid.org/0000-0002-7923-9609'
+repository-code: 'https://github.com/juntyr/numcodecs-guardrails'
+url: 'https://numcodecs-guardrails.readthedocs.io/en/stable/'
+repository-artifact: 'https://pypi.org/project/numcodecs-guardrails/'
+abstract: Fearless lossy compression using guardrails
+keywords:
+  - compression
+  - lossy-compression
+  - fearless
+  - guardrails
+  - adapter
+license: MPL-2.0

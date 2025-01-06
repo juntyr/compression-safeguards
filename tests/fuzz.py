@@ -2,16 +2,20 @@ import atheris
 
 with atheris.instrument_imports():
     import sys
+    import types
+    import typing
 
-    from inspect import signature
+    from enum import Enum
+    from inspect import signature, Parameter
 
+    import numcodecs.registry
     import numpy as np
 
     from numcodecs.abc import Codec
     from numcodecs_guardrails import (
         GuardrailsCodec,
-        GuardrailKind,
-        SUPPORTED_DTYPES,
+        Guardrails,
+        _SUPPORTED_DTYPES,
     )
 
 
@@ -32,13 +36,32 @@ class FuzzCodec(Codec):
         return out
 
 
+numcodecs.registry.register_codec(FuzzCodec)
+
+
+def generate_parameter(data: atheris.FuzzedDataProvider, p: Parameter):
+    if p.annotation is float:
+        return data.ConsumeFloat()
+    if p.annotation is int:
+        return data.ConsumeInt(1)
+    if p.annotation is bool:
+        return data.ConsumeBool()
+
+    if typing.get_origin(p.annotation) in (typing.Union, types.UnionType):
+        tys = typing.get_args(p.annotation)
+        if len(tys) == 2 and tys[0] is str and issubclass(tys[1], Enum):
+            return list(tys[1])[data.ConsumeIntInRange(0, len(tys[1]) - 1)]
+
+    assert False, f"unknown parameter type {p.annotation!r}"
+
+
 def check_one_input(data):
     data = atheris.FuzzedDataProvider(data)
 
     # top-level metadata: which guardrails and what type of data
-    kinds: list[GuardrailKind] = [kind for kind in GuardrailKind if data.ConsumeBool()]
-    dtype: np.ndtype = list(SUPPORTED_DTYPES)[
-        data.ConsumeIntInRange(0, len(GuardrailKind) - 1)
+    kinds: list[Guardrails] = [kind for kind in Guardrails if data.ConsumeBool()]
+    dtype: np.ndtype = list(_SUPPORTED_DTYPES)[
+        data.ConsumeIntInRange(0, len(Guardrails) - 1)
     ]
     size: int = data.ConsumeIntInRange(0, 10)
 
@@ -60,7 +83,7 @@ def check_one_input(data):
         {
             "kind": kind.name,
             **{
-                p: data.ConsumeFloat()
+                p: generate_parameter(data, v)
                 for p, v in signature(kind.value).parameters.items()
             },
         }
@@ -75,11 +98,17 @@ def check_one_input(data):
     except AssertionError:
         return
 
+    grepr = repr(guardrail)
+    gconfig = guardrail.get_config()
+
+    guardrail = numcodecs.registry.get_codec(gconfig)
+    assert guardrail.get_config() == gconfig
+
     try:
         encoded = guardrail.encode(raw)
         guardrail.decode(encoded, out=np.empty_like(raw))
     except Exception as err:
-        print(f"\n===\n\ncodec = {guardrail!r}\n\n===\n")
+        print(f"\n===\n\ncodec = {grepr}\n\n===\n")
         raise err
 
 

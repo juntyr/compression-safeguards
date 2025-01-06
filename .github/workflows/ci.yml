@@ -55,6 +55,9 @@ jobs:
   fuzz:
     name: Fuzz
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the Repository
         uses: actions/checkout@v4
@@ -73,5 +76,28 @@ jobs:
       - name: Install numcodecs-guardrails
         run: uv sync --only-group fuzz && uv pip install .
 
+      - name: Restore the fuzzer corpus
+        id: fuzzer-corpus-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: ./corpus
+          key: fuzzer-corpus
+
+      - name: Ensure the fuzzer corpus exists
+        run: mkdir -p ./corpus
+
       - name: Run the fuzzer
-        run: uv run tests/fuzz.py -max_total_time=60
+        run: uv run tests/fuzz.py ./corpus -max_total_time=60
+
+      - name: Delete the previous fuzzer corpus
+        if: always() && steps.fuzzer-corpus-restore.outputs.cache-hit == 'true'
+        run: gh cache delete fuzzer-corpus
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Save the fuzzer corpus
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ./corpus
+          key: fuzzer-corpus

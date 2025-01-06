@@ -1,3 +1,7 @@
+"""
+Relative (or absolute) error bound guardrail.
+"""
+
 __all__ = ["RelativeOrAbsoluteErrorBoundGuardrail"]
 
 import numpy as np
@@ -14,6 +18,31 @@ class RelativeOrAbsoluteErrorBoundGuardrail(ElementwiseGuardrail):
     _priority = 0
 
     def __init__(self, eb_rel: float, eb_abs: float):
+        r"""
+        The `RelativeOrAbsoluteErrorBoundGuardrail` guarantees that the
+        absolute elementwise error between the *logarithms*\* of the values is
+        less than or equal to $\log(1 + eb_{rel})$ where `eb_rel` is e.g. 2%.
+
+        The logarithm* here is adapted to support positive, negative, and zero
+        values. For values close to zero, where the relative error is not well-
+        defined, the absolute elementwise error is guaranteed to be less than
+        or equal to the absolute error bound.
+
+        Put simply, each element satisfies the relative or the absolute error
+        bound (or both). In cases where the arithmetic evaluation of the error
+        bound is not well-defined, e.g. for infinite or NaN values, producing
+        the exact same bitpattern is defined to satisfy the error bound.
+
+        Parameters
+        ----------
+        eb_rel : float
+            The positive relative error bound that is enforced by this
+            guardrail. `eb_rel=0.02` corresponds to a 2% relative bound.
+        eb_abs : float
+            The positive absolute error bound that is enforced by this
+            guardrail.
+        """
+
         assert eb_rel > 0.0, "eb_rel must be positive"
         assert np.isfinite(eb_rel), "eb_rel must be finite"
         assert eb_abs > 0.0, "eb_abs must be positive"
@@ -24,6 +53,23 @@ class RelativeOrAbsoluteErrorBoundGuardrail(ElementwiseGuardrail):
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
+        """
+        Check which elements in the `decoded` array satisfy the relative or the
+        absolute error bound.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data to be encoded.
+        decoded : np.ndarray
+            Decoded data.
+
+        Returns
+        -------
+        ok : np.ndarray
+            Per-element, `True` if the check succeeded for this element.
+        """
+
         return (
             (np.abs(self._log(data) - self._log(decoded)) <= np.log(1.0 + self._eb_rel))
             | (np.abs(data - decoded) <= self._eb_abs)
@@ -31,7 +77,7 @@ class RelativeOrAbsoluteErrorBoundGuardrail(ElementwiseGuardrail):
         )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def compute_correction(
+    def _compute_correction(
         self,
         data: np.ndarray,
         decoded: np.ndarray,
@@ -54,7 +100,16 @@ class RelativeOrAbsoluteErrorBoundGuardrail(ElementwiseGuardrail):
         )
 
     def get_config(self) -> dict:
-        return dict(eb_rel=self._eb_rel, eb_abs=self._eb_abs)
+        """
+        Returns the configuration of the guardrail.
+
+        Returns
+        -------
+        config : dict
+            Configuration of the guardrail.
+        """
+
+        return dict(kind=type(self).kind, eb_rel=self._eb_rel, eb_abs=self._eb_abs)
 
     def _log(self, x: np.ndarray) -> np.ndarray:
         a = 0.5 * self._eb_abs / (1.0 + self._eb_rel)
