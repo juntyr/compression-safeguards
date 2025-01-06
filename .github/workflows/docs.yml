@@ -22,7 +22,7 @@ jobs:
         run: uv python install
 
       - name: Install mkdocs dependencies
-        run: uv pip install -r docs/requirements.txt
+        run: uv venv && uv pip install -r docs/requirements.txt
 
       - name: Install numcodecs-guardrails
         run: uv sync --only-group test && uv pip install .
