@@ -2,7 +2,7 @@
 Monotonicity-preserving guardrail.
 """
 
-__all__ = ["Monotonicity", "MonotonicGuardrail"]
+__all__ = ["Monotonicity", "MonotonicityPreservingGuardrail"]
 
 from enum import Enum
 from operator import le, lt, ge, gt
@@ -24,7 +24,7 @@ _WEAK = ((le, ge, False), (le, ge, True))
 class Monotonicity(Enum):
     """
     Different levels of monotonicity that can be enforced by the
-    [`MonotonicGuardrail`][numcodecs_guardrails.guardrails.elementwise.monotonic.MonotonicGuardrail].
+    [`MonotonicityPreservingGuardrail`][numcodecs_guardrails.guardrails.elementwise.monotonicity.MonotonicityPreservingGuardrail].
     """
 
     strict = _STRICT
@@ -66,15 +66,40 @@ class Monotonicity(Enum):
     """
 
 
-class MonotonicGuardrail(ElementwiseGuardrail):
+class MonotonicityPreservingGuardrail(ElementwiseGuardrail):
     __slots__ = "_window"
     _window: int
     _monotonicity: Monotonicity
 
-    kind = "monotonic"
+    kind = "monotonicity"
     _priority = 1
 
     def __init__(self, monotonicity: str | Monotonicity, window: int):
+        r"""
+        The `MonotonicityPreservingGuardrail` guarantees that sequences that
+        are monotonic in the input are guaranteed to be monotonic in the
+        decompressed output.
+
+        Monotonic sequences are detected using per-axis moving windows with a
+        symmetric size of $(1 + window \cdot 2)$.
+
+        The guardrail supports enforcing four levels of
+        [`Monotonicity`][numcodecs_guardrails.guardrails.elementwise.monotonicity.Monotonicity]:
+        `strict`, `strict_with_consts`, `strict_to_weak`, `weak`.
+
+        Windows that are not monotonic or contain non-finite data are skipped.
+        Axes that have fewer elements than the window size are skipped as well.
+
+        Parameters
+        ----------
+        monotonicity : Monotonicity
+            The level of monotonicity that is guaranteed to be preserved by the
+            guardrail.
+        window : int
+            Positive symmetric half-window size; the window has size
+            $(1 + window \cdot 2)$.
+        """
+
         self._monotonicity = (
             monotonicity
             if isinstance(monotonicity, Monotonicity)
@@ -85,6 +110,23 @@ class MonotonicGuardrail(ElementwiseGuardrail):
         self._window = window
 
     def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
+        """
+        Check if monotonic sequences in the `data` array are preserved in the
+        `decoded` array.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data to be encoded.
+        decoded : np.ndarray
+            Decoded data.
+
+        Returns
+        -------
+        ok : bool
+            `True` if the check succeeded.
+        """
+
         window = 1 + self._window * 2
 
         for axis, alen in enumerate(data.shape):
@@ -106,6 +148,23 @@ class MonotonicGuardrail(ElementwiseGuardrail):
         return True
 
     def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
+        """
+        Check which elements in the `decoded` array preserve the monotonicity
+        of the `data` array.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data to be encoded.
+        decoded : np.ndarray
+            Decoded data.
+
+        Returns
+        -------
+        ok : np.ndarray
+            Per-element, `True` if the check succeeded for this element.
+        """
+
         window = 1 + self._window * 2
 
         needs_correction = np.zeros_like(decoded, dtype=bool)

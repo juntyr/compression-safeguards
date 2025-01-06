@@ -33,7 +33,7 @@ from numcodecs.abc import Codec
 from .guardrails import Guardrail
 from .guardrails.elementwise import ElementwiseGuardrail
 from .guardrails.elementwise.abs import AbsoluteErrorBoundGuardrail
-from .guardrails.elementwise.monotonic import MonotonicGuardrail
+from .guardrails.elementwise.monotonicity import MonotonicityPreservingGuardrail
 from .guardrails.elementwise.rel_or_abs import RelativeOrAbsoluteErrorBoundGuardrail
 
 
@@ -49,8 +49,8 @@ class Guardrails(Enum):
     rel_or_abs = RelativeOrAbsoluteErrorBoundGuardrail
     """Enforce a relative error bound, fall back to an absolute error bound close to zero."""
 
-    # monotonic
-    monotonic = MonotonicGuardrail
+    # monotonicity
+    monotonicity = MonotonicityPreservingGuardrail
     """Enforce that monotonic sequences remain monotonic."""
 
 

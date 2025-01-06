@@ -33,6 +33,10 @@ This package currently implements the following [guardrails][numcodecs_guardrail
     
     Put simply, each element satisfies the relative or the absolute error bound (or both). In cases where the arithmetic evaluation of the error bound is not well-defined, e.g. for infinite or NaN values, producing the exact same bitpattern is defined to satisfy the error bound.
 
+- [`monotonicity`][numcodecs_guardrails.guardrails.elementwise.monotonicity.MonotonicityPreservingGuardrail] (monotonicity-preserving):
+
+    Sequences that are monotonic in the input are guaranteed to be monotonic in the decompressed output. Monotonic sequences are detected using per-axis moving windows. The guardrail supports enforcing four levels of [monotonicity][numcodecs_guardrails.guardrails.elementwise.monotonicity.Monotonicity]: `strict`, `strict_with_consts`, `strict_to_weak`, `weak`. Windows that are not monotonic or contain non-finite data are skipped. Axes that have fewer elements than the window size are skipped as well.
+
 
 ## Usage
 

@@ -2,9 +2,9 @@ from itertools import product
 
 import numpy as np
 
-from numcodecs_guardrails.guardrails.elementwise.monotonic import (
+from numcodecs_guardrails.guardrails.elementwise.monotonicity import (
     Monotonicity,
-    MonotonicGuardrail,
+    MonotonicityPreservingGuardrail,
 )
 from numcodecs_guardrails.guardrails.elementwise import _as_bits
 
@@ -22,25 +22,25 @@ def check_all_codecs(data: np.ndarray):
         encode_decode_zero(
             data,
             guardrails=[
-                dict(kind="monotonic", monotonicity=monotonicity, window=window)
+                dict(kind="monotonicity", monotonicity=monotonicity, window=window)
             ],
         )
         encode_decode_neg(
             data,
             guardrails=[
-                dict(kind="monotonic", monotonicity=monotonicity, window=window)
+                dict(kind="monotonicity", monotonicity=monotonicity, window=window)
             ],
         )
         encode_decode_identity(
             data,
             guardrails=[
-                dict(kind="monotonic", monotonicity=monotonicity, window=window)
+                dict(kind="monotonicity", monotonicity=monotonicity, window=window)
             ],
         )
         encode_decode_noise(
             data,
             guardrails=[
-                dict(kind="monotonic", monotonicity=monotonicity, window=window)
+                dict(kind="monotonicity", monotonicity=monotonicity, window=window)
             ],
         )
 
@@ -127,7 +127,7 @@ def test_monotonicity():
 
     # test for all monotonicities
     for monotonicity, active_allowed in monotonicities.items():
-        guardrail = MonotonicGuardrail(monotonicity, window=1)
+        guardrail = MonotonicityPreservingGuardrail(monotonicity, window=1)
 
         # test for all possible window combinations
         for data_window, decoded_window in product(windows, windows):
