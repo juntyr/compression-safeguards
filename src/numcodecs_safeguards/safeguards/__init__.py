@@ -1,8 +1,8 @@
 """
-Implementations for the provided guardrails.
+Implementations for the provided safeguards.
 """
 
-__all__ = ["Guardrail"]
+__all__ = ["Safeguard"]
 
 from abc import ABC, abstractmethod
 from typing import Self
@@ -10,20 +10,20 @@ from typing import Self
 import numpy as np
 
 
-class Guardrail(ABC):
+class Safeguard(ABC):
     """
-    Guardrail abstract base class.
+    Safeguard abstract base class.
     """
 
     kind: str
-    """Guardrail kind."""
+    """Safeguard kind."""
     _priority: int
 
     @abstractmethod
     def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
         """
         Check if the `decoded` array upholds the property enforced by this
-        guardrail.
+        safeguard.
 
         Parameters
         ----------
@@ -42,15 +42,15 @@ class Guardrail(ABC):
     @abstractmethod
     def get_config(self) -> dict:
         """
-        Returns the configuration of the guardrail.
+        Returns the configuration of the safeguard.
 
-        The config must include a 'kind' field with the guardrail kind. All
+        The config must include a 'kind' field with the safeguard kind. All
         values must be compatible with JSON encoding.
 
         Returns
         -------
         config : dict
-            Configuration of the guardrail.
+            Configuration of the safeguard.
         """
 
         pass
@@ -58,17 +58,17 @@ class Guardrail(ABC):
     @classmethod
     def from_config(cls, config: dict) -> Self:
         """
-        Instantiate the guardrail from a configuration [`dict`][dict].
+        Instantiate the safeguard from a configuration [`dict`][dict].
 
         Parameters
         ----------
         config : dict
-            Configuration of the guardrail.
+            Configuration of the safeguard.
 
         Returns
         -------
-        guardrail : Self
-            Instantiated guardrail.
+        safeguard : Self
+            Instantiated safeguard.
         """
 
         return cls(**config)

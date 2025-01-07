@@ -1,15 +1,15 @@
 """
-Absolute error bound guardrail.
+Absolute error bound safeguard.
 """
 
-__all__ = ["AbsoluteErrorBoundGuardrail"]
+__all__ = ["AbsoluteErrorBoundSafeguard"]
 
 import numpy as np
 
-from . import ElementwiseGuardrail, _as_bits
+from . import ElementwiseSafeguard, _as_bits
 
 
-class AbsoluteErrorBoundGuardrail(ElementwiseGuardrail):
+class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     __slots__ = ("_eb_abs",)
     _eb_abs: float
 
@@ -18,7 +18,7 @@ class AbsoluteErrorBoundGuardrail(ElementwiseGuardrail):
 
     def __init__(self, eb_abs: float):
         """
-        The `AbsoluteErrorBoundGuardrail` guarantees that the absolute
+        The `AbsoluteErrorBoundSafeguard` guarantees that the absolute
         elementwise error is less than or equal to the provided bound `eb_abs`.
 
         In cases where the arithmetic evaluation of the error bound not well-
@@ -29,7 +29,7 @@ class AbsoluteErrorBoundGuardrail(ElementwiseGuardrail):
         ----------
         eb_abs : float
             The positive absolute error bound that is enforced by this
-            guardrail.
+            safeguard.
         """
 
         assert eb_abs > 0.0, "eb_abs must be positive"
@@ -80,12 +80,12 @@ class AbsoluteErrorBoundGuardrail(ElementwiseGuardrail):
 
     def get_config(self) -> dict:
         """
-        Returns the configuration of the guardrail.
+        Returns the configuration of the safeguard.
 
         Returns
         -------
         config : dict
-            Configuration of the guardrail.
+            Configuration of the safeguard.
         """
 
         return dict(kind=type(self).kind, eb_abs=self._eb_abs)

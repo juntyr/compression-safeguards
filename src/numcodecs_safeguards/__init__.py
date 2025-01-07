@@ -1,23 +1,23 @@
 """
-# Fearless lossy compression with `numcodecs-guardrails`
+# Fearless lossy compression with `numcodecs-safeguards`
 
 Lossy compression can be scary as valuable information may be lost.
 
 This package provides the
-[`GuardrailsCodec`][numcodecs_guardrails.GuardrailsCodec] adapter and several
-[`Guardrails`][numcodecs_guardrails.Guardrails] that can be applied to *any*
+[`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec] adapter and several
+[`Safeguards`][numcodecs_safeguards.Safeguards] that can be applied to *any*
 existing (lossy) compressor to *guarantee* that certain properties about the
 compression error are upheld.
 
 Note that the wrapped compressor is treated as a blackbox and the decompressed
 data is postprocessed to re-establish the properties, if necessary.
 
-By using the [`GuardrailsCodec`][numcodecs_guardrails.GuardrailsCodec] adapter,
+By using the [`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec] adapter,
 badly behaving lossy compressors become safe to use, at the cost of potentially
 less efficient compression, and lossy compression can be applied without fear.
 """
 
-__all__ = ["GuardrailsCodec", "Guardrails"]
+__all__ = ["SafeguardsCodec", "Safeguards"]
 
 from collections.abc import Buffer, Sequence
 from enum import Enum
@@ -33,27 +33,27 @@ import varint
 
 from numcodecs.abc import Codec
 
-from .guardrails import Guardrail
-from .guardrails.elementwise import ElementwiseGuardrail
-from .guardrails.elementwise.abs import AbsoluteErrorBoundGuardrail
-from .guardrails.elementwise.monotonicity import MonotonicityPreservingGuardrail
-from .guardrails.elementwise.rel_or_abs import RelativeOrAbsoluteErrorBoundGuardrail
+from .safeguards import Safeguard
+from .safeguards.elementwise import ElementwiseSafeguard
+from .safeguards.elementwise.abs import AbsoluteErrorBoundSafeguard
+from .safeguards.elementwise.monotonicity import MonotonicityPreservingSafeguard
+from .safeguards.elementwise.rel_or_abs import RelativeOrAbsoluteErrorBoundSafeguard
 
 
-class Guardrails(Enum):
+class Safeguards(Enum):
     """
-    Enumeration of all supported guardrails:
+    Enumeration of all supported safeguards:
     """
 
     # error bounds
-    abs = AbsoluteErrorBoundGuardrail
+    abs = AbsoluteErrorBoundSafeguard
     """Enforce an absolute error bound."""
 
-    rel_or_abs = RelativeOrAbsoluteErrorBoundGuardrail
+    rel_or_abs = RelativeOrAbsoluteErrorBoundSafeguard
     """Enforce a relative error bound, fall back to an absolute error bound close to zero."""
 
     # monotonicity
-    monotonicity = MonotonicityPreservingGuardrail
+    monotonicity = MonotonicityPreservingSafeguard
     """Enforce that monotonic sequences remain monotonic."""
 
 
@@ -74,46 +74,46 @@ _SUPPORTED_DTYPES: set[np.dtype] = {
 }
 
 
-class GuardrailsCodec(Codec):
+class SafeguardsCodec(Codec):
     """
-    An adaptor codec that uses guardrails to guarantee certain properties are
+    An adaptor codec that uses safeguards to guarantee certain properties are
     upheld by the wrapped codec.
 
     Parameters
     ----------
     codec : dict | Codec
-        The codec to wrap with guardrails. It can either be passed as a codec
+        The codec to wrap with safeguards. It can either be passed as a codec
         configuration [`dict`][dict], which is passed to
         [`numcodecs.registry.get_codec(config)`][numcodecs.registry.get_codec],
         or an already initialized [`Codec`][numcodecs.abc.Codec].
 
         The codec must encode to a 1D buffer of bytes. It is desirable to
-        perform lossless compression after applying the guardrails (rather than
+        perform lossless compression after applying the safeguards (rather than
         before).
-    guardrails : Sequence[dict | Guardrail]
-        The guardrails that will be applied to the codec. They can either be
-        passed as a guardrail configuration [`dict`][dict] or an already
-        initialized [`Guardrail`][numcodecs_guardrails.guardrails.Guardrail].
+    safeguards : Sequence[dict | Safeguard]
+        The safeguards that will be applied to the codec. They can either be
+        passed as a safeguard configuration [`dict`][dict] or an already
+        initialized [`Safeguard`][numcodecs_safeguards.safeguards.Safeguard].
 
-        Please refer to [`Guardrails`][numcodecs_guardrails.Guardrails] for an
-        enumeration of all supported guardrails.
+        Please refer to [`Safeguards`][numcodecs_safeguards.Safeguards] for an
+        enumeration of all supported safeguards.
     _version : Optional[str]
         Internal, do not provide this paramter explicitly.
     """
 
-    __slots__ = ("_version", "_codec", "_lossless", "_guardrails")
+    __slots__ = ("_version", "_codec", "_lossless", "_safeguards")
     _version: str
     _codec: Codec
     _lossless: Codec
-    _elementwise_guardrails: tuple[ElementwiseGuardrail]
+    _elementwise_safeguards: tuple[ElementwiseSafeguard]
 
-    codec_id = "guardrails"
+    codec_id = "safeguards"
 
     def __init__(
         self,
         *,
         codec: dict | Codec,
-        guardrails: Sequence[dict | Guardrail],
+        safeguards: Sequence[dict | Safeguard],
         _version: Optional[str] = None,
     ):
         if _version is not None:
@@ -124,32 +124,32 @@ class GuardrailsCodec(Codec):
         )
         self._lossless = numcodecs.zlib.Zlib(level=9)
 
-        guardrails = [
-            guardrail
-            if isinstance(guardrail, Guardrail)
-            else Guardrails[guardrail["kind"]].value(
-                **{p: v for p, v in guardrail.items() if p != "kind"}
+        safeguards = [
+            safeguard
+            if isinstance(safeguard, Safeguard)
+            else Safeguards[safeguard["kind"]].value(
+                **{p: v for p, v in safeguard.items() if p != "kind"}
             )
-            for guardrail in guardrails
+            for safeguard in safeguards
         ]
 
-        self._elementwise_guardrails = tuple(
+        self._elementwise_safeguards = tuple(
             sorted(
                 (
-                    guardrail
-                    for guardrail in guardrails
-                    if isinstance(guardrail, ElementwiseGuardrail)
+                    safeguard
+                    for safeguard in safeguards
+                    if isinstance(safeguard, ElementwiseSafeguard)
                 ),
-                key=lambda guardrail: guardrail._priority,
+                key=lambda safeguard: safeguard._priority,
             )
         )
-        guardrails = [
-            guardrail
-            for guardrail in guardrails
-            if not isinstance(guardrail, ElementwiseGuardrail)
+        safeguards = [
+            safeguard
+            for safeguard in safeguards
+            if not isinstance(safeguard, ElementwiseSafeguard)
         ]
 
-        assert len(guardrails) == 0, f"unsupported guardrails {guardrails:!r}"
+        assert len(safeguards) == 0, f"unsupported safeguards {safeguards:!r}"
 
     def encode(self, buf: Buffer) -> Buffer:
         """Encode the data in `buf`.
@@ -189,21 +189,21 @@ class GuardrailsCodec(Codec):
 
         prev_correction = decoded
         correction = None
-        for guardrail in self._elementwise_guardrails:
-            if not guardrail.check(data, prev_correction):
-                correction = guardrail._compute_correction(data, prev_correction)
+        for safeguard in self._elementwise_safeguards:
+            if not safeguard.check(data, prev_correction):
+                correction = safeguard._compute_correction(data, prev_correction)
                 prev_correction = correction
 
         if correction is None:
             correction = bytes()
         else:
-            for guardrail in self._elementwise_guardrails:
-                assert guardrail.check(
+            for safeguard in self._elementwise_safeguards:
+                assert safeguard.check(
                     data,
                     correction,
-                ), f"{guardrail!r} check fails after correction"
+                ), f"{safeguard!r} check fails after correction"
 
-            correction = ElementwiseGuardrail._encode_correction(
+            correction = ElementwiseSafeguard._encode_correction(
                 decoded,
                 correction,
                 self._lossless,
@@ -254,7 +254,7 @@ class GuardrailsCodec(Codec):
         decoded = self._codec.decode(encoded, out=out)
 
         if correction_len > 0:
-            corrected = ElementwiseGuardrail._apply_correction(
+            corrected = ElementwiseSafeguard._apply_correction(
                 decoded,
                 correction,
                 self._lossless,
@@ -266,7 +266,7 @@ class GuardrailsCodec(Codec):
 
     def get_config(self) -> dict:
         """
-        Returns the configuration of the codec with guardrails.
+        Returns the configuration of the codec with safeguards.
 
         [`numcodecs.registry.get_codec(config)`][numcodecs.registry.get_codec]
         can be used to reconstruct this stack from the returned config.
@@ -274,20 +274,20 @@ class GuardrailsCodec(Codec):
         Returns
         -------
         config : dict
-            Configuration of the codec with guardrails.
+            Configuration of the codec with safeguards.
         """
 
         return dict(
             id=type(self).codec_id,
             _version=_FORMAT_VERSION,
             codec=self._codec.get_config(),
-            guardrails=[
-                guardrail.get_config() for guardrail in self._elementwise_guardrails
+            safeguards=[
+                safeguard.get_config() for safeguard in self._elementwise_safeguards
             ],
         )
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(codec={self._codec!r}, guardrails={list(self._elementwise_guardrails)!r})"
+        return f"{type(self).__name__}(codec={self._codec!r}, safeguards={list(self._elementwise_safeguards)!r})"
 
 
-numcodecs.registry.register_codec(GuardrailsCodec)
+numcodecs.registry.register_codec(SafeguardsCodec)

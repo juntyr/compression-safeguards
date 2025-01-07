@@ -1,7 +1,7 @@
 [project]
-name = "numcodecs-guardrails"
+name = "numcodecs-safeguards"
 version = "0.0.1"
-description = "Fearless lossy compression using guardrails"
+description = "Fearless lossy compression using safeguards"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

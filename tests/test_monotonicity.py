@@ -2,11 +2,11 @@ from itertools import product
 
 import numpy as np
 
-from numcodecs_guardrails.guardrails.elementwise.monotonicity import (
+from numcodecs_safeguards.safeguards.elementwise.monotonicity import (
     Monotonicity,
-    MonotonicityPreservingGuardrail,
+    MonotonicityPreservingSafeguard,
 )
-from numcodecs_guardrails.guardrails.elementwise import _as_bits
+from numcodecs_safeguards.safeguards.elementwise import _as_bits
 
 
 from .codecs import (
@@ -21,25 +21,25 @@ def check_all_codecs(data: np.ndarray):
     for monotonicity, window in product(Monotonicity, range(1, 3 + 1)):
         encode_decode_zero(
             data,
-            guardrails=[
+            safeguards=[
                 dict(kind="monotonicity", monotonicity=monotonicity, window=window)
             ],
         )
         encode_decode_neg(
             data,
-            guardrails=[
+            safeguards=[
                 dict(kind="monotonicity", monotonicity=monotonicity, window=window)
             ],
         )
         encode_decode_identity(
             data,
-            guardrails=[
+            safeguards=[
                 dict(kind="monotonicity", monotonicity=monotonicity, window=window)
             ],
         )
         encode_decode_noise(
             data,
-            guardrails=[
+            safeguards=[
                 dict(kind="monotonicity", monotonicity=monotonicity, window=window)
             ],
         )
@@ -101,7 +101,7 @@ def test_monotonicity():
     )
 
     # mapping for each monotonicity
-    # - keys: which windows activate the guardrail
+    # - keys: which windows activate the safeguard
     # - values: which windows validate without correction
     monotonicities = {
         Monotonicity.strict: dict(
@@ -127,7 +127,7 @@ def test_monotonicity():
 
     # test for all monotonicities
     for monotonicity, active_allowed in monotonicities.items():
-        guardrail = MonotonicityPreservingGuardrail(monotonicity, window=1)
+        safeguard = MonotonicityPreservingSafeguard(monotonicity, window=1)
 
         # test for all possible window combinations
         for data_window, decoded_window in product(windows, windows):
@@ -140,30 +140,30 @@ def test_monotonicity():
             if decoded_window == "co" and data_window in ("wi", "wd"):
                 decoded = np.array([1.0, 1, 1])
 
-            # if the window activates the guardrail ...
+            # if the window activates the safeguard ...
             if data_window in active_allowed:
                 # the check has to return the expected result
-                assert guardrail.check(data, decoded) == (
+                assert safeguard.check(data, decoded) == (
                     decoded_window in active_allowed[data_window]
                 )
                 # the elementwise check has to return the expected result
-                assert np.all(guardrail.check_elementwise(data, decoded)) == (
+                assert np.all(safeguard.check_elementwise(data, decoded)) == (
                     decoded_window in active_allowed[data_window]
                 )
 
                 # correcting the data must pass both checks
-                corrected = guardrail._compute_correction(data, decoded)
-                assert guardrail.check(data, corrected)
-                assert np.all(guardrail.check_elementwise(data, corrected))
+                corrected = safeguard._compute_correction(data, decoded)
+                assert safeguard.check(data, corrected)
+                assert np.all(safeguard.check_elementwise(data, corrected))
             else:
-                # the window doesn't activate the guardrail so the checks must
+                # the window doesn't activate the safeguard so the checks must
                 #  succeed
-                assert guardrail.check(data, decoded)
-                assert np.all(guardrail.check_elementwise(data, decoded))
+                assert safeguard.check(data, decoded)
+                assert np.all(safeguard.check_elementwise(data, decoded))
 
-                # the window doesn't activate the guardrail so the corrected
+                # the window doesn't activate the safeguard so the corrected
                 #  array should be bit-equivalent to the decoded array
                 assert np.array_equal(
-                    _as_bits(guardrail._compute_correction(data, decoded)),
+                    _as_bits(safeguard._compute_correction(data, decoded)),
                     _as_bits(decoded),
                 )

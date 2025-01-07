@@ -11,25 +11,25 @@ from .codecs import (
 def check_all_codecs(data: np.ndarray):
     decoded = encode_decode_zero(
         data,
-        guardrails=[dict(kind="rel_or_abs", eb_rel=0.1, eb_abs=0.1)],
+        safeguards=[dict(kind="rel_or_abs", eb_rel=0.1, eb_abs=0.1)],
     )
     np.testing.assert_allclose(decoded, data, rtol=0.1, atol=0.1)
 
     decoded = encode_decode_neg(
         data,
-        guardrails=[dict(kind="rel_or_abs", eb_rel=0.1, eb_abs=0.1)],
+        safeguards=[dict(kind="rel_or_abs", eb_rel=0.1, eb_abs=0.1)],
     )
     np.testing.assert_allclose(decoded, data, rtol=0.1, atol=0.1)
 
     decoded = encode_decode_identity(
         data,
-        guardrails=[dict(kind="rel_or_abs", eb_rel=0.1, eb_abs=0.1)],
+        safeguards=[dict(kind="rel_or_abs", eb_rel=0.1, eb_abs=0.1)],
     )
     np.testing.assert_allclose(decoded, data, rtol=0.0, atol=0.0)
 
     decoded = encode_decode_noise(
         data,
-        guardrails=[dict(kind="rel_or_abs", eb_rel=0.1, eb_abs=0.1)],
+        safeguards=[dict(kind="rel_or_abs", eb_rel=0.1, eb_abs=0.1)],
     )
     np.testing.assert_allclose(decoded, data, rtol=0.1, atol=0.1)
 

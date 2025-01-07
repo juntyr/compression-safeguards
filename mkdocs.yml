@@ -1,4 +1,4 @@
-site_name: numcodecs-guardrails
+site_name: numcodecs-safeguards
 
 strict: true
 
@@ -26,8 +26,8 @@ theme:
 nav:
   - Home: index.md
   - Links:
-      - GitHub: https://github.com/juntyr/numcodecs-guardrails
-      - PyPI: https://pypi.org/project/numcodecs-guardrails/
+      - GitHub: https://github.com/juntyr/numcodecs-safeguards
+      - PyPI: https://pypi.org/project/numcodecs-safeguards/
 
 plugins:
   - exclude:

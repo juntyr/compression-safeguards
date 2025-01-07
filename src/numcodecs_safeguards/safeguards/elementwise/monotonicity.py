@@ -1,8 +1,8 @@
 """
-Monotonicity-preserving guardrail.
+Monotonicity-preserving safeguard.
 """
 
-__all__ = ["Monotonicity", "MonotonicityPreservingGuardrail"]
+__all__ = ["Monotonicity", "MonotonicityPreservingSafeguard"]
 
 from enum import Enum
 from operator import le, lt, ge, gt
@@ -12,7 +12,7 @@ import numpy as np
 
 from numpy.lib.stride_tricks import sliding_window_view
 
-from . import ElementwiseGuardrail
+from . import ElementwiseSafeguard
 
 
 _STRICT = ((lt, gt, False),) * 2
@@ -24,7 +24,7 @@ _WEAK = ((le, ge, False), (le, ge, True))
 class Monotonicity(Enum):
     """
     Different levels of monotonicity that can be enforced by the
-    [`MonotonicityPreservingGuardrail`][numcodecs_guardrails.guardrails.elementwise.monotonicity.MonotonicityPreservingGuardrail].
+    [`MonotonicityPreservingSafeguard`][numcodecs_safeguards.safeguards.elementwise.monotonicity.MonotonicityPreservingSafeguard].
     """
 
     strict = _STRICT
@@ -66,7 +66,7 @@ class Monotonicity(Enum):
     """
 
 
-class MonotonicityPreservingGuardrail(ElementwiseGuardrail):
+class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
     __slots__ = "_window"
     _window: int
     _monotonicity: Monotonicity
@@ -76,15 +76,15 @@ class MonotonicityPreservingGuardrail(ElementwiseGuardrail):
 
     def __init__(self, monotonicity: str | Monotonicity, window: int):
         r"""
-        The `MonotonicityPreservingGuardrail` guarantees that sequences that
+        The `MonotonicityPreservingSafeguard` guarantees that sequences that
         are monotonic in the input are guaranteed to be monotonic in the
         decompressed output.
 
         Monotonic sequences are detected using per-axis moving windows with a
         symmetric size of $(1 + window \cdot 2)$.
 
-        The guardrail supports enforcing four levels of
-        [`Monotonicity`][numcodecs_guardrails.guardrails.elementwise.monotonicity.Monotonicity]:
+        The safeguard supports enforcing four levels of
+        [`Monotonicity`][numcodecs_safeguards.safeguards.elementwise.monotonicity.Monotonicity]:
         `strict`, `strict_with_consts`, `strict_to_weak`, `weak`.
 
         Windows that are not monotonic or contain non-finite data are skipped.
@@ -94,7 +94,7 @@ class MonotonicityPreservingGuardrail(ElementwiseGuardrail):
         ----------
         monotonicity : Monotonicity
             The level of monotonicity that is guaranteed to be preserved by the
-            guardrail.
+            safeguard.
         window : int
             Positive symmetric half-window size; the window has size
             $(1 + window \cdot 2)$.
@@ -253,12 +253,12 @@ class MonotonicityPreservingGuardrail(ElementwiseGuardrail):
 
     def get_config(self) -> dict:
         """
-        Returns the configuration of the guardrail.
+        Returns the configuration of the safeguard.
 
         Returns
         -------
         config : dict
-            Configuration of the guardrail.
+            Configuration of the safeguard.
         """
 
         return dict(

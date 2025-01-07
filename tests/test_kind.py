@@ -1,6 +1,6 @@
-from numcodecs_guardrails import Guardrails
+from numcodecs_safeguards import Safeguards
 
 
-def test_guardrail_kinds():
-    for kind in Guardrails:
+def test_safeguard_kinds():
+    for kind in Safeguards:
         assert kind.name == kind.value.kind
