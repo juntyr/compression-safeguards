@@ -24,7 +24,7 @@ jobs:
       - name: Install mkdocs dependencies
         run: uv venv && uv pip install -r docs/requirements.txt
 
-      - name: Install numcodecs-guardrails
+      - name: Install numcodecs-safeguards
         run: uv pip install .
 
       - name: Build the documentation

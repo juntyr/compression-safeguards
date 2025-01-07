@@ -1,8 +1,8 @@
 """
-Implementations for the provided elementwise guardrails.
+Implementations for the provided elementwise safeguards.
 """
 
-__all__ = ["ElementwiseGuardrail"]
+__all__ = ["ElementwiseSafeguard"]
 
 from abc import ABC, abstractmethod
 from io import BytesIO
@@ -14,21 +14,21 @@ import varint
 
 from numcodecs.abc import Codec
 
-from .. import Guardrail
+from .. import Safeguard
 
 
-class ElementwiseGuardrail(Guardrail, ABC):
+class ElementwiseSafeguard(Safeguard, ABC):
     """
-    Elementwise guardrail abstract base class.
+    Elementwise safeguard abstract base class.
 
-    Elementwise guardrails can identitfy individual elements that violate the
-    property enforced by the guardrail.
+    Elementwise safeguards can identitfy individual elements that violate the
+    property enforced by the safeguard.
     """
 
     def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
         """
         Check if the `decoded` array upholds the property enforced by this
-        guardrail.
+        safeguard.
 
         Parameters
         ----------
@@ -49,7 +49,7 @@ class ElementwiseGuardrail(Guardrail, ABC):
     def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
         """
         Check which elements in the `decoded` array uphold the property
-        enforced by this guardrail.
+        enforced by this safeguard.
 
         Parameters
         ----------
@@ -74,7 +74,7 @@ class ElementwiseGuardrail(Guardrail, ABC):
     ) -> np.ndarray:
         """
         Compute the correction for the `decoded` array to uphold the property
-        enforced by this guardrail.
+        enforced by this safeguard.
 
         Parameters
         ----------
@@ -99,7 +99,7 @@ class ElementwiseGuardrail(Guardrail, ABC):
         decoded: np.ndarray, correction: np.ndarray, lossless: Codec
     ) -> bytes:
         """
-        Encode the combined correction from one or more elementwise guardrails
+        Encode the combined correction from one or more elementwise safeguards
         to [`bytes`][bytes].
 
         Parameters

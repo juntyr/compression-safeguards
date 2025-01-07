@@ -12,9 +12,9 @@ with atheris.instrument_imports():
     import numpy as np
 
     from numcodecs.abc import Codec
-    from numcodecs_guardrails import (
-        GuardrailsCodec,
-        Guardrails,
+    from numcodecs_safeguards import (
+        SafeguardsCodec,
+        Safeguards,
         _SUPPORTED_DTYPES,
     )
 
@@ -58,10 +58,10 @@ def generate_parameter(data: atheris.FuzzedDataProvider, p: Parameter):
 def check_one_input(data):
     data = atheris.FuzzedDataProvider(data)
 
-    # top-level metadata: which guardrails and what type of data
-    kinds: list[Guardrails] = [kind for kind in Guardrails if data.ConsumeBool()]
+    # top-level metadata: which safeguards and what type of data
+    kinds: list[Safeguards] = [kind for kind in Safeguards if data.ConsumeBool()]
     dtype: np.ndtype = list(_SUPPORTED_DTYPES)[
-        data.ConsumeIntInRange(0, len(Guardrails) - 1)
+        data.ConsumeIntInRange(0, len(Safeguards) - 1)
     ]
     size: int = data.ConsumeIntInRange(0, 10)
 
@@ -78,8 +78,8 @@ def check_one_input(data):
     raw = np.frombuffer(raw, dtype=dtype)
     decoded = np.frombuffer(decoded, dtype=dtype)
 
-    # guardrail parameters
-    guardrails = [
+    # safeguard parameters
+    safeguards = [
         {
             "kind": kind.name,
             **{
@@ -91,22 +91,22 @@ def check_one_input(data):
     ]
 
     try:
-        guardrail = GuardrailsCodec(
+        safeguard = SafeguardsCodec(
             codec=FuzzCodec(raw, decoded),
-            guardrails=guardrails,
+            safeguards=safeguards,
         )
     except AssertionError:
         return
 
-    grepr = repr(guardrail)
-    gconfig = guardrail.get_config()
+    grepr = repr(safeguard)
+    gconfig = safeguard.get_config()
 
-    guardrail = numcodecs.registry.get_codec(gconfig)
-    assert guardrail.get_config() == gconfig
+    safeguard = numcodecs.registry.get_codec(gconfig)
+    assert safeguard.get_config() == gconfig
 
     try:
-        encoded = guardrail.encode(raw)
-        guardrail.decode(encoded, out=np.empty_like(raw))
+        encoded = safeguard.encode(raw)
+        safeguard.decode(encoded, out=np.empty_like(raw))
     except Exception as err:
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")
         raise err

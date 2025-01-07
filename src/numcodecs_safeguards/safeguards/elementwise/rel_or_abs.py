@@ -1,15 +1,15 @@
 """
-Relative (or absolute) error bound guardrail.
+Relative (or absolute) error bound safeguard.
 """
 
-__all__ = ["RelativeOrAbsoluteErrorBoundGuardrail"]
+__all__ = ["RelativeOrAbsoluteErrorBoundSafeguard"]
 
 import numpy as np
 
-from . import ElementwiseGuardrail, _as_bits
+from . import ElementwiseSafeguard, _as_bits
 
 
-class RelativeOrAbsoluteErrorBoundGuardrail(ElementwiseGuardrail):
+class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     __slots__ = ("_eb_rel", "_eb_abs")
     _eb_rel: float
     _eb_abs: float
@@ -19,7 +19,7 @@ class RelativeOrAbsoluteErrorBoundGuardrail(ElementwiseGuardrail):
 
     def __init__(self, eb_rel: float, eb_abs: float):
         r"""
-        The `RelativeOrAbsoluteErrorBoundGuardrail` guarantees that the
+        The `RelativeOrAbsoluteErrorBoundSafeguard` guarantees that the
         absolute elementwise error between the *logarithms*\* of the values is
         less than or equal to $\log(1 + eb_{rel})$ where `eb_rel` is e.g. 2%.
 
@@ -37,10 +37,10 @@ class RelativeOrAbsoluteErrorBoundGuardrail(ElementwiseGuardrail):
         ----------
         eb_rel : float
             The positive relative error bound that is enforced by this
-            guardrail. `eb_rel=0.02` corresponds to a 2% relative bound.
+            safeguard. `eb_rel=0.02` corresponds to a 2% relative bound.
         eb_abs : float
             The positive absolute error bound that is enforced by this
-            guardrail.
+            safeguard.
         """
 
         assert eb_rel > 0.0, "eb_rel must be positive"
@@ -101,12 +101,12 @@ class RelativeOrAbsoluteErrorBoundGuardrail(ElementwiseGuardrail):
 
     def get_config(self) -> dict:
         """
-        Returns the configuration of the guardrail.
+        Returns the configuration of the safeguard.
 
         Returns
         -------
         config : dict
-            Configuration of the guardrail.
+            Configuration of the safeguard.
         """
 
         return dict(kind=type(self).kind, eb_rel=self._eb_rel, eb_abs=self._eb_abs)
