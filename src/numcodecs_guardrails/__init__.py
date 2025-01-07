@@ -9,9 +9,12 @@ This package provides the
 existing (lossy) compressor to *guarantee* that certain properties about the
 compression error are upheld.
 
-By using these adapters, badly behaving lossy compressors become safe to use,
-at the cost of potentially less efficient compression, and lossy compression
-can be applied without fear.
+Note that the wrapped compressor is treated as a blackbox and the decompressed
+data is postprocessed to re-establish the properties, if necessary.
+
+By using the [`GuardrailsCodec`][numcodecs_guardrails.GuardrailsCodec] adapter,
+badly behaving lossy compressors become safe to use, at the cost of potentially
+less efficient compression, and lossy compression can be applied without fear.
 """
 
 __all__ = ["GuardrailsCodec", "Guardrails"]
