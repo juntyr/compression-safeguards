@@ -43,7 +43,7 @@ class ElementwiseSafeguard(Safeguard, ABC):
             `True` if the check succeeded.
         """
 
-        return np.all(self.check_elementwise(data, decoded))
+        return bool(np.all(self.check_elementwise(data, decoded)))
 
     @abstractmethod
     def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
@@ -122,10 +122,10 @@ class ElementwiseSafeguard(Safeguard, ABC):
 
         correction_bits = decoded_bits - corrected_bits
 
-        correction = _runlength_encode(correction_bits)
-        correction = lossless.encode(correction)
+        correction_bytes = _runlength_encode(correction_bits)
+        correction_bytes = lossless.encode(correction_bytes)
 
-        return numcodecs.compat.ensure_bytes(correction)
+        return numcodecs.compat.ensure_bytes(correction_bytes)
 
     @staticmethod
     def _apply_correction(

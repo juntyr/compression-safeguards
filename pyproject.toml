@@ -4,24 +4,23 @@ version = "0.0.1"
 description = "Fearless lossy compression using safeguards"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
-    "numcodecs~=0.13",
-    "numpy~=2.2",
-    "varint~=1.0",
-]
+dependencies = ["numcodecs~=0.13", "numpy~=2.2", "varint~=1.0"]
 
 [dependency-groups]
-dev = [
-    "ruff~=0.8",
-]
-test = [
-    "pytest~=8.3",
-]
-fuzz = [
-    "atheris~=2.3",
-]
+dev = ["ruff~=0.8"]
+test = ["pytest~=8.3"]
+types = ["mypy~=1.14"]
+fuzz = ["atheris~=2.3"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"climatebenchpress.compressor" = ["py.typed"]
 
 [tool.pytest.ini_options]
-addopts = [
-    "--import-mode=importlib",
-]
+addopts = ["--import-mode=importlib"]
+
+[[tool.mypy.overrides]]
+module = ["numcodecs.*", "varint.*"]
+follow_untyped_imports = true

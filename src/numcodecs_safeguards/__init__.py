@@ -105,7 +105,7 @@ class SafeguardsCodec(Codec):
     _version: str
     _codec: Codec
     _lossless: Codec
-    _elementwise_safeguards: tuple[ElementwiseSafeguard]
+    _elementwise_safeguards: tuple[ElementwiseSafeguard, ...]
 
     codec_id = "safeguards"
 
@@ -169,9 +169,9 @@ class SafeguardsCodec(Codec):
 
         data = numcodecs.compat.ensure_ndarray(buf)
 
-        assert (
-            data.dtype in _SUPPORTED_DTYPES
-        ), f"can only encode arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
+        assert data.dtype in _SUPPORTED_DTYPES, (
+            f"can only encode arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
+        )
 
         encoded = self._codec.encode(np.copy(data))
         encoded = numcodecs.compat.ensure_ndarray(encoded)
@@ -195,7 +195,7 @@ class SafeguardsCodec(Codec):
                 prev_correction = correction
 
         if correction is None:
-            correction = bytes()
+            correction_bytes = bytes()
         else:
             for safeguard in self._elementwise_safeguards:
                 assert safeguard.check(
@@ -203,15 +203,15 @@ class SafeguardsCodec(Codec):
                     correction,
                 ), f"{safeguard!r} check fails after correction"
 
-            correction = ElementwiseSafeguard._encode_correction(
+            correction_bytes = ElementwiseSafeguard._encode_correction(
                 decoded,
                 correction,
                 self._lossless,
             )
 
-        correction_len = varint.encode(len(correction))
+        correction_len = varint.encode(len(correction_bytes))
 
-        return correction_len + encoded + correction
+        return correction_len + encoded + correction_bytes
 
     def decode(self, buf: Buffer, out: Optional[Buffer] = None) -> Buffer:
         """Decode the data in `buf`.
@@ -262,7 +262,7 @@ class SafeguardsCodec(Codec):
         else:
             corrected = decoded
 
-        return numcodecs.compat.ndarray_copy(corrected, out)
+        return numcodecs.compat.ndarray_copy(corrected, out)  # type: ignore
 
     def get_config(self) -> dict:
         """
