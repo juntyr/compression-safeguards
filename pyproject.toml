@@ -7,9 +7,9 @@ requires-python = ">=3.12"
 dependencies = ["numcodecs~=0.13", "numpy~=2.2", "varint~=1.0"]
 
 [dependency-groups]
-dev = ["ruff~=0.8"]
+dev = ["ruff~=0.9"]
 test = ["pytest~=8.3"]
-types = ["mypy~=1.14"]
+typing = ["mypy~=1.14"]
 fuzz = ["atheris~=2.3"]
 
 [tool.setuptools.packages.find]
