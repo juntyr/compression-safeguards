@@ -32,7 +32,6 @@ nav:
 plugins:
   - exclude:
       glob:
-        - generate_api.py
         - requirements.txt
   - search
   - mkdocstrings-python-generator:
