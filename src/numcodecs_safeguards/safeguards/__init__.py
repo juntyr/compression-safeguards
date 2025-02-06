@@ -5,7 +5,7 @@ Implementations for the provided safeguards.
 __all__ = ["Safeguard"]
 
 from abc import ABC, abstractmethod
-from typing import Self
+from typing_extensions import Self  # MSPV 3.11
 
 import numpy as np
 

@@ -19,10 +19,11 @@ less efficient compression, and lossy compression can be applied without fear.
 
 __all__ = ["SafeguardsCodec", "Safeguards"]
 
-from collections.abc import Buffer, Sequence
+from collections.abc import Sequence
 from enum import Enum
 from io import BytesIO
 from typing import Optional
+from typing_extensions import Buffer  # MSPV 3.12
 
 import numcodecs
 import numcodecs.compat

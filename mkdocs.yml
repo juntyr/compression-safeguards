@@ -62,10 +62,11 @@ plugins:
               classes: true
               functions: true
               modules: true
-          import:
+          inventories:
             - https://docs.python.org/3.12/objects.inv
             - https://numpy.org/doc/2.2/objects.inv
-            - https://numcodecs.readthedocs.io/en/v0.13.0/objects.inv
+            - https://numcodecs.readthedocs.io/en/v0.15.0/objects.inv
+            - https://numcodecs-combinators.readthedocs.io/en/v0.2.3/objects.inv
 
 watch:
   - src
