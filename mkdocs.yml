@@ -34,6 +34,7 @@ plugins:
       glob:
         - requirements.txt
   - search
+  - autorefs
   - mkdocstrings-python-generator:
       source_dirs:
         - nav_heading: [Documentation]

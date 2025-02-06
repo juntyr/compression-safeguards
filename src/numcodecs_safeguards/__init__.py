@@ -109,7 +109,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
     _lossless: Codec
     _elementwise_safeguards: tuple[ElementwiseSafeguard, ...]
 
-    codec_id = "safeguards"
+    codec_id: str = "safeguards"  # type: ignore
 
     def __init__(
         self,
@@ -235,22 +235,21 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         """
 
         assert out is not None, "can only decode into known dtype and shape"
-        out = numcodecs.compat.ensure_ndarray(out)
 
-        buf = numcodecs.compat.ensure_ndarray(buf)
-        assert buf.dtype == np.dtype("uint8"), "codec must decode from bytes"
-        assert len(buf.shape) <= 1, "codec must decode from 1D bytes"
-        buf = numcodecs.compat.ensure_bytes(buf)
+        buf_array = numcodecs.compat.ensure_ndarray(buf)
+        assert buf_array.dtype == np.dtype("uint8"), "codec must decode from bytes"
+        assert len(buf_array.shape) <= 1, "codec must decode from 1D bytes"
+        buf_bytes = numcodecs.compat.ensure_bytes(buf)
 
-        buf_io = BytesIO(buf)
+        buf_io = BytesIO(buf_bytes)
         correction_len = varint.decode_stream(buf_io)
         assert correction_len >= 0
 
         if correction_len > 0:
-            encoded = buf[buf_io.tell() : -correction_len]
-            correction = buf[-correction_len:]
+            encoded = buf_bytes[buf_io.tell() : -correction_len]
+            correction = buf_bytes[-correction_len:]
         else:
-            encoded = buf[buf_io.tell() :]
+            encoded = buf_bytes[buf_io.tell() :]
             correction = bytes()
 
         decoded = self._codec.decode(encoded, out=out)
