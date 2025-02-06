@@ -322,7 +322,9 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         """
 
         return SafeguardsCodec(
-            mapper(self._codec), self._elementwise_safeguards, self._version
+            codec=mapper(self._codec),
+            safeguards=self._elementwise_safeguards,
+            _version=self._version,
         )
 
 
