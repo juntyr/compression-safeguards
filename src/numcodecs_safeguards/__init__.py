@@ -22,7 +22,7 @@ __all__ = ["SafeguardsCodec", "Safeguards"]
 from collections.abc import Sequence
 from enum import Enum
 from io import BytesIO
-from typing import Optional
+from typing import Optional, Callable
 from typing_extensions import Buffer  # MSPV 3.12
 
 import numcodecs
@@ -33,6 +33,7 @@ import numpy as np
 import varint
 
 from numcodecs.abc import Codec
+from numcodecs_combinators.abc import CodecCombinatorMixin
 
 from .safeguards import Safeguard
 from .safeguards.elementwise import ElementwiseSafeguard
@@ -75,7 +76,7 @@ _SUPPORTED_DTYPES: set[np.dtype] = {
 }
 
 
-class SafeguardsCodec(Codec):
+class SafeguardsCodec(Codec, CodecCombinatorMixin):
     """
     An adaptor codec that uses safeguards to guarantee certain properties are
     upheld by the wrapped codec.
@@ -289,6 +290,41 @@ class SafeguardsCodec(Codec):
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(codec={self._codec!r}, safeguards={list(self._elementwise_safeguards)!r})"
+
+    def map(self, mapper: Callable[[Codec], Codec]) -> "SafeguardsCodec":
+        """
+        Apply the `mapper` to this codec with safeguards.
+        In the returned
+        [`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec], the codec is
+        replaced by its mapped codec.
+
+        The `mapper` should recursively apply itself to any inner codecs that
+        also implement the
+        [`CodecCombinatorMixin`][numcodecs_combinators.abc.CodecCombinatorMixin]
+        mixin.
+
+        To automatically handle the recursive application as a caller, you can
+        use
+        ```python
+        numcodecs_combinators.map_codec(codec, mapper)
+        ```
+        instead.
+
+        Parameters
+        ----------
+        mapper : Callable[[Codec], Codec]
+            The callable that should be applied to this codec to map over this
+            codec with safeguards.
+
+        Returns
+        -------
+        mapped : SafeguardsCodec
+            The mapped codec with safeguards.
+        """
+
+        return SafeguardsCodec(
+            mapper(self._codec), self._elementwise_safeguards, self._version
+        )
 
 
 numcodecs.registry.register_codec(SafeguardsCodec)

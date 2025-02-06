@@ -79,7 +79,7 @@ numcodecs.registry.get_codec(dict(
 
 [`Codec`]: https://numcodecs.readthedocs.io/en/stable/abc.html#numcodecs.abc.Codec
 [`numcodecs`]: https://numcodecs.readthedocs.io/en/stable/
-[`CodecStack`]: https://numcodecs-combinators.readthedocs.io/en/stable/api/#numcodecs_combinators.CodecStack
+[`CodecStack`]: https://numcodecs-combinators.readthedocs.io/en/stable/_ref/numcodecs_combinators/stack/#numcodecs_combinators.stack.CodecStack
 [`numcodecs-combinators`]: https://numcodecs-combinators.readthedocs.io/en/stable/
 
 
