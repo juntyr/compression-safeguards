@@ -45,8 +45,8 @@ def test_edge_cases():
                 -np.nan,
                 np.finfo(float).min,
                 np.finfo(float).max,
-                np.tiny,
-                -np.tiny,
+                np.finfo(float).tiny,
+                -np.finfo(float).tiny,
             ]
         )
     )

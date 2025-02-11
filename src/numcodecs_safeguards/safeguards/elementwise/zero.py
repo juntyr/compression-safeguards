@@ -36,6 +36,7 @@ class ZeroIsZeroSafeguard(ElementwiseSafeguard):
     def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
         """
         Check which elements are either
+
         - non-zero in the `data` array,
         - or zero in the `data` *and* the `decoded` array.
 
