@@ -40,12 +40,17 @@ from .safeguards.elementwise import ElementwiseSafeguard
 from .safeguards.elementwise.abs import AbsoluteErrorBoundSafeguard
 from .safeguards.elementwise.monotonicity import MonotonicityPreservingSafeguard
 from .safeguards.elementwise.rel_or_abs import RelativeOrAbsoluteErrorBoundSafeguard
+from .safeguards.elementwise.zero import ZeroIsZeroSafeguard
 
 
 class Safeguards(Enum):
     """
     Enumeration of all supported safeguards:
     """
+
+    # exact values
+    zero = ZeroIsZeroSafeguard
+    """Enforce that zero (or another constant) is exactly preserved."""
 
     # error bounds
     abs = AbsoluteErrorBoundSafeguard

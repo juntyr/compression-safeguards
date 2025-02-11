@@ -67,6 +67,31 @@ class Monotonicity(Enum):
 
 
 class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
+    r"""
+    The `MonotonicityPreservingSafeguard` guarantees that sequences that are
+    monotonic in the input are guaranteed to be monotonic in the decompressed
+    output.
+
+    Monotonic sequences are detected using per-axis moving windows with a
+    symmetric size of $(1 + window \cdot 2)$.
+
+    The safeguard supports enforcing four levels of
+    [`Monotonicity`][numcodecs_safeguards.safeguards.elementwise.monotonicity.Monotonicity]:
+    `strict`, `strict_with_consts`, `strict_to_weak`, `weak`.
+
+    Windows that are not monotonic or contain non-finite data are skipped. Axes
+    that have fewer elements than the window size are skipped as well.
+
+    Parameters
+    ----------
+    monotonicity : Monotonicity
+        The level of monotonicity that is guaranteed to be preserved by the
+        safeguard.
+    window : int
+        Positive symmetric half-window size; the window has size
+        $(1 + window \cdot 2)$.
+    """
+
     __slots__ = "_window"
     _window: int
     _monotonicity: Monotonicity
@@ -75,31 +100,6 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
     _priority = 1
 
     def __init__(self, monotonicity: str | Monotonicity, window: int):
-        r"""
-        The `MonotonicityPreservingSafeguard` guarantees that sequences that
-        are monotonic in the input are guaranteed to be monotonic in the
-        decompressed output.
-
-        Monotonic sequences are detected using per-axis moving windows with a
-        symmetric size of $(1 + window \cdot 2)$.
-
-        The safeguard supports enforcing four levels of
-        [`Monotonicity`][numcodecs_safeguards.safeguards.elementwise.monotonicity.Monotonicity]:
-        `strict`, `strict_with_consts`, `strict_to_weak`, `weak`.
-
-        Windows that are not monotonic or contain non-finite data are skipped.
-        Axes that have fewer elements than the window size are skipped as well.
-
-        Parameters
-        ----------
-        monotonicity : Monotonicity
-            The level of monotonicity that is guaranteed to be preserved by the
-            safeguard.
-        window : int
-            Positive symmetric half-window size; the window has size
-            $(1 + window \cdot 2)$.
-        """
-
         self._monotonicity = (
             monotonicity
             if isinstance(monotonicity, Monotonicity)

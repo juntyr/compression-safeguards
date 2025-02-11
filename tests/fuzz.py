@@ -49,8 +49,17 @@ def generate_parameter(data: atheris.FuzzedDataProvider, p: Parameter):
 
     if typing.get_origin(p.annotation) in (typing.Union, types.UnionType):
         tys = typing.get_args(p.annotation)
+
         if len(tys) == 2 and tys[0] is str and issubclass(tys[1], Enum):
             return list(tys[1])[data.ConsumeIntInRange(0, len(tys[1]) - 1)]
+
+        ty = tys[data.ConsumeIntInRange(0, len(tys) - 1)]
+        if ty is float:
+            return data.ConsumeFloat()
+        if ty is int:
+            return data.ConsumeInt(1)
+        if ty is bool:
+            return data.ConsumeBool()
 
     assert False, f"unknown parameter type {p.annotation!r}"
 

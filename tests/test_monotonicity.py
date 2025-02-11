@@ -60,7 +60,16 @@ def test_linspace():
 def test_edge_cases():
     check_all_codecs(
         np.array(
-            [np.inf, np.nan, -np.inf, -np.nan, np.finfo(float).min, np.finfo(float).max]
+            [
+                np.inf,
+                np.nan,
+                -np.inf,
+                -np.nan,
+                np.finfo(float).min,
+                np.finfo(float).max,
+                np.tiny,
+                -np.tiny,
+            ]
         )
     )
 

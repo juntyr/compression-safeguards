@@ -10,17 +10,24 @@ from .codecs import (
 
 
 def check_all_codecs(data: np.ndarray):
-    decoded = encode_decode_zero(data, safeguards=[dict(kind="abs", eb_abs=0.1)])
-    np.testing.assert_allclose(decoded, data, rtol=0.0, atol=0.1)
+    for zero in [None, 0, 42, -1024, np.finfo(float).min]:
+        safeguard = dict(kind="zero")
+        if zero is not None:
+            safeguard["zero"] = zero
+        else:
+            zero = 0
 
-    decoded = encode_decode_neg(data, safeguards=[dict(kind="abs", eb_abs=0.1)])
-    np.testing.assert_allclose(decoded, data, rtol=0.0, atol=0.1)
+        decoded = encode_decode_zero(data, safeguards=[safeguard])
+        assert np.all((data != zero) | (decoded == zero))
 
-    decoded = encode_decode_identity(data, safeguards=[dict(kind="abs", eb_abs=0.1)])
-    np.testing.assert_allclose(decoded, data, rtol=0.0, atol=0.0)
+        decoded = encode_decode_neg(data, safeguards=[safeguard])
+        assert np.all((data != zero) | (decoded == zero))
 
-    decoded = encode_decode_noise(data, safeguards=[dict(kind="abs", eb_abs=0.1)])
-    np.testing.assert_allclose(decoded, data, rtol=0.0, atol=0.1)
+        decoded = encode_decode_identity(data, safeguards=[safeguard])
+        assert np.all((data != zero) | (decoded == zero))
+
+        decoded = encode_decode_noise(data, safeguards=[safeguard])
+        assert np.all((data != zero) | (decoded == zero))
 
 
 def test_empty():

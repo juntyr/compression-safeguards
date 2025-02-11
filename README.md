@@ -24,6 +24,10 @@ If applied to
 
 This package currently implements the following safeguards
 
+- `zero` (zero/constant preserving):
+
+    Values that are zero in the input are guaranteed to also be *exactly* zero in the decompressed output. This safeguard can also be used to enforce that another constant value is bitwise preserved, e.g. a missing value constant or a semantic "zero" value that is represented as a non-zero number.
+
 - `abs` (absolute error bound):
 
     The absolute elementwise error is guaranteed to be less than or equal to the provided bound. In cases where the arithmetic evaluation of the error bound not well-defined, e.g. for infinite or NaN values, producing the exact same bitpattern is defined to satisfy the error bound.
