@@ -46,8 +46,8 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         data: np.ndarray,
         decoded: np.ndarray,
     ) -> np.ndarray:
-        # flip incorrect signs
-        decoded = decoded * (1 - (np.sign(data) != np.sign(decoded)) * 2)
+        # if sign(data) == -sign(decoded), flip the sign
+        decoded = decoded * (1 - (np.sign(data) == -np.sign(decoded)) * 2)
 
         # round the decimal error to the desired precision
         decimal_error = self._decimal_error(data, decoded)
@@ -60,9 +60,10 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
             np.abs(data) - np.abs(decoded)
         )
         corrected = np.power(10.0, decimal_corrected, dtype=data.dtype) * np.sign(data)
+        corrected = corrected.astype(data.dtype)
 
         # fall back to the original data if the arithmetic evaluation of the
-        #  error correction fails, e.g. for infinite or NaN values
+        #  error correction fails, e.g. for 0 != 0 or infinite or NaN values
         return np.where(
             self.check_elementwise(data, corrected),
             corrected,
@@ -83,9 +84,9 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def _decimal_error(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
-        # 0               if x == 0 and y == 0
-        # inf             if sign(x) != sign(y)
-        # abs(log10(x/y)) otherwise
+        # 0               : if x == 0 and y == 0
+        # inf             : if sign(x) != sign(y)
+        # abs(log10(x/y)) : otherwise
         return np.where(
             np.sign(x) == np.sign(y),
             np.abs(np.log10(np.abs(x)) - np.log10(np.abs(y))),
