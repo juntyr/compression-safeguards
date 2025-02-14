@@ -14,8 +14,7 @@ class SignPreservingSafeguard(ElementwiseSafeguard):
     The `SignPreservingSafeguard` guarantees that values have the same sign
     (-1, 0, +1) in the decompressed output as they have in the input data.
 
-    The sign for NaNs is derived from their sign bit, e.g.
-    $sign(-\text{NaN}) = -1$.
+    The sign for NaNs is derived from their sign bit, e.g. sign(-NaN) = -1.
     """
 
     __slots__ = ()

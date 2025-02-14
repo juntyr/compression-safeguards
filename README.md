@@ -44,7 +44,7 @@ This package currently implements the following safeguards
 
 - `sign` (sign-preserving):
 
-    Values are guaranteed to have the same sign (-1, 0, +1) in the decompressed output as they have in the input data. The sign for NaNs is derived from their sign bit, e.g. $sign(-\text{NaN})=-1$.
+    Values are guaranteed to have the same sign (-1, 0, +1) in the decompressed output as they have in the input data. The sign for NaNs is derived from their sign bit, e.g. sign(-NaN) = -1.
 
 
 ## Usage

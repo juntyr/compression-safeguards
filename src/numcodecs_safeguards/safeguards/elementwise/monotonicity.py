@@ -109,44 +109,6 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
         assert window > 0, "window size must be positive"
         self._window = window
 
-    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
-        """
-        Check if monotonic sequences in the `data` array are preserved in the
-        `decoded` array.
-
-        Parameters
-        ----------
-        data : np.ndarray
-            Data to be encoded.
-        decoded : np.ndarray
-            Decoded data.
-
-        Returns
-        -------
-        ok : bool
-            `True` if the check succeeded.
-        """
-
-        window = 1 + self._window * 2
-
-        for axis, alen in enumerate(data.shape):
-            if alen < window:
-                continue
-
-            data_windows = sliding_window_view(data, window, axis=axis)
-            decoded_windows = sliding_window_view(decoded, window, axis=axis)
-
-            data_monotonic = self._monotonic_sign(data_windows, is_decoded=False)
-            decoded_monotonic = self._monotonic_sign(decoded_windows, is_decoded=True)
-
-            # for monotonic windows, check that the monotonicity matches
-            if np.any(
-                self._monotonic_sign_not_equal(data_monotonic, decoded_monotonic)
-            ):
-                return False
-
-        return True
-
     def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
         """
         Check which elements in the `decoded` array preserve the monotonicity
@@ -233,6 +195,34 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
                         data_monotonic,
                         self._monotonic_sign_elementwise(
                             data_windows, decoded_windows, is_decoded=True
+                        ),
+                    )
+                ]
+            ] = True
+
+            # for monotonic windows, check that
+            #  decoded[i-1] ? data[i] ? decoded[i+1]
+            # has the correct sign, otherwise mark for correction
+            #
+            # note: this check is excessively strict but ensures that correcting
+            #       to the original data is always possible without affecting
+            #       the monotonicity of the corrected output
+            needs_correction[
+                indices_windows[..., :-1, :][
+                    self._monotonic_sign_not_equal(
+                        data_monotonic,
+                        self._monotonic_sign_elementwise(
+                            data_windows, decoded_windows, is_decoded=True
+                        ),
+                    )
+                ]
+            ] = True
+            needs_correction[
+                indices_windows[..., 1:, :][
+                    self._monotonic_sign_not_equal(
+                        data_monotonic,
+                        self._monotonic_sign_elementwise(
+                            decoded_windows, data_windows, is_decoded=True
                         ),
                     )
                 ]

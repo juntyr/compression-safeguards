@@ -59,6 +59,23 @@ class NoiseCodec(Codec):
         return out
 
 
+class MockCodec(Codec):
+    codec_id = "mock"
+
+    def __init__(self, data, decoded):
+        self.data = data
+        self.decoded = decoded
+
+    def encode(self, buf):
+        return b""
+
+    def decode(self, buf, out=None):
+        assert buf == b""
+        assert out is not None
+        out[:] = self.decoded
+        return out
+
+
 def encode_decode_zero(data: np.ndarray, **kwargs) -> np.ndarray:
     codec = SafeguardsCodec(codec=ZeroCodec(), **kwargs)
 
@@ -94,6 +111,15 @@ def encode_decode_identity(data: np.ndarray, **kwargs) -> np.ndarray:
 
 def encode_decode_noise(data: np.ndarray, **kwargs) -> np.ndarray:
     codec = SafeguardsCodec(codec=NoiseCodec(), **kwargs)
+
+    encoded = codec.encode(data)
+    decoded = codec.decode(encoded, out=np.empty_like(data))
+
+    return decoded
+
+
+def encode_decode_mock(data: np.ndarray, decoded: np.ndarray, **kwargs) -> np.ndarray:
+    codec = SafeguardsCodec(codec=MockCodec(data, decoded), **kwargs)
 
     encoded = codec.encode(data)
     decoded = codec.decode(encoded, out=np.empty_like(data))

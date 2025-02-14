@@ -14,6 +14,7 @@ from .codecs import (
     encode_decode_neg,
     encode_decode_identity,
     encode_decode_noise,
+    encode_decode_mock,
 )
 
 
@@ -176,3 +177,17 @@ def test_monotonicity():
                     _as_bits(safeguard._compute_correction(data, decoded)),
                     _as_bits(decoded),
                 )
+
+
+def test_fuzzer_sign_flip():
+    data = np.array([14, 47, 0, 0, 254, 255, 255, 255, 0, 0], dtype=np.uint8)
+    decoded = np.array([73, 0, 0, 0, 0, 27, 49, 14, 14, 50], dtype=np.uint8)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(kind="monotonicity", monotonicity="strict_to_weak", window=1),
+            dict(kind="sign"),
+        ],
+    )
