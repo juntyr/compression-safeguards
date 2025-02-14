@@ -11,10 +11,10 @@ from . import ElementwiseSafeguard, _as_bits
 
 class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     """
-    The `AbsoluteErrorBoundSafeguard` guarantees that the absolute elementwise
+    The `AbsoluteErrorBoundSafeguard` guarantees that the elementwise absolute
     error is less than or equal to the provided bound `eb_abs`.
 
-    In cases where the arithmetic evaluation of the error bound not well-
+    In cases where the arithmetic evaluation of the error bound is not well-
     defined, e.g. for infinite or NaN values, producing the exact same
     bitpattern is defined to satisfy the error bound.
 

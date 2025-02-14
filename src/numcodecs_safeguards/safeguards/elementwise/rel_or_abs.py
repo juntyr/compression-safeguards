@@ -11,8 +11,8 @@ from . import ElementwiseSafeguard, _as_bits
 
 class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     r"""
-    The `RelativeOrAbsoluteErrorBoundSafeguard` guarantees that the absolute
-    elementwise error between the *logarithms*\* of the values is less than or
+    The `RelativeOrAbsoluteErrorBoundSafeguard` guarantees that the elementwise
+    absolute error between the *logarithms*\* of the values is less than or
     equal to $\log(1 + eb_{rel})$ where `eb_rel` is e.g. 2%.
 
     The logarithm* here is adapted to support positive, negative, and zero

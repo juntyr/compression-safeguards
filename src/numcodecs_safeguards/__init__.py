@@ -62,6 +62,7 @@ class Safeguards(Enum):
     """Enforce a relative error bound, fall back to an absolute error bound close to zero."""
 
     decimal = DecimalErrorBoundSafeguard
+    """Enforce a decimal error bound."""
 
     # monotonicity
     monotonicity = MonotonicityPreservingSafeguard

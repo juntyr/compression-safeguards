@@ -1,3 +1,7 @@
+"""
+Decimal error bound safeguard.
+"""
+
 __all__ = ["DecimalErrorBoundSafeguard"]
 
 import numpy as np
@@ -6,6 +10,50 @@ from . import ElementwiseSafeguard, _as_bits
 
 
 class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
+    r"""
+    The `DecimalErrorBoundSafeguard` guarantees that the elementwise decimal
+    error is less than or equal to the provided bound `eb_decimal`.
+
+    The decimal error quantifies the orders of magnitude that the lossy-decoded
+    value $\hat{x}$ is away from the original value $x$. It is defined as
+    follows[^1] [^2]:
+
+    \[
+        \text{decimal error} = \begin{cases}
+            0 & \quad \text{if } x = \hat{x} = 0 \\
+            \inf & \quad \text{if } \text{sign}(x) \neq \text{sign}(\hat{x}) \\
+            \left| \log_{10}{\left( \frac{x}{\hat{x}} \right)} \right| & \quad \text{otherwise}
+        \end{cases}
+    \]
+
+    The decimal error is defined to be infinite if the signs of the data and
+    decoded data do not match. Since the `eb_decimal` error bound must be
+    finite, the `DecimalErrorBoundSafeguard` also guarantees that the sign of
+    each decode value matches the sign of each original value and that a
+    decoded value is zero if and only if it is zero in the original data.
+
+    In cases where the arithmetic evaluation of the error bound not well-
+    defined, e.g. for infinite or NaN values, producing the exact same
+    bitpattern is defined to satisfy the error bound.
+    
+    [^1]: Gustafson, J. L., & Yonemoto, I. T. (2017). Beating Floating Point at
+        its Own Game: Posit Arithmetic. *Supercomputing Frontiers and
+        Innovations*, 4(2). Available from:
+        [doi:10.14529/jsfi170206](https://doi.org/10.14529/jsfi170206).
+    
+    [^2]: Klöwer, M., Düben, P. D., & Palmer, T. N. (2019). Posits as an
+        alternative to floats for weather and climate models. *CoNGA'19:
+        Proceedings of the Conference for Next Generation Arithmetic 2019*, 1–8.
+        Available from:
+        [doi:10.1145/3316279.3316281](https://doi.org/10.1145/3316279.3316281).
+
+    Parameters
+    ----------
+    eb_decimal : float
+        The positive decimal error bound that is enforced by this safeguard.
+        `eb_decimal=1.0` corresponds to a 100% relative error bound.
+    """
+
     __slots__ = ("_eb_decimal",)
     _eb_decimal: float
 
