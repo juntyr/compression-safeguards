@@ -42,6 +42,10 @@ This package currently implements the following safeguards
 
     Sequences that are monotonic in the input are guaranteed to be monotonic in the decompressed output. Monotonic sequences are detected using per-axis moving windows. The safeguard supports enforcing four levels of monotonicity: `strict`, `strict_with_consts`, `strict_to_weak`, `weak`. Windows that are not monotonic or contain non-finite data are skipped. Axes that have fewer elements than the window size are skipped as well.
 
+- `sign` (sign-preserving):
+
+    Values are guaranteed to have the same sign (-1, 0, +1) in the decompressed output as they have in the input data. The sign for NaNs is derived from their sign bit, e.g. $sign(-\text{NaN})=-1$.
+
 
 ## Usage
 

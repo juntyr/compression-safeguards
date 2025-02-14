@@ -40,6 +40,7 @@ from .safeguards.elementwise import ElementwiseSafeguard
 from .safeguards.elementwise.abs import AbsoluteErrorBoundSafeguard
 from .safeguards.elementwise.monotonicity import MonotonicityPreservingSafeguard
 from .safeguards.elementwise.rel_or_abs import RelativeOrAbsoluteErrorBoundSafeguard
+from .safeguards.elementwise.sign import SignPreservingSafeguard
 from .safeguards.elementwise.zero import ZeroIsZeroSafeguard
 
 
@@ -62,6 +63,10 @@ class Safeguards(Enum):
     # monotonicity
     monotonicity = MonotonicityPreservingSafeguard
     """Enforce that monotonic sequences remain monotonic."""
+
+    # sign
+    sign = SignPreservingSafeguard
+    """Enforce that the sign (-1, 0, +1) of each element is preserved."""
 
 
 _FORMAT_VERSION: str = "0.1.x"
