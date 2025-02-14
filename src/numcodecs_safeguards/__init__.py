@@ -38,6 +38,7 @@ from numcodecs_combinators.abc import CodecCombinatorMixin
 from .safeguards import Safeguard
 from .safeguards.elementwise import ElementwiseSafeguard
 from .safeguards.elementwise.abs import AbsoluteErrorBoundSafeguard
+from .safeguards.elementwise.decimal import DecimalErrorBoundSafeguard
 from .safeguards.elementwise.monotonicity import MonotonicityPreservingSafeguard
 from .safeguards.elementwise.rel_or_abs import RelativeOrAbsoluteErrorBoundSafeguard
 from .safeguards.elementwise.sign import SignPreservingSafeguard
@@ -59,6 +60,8 @@ class Safeguards(Enum):
 
     rel_or_abs = RelativeOrAbsoluteErrorBoundSafeguard
     """Enforce a relative error bound, fall back to an absolute error bound close to zero."""
+
+    decimal = DecimalErrorBoundSafeguard
 
     # monotonicity
     monotonicity = MonotonicityPreservingSafeguard
