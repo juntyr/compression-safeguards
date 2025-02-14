@@ -59,7 +59,7 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         decimal_corrected = np.log10(np.abs(decoded)) + decimal_correction * np.sign(
             np.abs(data) - np.abs(decoded)
         )
-        corrected = np.power(10.0, decimal_corrected, dtype=data.dtype) * np.sign(data)
+        corrected = np.power(10.0, decimal_corrected) * np.sign(data)
         corrected = corrected.astype(data.dtype)
 
         # fall back to the original data if the arithmetic evaluation of the
