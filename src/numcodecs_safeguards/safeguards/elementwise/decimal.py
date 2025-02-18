@@ -137,6 +137,6 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         # abs(log10(x/y)) : otherwise
         return np.where(
             np.sign(x) == np.sign(y),
-            np.abs(np.log10(np.abs(x)) - np.log10(np.abs(y))),
+            np.abs(np.log10(x / y)),
             np.inf,
         )
