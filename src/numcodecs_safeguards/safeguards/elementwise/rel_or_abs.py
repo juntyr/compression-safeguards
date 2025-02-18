@@ -81,6 +81,9 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         data: np.ndarray,
         decoded: np.ndarray,
     ) -> np.ndarray:
+        # remember which elements already passed the check
+        already_correct = self.check_elementwise(data, decoded)
+
         log_eb_rel = np.log(1.0 + self._eb_rel)
 
         data_log = self._log(data)
@@ -91,6 +94,9 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
         corrected_log = decoded_log - correction_log
         corrected = self._exp(corrected_log).astype(data.dtype)
+
+        # don't apply corrections to already-passing elements
+        corrected = np.where(already_correct, decoded, corrected)
 
         return np.where(
             self.check_elementwise(data, corrected),

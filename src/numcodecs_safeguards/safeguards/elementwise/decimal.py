@@ -35,12 +35,12 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
     In cases where the arithmetic evaluation of the error bound not well-
     defined, e.g. for infinite or NaN values, producing the exact same
     bitpattern is defined to satisfy the error bound.
-    
+
     [^1]: Gustafson, J. L., & Yonemoto, I. T. (2017). Beating Floating Point at
         its Own Game: Posit Arithmetic. *Supercomputing Frontiers and
         Innovations*, 4(2). Available from:
         [doi:10.14529/jsfi170206](https://doi.org/10.14529/jsfi170206).
-    
+
     [^2]: Klöwer, M., Düben, P. D., & Palmer, T. N. (2019). Posits as an
         alternative to floats for weather and climate models. *CoNGA'19:
         Proceedings of the Conference for Next Generation Arithmetic 2019*, 1–8.
@@ -94,21 +94,27 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         data: np.ndarray,
         decoded: np.ndarray,
     ) -> np.ndarray:
+        # remember which elements already passed the check
+        already_correct = self.check_elementwise(data, decoded)
+
         # if sign(data) == -sign(decoded), flip the sign
-        decoded = decoded * (1 - (np.sign(data) == -np.sign(decoded)) * 2)
+        decoded_signed = decoded * (1 - (np.sign(data) == -np.sign(decoded)) * 2)
 
         # round the decimal error to the desired precision
-        decimal_error = self._decimal_error(data, decoded)
+        decimal_error = self._decimal_error(data, decoded_signed)
         decimal_correction = np.round(decimal_error / (self._eb_decimal * 2.0)) * (
             self._eb_decimal * 2.0
         )
 
         # apply the decimal error correction
-        decimal_corrected = np.log10(np.abs(decoded)) + decimal_correction * np.sign(
-            np.abs(data) - np.abs(decoded)
-        )
+        decimal_corrected = np.log10(
+            np.abs(decoded_signed)
+        ) + decimal_correction * np.sign(np.abs(data) - np.abs(decoded_signed))
         corrected = np.power(10.0, decimal_corrected) * np.sign(data)
         corrected = corrected.astype(data.dtype)
+
+        # don't apply corrections to already-passing elements
+        corrected = np.where(already_correct, decoded, corrected)
 
         # fall back to the original data if the arithmetic evaluation of the
         #  error correction fails, e.g. for 0 != 0 or infinite or NaN values
