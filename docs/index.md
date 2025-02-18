@@ -43,7 +43,7 @@ This package currently implements the following [safeguards][numcodecs_safeguard
 
 - [`monotonicity`][numcodecs_safeguards.safeguards.elementwise.monotonicity.MonotonicityPreservingSafeguard] (monotonicity-preserving):
 
-    Sequences that are monotonic in the input are guaranteed to be monotonic in the decompressed output. Monotonic sequences are detected using per-axis moving windows of constant size. The safeguard supports enforcing four levels of [monotonicity][numcodecs_safeguards.safeguards.elementwise.monotonicity.Monotonicity]: `strict`, `strict_with_consts`, `strict_to_weak`, `weak`. Windows that are not monotonic or contain non-finite data are skipped. Axes that have fewer elements than the window size are skipped as well.
+    Sequences that are monotonic in the input are guaranteed to be monotonic in the decompressed output. Monotonic sequences are detected using per-axis moving windows of constant size. Typically, the window size should be chosen to be large enough to ignore noise but small enough to capture details. The safeguard supports enforcing four levels of [monotonicity][numcodecs_safeguards.safeguards.elementwise.monotonicity.Monotonicity]: `strict`, `strict_with_consts`, `strict_to_weak`, `weak`. Windows that are not monotonic or contain non-finite data are skipped. Axes that have fewer elements than the window size are skipped as well.
 
 - [`sign`][numcodecs_safeguards.safeguards.elementwise.sign.SignPreservingSafeguard] (sign-preserving):
 

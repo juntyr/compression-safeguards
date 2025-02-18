@@ -73,7 +73,9 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
     output.
 
     Monotonic sequences are detected using per-axis moving windows with a
-    constant symmetric size of $(1 + window \cdot 2)$.
+    constant symmetric size of $(1 + window \cdot 2)$. Typically, the window
+    size should be chosen to be large enough to ignore noise, i.e. $>1$, but
+    small enough to capture details.
 
     The safeguard supports enforcing four levels of
     [`Monotonicity`][numcodecs_safeguards.safeguards.elementwise.monotonicity.Monotonicity]:
