@@ -23,7 +23,9 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     Put simply, each element satisfies the relative or the absolute error bound
     (or both). In cases where the arithmetic evaluation of the error bound is
     not well-defined, e.g. for infinite or NaN values, producing the exact same
-    bitpattern is defined to satisfy the error bound.
+    bitpattern is defined to satisfy the error bound. If `equal_nan` is set to
+    [`True`][True], decoding a NaN value to a NaN value with a different
+    bitpattern also satisfies the error bound.
 
     Parameters
     ----------
@@ -32,16 +34,20 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         `eb_rel=0.02` corresponds to a 2% relative bound.
     eb_abs : float
         The positive absolute error bound that is enforced by this safeguard.
+    equal_nan: bool
+        Whether decoding a NaN value to a NaN value with a different bit
+        pattern satisfies the error bound.
     """
 
-    __slots__ = ("_eb_rel", "_eb_abs")
+    __slots__ = ("_eb_rel", "_eb_abs", "_equal_nan")
     _eb_rel: float
     _eb_abs: float
+    _equal_nan: bool
 
     kind = "rel_or_abs"
     _priority = 0
 
-    def __init__(self, eb_rel: float, eb_abs: float):
+    def __init__(self, eb_rel: float, eb_abs: float, *, equal_nan: bool = False):
         assert eb_rel > 0.0, "eb_rel must be positive"
         assert np.isfinite(eb_rel), "eb_rel must be finite"
         assert eb_abs > 0.0, "eb_abs must be positive"
@@ -49,6 +55,7 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
         self._eb_rel = eb_rel
         self._eb_abs = eb_abs
+        self._equal_nan = equal_nan
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
@@ -73,6 +80,7 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             (np.abs(self._log(data) - self._log(decoded)) <= np.log(1.0 + self._eb_rel))
             | (np.abs(data - decoded) <= self._eb_abs)
             | (_as_bits(data) == _as_bits(decoded))
+            | (self._equal_nan and (np.isnan(data) == np.isnan(decoded)))
         )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -114,7 +122,12 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             Configuration of the safeguard.
         """
 
-        return dict(kind=type(self).kind, eb_rel=self._eb_rel, eb_abs=self._eb_abs)
+        return dict(
+            kind=type(self).kind,
+            eb_rel=self._eb_rel,
+            eb_abs=self._eb_abs,
+            equal_nan=self._equal_nan,
+        )
 
     def _log(self, x: np.ndarray) -> np.ndarray:
         a = 0.5 * self._eb_abs / (1.0 + self._eb_rel)

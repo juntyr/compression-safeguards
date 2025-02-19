@@ -34,7 +34,9 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
 
     In cases where the arithmetic evaluation of the error bound not well-
     defined, e.g. for infinite or NaN values, producing the exact same
-    bitpattern is defined to satisfy the error bound.
+    bitpattern is defined to satisfy the error bound. If `equal_nan` is set to
+    [`True`][True], decoding a NaN value to a NaN value with a different
+    bitpattern also satisfies the error bound.
 
     [^1]: Gustafson, J. L., & Yonemoto, I. T. (2017). Beating Floating Point at
         its Own Game: Posit Arithmetic. *Supercomputing Frontiers and
@@ -52,19 +54,24 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
     eb_decimal : float
         The positive decimal error bound that is enforced by this safeguard.
         `eb_decimal=1.0` corresponds to a 100% relative error bound.
+    equal_nan: bool
+        Whether decoding a NaN value to a NaN value with a different bit
+        pattern satisfies the error bound.
     """
 
-    __slots__ = ("_eb_decimal",)
+    __slots__ = ("_eb_decimal", "_equal_nan")
     _eb_decimal: float
+    _equal_nan: bool
 
     kind = "decimal"
     _priority = 0
 
-    def __init__(self, eb_decimal: float):
+    def __init__(self, eb_decimal: float, *, equal_nan: bool = False):
         assert eb_decimal > 0.0, "eb_decimal must be positive"
         assert np.isfinite(eb_decimal), "eb_decimal must be finite"
 
         self._eb_decimal = eb_decimal
+        self._equal_nan = equal_nan
 
     def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
         """
@@ -84,8 +91,10 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
             Per-element, `True` if the check succeeded for this element.
         """
 
-        return (self._decimal_error(data, decoded) <= self._eb_decimal) | (
-            _as_bits(data) == _as_bits(decoded)
+        return (
+            (self._decimal_error(data, decoded) <= self._eb_decimal)
+            | (_as_bits(data) == _as_bits(decoded))
+            | (self._equal_nan and (np.isnan(data) == np.isnan(decoded)))
         )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -134,7 +143,9 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
             Configuration of the safeguard.
         """
 
-        return dict(kind=type(self).kind, eb_decimal=self._eb_decimal)
+        return dict(
+            kind=type(self).kind, eb_decimal=self._eb_decimal, equal_nan=self._equal_nan
+        )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def _decimal_error(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:

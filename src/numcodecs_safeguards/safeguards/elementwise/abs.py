@@ -16,25 +16,32 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
     In cases where the arithmetic evaluation of the error bound is not well-
     defined, e.g. for infinite or NaN values, producing the exact same
-    bitpattern is defined to satisfy the error bound.
+    bitpattern is defined to satisfy the error bound. If `equal_nan` is set to
+    [`True`][True], decoding a NaN value to a NaN value with a different
+    bitpattern also satisfies the error bound.
 
     Parameters
     ----------
     eb_abs : float
         The positive absolute error bound that is enforced by this safeguard.
+    equal_nan: bool
+        Whether decoding a NaN value to a NaN value with a different bit
+        pattern satisfies the error bound.
     """
 
-    __slots__ = ("_eb_abs",)
+    __slots__ = ("_eb_abs", "_equal_nan")
     _eb_abs: float
+    _equal_nan: bool
 
     kind = "abs"
     _priority = 0
 
-    def __init__(self, eb_abs: float):
+    def __init__(self, eb_abs: float, *, equal_nan: bool = False):
         assert eb_abs > 0.0, "eb_abs must be positive"
         assert np.isfinite(eb_abs), "eb_abs must be finite"
 
         self._eb_abs = eb_abs
+        self._equal_nan = equal_nan
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
@@ -55,8 +62,10 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             Per-element, `True` if the check succeeded for this element.
         """
 
-        return (np.abs(data - decoded) <= self._eb_abs) | (
-            _as_bits(data) == _as_bits(decoded)
+        return (
+            (np.abs(data - decoded) <= self._eb_abs)
+            | (_as_bits(data) == _as_bits(decoded))
+            | (self._equal_nan and (np.isnan(data) == np.isnan(decoded)))
         )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -87,4 +96,6 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             Configuration of the safeguard.
         """
 
-        return dict(kind=type(self).kind, eb_abs=self._eb_abs)
+        return dict(
+            kind=type(self).kind, eb_abs=self._eb_abs, equal_nan=self._equal_nan
+        )
