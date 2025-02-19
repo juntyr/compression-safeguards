@@ -5,6 +5,14 @@ def _finite_difference_coefficients(
     order: int,
     offsets: list[int],
 ) -> list[Fraction]:
+    """
+    Finite difference coefficient algorithm from:
+
+    Fornberg, B. (1988). Generation of finite difference formulas on arbitrarily
+    spaced grids. Mathematics of Computation, 51(184), 699-706. Available from:
+    https://doi.org/10.1090/s0025-5718-1988-0935077-0.
+    """
+
     # x0 = 0
     M = order
     a = [Fraction(o) for o in offsets]
