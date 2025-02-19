@@ -1,17 +1,17 @@
-import numpy as np
+from fractions import Fraction
 
 
 def _finite_difference_coefficients(
     order: int,
-    offsets: np.ndarray,
-) -> np.ndarray:
+    offsets: list[int],
+) -> list[Fraction]:
     # x0 = 0
     M = order
-    a = offsets
+    a = [Fraction(o) for o in offsets]
     N = len(a) - 1
 
     coeffs = {
-        (0, 0, 0): 1,
+        (0, 0, 0): Fraction(1),
     }
 
     c1 = 1
@@ -22,7 +22,7 @@ def _finite_difference_coefficients(
             c3 = a[n] - a[v]
             c2 *= c3
             if n <= M:
-                coeffs[(n, n - 1, v)] = 0
+                coeffs[(n, n - 1, v)] = Fraction(0)
             for m in range(0, min(n, M) + 1):
                 if m > 0:
                     coeffs[(m, n, v)] = (
@@ -40,4 +40,4 @@ def _finite_difference_coefficients(
                 coeffs[(m, n, n)] = -(c1 / c2) * (a[n - 1] * coeffs[(m, n - 1, n - 1)])
         c1 = c2
 
-    return np.array([coeffs[M, N, v] for v in range(0, N + 1)])
+    return [coeffs[M, N, v] for v in range(0, N + 1)]

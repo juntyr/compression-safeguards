@@ -1,28 +1,43 @@
-import numpy as np
+from fractions import Fraction as F
+
 from numcodecs_safeguards.safeguards.elementwise.abs_findiff import (
     _finite_difference_coefficients,
 )
 
 
 def test_centred_zero_order():
-    np.testing.assert_array_equal(
-        _finite_difference_coefficients(0, np.array([0])),
-        np.array([1]),
-    )
+    assert _finite_difference_coefficients(0, [0]) == [1]
 
-    np.testing.assert_array_equal(
-        _finite_difference_coefficients(0, np.array([0, 1, -1, 2, -2, 3, -3, 4, -4])),
-        np.array([1, 0, 0, 0, 0, 0, 0, 0, 0]),
-    )
+    assert _finite_difference_coefficients(0, [0, 1, -1, 2, -2, 3, -3, 4, -4]) == [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+    ]
 
 
 def test_centred_first_order():
-    np.testing.assert_array_equal(
-        _finite_difference_coefficients(1, np.array([0, 1, -1])),
-        np.array([0, 0.5, -0.5]),
-    )
+    assert _finite_difference_coefficients(1, [0, 1, -1]) == [0, F(1, 2), F(-1, 2)]
 
-    np.testing.assert_array_equal(
-        _finite_difference_coefficients(1, np.array([0, 1, -1, 2, -2])),
-        np.array([0, 2 / 3, -2 / 3, -1 / 12, 1 / 12]),
-    )
+    assert _finite_difference_coefficients(1, [0, 1, -1, 2, -2]) == [
+        0,
+        F(2, 3),
+        F(-2, 3),
+        F(-1, 12),
+        F(1, 12),
+    ]
+
+    assert _finite_difference_coefficients(1, [0, 1, -1, 2, -2, 3, -3]) == [
+        0,
+        F(3, 4),
+        F(-3, 4),
+        F(-3, 20),
+        F(3, 20),
+        F(1, 60),
+        F(-1, 60),
+    ]
