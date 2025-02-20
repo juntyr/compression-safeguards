@@ -2,7 +2,7 @@
 Finite difference absolute error bound safeguard.
 """
 
-__all__ = ["FiniteDifferenceAbsoluteErrorBoundSafeguard"]
+__all__ = ["FiniteDifference", "FiniteDifferenceAbsoluteErrorBoundSafeguard"]
 
 from enum import auto, Enum
 from fractions import Fraction
@@ -15,7 +15,7 @@ from . import ElementwiseSafeguard, _as_bits
 class FiniteDifference(Enum):
     """
     Different types of finite difference that can be safeguarded by the
-    [`FiniteDifferenceAbsoluteErrorBoundSafeguard`][numcodecs_safeguards.safeguards.elementwise.abs_findiff.FiniteDifferenceAbsoluteErrorBoundSafeguard].
+    [`FiniteDifferenceAbsoluteErrorBoundSafeguard`][numcodecs_safeguards.safeguards.elementwise.findiff_abs.FiniteDifferenceAbsoluteErrorBoundSafeguard].
     """
 
     central = auto()
@@ -41,6 +41,10 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     elementwise absolute error of the finite-difference-approximated derivative
     is less than or equal to the provided bound `eb_abs`.
 
+    The safeguard supports three types of
+    [`FiniteDifference`][numcodecs_safeguards.safeguards.elementwise.findiff_abs.FiniteDifference]:
+    `central`, `forward`, `backward`.
+
     If the finite difference for an element evaluates to an infinite value,
     this safeguard guarantees that the finite difference on the decoded value
     produces the exact same infinite value. For a NaN finite difference, this
@@ -56,7 +60,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         The positive order of accuracy of the finite difference approximation.
 
         The order of accuracy must be even for a central finite difference.
-    type : FiniteDifference
+    type : str | FiniteDifference
         The type of finite difference.
     eb_abs : float
         The positive absolute error bound that is enforced by this safeguard.
@@ -73,8 +77,10 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     _priority = 0
 
     def __init__(
-        self, order: int, accuracy: int, type: FiniteDifference, eb_abs: float
+        self, order: int, accuracy: int, type: str | FiniteDifference, eb_abs: float
     ):
+        type = type if isinstance(type, FiniteDifference) else FiniteDifference[type]
+
         assert order >= 0, "order must be non-negative"
         assert accuracy > 0, "accuracy must be positive"
 
@@ -153,7 +159,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             kind=type(self).kind,
             order=self._order,
             accuracy=self._accuracy,
-            type=self._type,
+            type=self._type.name,
             eb_abs=self._eb_abs,
         )
 
@@ -195,10 +201,10 @@ def _finite_difference_coefficients(
         (0, 0, 0): Fraction(1),
     }
 
-    c1 = 1
+    c1 = Fraction(1)
 
     for n in range(1, N + 1):
-        c2 = 1
+        c2 = Fraction(1)
         for v in range(0, n):
             c3 = a[n] - a[v]
             c2 *= c3

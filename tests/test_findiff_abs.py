@@ -176,10 +176,14 @@ def test_forward_zeroth_order():
 def test_forward_first_order():
     assert _finite_difference_coefficients(1, [0, 1]) == [-1, 1]
 
-    assert _finite_difference_coefficients(1, [0, 1, 2]) == [F(-3, 2), 2, F(-1 / 2)]
+    assert _finite_difference_coefficients(1, [0, 1, 2]) == [F(-3, 2), 2, F(-1, 2)]
 
-    # FIXME
-    # assert _finite_difference_coefficients(1, [0, 1, 2, 3]) == [F(-11, 6), 3, F(-3/2), F(1/3)]
+    assert _finite_difference_coefficients(1, [0, 1, 2, 3]) == [
+        F(-11, 6),
+        3,
+        F(-3, 2),
+        F(1, 3),
+    ]
 
     assert _finite_difference_coefficients(1, [0, 1, 2, 3, 4]) == [
         F(-25, 12),
@@ -293,10 +297,14 @@ def test_backward_zeroth_order():
 def test_backward_first_order():
     assert _finite_difference_coefficients(1, [0, -1]) == [1, -1]
 
-    assert _finite_difference_coefficients(1, [0, -1, -2]) == [F(3, 2), -2, F(1 / 2)]
+    assert _finite_difference_coefficients(1, [0, -1, -2]) == [F(3, 2), -2, F(1, 2)]
 
-    # FIXME
-    # assert _finite_difference_coefficients(1, [0, -1, -2, -3]) == [F(11, 6), -3, F(3/2), F(-1/3)]
+    assert _finite_difference_coefficients(1, [0, -1, -2, -3]) == [
+        F(11, 6),
+        -3,
+        F(3, 2),
+        F(-1, 3),
+    ]
 
     assert _finite_difference_coefficients(1, [0, -1, -2, -3, -4]) == [
         F(25, 12),

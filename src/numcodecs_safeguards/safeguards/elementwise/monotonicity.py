@@ -86,7 +86,7 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
 
     Parameters
     ----------
-    monotonicity : Monotonicity
+    monotonicity : str | Monotonicity
         The level of monotonicity that is guaranteed to be preserved by the
         safeguard.
     window : int
