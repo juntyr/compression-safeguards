@@ -4,13 +4,12 @@ with atheris.instrument_imports():
     import sys
     import types
     import typing
-
+    import warnings
     from enum import Enum
     from inspect import signature, Parameter
 
     import numcodecs.registry
     import numpy as np
-
     from numcodecs.abc import Codec
     from numcodecs_safeguards import (
         SafeguardsCodec,
@@ -54,6 +53,9 @@ def generate_parameter(data: atheris.FuzzedDataProvider, p: Parameter):
             return list(tys[1])[data.ConsumeIntInRange(0, len(tys[1]) - 1)]
 
         ty = tys[data.ConsumeIntInRange(0, len(tys) - 1)]
+
+        if ty is types.NoneType:
+            return None
         if ty is float:
             return data.ConsumeFloat()
         if ty is int:
@@ -99,12 +101,14 @@ def check_one_input(data):
         for kind in kinds
     ]
 
+    warnings.filterwarnings("error")
+
     try:
         safeguard = SafeguardsCodec(
             codec=FuzzCodec(raw, decoded),
             safeguards=safeguards,
         )
-    except AssertionError:
+    except (AssertionError, Warning):
         return
 
     grepr = repr(safeguard)

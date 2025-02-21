@@ -39,6 +39,9 @@ from .safeguards import Safeguard
 from .safeguards.elementwise import ElementwiseSafeguard
 from .safeguards.elementwise.abs import AbsoluteErrorBoundSafeguard
 from .safeguards.elementwise.decimal import DecimalErrorBoundSafeguard
+from .safeguards.elementwise.findiff.abs import (
+    FiniteDifferenceAbsoluteErrorBoundSafeguard,
+)
 from .safeguards.elementwise.monotonicity import MonotonicityPreservingSafeguard
 from .safeguards.elementwise.rel_or_abs import RelativeOrAbsoluteErrorBoundSafeguard
 from .safeguards.elementwise.sign import SignPreservingSafeguard
@@ -63,6 +66,10 @@ class Safeguards(Enum):
 
     decimal = DecimalErrorBoundSafeguard
     """Enforce a decimal error bound."""
+
+    # finite difference error bounds
+    findiff_abs = FiniteDifferenceAbsoluteErrorBoundSafeguard
+    """Enforce an absolute error bound for the finite differences."""
 
     # monotonicity
     monotonicity = MonotonicityPreservingSafeguard
@@ -208,7 +215,6 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         for safeguard in self._elementwise_safeguards:
             if not safeguard.check(data, prev_correction):
                 correction = safeguard._compute_correction(data, prev_correction)
-                print(safeguard, data, prev_correction, correction)
                 prev_correction = correction
 
         if correction is None:

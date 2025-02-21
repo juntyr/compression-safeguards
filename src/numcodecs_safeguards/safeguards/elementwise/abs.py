@@ -65,7 +65,7 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         return (
             (np.abs(data - decoded) <= self._eb_abs)
             | (_as_bits(data) == _as_bits(decoded))
-            | (self._equal_nan and (np.isnan(data) == np.isnan(decoded)))
+            | (self._equal_nan and (np.isnan(data) & np.isnan(decoded)))
         )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")

@@ -94,7 +94,7 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         return (
             (self._decimal_error(data, decoded) <= self._eb_decimal)
             | (_as_bits(data) == _as_bits(decoded))
-            | (self._equal_nan and (np.isnan(data) == np.isnan(decoded)))
+            | (self._equal_nan and (np.isnan(data) & np.isnan(decoded)))
         )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")

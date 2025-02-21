@@ -55,7 +55,10 @@ class ZeroIsZeroSafeguard(ElementwiseSafeguard):
 
         zero = np.array(self._zero)
         if zero.dtype != data.dtype:
-            zero = zero.astype(data.dtype)
+            with np.errstate(
+                divide="ignore", over="ignore", under="ignore", invalid="ignore"
+            ):
+                zero = zero.astype(data.dtype)
         zero = _as_bits(zero)
 
         return (_as_bits(data) != zero) | (_as_bits(decoded) == zero)
