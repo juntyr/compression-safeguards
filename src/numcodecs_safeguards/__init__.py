@@ -215,7 +215,6 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         for safeguard in self._elementwise_safeguards:
             if not safeguard.check(data, prev_correction):
                 correction = safeguard._compute_correction(data, prev_correction)
-                print(safeguard, data, prev_correction, correction)
                 prev_correction = correction
 
         if correction is None:

@@ -135,7 +135,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         return (
             (np.abs(data - decoded) <= self._eb_abs_impl)
             | (_as_bits(data) == _as_bits(decoded))
-            | (np.isnan(data) == np.isnan(decoded))
+            | (np.isnan(data) & np.isnan(decoded))
         )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
