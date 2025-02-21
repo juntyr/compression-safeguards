@@ -39,7 +39,7 @@ from .safeguards import Safeguard
 from .safeguards.elementwise import ElementwiseSafeguard
 from .safeguards.elementwise.abs import AbsoluteErrorBoundSafeguard
 from .safeguards.elementwise.decimal import DecimalErrorBoundSafeguard
-from .safeguards.elementwise.findiff_abs import (
+from .safeguards.elementwise.findiff.abs import (
     FiniteDifferenceAbsoluteErrorBoundSafeguard,
 )
 from .safeguards.elementwise.monotonicity import MonotonicityPreservingSafeguard

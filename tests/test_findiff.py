@@ -8,7 +8,7 @@ https://doi.org/10.1090/s0025-5718-1988-0935077-0.
 
 from fractions import Fraction as F
 
-from numcodecs_safeguards.safeguards.elementwise.findiff_abs import (
+from numcodecs_safeguards.safeguards.elementwise.findiff import (
     _finite_difference_coefficients,
 )
 
