@@ -73,6 +73,7 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         self._eb_decimal = eb_decimal
         self._equal_nan = equal_nan
 
+    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
         """
         Check which elements have matching signs in the `data` and the
