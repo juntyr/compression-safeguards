@@ -55,7 +55,7 @@ def generate_parameter(data: atheris.FuzzedDataProvider, p: Parameter):
 
         ty = tys[data.ConsumeIntInRange(0, len(tys) - 1)]
 
-        if ty is None:
+        if ty is types.NoneType:
             return None
         if ty is float:
             return data.ConsumeFloat()
