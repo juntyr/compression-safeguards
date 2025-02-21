@@ -29,17 +29,21 @@ This package currently implements the following [safeguards][numcodecs_safeguard
 
 - [`abs`][numcodecs_safeguards.safeguards.elementwise.abs.AbsoluteErrorBoundSafeguard] (absolute error bound):
 
-    The absolute elementwise error is guaranteed to be less than or equal to the provided bound. In cases where the arithmetic evaluation of the error bound not well-defined, e.g. for infinite or NaN values, producing the exact same bitpattern is defined to satisfy the error bound.
+    The elementwise absolute error is guaranteed to be less than or equal to the provided bound. In cases where the arithmetic evaluation of the error bound is not well-defined, e.g. for infinite or NaN values, producing the exact same bitpattern is defined to satisfy the error bound. The safeguard can also be configured such that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
 
 - [`rel_or_abs`][numcodecs_safeguards.safeguards.elementwise.rel_or_abs.RelativeOrAbsoluteErrorBoundSafeguard] (relative [or absolute] error bound):
 
-    The absolute elementwise error between the *logarithms*\* of the values is guaranteed to be less than or equal to $\log(1 + eb_{rel})$ where $eb_{rel}$ is e.g. 2%. The logarithm* here is adapted to support positive, negative, and zero values. For values close to zero, where the relative error is not well-defined, the absolute elementwise error is guaranteed to be less than or equal to the absolute error bound.
-    
-    Put simply, each element satisfies the relative or the absolute error bound (or both). In cases where the arithmetic evaluation of the error bound is not well-defined, e.g. for infinite or NaN values, producing the exact same bitpattern is defined to satisfy the error bound.
+    The elementwise absolute error between the *logarithms*\* of the values is guaranteed to be less than or equal to $\log(1 + eb_{rel})$ where $eb_{rel}$ is e.g. 2%. The logarithm* here is adapted to support positive, negative, and zero values. For values close to zero, where the relative error is not well-defined, the absolute elementwise error is guaranteed to be less than or equal to the absolute error bound.
+
+    Put simply, each element satisfies the relative or the absolute error bound (or both). In cases where the arithmetic evaluation of the error bound is not well-defined, e.g. for infinite or NaN values, producing the exact same bitpattern is defined to satisfy the error bound. The safeguard can also be configured such that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
+
+- [`decimal`][numcodecs_safeguards.safeguards.elementwise.decimal.DecimalErrorBoundSafeguard] (decimal error bound):
+
+    The elementwise decimal error is guaranteed to be less than or equal to the provided bound. The decimal error quantifies the orders of magnitude that the lossy-decoded value is away from the original value, i.e. the difference in their decimal logarithms. It is defined to be infinite if the signs of the data and decoded data do not match. Since the decimal error bound must be finite, this safeguard also guarantees that the sign of each decode value matches the sign of each original value and that a decoded value is zero if and only if it is zero in the original data. In cases where the arithmetic evaluation of the error bound not well-defined, e.g. for infinite or NaN values, producing the exact same bitpattern is defined to satisfy the error bound. The safeguard can also be configured such that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
 
 - [`monotonicity`][numcodecs_safeguards.safeguards.elementwise.monotonicity.MonotonicityPreservingSafeguard] (monotonicity-preserving):
 
-    Sequences that are monotonic in the input are guaranteed to be monotonic in the decompressed output. Monotonic sequences are detected using per-axis moving windows. The safeguard supports enforcing four levels of [monotonicity][numcodecs_safeguards.safeguards.elementwise.monotonicity.Monotonicity]: `strict`, `strict_with_consts`, `strict_to_weak`, `weak`. Windows that are not monotonic or contain non-finite data are skipped. Axes that have fewer elements than the window size are skipped as well.
+    Sequences that are monotonic in the input are guaranteed to be monotonic in the decompressed output. Monotonic sequences are detected using per-axis moving windows of constant size. Typically, the window size should be chosen to be large enough to ignore noise but small enough to capture details. The safeguard supports enforcing four levels of [monotonicity][numcodecs_safeguards.safeguards.elementwise.monotonicity.Monotonicity]: `strict`, `strict_with_consts`, `strict_to_weak`, `weak`. Windows that are not monotonic or contain non-finite data are skipped. Axes that have fewer elements than the window size are skipped as well.
 
 - [`sign`][numcodecs_safeguards.safeguards.elementwise.sign.SignPreservingSafeguard] (sign-preserving):
 

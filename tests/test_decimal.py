@@ -1,0 +1,82 @@
+import numpy as np
+
+from .codecs import (
+    encode_decode_zero,
+    encode_decode_neg,
+    encode_decode_identity,
+    encode_decode_noise,
+    encode_decode_mock,
+)
+
+
+def check_all_codecs(data: np.ndarray):
+    decoded = encode_decode_zero(
+        data,
+        safeguards=[dict(kind="decimal", eb_decimal=1.0)],
+    )
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        np.testing.assert_allclose(decoded, data, rtol=10.0, atol=0.0)
+
+    decoded = encode_decode_neg(
+        data,
+        safeguards=[dict(kind="decimal", eb_decimal=1.0)],
+    )
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        np.testing.assert_allclose(decoded, data, rtol=10.0, atol=0.0)
+
+    decoded = encode_decode_identity(
+        data,
+        safeguards=[dict(kind="decimal", eb_decimal=1.0)],
+    )
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        np.testing.assert_allclose(decoded, data, rtol=10.0, atol=0.0)
+
+    decoded = encode_decode_noise(
+        data,
+        safeguards=[dict(kind="decimal", eb_decimal=1.0)],
+    )
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        np.testing.assert_allclose(decoded, data, rtol=10.0, atol=0.0)
+
+
+def test_empty():
+    check_all_codecs(np.empty(0))
+
+
+def test_arange():
+    check_all_codecs(np.arange(100, dtype=float))
+
+
+def test_linspace():
+    check_all_codecs(np.linspace(-1024, 1024, 2831))
+
+
+def test_edge_cases():
+    check_all_codecs(
+        np.array(
+            [
+                np.inf,
+                np.nan,
+                -np.inf,
+                -np.nan,
+                np.finfo(float).min,
+                np.finfo(float).max,
+                np.finfo(float).tiny,
+                -np.finfo(float).tiny,
+            ]
+        )
+    )
+
+
+def test_fuzzer_overcorrect():
+    data = np.array([255, 0], dtype=np.uint8)
+    decoded = np.array([0, 4], dtype=np.uint8)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(kind="zero", zero=-1),
+            dict(kind="decimal", eb_decimal=3.567564553293311e293),
+        ],
+    )
