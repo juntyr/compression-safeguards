@@ -4,8 +4,10 @@ Finite difference absolute error bound safeguard.
 
 __all__ = ["FiniteDifferenceAbsoluteErrorBoundSafeguard"]
 
-import numpy as np
+import warnings
 from typing import Optional
+
+import numpy as np
 
 from .. import ElementwiseSafeguard, _as_bits
 from . import (
@@ -98,6 +100,12 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         assert dx > 0.0, "dx must be positive"
         assert eb_abs > 0.0, "eb_abs must be positive"
         assert np.isfinite(eb_abs), "eb_abs must be finite"
+
+        if order > 8 or accuracy > 8:
+            warnings.warn(
+                f"computing a finite difference of order {order} and accuracy {accuracy} will be costly",
+                stacklevel=2,
+            )
 
         self._type = type
         self._order = order
