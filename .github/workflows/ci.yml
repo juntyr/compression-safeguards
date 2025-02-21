@@ -50,7 +50,7 @@ jobs:
         run: uv sync --only-group test && uv pip install .
 
       - name: Run tests
-        run: uv run pytest
+        run: uv run pytest -W error
 
   mypy:
     name: Typecheck
