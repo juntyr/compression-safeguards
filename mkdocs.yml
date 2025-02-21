@@ -22,6 +22,7 @@ extra_css:
 theme:
   name: readthedocs
   highlightjs: false
+  navigation_depth: 99
 
 nav:
   - Home: index.md
@@ -47,9 +48,7 @@ plugins:
             docstring_section_style: list
             docstring_style: numpy
             show_if_no_docstring: true
-            filters: [
-              "!^_$", "!^_[^_]", "!^__", "__init__"
-            ]
+            filters: ["!^_$", "!^_[^_]", "!^__", "__init__"]
             members_order: source
             group_by_category: false
             show_source: false

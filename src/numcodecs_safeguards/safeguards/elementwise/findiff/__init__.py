@@ -32,9 +32,9 @@ class FiniteDifference(Enum):
 
 
 def _finite_difference_offsets(
+    type: FiniteDifference,
     order: int,
     accuracy: int,
-    type: FiniteDifference,
 ) -> list[int]:
     match type:
         case FiniteDifference.central:
