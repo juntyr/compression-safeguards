@@ -7,6 +7,7 @@ __all__ = ["SignPreservingSafeguard"]
 import numpy as np
 
 from . import ElementwiseSafeguard
+from ...intervals import IntervalUnion
 
 
 class SignPreservingSafeguard(ElementwiseSafeguard):
@@ -55,6 +56,22 @@ class SignPreservingSafeguard(ElementwiseSafeguard):
             decoded,
             data,
         )
+
+    def _compute_intervals(self, data: np.ndarray) -> IntervalUnion:
+        sign = self._sign(data).flatten()
+        zero = np.zeros((), dtype=data.dtype)
+        one = np.ones((), dtype=data.dtype)
+
+        single = IntervalUnion.empty(data.dtype, data.size, 1)
+
+        single.lower = np.where(sign == 0, zero, single.lower)
+        single.upper = np.where(sign == 0, zero, single.upper)  # [0 .. 0]
+
+        # FIXME: support floating types as well
+        single.lower = np.where(sign == 1, one, single.lower)  # [1 .. max]
+        single.upper = np.where(sign == -1, -one, single.upper)  # [min .. -1]
+
+        return IntervalUnion
 
     def get_config(self) -> dict:
         """
