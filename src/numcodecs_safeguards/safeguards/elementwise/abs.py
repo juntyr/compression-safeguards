@@ -7,6 +7,7 @@ __all__ = ["AbsoluteErrorBoundSafeguard"]
 import numpy as np
 
 from . import ElementwiseSafeguard, _as_bits
+from ...intervals import IntervalUnion
 
 
 class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
@@ -22,7 +23,7 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
     Parameters
     ----------
-    eb_abs : float
+    eb_abs : int | float
         The positive absolute error bound that is enforced by this safeguard.
     equal_nan: bool
         Whether decoding a NaN value to a NaN value with a different bit
@@ -30,13 +31,13 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     """
 
     __slots__ = ("_eb_abs", "_equal_nan")
-    _eb_abs: float
+    _eb_abs: int | float
     _equal_nan: bool
 
     kind = "abs"
     _priority = 0
 
-    def __init__(self, eb_abs: float, *, equal_nan: bool = False):
+    def __init__(self, eb_abs: int | float, *, equal_nan: bool = False):
         assert eb_abs > 0.0, "eb_abs must be positive"
         assert np.isfinite(eb_abs), "eb_abs must be finite"
 
@@ -85,6 +86,39 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             corrected,
             data,
         )
+
+    def _compute_intervals(self, data: np.ndarray) -> IntervalUnion:
+        data = data.flatten()
+
+        # x <= valid <= x
+        valid = IntervalUnion.from_singular(data)  # type: ignore
+
+        # (x - eb_abs) <= valid <= (x + eb_abs)
+        valid.lower[0, np.isfinite(data)] -= self._eb_abs
+        valid.upper[0, np.isfinite(data)] += self._eb_abs
+
+        if np.issubdtype(data.dtype, np.integer):
+            info = np.iinfo(data.dtype)
+
+            # saturate the error bounds so that they don't wrap around
+            valid.lower[0, valid.lower[0] > data] = info.min
+            valid.upper[0, valid.upper[0] < data] = info.max
+        elif np.issubdtype(data.dtype, np.floating):
+            # correct rounding errors in the lower and upper bound
+            lower_bound_outside_eb_abs = np.abs(data - valid.lower[0]) > self._eb_abs
+            upper_bound_outside_eb_abs = np.abs(data - valid.upper[0]) > self._eb_abs
+
+            valid.lower[0, np.isfinite(data)] += lower_bound_outside_eb_abs[
+                np.isfinite(data)
+            ]
+            valid.upper[0, np.isfinite(data)] -= upper_bound_outside_eb_abs[
+                np.isfinite(data)
+            ]
+
+            if self._equal_nan:
+                assert False, "not yet implemented for floats"
+
+        return valid
 
     def get_config(self) -> dict:
         """

@@ -1,5 +1,6 @@
 import numpy as np
 
+from numcodecs_safeguards.safeguards.elementwise import _as_bits
 
 from .codecs import (
     encode_decode_zero,
@@ -17,18 +18,19 @@ def check_all_codecs(data: np.ndarray):
             safeguard["zero"] = zero
         else:
             zero = 0
+        zero = _as_bits(np.full((), zero, dtype=data.dtype))
 
         decoded = encode_decode_zero(data, safeguards=[safeguard])
-        assert np.all((data != zero) | (decoded == zero))
+        assert np.all((_as_bits(data) != zero) | (_as_bits(decoded) == zero))
 
         decoded = encode_decode_neg(data, safeguards=[safeguard])
-        assert np.all((data != zero) | (decoded == zero))
+        assert np.all((_as_bits(data) != zero) | (_as_bits(decoded) == zero))
 
         decoded = encode_decode_identity(data, safeguards=[safeguard])
-        assert np.all((data != zero) | (decoded == zero))
+        assert np.all((_as_bits(data) != zero) | (_as_bits(decoded) == zero))
 
         decoded = encode_decode_noise(data, safeguards=[safeguard])
-        assert np.all((data != zero) | (decoded == zero))
+        assert np.all((_as_bits(data) != zero) | (_as_bits(decoded) == zero))
 
 
 def test_empty():
@@ -55,6 +57,8 @@ def test_edge_cases():
                 np.finfo(float).max,
                 np.finfo(float).tiny,
                 -np.finfo(float).tiny,
+                -0.0,
+                +0.0,
             ]
         )
     )

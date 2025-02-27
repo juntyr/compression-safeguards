@@ -32,7 +32,7 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     eb_rel : float
         The positive relative error bound that is enforced by this safeguard.
         `eb_rel=0.02` corresponds to a 2% relative bound.
-    eb_abs : float
+    eb_abs : int | float
         The positive absolute error bound that is enforced by this safeguard.
     equal_nan: bool
         Whether decoding a NaN value to a NaN value with a different bit
@@ -41,13 +41,13 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
     __slots__ = ("_eb_rel", "_eb_abs", "_equal_nan")
     _eb_rel: float
-    _eb_abs: float
+    _eb_abs: int | float
     _equal_nan: bool
 
     kind = "rel_or_abs"
     _priority = 0
 
-    def __init__(self, eb_rel: float, eb_abs: float, *, equal_nan: bool = False):
+    def __init__(self, eb_rel: float, eb_abs: int | float, *, equal_nan: bool = False):
         assert eb_rel > 0.0, "eb_rel must be positive"
         assert np.isfinite(eb_rel), "eb_rel must be finite"
         assert eb_abs > 0.0, "eb_abs must be positive"

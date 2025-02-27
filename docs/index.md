@@ -25,7 +25,7 @@ This package currently implements the following [safeguards][numcodecs_safeguard
 
 - [`zero`][numcodecs_safeguards.safeguards.elementwise.zero.ZeroIsZeroSafeguard] (zero/constant preserving):
 
-    Values that are zero in the input are guaranteed to also be *exactly* zero in the decompressed output. This safeguard can also be used to enforce that another constant value is bitwise preserved, e.g. a missing value constant or a semantic "zero" value that is represented as a non-zero number.
+    Values that are zero in the input are guaranteed to also be *exactly* zero in the decompressed output. This safeguard can also be used to enforce that another constant value is bitwise preserved, e.g. a missing value constant or a semantic "zero" value that is represented as a non-zero number. Beware that +0.0 and -0.0 are semantically equivalent in floating point but have different bitwise patterns. If you want to preserve both, you need to use two safeguards, one configured for each zero.
 
 - [`abs`][numcodecs_safeguards.safeguards.elementwise.abs.AbsoluteErrorBoundSafeguard] (absolute error bound):
 

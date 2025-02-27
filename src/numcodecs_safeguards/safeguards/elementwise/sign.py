@@ -62,16 +62,20 @@ class SignPreservingSafeguard(ElementwiseSafeguard):
         zero = np.zeros((), dtype=data.dtype)
         one = np.ones((), dtype=data.dtype)
 
-        single = IntervalUnion.empty(data.dtype, data.size, 1)
+        # min <= valid <= max
+        valid = IntervalUnion.full(data.dtype, data.size, 1)  # type: ignore
 
-        single.lower = np.where(sign == 0, zero, single.lower)
-        single.upper = np.where(sign == 0, zero, single.upper)  # [0 .. 0]
+        # sign = 0 -> 0 <= valid <= 0
+        valid.lower[0, sign == 0] = zero
+        valid.upper[0, sign == 0] = zero
 
-        # FIXME: support floating types as well
-        single.lower = np.where(sign == 1, one, single.lower)  # [1 .. max]
-        single.upper = np.where(sign == -1, -one, single.upper)  # [min .. -1]
+        # sign = -1 -> min <= valid <= -1
+        valid.upper[0, sign == -1] = -one
 
-        return IntervalUnion
+        # sign = +1 -> 1 <= valid <= max
+        valid.lower[0, sign == +1] = one
+
+        return valid
 
     def get_config(self) -> dict:
         """

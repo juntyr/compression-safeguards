@@ -7,6 +7,7 @@ __all__ = ["ZeroIsZeroSafeguard"]
 import numpy as np
 
 from . import ElementwiseSafeguard, _as_bits
+from ...intervals import IntervalUnion
 
 
 class ZeroIsZeroSafeguard(ElementwiseSafeguard):
@@ -17,6 +18,10 @@ class ZeroIsZeroSafeguard(ElementwiseSafeguard):
     This safeguard can also be used to enforce that another constant value is
     bitwise preserved, e.g. a missing value constant or a semantic "zero" value
     that is represented as a non-zero number.
+
+    Beware that +0.0 and -0.0 are semantically equivalent in floating point but
+    have different bitwise patterns. If you want to preserve both, you need to
+    use two safeguards, one configured for each zero.
 
     Parameters
     ----------
@@ -53,13 +58,7 @@ class ZeroIsZeroSafeguard(ElementwiseSafeguard):
             Per-element, `True` if the check succeeded for this element.
         """
 
-        zero = np.array(self._zero)
-        if zero.dtype != data.dtype:
-            with np.errstate(
-                divide="ignore", over="ignore", under="ignore", invalid="ignore"
-            ):
-                zero = zero.astype(data.dtype)
-        zero = _as_bits(zero)
+        zero = _as_bits(self._zero_like(data.dtype))
 
         return (_as_bits(data) != zero) | (_as_bits(decoded) == zero)
 
@@ -74,6 +73,19 @@ class ZeroIsZeroSafeguard(ElementwiseSafeguard):
             data,
         )
 
+    def _compute_intervals(self, data: np.ndarray) -> IntervalUnion:
+        # min <= valid <= max
+        valid = IntervalUnion.full(data.dtype, data.size, 1)  # type: ignore
+
+        zero = _as_bits(self._zero_like(data.dtype))
+        data = _as_bits(data.flatten())
+
+        # data = zero -> zero <= valid <= zero
+        valid.lower[0, data == zero] = zero
+        valid.upper[0, data == zero] = zero
+
+        return valid
+
     def get_config(self) -> dict:
         """
         Returns the configuration of the safeguard.
@@ -85,3 +97,12 @@ class ZeroIsZeroSafeguard(ElementwiseSafeguard):
         """
 
         return dict(kind=type(self).kind, zero=self._zero)
+
+    def _zero_like(self, dtype: np.dtype) -> np.ndarray:
+        zero = np.array(self._zero)
+        if zero.dtype != dtype:
+            with np.errstate(
+                divide="ignore", over="ignore", under="ignore", invalid="ignore"
+            ):
+                zero = zero.astype(dtype)
+        return zero
