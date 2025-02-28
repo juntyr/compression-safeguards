@@ -38,12 +38,13 @@ from numcodecs_combinators.abc import CodecCombinatorMixin
 from .safeguards import Safeguard
 from .safeguards.elementwise import ElementwiseSafeguard
 from .safeguards.elementwise.abs import AbsoluteErrorBoundSafeguard
-from .safeguards.elementwise.decimal import DecimalErrorBoundSafeguard
-from .safeguards.elementwise.findiff.abs import (
-    FiniteDifferenceAbsoluteErrorBoundSafeguard,
-)
-from .safeguards.elementwise.monotonicity import MonotonicityPreservingSafeguard
-from .safeguards.elementwise.rel_or_abs import RelativeOrAbsoluteErrorBoundSafeguard
+
+# from .safeguards.elementwise.decimal import DecimalErrorBoundSafeguard
+# from .safeguards.elementwise.findiff.abs import (
+#     FiniteDifferenceAbsoluteErrorBoundSafeguard,
+# )
+# from .safeguards.elementwise.monotonicity import MonotonicityPreservingSafeguard
+# from .safeguards.elementwise.rel_or_abs import RelativeOrAbsoluteErrorBoundSafeguard
 from .safeguards.elementwise.sign import SignPreservingSafeguard
 from .safeguards.elementwise.zero import ZeroIsZeroSafeguard
 
@@ -61,19 +62,19 @@ class Safeguards(Enum):
     abs = AbsoluteErrorBoundSafeguard
     """Enforce an absolute error bound."""
 
-    rel_or_abs = RelativeOrAbsoluteErrorBoundSafeguard
-    """Enforce a relative error bound, fall back to an absolute error bound close to zero."""
+    # rel_or_abs = RelativeOrAbsoluteErrorBoundSafeguard
+    # """Enforce a relative error bound, fall back to an absolute error bound close to zero."""
 
-    decimal = DecimalErrorBoundSafeguard
-    """Enforce a decimal error bound."""
+    # decimal = DecimalErrorBoundSafeguard
+    # """Enforce a decimal error bound."""
 
-    # finite difference error bounds
-    findiff_abs = FiniteDifferenceAbsoluteErrorBoundSafeguard
-    """Enforce an absolute error bound for the finite differences."""
+    # # finite difference error bounds
+    # findiff_abs = FiniteDifferenceAbsoluteErrorBoundSafeguard
+    # """Enforce an absolute error bound for the finite differences."""
 
-    # monotonicity
-    monotonicity = MonotonicityPreservingSafeguard
-    """Enforce that monotonic sequences remain monotonic."""
+    # # monotonicity
+    # monotonicity = MonotonicityPreservingSafeguard
+    # """Enforce that monotonic sequences remain monotonic."""
 
     # sign
     sign = SignPreservingSafeguard
@@ -210,28 +211,37 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         assert decoded.dtype == data.dtype, "codec must roundtrip dtype"
         assert decoded.shape == data.shape, "codec must roundtrip shape"
 
-        prev_correction = decoded
-        correction = None
+        all_intervals = []
         for safeguard in self._elementwise_safeguards:
-            # TODO: check that each safeguard's interval contains the original data
-            if not safeguard.check(data, prev_correction):
-                correction = safeguard._compute_correction(data, prev_correction)
-                prev_correction = correction
+            intervals = safeguard._compute_intervals(data)
+            assert np.all(intervals.contains(data)), (
+                "elementwise safeguard intervals must contain the original data"
+            )
+            all_intervals.append(intervals)
 
-        if correction is None:
+        if len(all_intervals) == 0:
             correction_bytes = bytes()
         else:
-            for safeguard in self._elementwise_safeguards:
-                assert safeguard.check(
-                    data,
-                    correction,
-                ), f"{safeguard!r} check fails after correction"
+            combined_intervals = all_intervals[0]
+            for intervals in all_intervals[1:]:
+                combined_intervals = combined_intervals.intersect(intervals)
+            correction = combined_intervals.encode(decoded)
 
-            correction_bytes = ElementwiseSafeguard._encode_correction(
-                decoded,
-                correction,
-                self._lossless,
-            )
+            for safeguard, intervals in zip(
+                self._elementwise_safeguards, all_intervals
+            ):
+                assert np.all(intervals.contains(correction)), (
+                    f"{safeguard!r} check fails after correction"
+                )
+
+            if np.all(combined_intervals.contains(decoded)):
+                correction_bytes = bytes()
+            else:
+                correction_bytes = ElementwiseSafeguard._encode_correction(
+                    decoded,
+                    correction,
+                    self._lossless,
+                )
 
         correction_len = varint.encode(len(correction_bytes))
 

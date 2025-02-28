@@ -1,5 +1,6 @@
 import numpy as np
 
+from numcodecs_safeguards.safeguards.elementwise.sign import SignPreservingSafeguard
 
 from .codecs import (
     encode_decode_zero,
@@ -12,38 +13,26 @@ from .codecs import (
 def check_all_codecs(data: np.ndarray):
     decoded = encode_decode_zero(data, safeguards=[dict(kind="sign")])
     assert np.all(
-        np.where(
-            np.isnan(data),
-            np.signbit(data) == np.signbit(decoded),
-            np.sign(data) == np.sign(decoded),
-        )
+        SignPreservingSafeguard()._sign(data)
+        == SignPreservingSafeguard()._sign(decoded)
     )
 
     decoded = encode_decode_neg(data, safeguards=[dict(kind="sign")])
     assert np.all(
-        np.where(
-            np.isnan(data),
-            np.signbit(data) == np.signbit(decoded),
-            np.sign(data) == np.sign(decoded),
-        )
+        SignPreservingSafeguard()._sign(data)
+        == SignPreservingSafeguard()._sign(decoded)
     )
 
     decoded = encode_decode_identity(data, safeguards=[dict(kind="sign")])
     assert np.all(
-        np.where(
-            np.isnan(data),
-            np.signbit(data) == np.signbit(decoded),
-            np.sign(data) == np.sign(decoded),
-        )
+        SignPreservingSafeguard()._sign(data)
+        == SignPreservingSafeguard()._sign(decoded)
     )
 
     decoded = encode_decode_noise(data, safeguards=[dict(kind="sign")])
     assert np.all(
-        np.where(
-            np.isnan(data),
-            np.signbit(data) == np.signbit(decoded),
-            np.sign(data) == np.sign(decoded),
-        )
+        SignPreservingSafeguard()._sign(data)
+        == SignPreservingSafeguard()._sign(decoded)
     )
 
 

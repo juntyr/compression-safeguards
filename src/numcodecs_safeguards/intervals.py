@@ -236,15 +236,26 @@ class IntervalUnion(Generic[T, N, U]):
     ) -> np.ndarray[tuple[N], np.dtype[np.bool]]:
         other = _to_total_order(other)
 
-        (_, n) = self._lower.shape
+        (u, n) = self._lower.shape
         is_contained = np.zeros((n,), dtype=bool)
 
-        for i in range(n):
+        for i in range(u):
             is_contained |= (other >= _to_total_order(self._lower[i])) & (
                 other <= _to_total_order(self._upper[i])
             )
 
         return is_contained
+
+    def encode(self, decoded: np.ndarray[tuple[N], T]) -> np.ndarray[tuple[N], T]:
+        is_contained = self.contains(decoded)
+
+        # simple encoding:
+        #  1. if decoded is in the interval, use it
+        #  2. otherwise pick the lower bound of the first interval
+        encoding_pick = self._lower[0].copy()
+        encoding_pick[is_contained] = decoded[is_contained]
+
+        return encoding_pick
 
     def __repr__(self) -> str:
         return f"IntervalUnion(lower={self._lower!r}, upper={self._upper!r})"

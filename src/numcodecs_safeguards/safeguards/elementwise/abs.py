@@ -122,9 +122,12 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             else:
                 Lower(data) <= valid[np.isnan(data)] <= Upper(data)
 
-        Lower(data - self._eb_abs) <= valid[np.isfinite(data)] <= Upper(
-            data + self._eb_abs
-        )
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            Lower(data - self._eb_abs) <= valid[np.isfinite(data)] <= Upper(
+                data + self._eb_abs
+            )
 
         if np.issubdtype(data.dtype, np.integer):
             # saturate the error bounds so that they don't wrap around
@@ -132,8 +135,11 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             valid[valid._upper < data] <= Maximum
         elif np.issubdtype(data.dtype, np.floating):
             # correct rounding errors in the lower and upper bound
-            lower_bound_outside_eb_abs = np.abs(data - valid._lower) > self._eb_abs
-            upper_bound_outside_eb_abs = np.abs(data - valid._upper) > self._eb_abs
+            with np.errstate(
+                divide="ignore", over="ignore", under="ignore", invalid="ignore"
+            ):
+                lower_bound_outside_eb_abs = np.abs(data - valid._lower) > self._eb_abs
+                upper_bound_outside_eb_abs = np.abs(data - valid._upper) > self._eb_abs
 
             valid._lower[np.isfinite(data)] = _from_total_order(
                 _to_total_order(valid._lower) + lower_bound_outside_eb_abs,

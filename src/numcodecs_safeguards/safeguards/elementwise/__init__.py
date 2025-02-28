@@ -15,6 +15,7 @@ import varint
 from numcodecs.abc import Codec
 
 from .. import Safeguard
+from ...intervals import IntervalUnion
 
 
 class ElementwiseSafeguard(Safeguard, ABC):
@@ -64,6 +65,7 @@ class ElementwiseSafeguard(Safeguard, ABC):
             Per-element, `True` if the check succeeded for this element.
         """
 
+        # TODO: implement non-abstract based on the intervals
         pass
 
     @abstractmethod
@@ -92,7 +94,12 @@ class ElementwiseSafeguard(Safeguard, ABC):
             returned. It is always valid to return elements of the `data`.
         """
 
+        # TODO: remove
         pass
+
+    # TODO: @abstractmethod
+    def _compute_intervals(self, data: np.ndarray) -> IntervalUnion:
+        raise NotImplementedError("todo")
 
     @staticmethod
     def _encode_correction(
