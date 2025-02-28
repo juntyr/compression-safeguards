@@ -61,14 +61,20 @@ class SignPreservingSafeguard(ElementwiseSafeguard):
         sign = self._sign(data).flatten()
 
         zero = np.zeros((), dtype=data.dtype)
-        one = np.ones((), dtype=data.dtype)
-        neg_one = np.array(-one)
+
+        if np.issubdtype(data.dtype, np.integer):
+            tiny = np.ones((), dtype=data.dtype)
+            neg_tiny = np.array(-tiny)
+        else:
+            info = np.finfo(data.dtype)
+            tiny = np.array(info.smallest_subnormal)
+            neg_tiny = np.array(-info.smallest_subnormal)
 
         valid = Interval.empty_like(data)
 
         Lower(zero) <= valid[sign == 0] <= Upper(zero)
-        Minimum <= valid[sign == -1] <= Upper(neg_one)
-        Lower(one) <= valid[sign == +1] <= Maximum
+        Minimum <= valid[sign == -1] <= Upper(neg_tiny)
+        Lower(tiny) <= valid[sign == +1] <= Maximum
 
         return valid.into_union()
 

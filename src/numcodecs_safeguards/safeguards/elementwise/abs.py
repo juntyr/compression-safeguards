@@ -7,7 +7,16 @@ __all__ = ["AbsoluteErrorBoundSafeguard"]
 import numpy as np
 
 from . import ElementwiseSafeguard, _as_bits
-from ...intervals import IntervalUnion, Interval, Lower, Upper
+from ...intervals import (
+    IntervalUnion,
+    Interval,
+    Lower,
+    Upper,
+    Minimum,
+    Maximum,
+    _to_total_order,
+    _from_total_order,
+)
 
 
 class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
@@ -92,39 +101,53 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
         valid = Interval.empty_like(data)
 
-        finite_valid, finite_data = valid[np.isfinite(data)], data[np.isfinite(data)]
-        Lower(finite_data - self._eb_abs) <= finite_valid <= Upper(
-            finite_data + self._eb_abs
-        )
-
         if np.issubdtype(data.dtype, np.floating):
             inf_valid, inf_data = valid[np.isinf(data)], data[np.isinf(data)]
             Lower(inf_data) <= inf_valid <= Upper(inf_data)
 
         if np.issubdtype(data.dtype, np.floating):
-            # TODO: handle NaNs
-            pass
+            nan_valid, nan_data = valid[np.isnan(data)], data[np.isnan(data)]
+
+            if self._equal_nan:
+                nan_min = np.array(
+                    np.array(np.inf, dtype=data.dtype).view(
+                        data.dtype.str.replace("f", "u")
+                    )
+                    + 1
+                ).view(data.dtype)
+                nan_max = np.array(-1, dtype=data.dtype.str.replace("f", "i")).view(
+                    data.dtype
+                )
+
+                # any NaN with the same sign is valid
+                Lower(np.copysign(nan_min, nan_data)) <= nan_valid <= Upper(
+                    np.copysign(nan_max, nan_data)
+                )
+            else:
+                Lower(nan_data) <= nan_valid <= Upper(nan_data)
+
+        finite_valid, finite_data = valid[np.isfinite(data)], data[np.isfinite(data)]
+        Lower(finite_data - self._eb_abs) <= finite_valid <= Upper(
+            finite_data + self._eb_abs
+        )
 
         if np.issubdtype(data.dtype, np.integer):
-            info = np.iinfo(data.dtype)
-
             # saturate the error bounds so that they don't wrap around
-            valid._lower[valid._lower > data] = info.min
-            valid._upper[valid._upper < data] = info.max
+            Minimum <= valid[valid._lower > data]
+            valid[valid._upper < data] <= Maximum
         elif np.issubdtype(data.dtype, np.floating):
             # correct rounding errors in the lower and upper bound
             lower_bound_outside_eb_abs = np.abs(data - valid._lower) > self._eb_abs
             upper_bound_outside_eb_abs = np.abs(data - valid._upper) > self._eb_abs
 
-            valid._lower[np.isfinite(data)] += lower_bound_outside_eb_abs[
-                np.isfinite(data)
-            ]
-            valid._upper[np.isfinite(data)] -= upper_bound_outside_eb_abs[
-                np.isfinite(data)
-            ]
-
-            if self._equal_nan:
-                assert False, "not yet implemented for floats"
+            valid._lower[np.isfinite(data)] = _from_total_order(
+                _to_total_order(valid._lower) + lower_bound_outside_eb_abs,
+                data.dtype,
+            )[np.isfinite(data)]
+            valid._upper[np.isfinite(data)] = _from_total_order(
+                _to_total_order(valid._upper) - upper_bound_outside_eb_abs,
+                data.dtype,
+            )[np.isfinite(data)]
 
         return valid.into_union()
 

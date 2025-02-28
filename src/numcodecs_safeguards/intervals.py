@@ -63,17 +63,24 @@ class IndexedInterval(Generic[T, N]):
         self._index = _index
 
 
+def _minimum(dtype: np.dtype):
+    if np.issubdtype(dtype, np.integer):
+        return np.iinfo(dtype).min
+
+    if np.issubdtype(dtype, np.floating):
+        btype = dtype.str.replace("f", "u")
+        bmin = np.iinfo(btype).max  # produces -NaN (0xffff...)
+        return np.array(bmin, dtype=btype).view(dtype)
+
+    raise TypeError(f"unsupported interval type {dtype}")
+
+
 class _Minimum:
     def __le__(self, interval) -> IndexedInterval:
         if not isinstance(interval, IndexedInterval):
             return NotImplemented
 
-        # FIXME
-        assert np.issubdtype(interval._lower.dtype, np.integer), (
-            "only integer intervals supported for now"
-        )
-
-        interval._lower[interval._index] = np.iinfo(interval._lower.dtype).min
+        interval._lower[interval._index] = _minimum(interval._lower.dtype)
 
         return interval
 
@@ -81,17 +88,24 @@ class _Minimum:
 Minimum = _Minimum()
 
 
+def _maximum(dtype: np.dtype):
+    if np.issubdtype(dtype, np.integer):
+        return np.iinfo(dtype).max
+
+    if np.issubdtype(dtype, np.floating):
+        btype = dtype.str.replace("f", "u")
+        bmin = np.iinfo(btype).max  # produces -NaN (0xffff...)
+        return np.copysign(np.array(bmin, dtype=btype).view(dtype), +1)
+
+    raise TypeError(f"unsupported interval type {dtype}")
+
+
 class _Maximum:
     def __ge__(self, interval) -> IndexedInterval:
         if not isinstance(interval, IndexedInterval):
             return NotImplemented
 
-        # FIXME
-        assert np.issubdtype(interval._upper.dtype, np.integer), (
-            "only integer intervals supported for now"
-        )
-
-        interval._upper[interval._index] = np.iinfo(interval._upper.dtype).max
+        interval._upper[interval._index] = _maximum(interval._upper.dtype)
 
         return interval
 
@@ -168,16 +182,9 @@ class IntervalUnion(Generic[T, N, U]):
 
     @staticmethod
     def empty(dtype: T, n: N, u: U) -> "IntervalUnion[T, N, U]":
-        # FIXME
-        assert np.issubdtype(dtype, np.integer), (
-            "only integer intervals supported for now"
-        )
-
-        info = np.iinfo(dtype)
-
         return IntervalUnion(
-            _lower=np.full((u, n), info.max, dtype=dtype),
-            _upper=np.full((u, n), info.min, dtype=dtype),
+            _lower=np.full((u, n), _maximum(dtype), dtype=dtype),
+            _upper=np.full((u, n), _minimum(dtype), dtype=dtype),
         )
 
     def intersect(self, other: "IntervalUnion[T, N, V]") -> "IntervalUnion[T, N, Any]":
@@ -190,17 +197,25 @@ class IntervalUnion(Generic[T, N, U]):
 
         for i in range(u):
             for j in range(v):
-                intersection_lower = np.maximum(self._lower[i], other._lower[j])
-                intersection_upper = np.minimum(self._upper[i], other._upper[j])
+                intersection_lower = np.maximum(
+                    _to_total_order(self._lower[i]), _to_total_order(other._lower[j])
+                )
+                intersection_upper = np.minimum(
+                    _to_total_order(self._upper[i]), _to_total_order(other._upper[j])
+                )
 
                 has_intersection = intersection_lower <= intersection_upper
 
-                out._lower[n_intervals, has_intersection] = intersection_lower[
-                    has_intersection
-                ]
-                out._upper[n_intervals, has_intersection] = intersection_upper[
-                    has_intersection
-                ]
+                out._lower[n_intervals[has_intersection], has_intersection] = (
+                    _from_total_order(
+                        intersection_lower[has_intersection], out._lower.dtype
+                    )
+                )
+                out._upper[n_intervals[has_intersection], has_intersection] = (
+                    _from_total_order(
+                        intersection_upper[has_intersection], out._upper.dtype
+                    )
+                )
 
                 n_intervals += has_intersection
 
@@ -212,3 +227,41 @@ class IntervalUnion(Generic[T, N, U]):
 
     def __repr__(self) -> str:
         return f"IntervalUnion(lower={self._lower!r}, upper={self._upper!r})"
+
+
+def _to_total_order(x: np.ndarray) -> np.ndarray:
+    if np.issubdtype(x.dtype, np.integer):
+        return x
+
+    if not np.issubdtype(x.dtype, np.floating):
+        raise TypeError(f"unsupported interval type {x.dtype}")
+
+    utype = x.dtype.str.replace("f", "u")
+    itype = x.dtype.str.replace("f", "i")
+    bits = np.iinfo(utype).bits
+
+    mask = (-((x.view(dtype=utype) >> (bits - 1)).view(dtype=itype))).view(
+        dtype=utype
+    ) | (np.array(1, dtype=utype) << (bits - 1))
+
+    return x.view(dtype=utype) ^ mask
+
+
+def _from_total_order(x: np.ndarray, dtype: np.dtype) -> np.ndarray:
+    assert np.issubdtype(x.dtype, np.integer)
+
+    if np.issubdtype(dtype, np.integer):
+        return x
+
+    if not np.issubdtype(dtype, np.floating):
+        raise TypeError(f"unsupported interval type {dtype}")
+
+    utype = dtype.str.replace("f", "u")
+    itype = dtype.str.replace("f", "i")
+    bits = np.iinfo(utype).bits
+
+    mask = ((x >> (bits - 1)).view(dtype=itype) - 1).view(dtype=utype) | (
+        np.array(1, dtype=utype) << (bits - 1)
+    )
+
+    return (x ^ mask).view(dtype=dtype)
