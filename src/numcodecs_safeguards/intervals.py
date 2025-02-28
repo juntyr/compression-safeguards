@@ -197,9 +197,7 @@ class IntervalUnion(Generic[T, N, U]):
         ((u, n), (v, _)) = self._lower.shape, other._lower.shape
 
         if n == 0:
-            return IntervalUnion.empty(
-                self._lower.dtype, n, min(u, v)
-            )
+            return IntervalUnion.empty(self._lower.dtype, n, min(u, v))
 
         out: IntervalUnion[T, N, Any] = IntervalUnion.empty(
             self._lower.dtype, n, max(u, v)
