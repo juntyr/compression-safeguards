@@ -88,8 +88,18 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
                 )
 
                 # any NaN with the same sign is valid
-                Lower(np.copysign(nan_min, data)) <= valid[np.isnan(data)] <= Upper(
-                    np.copysign(nan_max, data)
+                Lower(
+                    np.where(
+                        np.signbit(data),
+                        np.copysign(nan_max, -1),
+                        np.copysign(nan_min, +1),
+                    )
+                ) <= valid[np.isnan(data)] <= Upper(
+                    np.where(
+                        np.signbit(data),
+                        np.copysign(nan_min, -1),
+                        np.copysign(nan_max, +1),
+                    )
                 )
             else:
                 Lower(data) <= valid[np.isnan(data)] <= Upper(data)
