@@ -236,6 +236,10 @@ class IntervalUnion(Generic[T, N, U]):
 
 
 def _to_total_order(x: np.ndarray) -> np.ndarray:
+    """
+    FloatFlip in http://stereopsis.com/radix.html
+    """
+
     if np.issubdtype(x.dtype, np.integer):
         return x
 
@@ -254,6 +258,10 @@ def _to_total_order(x: np.ndarray) -> np.ndarray:
 
 
 def _from_total_order(x: np.ndarray, dtype: np.dtype) -> np.ndarray:
+    """
+    IFloatFlip in http://stereopsis.com/radix.html
+    """
+
     assert np.issubdtype(x.dtype, np.integer)
 
     if np.issubdtype(dtype, np.integer):
