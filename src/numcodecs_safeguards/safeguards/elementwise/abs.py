@@ -98,16 +98,12 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
     def _compute_intervals(self, data: np.ndarray) -> IntervalUnion:
         data = data.flatten()
-
         valid = Interval.empty_like(data)
 
         if np.issubdtype(data.dtype, np.floating):
-            inf_valid, inf_data = valid[np.isinf(data)], data[np.isinf(data)]
-            Lower(inf_data) <= inf_valid <= Upper(inf_data)
+            Lower(data) <= valid[np.isinf(data)] <= Upper(data)
 
         if np.issubdtype(data.dtype, np.floating):
-            nan_valid, nan_data = valid[np.isnan(data)], data[np.isnan(data)]
-
             if self._equal_nan:
                 nan_min = np.array(
                     np.array(np.inf, dtype=data.dtype).view(
@@ -120,15 +116,14 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
                 )
 
                 # any NaN with the same sign is valid
-                Lower(np.copysign(nan_min, nan_data)) <= nan_valid <= Upper(
-                    np.copysign(nan_max, nan_data)
+                Lower(np.copysign(nan_min, data)) <= valid[np.isnan(data)] <= Upper(
+                    np.copysign(nan_max, data)
                 )
             else:
-                Lower(nan_data) <= nan_valid <= Upper(nan_data)
+                Lower(data) <= valid[np.isnan(data)] <= Upper(data)
 
-        finite_valid, finite_data = valid[np.isfinite(data)], data[np.isfinite(data)]
-        Lower(finite_data - self._eb_abs) <= finite_valid <= Upper(
-            finite_data + self._eb_abs
+        Lower(data - self._eb_abs) <= valid[np.isfinite(data)] <= Upper(
+            data + self._eb_abs
         )
 
         if np.issubdtype(data.dtype, np.integer):

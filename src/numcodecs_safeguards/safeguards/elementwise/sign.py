@@ -58,9 +58,10 @@ class SignPreservingSafeguard(ElementwiseSafeguard):
         )
 
     def _compute_intervals(self, data: np.ndarray) -> IntervalUnion:
-        sign = self._sign(data).flatten()
+        data = data.flatten()
+        valid = Interval.empty_like(data)
 
-        zero = np.zeros((), dtype=data.dtype)
+        sign = self._sign(data)
 
         if np.issubdtype(data.dtype, np.integer):
             tiny = np.ones((), dtype=data.dtype)
@@ -70,9 +71,7 @@ class SignPreservingSafeguard(ElementwiseSafeguard):
             tiny = np.array(info.smallest_subnormal)
             neg_tiny = np.array(-info.smallest_subnormal)
 
-        valid = Interval.empty_like(data)
-
-        Lower(zero) <= valid[sign == 0] <= Upper(zero)
+        Lower(data) <= valid[sign == 0] <= Upper(data)
         Minimum <= valid[sign == -1] <= Upper(neg_tiny)
         Lower(tiny) <= valid[sign == +1] <= Maximum
 

@@ -75,15 +75,12 @@ class ZeroIsZeroSafeguard(ElementwiseSafeguard):
 
     def _compute_intervals(self, data: np.ndarray) -> IntervalUnion:
         data = data.flatten()
-
         valid = Interval.empty_like(data)
 
-        zero = _as_bits(self._zero_like(data.dtype))
+        zero = self._zero_like(data.dtype)
 
-        data_iszero = _as_bits(data) == zero
-
-        Lower(data[data_iszero]) <= valid[data_iszero] <= Upper(data[data_iszero])
-        Minimum <= valid[~data_iszero] <= Maximum
+        Lower(zero) <= valid[_as_bits(data) == _as_bits(zero)] <= Upper(zero)
+        Minimum <= valid[_as_bits(data) != _as_bits(zero)] <= Maximum
 
         return valid.into_union()
 

@@ -129,13 +129,16 @@ class Lower:
         # if self._lower.dtype != interval._lower.dtype:
         #     return NotImplemented
 
-        if not (
-            (self._lower.shape == ())
-            or (self._lower.shape == interval._lower[interval._index].shape)
-        ):
+        if self._lower.shape == ():
+            lower = self._lower
+        elif self._lower.shape == interval._lower.shape:
+            lower = self._lower[interval._index]
+        elif self._lower.shape == interval._lower[interval._index].shape:
+            lower = self._lower
+        else:
             return NotImplemented
 
-        interval._lower[interval._index] = self._lower
+        interval._lower[interval._index] = lower
 
         return interval
 
@@ -156,13 +159,16 @@ class Upper:
         # if self._upper.dtype != interval._upper.dtype:
         #     return NotImplemented
 
-        if not (
-            (self._upper.shape == ())
-            or (self._upper.shape == interval._upper[interval._index].shape)
-        ):
+        if self._upper.shape == ():
+            upper = self._upper
+        elif self._upper.shape == interval._upper.shape:
+            upper = self._upper[interval._index]
+        elif self._upper.shape == interval._upper[interval._index].shape:
+            upper = self._upper
+        else:
             return NotImplemented
 
-        interval._upper[interval._index] = self._upper
+        interval._upper[interval._index] = upper
 
         return interval
 
