@@ -196,6 +196,11 @@ class IntervalUnion(Generic[T, N, U]):
     def intersect(self, other: "IntervalUnion[T, N, V]") -> "IntervalUnion[T, N, Any]":
         ((u, n), (v, _)) = self._lower.shape, other._lower.shape
 
+        if n == 0:
+            return IntervalUnion.empty(
+                self._lower.dtype, n, min(u, v)
+            )
+
         out: IntervalUnion[T, N, Any] = IntervalUnion.empty(
             self._lower.dtype, n, max(u, v)
         )
