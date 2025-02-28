@@ -213,6 +213,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         prev_correction = decoded
         correction = None
         for safeguard in self._elementwise_safeguards:
+            # TODO: check that each safeguard's interval contains the original data
             if not safeguard.check(data, prev_correction):
                 correction = safeguard._compute_correction(data, prev_correction)
                 prev_correction = correction

@@ -231,6 +231,21 @@ class IntervalUnion(Generic[T, N, U]):
 
         return IntervalUnion(_lower=out._lower[:uv], _upper=out._upper[:uv])  # type: ignore
 
+    def contains(
+        self, other: np.ndarray[tuple[N], T]
+    ) -> np.ndarray[tuple[N], np.dtype[np.bool]]:
+        other = _to_total_order(other)
+
+        (_, n) = self._lower.shape
+        is_contained = np.zeros((n,), dtype=bool)
+
+        for i in range(n):
+            is_contained |= (other >= _to_total_order(self._lower[i])) & (
+                other <= _to_total_order(self._upper[i])
+            )
+
+        return is_contained
+
     def __repr__(self) -> str:
         return f"IntervalUnion(lower={self._lower!r}, upper={self._upper!r})"
 
