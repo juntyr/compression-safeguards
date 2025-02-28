@@ -7,7 +7,7 @@ __all__ = ["ZeroIsZeroSafeguard"]
 import numpy as np
 
 from . import ElementwiseSafeguard, _as_bits
-from ...intervals import IntervalUnion
+from ...intervals import IntervalUnion, Interval, Lower, Upper, Minimum, Maximum
 
 
 class ZeroIsZeroSafeguard(ElementwiseSafeguard):
@@ -74,17 +74,15 @@ class ZeroIsZeroSafeguard(ElementwiseSafeguard):
         )
 
     def _compute_intervals(self, data: np.ndarray) -> IntervalUnion:
-        # min <= valid <= max
-        valid = IntervalUnion.full(data.dtype, data.size, 1)  # type: ignore
+        valid = Interval.empty_like(data)
 
         zero = _as_bits(self._zero_like(data.dtype))
         data = _as_bits(data.flatten())
 
-        # data = zero -> zero <= valid <= zero
-        valid.lower[0, data == zero] = zero
-        valid.upper[0, data == zero] = zero
+        Lower(zero) <= valid[data == zero] <= Upper(zero)
+        Minimum <= valid[data != zero] <= Maximum
 
-        return valid
+        return valid.into_union()
 
     def get_config(self) -> dict:
         """

@@ -7,7 +7,7 @@ __all__ = ["SignPreservingSafeguard"]
 import numpy as np
 
 from . import ElementwiseSafeguard
-from ...intervals import IntervalUnion
+from ...intervals import IntervalUnion, Interval, Lower, Upper, Minimum, Maximum
 
 
 class SignPreservingSafeguard(ElementwiseSafeguard):
@@ -59,23 +59,18 @@ class SignPreservingSafeguard(ElementwiseSafeguard):
 
     def _compute_intervals(self, data: np.ndarray) -> IntervalUnion:
         sign = self._sign(data).flatten()
+
         zero = np.zeros((), dtype=data.dtype)
         one = np.ones((), dtype=data.dtype)
+        neg_one = np.array(-one)
 
-        # min <= valid <= max
-        valid = IntervalUnion.full(data.dtype, data.size, 1)  # type: ignore
+        valid = Interval.empty_like(data)
 
-        # sign = 0 -> 0 <= valid <= 0
-        valid.lower[0, sign == 0] = zero
-        valid.upper[0, sign == 0] = zero
+        Lower(zero) <= valid[sign == 0] <= Upper(zero)
+        Minimum <= valid[sign == -1] <= Upper(neg_one)
+        Lower(one) <= valid[sign == +1] <= Maximum
 
-        # sign = -1 -> min <= valid <= -1
-        valid.upper[0, sign == -1] = -one
-
-        # sign = +1 -> 1 <= valid <= max
-        valid.lower[0, sign == +1] = one
-
-        return valid
+        return valid.into_union()
 
     def get_config(self) -> dict:
         """
