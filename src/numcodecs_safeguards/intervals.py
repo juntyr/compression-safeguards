@@ -6,6 +6,7 @@ T = TypeVar("T", bound=np.dtype)
 N = TypeVar("N", bound=Literal[1])
 U = TypeVar("U", bound=Literal[1])
 V = TypeVar("V", bound=Literal[1])
+S = TypeVar("S", bound=tuple[int, ...])
 
 
 class Interval(Generic[T, N]):
@@ -76,7 +77,7 @@ def _minimum(dtype: np.dtype):
 
 
 class _Minimum:
-    def __le__(self, interval) -> IndexedInterval:
+    def __le__(self, interval: IndexedInterval[T, N]) -> IndexedInterval[T, N]:
         if not isinstance(interval, IndexedInterval):
             return NotImplemented
 
@@ -101,7 +102,7 @@ def _maximum(dtype: np.dtype):
 
 
 class _Maximum:
-    def __ge__(self, interval) -> IndexedInterval:
+    def __ge__(self, interval: IndexedInterval[T, N]) -> IndexedInterval[T, N]:
         if not isinstance(interval, IndexedInterval):
             return NotImplemented
 
@@ -119,7 +120,7 @@ class Lower:
     def __init__(self, lower: np.ndarray) -> None:
         self._lower = lower
 
-    def __le__(self, interval) -> IndexedInterval:
+    def __le__(self, interval: IndexedInterval[T, N]) -> IndexedInterval[T, N]:
         if not isinstance(self._lower, np.ndarray):
             return NotImplemented
 
@@ -149,7 +150,7 @@ class Upper:
     def __init__(self, upper: np.ndarray) -> None:
         self._upper = upper
 
-    def __ge__(self, interval) -> IndexedInterval:
+    def __ge__(self, interval: IndexedInterval[T, N]) -> IndexedInterval[T, N]:
         if not isinstance(self._upper, np.ndarray):
             return NotImplemented
 
@@ -234,29 +235,25 @@ class IntervalUnion(Generic[T, N, U]):
 
         return IntervalUnion(_lower=out._lower[:uv], _upper=out._upper[:uv])  # type: ignore
 
-    def contains(
-        self, other: np.ndarray[tuple[N], T]
-    ) -> np.ndarray[tuple[N], np.dtype[np.bool]]:
-        other = _to_total_order(other)
+    def contains(self, other: np.ndarray[S, T]) -> np.ndarray[S, np.dtype[np.bool]]:
+        other_flat = _to_total_order(other).flatten()
 
         (u, n) = self._lower.shape
-        is_contained = np.zeros((n,), dtype=bool)
+        is_contained = np.zeros((n,), dtype=np.dtype(bool))
 
         for i in range(u):
-            is_contained |= (other >= _to_total_order(self._lower[i])) & (
-                other <= _to_total_order(self._upper[i])
+            is_contained |= (other_flat >= _to_total_order(self._lower[i])) & (
+                other_flat <= _to_total_order(self._upper[i])
             )
 
-        return is_contained
+        return is_contained.reshape(other.shape)  # type: ignore
 
-    def encode(self, decoded: np.ndarray[tuple[N], T]) -> np.ndarray[tuple[N], T]:
-        is_contained = self.contains(decoded)
-
+    def encode(self, decoded: np.ndarray[S, T]) -> np.ndarray[S, T]:
         # simple encoding:
         #  1. if decoded is in the interval, use it
         #  2. otherwise pick the lower bound of the first interval
-        encoding_pick = self._lower[0].copy()
-        encoding_pick[is_contained] = decoded[is_contained]
+        encoding_pick = self._lower[0].reshape(decoded.shape).copy()
+        encoding_pick = np.where(self.contains(decoded), decoded, encoding_pick)
 
         return encoding_pick
 

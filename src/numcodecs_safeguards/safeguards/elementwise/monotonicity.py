@@ -111,7 +111,7 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
         assert window > 0, "window size must be positive"
         self._window = window
 
-    def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
+    def _check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
         """
         Check which elements in the `decoded` array preserve the monotonicity
         of the `data` array.

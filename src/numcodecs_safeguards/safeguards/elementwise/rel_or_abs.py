@@ -58,7 +58,7 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         self._equal_nan = equal_nan
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
+    def _check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
         """
         Check which elements in the `decoded` array satisfy the relative or the
         absolute error bound.

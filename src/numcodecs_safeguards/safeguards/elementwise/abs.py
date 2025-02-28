@@ -6,7 +6,7 @@ __all__ = ["AbsoluteErrorBoundSafeguard"]
 
 import numpy as np
 
-from . import ElementwiseSafeguard, _as_bits
+from . import ElementwiseSafeguard
 from ...intervals import (
     IntervalUnion,
     Interval,
@@ -53,50 +53,22 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         self._eb_abs = eb_abs
         self._equal_nan = equal_nan
 
-    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
+    def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
         """
-        Check which elements in the `decoded` array satisfy the absolute error
-        bound.
+        Compute the intervals in which the absolute error bound is upheld with
+        respect to the `data`.
 
         Parameters
         ----------
         data : np.ndarray
-            Data to be encoded.
-        decoded : np.ndarray
-            Decoded data.
+            Data for which the safe intervals should be computed.
 
         Returns
         -------
-        ok : np.ndarray
-            Per-element, `True` if the check succeeded for this element.
+        intervals : IntervalUnion
+            Union of intervals in which the absolute error bound is upheld.
         """
 
-        return (
-            (np.abs(data - decoded) <= self._eb_abs)
-            | (_as_bits(data) == _as_bits(decoded))
-            | (self._equal_nan and (np.isnan(data) & np.isnan(decoded)))
-        )
-
-    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def _compute_correction(
-        self,
-        data: np.ndarray,
-        decoded: np.ndarray,
-    ) -> np.ndarray:
-        error = decoded - data
-        correction = (
-            np.round(error / (self._eb_abs * 2.0)) * (self._eb_abs * 2.0)
-        ).astype(data.dtype)
-        corrected = decoded - correction
-
-        return np.where(
-            self.check_elementwise(data, corrected),
-            corrected,
-            data,
-        )
-
-    def _compute_intervals(self, data: np.ndarray) -> IntervalUnion:
         data = data.flatten()
         valid = Interval.empty_like(data)
 

@@ -122,7 +122,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
+    def _check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
         """
         Check for which elements in the `decoded` array the finite differences
         satisfy the absolute error bound.

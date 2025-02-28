@@ -213,7 +213,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         all_intervals = []
         for safeguard in self._elementwise_safeguards:
-            intervals = safeguard._compute_intervals(data)
+            intervals = safeguard.compute_safe_intervals(data)
             assert np.all(intervals.contains(data)), (
                 "elementwise safeguard intervals must contain the original data"
             )

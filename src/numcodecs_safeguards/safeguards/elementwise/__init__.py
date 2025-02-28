@@ -6,7 +6,7 @@ __all__ = ["ElementwiseSafeguard"]
 
 from abc import ABC, abstractmethod
 from io import BytesIO
-from typing import Optional
+from typing import final, Any, Optional, TypeVar
 
 import numcodecs.compat
 import numpy as np
@@ -17,6 +17,9 @@ from numcodecs.abc import Codec
 from .. import Safeguard
 from ...intervals import IntervalUnion
 
+T = TypeVar("T", bound=np.dtype)
+S = TypeVar("S", bound=tuple[int, ...])
+
 
 class ElementwiseSafeguard(Safeguard, ABC):
     """
@@ -26,7 +29,8 @@ class ElementwiseSafeguard(Safeguard, ABC):
     property enforced by the safeguard.
     """
 
-    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
+    @final
+    def check(self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]) -> bool:
         """
         Check if the `decoded` array upholds the property enforced by this
         safeguard.
@@ -46,8 +50,10 @@ class ElementwiseSafeguard(Safeguard, ABC):
 
         return bool(np.all(self.check_elementwise(data, decoded)))
 
-    @abstractmethod
-    def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
+    @final
+    def check_elementwise(
+        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `decoded` array uphold the property
         enforced by this safeguard.
@@ -65,45 +71,36 @@ class ElementwiseSafeguard(Safeguard, ABC):
             Per-element, `True` if the check succeeded for this element.
         """
 
-        # TODO: implement non-abstract based on the intervals
-        pass
+        return self.compute_safe_intervals(data).contains(decoded)
 
     @abstractmethod
-    def _compute_correction(
-        self,
-        data: np.ndarray,
-        decoded: np.ndarray,
-    ) -> np.ndarray:
+    def compute_safe_intervals(
+        self, data: np.ndarray[S, T]
+    ) -> IntervalUnion[T, Any, Any]:
         """
-        Compute the correction for the `decoded` array to uphold the property
-        enforced by this safeguard.
+        Compute the intervals in which the safeguard's guarantees with respect
+        to the `data` are upheld.
+
+        The returned union of intervals must not have any overlap between the
+        intervals inside the union. The `data` must be contained in the union.
 
         Parameters
         ----------
         data : np.ndarray
-            Data to be encoded.
-        decoded : np.ndarray
-            Decoded data.
+            Data for which the safe intervals should be computed.
 
         Returns
         -------
-        corrected : np.ndarray
-            Corrected decoded data.
-
-            If the `decoded` array already upholds the property, it can be
-            returned. It is always valid to return elements of the `data`.
+        intervals : IntervalUnion
+            Union of intervals in which the safeguard's guarantees are upheld.
         """
 
-        # TODO: remove
         pass
 
-    # TODO: @abstractmethod
-    def _compute_intervals(self, data: np.ndarray) -> IntervalUnion:
-        raise NotImplementedError("todo")
-
+    @final
     @staticmethod
     def _encode_correction(
-        decoded: np.ndarray, correction: np.ndarray, lossless: Codec
+        decoded: np.ndarray[S, T], correction: np.ndarray[S, T], lossless: Codec
     ) -> bytes:
         """
         Encode the combined correction from one or more elementwise safeguards
@@ -134,10 +131,11 @@ class ElementwiseSafeguard(Safeguard, ABC):
 
         return numcodecs.compat.ensure_bytes(correction_bytes)
 
+    @final
     @staticmethod
     def _apply_correction(
-        decoded: np.ndarray, correction: bytes, lossless: Codec
-    ) -> np.ndarray:
+        decoded: np.ndarray[S, T], correction: bytes, lossless: Codec
+    ) -> np.ndarray[S, T]:
         """
         Apply the encoded `correction` to the `decoded` array.
 
