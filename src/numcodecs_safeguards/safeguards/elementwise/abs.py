@@ -115,22 +115,29 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             # saturate the error bounds so that they don't wrap around
             Minimum <= valid[valid._lower > data]
             valid[valid._upper < data] <= Maximum
-        elif np.issubdtype(data.dtype, np.floating):
-            # correct rounding errors in the lower and upper bound
-            with np.errstate(
-                divide="ignore", over="ignore", under="ignore", invalid="ignore"
-            ):
-                lower_bound_outside_eb_abs = np.abs(data - valid._lower) > self._eb_abs
-                upper_bound_outside_eb_abs = np.abs(data - valid._upper) > self._eb_abs
 
-            valid._lower[np.isfinite(data)] = _from_total_order(
-                _to_total_order(valid._lower) + lower_bound_outside_eb_abs,
-                data.dtype,
-            )[np.isfinite(data)]
-            valid._upper[np.isfinite(data)] = _from_total_order(
-                _to_total_order(valid._upper) - upper_bound_outside_eb_abs,
-                data.dtype,
-            )[np.isfinite(data)]
+        # correct rounding errors in the lower and upper bound
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            # we don't use abs (data - bound) here to accommodate unsigned ints
+            lower_bound_outside_eb_abs = (
+                np.where(data >= valid._lower, data - valid._lower, valid._lower - data)
+                > self._eb_abs
+            )
+            upper_bound_outside_eb_abs = (
+                np.where(data >= valid._upper, data - valid._upper, valid._upper - data)
+                > self._eb_abs
+            )
+
+        valid._lower[np.isfinite(data)] = _from_total_order(
+            _to_total_order(valid._lower) + lower_bound_outside_eb_abs,
+            data.dtype,
+        )[np.isfinite(data)]
+        valid._upper[np.isfinite(data)] = _from_total_order(
+            _to_total_order(valid._upper) - upper_bound_outside_eb_abs,
+            data.dtype,
+        )[np.isfinite(data)]
 
         return valid.into_union()
 
