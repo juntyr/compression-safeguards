@@ -35,6 +35,8 @@ import varint
 from numcodecs.abc import Codec
 from numcodecs_combinators.abc import CodecCombinatorMixin
 
+from .intervals import _as_bits
+
 from .safeguards import Safeguard
 from .safeguards.elementwise import ElementwiseSafeguard
 from .safeguards.elementwise.abs import AbsoluteErrorBoundSafeguard
@@ -234,7 +236,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                     f"{safeguard!r} check fails after correction"
                 )
 
-            if np.all(combined_intervals.contains(decoded)):
+            if np.all(_as_bits(correction) == _as_bits(decoded)):
                 correction_bytes = bytes()
             else:
                 correction_bytes = ElementwiseSafeguard._encode_correction(

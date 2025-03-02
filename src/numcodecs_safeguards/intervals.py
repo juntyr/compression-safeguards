@@ -252,10 +252,10 @@ class IntervalUnion(Generic[T, N, U]):
         # simple encoding:
         #  1. if decoded is in the interval, use it
         #  2. otherwise pick the lower bound of the first interval
-        encoding_pick = self._lower[0].reshape(decoded.shape).copy()
-        encoding_pick = np.where(self.contains(decoded), decoded, encoding_pick)
+        pick = self._lower[0].reshape(decoded.shape).copy()
+        pick = np.where(self.contains(decoded), decoded, pick)
 
-        return encoding_pick
+        return pick
 
     def encode_more_zeros(self, decoded: np.ndarray[S, T]) -> np.ndarray[S, T]:
         if decoded.size == 0:
