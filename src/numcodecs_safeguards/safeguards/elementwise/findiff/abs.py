@@ -195,15 +195,9 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            # we don't use abs (data - bound) here to accommodate unsigned ints
-            lower_bound_outside_eb_abs = (
-                np.where(data >= valid._lower, data - valid._lower, valid._lower - data)
-                > self._eb_abs_impl
-            )
-            upper_bound_outside_eb_abs = (
-                np.where(data >= valid._upper, data - valid._upper, valid._upper - data)
-                > self._eb_abs_impl
-            )
+            # we don't use abs(data - bound) here to accommodate unsigned ints
+            lower_bound_outside_eb_abs = (data - valid._lower) > self._eb_abs_impl
+            upper_bound_outside_eb_abs = (valid._upper - data) > self._eb_abs_impl
 
         valid._lower[np.isfinite(data)] = _from_total_order(
             _to_total_order(valid._lower) + lower_bound_outside_eb_abs,

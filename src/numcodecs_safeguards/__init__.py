@@ -41,7 +41,7 @@ from .safeguards import Safeguard
 from .safeguards.elementwise import ElementwiseSafeguard
 from .safeguards.elementwise.abs import AbsoluteErrorBoundSafeguard
 
-# from .safeguards.elementwise.decimal import DecimalErrorBoundSafeguard
+from .safeguards.elementwise.decimal import DecimalErrorBoundSafeguard
 from .safeguards.elementwise.findiff.abs import (
     FiniteDifferenceAbsoluteErrorBoundSafeguard,
 )
@@ -68,8 +68,8 @@ class Safeguards(Enum):
     # rel_or_abs = RelativeOrAbsoluteErrorBoundSafeguard
     # """Enforce a relative error bound, fall back to an absolute error bound close to zero."""
 
-    # decimal = DecimalErrorBoundSafeguard
-    # """Enforce a decimal error bound."""
+    decimal = DecimalErrorBoundSafeguard
+    """Enforce a decimal error bound."""
 
     # finite difference error bounds
     findiff_abs = FiniteDifferenceAbsoluteErrorBoundSafeguard

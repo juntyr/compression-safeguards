@@ -47,7 +47,7 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     _priority = 0
 
     def __init__(self, eb_abs: int | float, *, equal_nan: bool = False):
-        assert eb_abs > 0.0, "eb_abs must be positive"
+        assert eb_abs > 0, "eb_abs must be positive"
         assert np.isfinite(eb_abs), "eb_abs must be finite"
 
         self._eb_abs = eb_abs
@@ -120,15 +120,9 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            # we don't use abs (data - bound) here to accommodate unsigned ints
-            lower_bound_outside_eb_abs = (
-                np.where(data >= valid._lower, data - valid._lower, valid._lower - data)
-                > self._eb_abs
-            )
-            upper_bound_outside_eb_abs = (
-                np.where(data >= valid._upper, data - valid._upper, valid._upper - data)
-                > self._eb_abs
-            )
+            # we don't use abs(data - bound) here to accommodate unsigned ints
+            lower_bound_outside_eb_abs = (data - valid._lower) > self._eb_abs
+            upper_bound_outside_eb_abs = (valid._upper - data) > self._eb_abs
 
         valid._lower[np.isfinite(data)] = _from_total_order(
             _to_total_order(valid._lower) + lower_bound_outside_eb_abs,
