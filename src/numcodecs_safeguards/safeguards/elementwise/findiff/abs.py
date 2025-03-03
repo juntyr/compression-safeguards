@@ -9,7 +9,17 @@ from typing import Optional
 
 import numpy as np
 
-from .. import ElementwiseSafeguard, _as_bits
+from ....intervals import (
+    IntervalUnion,
+    Interval,
+    Lower,
+    Upper,
+    Minimum,
+    Maximum,
+    _to_total_order,
+    _from_total_order,
+)
+from .. import ElementwiseSafeguard
 from . import (
     FiniteDifference,
     _finite_difference_offsets,
@@ -121,48 +131,90 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             eb_abs * np.power(dx, order) / sum(abs(c) for c in coefficients)
         )
 
-    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def _check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
+    def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
         """
-        Check for which elements in the `decoded` array the finite differences
-        satisfy the absolute error bound.
+        Compute the intervals in which the absolute error bound is upheld with
+        respect to the finite differences of the `data`.
 
         Parameters
         ----------
         data : np.ndarray
-            Data to be encoded.
-        decoded : np.ndarray
-            Decoded data.
+            Data for which the safe intervals should be computed.
 
         Returns
         -------
-        ok : np.ndarray
-            Per-element, `True` if the check succeeded for this element.
+        intervals : IntervalUnion
+            Union of intervals in which the absolute error bound is upheld.
         """
 
-        return (
-            (np.abs(data - decoded) <= self._eb_abs_impl)
-            | (_as_bits(data) == _as_bits(decoded))
-            | (np.isnan(data) & np.isnan(decoded))
-        )
+        data = data.flatten()
+        valid = Interval.empty_like(data)
 
-    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def _compute_correction(
-        self,
-        data: np.ndarray,
-        decoded: np.ndarray,
-    ) -> np.ndarray:
-        error = decoded - data
-        correction = (
-            np.round(error / (self._eb_abs_impl * 2.0)) * (self._eb_abs_impl * 2.0)
-        ).astype(data.dtype)
-        corrected = decoded - correction
+        if np.issubdtype(data.dtype, np.floating):
+            Lower(data) <= valid[np.isinf(data)] <= Upper(data)
 
-        return np.where(
-            self.check_elementwise(data, corrected),
-            corrected,
-            data,
-        )
+        if np.issubdtype(data.dtype, np.floating):
+            nan_min = np.array(
+                np.array(np.inf, dtype=data.dtype).view(
+                    data.dtype.str.replace("f", "u")
+                )
+                + 1
+            ).view(data.dtype)
+            nan_max = np.array(-1, dtype=data.dtype.str.replace("f", "i")).view(
+                data.dtype
+            )
+
+            # any NaN with the same sign is valid
+            Lower(
+                np.where(
+                    np.signbit(data),
+                    np.copysign(nan_max, -1),
+                    np.copysign(nan_min, +1),
+                )
+            ) <= valid[np.isnan(data)] <= Upper(
+                np.where(
+                    np.signbit(data),
+                    np.copysign(nan_min, -1),
+                    np.copysign(nan_max, +1),
+                )
+            )
+
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            Lower(data - self._eb_abs_impl) <= valid[np.isfinite(data)] <= Upper(
+                data + self._eb_abs_impl
+            )
+
+        if np.issubdtype(data.dtype, np.integer):
+            # saturate the error bounds so that they don't wrap around
+            Minimum <= valid[valid._lower > data]
+            valid[valid._upper < data] <= Maximum
+
+        # correct rounding errors in the lower and upper bound
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            # we don't use abs (data - bound) here to accommodate unsigned ints
+            lower_bound_outside_eb_abs = (
+                np.where(data >= valid._lower, data - valid._lower, valid._lower - data)
+                > self._eb_abs_impl
+            )
+            upper_bound_outside_eb_abs = (
+                np.where(data >= valid._upper, data - valid._upper, valid._upper - data)
+                > self._eb_abs_impl
+            )
+
+        valid._lower[np.isfinite(data)] = _from_total_order(
+            _to_total_order(valid._lower) + lower_bound_outside_eb_abs,
+            data.dtype,
+        )[np.isfinite(data)]
+        valid._upper[np.isfinite(data)] = _from_total_order(
+            _to_total_order(valid._upper) - upper_bound_outside_eb_abs,
+            data.dtype,
+        )[np.isfinite(data)]
+
+        return valid.into_union()
 
     def get_config(self) -> dict:
         """
