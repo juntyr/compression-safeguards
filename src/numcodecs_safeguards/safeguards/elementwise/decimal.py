@@ -105,11 +105,15 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_decimal_multipler = np.minimum(
-                np.power(10, self._eb_decimal),
-                np.finfo(self._eb_decimal).max
-                if np.issubdtype(np.array(self._eb_decimal).dtype, np.floating)
-                else np.iinfo(self._eb_decimal).max,  # type: ignore
+            eb_decimal_multipler = np.power(
+                np.array(10, dtype=data.dtype), self._eb_decimal
+            )
+        if eb_decimal_multipler < 1 or not np.isfinite(eb_decimal_multipler):
+            eb_decimal_multipler = np.array(
+                np.finfo(data.dtype).max
+                if np.issubdtype(data.dtype, np.floating)
+                else np.iinfo(data.dtype).max,
+                dtype=data.dtype,
             )
 
         if np.issubdtype(data.dtype, np.floating):
@@ -154,6 +158,10 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
             Lower(np.where(data < 0, data_mul, data_div)) <= valid[
                 np.isfinite(data)
             ] <= Upper(np.where(data < 0, data_div, data_mul))
+
+        print(data)
+        print(eb_decimal_multipler)
+        print(valid)
 
         if np.issubdtype(data.dtype, np.integer):
             # saturate the error bounds so that they don't wrap around

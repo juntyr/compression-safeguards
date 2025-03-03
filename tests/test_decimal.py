@@ -82,3 +82,18 @@ def test_fuzzer_overcorrect():
             dict(kind="decimal", eb_decimal=3.567564553293311e293),
         ],
     )
+
+
+def test_fuzzer_overflow():
+    data = np.array([506, 0, 64000, 57094, 65535, 255, 65321, 65535], dtype=np.uint16)
+    decoded = np.array(
+        [65535, 65535, 1535, 1285, 64215, 64250, 9731, 10499], dtype=np.uint16
+    )
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(kind="decimal", eb_decimal=61, equal_nan=True),
+        ],
+    )
