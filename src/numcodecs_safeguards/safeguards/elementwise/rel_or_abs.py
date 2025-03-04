@@ -92,7 +92,7 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_rel_multipler = np.array(self._eb_rel, dtype=data.dtype) + 1
+            eb_rel_multipler = np.array(np.array(self._eb_rel) + 1, dtype=data.dtype)
         if eb_rel_multipler < 1 or not np.isfinite(eb_rel_multipler):
             eb_rel_multipler = np.array(
                 np.finfo(data.dtype).max
@@ -101,7 +101,24 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
                 dtype=data.dtype,
             )
 
-        eb_abs_half = np.array(self._eb_abs / 2, dtype=data.dtype)
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            eb_abs_half = np.array(np.array(self._eb_abs) / 2, dtype=data.dtype)
+        if not np.isfinite(eb_abs_half):
+            eb_abs_half = np.array(
+                np.finfo(data.dtype).max
+                if np.issubdtype(data.dtype, np.floating)
+                else np.iinfo(data.dtype).max,
+                dtype=data.dtype,
+            )
+        if eb_abs_half <= 0:
+            eb_abs_half = np.array(
+                np.finfo(data.dtype).smallest_subnormal
+                if np.issubdtype(data.dtype, np.floating)
+                else 1,
+                dtype=data.dtype,
+            )
 
         if np.issubdtype(data.dtype, np.floating):
             Lower(data) <= valid[np.isinf(data)] <= Upper(data)
