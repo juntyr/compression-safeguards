@@ -92,7 +92,7 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_rel_multipler = np.array(self._eb_rel + 1, dtype=data.dtype)
+            eb_rel_multipler = np.array(self._eb_rel, dtype=data.dtype) + 1
         if eb_rel_multipler < 1 or not np.isfinite(eb_rel_multipler):
             eb_rel_multipler = np.array(
                 np.finfo(data.dtype).max
@@ -100,6 +100,8 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
                 else np.iinfo(data.dtype).max,
                 dtype=data.dtype,
             )
+
+        eb_abs_half = np.array(self._eb_abs / 2, dtype=data.dtype)
 
         if np.issubdtype(data.dtype, np.floating):
             Lower(data) <= valid[np.isinf(data)] <= Upper(data)
@@ -144,8 +146,6 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
                 np.isfinite(data)
             ] <= Upper(np.where(data < 0, data_div, data_mul))
 
-            # TODO: also add the abs error bound
-
         if np.issubdtype(data.dtype, np.integer):
             # saturate the error bounds so that they don't wrap around
             Minimum <= valid[valid._lower > data]
@@ -172,6 +172,16 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             _to_total_order(valid._upper) - upper_bound_outside_eb_decimal,
             data.dtype,
         )[np.isfinite(data)]
+
+        # apply the absolute error bound if abs(data) <= eb_abs/2
+        Lower(np.array(-eb_abs_half)) <= valid[np.abs(data) <= eb_abs_half] <= Upper(
+            eb_abs_half
+        )
+
+        if np.issubdtype(data.dtype, np.integer):
+            # saturate the error bounds so that they don't wrap around
+            Minimum <= valid[valid._lower > data]
+            valid[valid._upper < data] <= Maximum
 
         return valid.into_union()
 
