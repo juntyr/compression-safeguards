@@ -6,7 +6,7 @@ __all__ = ["RelativeOrAbsoluteErrorBoundSafeguard"]
 
 import numpy as np
 
-from . import ElementwiseSafeguard
+from . import ElementwiseSafeguard, _as_bits
 from ...intervals import (
     IntervalUnion,
     Interval,
@@ -68,6 +68,55 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         self._eb_rel = eb_rel
         self._eb_abs = eb_abs
         self._equal_nan = equal_nan
+
+    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
+        """
+        Check if the `decoded` array satisfies the relative or the absolute
+        error bound.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data to be encoded.
+        decoded : np.ndarray
+            Decoded data.
+
+        Returns
+        -------
+        ok : bool
+            `True` if the check succeeded.
+        """
+
+        # abs(data - decoded) <= self._eb_abs, but works for unsigned ints
+        absolute_bound = (
+            np.where(
+                data > decoded,
+                data - decoded,
+                decoded - data,
+            )
+            <= self._eb_abs
+        )
+        relative_bound = (
+            (np.sign(data) == np.sign(decoded)) & (
+                (np.where(np.abs(data) > np.abs(decoded), np.abs(data) / np.abs(decoded), np.abs(decoded) / np.abs(data)) - 1) <= self._eb_rel
+            )
+        )
+        # bitwise equality for inf and NaNs (unless equal_nan)
+        same_bits = _as_bits(data) == _as_bits(decoded)
+        both_nan = self._equal_nan and (np.isnan(data) & np.isnan(decoded))
+
+        ok = np.where(
+            np.isfinite(data),
+            relative_bound | absolute_bound,
+            np.where(
+                np.isinf(data),
+                same_bits,
+                both_nan if self._equal_nan else same_bits,
+            ),
+        )
+
+        return bool(np.all(ok))
 
     def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
         """

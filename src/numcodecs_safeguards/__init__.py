@@ -35,8 +35,6 @@ import varint
 from numcodecs.abc import Codec
 from numcodecs_combinators.abc import CodecCombinatorMixin
 
-from .intervals import _as_bits
-
 from .safeguards import Safeguard
 from .safeguards.elementwise import ElementwiseSafeguard
 from .safeguards.elementwise.abs import AbsoluteErrorBoundSafeguard
@@ -214,17 +212,23 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         assert decoded.dtype == data.dtype, "codec must roundtrip dtype"
         assert decoded.shape == data.shape, "codec must roundtrip shape"
 
-        all_intervals = []
+        all_ok = True
         for safeguard in self._elementwise_safeguards:
-            intervals = safeguard.compute_safe_intervals(data)
-            assert np.all(intervals.contains(data)), (
-                f"elementwise safeguard {safeguard!r}'s intervals must contain the original data"
-            )
-            all_intervals.append(intervals)
+            if not safeguard.check(data, decoded):
+                all_ok = False
+                break
 
-        if len(all_intervals) == 0:
+        if all_ok:
             correction_bytes = bytes()
         else:
+            all_intervals = []
+            for safeguard in self._elementwise_safeguards:
+                intervals = safeguard.compute_safe_intervals(data)
+                assert np.all(intervals.contains(data)), (
+                    f"elementwise safeguard {safeguard!r}'s intervals must contain the original data"
+                )
+                all_intervals.append(intervals)
+
             combined_intervals = all_intervals[0]
             for intervals in all_intervals[1:]:
                 combined_intervals = combined_intervals.intersect(intervals)
@@ -234,17 +238,17 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 self._elementwise_safeguards, all_intervals
             ):
                 assert np.all(intervals.contains(correction)), (
+                    f"{safeguard!r} interval does not contain the correction"
+                )
+                assert safeguard.check(data, correction), (
                     f"{safeguard!r} check fails after correction"
                 )
 
-            if np.all(_as_bits(correction) == _as_bits(decoded)):
-                correction_bytes = bytes()
-            else:
-                correction_bytes = ElementwiseSafeguard._encode_correction(
-                    decoded,
-                    correction,
-                    self._lossless,
-                )
+            correction_bytes = ElementwiseSafeguard._encode_correction(
+                decoded,
+                correction,
+                self._lossless,
+            )
 
         correction_len = varint.encode(len(correction_bytes))
 

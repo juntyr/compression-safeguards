@@ -38,6 +38,31 @@ class ZeroIsZeroSafeguard(ElementwiseSafeguard):
     def __init__(self, zero: int | float = 0):
         self._zero = zero
 
+    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
+        """
+        Check that the elements are either
+        - non-zero in the `data` array,
+        - or zero in the `data` *and* the `decoded` array.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data to be encoded.
+        decoded : np.ndarray
+            Decoded data.
+
+        Returns
+        -------
+        ok : bool
+            `True` if the check succeeded.
+        """
+
+        zero_bits = _as_bits(self._zero_like(data.dtype))
+
+        return bool(
+            np.all((_as_bits(data) != zero_bits) | (_as_bits(decoded) == zero_bits))
+        )
+
     def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
         """
         Compute the intervals in which the zero-is-zero guarantee is upheld with

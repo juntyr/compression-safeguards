@@ -9,7 +9,6 @@ from operator import le, lt, ge, gt
 from typing import Optional
 
 import numpy as np
-
 from numpy.lib.stride_tricks import sliding_window_view
 
 from . import ElementwiseSafeguard
@@ -238,7 +237,7 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
         decoded: np.ndarray,
     ) -> np.ndarray:
         return np.where(
-            self.check_elementwise(data, decoded),
+            self._check_elementwise(data, decoded),
             decoded,
             data,
         )

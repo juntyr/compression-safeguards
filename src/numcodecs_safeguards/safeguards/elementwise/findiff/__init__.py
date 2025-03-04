@@ -35,22 +35,22 @@ def _finite_difference_offsets(
     type: FiniteDifference,
     order: int,
     accuracy: int,
-) -> list[int]:
+) -> tuple[int, ...]:
     match type:
         case FiniteDifference.central:
             noffsets = order + (order % 2) - 1 + accuracy
             p = (noffsets - 1) // 2
-            return [0] + [j for i in range(1, p + 1) for j in [i, -i]]
+            return (0,) + tuple(j for i in range(1, p + 1) for j in (i, -i))
         case FiniteDifference.forward:
-            return [i for i in range(order + accuracy)]
+            return tuple(i for i in range(order + accuracy))
         case FiniteDifference.backwards:
-            return [-i for i in range(order + accuracy)]
+            return tuple(-i for i in range(order + accuracy))
 
 
 def _finite_difference_coefficients(
     order: int,
-    offsets: list[int],
-) -> list[Fraction]:
+    offsets: tuple[int, ...],
+) -> tuple[Fraction, ...]:
     """
     Finite difference coefficient algorithm from:
 
@@ -94,4 +94,4 @@ def _finite_difference_coefficients(
                 coeffs[(m, n, n)] = -(c1 / c2) * (a[n - 1] * coeffs[(m, n - 1, n - 1)])
         c1 = c2
 
-    return [coeffs[M, N, v] for v in range(0, N + 1)]
+    return tuple(coeffs[M, N, v] for v in range(0, N + 1))

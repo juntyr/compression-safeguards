@@ -26,6 +26,26 @@ class SignPreservingSafeguard(ElementwiseSafeguard):
     def __init__(self):
         pass
 
+    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
+        """
+        Check if the signs of the `decoded` array elements match the signs of
+        the `data` array elements'.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data to be encoded.
+        decoded : np.ndarray
+            Decoded data.
+
+        Returns
+        -------
+        ok : bool
+            `True` if the check succeeded.
+        """
+
+        return bool(np.all(self._sign(data) == self._sign(decoded)))
+
     def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
         """
         Compute the intervals in which the `data`'s sign is preserved.

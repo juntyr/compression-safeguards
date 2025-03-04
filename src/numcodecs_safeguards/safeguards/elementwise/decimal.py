@@ -6,7 +6,7 @@ __all__ = ["DecimalErrorBoundSafeguard"]
 
 import numpy as np
 
-from . import ElementwiseSafeguard
+from . import ElementwiseSafeguard, _as_bits
 from ...intervals import (
     IntervalUnion,
     Interval,
@@ -82,6 +82,42 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
 
         self._eb_decimal = eb_decimal
         self._equal_nan = equal_nan
+
+    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
+        """
+        Check if the `decoded` array satisfies the decimal error bound.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data to be encoded.
+        decoded : np.ndarray
+            Decoded data.
+
+        Returns
+        -------
+        ok : bool
+            `True` if the check succeeded.
+        """
+
+        decimal_bound = self._decimal_error(data, decoded) <= self._eb_decimal
+
+        # bitwise equality for inf and NaNs (unless equal_nan)
+        same_bits = _as_bits(data) == _as_bits(decoded)
+        both_nan = self._equal_nan and (np.isnan(data) & np.isnan(decoded))
+
+        ok = np.where(
+            np.isfinite(data),
+            decimal_bound,
+            np.where(
+                np.isinf(data),
+                same_bits,
+                both_nan if self._equal_nan else same_bits,
+            ),
+        )
+
+        return bool(np.all(ok))
 
     def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
         """
@@ -200,4 +236,17 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
 
         return dict(
             kind=type(self).kind, eb_decimal=self._eb_decimal, equal_nan=self._equal_nan
+        )
+
+    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+    def _decimal_error(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        sign_x, sign_y = np.sign(x), np.sign(y)
+
+        # 0               : if x == 0 and y == 0
+        # inf             : if sign(x) != sign(y)
+        # abs(log10(x/y)) : otherwise
+        return np.where(
+            (sign_x == 0) & (sign_y == 0),
+            0.0,
+            np.where(sign_x != sign_y, np.inf, (np.abs(np.log10(x / y)))),
         )

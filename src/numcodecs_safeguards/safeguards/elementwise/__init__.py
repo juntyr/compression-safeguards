@@ -29,50 +29,6 @@ class ElementwiseSafeguard(Safeguard, ABC):
     property enforced by the safeguard.
     """
 
-    @final
-    def check(self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]) -> bool:
-        """
-        Check if the `decoded` array upholds the property enforced by this
-        safeguard.
-
-        Parameters
-        ----------
-        data : np.ndarray
-            Data to be encoded.
-        decoded : np.ndarray
-            Decoded data.
-
-        Returns
-        -------
-        ok : bool
-            `True` if the check succeeded.
-        """
-
-        return bool(np.all(self.check_elementwise(data, decoded)))
-
-    @final
-    def check_elementwise(
-        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
-    ) -> np.ndarray[S, np.dtype[np.bool]]:
-        """
-        Check which elements in the `decoded` array uphold the property
-        enforced by this safeguard.
-
-        Parameters
-        ----------
-        data : np.ndarray
-            Data to be encoded.
-        decoded : np.ndarray
-            Decoded data.
-
-        Returns
-        -------
-        ok : np.ndarray
-            Per-element, `True` if the check succeeded for this element.
-        """
-
-        return self.compute_safe_intervals(data).contains(decoded)
-
     @abstractmethod
     def compute_safe_intervals(
         self, data: np.ndarray[S, T]
