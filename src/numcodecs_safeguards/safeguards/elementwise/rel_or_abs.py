@@ -6,7 +6,17 @@ __all__ = ["RelativeOrAbsoluteErrorBoundSafeguard"]
 
 import numpy as np
 
-from . import ElementwiseSafeguard, _as_bits
+from . import ElementwiseSafeguard
+from ...intervals import (
+    IntervalUnion,
+    Interval,
+    Lower,
+    Upper,
+    Minimum,
+    Maximum,
+    _to_total_order,
+    _from_total_order,
+)
 
 
 class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
@@ -29,7 +39,7 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
     Parameters
     ----------
-    eb_rel : float
+    eb_rel : int | float
         The positive relative error bound that is enforced by this safeguard.
         `eb_rel=0.02` corresponds to a 2% relative bound.
     eb_abs : int | float
@@ -40,77 +50,130 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     """
 
     __slots__ = ("_eb_rel", "_eb_abs", "_equal_nan")
-    _eb_rel: float
+    _eb_rel: int | float
     _eb_abs: int | float
     _equal_nan: bool
 
     kind = "rel_or_abs"
     _priority = 0
 
-    def __init__(self, eb_rel: float, eb_abs: int | float, *, equal_nan: bool = False):
-        assert eb_rel > 0.0, "eb_rel must be positive"
+    def __init__(
+        self, eb_rel: int | float, eb_abs: int | float, *, equal_nan: bool = False
+    ):
+        assert eb_rel > 0, "eb_rel must be positive"
         assert np.isfinite(eb_rel), "eb_rel must be finite"
-        assert eb_abs > 0.0, "eb_abs must be positive"
+        assert eb_abs > 0, "eb_abs must be positive"
         assert np.isfinite(eb_abs), "eb_abs must be finite"
 
         self._eb_rel = eb_rel
         self._eb_abs = eb_abs
         self._equal_nan = equal_nan
 
-    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def _check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
+    def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
         """
-        Check which elements in the `decoded` array satisfy the relative or the
-        absolute error bound.
+        Compute the intervals in which the relative or absolute error bound is
+        upheld with respect to the `data`.
 
         Parameters
         ----------
         data : np.ndarray
-            Data to be encoded.
-        decoded : np.ndarray
-            Decoded data.
+            Data for which the safe intervals should be computed.
 
         Returns
         -------
-        ok : np.ndarray
-            Per-element, `True` if the check succeeded for this element.
+        intervals : IntervalUnion
+            Union of intervals in which the relative or absolute error bound is
+            upheld.
         """
 
-        return (
-            (np.abs(self._log(data) - self._log(decoded)) <= np.log(1.0 + self._eb_rel))
-            | (np.abs(data - decoded) <= self._eb_abs)
-            | (_as_bits(data) == _as_bits(decoded))
-            | (self._equal_nan and (np.isnan(data) & np.isnan(decoded)))
-        )
+        data = data.flatten()
+        valid = Interval.empty_like(data)
 
-    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def _compute_correction(
-        self,
-        data: np.ndarray,
-        decoded: np.ndarray,
-    ) -> np.ndarray:
-        # remember which elements already passed the check
-        already_correct = self.check_elementwise(data, decoded)
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            eb_rel_multipler = np.array(self._eb_rel + 1, dtype=data.dtype)
+        if eb_rel_multipler < 1 or not np.isfinite(eb_rel_multipler):
+            eb_rel_multipler = np.array(
+                np.finfo(data.dtype).max
+                if np.issubdtype(data.dtype, np.floating)
+                else np.iinfo(data.dtype).max,
+                dtype=data.dtype,
+            )
 
-        log_eb_rel = np.log(1.0 + self._eb_rel)
+        if np.issubdtype(data.dtype, np.floating):
+            Lower(data) <= valid[np.isinf(data)] <= Upper(data)
 
-        data_log = self._log(data)
-        decoded_log = self._log(decoded)
+        if np.issubdtype(data.dtype, np.floating):
+            if self._equal_nan:
+                nan_min = np.array(
+                    np.array(np.inf, dtype=data.dtype).view(
+                        data.dtype.str.replace("f", "u")
+                    )
+                    + 1
+                ).view(data.dtype)
+                nan_max = np.array(-1, dtype=data.dtype.str.replace("f", "i")).view(
+                    data.dtype
+                )
 
-        error_log = decoded_log - data_log
-        correction_log = np.round(error_log / (log_eb_rel * 2.0)) * (log_eb_rel * 2.0)
+                # any NaN with the same sign is valid
+                Lower(
+                    np.where(
+                        np.signbit(data),
+                        np.copysign(nan_max, -1),
+                        np.copysign(nan_min, +1),
+                    )
+                ) <= valid[np.isnan(data)] <= Upper(
+                    np.where(
+                        np.signbit(data),
+                        np.copysign(nan_min, -1),
+                        np.copysign(nan_max, +1),
+                    )
+                )
+            else:
+                Lower(data) <= valid[np.isnan(data)] <= Upper(data)
 
-        corrected_log = decoded_log - correction_log
-        corrected = self._exp(corrected_log).astype(data.dtype)
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            data_mul, data_div = (
+                data * eb_rel_multipler,
+                data / eb_rel_multipler,
+            )
+            Lower(np.where(data < 0, data_mul, data_div)) <= valid[
+                np.isfinite(data)
+            ] <= Upper(np.where(data < 0, data_div, data_mul))
 
-        # don't apply corrections to already-passing elements
-        corrected = np.where(already_correct, decoded, corrected)
+            # TODO: also add the abs error bound
 
-        return np.where(
-            self.check_elementwise(data, corrected),
-            corrected,
-            data,
-        )
+        if np.issubdtype(data.dtype, np.integer):
+            # saturate the error bounds so that they don't wrap around
+            Minimum <= valid[valid._lower > data]
+            valid[valid._upper < data] <= Maximum
+
+        # correct rounding errors in the lower and upper bound
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            lower_bound_outside_eb_decimal = (
+                np.where(data < 0, valid._lower / data, data / valid._lower)
+                > eb_rel_multipler
+            )
+            upper_bound_outside_eb_decimal = (
+                np.where(data < 0, data / valid._upper, valid._upper / data)
+                > eb_rel_multipler
+            )
+
+        valid._lower[np.isfinite(data)] = _from_total_order(
+            _to_total_order(valid._lower) + lower_bound_outside_eb_decimal,
+            data.dtype,
+        )[np.isfinite(data)]
+        valid._upper[np.isfinite(data)] = _from_total_order(
+            _to_total_order(valid._upper) - upper_bound_outside_eb_decimal,
+            data.dtype,
+        )[np.isfinite(data)]
+
+        return valid.into_union()
 
     def get_config(self) -> dict:
         """
@@ -128,13 +191,3 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             eb_abs=self._eb_abs,
             equal_nan=self._equal_nan,
         )
-
-    def _log(self, x: np.ndarray) -> np.ndarray:
-        a = 0.5 * self._eb_abs / (1.0 + self._eb_rel)
-
-        return np.sign(x) * np.log(np.maximum(np.abs(x), a) / a)
-
-    def _exp(self, x: np.ndarray) -> np.ndarray:
-        a = 0.5 * self._eb_abs / (1.0 + self._eb_rel)
-
-        return np.sign(x) * np.exp(np.abs(x)) * a

@@ -47,7 +47,7 @@ from .safeguards.elementwise.findiff.abs import (
 )
 
 # from .safeguards.elementwise.monotonicity import MonotonicityPreservingSafeguard
-# from .safeguards.elementwise.rel_or_abs import RelativeOrAbsoluteErrorBoundSafeguard
+from .safeguards.elementwise.rel_or_abs import RelativeOrAbsoluteErrorBoundSafeguard
 from .safeguards.elementwise.sign import SignPreservingSafeguard
 from .safeguards.elementwise.zero import ZeroIsZeroSafeguard
 
@@ -65,8 +65,8 @@ class Safeguards(Enum):
     abs = AbsoluteErrorBoundSafeguard
     """Enforce an absolute error bound."""
 
-    # rel_or_abs = RelativeOrAbsoluteErrorBoundSafeguard
-    # """Enforce a relative error bound, fall back to an absolute error bound close to zero."""
+    rel_or_abs = RelativeOrAbsoluteErrorBoundSafeguard
+    """Enforce a relative error bound, fall back to an absolute error bound close to zero."""
 
     decimal = DecimalErrorBoundSafeguard
     """Enforce a decimal error bound."""

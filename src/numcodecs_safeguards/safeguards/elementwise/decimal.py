@@ -55,7 +55,7 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
 
     [^2]: Klöwer, M., Düben, P. D., & Palmer, T. N. (2019). Posits as an
         alternative to floats for weather and climate models. *CoNGA'19:
-        Proceedings of the Conference for Next Generation Arithmetic 2019*, 1–8.
+        Proceedings of the Conference for Next Generation Arithmetic 2019*, 1-8.
         Available from:
         [doi:10.1145/3316279.3316281](https://doi.org/10.1145/3316279.3316281).
 
@@ -158,10 +158,6 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
             Lower(np.where(data < 0, data_mul, data_div)) <= valid[
                 np.isfinite(data)
             ] <= Upper(np.where(data < 0, data_div, data_mul))
-
-        print(data)
-        print(eb_decimal_multipler)
-        print(valid)
 
         if np.issubdtype(data.dtype, np.integer):
             # saturate the error bounds so that they don't wrap around
