@@ -21,7 +21,6 @@ class SignPreservingSafeguard(ElementwiseSafeguard):
     __slots__ = ()
 
     kind = "sign"
-    _priority = 1
 
     def __init__(self):
         pass

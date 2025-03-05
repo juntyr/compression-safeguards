@@ -17,7 +17,6 @@ class Safeguard(ABC):
 
     kind: str
     """Safeguard kind."""
-    _priority: int
 
     @abstractmethod
     def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:

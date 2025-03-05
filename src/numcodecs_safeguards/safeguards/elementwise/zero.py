@@ -33,7 +33,6 @@ class ZeroIsZeroSafeguard(ElementwiseSafeguard):
     _zero: int | float
 
     kind = "zero"
-    _priority = -1
 
     def __init__(self, zero: int | float = 0):
         self._zero = zero

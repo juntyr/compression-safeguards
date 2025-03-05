@@ -97,3 +97,21 @@ def test_fuzzer_overflow():
             dict(kind="decimal", eb_decimal=61, equal_nan=True),
         ],
     )
+
+
+def test_fuzzer_rounding_error():
+    data = np.array(
+        [5723915, 0, 1460076544, -43177, -1, -1, -1, -1, -1, -1], dtype=np.int32
+    )
+    decoded = np.array(
+        [-1, -1, -1, -1, -1, -1, 33554431, -16777216, -1, -1], dtype=np.int32
+    )
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(kind="zero", zero=1.6989962568688874e308),
+            dict(kind="decimal", eb_decimal=2.5924625501554395e303, equal_nan=False),
+        ],
+    )

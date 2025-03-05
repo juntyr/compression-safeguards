@@ -74,7 +74,6 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
     _equal_nan: bool
 
     kind = "decimal"
-    _priority = 0
 
     def __init__(self, eb_decimal: int | float, *, equal_nan: bool = False):
         assert eb_decimal > 0, "eb_decimal must be positive"
@@ -205,11 +204,11 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
             lower_bound_outside_eb_decimal = (
-                np.where(data < 0, valid._lower / data, data / valid._lower)
+                np.abs(np.where(data < 0, valid._lower / data, data / valid._lower))
                 > eb_decimal_multipler
             )
             upper_bound_outside_eb_decimal = (
-                np.where(data < 0, data / valid._upper, valid._upper / data)
+                np.abs(np.where(data < 0, data / valid._upper, valid._upper / data))
                 > eb_decimal_multipler
             )
 

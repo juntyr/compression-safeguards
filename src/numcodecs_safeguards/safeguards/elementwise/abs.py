@@ -44,7 +44,6 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     _equal_nan: bool
 
     kind = "abs"
-    _priority = 0
 
     def __init__(self, eb_abs: int | float, *, equal_nan: bool = False):
         assert eb_abs > 0, "eb_abs must be positive"

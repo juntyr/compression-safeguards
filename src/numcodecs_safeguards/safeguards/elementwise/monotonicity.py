@@ -98,7 +98,6 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
     _monotonicity: Monotonicity
 
     kind = "monotonicity"
-    _priority = 1
 
     def __init__(self, monotonicity: str | Monotonicity, window: int):
         self._monotonicity = (

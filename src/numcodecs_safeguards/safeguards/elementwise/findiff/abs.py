@@ -90,7 +90,6 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     _eb_abs_impl: float
 
     kind = "findiff_abs"
-    _priority = 0
 
     def __init__(
         self,

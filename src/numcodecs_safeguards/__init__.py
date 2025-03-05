@@ -159,14 +159,9 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         ]
 
         self._elementwise_safeguards = tuple(
-            sorted(
-                (
-                    safeguard
-                    for safeguard in safeguards
-                    if isinstance(safeguard, ElementwiseSafeguard)
-                ),
-                key=lambda safeguard: safeguard._priority,
-            )
+            safeguard
+            for safeguard in safeguards
+            if isinstance(safeguard, ElementwiseSafeguard)
         )
         safeguards = [
             safeguard

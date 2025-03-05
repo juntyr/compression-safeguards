@@ -55,7 +55,6 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     _equal_nan: bool
 
     kind = "rel_or_abs"
-    _priority = 0
 
     def __init__(
         self, eb_rel: int | float, eb_abs: int | float, *, equal_nan: bool = False
@@ -209,11 +208,11 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
             lower_bound_outside_eb_decimal = (
-                np.where(data < 0, valid._lower / data, data / valid._lower)
+                np.abs(np.where(data < 0, valid._lower / data, data / valid._lower))
                 > eb_rel_multipler
             )
             upper_bound_outside_eb_decimal = (
-                np.where(data < 0, data / valid._upper, valid._upper / data)
+                np.abs(np.where(data < 0, data / valid._upper, valid._upper / data))
                 > eb_rel_multipler
             )
 
