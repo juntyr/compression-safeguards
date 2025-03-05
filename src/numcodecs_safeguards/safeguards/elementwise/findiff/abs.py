@@ -9,7 +9,6 @@ from fractions import Fraction
 from typing import Optional
 
 import numpy as np
-from numpy.lib.stride_tricks import sliding_window_view
 
 from ....intervals import (
     IntervalUnion,
@@ -26,6 +25,7 @@ from . import (
     FiniteDifference,
     _finite_difference_offsets,
     _finite_difference_coefficients,
+    _finite_difference,
 )
 
 
@@ -135,34 +135,58 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             eb_abs * np.power(dx, order) / sum(abs(c) for c in self._coefficients)
         )
 
+    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
-        findiff_data = self._findiff(data)
-        findiff_decoded = self._findiff(decoded)
+        axes = list(range(len(data.shape))) if self._axis is None else [self._axis]
 
-        # abs(findiff_data - findiff_decoded) <= self._eb_abs, but works for
-        # unsigned ints
-        absolute_bound = (
-            np.where(
-                findiff_data > findiff_decoded,
-                findiff_data - findiff_decoded,
-                findiff_decoded - findiff_data,
+        axes = [
+            a
+            for a in axes
+            if ((a >= 0) and (a < len(data.shape)))
+            or ((a < 0) and (a >= -len(data.shape)))
+        ]
+        axes = [a for a in axes if data.shape[a] >= len(self._coefficients)]
+
+        for a in axes:
+            findiff_data = _finite_difference(
+                data, self._order, self._offsets, self._coefficients, self._dx, axis=a
             )
-            <= self._eb_abs
-        )
-        same_bits = _as_bits(findiff_data) == _as_bits(findiff_decoded)
-        both_nan = np.isnan(findiff_data) & np.isnan(findiff_decoded)
+            findiff_decoded = _finite_difference(
+                decoded,
+                self._order,
+                self._offsets,
+                self._coefficients,
+                self._dx,
+                axis=a,
+            )
 
-        ok = np.where(
-            np.isfinite(findiff_data),
-            absolute_bound,
-            np.where(
-                np.isinf(findiff_data),
-                same_bits,
-                both_nan,
-            ),
-        )
+            # abs(findiff_data - findiff_decoded) <= self._eb_abs, but works for
+            # unsigned ints
+            absolute_bound = (
+                np.where(
+                    findiff_data > findiff_decoded,
+                    findiff_data - findiff_decoded,
+                    findiff_decoded - findiff_data,
+                )
+                <= self._eb_abs
+            )
+            same_bits = _as_bits(findiff_data) == _as_bits(findiff_decoded)
+            both_nan = np.isnan(findiff_data) & np.isnan(findiff_decoded)
 
-        return bool(np.all(ok))
+            ok = np.where(
+                np.isfinite(findiff_data),
+                absolute_bound,
+                np.where(
+                    np.isinf(findiff_data),
+                    same_bits,
+                    both_nan,
+                ),
+            )
+
+            if not np.all(ok):
+                return False
+
+        return True
 
     def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
         """
@@ -262,13 +286,3 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             eb_abs=self._eb_abs,
             axis=self._axis,
         )
-
-    def _findiff(self, x: np.ndarray, axis: int) -> np.ndarray:
-        raise NotImplementedError("todo")
-
-        # if self._axis is not None and (self._axis >= len(x.shape)) or ((self._axis < 0) and (self._axis < -len(x.shape))):
-        #     return np.full_like(x, np.nan)
-
-        window = max(abs(min(*self._coefficients)), abs(max(*self._coefficients))) * 2 + 1
-
-        x_windows = sliding_window_view(x, window, axis=axis)

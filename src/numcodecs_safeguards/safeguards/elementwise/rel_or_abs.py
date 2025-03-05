@@ -97,10 +97,16 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             )
             <= self._eb_abs
         )
-        relative_bound = (
-            (np.sign(data) == np.sign(decoded)) & (
-                (np.where(np.abs(data) > np.abs(decoded), np.abs(data) / np.abs(decoded), np.abs(decoded) / np.abs(data)) - 1) <= self._eb_rel
+        relative_bound = (np.sign(data) == np.sign(decoded)) & (
+            (
+                np.where(
+                    np.abs(data) > np.abs(decoded),
+                    np.abs(data) / np.abs(decoded),
+                    np.abs(decoded) / np.abs(data),
+                )
+                - 1
             )
+            <= self._eb_rel
         )
         # bitwise equality for inf and NaNs (unless equal_nan)
         same_bits = _as_bits(data) == _as_bits(decoded)
@@ -239,15 +245,42 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             data.dtype,
         )[np.isfinite(data)]
 
-        # apply the absolute error bound if abs(data) <= eb_abs/2
-        Lower(np.array(-eb_abs_half)) <= valid[np.abs(data) <= eb_abs_half] <= Upper(
-            eb_abs_half
-        )
+        # create a separate interval for the absolute error bound
+        valid_abs = Interval.empty_like(data)
+
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            Lower(data - self._eb_abs) <= valid_abs[np.isfinite(data)] <= Upper(
+                data + self._eb_abs
+            )
 
         if np.issubdtype(data.dtype, np.integer):
             # saturate the error bounds so that they don't wrap around
-            Minimum <= valid[valid._lower > data]
-            valid[valid._upper < data] <= Maximum
+            Minimum <= valid_abs[valid_abs._lower > data]
+            valid_abs[valid_abs._upper < data] <= Maximum
+
+        # correct rounding errors in the lower and upper bound
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            # we don't use abs(data - bound) here to accommodate unsigned ints
+            lower_bound_outside_eb_abs = (data - valid_abs._lower) > self._eb_abs
+            upper_bound_outside_eb_abs = (valid_abs._upper - data) > self._eb_abs
+
+        valid_abs._lower[np.isfinite(data)] = _from_total_order(
+            _to_total_order(valid_abs._lower) + lower_bound_outside_eb_abs,
+            data.dtype,
+        )[np.isfinite(data)]
+        valid_abs._upper[np.isfinite(data)] = _from_total_order(
+            _to_total_order(valid_abs._upper) - upper_bound_outside_eb_abs,
+            data.dtype,
+        )[np.isfinite(data)]
+
+        # combine the absolute and relative error bounds
+        Lower(np.minimum(valid._lower, valid_abs._lower)) <= valid[
+            np.isfinite(data)
+        ] <= Upper(np.maximum(valid._upper, valid_abs._upper))
 
         return valid.into_union()
 
