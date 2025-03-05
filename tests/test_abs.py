@@ -6,6 +6,7 @@ from .codecs import (
     encode_decode_neg,
     encode_decode_identity,
     encode_decode_noise,
+    encode_decode_mock,
 )
 
 
@@ -51,4 +52,17 @@ def test_edge_cases():
                 +0.0,
             ]
         )
+    )
+
+
+def test_fuzzer_rounding_error():
+    data = np.array([3785425606792480904, 9838263505978427528], dtype=np.uint64)
+    decoded = np.array([506381766090041480, 4722174329285543943], dtype=np.uint64)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(kind="abs", eb_abs=2.2250738585072014e-308, equal_nan=True),
+        ],
     )

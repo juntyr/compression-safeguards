@@ -239,8 +239,9 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            Lower(data - self._eb_abs_impl) <= valid[np.isfinite(data)] <= Upper(
-                data + self._eb_abs_impl
+            eb_abs_impl = np.array(self._eb_abs_impl).astype(data.dtype)
+            Lower(data - eb_abs_impl) <= valid[np.isfinite(data)] <= Upper(
+                data + eb_abs_impl
             )
 
         if np.issubdtype(data.dtype, np.integer):

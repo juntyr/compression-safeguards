@@ -150,9 +150,8 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            Lower(data - self._eb_abs) <= valid[np.isfinite(data)] <= Upper(
-                data + self._eb_abs
-            )
+            eb_abs = np.array(self._eb_abs).astype(data.dtype)
+            Lower(data - eb_abs) <= valid[np.isfinite(data)] <= Upper(data + eb_abs)
 
         if np.issubdtype(data.dtype, np.integer):
             # saturate the error bounds so that they don't wrap around

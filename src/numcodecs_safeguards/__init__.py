@@ -238,10 +238,10 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 self._elementwise_safeguards, all_intervals
             ):
                 assert np.all(intervals.contains(correction)), (
-                    f"{safeguard!r} interval does not contain the correction"
+                    f"{safeguard!r} interval does not contain the correction {correction!r}"
                 )
                 assert safeguard.check(data, correction), (
-                    f"{safeguard!r} check fails after correction"
+                    f"{safeguard!r} check fails after correction {correction!r}"
                 )
 
             correction_bytes = ElementwiseSafeguard._encode_correction(
