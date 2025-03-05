@@ -115,3 +115,16 @@ def test_fuzzer_rounding_error():
             dict(kind="decimal", eb_decimal=2.5924625501554395e303, equal_nan=False),
         ],
     )
+
+
+def test_fuzzer_int_to_float_precision():
+    data = np.array([71789313200750347])
+    decoded = np.array([2821266740684990247])
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(kind="decimal", eb_decimal=2.2250738585072014e-308, equal_nan=True),
+        ],
+    )

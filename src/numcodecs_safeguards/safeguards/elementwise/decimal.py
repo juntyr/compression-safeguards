@@ -17,6 +17,7 @@ from ...intervals import (
     _to_total_order,
     _from_total_order,
 )
+from ...cast import to_float
 
 
 class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
@@ -137,12 +138,14 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         data = data.flatten()
         valid = Interval.empty_like(data)
 
+        data_float = to_float(data)
+
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
             eb_decimal_multipler = np.power(
                 np.array(10, dtype=data.dtype), self._eb_decimal
-            )
+            ).astype(data.dtype)
         if eb_decimal_multipler < 1 or not np.isfinite(eb_decimal_multipler):
             eb_decimal_multipler = np.array(
                 np.finfo(data.dtype).max
@@ -187,8 +190,8 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
             data_mul, data_div = (
-                data * eb_decimal_multipler,
-                data / eb_decimal_multipler,
+                data_float * eb_decimal_multipler,
+                data_float / eb_decimal_multipler,
             )
             Lower(np.where(data < 0, data_mul, data_div)) <= valid[
                 np.isfinite(data)
@@ -204,11 +207,23 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
             lower_bound_outside_eb_decimal = (
-                np.abs(np.where(data < 0, valid._lower / data, data / valid._lower))
+                np.abs(
+                    np.where(
+                        data < 0,
+                        to_float(valid._lower) / data_float,
+                        data_float / to_float(valid._lower),
+                    )
+                )
                 > eb_decimal_multipler
             )
             upper_bound_outside_eb_decimal = (
-                np.abs(np.where(data < 0, data / valid._upper, valid._upper / data))
+                np.abs(
+                    np.where(
+                        data < 0,
+                        data_float / to_float(valid._upper),
+                        to_float(valid._upper) / data_float,
+                    )
+                )
                 > eb_decimal_multipler
             )
 
