@@ -1,13 +1,12 @@
-from typing import TypeVar
+from typing import Any, TypeVar
 
 import numpy as np
 
 T = TypeVar("T", bound=np.dtype)
-T2 = TypeVar("T", bound=np.dtype)
 S = TypeVar("S", bound=tuple[int, ...])
 
 
-def to_float(x: np.ndarray[S, T]) -> np.ndarray[S, T2]:
+def to_float(x: np.ndarray[S, T]) -> np.ndarray[S, Any]:
     if np.issubdtype(x.dtype, np.floating):
         return x
 

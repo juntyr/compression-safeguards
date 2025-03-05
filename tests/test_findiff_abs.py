@@ -6,6 +6,7 @@ from .codecs import (
     encode_decode_neg,
     encode_decode_identity,
     encode_decode_noise,
+    encode_decode_mock,
 )
 
 
@@ -103,4 +104,25 @@ def test_edge_cases():
                 +0.0,
             ]
         )
+    )
+
+
+def test_fuzzer_int_iter():
+    data = np.array([65373], dtype=np.uint16)
+    decoded = np.array([42246], dtype=np.uint16)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(
+                kind="findiff_abs",
+                type="backwards",
+                order=0,
+                accuracy=1,
+                dx=2.2250738585072014e-308,
+                eb_abs=2.2250738585072014e-308,
+                axis=0,
+            ),
+        ],
     )

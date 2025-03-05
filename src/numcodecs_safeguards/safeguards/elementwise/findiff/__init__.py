@@ -108,7 +108,9 @@ def _finite_difference(
     dx: float,
     axis: int,
 ) -> np.ndarray:
-    omin, omax = min(*offsets), max(*offsets)
+    omin, omax = (
+        (min(*offsets), max(*offsets)) if len(offsets) > 1 else (offsets[0], offsets[0])
+    )
     window = 1 + omax - omin
 
     x_windows = sliding_window_view(x, window, axis=axis, writeable=False)
