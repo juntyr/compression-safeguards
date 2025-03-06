@@ -126,3 +126,24 @@ def test_fuzzer_int_iter():
             ),
         ],
     )
+
+
+def test_fuzzer_fraction_overflow():
+    data = np.array([7], dtype=np.int8)
+    decoded = np.array([0], dtype=np.int8)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(
+                kind="findiff_abs",
+                type="backwards",
+                order=7,
+                accuracy=6,
+                dx=7.215110354450764e305,
+                eb_abs=2.2250738585072014e-308,
+                axis=0,
+            ),
+        ],
+    )

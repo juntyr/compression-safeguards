@@ -217,10 +217,14 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_abs_impl = min(
-                np.array(self._eb_abs_impl).astype(data_float.dtype),
-                np.finfo(data_float.dtype).max,
-            )
+            try:
+                eb_abs_impl = min(
+                    np.array(self._eb_abs_impl).astype(data_float.dtype),
+                    np.finfo(data_float.dtype).max,
+                )
+            # converting Fraction to an array may error
+            except OverflowError:
+                eb_abs_impl = np.finfo(data_float.dtype).max
         assert eb_abs_impl >= 0.0 and np.isfinite(eb_abs_impl)
 
         valid = (
