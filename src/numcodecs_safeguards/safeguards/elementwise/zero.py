@@ -78,11 +78,12 @@ class ZeroIsZeroSafeguard(ElementwiseSafeguard):
             Union of intervals in which the zero-is-zero guarantee is upheld.
         """
 
+        zero = self._zero_like(data.dtype)
+
         data = data.flatten()
         valid = Interval.empty_like(data)
 
-        zero = self._zero_like(data.dtype)
-
+        # preserve zero values exactly, do not constrain other values
         Lower(zero) <= valid[_as_bits(data) == _as_bits(zero)] <= Upper(zero)
         Minimum <= valid[_as_bits(data) != _as_bits(zero)] <= Maximum
 

@@ -60,19 +60,15 @@ class SignPreservingSafeguard(ElementwiseSafeguard):
             Union of intervals in which the `data`'s sign is preserved.
         """
 
+        # tiny: the smallest-in-magnitude non-zero value
+        tiny, neg_tiny = self._tiny_like(data)
+
         data = data.flatten()
         valid = Interval.empty_like(data)
 
         sign = self._sign(data)
 
-        if np.issubdtype(data.dtype, np.integer):
-            tiny = np.ones((), dtype=data.dtype)
-            neg_tiny = np.array(-tiny)
-        else:
-            info = np.finfo(data.dtype)
-            tiny = np.array(info.smallest_subnormal)
-            neg_tiny = np.array(-info.smallest_subnormal)
-
+        # preserve zero-sign values exactly
         Lower(data) <= valid[sign == 0] <= Upper(data)
         Minimum <= valid[sign == -1] <= Upper(neg_tiny)
         Lower(tiny) <= valid[sign == +1] <= Maximum
@@ -92,9 +88,20 @@ class SignPreservingSafeguard(ElementwiseSafeguard):
         return dict(kind=type(self).kind)
 
     def _sign(self, x: np.ndarray) -> np.ndarray:
-        zero = np.zeros((), dtype=x.dtype)
+        zero = np.array(0, dtype=x.dtype)
 
         # if >0: (true) * (1 - 0*2) = 1
         # if =0: (false) * (1 - 0*2) = 0
         # if <0: (true) * (1 - 1*2) = -1
         return (x != zero) * (1 - np.signbit(x) * 2)
+
+    def _tiny_like(self, a: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        if np.issubdtype(a.dtype, np.integer):
+            tiny = np.array(1, dtype=a.dtype)
+            neg_tiny = np.array(-tiny)
+        else:
+            info = np.finfo(a.dtype)
+            tiny = np.array(info.smallest_subnormal)
+            neg_tiny = np.array(-info.smallest_subnormal)
+
+        return tiny, neg_tiny
