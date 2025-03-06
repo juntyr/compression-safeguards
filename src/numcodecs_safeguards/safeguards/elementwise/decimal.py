@@ -12,12 +12,10 @@ from ...intervals import (
     Interval,
     Lower,
     Upper,
-    Minimum,
-    Maximum,
     _to_total_order,
     _from_total_order,
 )
-from ...cast import to_float
+from ...cast import to_float, from_float
 
 
 class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
@@ -63,8 +61,8 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
     Parameters
     ----------
     eb_decimal : int | float
-        The positive decimal error bound that is enforced by this safeguard.
-        `eb_decimal=1.0` corresponds to a 100% relative error bound.
+        The non-negative decimal error bound that is enforced by this safeguard.
+        `eb_decimal=1.0` corresponds to a 10x relative error bound.
     equal_nan: bool
         Whether decoding a NaN value to a NaN value with a different bit
         pattern satisfies the error bound.
@@ -77,7 +75,7 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
     kind = "decimal"
 
     def __init__(self, eb_decimal: int | float, *, equal_nan: bool = False):
-        assert eb_decimal > 0, "eb_decimal must be positive"
+        assert eb_decimal >= 0, "eb_decimal must be non-negative"
         assert np.isfinite(eb_decimal), "eb_decimal must be finite"
 
         self._eb_decimal = eb_decimal
@@ -136,43 +134,35 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         """
 
         data = data.flatten()
+        data_float = to_float(data)
+
         valid = (
             Interval.empty_like(data)
             .preserve_inf(data)
             .preserve_nan(data, equal_nan=self._equal_nan)
         )
 
-        data_float = to_float(data)
-
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_decimal_multipler = np.power(
-                np.array(10, dtype=data.dtype), self._eb_decimal
-            ).astype(data.dtype)
-        if eb_decimal_multipler < 1 or not np.isfinite(eb_decimal_multipler):
-            eb_decimal_multipler = np.array(
-                np.finfo(data.dtype).max
-                if np.issubdtype(data.dtype, np.floating)
-                else np.iinfo(data.dtype).max,
-                dtype=data.dtype,
+            eb_decimal_multipler = min(
+                np.power(np.array(10, dtype=data_float.dtype), self._eb_decimal).astype(
+                    data_float.dtype
+                ),
+                np.finfo(data_float.dtype).max,
             )
+        assert eb_decimal_multipler >= 1.0 and np.isfinite(eb_decimal_multipler)
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
             data_mul, data_div = (
-                data_float * eb_decimal_multipler,
-                data_float / eb_decimal_multipler,
+                from_float(data_float * eb_decimal_multipler, data.dtype),
+                from_float(data_float / eb_decimal_multipler, data.dtype),
             )
             Lower(np.where(data < 0, data_mul, data_div)) <= valid[
                 np.isfinite(data)
             ] <= Upper(np.where(data < 0, data_div, data_mul))
-
-        if np.issubdtype(data.dtype, np.integer):
-            # saturate the error bounds so that they don't wrap around
-            Minimum <= valid[valid._lower > data]
-            valid[valid._upper < data] <= Maximum
 
         # correct rounding errors in the lower and upper bound
         with np.errstate(
@@ -234,5 +224,7 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         return np.where(
             (sign_x == 0) & (sign_y == 0),
             0.0,
-            np.where(sign_x != sign_y, np.inf, (np.abs(np.log10(x / y)))),
+            np.where(
+                sign_x != sign_y, np.inf, (np.abs(np.log10(to_float(x) / to_float(y))))
+            ),
         )

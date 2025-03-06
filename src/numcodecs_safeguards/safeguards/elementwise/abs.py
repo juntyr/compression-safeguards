@@ -12,11 +12,10 @@ from ...intervals import (
     Interval,
     Lower,
     Upper,
-    Minimum,
-    Maximum,
     _to_total_order,
     _from_total_order,
 )
+from ...cast import to_float, from_float
 
 
 class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
@@ -33,7 +32,8 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     Parameters
     ----------
     eb_abs : int | float
-        The positive absolute error bound that is enforced by this safeguard.
+        The non-negative absolute error bound that is enforced by this
+        safeguard.
     equal_nan: bool
         Whether decoding a NaN value to a NaN value with a different bit
         pattern satisfies the error bound.
@@ -46,7 +46,7 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     kind = "abs"
 
     def __init__(self, eb_abs: int | float, *, equal_nan: bool = False):
-        assert eb_abs > 0, "eb_abs must be positive"
+        assert eb_abs >= 0, "eb_abs must be non-negative"
         assert np.isfinite(eb_abs), "eb_abs must be finite"
 
         self._eb_abs = eb_abs
@@ -112,6 +112,8 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         """
 
         data = data.flatten()
+        data_float = to_float(data)
+
         valid = (
             Interval.empty_like(data)
             .preserve_inf(data)
@@ -121,21 +123,30 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_abs = np.array(self._eb_abs).astype(data.dtype)
-            Lower(data - eb_abs) <= valid[np.isfinite(data)] <= Upper(data + eb_abs)
+            eb_abs = min(
+                np.array(self._eb_abs).astype(data_float.dtype),
+                np.finfo(data_float.dtype).max,
+            )
+        assert eb_abs >= 0.0 and np.isfinite(eb_abs)
 
-        if np.issubdtype(data.dtype, np.integer):
-            # saturate the error bounds so that they don't wrap around
-            Minimum <= valid[valid._lower > data]
-            valid[valid._upper < data] <= Maximum
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            Lower(from_float(data_float - eb_abs, data.dtype)) <= valid[
+                np.isfinite(data)
+            ] <= Upper(from_float(data_float + eb_abs, data.dtype))
 
         # correct rounding errors in the lower and upper bound
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
             # we don't use abs(data - bound) here to accommodate unsigned ints
-            lower_bound_outside_eb_abs = (data - valid._lower) > self._eb_abs
-            upper_bound_outside_eb_abs = (valid._upper - data) > self._eb_abs
+            lower_bound_outside_eb_abs = (
+                data_float - to_float(valid._lower)
+            ) > self._eb_abs
+            upper_bound_outside_eb_abs = (
+                to_float(valid._upper) - data_float
+            ) > self._eb_abs
 
         valid._lower[np.isfinite(data)] = _from_total_order(
             _to_total_order(valid._lower) + lower_bound_outside_eb_abs,

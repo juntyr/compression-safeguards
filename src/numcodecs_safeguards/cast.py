@@ -22,3 +22,14 @@ def to_float(x: np.ndarray[S, T]) -> np.ndarray[S, Any]:
     }[x.dtype]
 
     return x.astype(ftype)
+
+
+def from_float(x: np.ndarray[S, Any], dtype: T) -> np.ndarray[S, T]:
+    if x.dtype == dtype:
+        return x
+
+    info = np.iinfo(dtype)
+    imin, imax = np.array(info.min, dtype=dtype), np.array(info.max, dtype=dtype)
+
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        return np.where(x < imin, imin, np.where(x <= imax, x.astype(dtype), imax))  # type: ignore

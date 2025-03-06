@@ -15,11 +15,10 @@ from ....intervals import (
     Interval,
     Lower,
     Upper,
-    Minimum,
-    Maximum,
     _to_total_order,
     _from_total_order,
 )
+from ....cast import to_float, from_float
 from .. import ElementwiseSafeguard, _as_bits
 from . import (
     FiniteDifference,
@@ -61,10 +60,11 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         The positive order of accuracy of the finite difference approximation.
 
         The order of accuracy must be even for a central finite difference.
-    dx : float
+    dx : int | float
         The uniform positive grid spacing between each point.
-    eb_abs : float
-        The positive absolute error bound that is enforced by this safeguard.
+    eb_abs : int | float
+        The non-negative absolute error bound on the finite difference that is
+        enforced by this safeguard.
     axis : Optional[int]
         The axis along which the finite difference is safeguarded. The default,
         [`None`][None], is to safeguard along all axes.
@@ -82,12 +82,12 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     _type: FiniteDifference
     _order: int
     _accuracy: int
-    _dx: float
-    _eb_abs: float
+    _dx: int | float
+    _eb_abs: int | float
     _axis: Optional[int]
     _offsets: tuple[int, ...]
     _coefficients: tuple[Fraction, ...]
-    _eb_abs_impl: float
+    _eb_abs_impl: Fraction
 
     kind = "findiff_abs"
 
@@ -96,8 +96,8 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         type: str | FiniteDifference,
         order: int,
         accuracy: int,
-        dx: float,
-        eb_abs: float,
+        dx: int | float,
+        eb_abs: int | float,
         axis: Optional[int] = None,
     ):
         type = type if isinstance(type, FiniteDifference) else FiniteDifference[type]
@@ -110,8 +110,8 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
                 "accuracy must be even for a central finite difference"
             )
 
-        assert dx > 0.0, "dx must be positive"
-        assert eb_abs > 0.0, "eb_abs must be positive"
+        assert dx > 0, "dx must be positive"
+        assert eb_abs >= 0, "eb_abs must be non-negative"
         assert np.isfinite(eb_abs), "eb_abs must be finite"
 
         if order > 8 or accuracy > 8:
@@ -131,7 +131,9 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         self._coefficients = _finite_difference_coefficients(order, self._offsets)
 
         self._eb_abs_impl = (
-            eb_abs * np.power(dx, order) / sum(abs(c) for c in self._coefficients)
+            Fraction(eb_abs)
+            * (Fraction(dx) ** order)
+            / sum(abs(c) for c in self._coefficients)
         )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -148,10 +150,15 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
         for a in axes:
             findiff_data = _finite_difference(
-                data, self._order, self._offsets, self._coefficients, self._dx, axis=a
+                to_float(data),
+                self._order,
+                self._offsets,
+                self._coefficients,
+                self._dx,
+                axis=a,
             )
             findiff_decoded = _finite_difference(
-                decoded,
+                to_float(decoded),
                 self._order,
                 self._offsets,
                 self._coefficients,
@@ -204,6 +211,17 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         """
 
         data = data.flatten()
+        data_float = to_float(data)
+
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            eb_abs_impl = min(
+                np.array(self._eb_abs_impl).astype(data_float.dtype),
+                np.finfo(data_float.dtype).max,
+            )
+        assert eb_abs_impl >= 0.0 and np.isfinite(eb_abs_impl)
+
         valid = (
             Interval.empty_like(data)
             .preserve_inf(data)
@@ -213,23 +231,21 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_abs_impl = np.array(self._eb_abs_impl).astype(data.dtype)
-            Lower(data - eb_abs_impl) <= valid[np.isfinite(data)] <= Upper(
-                data + eb_abs_impl
-            )
-
-        if np.issubdtype(data.dtype, np.integer):
-            # saturate the error bounds so that they don't wrap around
-            Minimum <= valid[valid._lower > data]
-            valid[valid._upper < data] <= Maximum
+            Lower(from_float(data_float - eb_abs_impl, data.dtype)) <= valid[
+                np.isfinite(data)
+            ] <= Upper(from_float(data_float + eb_abs_impl, data.dtype))
 
         # correct rounding errors in the lower and upper bound
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
             # we don't use abs(data - bound) here to accommodate unsigned ints
-            lower_bound_outside_eb_abs = (data - valid._lower) > self._eb_abs_impl
-            upper_bound_outside_eb_abs = (valid._upper - data) > self._eb_abs_impl
+            lower_bound_outside_eb_abs = (
+                data_float - to_float(valid._lower)
+            ) > self._eb_abs_impl
+            upper_bound_outside_eb_abs = (
+                to_float(valid._upper) - data_float
+            ) > self._eb_abs_impl
 
         valid._lower[np.isfinite(data)] = _from_total_order(
             _to_total_order(valid._lower) + lower_bound_outside_eb_abs,
