@@ -1,4 +1,5 @@
 from typing import Any, Generic, Literal, TypeVar
+from typing_extensions import Self  # MSPV 3.11
 
 import numpy as np
 
@@ -36,6 +37,48 @@ class Interval(Generic[T, N]):
 
     def __getitem__(self, key) -> "IndexedInterval[T, Any]":
         return IndexedInterval(_lower=self._lower, _upper=self._upper, _index=key)
+
+    def preserve_inf(self, a: np.ndarray[tuple[N], T]) -> Self:
+        if not np.issubdtype(a.dtype, np.floating):
+            return self
+
+        # bitwise preserve infinite values
+        Lower(a) <= self[np.isinf(a)] <= Upper(a)
+
+        return self
+
+    def preserve_nan(self, a: np.ndarray[tuple[N], T], *, equal_nan: bool) -> Self:
+        if not np.issubdtype(a.dtype, np.floating):
+            return self
+
+        if not equal_nan:
+            # bitwise preserve NaN values
+            Lower(a) <= self[np.isnan(a)] <= Upper(a)
+            return self
+
+        # smallest (positive) NaN bit pattern: 0b s 1..1 0..0
+        nan_min = np.array(_as_bits(np.array(np.inf, dtype=a.dtype)) + 1).view(a.dtype)
+        # largest (negative) NaN bit pattern: 0b s 1..1 1..1
+        nan_max = np.array(-1, dtype=a.dtype.str.replace("f", "i")).view(a.dtype)
+
+        # any NaN with the same sign is valid
+        # this is slightly stricter than what equal_nan requires
+        Lower(
+            np.where(
+                # ensure the NaN has the correct sign
+                np.signbit(a),
+                np.copysign(nan_max, -1),
+                np.copysign(nan_min, +1),
+            )
+        ) <= self[np.isnan(a)] <= Upper(
+            np.where(
+                np.signbit(a),
+                np.copysign(nan_min, -1),
+                np.copysign(nan_max, +1),
+            )
+        )
+
+        return self
 
     def into_union(self) -> "IntervalUnion[T, N, Literal[1]]":
         return IntervalUnion(

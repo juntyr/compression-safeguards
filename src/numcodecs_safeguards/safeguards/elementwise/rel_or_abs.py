@@ -141,7 +141,11 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         """
 
         data = data.flatten()
-        valid = Interval.empty_like(data)
+        valid = (
+            Interval.empty_like(data)
+            .preserve_inf(data)
+            .preserve_nan(data, equal_nan=self._equal_nan)
+        )
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
@@ -154,38 +158,6 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
                 else np.iinfo(data.dtype).max,
                 dtype=data.dtype,
             )
-
-        if np.issubdtype(data.dtype, np.floating):
-            Lower(data) <= valid[np.isinf(data)] <= Upper(data)
-
-        if np.issubdtype(data.dtype, np.floating):
-            if self._equal_nan:
-                nan_min = np.array(
-                    np.array(np.inf, dtype=data.dtype).view(
-                        data.dtype.str.replace("f", "u")
-                    )
-                    + 1
-                ).view(data.dtype)
-                nan_max = np.array(-1, dtype=data.dtype.str.replace("f", "i")).view(
-                    data.dtype
-                )
-
-                # any NaN with the same sign is valid
-                Lower(
-                    np.where(
-                        np.signbit(data),
-                        np.copysign(nan_max, -1),
-                        np.copysign(nan_min, +1),
-                    )
-                ) <= valid[np.isnan(data)] <= Upper(
-                    np.where(
-                        np.signbit(data),
-                        np.copysign(nan_min, -1),
-                        np.copysign(nan_max, +1),
-                    )
-                )
-            else:
-                Lower(data) <= valid[np.isnan(data)] <= Upper(data)
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
