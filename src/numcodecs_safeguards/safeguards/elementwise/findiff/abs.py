@@ -54,7 +54,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     type : str | FiniteDifference
         The type of finite difference.
     order : int
-        The non-negative order of the derivative that is approximayed by a
+        The non-negative order of the derivative that is approximated by a
         finite difference.
     accuracy : int
         The positive order of accuracy of the finite difference approximation.
@@ -111,6 +111,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             )
 
         assert dx > 0, "dx must be positive"
+        assert np.isfinite(dx), "dx must be finite"
         assert eb_abs >= 0, "eb_abs must be non-negative"
         assert np.isfinite(eb_abs), "eb_abs must be finite"
 
