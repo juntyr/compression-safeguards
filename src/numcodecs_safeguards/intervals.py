@@ -460,5 +460,5 @@ def _count_leading_zeros(x: np.ndarray) -> np.ndarray:
     return (nbits - np.where(high_exp, high_exp + 32, low_exp)).astype(np.uint8)
 
 
-def _as_bits(a: np.ndarray) -> np.ndarray:
+def _as_bits(a: np.ndarray, *, kind: str = "u") -> np.ndarray:
     return a.view(a.dtype.str.replace("f", "u").replace("i", "u"))

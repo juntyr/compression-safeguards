@@ -177,7 +177,9 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
                 )
                 <= self._eb_abs
             )
-            same_bits = _as_bits(findiff_data) == _as_bits(findiff_decoded)
+            same_bits = _as_bits(findiff_data, kind="V") == _as_bits(
+                findiff_decoded, kind="V"
+            )
             both_nan = np.isnan(findiff_data) & np.isnan(findiff_decoded)
 
             ok = np.where(
