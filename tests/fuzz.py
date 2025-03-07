@@ -140,7 +140,7 @@ def check_one_input(data):
         encoded = safeguard.encode(raw)
         safeguard.decode(encoded, out=np.empty_like(raw))
     except Exception as err:
-        print(f"\n===\n\ncodec = {grepr}\n\n===\n")
+        print(f"\n===\n\ncodec = {grepr}\n\ndata = {raw!r}\n\n===\n")
         raise err
 
 
