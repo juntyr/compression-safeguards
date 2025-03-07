@@ -1,6 +1,5 @@
 import numpy as np
-from numcodecs_safeguards.intervals import _minimum, _maximum
-from numcodecs_safeguards.safeguards.elementwise import _as_bits
+from numcodecs_safeguards.intervals import _minimum, _maximum, _as_bits
 from numcodecs_safeguards.safeguards.elementwise.abs import AbsoluteErrorBoundSafeguard
 from numcodecs_safeguards.safeguards.elementwise.sign import SignPreservingSafeguard
 from numcodecs_safeguards.safeguards.elementwise.zero import ZeroIsZeroSafeguard
@@ -37,14 +36,16 @@ def test_sign():
         _as_bits(
             np.array(
                 [
-                    _minimum(np.dtype(float)),
-                    _minimum(np.dtype(float)),
-                    _minimum(np.dtype(float)),
-                    -0.0,
-                    0.0,
-                    np.finfo(float).smallest_subnormal,
-                    np.finfo(float).smallest_subnormal,
-                    np.finfo(float).smallest_subnormal,
+                    [
+                        _minimum(np.dtype(float)),
+                        _minimum(np.dtype(float)),
+                        _minimum(np.dtype(float)),
+                        -0.0,
+                        0.0,
+                        np.finfo(float).smallest_subnormal,
+                        np.finfo(float).smallest_subnormal,
+                        np.finfo(float).smallest_subnormal,
+                    ]
                 ]
             )
         ),
@@ -54,14 +55,16 @@ def test_sign():
         _as_bits(
             np.array(
                 [
-                    -np.finfo(float).smallest_subnormal,
-                    -np.finfo(float).smallest_subnormal,
-                    -np.finfo(float).smallest_subnormal,
-                    -0.0,
-                    0.0,
-                    _maximum(np.dtype(float)),
-                    _maximum(np.dtype(float)),
-                    _maximum(np.dtype(float)),
+                    [
+                        -np.finfo(float).smallest_subnormal,
+                        -np.finfo(float).smallest_subnormal,
+                        -np.finfo(float).smallest_subnormal,
+                        -0.0,
+                        0.0,
+                        _maximum(np.dtype(float)),
+                        _maximum(np.dtype(float)),
+                        _maximum(np.dtype(float)),
+                    ]
                 ]
             )
         ),

@@ -6,7 +6,7 @@ __all__ = ["AbsoluteErrorBoundSafeguard"]
 
 import numpy as np
 
-from . import ElementwiseSafeguard, _as_bits
+from . import ElementwiseSafeguard
 from ...intervals import (
     IntervalUnion,
     Interval,
@@ -14,6 +14,7 @@ from ...intervals import (
     Upper,
     _to_total_order,
     _from_total_order,
+    _as_bits,
 )
 from ...cast import to_float, from_float
 

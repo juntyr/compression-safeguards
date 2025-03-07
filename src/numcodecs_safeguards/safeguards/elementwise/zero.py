@@ -6,8 +6,16 @@ __all__ = ["ZeroIsZeroSafeguard"]
 
 import numpy as np
 
-from . import ElementwiseSafeguard, _as_bits
-from ...intervals import IntervalUnion, Interval, Lower, Upper, Minimum, Maximum
+from . import ElementwiseSafeguard
+from ...intervals import (
+    IntervalUnion,
+    Interval,
+    Lower,
+    Upper,
+    Minimum,
+    Maximum,
+    _as_bits,
+)
 
 
 class ZeroIsZeroSafeguard(ElementwiseSafeguard):

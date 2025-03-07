@@ -304,8 +304,10 @@ class IntervalUnion(Generic[T, N, U]):
         if decoded.size == 0:
             return decoded
 
+        (_, n) = self._lower.shape
+
         # (a) if decoded is in the interval, use it
-        contains_decoded = self.contains(decoded)
+        contains_decoded = self.contains(decoded).flatten()
 
         # 1. convert everything to bits in total order
         decoded_bits = _to_total_order(decoded).reshape(1, -1)
@@ -334,7 +336,7 @@ class IntervalUnion(Generic[T, N, U]):
         # 5. if there are several intervals, pick the one with the smallest
         #    lower bound, ensuring that empty intervals are not picked
         least = np.where(interval_nonempty, lower, allbits).argmin(axis=0)
-        lower, upper = np.diag(lower[least]), np.diag(upper[least])
+        lower, upper = lower[least, np.arange(n)], upper[least, np.arange(n)]
         assert np.all(lower <= upper)
 
         # 6. count the number of leading zero bits in lower and upper
@@ -374,7 +376,7 @@ class IntervalUnion(Generic[T, N, U]):
         )
         assert np.all(self.contains(pick))
 
-        return pick
+        return pick.reshape(decoded.shape)
 
     def encode(self, decoded: np.ndarray[S, T]) -> np.ndarray[S, T]:
         return self.encode_more_zeros(decoded)

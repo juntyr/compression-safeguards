@@ -74,7 +74,9 @@ def check_one_input(data):
     dtype: np.ndtype = list(_SUPPORTED_DTYPES)[
         data.ConsumeIntInRange(0, len(Safeguards) - 1)
     ]
-    size: int = data.ConsumeIntInRange(0, 10)
+    sizea: int = data.ConsumeIntInRange(0, 20)
+    sizeb: int = data.ConsumeIntInRange(0, 20 // max(1, sizea))
+    size = sizea * sizeb
 
     # input data and the decoded data
     raw = data.ConsumeBytes(size * dtype.itemsize)
@@ -88,6 +90,10 @@ def check_one_input(data):
 
     raw = np.frombuffer(raw, dtype=dtype)
     decoded = np.frombuffer(decoded, dtype=dtype)
+
+    if sizeb != 0:
+        raw = raw.reshape((sizea, sizeb))
+        decoded = decoded.reshape((sizea, sizeb))
 
     # safeguard parameters
     safeguards = [

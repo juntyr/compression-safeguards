@@ -56,7 +56,7 @@ class ElementwiseSafeguard(Safeguard, ABC):
     @final
     @staticmethod
     def _encode_correction(
-        decoded: np.ndarray[S, T], correction: np.ndarray[S, T], lossless: Codec
+        decoded: np.ndarray[S, T], corrected: np.ndarray[S, T], lossless: Codec
     ) -> bytes:
         """
         Encode the combined correction from one or more elementwise safeguards
@@ -77,8 +77,8 @@ class ElementwiseSafeguard(Safeguard, ABC):
             Encoded correction for the `decoded` array.
         """
 
-        decoded_bits = _as_bits(decoded)
-        corrected_bits = _as_bits(correction, like=decoded)
+        decoded_bits = _buffer_as_bits(decoded)
+        corrected_bits = _buffer_as_bits(corrected, like=decoded)
 
         correction_bits = decoded_bits - corrected_bits
 
@@ -110,7 +110,7 @@ class ElementwiseSafeguard(Safeguard, ABC):
             Corrected decoded data.
         """
 
-        decoded_bits = _as_bits(decoded)
+        decoded_bits = _buffer_as_bits(decoded)
 
         correction = lossless.decode(correction)
         correction = numcodecs.compat.ensure_bytes(correction)
@@ -120,7 +120,7 @@ class ElementwiseSafeguard(Safeguard, ABC):
         return (decoded_bits - correction_bits).view(decoded.dtype)
 
 
-def _as_bits(a: np.ndarray, *, like: None | np.ndarray = None) -> np.ndarray:
+def _buffer_as_bits(a: np.ndarray, *, like: None | np.ndarray = None) -> np.ndarray:
     """
     Reinterpret the array `a` to an array of equal-sized uints (bits).
 

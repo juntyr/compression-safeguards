@@ -16,9 +16,10 @@ from ....intervals import (
     Upper,
     _to_total_order,
     _from_total_order,
+    _as_bits,
 )
 from ....cast import to_float, from_float
-from .. import ElementwiseSafeguard, _as_bits
+from .. import ElementwiseSafeguard
 from . import (
     FiniteDifference,
     _finite_difference_offsets,

@@ -1,6 +1,6 @@
 import numpy as np
 
-from numcodecs_safeguards.safeguards.elementwise import _as_bits
+from numcodecs_safeguards.intervals import _as_bits
 
 from .codecs import (
     encode_decode_zero,
