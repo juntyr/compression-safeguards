@@ -246,10 +246,10 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             # we don't use abs(data - bound) here to accommodate unsigned ints
             lower_bound_outside_eb_abs = (
                 data_float - to_float(valid._lower)
-            ) > self._eb_abs_impl
+            ) > eb_abs_impl
             upper_bound_outside_eb_abs = (
                 to_float(valid._upper) - data_float
-            ) > self._eb_abs_impl
+            ) > eb_abs_impl
 
         valid._lower[np.isfinite(data)] = _from_total_order(
             _to_total_order(valid._lower) + lower_bound_outside_eb_abs,

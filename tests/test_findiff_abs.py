@@ -7,6 +7,7 @@ from .codecs import (
     encode_decode_identity,
     encode_decode_noise,
     encode_decode_mock,
+    encode_decode_none,
 )
 
 
@@ -145,5 +146,26 @@ def test_fuzzer_fraction_overflow():
                 eb_abs=2.2250738585072014e-308,
                 axis=0,
             ),
+        ],
+    )
+
+
+def test_fuzzer_fraction_compare():
+    data = np.array([1978047305655558])
+
+    encode_decode_none(
+        data,
+        safeguards=[
+            dict(kind="zero", zero=7),
+            dict(
+                kind="findiff_abs",
+                type="backwards",
+                order=7,
+                accuracy=7,
+                dx=2.2250738585072014e-308,
+                eb_abs=0,
+                axis=None,
+            ),
+            dict(kind="sign"),
         ],
     )

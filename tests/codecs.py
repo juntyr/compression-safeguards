@@ -125,3 +125,12 @@ def encode_decode_mock(data: np.ndarray, decoded: np.ndarray, **kwargs) -> np.nd
     decoded = codec.decode(encoded, out=np.empty_like(data))
 
     return decoded
+
+
+def encode_decode_none(data: np.ndarray, **kwargs) -> np.ndarray:
+    codec = SafeguardsCodec(codec=None, **kwargs)
+
+    encoded = codec.encode(data)
+    decoded = codec.decode(encoded, out=np.empty_like(data))
+
+    return decoded
