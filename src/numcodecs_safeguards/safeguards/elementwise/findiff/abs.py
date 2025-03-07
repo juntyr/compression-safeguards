@@ -6,7 +6,6 @@ __all__ = ["FiniteDifferenceAbsoluteErrorBoundSafeguard"]
 
 import warnings
 from fractions import Fraction
-from typing import Optional
 
 import numpy as np
 
@@ -65,7 +64,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     eb_abs : int | float
         The non-negative absolute error bound on the finite difference that is
         enforced by this safeguard.
-    axis : Optional[int]
+    axis : None | int
         The axis along which the finite difference is safeguarded. The default,
         [`None`][None], is to safeguard along all axes.
     """
@@ -84,7 +83,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     _accuracy: int
     _dx: int | float
     _eb_abs: int | float
-    _axis: Optional[int]
+    _axis: None | int
     _offsets: tuple[int, ...]
     _coefficients: tuple[Fraction, ...]
     _eb_abs_impl: Fraction
@@ -98,7 +97,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         accuracy: int,
         dx: int | float,
         eb_abs: int | float,
-        axis: Optional[int] = None,
+        axis: None | int = None,
     ):
         type = type if isinstance(type, FiniteDifference) else FiniteDifference[type]
 

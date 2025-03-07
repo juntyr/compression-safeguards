@@ -22,7 +22,7 @@ __all__ = ["SafeguardsCodec", "Safeguards"]
 from collections.abc import Sequence
 from enum import Enum
 from io import BytesIO
-from typing import Optional, Callable
+from typing import Callable
 from typing_extensions import Buffer  # MSPV 3.12
 
 import numcodecs
@@ -106,7 +106,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
     Parameters
     ----------
-    codec : dict | Codec
+    codec : None | dict | Codec
         The codec to wrap with safeguards. It can either be passed as a codec
         configuration [`dict`][dict], which is passed to
         [`numcodecs.registry.get_codec(config)`][numcodecs.registry.get_codec],
@@ -115,6 +115,11 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         The codec must encode to a 1D buffer of bytes. It is desirable to
         perform lossless compression after applying the safeguards (rather than
         before).
+
+        If [`None`][None], *only* the safeguards are used to encode the data.
+        Note that using a codec likely provides a better compression ratio. If
+        no safeguards are provided, the encoded data can be decoded to *any*
+        output.
     safeguards : Sequence[dict | Safeguard]
         The safeguards that will be applied to the codec. They can either be
         passed as a safeguard configuration [`dict`][dict] or an already
@@ -122,13 +127,13 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         Please refer to [`Safeguards`][numcodecs_safeguards.Safeguards] for an
         enumeration of all supported safeguards.
-    _version : Optional[str]
+    _version : ...
         Internal, do not provide this paramter explicitly.
     """
 
     __slots__ = ("_version", "_codec", "_lossless", "_safeguards")
     _version: str
-    _codec: Codec
+    _codec: None | Codec
     _lossless: Codec
     _elementwise_safeguards: tuple[ElementwiseSafeguard, ...]
 
@@ -137,15 +142,19 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
     def __init__(
         self,
         *,
-        codec: dict | Codec,
+        codec: None | dict | Codec,
         safeguards: Sequence[dict | Safeguard],
-        _version: Optional[str] = None,
+        _version: None | str = None,
     ):
         if _version is not None:
             assert _version == _FORMAT_VERSION
 
         self._codec = (
-            codec if isinstance(codec, Codec) else numcodecs.registry.get_codec(codec)
+            codec
+            if isinstance(codec, Codec)
+            else numcodecs.registry.get_codec(codec)
+            if codec is not None
+            else None
         )
         self._lossless = numcodecs.zlib.Zlib(level=9)
 
@@ -193,16 +202,20 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             f"can only encode arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
         )
 
-        encoded = self._codec.encode(np.copy(data))
-        encoded = numcodecs.compat.ensure_ndarray(encoded)
+        if self._codec is None:
+            encoded_bytes = b""
+            decoded = np.zeros_like(data)
+        else:
+            encoded = self._codec.encode(np.copy(data))
+            encoded = numcodecs.compat.ensure_ndarray(encoded)
 
-        assert encoded.dtype == np.dtype("uint8"), "codec must encode to bytes"
-        assert len(encoded.shape) <= 1, "codec must encode to 1D bytes"
-        encoded = numcodecs.compat.ensure_bytes(encoded)
+            assert encoded.dtype == np.dtype("uint8"), "codec must encode to bytes"
+            assert len(encoded.shape) <= 1, "codec must encode to 1D bytes"
+            encoded_bytes = numcodecs.compat.ensure_bytes(encoded)
 
-        decoded = np.empty_like(data)
-        decoded = self._codec.decode(np.copy(encoded), out=decoded)
-        decoded = numcodecs.compat.ensure_ndarray(decoded)
+            decoded = np.empty_like(data)
+            decoded = self._codec.decode(np.copy(encoded_bytes), out=decoded)
+            decoded = numcodecs.compat.ensure_ndarray(decoded)
 
         assert decoded.dtype == data.dtype, "codec must roundtrip dtype"
         assert decoded.shape == data.shape, "codec must roundtrip shape"
@@ -214,7 +227,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 break
 
         if all_ok:
-            correction_bytes = bytes()
+            correction_bytes = b""
         else:
             all_intervals = []
             for safeguard in self._elementwise_safeguards:
@@ -247,9 +260,9 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         correction_len = varint.encode(len(correction_bytes))
 
-        return correction_len + encoded + correction_bytes
+        return correction_len + encoded_bytes + correction_bytes
 
-    def decode(self, buf: Buffer, out: Optional[Buffer] = None) -> Buffer:
+    def decode(self, buf: Buffer, out: None | Buffer = None) -> Buffer:
         """Decode the data in `buf`.
 
         Parameters
@@ -257,7 +270,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         buf : Buffer
             Encoded data. May be any object supporting the new-style buffer
             protocol.
-        out : Optional[Buffer]
+        out : None | Buffer
             Writeable buffer to store decoded data. N.B. if provided, this buffer must
             be exactly the right size to store the decoded data.
 
@@ -284,9 +297,13 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             correction = buf_bytes[-correction_len:]
         else:
             encoded = buf_bytes[buf_io.tell() :]
-            correction = bytes()
+            correction = b""
 
-        decoded = self._codec.decode(encoded, out=out)
+        if self._codec is None:
+            assert encoded == b"", "can only decode empy message without a codec"
+            decoded = np.zeros_like(out)
+        else:
+            decoded = self._codec.decode(encoded, out=out)
 
         if correction_len > 0:
             corrected = ElementwiseSafeguard._apply_correction(
@@ -315,7 +332,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         return dict(
             id=type(self).codec_id,
             _version=_FORMAT_VERSION,
-            codec=self._codec.get_config(),
+            codec=None if self._codec is None else self._codec.get_config(),
             safeguards=[
                 safeguard.get_config() for safeguard in self._elementwise_safeguards
             ],
@@ -356,7 +373,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         """
 
         return SafeguardsCodec(
-            codec=mapper(self._codec),
+            codec=None if self._codec is None else mapper(self._codec),
             safeguards=self._elementwise_safeguards,
             _version=self._version,
         )

@@ -124,6 +124,25 @@ def check_one_input(data):
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")
         raise err
 
+    # test using the safeguards without a codec
+    safeguard = SafeguardsCodec(
+        codec=None,
+        safeguards=safeguards,
+    )
+
+    grepr = repr(safeguard)
+    gconfig = safeguard.get_config()
+
+    safeguard = numcodecs.registry.get_codec(gconfig)
+    assert safeguard.get_config() == gconfig
+
+    try:
+        encoded = safeguard.encode(raw)
+        safeguard.decode(encoded, out=np.empty_like(raw))
+    except Exception as err:
+        print(f"\n===\n\ncodec = {grepr}\n\n===\n")
+        raise err
+
 
 atheris.Setup(sys.argv, check_one_input)
 atheris.Fuzz()

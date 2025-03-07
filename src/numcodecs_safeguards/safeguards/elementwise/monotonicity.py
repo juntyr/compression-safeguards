@@ -6,7 +6,6 @@ __all__ = ["Monotonicity", "MonotonicityPreservingSafeguard"]
 
 from enum import Enum
 from operator import le, lt, ge, gt
-from typing import Optional
 
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
@@ -295,7 +294,7 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
     def _monotonic_sign_elementwise(
         self,
         left: np.ndarray,
-        right: Optional[np.ndarray] = None,
+        right: None | np.ndarray = None,
         *,
         is_decoded: bool,
     ) -> np.ndarray:

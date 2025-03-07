@@ -6,7 +6,7 @@ __all__ = ["ElementwiseSafeguard"]
 
 from abc import ABC, abstractmethod
 from io import BytesIO
-from typing import final, Any, Optional, TypeVar
+from typing import final, Any, TypeVar
 
 import numcodecs.compat
 import numpy as np
@@ -120,7 +120,7 @@ class ElementwiseSafeguard(Safeguard, ABC):
         return (decoded_bits - correction_bits).view(decoded.dtype)
 
 
-def _as_bits(a: np.ndarray, *, like: Optional[np.ndarray] = None) -> np.ndarray:
+def _as_bits(a: np.ndarray, *, like: None | np.ndarray = None) -> np.ndarray:
     """
     Reinterpret the array `a` to an array of equal-sized uints (bits).
 
@@ -128,8 +128,9 @@ def _as_bits(a: np.ndarray, *, like: Optional[np.ndarray] = None) -> np.ndarray:
     ----------
     a : np.ndarray
         Input array.
-    like : Optional[np.ndarray]
-        Optional array whose `dtype` should be used to derive the uint type.
+    like : None | np.ndarray
+        Array whose `dtype` should be used to derive the uint type.
+        If [`None`][None], `a` is used to derive the uint type.
 
     Returns
     -------
@@ -190,8 +191,8 @@ def _runlength_decode(b: bytes, *, like: np.ndarray) -> np.ndarray:
     ----------
     rle : bytes
         Run-length encoded bytes.
-    like : Optional[np.ndarray]
-        Optional array whose `dtype` and shape determine the output's.
+    like : np.ndarray
+        Array whose `dtype` and shape determine the output's.
 
     Returns
     -------
