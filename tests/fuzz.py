@@ -29,7 +29,7 @@ class FuzzCodec(Codec):
         return b""
 
     def decode(self, buf, out=None):
-        assert buf == b""
+        assert len(buf) == 0
         assert out is not None
         out[:] = self.decoded
         return out

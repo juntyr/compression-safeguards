@@ -215,7 +215,10 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
             decoded = np.empty_like(data)
             decoded = self._codec.decode(
-                np.frombuffer(np.copy(encoded_bytes), dtype="uint8"), out=decoded
+                np.frombuffer(
+                    np.copy(encoded_bytes), dtype="uint8", count=len(encoded_bytes)
+                ),
+                out=decoded,
             )
             decoded = numcodecs.compat.ensure_ndarray(decoded)
 
@@ -305,7 +308,9 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             assert encoded == b"", "can only decode empy message without a codec"
             decoded = np.zeros_like(out)
         else:
-            decoded = self._codec.decode(np.frombuffer(encoded, dtype="uint8"), out=out)
+            decoded = self._codec.decode(
+                np.frombuffer(encoded, dtype="uint8", count=len(encoded)), out=out
+            )
 
         if correction_len > 0:
             corrected = ElementwiseSafeguard._apply_correction(
