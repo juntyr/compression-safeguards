@@ -117,7 +117,9 @@ class ElementwiseSafeguard(Safeguard, ABC):
 
         correction_bits = _runlength_decode(correction, like=decoded_bits)
 
-        return (decoded_bits - correction_bits).view(decoded.dtype)
+        return (
+            (decoded_bits - correction_bits).view(decoded.dtype).reshape(decoded.shape)
+        )
 
 
 def _buffer_as_bits(a: np.ndarray, *, like: None | np.ndarray = None) -> np.ndarray:

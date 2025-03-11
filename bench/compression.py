@@ -18,7 +18,10 @@ def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
     )
     yield "t2m", ds.t2m.values
 
-    yield "N(10)", np.random.default_rng(seed=42).normal(scale=10.0, size=ds.t2m.shape)
+    yield (
+        "N(0,10)",
+        np.random.default_rng(seed=42).normal(loc=0.0, scale=10.0, size=ds.t2m.shape),
+    )
 
 
 def gen_codecs_with_eb_abs(
