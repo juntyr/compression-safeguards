@@ -16,7 +16,8 @@ def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
     ds: xr.Dataset = xr.open_dataset(
         Path(__file__) / ".." / "era5_t2m_2012_12_01_14:00.nc", engine="netcdf4"
     )
-    yield "t2m", ds.t2m.values
+    yield "+t2m", ds.t2m.values
+    yield "-t2m", -ds.t2m.values
 
     yield (
         "N(0,10)",
