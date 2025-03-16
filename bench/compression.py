@@ -18,13 +18,13 @@ def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
     ds: xr.Dataset = xr.open_dataset(
         Path(__file__) / ".." / "era5_t2m_2012_12_01_14:00.nc", engine="netcdf4"
     )
-    yield "+t2m", ds.t2m.values
-    yield "-t2m", -ds.t2m.values
+    # yield "+t2m", ds.t2m.values
+    # yield "-t2m", -ds.t2m.values
 
-    yield (
-        "N(0,10)",
-        np.random.default_rng(seed=42).normal(loc=0.0, scale=10.0, size=ds.t2m.shape),
-    )
+    # yield (
+    #     "N(0,10)",
+    #     np.random.default_rng(seed=42).normal(loc=0.0, scale=10.0, size=ds.t2m.shape),
+    # )
 
     yield "+t2mi", np.round(ds.t2m.values * 1000).astype(int)
     yield "-t2mi", np.round(-ds.t2m.values * 1000).astype(int)
@@ -98,11 +98,9 @@ class RoundQuantizer(Quantizer):
     def encoded_dtype(self, dtype: np.dtype) -> np.dtype:
         return np.dtype(int)
 
-    @abstractmethod
     def encode(self, x, predict):
         return np.round((x - predict) / self._eb_abs)
 
-    @abstractmethod
     def decode(self, e, predict):
         return predict + e * self._eb_abs
 
@@ -118,7 +116,6 @@ class SafeguardQuantizer(Quantizer):
     def encoded_dtype(self, dtype: np.dtype) -> np.dtype:
         return np.dtype(dtype.str.replace("f", "u").replace("i", "u"))
 
-    @abstractmethod
     def encode(self, x, predict):
         from numcodecs_safeguards.intervals import _as_bits
 
@@ -127,7 +124,6 @@ class SafeguardQuantizer(Quantizer):
         )[()]
         return _as_bits(np.array(predict)) - _as_bits(np.array(encoded))
 
-    @abstractmethod
     def decode(self, e, predict):
         from numcodecs_safeguards.intervals import _as_bits
 
@@ -158,25 +154,29 @@ class Lorenzo2dPredictor(Codec):
         decoded = np.zeros_like(data)
 
         if data.size > 0:
-            encoded[0, 0] = self._encode(data[0, 0], 0.0)
-            decoded[0, 0] = self._decode(encoded[0, 0], 0.0)
+            encoded[0, 0] = self._quantizer.encode(
+                data[0, 0], np.array(0, dtype=data.dtype)
+            )
+            decoded[0, 0] = self._quantizer.decode(
+                encoded[0, 0], np.array(0, dtype=data.dtype)
+            )
 
             for i in range(1, N):
                 predict = decoded[0, i - 1]
-                encoded[0, i] = self._encode(data[0, i], predict)
-                decoded[0, i] = self._decode(encoded[0, i], predict)
+                encoded[0, i] = self._quantizer.encode(data[0, i], predict)
+                decoded[0, i] = self._quantizer.decode(encoded[0, i], predict)
 
             for j in tqdm(range(1, M)):
                 predict = decoded[j - 1, 0]
-                encoded[j, 0] = self._encode(data[j, 0], predict)
-                decoded[j, 0] = self._decode(encoded[j, 0], predict)
+                encoded[j, 0] = self._quantizer.encode(data[j, 0], predict)
+                decoded[j, 0] = self._quantizer.decode(encoded[j, 0], predict)
 
                 for i in range(1, N):
                     predict = (
                         decoded[j, i - 1] + decoded[j - 1, i] - decoded[j - 1, i - 1]
                     )
-                    encoded[j, i] = self._encode(data[j, i], predict)
-                    decoded[j, i] = self._decode(encoded[j, i], predict)
+                    encoded[j, i] = self._quantizer.encode(data[j, i], predict)
+                    decoded[j, i] = self._quantizer.decode(encoded[j, i], predict)
 
         print(
             len(np.unique(encoded)),
@@ -204,21 +204,23 @@ class Lorenzo2dPredictor(Codec):
         encoded = _runlength_decode(encoded, like=decoded)
 
         if decoded.size > 0:
-            decoded[0, 0] = encoded[0, 0] * self.eb_abs
+            decoded[0, 0] = self._quantizer.decode(
+                encoded[0, 0], np.array(0, decoded.dtype)
+            )
 
             for i in range(1, N):
                 predict = decoded[0, i - 1]
-                decoded[0, i] = predict + encoded[0, i] * self.eb_abs
+                decoded[0, i] = self._quantizer.decode(encoded[0, i], predict)
 
             for j in tqdm(range(1, M)):
                 predict = decoded[j - 1, 0]
-                decoded[j, 0] = predict + encoded[j, 0] * self.eb_abs
+                decoded[j, 0] = self._quantizer.decode(encoded[j, 0], predict)
 
                 for i in range(1, N):
                     predict = (
                         decoded[j, i - 1] + decoded[j - 1, i] - decoded[j - 1, i - 1]
                     )
-                    decoded[j, i] = predict + encoded[j, i] * self.eb_abs
+                    decoded[j, i] = self._quantizer.decode(encoded[j, i], predict)
 
         return numcodecs.compat.ndarray_copy(decoded.reshape(out.shape), out)
 
@@ -233,6 +235,11 @@ if __name__ == "__main__":
             #         eb_mode="abs", eb_abs=eb_abs, predictor="linear-interpolation"
             #     )
             # ),
+            gen_codecs_with_eb_abs(
+                lambda eb_abs: Sz3(
+                    eb_mode="abs", eb_abs=eb_abs, predictor="lorenzo-regression"
+                )
+            ),
             # gen_codecs_with_eb_abs(
             #     lambda eb_abs: Sz3(eb_mode="abs", eb_abs=eb_abs, predictor=None)
             # ),
@@ -255,7 +262,9 @@ if __name__ == "__main__":
                 )
             ),
             gen_codecs_with_eb_abs(
-                lambda eb_abs: Lorenzo2dPredictor(quantizer=RoundQuantizer(eb_abs=eb_abs))
+                lambda eb_abs: Lorenzo2dPredictor(
+                    quantizer=RoundQuantizer(eb_abs=eb_abs)
+                )
             ),
             gen_codecs_with_eb_abs(
                 lambda eb_abs: Lorenzo2dPredictor(
