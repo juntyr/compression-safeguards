@@ -24,47 +24,61 @@ def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
         np.random.default_rng(seed=42).normal(loc=0.0, scale=10.0, size=ds.t2m.shape),
     )
 
-    # yield "+t2mi", np.round(ds.t2m.values * 1000).astype(int)
-    # yield "-t2mi", np.round(-ds.t2m.values * 1000).astype(int)
+    yield "+t2mi", np.round(ds.t2m.values * 1000).astype(int)
+    yield "-t2mi", np.round(-ds.t2m.values * 1000).astype(int)
+
+    yield (
+        "N(0,10)i",
+        np.round(
+            np.random.default_rng(seed=42).normal(
+                loc=0.0, scale=10.0, size=ds.t2m.shape
+            )
+            * 1000
+        ).astype(int),
+    )
 
 
 def gen_codecs_with_eb_abs(
     make_codec: Callable[[float], Codec],
-) -> Generator[Codec, None, None]:
-    for eb_abs in [1.0, 0.1, 0.01, 0.001]:
-        # for eb_abs in [1000, 100, 10, 1]:
-        yield make_codec(eb_abs)
+) -> Callable[[Generator[float]], Generator[Codec]]:
+    def gen_codecs_with_eb_abs_inner(eb_abs: Generator[float]) -> Generator[Codec]:
+        for eb_abs in eb_abs:
+            yield make_codec(eb_abs)
+
+    return gen_codecs_with_eb_abs_inner
 
 
-def gen_single_codec(codec: Codec) -> Generator[Codec, None, None]:
-    yield codec
+def gen_single_codec(codec: Codec) -> Callable[[Generator[float]], Generator[Codec]]:
+    def gen_single_codec_inner(_eb_abs: Generator[float]) -> Generator[Codec]:
+        yield codec
+
+    return gen_single_codec_inner
 
 
-def gen_codec(
+def gen_benchmark(
     data: Generator[tuple[str, np.ndarray], None, None],
-    codecs: Generator[Codec, None, None],
+    codec_gens: list[Callable[[Generator[float]], Generator[Codec]], None, None],
 ) -> Generator[tuple[str, Codec, float | Exception], None, None]:
-    codec_list = list(codecs)
-
     for d, datum in data:
-        for codec in codec_list:
-            try:
-                compressed = codec.encode(datum)
-            except Exception as err:
-                yield d, codec, err
+        for codec_gen in codec_gens:
+            if np.issubdtype(datum.dtype, np.floating):
+                eb_abs = [1.0, 0.1, 0.01, 0.001]
             else:
-                yield d, codec, datum.nbytes / np.asarray(compressed).nbytes
+                eb_abs = [1000, 100, 10, 1]
 
-
-def gen_concat(*args: Generator) -> Generator:
-    for a in args:
-        yield from a
+            for codec in codec_gen(iter(eb_abs)):
+                try:
+                    compressed = codec.encode(datum)
+                except Exception as err:
+                    yield d, codec, err
+                else:
+                    yield d, codec, datum.nbytes / np.asarray(compressed).nbytes
 
 
 if __name__ == "__main__":
-    for d, codec, result in gen_codec(
+    for d, codec, result in gen_benchmark(
         gen_data(),
-        gen_concat(
+        [
             gen_codecs_with_eb_abs(lambda eb_abs: Sz3(eb_mode="abs", eb_abs=eb_abs)),
             gen_codecs_with_eb_abs(
                 lambda eb_abs: Sz3(
@@ -92,6 +106,6 @@ if __name__ == "__main__":
                     codec=None, safeguards=[dict(kind="abs", eb_abs=eb_abs)]
                 )
             ),
-        ),
+        ],
     ):
         print(f"- {d} {codec}: {result}")
