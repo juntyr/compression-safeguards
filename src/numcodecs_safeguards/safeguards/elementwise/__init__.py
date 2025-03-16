@@ -175,11 +175,15 @@ def _runlength_encode(a: np.ndarray) -> bytes:
 
     a_delta = a.copy()
     a_delta[1:] = np.diff(a_delta)
-    
+
     huffman_delta = HuffmanCodec.from_data(a_delta)
     encoded_delta = huffman_delta.encode(a_delta)
 
-    marker, huffman, encoded = (bytes([0]), huffman, encoded) if len(encoded) <= len(encoded_delta) else (bytes([1]), huffman_delta, encoded_delta)
+    marker, huffman, encoded = (
+        (bytes([0]), huffman, encoded)
+        if len(encoded) <= len(encoded_delta)
+        else (bytes([1]), huffman_delta, encoded_delta)
+    )
 
     table = pickle.dumps(huffman.get_code_table())
 
@@ -227,12 +231,12 @@ def _runlength_decode(b: bytes, *, like: np.ndarray) -> np.ndarray:
     marker, b = b[0], b[1:]
 
     b_io = BytesIO(b)
-    
+
     table_len = varint.decode_stream(b_io)
-    table = pickle.loads(b[b_io.tell():b_io.tell()+table_len])
+    table = pickle.loads(b[b_io.tell() : b_io.tell() + table_len])
     huffman = HuffmanCodec(table)
 
-    decoded = np.array(huffman.decode(b[b_io.tell()+table_len:]))
+    decoded = np.array(huffman.decode(b[b_io.tell() + table_len :]))
 
     if marker != 0:
         decoded = np.cumsum(decoded)

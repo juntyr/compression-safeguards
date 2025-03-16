@@ -24,11 +24,15 @@ def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
         np.random.default_rng(seed=42).normal(loc=0.0, scale=10.0, size=ds.t2m.shape),
     )
 
+    # yield "+t2mi", np.round(ds.t2m.values * 1000).astype(int)
+    # yield "-t2mi", np.round(-ds.t2m.values * 1000).astype(int)
+
 
 def gen_codecs_with_eb_abs(
     make_codec: Callable[[float], Codec],
 ) -> Generator[Codec, None, None]:
     for eb_abs in [1.0, 0.1, 0.01, 0.001]:
+        # for eb_abs in [1000, 100, 10, 1]:
         yield make_codec(eb_abs)
 
 

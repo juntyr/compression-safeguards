@@ -324,53 +324,60 @@ class IntervalUnion(Generic[T, N, U]):
         lower = decoded_bits - lower
         upper = decoded_bits - upper
 
-        # 3. ensure that lower <= upper also in binary
+        # 3. only work with "positive" unsigned values
+        negative = _as_bits(lower, kind="i") < 0
+        lower = np.where(negative, ~lower + 1, lower)
+        upper = np.where(negative, ~upper + 1, upper)
+
+        # 4. ensure that lower <= upper also in binary
         flip = (lower > upper) & interval_nonempty
         lower, upper = np.where(flip, upper, lower), np.where(flip, lower, upper)
 
-        # 4. 0b1111...1111
+        # 5. 0b1111...1111
         allbits = np.array(-1, dtype=upper.dtype.str.replace("u", "i")).view(
             upper.dtype
         )
 
-        # 5. if there are several intervals, pick the one with the smallest
+        # 6. if there are several intervals, pick the one with the smallest
         #    lower bound, ensuring that empty intervals are not picked
         least = np.where(interval_nonempty, lower, allbits).argmin(axis=0)
         lower, upper = lower[least, np.arange(n)], upper[least, np.arange(n)]
         assert np.all(lower <= upper)
 
-        # 6. count the number of leading zero bits in lower and upper
+        # 7. count the number of leading zero bits in lower and upper
         lower_lz = _count_leading_zeros(lower)
         upper_lz = _count_leading_zeros(upper)
 
-        # 7. if upper_lz < lower_lz,
+        # 8. if upper_lz < lower_lz,
         #    i.e. ceil(log2(upper)) > ceil(log2(lower)),
-        #    (2 ** ceil(log2(lower))) - 1 is a tighter upper bound
+        #    2 ** ceil(log2(lower)) is a tighter upper bound
         #
         #    upper: 0b00..01xxxxxxxxxxx
         #    lower: 0b00..00..01yyyyyyy
-        # -> upper: 0b00..00..011111111
-        upper = np.where(upper_lz < lower_lz, allbits >> lower_lz, upper)
+        # -> upper: 0b00..00..100000000
+        upper = np.where(upper_lz < lower_lz, (allbits >> lower_lz) + 1, upper)
 
-        # 8. count the number of leading zero bits in (lower ^ upper) to find
+        # 9. count the number of leading zero bits in (lower ^ upper) to find
         #    the most significant bit where lower and upper differ.
         #    Since upper > lower, at this bit i, upper[i] = 1 and lower[i] = 0.
         lxu_lz = _count_leading_zeros(lower ^ upper)
 
-        # 9. pick such that the binary difference starts and ends with a
-        #    maximally long sequence of zeros
+        # 10. pick such that the binary difference starts and ends with a
+        #     maximally long sequence of zeros
         #
-        #    upper: 0b00..01xxx1zzzzzzz
-        #    lower: 0b00..01yyy0wwwwwww
-        #  -> pick: 0b00..01xxx10000000
-        # assert False, f"{contains_decoded} {lower} {upper} {lxu_lz}"
+        #     upper: 0b00..01xxx1zzzzzzz
+        #     lower: 0b00..01yyy0wwwwwww
+        #   -> pick: 0b00..01xxx10000000
         pick = upper & ~(allbits >> (lxu_lz + 1))
 
-        # 10. undo the difference with decoded and enforce the special case from
+        # 11. undo the negation step to allow "negative" unsigned values again
+        pick = np.where(negative, ~pick + 1, pick)
+
+        # 12. undo the difference with decoded and enforce the special case from
         #     (a) that decoded values inside the interval are kept as-is
         pick = np.where(contains_decoded, decoded_bits, decoded_bits - pick)
 
-        # 11. convert everything back from total-ordered bits to value space
+        # 13. convert everything back from total-ordered bits to value space
         pick = _from_total_order(pick.view(todtype), decoded.dtype).reshape(
             decoded.shape
         )
@@ -461,4 +468,4 @@ def _count_leading_zeros(x: np.ndarray) -> np.ndarray:
 
 
 def _as_bits(a: np.ndarray, *, kind: str = "u") -> np.ndarray:
-    return a.view(a.dtype.str.replace("f", kind).replace("i", kind))
+    return a.view(a.dtype.str.replace("f", kind).replace("i", kind).replace("u", kind))
