@@ -1,7 +1,9 @@
+from abc import ABC, abstractmethod
 from collections.abc import Generator
 from pathlib import Path
 from typing import Callable
 
+import numcodecs
 import numpy as np
 import xarray as xr
 from numcodecs.abc import Codec
@@ -75,19 +77,165 @@ def gen_benchmark(
                     yield d, codec, datum.nbytes / np.asarray(compressed).nbytes
 
 
+class Quantizer(ABC):
+    @abstractmethod
+    def encoded_dtype(self, dtype: np.dtype) -> np.dtype:
+        pass
+
+    @abstractmethod
+    def encode(self, x, predict):
+        pass
+
+    @abstractmethod
+    def decode(self, e, predict):
+        pass
+
+
+class RoundQuantizer(Quantizer):
+    def __init__(self, eb_abs):
+        self._eb_abs = eb_abs
+
+    def encoded_dtype(self, dtype: np.dtype) -> np.dtype:
+        return np.dtype(int)
+
+    @abstractmethod
+    def encode(self, x, predict):
+        return np.round((x - predict) / self._eb_abs)
+
+    @abstractmethod
+    def decode(self, e, predict):
+        return predict + e * self._eb_abs
+
+
+class SafeguardQuantizer(Quantizer):
+    def __init__(self, eb_abs):
+        from numcodecs_safeguards.safeguards.elementwise.abs import (
+            AbsoluteErrorBoundSafeguard,
+        )
+
+        self._safeguard = AbsoluteErrorBoundSafeguard(eb_abs=eb_abs)
+
+    def encoded_dtype(self, dtype: np.dtype) -> np.dtype:
+        return np.dtype(dtype.str.replace("f", "u").replace("i", "u"))
+
+    @abstractmethod
+    def encode(self, x, predict):
+        from numcodecs_safeguards.intervals import _as_bits
+
+        encoded = self._safeguard.compute_safe_intervals(np.array(x)).encode(
+            np.array(predict)
+        )[()]
+        return _as_bits(np.array(predict)) - _as_bits(np.array(encoded))
+
+    @abstractmethod
+    def decode(self, e, predict):
+        from numcodecs_safeguards.intervals import _as_bits
+
+        return (_as_bits(np.array(predict)) - _as_bits(np.array(e))).view(
+            np.array(predict).dtype
+        )[()]
+
+
+class Lorenzo2dPredictor(Codec):
+    codec_id = "lorenzo"
+
+    def __init__(self, quantizer: Quantizer):
+        self._quantizer = quantizer
+        self._lossless = numcodecs.zstd.Zstd(level=3)
+
+    def encode(self, buf):
+        from tqdm import tqdm
+
+        from numcodecs_safeguards.safeguards.elementwise import _runlength_encode
+
+        data = np.asarray(buf).squeeze()
+        assert len(data.shape) == 2
+        M, N = data.shape
+
+        encoded = np.zeros(
+            shape=data.shape, dtype=self._quantizer.encoded_dtype(data.dtype)
+        )
+        decoded = np.zeros_like(data)
+
+        if data.size > 0:
+            encoded[0, 0] = self._encode(data[0, 0], 0.0)
+            decoded[0, 0] = self._decode(encoded[0, 0], 0.0)
+
+            for i in range(1, N):
+                predict = decoded[0, i - 1]
+                encoded[0, i] = self._encode(data[0, i], predict)
+                decoded[0, i] = self._decode(encoded[0, i], predict)
+
+            for j in tqdm(range(1, M)):
+                predict = decoded[j - 1, 0]
+                encoded[j, 0] = self._encode(data[j, 0], predict)
+                decoded[j, 0] = self._decode(encoded[j, 0], predict)
+
+                for i in range(1, N):
+                    predict = (
+                        decoded[j, i - 1] + decoded[j - 1, i] - decoded[j - 1, i - 1]
+                    )
+                    encoded[j, i] = self._encode(data[j, i], predict)
+                    decoded[j, i] = self._decode(encoded[j, i], predict)
+
+        print(
+            len(np.unique(encoded)),
+            np.unique(encoded),
+            np.count_nonzero(encoded),
+            encoded.size,
+        )
+
+        encoded = _runlength_encode(encoded)
+
+        return self._lossless.encode(encoded)
+
+    def decode(self, buf, out=None):
+        from tqdm import tqdm
+
+        from numcodecs_safeguards.safeguards.elementwise import _runlength_decode
+
+        assert out is not None
+
+        decoded = np.asarray(out).squeeze()
+        assert len(decoded.shape) == 2
+        M, N = decoded.shape
+
+        encoded = self._lossless.decode(buf)
+        encoded = _runlength_decode(encoded, like=decoded)
+
+        if decoded.size > 0:
+            decoded[0, 0] = encoded[0, 0] * self.eb_abs
+
+            for i in range(1, N):
+                predict = decoded[0, i - 1]
+                decoded[0, i] = predict + encoded[0, i] * self.eb_abs
+
+            for j in tqdm(range(1, M)):
+                predict = decoded[j - 1, 0]
+                decoded[j, 0] = predict + encoded[j, 0] * self.eb_abs
+
+                for i in range(1, N):
+                    predict = (
+                        decoded[j, i - 1] + decoded[j - 1, i] - decoded[j - 1, i - 1]
+                    )
+                    decoded[j, i] = predict + encoded[j, i] * self.eb_abs
+
+        return numcodecs.compat.ndarray_copy(decoded.reshape(out.shape), out)
+
+
 if __name__ == "__main__":
     for d, codec, result in gen_benchmark(
         gen_data(),
         [
             gen_codecs_with_eb_abs(lambda eb_abs: Sz3(eb_mode="abs", eb_abs=eb_abs)),
-            gen_codecs_with_eb_abs(
-                lambda eb_abs: Sz3(
-                    eb_mode="abs", eb_abs=eb_abs, predictor="linear-interpolation"
-                )
-            ),
-            gen_codecs_with_eb_abs(
-                lambda eb_abs: Sz3(eb_mode="abs", eb_abs=eb_abs, predictor=None)
-            ),
+            # gen_codecs_with_eb_abs(
+            #     lambda eb_abs: Sz3(
+            #         eb_mode="abs", eb_abs=eb_abs, predictor="linear-interpolation"
+            #     )
+            # ),
+            # gen_codecs_with_eb_abs(
+            #     lambda eb_abs: Sz3(eb_mode="abs", eb_abs=eb_abs, predictor=None)
+            # ),
             # FIXME: https://github.com/szcompressor/SZ3/issues/78
             # gen_codecs_with_eb_abs(
             #     lambda eb_abs: Sz3(eb_mode="abs", eb_abs=eb_abs, encoder=None)
@@ -96,14 +244,22 @@ if __name__ == "__main__":
             # gen_codecs_with_eb_abs(
             #     lambda eb_abs: Sz3(eb_mode="abs", eb_abs=eb_abs, lossless=None)
             # ),
-            gen_codecs_with_eb_abs(
-                lambda eb_abs: Zfp(mode="fixed-accuracy", tolerance=eb_abs)
-            ),
-            gen_single_codec(Zlib(level=9)),
-            gen_single_codec(Zstd(level=20)),
+            # gen_codecs_with_eb_abs(
+            #     lambda eb_abs: Zfp(mode="fixed-accuracy", tolerance=eb_abs)
+            # ),
+            # gen_single_codec(Zlib(level=9)),
+            # gen_single_codec(Zstd(level=20)),
             gen_codecs_with_eb_abs(
                 lambda eb_abs: SafeguardsCodec(
                     codec=None, safeguards=[dict(kind="abs", eb_abs=eb_abs)]
+                )
+            ),
+            gen_codecs_with_eb_abs(
+                lambda eb_abs: Lorenzo2dPredictor(quantizer=RoundQuantizer(eb_abs=eb_abs))
+            ),
+            gen_codecs_with_eb_abs(
+                lambda eb_abs: Lorenzo2dPredictor(
+                    quantizer=SafeguardQuantizer(eb_abs=eb_abs)
                 )
             ),
         ],
