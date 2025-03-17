@@ -12,14 +12,15 @@ from numcodecs_wasm_sz3 import Sz3
 from numcodecs_wasm_zfp import Zfp
 from numcodecs_wasm_zlib import Zlib
 from numcodecs_wasm_zstd import Zstd
+from matplotlib import pyplot as plt
 
 
 def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
     ds: xr.Dataset = xr.open_dataset(
         Path(__file__) / ".." / "era5_t2m_2012_12_01_14:00.nc", engine="netcdf4"
     )
-    # yield "+t2m", ds.t2m.values
-    # yield "-t2m", -ds.t2m.values
+    yield "+t2m", ds.t2m.values
+    yield "-t2m", -ds.t2m.values
 
     # yield (
     #     "N(0,10)",
@@ -74,6 +75,10 @@ def gen_benchmark(
                 except Exception as err:
                     yield d, codec, err
                 else:
+                    decompressed = codec.decode(compressed, out=np.empty_like(datum))
+                    fig, ax = plt.subplots()
+                    ax.hist((decompressed - datum).flatten())
+                    plt.show()
                     yield d, codec, datum.nbytes / np.asarray(compressed).nbytes
 
 
@@ -99,10 +104,13 @@ class RoundQuantizer(Quantizer):
         return np.dtype(int)
 
     def encode(self, x, predict):
-        return np.round((x - predict) / self._eb_abs)
+        return np.round((x - predict) / (self._eb_abs * 2))
 
     def decode(self, e, predict):
-        return predict + e * self._eb_abs
+        return predict + e * self._eb_abs * 2
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(eb_abs={self._eb_abs})"
 
 
 class SafeguardQuantizer(Quantizer):
@@ -130,6 +138,9 @@ class SafeguardQuantizer(Quantizer):
         return (_as_bits(np.array(predict)) - _as_bits(np.array(e))).view(
             np.array(predict).dtype
         )[()]
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(safeguards={[self._safeguard]!r})"
 
 
 class Lorenzo2dPredictor(Codec):
@@ -224,8 +235,14 @@ class Lorenzo2dPredictor(Codec):
 
         return numcodecs.compat.ndarray_copy(decoded.reshape(out.shape), out)
 
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(quantizer={self._quantizer})"
+
 
 if __name__ == "__main__":
+    import matplotlib
+    matplotlib.use('module://mpl_ascii')
+
     for d, codec, result in gen_benchmark(
         gen_data(),
         [
@@ -273,4 +290,4 @@ if __name__ == "__main__":
             ),
         ],
     ):
-        print(f"- {d} {codec}: {result}")
+        print(f"- {d} {codec}: {result}", flush=True)

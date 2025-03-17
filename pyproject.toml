@@ -27,6 +27,8 @@ bench = [
     "xarray~=2025.1",
     "netcdf4~=1.7.2",
     "tqdm~=4.0",
+    "matplotlib~=3.10.0",
+    "mpl-ascii~=0.10.0",
 ]
 dev = ["ruff~=0.9"]
 fuzz = ["atheris~=2.3"]

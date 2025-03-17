@@ -239,7 +239,7 @@ def _runlength_decode(b: bytes, *, like: np.ndarray) -> np.ndarray:
     decoded = np.array(huffman.decode(b[b_io.tell() + table_len :]))
 
     if marker != 0:
-        decoded = np.cumsum(decoded)
+        decoded = np.cumsum(decoded, dtype=decoded.dtype)
 
     return decoded.reshape(like.shape)
 
