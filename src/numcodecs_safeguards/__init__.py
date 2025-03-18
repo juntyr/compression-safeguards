@@ -139,9 +139,8 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
           is applied.
         - [`Lossless.for_safeguards`][numcodecs_safeguards.Lossless.for_safeguards]
           specifies the lossless encoding that is applied to the encoded
-          correction that the safeguards produce. By default, the
-          [`SafeguardsLosslessCodec`][numcodecs_safeguards.lossless.SafeguardsLosslessCodec]
-          is applied.
+          correction that the safeguards produce. By default, Huffman encoding
+          followed by Zstandard is applied.
     _version : ...
         Internal, do not provide this paramter explicitly.
     """

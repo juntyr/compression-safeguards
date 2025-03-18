@@ -1,33 +1,23 @@
 import pickle
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from io import BytesIO
 from typing_extensions import Buffer  # MSPV 3.12
 
 import numcodecs.compat
+import numcodecs.registry
 import numpy as np
 import varint
 from dahuffman import HuffmanCodec
 from numcodecs.abc import Codec
+from numcodecs_combinators.stack import CodecStack
 
 _LOSSLESS_VERSION: str = "0.1.x"
 
 
-class SafeguardsLosslessCodec(Codec):
-    __slots__ = ("_version", "_lossless")
-    _version: str
-    _lossless: Codec
+class DeltaHuffmanCodec(Codec):
+    __slots__ = ()
 
-    codec_id: str = "safeguards-lossless"  # type: ignore
-
-    def __init__(
-        self,
-        *,
-        _version: None | str = None,
-    ):
-        if _version is not None:
-            assert _version == _LOSSLESS_VERSION
-
-        self._lossless = numcodecs.zstd.Zstd(level=3)
+    codec_id: str = "safeguards.lossless.delta_huffman"  # type: ignore
 
     def encode(self, buf: Buffer) -> Buffer:
         a = numcodecs.compat.ensure_ndarray(buf).flatten()
@@ -72,7 +62,15 @@ class SafeguardsLosslessCodec(Codec):
         return decoded  # type: ignore
 
 
+numcodecs.registry.register_codec(DeltaHuffmanCodec)
+
+
 @dataclass
 class Lossless:
     for_codec: None | dict | Codec = None
-    for_safeguards: dict | Codec = SafeguardsLosslessCodec()
+    for_safeguards: dict | Codec = field(
+        default_factory=lambda: CodecStack(
+            DeltaHuffmanCodec(),
+            numcodecs.zstd.Zstd(level=3),
+        )
+    )

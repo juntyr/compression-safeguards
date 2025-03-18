@@ -4,10 +4,12 @@ from pathlib import Path
 from typing import Callable
 
 import numcodecs
+import numcodecs.compat
 import numpy as np
 import xarray as xr
 from numcodecs.abc import Codec
 from numcodecs_safeguards import SafeguardsCodec
+from numcodecs_safeguards.lossless import Lossless
 from numcodecs_wasm_sz3 import Sz3
 from numcodecs_wasm_zfp import Zfp
 from numcodecs_wasm_zlib import Zlib
@@ -75,10 +77,10 @@ def gen_benchmark(
                 except Exception as err:
                     yield d, codec, err
                 else:
-                    decompressed = codec.decode(compressed, out=np.empty_like(datum))
-                    fig, ax = plt.subplots()
-                    ax.hist((decompressed - datum).flatten())
-                    plt.show()
+                    # decompressed = codec.decode(compressed, out=np.empty_like(datum))
+                    # fig, ax = plt.subplots()
+                    # ax.hist((decompressed - datum).flatten())
+                    # plt.show()
                     yield d, codec, datum.nbytes / np.asarray(compressed).nbytes
 
 
@@ -148,12 +150,10 @@ class Lorenzo2dPredictor(Codec):
 
     def __init__(self, quantizer: Quantizer):
         self._quantizer = quantizer
-        self._lossless = numcodecs.zstd.Zstd(level=3)
+        self._lossless = Lossless().for_safeguards
 
     def encode(self, buf):
         from tqdm import tqdm
-
-        from numcodecs_safeguards.safeguards.elementwise import _runlength_encode
 
         data = np.asarray(buf).squeeze()
         assert len(data.shape) == 2
@@ -197,14 +197,10 @@ class Lorenzo2dPredictor(Codec):
                 encoded.size,
             )
 
-        encoded = _runlength_encode(encoded)
-
         return self._lossless.encode(encoded)
 
     def decode(self, buf, out=None):
         from tqdm import tqdm
-
-        from numcodecs_safeguards.safeguards.elementwise import _runlength_decode
 
         assert out is not None
 
@@ -212,8 +208,11 @@ class Lorenzo2dPredictor(Codec):
         assert len(decoded.shape) == 2
         M, N = decoded.shape
 
-        encoded = self._lossless.decode(buf)
-        encoded = _runlength_decode(encoded, like=decoded)
+        encoded = (
+            numcodecs.compat.ensure_ndarray(self._lossless.decode(buf))
+            .view(decoded.dtype)
+            .reshape(decoded.shape)
+        )
 
         if decoded.size > 0:
             decoded[0, 0] = self._quantizer.decode(
