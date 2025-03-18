@@ -22,13 +22,13 @@ def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
     yield "+t2m", ds.t2m.values
     yield "-t2m", -ds.t2m.values
 
-    # yield (
-    #     "N(0,10)",
-    #     np.random.default_rng(seed=42).normal(loc=0.0, scale=10.0, size=ds.t2m.shape),
-    # )
+    yield (
+        "N(0,10)",
+        np.random.default_rng(seed=42).normal(loc=0.0, scale=10.0, size=ds.t2m.shape),
+    )
 
-    yield "+t2mi", np.round(ds.t2m.values * 1000).astype(int)
-    yield "-t2mi", np.round(-ds.t2m.values * 1000).astype(int)
+    yield "+t2mi", np.round(ds.t2m.values * 1000).astype(np.int32)
+    yield "-t2mi", np.round(-ds.t2m.values * 1000).astype(np.int32)
 
     yield (
         "N(0,10)i",
@@ -37,7 +37,7 @@ def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
                 loc=0.0, scale=10.0, size=ds.t2m.shape
             )
             * 1000
-        ).astype(int),
+        ).astype(np.int32),
     )
 
 
@@ -189,12 +189,13 @@ class Lorenzo2dPredictor(Codec):
                     encoded[j, i] = self._quantizer.encode(data[j, i], predict)
                     decoded[j, i] = self._quantizer.decode(encoded[j, i], predict)
 
-        print(
-            len(np.unique(encoded)),
-            np.unique(encoded),
-            np.count_nonzero(encoded),
-            encoded.size,
-        )
+        with np.printoptions(threshold=50):
+            print(
+                len(np.unique(encoded)),
+                np.unique(encoded),
+                np.count_nonzero(encoded),
+                encoded.size,
+            )
 
         encoded = _runlength_encode(encoded)
 
@@ -241,7 +242,8 @@ class Lorenzo2dPredictor(Codec):
 
 if __name__ == "__main__":
     import matplotlib
-    matplotlib.use('module://mpl_ascii')
+
+    matplotlib.use("module://mpl_ascii")
 
     for d, codec, result in gen_benchmark(
         gen_data(),
