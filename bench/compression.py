@@ -249,32 +249,19 @@ if __name__ == "__main__":
         gen_data(),
         [
             gen_codecs_with_eb_abs(lambda eb_abs: Sz3(eb_mode="abs", eb_abs=eb_abs)),
-            # gen_codecs_with_eb_abs(
-            #     lambda eb_abs: Sz3(
-            #         eb_mode="abs", eb_abs=eb_abs, predictor="linear-interpolation"
-            #     )
-            # ),
             gen_codecs_with_eb_abs(
                 lambda eb_abs: Sz3(
                     eb_mode="abs", eb_abs=eb_abs, predictor="lorenzo-regression"
                 )
             ),
-            # gen_codecs_with_eb_abs(
-            #     lambda eb_abs: Sz3(eb_mode="abs", eb_abs=eb_abs, predictor=None)
-            # ),
-            # FIXME: https://github.com/szcompressor/SZ3/issues/78
-            # gen_codecs_with_eb_abs(
-            #     lambda eb_abs: Sz3(eb_mode="abs", eb_abs=eb_abs, encoder=None)
-            # ),
-            # FIXME: https://github.com/szcompressor/SZ3/issues/78
-            # gen_codecs_with_eb_abs(
-            #     lambda eb_abs: Sz3(eb_mode="abs", eb_abs=eb_abs, lossless=None)
-            # ),
-            # gen_codecs_with_eb_abs(
-            #     lambda eb_abs: Zfp(mode="fixed-accuracy", tolerance=eb_abs)
-            # ),
-            # gen_single_codec(Zlib(level=9)),
-            # gen_single_codec(Zstd(level=20)),
+            gen_codecs_with_eb_abs(
+                lambda eb_abs: Sz3(eb_mode="abs", eb_abs=eb_abs, predictor=None)
+            ),
+            gen_codecs_with_eb_abs(
+                lambda eb_abs: Zfp(mode="fixed-accuracy", tolerance=eb_abs)
+            ),
+            gen_single_codec(Zlib(level=9)),
+            gen_single_codec(Zstd(level=20)),
             gen_codecs_with_eb_abs(
                 lambda eb_abs: SafeguardsCodec(
                     codec=None, safeguards=[dict(kind="abs", eb_abs=eb_abs)]

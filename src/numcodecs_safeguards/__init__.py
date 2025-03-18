@@ -35,10 +35,10 @@ import varint
 from numcodecs.abc import Codec
 from numcodecs_combinators.abc import CodecCombinatorMixin
 
+from .lossless import Lossless
 from .safeguards import Safeguard
 from .safeguards.elementwise import ElementwiseSafeguard
 from .safeguards.elementwise.abs import AbsoluteErrorBoundSafeguard
-
 from .safeguards.elementwise.decimal import DecimalErrorBoundSafeguard
 from .safeguards.elementwise.findiff.abs import (
     FiniteDifferenceAbsoluteErrorBoundSafeguard,
@@ -114,7 +114,9 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         The codec must encode to a 1D buffer of bytes. It is desirable to
         perform lossless compression after applying the safeguards (rather than
-        before).
+        before), e.g. by customising the
+        [`Lossless.for_codec`][numcodecs_safeguards.Lossless.for_codec]
+        field of the `lossless` parameter.
 
         If [`None`][None], *only* the safeguards are used to encode the data.
         Note that using a codec likely provides a better compression ratio. If
@@ -127,15 +129,35 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         Please refer to [`Safeguards`][numcodecs_safeguards.Safeguards] for an
         enumeration of all supported safeguards.
+    lossless : None | dict | Lossless, optional
+        The lossless encoding that is applied after the codec and the
+        safeguards:
+
+        - [`Lossless.for_codec`][numcodecs_safeguards.Lossless.for_codec]
+          specifies the lossless encoding that is applied to the encoded output
+          of the wrapped `codec`. By default, no additional lossless encoding
+          is applied.
+        - [`Lossless.for_safeguards`][numcodecs_safeguards.Lossless.for_safeguards]
+          specifies the lossless encoding that is applied to the encoded
+          correction that the safeguards produce. By default, the
+          [`SafeguardsLosslessCodec`][numcodecs_safeguards.lossless.SafeguardsLosslessCodec]
+          is applied.
     _version : ...
         Internal, do not provide this paramter explicitly.
     """
 
-    __slots__ = ("_version", "_codec", "_lossless", "_safeguards")
+    __slots__ = (
+        "_version",
+        "_codec",
+        "_safeguards",
+        "_lossless_for_codec",
+        "_lossless_for_safeguards",
+    )
     _version: str
     _codec: None | Codec
-    _lossless: Codec
     _elementwise_safeguards: tuple[ElementwiseSafeguard, ...]
+    _lossless_for_codec: None | Codec
+    _lossless_for_safeguards: Codec
 
     codec_id: str = "safeguards"  # type: ignore
 
@@ -144,6 +166,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         *,
         codec: None | dict | Codec,
         safeguards: Sequence[dict | Safeguard],
+        lossless: None | dict | Lossless = None,
         _version: None | str = None,
     ):
         if _version is not None:
@@ -156,7 +179,26 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             if codec is not None
             else None
         )
-        self._lossless = numcodecs.zlib.Zlib(level=9)
+
+        lossless = (
+            lossless
+            if isinstance(lossless, Lossless)
+            else Lossless(**lossless)
+            if lossless is not None
+            else Lossless()
+        )
+        self._lossless_for_codec = (
+            lossless.for_codec
+            if isinstance(lossless.for_codec, Codec)
+            else numcodecs.registry.get_codec(codec)
+            if lossless.for_codec is not None
+            else None
+        )
+        self._lossless_for_safeguards = (
+            lossless.for_safeguards
+            if isinstance(lossless.for_safeguards, Codec)
+            else numcodecs.registry.get_codec(codec)
+        )
 
         safeguards = [
             safeguard
@@ -222,6 +264,11 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             )
             decoded = numcodecs.compat.ensure_ndarray(decoded)
 
+            if self._lossless_for_codec is not None:
+                encoded_bytes = numcodecs.compat.ensure_bytes(
+                    self._lossless_for_codec.encode(encoded_bytes)
+                )
+
         assert decoded.dtype == data.dtype, "codec must roundtrip dtype"
         assert decoded.shape == data.shape, "codec must roundtrip shape"
 
@@ -260,7 +307,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             correction_bytes = ElementwiseSafeguard._encode_correction(
                 decoded,
                 correction,
-                self._lossless,
+                self._lossless_for_safeguards,
             )
 
         correction_len = varint.encode(len(correction_bytes))
@@ -308,6 +355,11 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             assert encoded == b"", "can only decode empy message without a codec"
             decoded = np.zeros_like(out)
         else:
+            if self._lossless_for_codec is not None:
+                encoded = numcodecs.compat.ensure_bytes(
+                    self._lossless_for_codec.decode(encoded)
+                )
+
             decoded = self._codec.decode(
                 np.frombuffer(encoded, dtype="uint8", count=len(encoded)), out=out
             )
@@ -316,7 +368,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             corrected = ElementwiseSafeguard._apply_correction(
                 decoded,
                 correction,
-                self._lossless,
+                self._lossless_for_safeguards,
             )
         else:
             corrected = decoded
@@ -343,10 +395,16 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             safeguards=[
                 safeguard.get_config() for safeguard in self._elementwise_safeguards
             ],
+            lossless=dict(
+                for_codec=None
+                if self._lossless_for_codec is None
+                else self._lossless_for_codec.get_config(),
+                for_safeguards=self._lossless_for_safeguards.get_config(),
+            ),
         )
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(codec={self._codec!r}, safeguards={list(self._elementwise_safeguards)!r})"
+        return f"{type(self).__name__}(codec={self._codec!r}, safeguards={list(self._elementwise_safeguards)!r}, lossless={Lossless(for_codec=self._lossless_for_codec, for_safeguards=self._lossless_for_safeguards)!r})"
 
     def map(self, mapper: Callable[[Codec], Codec]) -> "SafeguardsCodec":
         """
@@ -382,6 +440,12 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         return SafeguardsCodec(
             codec=None if self._codec is None else mapper(self._codec),
             safeguards=self._elementwise_safeguards,
+            lossless=Lossless(
+                for_codec=None
+                if self._lossless_for_codec is None
+                else mapper(self._lossless_for_codec),
+                for_safeguards=mapper(self._lossless_for_safeguards),
+            ),
             _version=self._version,
         )
 

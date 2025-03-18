@@ -45,5 +45,5 @@ where = ["src"]
 addopts = ["--import-mode=importlib"]
 
 [[tool.mypy.overrides]]
-module = ["numcodecs.*", "varint.*"]
+module = ["dahuffman.*", "numcodecs.*", "varint.*"]
 follow_untyped_imports = true

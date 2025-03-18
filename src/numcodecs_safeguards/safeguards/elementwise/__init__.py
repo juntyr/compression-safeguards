@@ -5,13 +5,10 @@ Implementations for the provided elementwise safeguards.
 __all__ = ["ElementwiseSafeguard"]
 
 from abc import ABC, abstractmethod
-from io import BytesIO
 from typing import final, Any, TypeVar
 
 import numcodecs.compat
 import numpy as np
-import varint
-from dahuffman import HuffmanCodec
 from numcodecs.abc import Codec
 
 from .. import Safeguard
@@ -82,8 +79,7 @@ class ElementwiseSafeguard(Safeguard, ABC):
 
         correction_bits = decoded_bits - corrected_bits
 
-        correction_bytes = _runlength_encode(correction_bits)
-        correction_bytes = lossless.encode(correction_bytes)
+        correction_bytes = lossless.encode(correction_bits)
 
         return numcodecs.compat.ensure_bytes(correction_bytes)
 
@@ -112,10 +108,11 @@ class ElementwiseSafeguard(Safeguard, ABC):
 
         decoded_bits = _buffer_as_bits(decoded)
 
-        correction = lossless.decode(correction)
-        correction = numcodecs.compat.ensure_bytes(correction)
-
-        correction_bits = _runlength_decode(correction, like=decoded_bits)
+        correction_bits = (
+            numcodecs.compat.ensure_ndarray(lossless.decode(correction))
+            .view(decoded_bits.dtype)
+            .reshape(decoded_bits.shape)
+        )
 
         return (
             (decoded_bits - correction_bits).view(decoded.dtype).reshape(decoded.shape)
@@ -145,131 +142,3 @@ def _buffer_as_bits(a: np.ndarray, *, like: None | np.ndarray = None) -> np.ndar
             (a if like is None else like).dtype.str.replace("f", "u").replace("i", "u")
         ),
     )
-
-
-def _runlength_encode(a: np.ndarray) -> bytes:
-    """
-    Encode the array `a` using run-length encoding.
-
-    Currently, only zero-runs are RL-encoded and non-zero values are stored
-    verbatim in non-zero runs.
-
-    Parameters
-    ----------
-    a : np.ndarray
-        Input array.
-
-    Returns
-    -------
-    rle : bytes
-        Run-length encoded bytes.
-    """
-
-    # FIXME: use a different encoding
-    import pickle
-
-    a = a.flatten()
-
-    huffman = HuffmanCodec.from_data(a)
-    encoded = huffman.encode(a)
-
-    a_delta = a.copy()
-    a_delta[1:] = np.diff(a_delta)
-
-    huffman_delta = HuffmanCodec.from_data(a_delta)
-    encoded_delta = huffman_delta.encode(a_delta)
-
-    marker, huffman, encoded = (
-        (bytes([0]), huffman, encoded)
-        if len(encoded) <= len(encoded_delta)
-        else (bytes([1]), huffman_delta, encoded_delta)
-    )
-
-    table = pickle.dumps(huffman.get_code_table())
-
-    return marker + varint.encode(len(table)) + table + encoded
-
-    # zeros = a == 0
-
-    # # run-length encoding of the "is-a-zero" mask
-    # starts = np.r_[0, np.flatnonzero(zeros[1:] != zeros[:-1]) + 1]
-    # lengths = np.diff(np.r_[starts, len(a)])
-
-    # # store all non-zero values and the first zero of each zero-run
-    # indices = np.r_[0, np.flatnonzero((~zeros[1:]) | (zeros[1:] != zeros[:-1])) + 1]
-    # values = a[indices]
-
-    # encoded = [varint.encode(length) for length in lengths]
-    # encoded.append(values.tobytes())
-
-    # return b"".join(encoded)
-
-
-def _runlength_decode(b: bytes, *, like: np.ndarray) -> np.ndarray:
-    """
-    Decode the bytes `b` using run-length encoding.
-
-    Currently, only zero-runs are RL-encoded and non-zero values are stored
-    verbatim in non-zero runs.
-
-    Parameters
-    ----------
-    rle : bytes
-        Run-length encoded bytes.
-    like : np.ndarray
-        Array whose `dtype` and shape determine the output's.
-
-    Returns
-    -------
-    decoded : np.ndarray
-        Run-length decoded array.
-    """
-
-    # FIXME: use a different encoding
-    import pickle
-
-    marker, b = b[0], b[1:]
-
-    b_io = BytesIO(b)
-
-    table_len = varint.decode_stream(b_io)
-    table = pickle.loads(b[b_io.tell() : b_io.tell() + table_len])
-    huffman = HuffmanCodec(table)
-
-    decoded = np.array(huffman.decode(b[b_io.tell() + table_len :]))
-
-    if marker != 0:
-        decoded = np.cumsum(decoded, dtype=decoded.dtype)
-
-    return decoded.reshape(like.shape)
-
-    # lengths = []
-    # total_length = 0
-
-    # b_io = BytesIO(b)
-
-    # while total_length < like.size:
-    #     length = varint.decode_stream(b_io)
-    #     assert length > 0
-    #     total_length += length
-    #     lengths.append(length)
-
-    # assert total_length >= 0
-
-    # decoded = np.zeros(like.size, dtype=like.dtype)
-
-    # if total_length == 0:
-    #     return decoded.reshape(like.shape)
-
-    # values = np.frombuffer(b, dtype=like.dtype, offset=b_io.tell())
-
-    # id, iv = 0, 0
-    # for length in lengths:
-    #     if values[iv] == 0:
-    #         iv += 1
-    #     else:
-    #         decoded[id : id + length] = values[iv : iv + length]
-    #         iv += length
-    #     id += length
-
-    # return decoded.reshape(like.shape)
