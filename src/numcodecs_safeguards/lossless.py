@@ -1,4 +1,3 @@
-import pickle
 from dataclasses import dataclass, field
 from io import BytesIO
 from typing_extensions import Buffer  # MSPV 3.12
@@ -8,6 +7,7 @@ import numcodecs.registry
 import numpy as np
 import varint
 from dahuffman import HuffmanCodec
+from dahuffman.huffmancodec import _EOF
 from numcodecs.abc import Codec
 from numcodecs_combinators.stack import CodecStack
 
@@ -20,7 +20,9 @@ class DeltaHuffmanCodec(Codec):
     codec_id: str = "safeguards.lossless.delta_huffman"  # type: ignore
 
     def encode(self, buf: Buffer) -> Buffer:
-        a = numcodecs.compat.ensure_ndarray(buf).flatten()
+        a = numcodecs.compat.ensure_ndarray(buf)
+        shape = a.shape
+        a = a.flatten()
 
         huffman = HuffmanCodec.from_data(a)
         encoded = huffman.encode(a)
@@ -37,10 +39,32 @@ class DeltaHuffmanCodec(Codec):
             else (bytes([1]), huffman_delta, encoded_delta)
         )
 
-        # FIXME: use safe format
-        table = pickle.dumps(huffman.get_code_table())
+        # message: marker dtype shape table encoded
+        message = [marker]
 
-        return marker + varint.encode(len(table)) + table + encoded
+        message.append(varint.encode(len(a.dtype.str)))
+        message.append(a.dtype.str.encode("ascii"))
+
+        message.append(varint.encode(len(shape)))
+        for s in shape:
+            message.append(varint.encode(s))
+
+        table = huffman.get_code_table()
+        table_no_eof = [
+            (k, e) for k, e in huffman.get_code_table().items() if k != _EOF
+        ]
+        message.append(varint.encode(len(table_no_eof)))
+        message.append(np.array([k for k, _ in table_no_eof]).tobytes())
+        for k, (bitsize, value) in table_no_eof:
+            message.append(varint.encode(bitsize))
+            message.append(varint.encode(value))
+        bitsize, value = table[_EOF]
+        message.append(varint.encode(bitsize))
+        message.append(varint.encode(value))
+
+        message.append(encoded)
+
+        return b"".join(message)
 
     def decode(self, buf: Buffer, out: None | Buffer = None) -> Buffer:
         b = numcodecs.compat.ensure_bytes(buf)
@@ -49,17 +73,28 @@ class DeltaHuffmanCodec(Codec):
 
         b_io = BytesIO(b)
 
+        dtype = np.dtype(b_io.read(varint.decode_stream(b_io)).decode("ascii"))
+
+        shape = tuple(
+            varint.decode_stream(b_io) for _ in range(varint.decode_stream(b_io))
+        )
+
         table_len = varint.decode_stream(b_io)
-        # FIXME: use safe format
-        table = pickle.loads(b[b_io.tell() : b_io.tell() + table_len])
+        table_keys = np.frombuffer(
+            b_io.read(table_len * dtype.itemsize), dtype=dtype, count=table_len
+        )
+        table = dict()
+        for k in table_keys:
+            table[k] = (varint.decode_stream(b_io), varint.decode_stream(b_io))
+        table[_EOF] = (varint.decode_stream(b_io), varint.decode_stream(b_io))
         huffman = HuffmanCodec(table)
 
-        decoded = np.array(huffman.decode(b[b_io.tell() + table_len :]))
+        decoded = np.array(huffman.decode(b_io.read()))
 
         if marker != 0:
             decoded = np.cumsum(decoded, dtype=decoded.dtype)
 
-        return decoded  # type: ignore
+        return decoded.reshape(shape)  # type: ignore
 
 
 numcodecs.registry.register_codec(DeltaHuffmanCodec)
