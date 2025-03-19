@@ -355,7 +355,15 @@ class IntervalUnion(Generic[T, N, U]):
         #    upper: 0b00..01xxxxxxxxxxx
         #    lower: 0b00..00..01yyyyyyy
         # -> upper: 0b00..00..100000000
-        upper = np.where(upper_lz < lower_lz, (allbits >> lower_lz) + 1, upper)
+        #
+        #    we actually end up choosing, if possible (larger than upper above)
+        #    upper: 0b00..0010000000000
+        #    since ~half the upper bound works well for symmetric intervals
+        upper = np.where(
+            upper_lz < lower_lz,
+            (allbits >> np.minimum(upper_lz + 2, lower_lz)) + 1,
+            upper,
+        )
 
         # 9. count the number of leading zero bits in (lower ^ upper) to find
         #    the most significant bit where lower and upper differ.
