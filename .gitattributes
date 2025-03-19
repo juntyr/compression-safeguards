@@ -1,1 +1,2 @@
 bench/era5_t2m_2012_12_01_14:00.nc filter=lfs diff=lfs merge=lfs -text
+bench/era5_tp_2024_08_02_10:00.nc filter=lfs diff=lfs merge=lfs -text

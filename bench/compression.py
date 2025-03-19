@@ -18,25 +18,36 @@ from matplotlib import pyplot as plt
 
 
 def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
-    ds: xr.Dataset = xr.open_dataset(
+    t2m: xr.DataArray = xr.open_dataset(
         Path(__file__) / ".." / "era5_t2m_2012_12_01_14:00.nc", engine="netcdf4"
-    )
-    yield "+t2m", ds.t2m.values
-    yield "-t2m", -ds.t2m.values
+    ).t2m
+
+    tp: xr.DataArray = xr.open_dataset(
+        Path(__file__) / ".." / "era5_tp_2024_08_02_10:00.nc", engine="netcdf4"
+    ).tp
+
+    yield "+t2m", t2m.values
+    yield "-t2m", -t2m.values
+
+    yield "+tp", tp.values * 100 # [cm]
+    yield "-tp", -tp.values * 100 # [cm]
 
     yield (
         "N(0,10)",
-        np.random.default_rng(seed=42).normal(loc=0.0, scale=10.0, size=ds.t2m.shape),
+        np.random.default_rng(seed=42).normal(loc=0.0, scale=10.0, size=t2m.shape),
     )
 
-    yield "+t2mi", np.round(ds.t2m.values * 1000).astype(np.int32)
-    yield "-t2mi", np.round(-ds.t2m.values * 1000).astype(np.int32)
+    yield "+t2mi", np.round(t2m.values * 1000).astype(np.int32)
+    yield "-t2mi", np.round(-t2m.values * 1000).astype(np.int32)
+
+    yield "+tpi", np.round(t2m.values * 100 * 1000).astype(np.int32)
+    yield "-tpi", np.round(-t2m.values * 100 * 1000).astype(np.int32)
 
     yield (
         "N(0,10)i",
         np.round(
             np.random.default_rng(seed=42).normal(
-                loc=0.0, scale=10.0, size=ds.t2m.shape
+                loc=0.0, scale=10.0, size=t2m.shape
             )
             * 1000
         ).astype(np.int32),
