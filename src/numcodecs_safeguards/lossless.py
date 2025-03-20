@@ -11,6 +11,8 @@ from dahuffman.huffmancodec import _EOF
 from numcodecs.abc import Codec
 from numcodecs_combinators.stack import CodecStack
 
+from .intervals import _as_bits
+
 _LOSSLESS_VERSION: str = "0.1.x"
 
 
@@ -21,8 +23,8 @@ class DeltaHuffmanCodec(Codec):
 
     def encode(self, buf: Buffer) -> Buffer:
         a = numcodecs.compat.ensure_ndarray(buf)
-        shape = a.shape
-        a = a.flatten()
+        dtype, shape = a.dtype, a.shape
+        a = _as_bits(a.flatten())
 
         huffman = HuffmanCodec.from_data(a)
         encoded = huffman.encode(a)
@@ -42,8 +44,8 @@ class DeltaHuffmanCodec(Codec):
         # message: marker dtype shape table encoded
         message = [marker]
 
-        message.append(varint.encode(len(a.dtype.str)))
-        message.append(a.dtype.str.encode("ascii"))
+        message.append(varint.encode(len(dtype.str)))
+        message.append(dtype.str.encode("ascii"))
 
         message.append(varint.encode(len(shape)))
         for s in shape:
@@ -92,7 +94,9 @@ class DeltaHuffmanCodec(Codec):
         decoded = np.array(huffman.decode(b_io.read()))
 
         if marker != 0:
+            decoded = _as_bits(decoded)
             decoded = np.cumsum(decoded, dtype=decoded.dtype)
+            decoded = decoded.view(dtype)
 
         return decoded.reshape(shape)  # type: ignore
 

@@ -7,6 +7,7 @@ import numcodecs
 import numcodecs.compat
 import numpy as np
 import xarray as xr
+from matplotlib import pyplot as plt
 from numcodecs.abc import Codec
 from numcodecs_safeguards import SafeguardsCodec
 from numcodecs_safeguards.lossless import Lossless
@@ -14,7 +15,6 @@ from numcodecs_wasm_sz3 import Sz3
 from numcodecs_wasm_zfp import Zfp
 from numcodecs_wasm_zlib import Zlib
 from numcodecs_wasm_zstd import Zstd
-from matplotlib import pyplot as plt
 
 
 def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
@@ -29,8 +29,8 @@ def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
     yield "+t2m", t2m.values
     yield "-t2m", -t2m.values
 
-    yield "+tp", tp.values * 100 # [cm]
-    yield "-tp", -tp.values * 100 # [cm]
+    yield "+tp", tp.values * 100  # [cm]
+    yield "-tp", -tp.values * 100  # [cm]
 
     yield (
         "N(0,10)",
@@ -46,9 +46,7 @@ def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
     yield (
         "N(0,10)i",
         np.round(
-            np.random.default_rng(seed=42).normal(
-                loc=0.0, scale=10.0, size=t2m.shape
-            )
+            np.random.default_rng(seed=42).normal(loc=0.0, scale=10.0, size=t2m.shape)
             * 1000
         ).astype(np.int32),
     )
@@ -164,6 +162,7 @@ class Lorenzo2dPredictor(Codec):
         self._lossless = Lossless().for_safeguards
 
     def encode(self, buf):
+        from numcodecs_safeguards.intervals import _as_bits
         from tqdm import tqdm
 
         data = np.asarray(buf).squeeze()
@@ -203,7 +202,7 @@ class Lorenzo2dPredictor(Codec):
         with np.printoptions(threshold=50):
             print(
                 len(np.unique(encoded)),
-                np.unique(encoded),
+                np.unique(_as_bits(encoded, kind="i")),
                 np.count_nonzero(encoded),
                 encoded.size,
             )
