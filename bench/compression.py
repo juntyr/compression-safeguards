@@ -260,7 +260,7 @@ if __name__ == "__main__":
             gen_codecs_with_eb_abs(lambda eb_abs: Sz3(eb_mode="abs", eb_abs=eb_abs)),
             gen_codecs_with_eb_abs(
                 lambda eb_abs: Sz3(
-                    eb_mode="abs", eb_abs=eb_abs, predictor="lorenzo-regression"
+                    eb_mode="abs", eb_abs=eb_abs, predictor="lorenzo"
                 )
             ),
             gen_codecs_with_eb_abs(

@@ -20,7 +20,7 @@ dependencies = [
 [dependency-groups]
 bench = [
     "numcodecs-wasm~=0.1",
-    "numcodecs-wasm-sz3~=0.3",
+    "numcodecs-wasm-sz3~=0.5",
     "numcodecs-wasm-zfp~=0.4",
     "numcodecs-wasm-zlib~=0.2",
     "numcodecs-wasm-zstd~=0.2",
