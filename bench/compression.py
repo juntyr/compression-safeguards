@@ -32,6 +32,9 @@ def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
     #     Path(__file__) / ".." / "era5_o3_pv_2024_08_02_12:00.nc", engine="netcdf4"
     # ).o3
 
+    yield "t2m-1d", t2m.values.flatten()
+    yield "tp-1d", tp.values.flatten() * 100
+
     yield "+t2m", t2m.values
     yield "-t2m", -t2m.values
 
@@ -154,7 +157,7 @@ class MySafeguardsQuantizer(MyQuantizer):
         return f"{type(self).__name__}(safeguards={list(self._quantizer.safeguards)!r})"
 
 
-class Lorenzo2dPredictor(Codec):
+class LorenzoPredictor(Codec):
     codec_id = "lorenzo"
 
     def __init__(self, quantizer: MyQuantizer):
@@ -163,6 +166,81 @@ class Lorenzo2dPredictor(Codec):
 
     def encode(self, buf):
         data = np.asarray(buf).squeeze()
+
+        if len(data.shape) == 1:
+            encoded = self.encode_1d(data)
+        elif len(data.shape) == 2:
+            encoded = self.encode_2d(data)
+        else:
+            raise TypeError("LorenzoPredictor currently only supports 1D and 2D data")
+
+        with np.printoptions(threshold=50):
+            print(
+                len(np.unique(encoded)),
+                np.unique(as_bits(encoded, kind="i")),
+                np.count_nonzero(encoded),
+                encoded.size,
+            )
+
+        return self._lossless.encode(encoded)
+
+    def decode(self, buf, out=None):
+        assert out is not None
+        dout = np.asarray(out).squeeze()
+
+        encoded = (
+            numcodecs.compat.ensure_ndarray(self._lossless.decode(buf))
+            .view(self._quantizer.encoded_dtype(dout.dtype))
+            .reshape(dout.shape)
+        )
+
+        if len(dout.shape) == 1:
+            decoded = self.decode_1d(encoded, dout.dtype)
+        elif len(dout.shape) == 2:
+            decoded = self.decode_2d(encoded, dout.dtype)
+        else:
+            raise TypeError("LorenzoPredictor currently only supports 1D and 2D data")
+
+        return numcodecs.compat.ndarray_copy(decoded.reshape(out.shape), out)
+
+    def encode_1d(self, data: np.ndarray) -> np.ndarray:
+        assert len(data.shape) == 1
+        (N,) = data.shape
+
+        encoded = np.zeros(
+            shape=data.shape, dtype=self._quantizer.encoded_dtype(data.dtype)
+        )
+        decoded = np.zeros_like(data)
+
+        if data.size > 0:
+            encoded[0] = self._quantizer.encode(data[0], np.array(0, dtype=data.dtype))
+            decoded[0] = self._quantizer.decode(
+                encoded[0], np.array(0, dtype=data.dtype)
+            )
+
+            for i in tqdm(range(1, N)):
+                predict = decoded[i - 1]
+                encoded[i] = self._quantizer.encode(data[i], predict)
+                decoded[i] = self._quantizer.decode(encoded[i], predict)
+
+        return encoded
+
+    def decode_1d(self, encoded: np.ndarray, dtype: np.dtype) -> np.ndarray:
+        assert len(encoded.shape) == 1
+        (N,) = encoded.shape
+
+        decoded = np.zeros_like(encoded, dtype=dtype)
+
+        if decoded.size > 0:
+            decoded[0] = self._quantizer.decode(encoded[0], np.array(0, decoded.dtype))
+
+            for i in tqdm(range(1, N)):
+                predict = decoded[i - 1]
+                decoded[i] = self._quantizer.decode(encoded[i], predict)
+
+        return decoded
+
+    def encode_2d(self, data: np.ndarray) -> np.ndarray:
         assert len(data.shape) == 2
         M, N = data.shape
 
@@ -196,30 +274,13 @@ class Lorenzo2dPredictor(Codec):
                     encoded[j, i] = self._quantizer.encode(data[j, i], predict)
                     decoded[j, i] = self._quantizer.decode(encoded[j, i], predict)
 
-        with np.printoptions(threshold=50):
-            print(
-                len(np.unique(encoded)),
-                np.unique(as_bits(encoded, kind="i")),
-                np.count_nonzero(encoded),
-                encoded.size,
-            )
+        return encoded
 
-        return self._lossless.encode(encoded)
+    def decode_2d(self, encoded: np.ndarray, dtype: np.dtype) -> np.ndarray:
+        assert len(encoded.shape) == 2
+        M, N = encoded.shape
 
-    def decode(self, buf, out=None):
-        from tqdm import tqdm
-
-        assert out is not None
-
-        decoded = np.asarray(out).squeeze()
-        assert len(decoded.shape) == 2
-        M, N = decoded.shape
-
-        encoded = (
-            numcodecs.compat.ensure_ndarray(self._lossless.decode(buf))
-            .view(decoded.dtype)
-            .reshape(decoded.shape)
-        )
+        decoded = np.zeros_like(encoded, dtype=dtype)
 
         if decoded.size > 0:
             decoded[0, 0] = self._quantizer.decode(
@@ -240,7 +301,7 @@ class Lorenzo2dPredictor(Codec):
                     )
                     decoded[j, i] = self._quantizer.decode(encoded[j, i], predict)
 
-        return numcodecs.compat.ndarray_copy(decoded.reshape(out.shape), out)
+        return decoded
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(quantizer={self._quantizer})"
@@ -272,12 +333,12 @@ if __name__ == "__main__":
                 )
             ),
             gen_codecs_with_eb_abs(
-                lambda eb_abs: Lorenzo2dPredictor(
+                lambda eb_abs: LorenzoPredictor(
                     quantizer=MyLinearQuantizer(eb_abs=eb_abs)
                 )
             ),
             gen_codecs_with_eb_abs(
-                lambda eb_abs: Lorenzo2dPredictor(
+                lambda eb_abs: LorenzoPredictor(
                     quantizer=MySafeguardsQuantizer(eb_abs=eb_abs)
                 )
             ),
