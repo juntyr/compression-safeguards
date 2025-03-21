@@ -21,7 +21,7 @@ def to_float(x: np.ndarray[S, T]) -> np.ndarray[S, Any]:
         np.dtype(np.uint64): np.float128,
     }[x.dtype]
 
-    return x.astype(ftype)
+    return x.astype(ftype)  # type: ignore
 
 
 def from_float(x: np.ndarray[S, Any], dtype: T) -> np.ndarray[S, T]:
@@ -33,3 +33,7 @@ def from_float(x: np.ndarray[S, Any], dtype: T) -> np.ndarray[S, T]:
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         return np.where(x < imin, imin, np.where(x <= imax, x.astype(dtype), imax))  # type: ignore
+
+
+def as_bits(a: np.ndarray, *, kind: str = "u") -> np.ndarray:
+    return a.view(a.dtype.str.replace("f", kind).replace("i", kind).replace("u", kind))

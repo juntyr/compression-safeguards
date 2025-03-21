@@ -1,6 +1,6 @@
 import numpy as np
 
-from numcodecs_safeguards.intervals import _as_bits
+from numcodecs_safeguards.cast import as_bits
 
 from .codecs import (
     encode_decode_zero,
@@ -18,19 +18,19 @@ def check_all_codecs(data: np.ndarray):
             safeguard["zero"] = zero
         else:
             zero = 0
-        zero = _as_bits(np.full((), zero, dtype=data.dtype))
+        zero = as_bits(np.full((), zero, dtype=data.dtype))
 
         decoded = encode_decode_zero(data, safeguards=[safeguard])
-        assert np.all((_as_bits(data) != zero) | (_as_bits(decoded) == zero))
+        assert np.all((as_bits(data) != zero) | (as_bits(decoded) == zero))
 
         decoded = encode_decode_neg(data, safeguards=[safeguard])
-        assert np.all((_as_bits(data) != zero) | (_as_bits(decoded) == zero))
+        assert np.all((as_bits(data) != zero) | (as_bits(decoded) == zero))
 
         decoded = encode_decode_identity(data, safeguards=[safeguard])
-        assert np.all((_as_bits(data) != zero) | (_as_bits(decoded) == zero))
+        assert np.all((as_bits(data) != zero) | (as_bits(decoded) == zero))
 
         decoded = encode_decode_noise(data, safeguards=[safeguard])
-        assert np.all((_as_bits(data) != zero) | (_as_bits(decoded) == zero))
+        assert np.all((as_bits(data) != zero) | (as_bits(decoded) == zero))
 
 
 def test_empty():

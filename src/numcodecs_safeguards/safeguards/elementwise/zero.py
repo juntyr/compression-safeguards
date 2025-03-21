@@ -6,7 +6,8 @@ __all__ = ["ZeroIsZeroSafeguard"]
 
 import numpy as np
 
-from . import ElementwiseSafeguard
+from .abc import ElementwiseSafeguard
+from ...cast import as_bits
 from ...intervals import (
     IntervalUnion,
     Interval,
@@ -14,7 +15,6 @@ from ...intervals import (
     Upper,
     Minimum,
     Maximum,
-    _as_bits,
 )
 
 
@@ -64,10 +64,10 @@ class ZeroIsZeroSafeguard(ElementwiseSafeguard):
             `True` if the check succeeded.
         """
 
-        zero_bits = _as_bits(self._zero_like(data.dtype))
+        zero_bits = as_bits(self._zero_like(data.dtype))
 
         return bool(
-            np.all((_as_bits(data) != zero_bits) | (_as_bits(decoded) == zero_bits))
+            np.all((as_bits(data) != zero_bits) | (as_bits(decoded) == zero_bits))
         )
 
     def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
@@ -92,8 +92,8 @@ class ZeroIsZeroSafeguard(ElementwiseSafeguard):
         valid = Interval.empty_like(data)
 
         # preserve zero values exactly, do not constrain other values
-        Lower(zero) <= valid[_as_bits(data) == _as_bits(zero)] <= Upper(zero)
-        Minimum <= valid[_as_bits(data) != _as_bits(zero)] <= Maximum
+        Lower(zero) <= valid[as_bits(data) == as_bits(zero)] <= Upper(zero)
+        Minimum <= valid[as_bits(data) != as_bits(zero)] <= Maximum
 
         return valid.into_union()
 

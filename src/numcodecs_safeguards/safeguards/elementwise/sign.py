@@ -6,7 +6,7 @@ __all__ = ["SignPreservingSafeguard"]
 
 import numpy as np
 
-from . import ElementwiseSafeguard
+from .abc import ElementwiseSafeguard
 from ...intervals import IntervalUnion, Interval, Lower, Upper, Minimum, Maximum
 
 

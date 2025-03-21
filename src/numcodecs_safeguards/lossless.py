@@ -6,43 +6,31 @@ import numcodecs.compat
 import numcodecs.registry
 import numpy as np
 import varint
-from dahuffman import HuffmanCodec
+from dahuffman import HuffmanCodec as DaHuffmanCodec
 from dahuffman.huffmancodec import _EOF
 from numcodecs.abc import Codec
 from numcodecs_combinators.stack import CodecStack
 
-from .intervals import _as_bits
+from .cast import as_bits
 
 _LOSSLESS_VERSION: str = "0.1.x"
 
 
-class DeltaHuffmanCodec(Codec):
+class HuffmanCodec(Codec):
     __slots__ = ()
 
-    codec_id: str = "safeguards.lossless.delta_huffman"  # type: ignore
+    codec_id: str = "safeguards.lossless.huffman"  # type: ignore
 
-    def encode(self, buf: Buffer) -> Buffer:
+    def encode(self, buf: Buffer) -> bytes:
         a = numcodecs.compat.ensure_ndarray(buf)
         dtype, shape = a.dtype, a.shape
-        a = _as_bits(a.flatten())
+        a = as_bits(a.flatten())
 
-        huffman = HuffmanCodec.from_data(a)
+        huffman = DaHuffmanCodec.from_data(a)
         encoded = huffman.encode(a)
 
-        a_delta = a.copy()
-        a_delta[1:] = np.diff(a_delta)
-
-        huffman_delta = HuffmanCodec.from_data(a_delta)
-        encoded_delta = huffman_delta.encode(a_delta)
-
-        marker, huffman, encoded = (
-            (bytes([0]), huffman, encoded)
-            if len(encoded) <= len(encoded_delta)
-            else (bytes([1]), huffman_delta, encoded_delta)
-        )
-
-        # message: marker dtype shape table encoded
-        message = [marker]
+        # message: dtype shape table encoded
+        message = []
 
         message.append(varint.encode(len(dtype.str)))
         message.append(dtype.str.encode("ascii"))
@@ -71,8 +59,6 @@ class DeltaHuffmanCodec(Codec):
     def decode(self, buf: Buffer, out: None | Buffer = None) -> Buffer:
         b = numcodecs.compat.ensure_bytes(buf)
 
-        marker, b = b[0], b[1:]
-
         b_io = BytesIO(b)
 
         dtype = np.dtype(b_io.read(varint.decode_stream(b_io)).decode("ascii"))
@@ -89,16 +75,51 @@ class DeltaHuffmanCodec(Codec):
         for k in table_keys:
             table[k] = (varint.decode_stream(b_io), varint.decode_stream(b_io))
         table[_EOF] = (varint.decode_stream(b_io), varint.decode_stream(b_io))
-        huffman = HuffmanCodec(table)
+        huffman = DaHuffmanCodec(table)
 
-        decoded = np.array(huffman.decode(b_io.read()))
+        decoded = np.array(huffman.decode(b_io.read())).reshape(shape)
+
+        return numcodecs.compat.ndarray_copy(decoded, out)  # type: ignore
+
+
+numcodecs.registry.register_codec(HuffmanCodec)
+
+
+class DeltaHuffmanCodec(HuffmanCodec):
+    __slots__ = ()
+
+    codec_id: str = "safeguards.lossless.delta_huffman"  # type: ignore
+
+    def encode(self, buf: Buffer) -> bytes:
+        a = numcodecs.compat.ensure_ndarray(buf)
+        dtype, shape = a.dtype, a.shape
+        a = as_bits(a.flatten())
+
+        a_delta = a.copy()
+        a_delta[1:] = np.diff(a_delta)
+
+        encoded: bytes = super().encode(a.view(dtype).reshape(shape))
+        encoded_delta: bytes = super().encode(a_delta.view(dtype).reshape(shape))
+
+        if len(encoded_delta) < len(encoded):
+            return bytes([1]) + encoded_delta
+
+        return bytes([0]) + encoded
+
+    def decode(self, buf: Buffer, out: None | Buffer = None) -> Buffer:
+        b = numcodecs.compat.ensure_bytes(buf)
+
+        marker, b = b[0], b[1:]
+
+        decoded = numcodecs.compat.ensure_ndarray(super().decode(b, out=out))
 
         if marker != 0:
-            decoded = _as_bits(decoded)
+            shape, dtype = decoded.shape, decoded.dtype
+            decoded = as_bits(decoded).flatten()
             decoded = np.cumsum(decoded, dtype=decoded.dtype)
-            decoded = decoded.view(dtype)
+            decoded = decoded.view(dtype).reshape(shape)
 
-        return decoded.reshape(shape)  # type: ignore
+        return numcodecs.compat.ndarray_copy(decoded, out)  # type: ignore
 
 
 numcodecs.registry.register_codec(DeltaHuffmanCodec)

@@ -9,6 +9,7 @@ from fractions import Fraction
 
 import numpy as np
 
+from ....cast import to_float, from_float, as_bits
 from ....intervals import (
     IntervalUnion,
     Interval,
@@ -16,10 +17,8 @@ from ....intervals import (
     Upper,
     _to_total_order,
     _from_total_order,
-    _as_bits,
 )
-from ....cast import to_float, from_float
-from .. import ElementwiseSafeguard
+from ..abc import ElementwiseSafeguard
 from . import (
     FiniteDifference,
     _finite_difference_offsets,
@@ -177,7 +176,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
                 )
                 <= self._eb_abs
             )
-            same_bits = _as_bits(findiff_data, kind="V") == _as_bits(
+            same_bits = as_bits(findiff_data, kind="V") == as_bits(
                 findiff_decoded, kind="V"
             )
             both_nan = np.isnan(findiff_data) & np.isnan(findiff_decoded)

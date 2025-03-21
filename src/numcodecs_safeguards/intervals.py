@@ -3,6 +3,8 @@ from typing_extensions import Self  # MSPV 3.11
 
 import numpy as np
 
+from .cast import as_bits
+
 T = TypeVar("T", bound=np.dtype)
 N = TypeVar("N", bound=Literal[1])
 U = TypeVar("U", bound=Literal[1])
@@ -57,7 +59,7 @@ class Interval(Generic[T, N]):
             return self
 
         # smallest (positive) NaN bit pattern: 0b s 1..1 0..0
-        nan_min = np.array(_as_bits(np.array(np.inf, dtype=a.dtype)) + 1).view(a.dtype)
+        nan_min = np.array(as_bits(np.array(np.inf, dtype=a.dtype)) + 1).view(a.dtype)
         # largest (negative) NaN bit pattern: 0b s 1..1 1..1
         nan_max = np.array(-1, dtype=a.dtype.str.replace("f", "i")).view(a.dtype)
 
@@ -312,11 +314,11 @@ class IntervalUnion(Generic[T, N, U]):
         # 1. convert everything to bits in total order
         decoded_bits = _to_total_order(decoded).reshape(1, -1)
         todtype = decoded_bits.dtype
-        decoded_bits = _as_bits(decoded_bits)
+        decoded_bits = as_bits(decoded_bits)
 
         lower, upper = _to_total_order(self._lower), _to_total_order(self._upper)
         interval_nonempty = lower <= upper
-        lower, upper = _as_bits(lower), _as_bits(upper)
+        lower, upper = as_bits(lower), as_bits(upper)
 
         # 2. look at the difference between the decoded value and the interval
         #    we assume that decoded is not inside the interval, since that's
@@ -325,7 +327,7 @@ class IntervalUnion(Generic[T, N, U]):
         upper = decoded_bits - upper
 
         # 3. only work with "positive" unsigned values
-        negative = _as_bits(lower, kind="i") < 0
+        negative = as_bits(lower, kind="i") < 0
         lower = np.where(negative, ~lower + 1, lower)
         upper = np.where(negative, ~upper + 1, upper)
 
@@ -458,7 +460,7 @@ def _count_leading_zeros(x: np.ndarray) -> np.ndarray:
     https://stackoverflow.com/a/79189999
     """
 
-    x_bits = _as_bits(x)
+    x_bits = as_bits(x)
     nbits = np.iinfo(x_bits.dtype).bits
 
     assert nbits <= 64
@@ -473,7 +475,3 @@ def _count_leading_zeros(x: np.ndarray) -> np.ndarray:
     _, high_exp = np.frexp(x_bits.astype(np.uint64) >> 32)
     _, low_exp = np.frexp(x_bits.astype(np.uint64) & 0xFFFFFFFF)
     return (nbits - np.where(high_exp, high_exp + 32, low_exp)).astype(np.uint8)
-
-
-def _as_bits(a: np.ndarray, *, kind: str = "u") -> np.ndarray:
-    return a.view(a.dtype.str.replace("f", kind).replace("i", kind).replace("u", kind))

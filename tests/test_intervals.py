@@ -1,5 +1,6 @@
 import numpy as np
-from numcodecs_safeguards.intervals import _minimum, _maximum, _as_bits
+from numcodecs_safeguards.cast import as_bits
+from numcodecs_safeguards.intervals import _minimum, _maximum
 from numcodecs_safeguards.safeguards.elementwise.abs import AbsoluteErrorBoundSafeguard
 from numcodecs_safeguards.safeguards.elementwise.sign import SignPreservingSafeguard
 from numcodecs_safeguards.safeguards.elementwise.zero import ZeroIsZeroSafeguard
@@ -32,8 +33,8 @@ def test_sign():
         np.array([-np.nan, -np.inf, -5.0, -0.0, +0.0, 5.0, np.inf, np.nan])
     )
     np.testing.assert_equal(
-        _as_bits(intervals._lower),
-        _as_bits(
+        as_bits(intervals._lower),
+        as_bits(
             np.array(
                 [
                     [
@@ -51,8 +52,8 @@ def test_sign():
         ),
     )
     np.testing.assert_equal(
-        _as_bits(intervals._upper),
-        _as_bits(
+        as_bits(intervals._upper),
+        as_bits(
             np.array(
                 [
                     [

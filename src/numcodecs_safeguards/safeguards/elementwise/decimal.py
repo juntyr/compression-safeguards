@@ -6,7 +6,8 @@ __all__ = ["DecimalErrorBoundSafeguard"]
 
 import numpy as np
 
-from . import ElementwiseSafeguard
+from .abc import ElementwiseSafeguard
+from ...cast import to_float, from_float, as_bits
 from ...intervals import (
     IntervalUnion,
     Interval,
@@ -14,9 +15,7 @@ from ...intervals import (
     Upper,
     _to_total_order,
     _from_total_order,
-    _as_bits,
 )
-from ...cast import to_float, from_float
 
 
 class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
@@ -103,7 +102,7 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         decimal_bound = self._decimal_error(data, decoded) <= self._eb_decimal
 
         # bitwise equality for inf and NaNs (unless equal_nan)
-        same_bits = _as_bits(data) == _as_bits(decoded)
+        same_bits = as_bits(data) == as_bits(decoded)
         both_nan = self._equal_nan and (np.isnan(data) & np.isnan(decoded))
 
         ok = np.where(

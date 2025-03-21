@@ -7,14 +7,16 @@ import numcodecs
 import numcodecs.compat
 import numpy as np
 import xarray as xr
-from matplotlib import pyplot as plt
 from numcodecs.abc import Codec
-from numcodecs_safeguards import SafeguardsCodec
+from numcodecs_safeguards import SafeguardsCodec, SafeguardsQuantizer
+from numcodecs_safeguards.cast import as_bits
 from numcodecs_safeguards.lossless import Lossless
+from numcodecs_safeguards.safeguards.elementwise.abs import AbsoluteErrorBoundSafeguard
 from numcodecs_wasm_sz3 import Sz3
 from numcodecs_wasm_zfp import Zfp
 from numcodecs_wasm_zlib import Zlib
 from numcodecs_wasm_zstd import Zstd
+from tqdm import tqdm
 
 
 def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
@@ -26,11 +28,18 @@ def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
         Path(__file__) / ".." / "era5_tp_2024_08_02_10:00.nc", engine="netcdf4"
     ).tp
 
+    # o3: xr.DataArray = xr.open_dataset(
+    #     Path(__file__) / ".." / "era5_o3_pv_2024_08_02_12:00.nc", engine="netcdf4"
+    # ).o3
+
     yield "+t2m", t2m.values
     yield "-t2m", -t2m.values
 
     yield "+tp", tp.values * 100  # [cm]
     yield "-tp", -tp.values * 100  # [cm]
+
+    # yield "+o3", o3.values * 1e6  # mg/mg
+    # yield "-o3", -o3.values * 1e6  # mg/mg
 
     yield (
         "N(0,10)",
@@ -40,8 +49,8 @@ def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
     yield "+t2mi", np.round(t2m.values * 1000).astype(np.int32)
     yield "-t2mi", np.round(-t2m.values * 1000).astype(np.int32)
 
-    yield "+tpi", np.round(t2m.values * 100 * 1000).astype(np.int32)
-    yield "-tpi", np.round(-t2m.values * 100 * 1000).astype(np.int32)
+    yield "+tpi", np.round(tp.values * 100 * 1000).astype(np.int32)
+    yield "-tpi", np.round(-tp.values * 100 * 1000).astype(np.int32)
 
     yield (
         "N(0,10)i",
@@ -73,6 +82,8 @@ def gen_benchmark(
     data: Generator[tuple[str, np.ndarray], None, None],
     codec_gens: list[Callable[[Generator[float]], Generator[Codec]], None, None],
 ) -> Generator[tuple[str, Codec, float | Exception], None, None]:
+    # from matplotlib import pyplot as plt
+
     for d, datum in data:
         for codec_gen in codec_gens:
             if np.issubdtype(datum.dtype, np.floating):
@@ -93,7 +104,7 @@ def gen_benchmark(
                     yield d, codec, datum.nbytes / np.asarray(compressed).nbytes
 
 
-class Quantizer(ABC):
+class MyQuantizer(ABC):
     @abstractmethod
     def encoded_dtype(self, dtype: np.dtype) -> np.dtype:
         pass
@@ -107,7 +118,7 @@ class Quantizer(ABC):
         pass
 
 
-class RoundQuantizer(Quantizer):
+class MyLinearQuantizer(MyQuantizer):
     def __init__(self, eb_abs):
         self._eb_abs = eb_abs
 
@@ -124,47 +135,33 @@ class RoundQuantizer(Quantizer):
         return f"{type(self).__name__}(eb_abs={self._eb_abs})"
 
 
-class SafeguardQuantizer(Quantizer):
+class MySafeguardsQuantizer(MyQuantizer):
     def __init__(self, eb_abs):
-        from numcodecs_safeguards.safeguards.elementwise.abs import (
-            AbsoluteErrorBoundSafeguard,
+        self._quantizer = SafeguardsQuantizer(
+            safeguards=[AbsoluteErrorBoundSafeguard(eb_abs=eb_abs)]
         )
-
-        self._safeguard = AbsoluteErrorBoundSafeguard(eb_abs=eb_abs)
 
     def encoded_dtype(self, dtype: np.dtype) -> np.dtype:
         return np.dtype(dtype.str.replace("f", "u").replace("i", "u"))
 
     def encode(self, x, predict):
-        from numcodecs_safeguards.intervals import _as_bits
-
-        encoded = self._safeguard.compute_safe_intervals(np.array(x)).encode(
-            np.array(predict)
-        )[()]
-        return _as_bits(np.array(predict)) - _as_bits(np.array(encoded))
+        return self._quantizer.quantize(np.array(x), np.array(predict))[()]
 
     def decode(self, e, predict):
-        from numcodecs_safeguards.intervals import _as_bits
-
-        return (_as_bits(np.array(predict)) - _as_bits(np.array(e))).view(
-            np.array(predict).dtype
-        )[()]
+        return self._quantizer.recover(np.array(predict), np.array(e))[()]
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(safeguards={[self._safeguard]!r})"
+        return f"{type(self).__name__}(safeguards={list(self._quantizer.safeguards)!r})"
 
 
 class Lorenzo2dPredictor(Codec):
     codec_id = "lorenzo"
 
-    def __init__(self, quantizer: Quantizer):
+    def __init__(self, quantizer: MyQuantizer):
         self._quantizer = quantizer
         self._lossless = Lossless().for_safeguards
 
     def encode(self, buf):
-        from numcodecs_safeguards.intervals import _as_bits
-        from tqdm import tqdm
-
         data = np.asarray(buf).squeeze()
         assert len(data.shape) == 2
         M, N = data.shape
@@ -202,7 +199,7 @@ class Lorenzo2dPredictor(Codec):
         with np.printoptions(threshold=50):
             print(
                 len(np.unique(encoded)),
-                np.unique(_as_bits(encoded, kind="i")),
+                np.unique(as_bits(encoded, kind="i")),
                 np.count_nonzero(encoded),
                 encoded.size,
             )
@@ -259,9 +256,7 @@ if __name__ == "__main__":
         [
             gen_codecs_with_eb_abs(lambda eb_abs: Sz3(eb_mode="abs", eb_abs=eb_abs)),
             gen_codecs_with_eb_abs(
-                lambda eb_abs: Sz3(
-                    eb_mode="abs", eb_abs=eb_abs, predictor="lorenzo"
-                )
+                lambda eb_abs: Sz3(eb_mode="abs", eb_abs=eb_abs, predictor="lorenzo")
             ),
             gen_codecs_with_eb_abs(
                 lambda eb_abs: Sz3(eb_mode="abs", eb_abs=eb_abs, predictor=None)
@@ -278,12 +273,12 @@ if __name__ == "__main__":
             ),
             gen_codecs_with_eb_abs(
                 lambda eb_abs: Lorenzo2dPredictor(
-                    quantizer=RoundQuantizer(eb_abs=eb_abs)
+                    quantizer=MyLinearQuantizer(eb_abs=eb_abs)
                 )
             ),
             gen_codecs_with_eb_abs(
                 lambda eb_abs: Lorenzo2dPredictor(
-                    quantizer=SafeguardQuantizer(eb_abs=eb_abs)
+                    quantizer=MySafeguardsQuantizer(eb_abs=eb_abs)
                 )
             ),
         ],

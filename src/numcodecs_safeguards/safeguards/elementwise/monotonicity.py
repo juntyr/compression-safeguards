@@ -10,7 +10,7 @@ from operator import le, lt, ge, gt
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
-from . import ElementwiseSafeguard
+from .abc import ElementwiseSafeguard
 
 
 _STRICT = ((lt, gt, False),) * 2
