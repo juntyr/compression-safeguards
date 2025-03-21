@@ -28,12 +28,12 @@ def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
         Path(__file__) / ".." / "era5_tp_2024_08_02_10:00.nc", engine="netcdf4"
     ).tp
 
-    # o3: xr.DataArray = xr.open_dataset(
-    #     Path(__file__) / ".." / "era5_o3_pv_2024_08_02_12:00.nc", engine="netcdf4"
-    # ).o3
+    o3: xr.DataArray = xr.open_dataset(
+        Path(__file__) / ".." / "era5_o3_pv_2024_08_02_12:00.nc", engine="netcdf4"
+    ).o3
 
     yield "t2m-1d", t2m.values.flatten()
-    yield "tp-1d", tp.values.flatten() * 100
+    yield "tp-1d", tp.values.flatten() * 100  # [cm]
 
     yield "+t2m", t2m.values
     yield "-t2m", -t2m.values
@@ -41,8 +41,8 @@ def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
     yield "+tp", tp.values * 100  # [cm]
     yield "-tp", -tp.values * 100  # [cm]
 
-    # yield "+o3", o3.values * 1e6  # mg/mg
-    # yield "-o3", -o3.values * 1e6  # mg/mg
+    yield "+o3", o3.values * 1e6  # mg/mg
+    yield "-o3", -o3.values * 1e6  # mg/mg
 
     yield (
         "N(0,10)",
@@ -171,8 +171,10 @@ class LorenzoPredictor(Codec):
             encoded = self.encode_1d(data)
         elif len(data.shape) == 2:
             encoded = self.encode_2d(data)
+        elif len(data.shape) == 3:
+            encoded = self.encode_3d(data)
         else:
-            raise TypeError("LorenzoPredictor currently only supports 1D and 2D data")
+            raise TypeError("LorenzoPredictor currently only supports 1D-3D data")
 
         with np.printoptions(threshold=50):
             print(
@@ -198,8 +200,10 @@ class LorenzoPredictor(Codec):
             decoded = self.decode_1d(encoded, dout.dtype)
         elif len(dout.shape) == 2:
             decoded = self.decode_2d(encoded, dout.dtype)
+        elif len(dout.shape) == 3:
+            decoded = self.decode_3d(encoded, dout.dtype)
         else:
-            raise TypeError("LorenzoPredictor currently only supports 1D and 2D data")
+            raise TypeError("LorenzoPredictor currently only supports 1D-3D data")
 
         return numcodecs.compat.ndarray_copy(decoded.reshape(out.shape), out)
 
@@ -262,11 +266,12 @@ class LorenzoPredictor(Codec):
                 encoded[0, i] = self._quantizer.encode(data[0, i], predict)
                 decoded[0, i] = self._quantizer.decode(encoded[0, i], predict)
 
-            for j in tqdm(range(1, M)):
+            for j in range(1, M):
                 predict = decoded[j - 1, 0]
                 encoded[j, 0] = self._quantizer.encode(data[j, 0], predict)
                 decoded[j, 0] = self._quantizer.decode(encoded[j, 0], predict)
 
+            for j in tqdm(range(1, M)):
                 for i in range(1, N):
                     predict = (
                         decoded[j, i - 1] + decoded[j - 1, i] - decoded[j - 1, i - 1]
@@ -291,15 +296,167 @@ class LorenzoPredictor(Codec):
                 predict = decoded[0, i - 1]
                 decoded[0, i] = self._quantizer.decode(encoded[0, i], predict)
 
-            for j in tqdm(range(1, M)):
+            for j in range(1, M):
                 predict = decoded[j - 1, 0]
                 decoded[j, 0] = self._quantizer.decode(encoded[j, 0], predict)
 
+            for j in tqdm(range(1, M)):
                 for i in range(1, N):
                     predict = (
                         decoded[j, i - 1] + decoded[j - 1, i] - decoded[j - 1, i - 1]
                     )
                     decoded[j, i] = self._quantizer.decode(encoded[j, i], predict)
+
+        return decoded
+
+    def encode_3d(self, data: np.ndarray) -> np.ndarray:
+        assert len(data.shape) == 3
+        L, M, N = data.shape
+
+        encoded = np.zeros(
+            shape=data.shape, dtype=self._quantizer.encoded_dtype(data.dtype)
+        )
+        decoded = np.zeros_like(data)
+
+        if data.size > 0:
+            encoded[0, 0, 0] = self._quantizer.encode(
+                data[0, 0, 0], np.array(0, dtype=data.dtype)
+            )
+            decoded[0, 0, 0] = self._quantizer.decode(
+                encoded[0, 0, 0], np.array(0, dtype=data.dtype)
+            )
+
+            for i in range(1, N):
+                predict = decoded[0, 0, i - 1]
+                encoded[0, 0, i] = self._quantizer.encode(data[0, 0, i], predict)
+                decoded[0, 0, i] = self._quantizer.decode(encoded[0, 0, i], predict)
+
+            for j in range(1, M):
+                predict = decoded[0, j - 1, 0]
+                encoded[0, j, 0] = self._quantizer.encode(data[0, j, 0], predict)
+                decoded[0, j, 0] = self._quantizer.decode(encoded[0, j, 0], predict)
+
+            for k in range(1, L):
+                predict = decoded[k - 1, 0, 0]
+                encoded[k, 0, 0] = self._quantizer.encode(data[k, 0, 0], predict)
+                decoded[k, 0, 0] = self._quantizer.decode(encoded[k, 0, 0], predict)
+
+            for j in tqdm(range(1, M)):
+                for i in range(1, N):
+                    predict = (
+                        decoded[0, j, i - 1]
+                        + decoded[0, j - 1, i]
+                        - decoded[0, j - 1, i - 1]
+                    )
+                    encoded[0, j, i] = self._quantizer.encode(data[0, j, i], predict)
+                    decoded[0, j, i] = self._quantizer.decode(encoded[0, j, i], predict)
+
+            for k in tqdm(range(1, L)):
+                for i in range(1, N):
+                    predict = (
+                        decoded[k, 0, i - 1]
+                        + decoded[k - 1, 0, i]
+                        - decoded[k - 1, 0, i - 1]
+                    )
+                    encoded[k, 0, i] = self._quantizer.encode(data[k, 0, i], predict)
+                    decoded[k, 0, i] = self._quantizer.decode(encoded[k, 0, i], predict)
+
+            for k in tqdm(range(1, L)):
+                for j in range(1, M):
+                    predict = (
+                        decoded[k, j - 1, 0]
+                        + decoded[k - 1, j, 0]
+                        - decoded[k - 1, j - 1, 0]
+                    )
+                    encoded[k, j, 0] = self._quantizer.encode(data[k, j, 0], predict)
+                    decoded[k, j, 0] = self._quantizer.decode(encoded[k, j, 0], predict)
+
+            for k in tqdm(range(1, L), position=0):
+                for j in tqdm(range(1, M), position=1):
+                    for i in range(1, N):
+                        predict = (
+                            decoded[k, j, i - 1]
+                            + decoded[k, j - 1, i]
+                            + decoded[k - 1, j, i]
+                            - decoded[k, j - 1, i - 1]
+                            - decoded[k - 1, j, i - 1]
+                            - decoded[k - 1, j - 1, i]
+                            + decoded[k - 1, j - 1, i - 1]
+                        )
+                        encoded[k, j, i] = self._quantizer.encode(
+                            data[k, j, i], predict
+                        )
+                        decoded[k, j, i] = self._quantizer.decode(
+                            encoded[k, j, i], predict
+                        )
+
+        return encoded
+
+    def decode_3d(self, encoded: np.ndarray, dtype: np.dtype) -> np.ndarray:
+        assert len(encoded.shape) == 3
+        L, M, N = encoded.shape
+
+        decoded = np.zeros_like(encoded, dtype=dtype)
+
+        if decoded.size > 0:
+            decoded[0, 0, 0] = self._quantizer.decode(
+                encoded[0, 0, 0], np.array(0, dtype=decoded.dtype)
+            )
+
+            for i in range(1, N):
+                predict = decoded[0, 0, i - 1]
+                decoded[0, 0, i] = self._quantizer.decode(encoded[0, 0, i], predict)
+
+            for j in range(1, M):
+                predict = decoded[0, j - 1, 0]
+                decoded[0, j, 0] = self._quantizer.decode(encoded[0, j, 0], predict)
+
+            for k in range(1, L):
+                predict = decoded[k - 1, 0, 0]
+                decoded[k, 0, 0] = self._quantizer.decode(encoded[k, 0, 0], predict)
+
+            for j in tqdm(range(1, M)):
+                for i in range(1, N):
+                    predict = (
+                        decoded[0, j, i - 1]
+                        + decoded[0, j - 1, i]
+                        - decoded[0, j - 1, i - 1]
+                    )
+                    decoded[0, j, i] = self._quantizer.decode(encoded[0, j, i], predict)
+
+            for k in tqdm(range(1, L)):
+                for i in range(1, N):
+                    predict = (
+                        decoded[k, 0, i - 1]
+                        + decoded[k - 1, 0, i]
+                        - decoded[k - 1, 0, i - 1]
+                    )
+                    decoded[k, 0, i] = self._quantizer.decode(encoded[k, 0, i], predict)
+
+            for k in tqdm(range(1, L)):
+                for j in range(1, M):
+                    predict = (
+                        decoded[k, j - 1, 0]
+                        + decoded[k - 1, j, 0]
+                        - decoded[k - 1, j - 1, 0]
+                    )
+                    decoded[k, j, 0] = self._quantizer.decode(encoded[k, j, 0], predict)
+
+            for k in tqdm(range(1, L), position=0):
+                for j in tqdm(range(1, M), position=1):
+                    for i in range(1, N):
+                        predict = (
+                            decoded[k, j, i - 1]
+                            + decoded[k, j - 1, i]
+                            + decoded[k - 1, j, i]
+                            - decoded[k, j - 1, i - 1]
+                            - decoded[k - 1, j, i - 1]
+                            - decoded[k - 1, j - 1, i]
+                            + decoded[k - 1, j - 1, i - 1]
+                        )
+                        decoded[k, j, i] = self._quantizer.decode(
+                            encoded[k, j, i], predict
+                        )
 
         return decoded
 
