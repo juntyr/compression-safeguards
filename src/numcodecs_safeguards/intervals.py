@@ -37,6 +37,18 @@ class Interval(Generic[T, N]):
     def empty_like(a: np.ndarray[tuple[int, ...], T]) -> "Interval[T, Any]":
         return Interval.empty(a.dtype, a.size)
 
+    @staticmethod
+    def full(dtype: T, n: N) -> "Interval[T, N]":
+        single = IntervalUnion.full(dtype, n, 1)
+        return Interval(
+            _lower=single._lower.reshape(-1),  # type: ignore
+            _upper=single._upper.reshape(-1),  # type: ignore
+        )
+
+    @staticmethod
+    def full_like(a: np.ndarray[tuple[int, ...], T]) -> "Interval[T, Any]":
+        return Interval.full(a.dtype, a.size)
+
     def __getitem__(self, key) -> "IndexedInterval[T, Any]":
         return IndexedInterval(_lower=self._lower, _upper=self._upper, _index=key)
 
@@ -81,6 +93,33 @@ class Interval(Generic[T, N]):
         )
 
         return self
+
+    def intersect(self, other: "Interval[T, N]") -> "Interval[T, N]":
+        (n,) = self._lower.shape
+
+        if n == 0:
+            return Interval.empty(self._lower.dtype, n)
+
+        out: Interval[T, N] = Interval.empty(
+            self._lower.dtype,
+            n,
+        )
+
+        intersection_lower = np.maximum(
+            _to_total_order(self._lower), _to_total_order(other._lower)
+        )
+        intersection_upper = np.minimum(
+            _to_total_order(self._upper), _to_total_order(other._upper)
+        )
+
+        assert intersection_lower <= intersection_upper, (
+            "intersection must not be empty"
+        )
+
+        out._lower[:] = _from_total_order(intersection_lower, out._lower.dtype)
+        out._upper[:] = _from_total_order(intersection_upper, out._upper.dtype)
+
+        return out
 
     def into_union(self) -> "IntervalUnion[T, N, Literal[1]]":
         return IntervalUnion(
@@ -237,6 +276,13 @@ class IntervalUnion(Generic[T, N, U]):
         return IntervalUnion(
             _lower=np.full((u, n), _maximum(dtype), dtype=dtype),
             _upper=np.full((u, n), _minimum(dtype), dtype=dtype),
+        )
+
+    @staticmethod
+    def full(dtype: T, n: N, u: U) -> "IntervalUnion[T, N, U]":
+        return IntervalUnion(
+            _lower=np.full((u, n), _minimum(dtype), dtype=dtype),
+            _upper=np.full((u, n), _maximum(dtype), dtype=dtype),
         )
 
     def intersect(self, other: "IntervalUnion[T, N, V]") -> "IntervalUnion[T, N, Any]":

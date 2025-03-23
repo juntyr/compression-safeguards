@@ -11,6 +11,12 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
 from .abc import ElementwiseSafeguard
+from ...intervals import (
+    IntervalUnion,
+    Interval,
+    _to_total_order,
+    _from_total_order,
+)
 
 
 _STRICT = ((lt, gt, False),) * 2
@@ -44,24 +50,24 @@ class Monotonicity(Enum):
     non-finite values are not affected.
     """
 
-    strict_to_weak = _STRICT_TO_WEAK
-    """
-    Strictly increasing/decreasing sequences in the input array are guaranteed
-    to be *weakly* increasing/decreasing (or constant) in the decoded array.
+    # strict_to_weak = _STRICT_TO_WEAK
+    # """
+    # Strictly increasing/decreasing sequences in the input array are guaranteed
+    # to be *weakly* increasing/decreasing (or constant) in the decoded array.
 
-    Sequences that are not strictly increasing/decreasing or contain non-finite
-    values are not affected.
-    """
+    # Sequences that are not strictly increasing/decreasing or contain non-finite
+    # values are not affected.
+    # """
 
-    weak = _WEAK
-    """
-    Weakly increasing/decreasing (but not constant) sequences in the input
-    array are guaranteed to be weakly increasing/decreasing (or constant) in
-    the decoded array.
+    # weak = _WEAK
+    # """
+    # Weakly increasing/decreasing (but not constant) sequences in the input
+    # array are guaranteed to be weakly increasing/decreasing (or constant) in
+    # the decoded array.
 
-    Sequences that are not weakly increasing/decreasing or are constant or
-    contain non-finite values are not affected.
-    """
+    # Sequences that are not weakly increasing/decreasing or are constant or
+    # contain non-finite values are not affected.
+    # """
 
 
 class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
@@ -108,10 +114,10 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
         assert window > 0, "window size must be positive"
         self._window = window
 
-    def _check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
+    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
         """
-        Check which elements in the `decoded` array preserve the monotonicity
-        of the `data` array.
+        Check if monotonic sequences in the `data` array are preserved in the
+        `decoded` array.
 
         Parameters
         ----------
@@ -122,18 +128,11 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
 
         Returns
         -------
-        ok : np.ndarray
-            Per-element, `True` if the check succeeded for this element.
+        ok : bool
+            `True` if the check succeeded.
         """
 
         window = 1 + self._window * 2
-
-        needs_correction = np.zeros_like(decoded, dtype=bool)
-
-        flat = np.arange(data.size).reshape(data.shape)
-        indices = np.stack(
-            np.meshgrid(*[np.arange(a) for a in data.shape], indexing="ij"), axis=-1
-        ).reshape(-1, data.ndim)
 
         for axis, alen in enumerate(data.shape):
             if alen < window:
@@ -142,103 +141,148 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
             data_windows = sliding_window_view(data, window, axis=axis)
             decoded_windows = sliding_window_view(decoded, window, axis=axis)
 
-            flat_windows = sliding_window_view(flat, window, axis=axis)
-            indices_windows = indices[flat_windows]
+            data_monotonic = self._monotonic_sign(data_windows, is_decoded=False)
+            decoded_monotonic = self._monotonic_sign(decoded_windows, is_decoded=True)
 
+            # for monotonic windows, check that the monotonicity matches
+            if np.any(
+                self._monotonic_sign_not_equal(data_monotonic, decoded_monotonic)
+            ):
+                return False
+
+        return True
+
+    def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
+        """
+        Compute the intervals in which the monotonicity of the `data` is
+        preserved.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data for which the safe intervals should be computed.
+
+        Returns
+        -------
+        intervals : IntervalUnion
+            Union of intervals in which the monotonicity is preserved.
+        """
+
+        window = 1 + self._window * 2
+
+        valid = Interval.full_like(data)
+
+        for axis, alen in enumerate(data.shape):
+            if alen < window:
+                continue
+
+            axis_valid = Interval.full_like(data)
+            lower = axis_valid._lower.reshape(data.shape)
+            upper = axis_valid._upper.reshape(data.shape)
+
+            data_windows = sliding_window_view(data, window, axis=axis)
             data_monotonic = self._monotonic_sign(data_windows, is_decoded=False)
 
-            # for monotonic windows, check that
-            #  decoded[i-1] ? decoded[i] ? decoded[i+1]
-            # has the correct sign, otherwise mark for correction
-            needs_correction[
-                indices_windows[..., :-1, :][
-                    self._monotonic_sign_not_equal(
-                        data_monotonic,
-                        self._monotonic_sign_elementwise(
-                            decoded_windows, is_decoded=True
-                        ),
-                    )
-                ]
-            ] = True
-            needs_correction[
-                indices_windows[..., 1:, :][
-                    self._monotonic_sign_not_equal(
-                        data_monotonic,
-                        self._monotonic_sign_elementwise(
-                            decoded_windows, is_decoded=True
-                        ),
-                    )
-                ]
-            ] = True
+            print(data_windows.shape, data_monotonic.shape)
 
-            # for monotonic windows, check that
-            #  data[i-1] ? decoded[i] ? data[i+1]
-            # has the correct sign, otherwise mark for correction
-            #
-            # note: this check is excessively strict but ensures that correcting
-            #       to the original data is always possible without affecting
-            #       the monotonicity of the corrected output
-            needs_correction[
-                indices_windows[..., :-1, :][
-                    self._monotonic_sign_not_equal(
-                        data_monotonic,
-                        self._monotonic_sign_elementwise(
-                            decoded_windows, data_windows, is_decoded=True
-                        ),
+            elem_lt, elem_eq, elem_gt = (
+                np.zeros_like(data, dtype=np.bool),
+                np.zeros_like(data, dtype=np.bool),
+                np.zeros_like(data, dtype=np.bool),
+            )
+            for w in range(window):
+                print(data.shape, window, axis, w, tuple(
+                        [slice(None)] * axis
+                        + [slice(w, None if (w + 1) == window else -window + w + 1)]
+                        + [slice(None)] * (len(data.shape) - axis - 1)
+                    ))
+                # problem here: data_monotonic has reduced axis dimensions
+                elem_lt[
+                    tuple(
+                        [slice(None)] * axis
+                        + [slice(w, None if (w + 1) == window else -window + w + 1)]
+                        + [slice(None)] * (len(data.shape) - axis - 1)
                     )
-                ]
-            ] = True
-            needs_correction[
-                indices_windows[..., 1:, :][
-                    self._monotonic_sign_not_equal(
-                        data_monotonic,
-                        self._monotonic_sign_elementwise(
-                            data_windows, decoded_windows, is_decoded=True
-                        ),
+                ] = data_monotonic[..., w] == -1
+                elem_eq[
+                    tuple(
+                        [slice(None)] * axis
+                        + [slice(w, None if (w + 1) == window else -window + w + 1)]
+                        + [slice(None)] * (len(data.shape) - axis - 1)
                     )
-                ]
-            ] = True
+                ] = data_monotonic[..., w] == 0
+                elem_gt[
+                    tuple(
+                        [slice(None)] * axis
+                        + [slice(w, None if (w + 1) == window else -window + w + 1)]
+                        + [slice(None)] * (len(data.shape) - axis - 1)
+                    )
+                ] = data_monotonic[..., w] == +1
 
-            # for monotonic windows, check that
-            #  decoded[i-1] ? data[i] ? decoded[i+1]
-            # has the correct sign, otherwise mark for correction
-            #
-            # note: this check is excessively strict but ensures that correcting
-            #       to the original data is always possible without affecting
-            #       the monotonicity of the corrected output
-            needs_correction[
-                indices_windows[..., :-1, :][
-                    self._monotonic_sign_not_equal(
-                        data_monotonic,
-                        self._monotonic_sign_elementwise(
-                            data_windows, decoded_windows, is_decoded=True
-                        ),
-                    )
-                ]
-            ] = True
-            needs_correction[
-                indices_windows[..., 1:, :][
-                    self._monotonic_sign_not_equal(
-                        data_monotonic,
-                        self._monotonic_sign_elementwise(
-                            decoded_windows, data_windows, is_decoded=True
-                        ),
-                    )
-                ]
-            ] = True
+            elem_monotonic = np.where(
+                elem_eq, 0, np.where(elem_lt, -1, np.where(elem_gt, +1, np.nan))
+            )
 
-        return ~needs_correction
+            lower[elem_monotonic == 0] = data[elem_monotonic == 0]
+            upper[elem_monotonic == 0] = data[elem_monotonic == 0]
 
-    def _compute_correction(
-        self,
-        data: np.ndarray,
-        decoded: np.ndarray,
-    ) -> np.ndarray:
-        return np.where(
-            self._check_elementwise(data, decoded),
-            decoded,
-            data,
+            mask = np.zeros(alen, dtype=np.bool)
+            mask[-1] = False
+            mask = mask.reshape(
+                [1] * axis + [alen] + [1] * (len(data.shape) - axis - 1)
+            )
+
+            lower[(elem_monotonic == -1) & mask] = _from_total_order(
+                _to_total_order(
+                    np.roll(data, -1, axis=axis)[(elem_monotonic == -1) & mask]
+                )
+                + 1,
+                dtype=data.dtype,
+            )
+            upper[(elem_monotonic == +1) & mask] = _from_total_order(
+                _to_total_order(
+                    np.roll(data, -1, axis=axis)[(elem_monotonic == +1) & mask]
+                )
+                - 1,
+                dtype=data.dtype,
+            )
+
+            mask = np.zeros(alen, dtype=np.bool)
+            mask[0] = False
+            mask = mask.reshape(
+                [1] * axis + [alen] + [1] * (len(data.shape) - axis - 1)
+            )
+
+            upper[(elem_monotonic == -1) & mask] = _from_total_order(
+                _to_total_order(
+                    np.roll(data, +1, axis=axis)[(elem_monotonic == -1) & mask]
+                )
+                - 1,
+                dtype=data.dtype,
+            )
+            lower[(elem_monotonic == +1) & mask] = _from_total_order(
+                _to_total_order(
+                    np.roll(data, +1, axis=axis)[(elem_monotonic == +1) & mask]
+                )
+                + 1,
+                dtype=data.dtype,
+            )
+
+            valid = valid.intersect(axis_valid)
+
+        lt, ut, dt = (
+            _to_total_order(valid._lower),
+            _to_total_order(valid._upper),
+            _to_total_order(data.flatten()),
         )
+        lt = np.where((lt + 1) > 0, lt + 1, lt)
+
+        # Hacker's Delight's algorithm to compute (a + b) / 2:
+        #  ((a ^ b) >> 1) + (a & b)
+        valid._lower = ((lt ^ dt) >> 1) + (lt & dt)
+        valid._upper = ((ut ^ dt) >> 1) + (ut & dt)
+
+        return valid.into_union()
 
     def get_config(self) -> dict:
         """
@@ -291,41 +335,6 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
         # return the result in a shape that's broadcastable to x
         return monotonic[..., np.newaxis]
 
-    def _monotonic_sign_elementwise(
-        self,
-        left: np.ndarray,
-        right: None | np.ndarray = None,
-        *,
-        is_decoded: bool,
-    ) -> np.ndarray:
-        right = left if right is None else right
-
-        (lt, gt, eq) = self._monotonicity.value[int(is_decoded)]
-
-        # default to NaN
-        monotonic = np.empty(list(left.shape[:-1]) + [left.shape[-1] - 1])
-        monotonic.fill(np.nan)
-
-        # use comparison instead of diff to account for uints
-
-        # +1: right[i+1] > left[i]
-        monotonic = np.where(gt(right[..., 1:], left[..., :-1]), +1, monotonic)
-        # -1: right[i+1] < left[i]
-        monotonic = np.where(lt(right[..., 1:], left[..., :-1]), -1, monotonic)
-
-        # 0/NaN: right[i+1] == left[i]
-        monotonic = np.where(
-            right[..., 1:] == left[..., :-1], 0 if eq else np.nan, monotonic
-        )
-
-        # non-finite values cannot participate in monotonic sequences
-        # NaN: !(isfinite(right[i+1]) && isfinite(lift[i]))
-        monotonic = np.where(
-            np.isfinite(right[..., 1:]) & np.isfinite(left[..., :-1]), monotonic, np.nan
-        )
-
-        return monotonic
-
     def _monotonic_sign_not_equal(
         self, data_monotonic: np.ndarray, decoded_monotonic: np.ndarray
     ) -> np.ndarray:
@@ -336,11 +345,11 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
                     decoded_monotonic != data_monotonic,
                     False,
                 )
-            case Monotonicity.strict_to_weak | Monotonicity.weak:
-                return np.where(
-                    np.isfinite(data_monotonic),
-                    # having the opposite sign or no sign are both not equal
-                    (decoded_monotonic == -data_monotonic)
-                    | np.isnan(decoded_monotonic),
-                    False,
-                )
+            # case Monotonicity.strict_to_weak | Monotonicity.weak:
+            #     return np.where(
+            #         np.isfinite(data_monotonic),
+            #         # having the opposite sign or no sign are both not equal
+            #         (decoded_monotonic == -data_monotonic)
+            #         | np.isnan(decoded_monotonic),
+            #         False,
+            #     )

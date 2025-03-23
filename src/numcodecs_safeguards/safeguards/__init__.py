@@ -11,8 +11,7 @@ from .elementwise.decimal import DecimalErrorBoundSafeguard
 from .elementwise.findiff.abs import (
     FiniteDifferenceAbsoluteErrorBoundSafeguard,
 )
-
-# from .elementwise.monotonicity import MonotonicityPreservingSafeguard
+from .elementwise.monotonicity import MonotonicityPreservingSafeguard
 from .elementwise.rel_or_abs import RelativeOrAbsoluteErrorBoundSafeguard
 from .elementwise.sign import SignPreservingSafeguard
 from .elementwise.zero import ZeroIsZeroSafeguard
@@ -41,9 +40,9 @@ class Safeguards(Enum):
     findiff_abs = FiniteDifferenceAbsoluteErrorBoundSafeguard
     """Enforce an absolute error bound for the finite differences."""
 
-    # # monotonicity
-    # monotonicity = MonotonicityPreservingSafeguard
-    # """Enforce that monotonic sequences remain monotonic."""
+    # monotonicity
+    monotonicity = MonotonicityPreservingSafeguard
+    """Enforce that monotonic sequences remain monotonic."""
 
     # sign
     sign = SignPreservingSafeguard
