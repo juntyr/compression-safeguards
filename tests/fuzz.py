@@ -14,8 +14,8 @@ with atheris.instrument_imports():
     from numcodecs_safeguards import (
         SafeguardsCodec,
         Safeguards,
-        _SUPPORTED_DTYPES,
     )
+    from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
 
 
 class FuzzCodec(Codec):
