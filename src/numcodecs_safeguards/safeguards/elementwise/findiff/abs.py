@@ -213,7 +213,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         """
 
         data = data.flatten()
-        data_float = to_float(data)
+        data_float: np.ndarray = to_float(data)
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"

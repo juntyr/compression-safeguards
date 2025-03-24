@@ -1,3 +1,7 @@
+"""
+Implementation of the [`SafeguardsQuantizer`][numcodecs_safeguards.quantizer.SafeguardsQuantizer], which quantizes the correction needed to satisfy a set of safeguards.
+"""
+
 __all__ = ["SafeguardsQuantizer"]
 
 from collections.abc import Sequence
@@ -11,11 +15,32 @@ from .safeguards.abc import Safeguard
 from .safeguards.elementwise.abc import ElementwiseSafeguard
 
 T = TypeVar("T", bound=np.dtype)
-U = TypeVar("U", bound=np.dtype)
+""" Any numpy [`dtype`][numpy.dtype] type variable. """
+C = TypeVar("C", bound=np.dtype)
+""" The numpy [`dtype`][numpy.dtype] type variable for corrections. """
 S = TypeVar("S", bound=tuple[int, ...])
+""" Any array shape. """
 
 
 class SafeguardsQuantizer:
+    """
+    A quantizer which computes the correction needed to satisfy a set of `safeguards`.
+
+    Parameters
+    ----------
+    safeguards : Sequence[dict | Safeguard]
+        The safeguards that will be applied to the codec. They can either be
+        passed as a safeguard configuration [`dict`][dict] or an already
+        initialized
+        [`Safeguard`][numcodecs_safeguards.safeguards.abc.Safeguard].
+
+        Please refer to
+        [`Safeguards`][numcodecs_safeguards.safeguards.Safeguards]
+        for an enumeration of all supported safeguards.
+    _version : ...
+        Internal, do not provide this paramter explicitly.
+    """
+
     __slots__ = ("_elementwise_safeguards",)
     _elementwise_safeguards: tuple[ElementwiseSafeguard, ...]
 
@@ -52,15 +77,46 @@ class SafeguardsQuantizer:
 
     @property
     def safeguards(self) -> tuple[Safeguard, ...]:
+        """
+        The set of safeguards that this quantizer has been configured to
+        uphold.
+        """
+
         return self._elementwise_safeguards
 
     @property
     def version(self) -> str:
+        """
+        The version of the format of the correction computed by the
+        [`quantize`][numcodecs_safeguards.quantizer.SafeguardsQuantizer.quantize]
+        method.
+
+        The quantizer can only
+        [`recover`][numcodecs_safeguards.quantizer.SafeguardsQuantizer.recover]
+        quantized corrections with the matching version.
+        """
+
         return _FORMAT_VERSION
 
     def quantize(
         self, data: np.ndarray[S, T], prediction: np.ndarray[S, T]
-    ) -> np.ndarray[S, U]:
+    ) -> np.ndarray[S, C]:
+        """
+        Quantize the correction required to make the `prediction` array satisfy the safeguards relative to the `data` array.
+
+        Parameters
+        ----------
+        data : np.ndarray[S, T]
+            The data array, relative to which the safeguards are enforced.
+        prediction : np.ndarray[S, T]
+            The prediction array for which the correction is computed.
+
+        Returns
+        -------
+        correction : np.ndarray[S, C]
+            The correction array.
+        """
+
         assert data.dtype in _SUPPORTED_DTYPES, (
             f"can only quantize arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
         )
@@ -101,8 +157,24 @@ class SafeguardsQuantizer:
         return prediction_bits - correction_bits
 
     def recover(
-        self, prediction: np.ndarray[S, T], quantized: np.ndarray[S, U]
+        self, prediction: np.ndarray[S, T], quantized: np.ndarray[S, C]
     ) -> np.ndarray[S, T]:
+        """
+        Recover the corrected array from the `prediction` and its quantized `correction`.
+
+        Parameters
+        ----------
+        prediction : np.ndarray[S, T]
+            The prediction array for which the correction has been computed.
+        quantized : quantized: np.ndarray[S, C]
+            The quantized correction array.
+
+        Returns
+        -------
+        corrected : np.ndarray[T, C]
+            The corrected array, which satisfies the safeguards.
+        """
+
         prediction_bits = as_bits(prediction)
         quantized_bits = as_bits(quantized)
 
@@ -111,6 +183,15 @@ class SafeguardsQuantizer:
         return recovered.view(prediction.dtype)
 
     def get_config(self) -> dict:
+        """
+        Returns the configuration of the quantizer with safeguards.
+
+        Returns
+        -------
+        config : dict
+            Configuration of the quantizer with safeguards.
+        """
+
         return dict(
             _version=self.version,
             safeguards=[safeguard.get_config() for safeguard in self.safeguards],

@@ -1,3 +1,7 @@
+"""
+Implementation of the [`SafeguardsCodec`][numcodecs_safeguards.codec.SafeguardsCodec], which wraps an existing codec with safeguards.
+"""
+
 __all__ = ["SafeguardsCodec"]
 
 from collections.abc import Sequence

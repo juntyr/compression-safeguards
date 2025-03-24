@@ -135,7 +135,7 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         """
 
         data = data.flatten()
-        data_float = to_float(data)
+        data_float: np.ndarray = to_float(data)
 
         valid = (
             Interval.empty_like(data)

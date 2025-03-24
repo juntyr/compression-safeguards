@@ -13,8 +13,6 @@ from numcodecs_combinators.stack import CodecStack
 
 from .cast import as_bits
 
-_LOSSLESS_VERSION: str = "0.1.x"
-
 
 class HuffmanCodec(Codec):
     __slots__ = ()
