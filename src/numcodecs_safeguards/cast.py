@@ -2,6 +2,8 @@
 Utility functions to cast arrays to floating point and binary representation.
 """
 
+__all__ = ["to_float", "from_float", "as_bits"]
+
 from typing import Any, TypeVar
 
 import numpy as np
