@@ -108,14 +108,14 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         self._lossless_for_codec = (
             lossless.for_codec
             if isinstance(lossless.for_codec, Codec)
-            else numcodecs.registry.get_codec(codec)
+            else numcodecs.registry.get_codec(lossless.for_codec)
             if lossless.for_codec is not None
             else None
         )
         self._lossless_for_safeguards = (
             lossless.for_safeguards
             if isinstance(lossless.for_safeguards, Codec)
-            else numcodecs.registry.get_codec(codec)
+            else numcodecs.registry.get_codec(lossless.for_safeguards)
         )
 
     def encode(self, buf: Buffer) -> Buffer:
