@@ -14,6 +14,8 @@ from .abc import ElementwiseSafeguard
 from ...intervals import (
     IntervalUnion,
     Interval,
+    Lower,
+    Upper,
     _to_total_order,
     _from_total_order,
 )
@@ -172,103 +174,90 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
 
         valid = Interval.full_like(data)
 
+        any_restriction = np.zeros_like(data, dtype=np.bool)
+
         for axis, alen in enumerate(data.shape):
             if alen < window:
                 continue
 
-            axis_valid = Interval.full_like(data)
-            lower = axis_valid._lower.reshape(data.shape)
-            upper = axis_valid._upper.reshape(data.shape)
-
             data_windows = sliding_window_view(data, window, axis=axis)
             data_monotonic = self._monotonic_sign(data_windows, is_decoded=False)
 
-            print(data_windows.shape, data_monotonic.shape)
-
-            elem_lt, elem_eq, elem_gt = (
+            elem_lt_left, elem_lt_right, elem_eq, elem_gt_left, elem_gt_right = (
+                np.zeros_like(data, dtype=np.bool),
+                np.zeros_like(data, dtype=np.bool),
                 np.zeros_like(data, dtype=np.bool),
                 np.zeros_like(data, dtype=np.bool),
                 np.zeros_like(data, dtype=np.bool),
             )
             for w in range(window):
-                print(data.shape, window, axis, w, tuple(
-                        [slice(None)] * axis
-                        + [slice(w, None if (w + 1) == window else -window + w + 1)]
-                        + [slice(None)] * (len(data.shape) - axis - 1)
-                    ))
-                # problem here: data_monotonic has reduced axis dimensions
-                elem_lt[
-                    tuple(
-                        [slice(None)] * axis
-                        + [slice(w, None if (w + 1) == window else -window + w + 1)]
-                        + [slice(None)] * (len(data.shape) - axis - 1)
-                    )
-                ] = data_monotonic[..., w] == -1
-                elem_eq[
-                    tuple(
-                        [slice(None)] * axis
-                        + [slice(w, None if (w + 1) == window else -window + w + 1)]
-                        + [slice(None)] * (len(data.shape) - axis - 1)
-                    )
-                ] = data_monotonic[..., w] == 0
-                elem_gt[
-                    tuple(
-                        [slice(None)] * axis
-                        + [slice(w, None if (w + 1) == window else -window + w + 1)]
-                        + [slice(None)] * (len(data.shape) - axis - 1)
-                    )
-                ] = data_monotonic[..., w] == +1
-
-            elem_monotonic = np.where(
-                elem_eq, 0, np.where(elem_lt, -1, np.where(elem_gt, +1, np.nan))
-            )
-
-            lower[elem_monotonic == 0] = data[elem_monotonic == 0]
-            upper[elem_monotonic == 0] = data[elem_monotonic == 0]
-
-            mask = np.zeros(alen, dtype=np.bool)
-            mask[-1] = False
-            mask = mask.reshape(
-                [1] * axis + [alen] + [1] * (len(data.shape) - axis - 1)
-            )
-
-            lower[(elem_monotonic == -1) & mask] = _from_total_order(
-                _to_total_order(
-                    np.roll(data, -1, axis=axis)[(elem_monotonic == -1) & mask]
+                s = tuple(
+                    [slice(None)] * axis
+                    + [slice(w, None if (w + 1) == window else -window + w + 1)]
+                    + [slice(None)] * (len(data.shape) - axis - 1)
                 )
-                + 1,
-                dtype=data.dtype,
-            )
-            upper[(elem_monotonic == +1) & mask] = _from_total_order(
-                _to_total_order(
-                    np.roll(data, -1, axis=axis)[(elem_monotonic == +1) & mask]
-                )
-                - 1,
-                dtype=data.dtype,
-            )
 
-            mask = np.zeros(alen, dtype=np.bool)
-            mask[0] = False
-            mask = mask.reshape(
-                [1] * axis + [alen] + [1] * (len(data.shape) - axis - 1)
-            )
+                if w > 0:
+                    elem_lt_left[s] |= data_monotonic[..., 0] == -1
+                if w < (window - 1):
+                    elem_lt_right[s] |= data_monotonic[..., 0] == -1
 
-            upper[(elem_monotonic == -1) & mask] = _from_total_order(
-                _to_total_order(
-                    np.roll(data, +1, axis=axis)[(elem_monotonic == -1) & mask]
-                )
-                - 1,
-                dtype=data.dtype,
-            )
-            lower[(elem_monotonic == +1) & mask] = _from_total_order(
-                _to_total_order(
-                    np.roll(data, +1, axis=axis)[(elem_monotonic == +1) & mask]
-                )
-                + 1,
-                dtype=data.dtype,
-            )
+                elem_eq[s] |= data_monotonic[..., 0] == 0
 
-            valid = valid.intersect(axis_valid)
+                if w > 0:
+                    elem_gt_left[s] |= data_monotonic[..., 0] == +1
+                if w < (window - 1):
+                    elem_gt_right[s] |= data_monotonic[..., 0] == +1
+
+            if np.any(elem_eq):
+                any_restriction |= elem_eq
+                valid_eq = Interval.full_like(data)
+                Lower(data.flatten()) <= valid_eq[elem_eq.flatten()] <= Upper(
+                    data.flatten()
+                )
+                valid = valid.intersect(valid_eq)
+
+            if np.any(elem_lt_left | elem_lt_right):
+                valid_lt = Interval.full_like(data)
+            if np.any(elem_lt_right):
+                any_restriction |= elem_lt_right
+                Lower(
+                    _from_total_order(
+                        _to_total_order(np.roll(data, -1, axis=axis)) + 1,
+                        dtype=data.dtype,
+                    ).flatten()
+                ) <= valid_lt[elem_lt_right.flatten()]
+            if np.any(elem_lt_left):
+                any_restriction |= elem_lt_left
+                valid_lt[elem_lt_left.flatten()] <= Upper(
+                    _from_total_order(
+                        _to_total_order(np.roll(data, +1, axis=axis)) - 1,
+                        dtype=data.dtype,
+                    ).flatten()
+                )
+            if np.any(elem_lt_left | elem_lt_right):
+                valid = valid.intersect(valid_lt)
+
+            if np.any(elem_gt_left | elem_gt_right):
+                valid_gt = Interval.full_like(data)
+            if np.any(elem_gt_left):
+                any_restriction |= elem_gt_left
+                Lower(
+                    _from_total_order(
+                        _to_total_order(np.roll(data, +1, axis=axis)) + 1,
+                        dtype=data.dtype,
+                    ).flatten()
+                ) <= valid_gt[elem_gt_left.flatten()]
+            if np.any(elem_gt_right):
+                any_restriction |= elem_gt_right
+                valid_gt[elem_gt_right.flatten()] <= Upper(
+                    _from_total_order(
+                        _to_total_order(np.roll(data, -1, axis=axis)) - 1,
+                        dtype=data.dtype,
+                    ).flatten()
+                )
+            if np.any(elem_gt_left | elem_gt_right):
+                valid = valid.intersect(valid_gt)
 
         lt, ut, dt = (
             _to_total_order(valid._lower),
@@ -279,10 +268,19 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
 
         # Hacker's Delight's algorithm to compute (a + b) / 2:
         #  ((a ^ b) >> 1) + (a & b)
-        valid._lower = ((lt ^ dt) >> 1) + (lt & dt)
-        valid._upper = ((ut ^ dt) >> 1) + (ut & dt)
+        valid._lower = _from_total_order(((lt ^ dt) >> 1) + (lt & dt), data.dtype)
+        valid._upper = _from_total_order(((ut ^ dt) >> 1) + (ut & dt), data.dtype)
 
-        return valid.into_union()
+        valid = valid.intersect(
+            Interval.full_like(data).preserve_finite(data.flatten())
+        )
+
+        filtered_valid = Interval.full_like(data)
+        Lower(valid._lower) <= filtered_valid[any_restriction.flatten()] <= Upper(
+            valid._upper
+        )
+
+        return filtered_valid.into_union()
 
     def get_config(self) -> dict:
         """

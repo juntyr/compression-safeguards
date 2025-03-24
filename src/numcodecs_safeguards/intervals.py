@@ -94,6 +94,26 @@ class Interval(Generic[T, N]):
 
         return self
 
+    def preserve_finite(self, a: np.ndarray[tuple[N], T]) -> Self:
+        if not np.issubdtype(a.dtype, np.floating):
+            return self
+
+        Lower(
+            np.array(
+                _from_total_order(
+                    _to_total_order(np.array(-np.inf, dtype=a.dtype)) + 1, a.dtype
+                )
+            )
+        ) <= self[np.isfinite(a)] <= Upper(
+            np.array(
+                _from_total_order(
+                    _to_total_order(np.array(np.inf, dtype=a.dtype)) - 1, a.dtype
+                )
+            )
+        )
+
+        return self
+
     def intersect(self, other: "Interval[T, N]") -> "Interval[T, N]":
         (n,) = self._lower.shape
 
@@ -112,7 +132,7 @@ class Interval(Generic[T, N]):
             _to_total_order(self._upper), _to_total_order(other._upper)
         )
 
-        assert intersection_lower <= intersection_upper, (
+        assert np.all(intersection_lower <= intersection_upper), (
             "intersection must not be empty"
         )
 
