@@ -121,7 +121,10 @@ def check_one_input(data):
     gconfig = safeguard.get_config()
 
     safeguard = numcodecs.registry.get_codec(gconfig)
-    assert safeguard.get_config() == gconfig
+    assert safeguard.get_config() == gconfig, (
+        f"{safeguard.get_config()!r} vs {gconfig!r}"
+    )
+    assert repr(safeguard) == grepr, f"{safeguard!r} vs {grepr}"
 
     try:
         encoded = safeguard.encode(raw)
