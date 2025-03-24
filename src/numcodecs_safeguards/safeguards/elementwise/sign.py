@@ -16,6 +16,9 @@ class SignPreservingSafeguard(ElementwiseSafeguard):
     (-1, 0, +1) in the decompressed output as they have in the input data.
 
     The sign for NaNs is derived from their sign bit, e.g. sign(-NaN) = -1.
+
+    This safeguard should be combined with e.g. an error bound, as it by itself
+    accepts *any* value with the same sign.
     """
 
     __slots__ = ()

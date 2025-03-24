@@ -29,17 +29,15 @@ This package currently implements the following [safeguards][numcodecs_safeguard
 
 - [`abs`][numcodecs_safeguards.safeguards.elementwise.abs.AbsoluteErrorBoundSafeguard] (absolute error bound):
 
-    The elementwise absolute error is guaranteed to be less than or equal to the provided bound. In cases where the arithmetic evaluation of the error bound is not well-defined, e.g. for infinite or NaN values, producing the exact same bitpattern is defined to satisfy the error bound. The safeguard can also be configured such that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
+    The elementwise absolute error is guaranteed to be less than or equal to the provided bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
 
 - [`rel_or_abs`][numcodecs_safeguards.safeguards.elementwise.rel_or_abs.RelativeOrAbsoluteErrorBoundSafeguard] (relative [or absolute] error bound):
 
-    The elementwise absolute error between the *logarithms*\* of the values is guaranteed to be less than or equal to $\log(1 + eb_{rel})$ where $eb_{rel}$ is e.g. 2%. The logarithm* here is adapted to support positive, negative, and zero values. For values close to zero, where the relative error is not well-defined, the absolute elementwise error is guaranteed to be less than or equal to the absolute error bound.
-
-    Put simply, each element satisfies the relative or the absolute error bound (or both). In cases where the arithmetic evaluation of the error bound is not well-defined, e.g. for infinite or NaN values, producing the exact same bitpattern is defined to satisfy the error bound. The safeguard can also be configured such that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
+    It is guaranteed that either the absolute error between the logarithms of the values is less than or equal to the provided relative error bound, and/or the absolute error between the values is less than or equal to the provided absolute error bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
 
 - [`decimal`][numcodecs_safeguards.safeguards.elementwise.decimal.DecimalErrorBoundSafeguard] (decimal error bound):
 
-    The elementwise decimal error is guaranteed to be less than or equal to the provided bound. The decimal error quantifies the orders of magnitude that the lossy-decoded value is away from the original value, i.e. the difference in their decimal logarithms. It is defined to be infinite if the signs of the data and decoded data do not match. Since the decimal error bound must be finite, this safeguard also guarantees that the sign of each decode value matches the sign of each original value and that a decoded value is zero if and only if it is zero in the original data. In cases where the arithmetic evaluation of the error bound not well-defined, e.g. for infinite or NaN values, producing the exact same bitpattern is defined to satisfy the error bound. The safeguard can also be configured such that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
+    The elementwise decimal error is guaranteed to be less than or equal to the provided bound. The decimal error quantifies the orders of magnitude that the lossy-decoded value is away from the original value, i.e. the difference in their decimal logarithms. It is defined to be infinite if the signs of the data and decoded data do not match. Since the decimal error bound must be finite, this safeguard also guarantees that the sign of each decode value matches the sign of each original value and that a decoded value is zero if and only if it is zero in the original data. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
 
 - [`findiff_abs`][numcodecs_safeguards.safeguards.elementwise.findiff.abs.FiniteDifferenceAbsoluteErrorBoundSafeguard] (absolute error bound for finite differences):
 
@@ -51,7 +49,7 @@ This package currently implements the following [safeguards][numcodecs_safeguard
 
 - [`sign`][numcodecs_safeguards.safeguards.elementwise.sign.SignPreservingSafeguard] (sign-preserving):
 
-    Values are guaranteed to have the same sign (-1, 0, +1) in the decompressed output as they have in the input data. The sign for NaNs is derived from their sign bit, e.g. sign(-NaN) = -1.
+    Values are guaranteed to have the same sign (-1, 0, +1) in the decompressed output as they have in the input data. The sign for NaNs is derived from their sign bit, e.g. sign(-NaN) = -1. This safeguard should be combined with e.g. an error bound, as it by itself accepts *any* value with the same sign.
 
 ## Usage
 

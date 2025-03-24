@@ -177,6 +177,8 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
 
         valid = Interval.full_like(data)
 
+        # track which elements have any monotonicity-based restrictions
+        #  imposed upon them
         any_restriction = np.zeros_like(data, dtype=np.bool)
 
         for axis, alen in enumerate(data.shape):
@@ -186,6 +188,12 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
             data_windows = sliding_window_view(data, window, axis=axis)
             data_monotonic = self._monotonic_sign(data_windows, is_decoded=False)
 
+            # compute, per-element, if the element has a decreasing (lt),
+            #  increasing (gt), or equality (eq) constraint imposed upon it
+            # for the lt and gt variants, compute both a mask for accesses to
+            #  elements on the left and to elements on the right, since the
+            #  elements at the left and right edge of the window cannot access
+            #  one further element to the left / right, respectively
             elem_lt_left, elem_lt_right, elem_eq, elem_gt_left, elem_gt_right = (
                 np.zeros_like(data, dtype=np.bool),
                 np.zeros_like(data, dtype=np.bool),
@@ -194,6 +202,8 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
                 np.zeros_like(data, dtype=np.bool),
             )
             for w in range(window):
+                # ensure that all members of the window receive their
+                #  monotonicity contribution
                 s = tuple(
                     [slice(None)] * axis
                     + [slice(w, None if (w + 1) == window else -window + w + 1)]
@@ -212,6 +222,8 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
                 if w < (window - 1):
                     elem_gt_right[s] |= data_monotonic[..., 0] == +1
 
+            # if any element has an equality constraint, impose it and
+            #  intersect with the overall valid interval
             if np.any(elem_eq):
                 any_restriction |= elem_eq
                 valid_eq = Interval.full_like(data)
@@ -220,6 +232,12 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
                 )
                 valid = valid.intersect(valid_eq)
 
+            # if any element has a decreasing constraint, impose it and
+            #  intersect with the overall valid interval
+            # constraints that need an element to the left/right are imposed
+            #  separately
+            # nudge the lower bound up and upper bound down for strict
+            #  monotonicity to ensure that the safe intervals don't overlap
             if np.any(elem_lt_left | elem_lt_right):
                 valid_lt = Interval.full_like(data)
             if np.any(elem_lt_right):
@@ -241,6 +259,12 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
             if np.any(elem_lt_left | elem_lt_right):
                 valid = valid.intersect(valid_lt)
 
+            # if any element has an increasing constraint, impose it and
+            #  intersect with the overall valid interval
+            # constraints that need an element to the left/right are imposed
+            #  separately
+            # nudge the lower bound up and upper bound down for strict
+            #  monotonicity to ensure that the safe intervals don't overlap
             if np.any(elem_gt_left | elem_gt_right):
                 valid_gt = Interval.full_like(data)
             if np.any(elem_gt_left):
@@ -262,6 +286,11 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
             if np.any(elem_gt_left | elem_gt_right):
                 valid = valid.intersect(valid_gt)
 
+        # produce conservative safe intervals by computing the midpoint between
+        #  the data and the lower/upper bound
+        # for strict monotonicity, the lower bound is nudged up to ensure its
+        #  midpoint rounds up while the limiting element's corresponding upper
+        #  bound will round down
         lt, ut, dt = (
             _to_total_order(valid._lower),
             _to_total_order(valid._upper),
@@ -275,10 +304,15 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
         valid._lower = _from_total_order(((lt ^ dt) >> 1) + (lt & dt), data.dtype)
         valid._upper = _from_total_order(((ut ^ dt) >> 1) + (ut & dt), data.dtype)
 
+        # ensure that finite values remain finite since they can otherwise
+        #  invalidate the monotonicity of their window
         valid = valid.intersect(
             Interval.full_like(data).preserve_finite(data.flatten())
         )
 
+        # only apply the safe interval restrictions to elements onto which any
+        #  constraints were actually imposed, i.e. leave elements alone that
+        #  are not part of any monotonic window
         filtered_valid = Interval.full_like(data)
         Lower(valid._lower) <= filtered_valid[any_restriction.flatten()] <= Upper(
             valid._upper

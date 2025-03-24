@@ -1,3 +1,7 @@
+"""
+Abstract base class for the elementwise safeguards.
+"""
+
 __all__ = ["ElementwiseSafeguard"]
 
 from abc import ABC, abstractmethod

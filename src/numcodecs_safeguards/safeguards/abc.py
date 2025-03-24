@@ -1,3 +1,7 @@
+"""
+Abstract base class for the safeguards.
+"""
+
 __all__ = ["Safeguard"]
 
 from abc import ABC, abstractmethod

@@ -20,21 +20,15 @@ from ...intervals import (
 
 class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     r"""
-    The `RelativeOrAbsoluteErrorBoundSafeguard` guarantees that the elementwise
-    absolute error between the *logarithms*\* of the values is less than or
-    equal to $\log(1 + eb_{rel})$ where `eb_rel` is e.g. 2%.
+    The `RelativeOrAbsoluteErrorBoundSafeguard` guarantees that either the
+    absolute error between the logarithms of the values is less than or
+    equal to $\log$(1 + `eb_rel`), and/or the absolute error between the values
+    is less than or equal to the provided absolute error bound `eb_abs`.
 
-    The logarithm* here is adapted to support positive, negative, and zero
-    values. For values close to zero, where the relative error is not well-
-    defined, the absolute elementwise error is guaranteed to be less than or
-    equal to the absolute error bound.
-
-    Put simply, each element satisfies the relative or the absolute error bound
-    (or both). In cases where the arithmetic evaluation of the error bound is
-    not well-defined, e.g. for infinite or NaN values, producing the exact same
-    bitpattern is defined to satisfy the error bound. If `equal_nan` is set to
-    [`True`][True], decoding a NaN value to a NaN value with a different
-    bitpattern also satisfies the error bound.
+    Infinite values are preserved with the same bit pattern. If `equal_nan` is
+    set to [`True`][True], decoding a NaN value to a NaN value with a different
+    bitpattern also satisfies the error bound. If `equal_nan` is set to
+    [`False`][False], NaN values are also preserved with the same bit pattern.
 
     Parameters
     ----------

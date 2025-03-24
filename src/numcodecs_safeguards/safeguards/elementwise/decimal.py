@@ -41,11 +41,10 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
     each decode value matches the sign of each original value and that a
     decoded value is zero if and only if it is zero in the original data.
 
-    In cases where the arithmetic evaluation of the error bound not well-
-    defined, e.g. for infinite or NaN values, producing the exact same
-    bitpattern is defined to satisfy the error bound. If `equal_nan` is set to
-    [`True`][True], decoding a NaN value to a NaN value with a different
-    bitpattern also satisfies the error bound.
+    Infinite values are preserved with the same bit pattern. If `equal_nan` is
+    set to [`True`][True], decoding a NaN value to a NaN value with a different
+    bitpattern also satisfies the error bound. If `equal_nan` is set to
+    [`False`][False], NaN values are also preserved with the same bit pattern.
 
     [^1]: Gustafson, J. L., & Yonemoto, I. T. (2017). Beating Floating Point at
         its Own Game: Posit Arithmetic. *Supercomputing Frontiers and

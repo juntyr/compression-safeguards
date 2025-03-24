@@ -37,7 +37,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         The codec must encode to a 1D buffer of bytes. It is desirable to
         perform lossless compression after applying the safeguards (rather than
         before), e.g. by customising the
-        [`Lossless.for_codec`][numcodecs_safeguards.Lossless.for_codec]
+        [`Lossless.for_codec`][numcodecs_safeguards.lossless.Lossless.for_codec]
         field of the `lossless` parameter.
 
         If [`None`][None], *only* the safeguards are used to encode the data.
@@ -47,19 +47,21 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
     safeguards : Sequence[dict | Safeguard]
         The safeguards that will be applied to the codec. They can either be
         passed as a safeguard configuration [`dict`][dict] or an already
-        initialized [`Safeguard`][numcodecs_safeguards.safeguards.Safeguard].
+        initialized
+        [`Safeguard`][numcodecs_safeguards.safeguards.abc.Safeguard].
 
-        Please refer to [`Safeguards`][numcodecs_safeguards.Safeguards] for an
-        enumeration of all supported safeguards.
+        Please refer to
+        [`Safeguards`][numcodecs_safeguards.safeguards.Safeguards]
+        for an enumeration of all supported safeguards.
     lossless : None | dict | Lossless, optional
         The lossless encoding that is applied after the codec and the
         safeguards:
 
-        - [`Lossless.for_codec`][numcodecs_safeguards.Lossless.for_codec]
+        - [`Lossless.for_codec`][numcodecs_safeguards.lossless.Lossless.for_codec]
           specifies the lossless encoding that is applied to the encoded output
           of the wrapped `codec`. By default, no additional lossless encoding
           is applied.
-        - [`Lossless.for_safeguards`][numcodecs_safeguards.Lossless.for_safeguards]
+        - [`Lossless.for_safeguards`][numcodecs_safeguards.lossless.Lossless.for_safeguards]
           specifies the lossless encoding that is applied to the encoded
           correction that the safeguards produce. By default, Huffman encoding
           followed by Zstandard is applied.

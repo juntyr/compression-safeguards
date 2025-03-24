@@ -23,11 +23,10 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     The `AbsoluteErrorBoundSafeguard` guarantees that the elementwise absolute
     error is less than or equal to the provided bound `eb_abs`.
 
-    In cases where the arithmetic evaluation of the error bound is not well-
-    defined, e.g. for infinite or NaN values, producing the exact same
-    bitpattern is defined to satisfy the error bound. If `equal_nan` is set to
-    [`True`][True], decoding a NaN value to a NaN value with a different
-    bitpattern also satisfies the error bound.
+    Infinite values are preserved with the same bit pattern. If `equal_nan` is
+    set to [`True`][True], decoding a NaN value to a NaN value with a different
+    bitpattern also satisfies the error bound. If `equal_nan` is set to
+    [`False`][False], NaN values are also preserved with the same bit pattern.
 
     Parameters
     ----------
