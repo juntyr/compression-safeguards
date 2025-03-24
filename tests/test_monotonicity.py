@@ -125,16 +125,16 @@ def test_monotonicity():
             sd=("sd",),
             co=("co",),
         ),
-        # Monotonicity.strict_to_weak: dict(
-        #     si=("si", "wi", "co"),
-        #     sd=("sd", "wd", "co"),
-        # ),
-        # Monotonicity.weak: dict(
-        #     si=("si", "wi", "co"),
-        #     sd=("sd", "wd", "co"),
-        #     wi=("si", "wi", "co"),
-        #     wd=("sd", "wd", "co"),
-        # ),
+        Monotonicity.strict_to_weak: dict(
+            si=("si", "wi", "co"),
+            sd=("sd", "wd", "co"),
+        ),
+        Monotonicity.weak: dict(
+            si=("si", "wi", "co"),
+            sd=("sd", "wd", "co"),
+            wi=("si", "wi", "co"),
+            wd=("sd", "wd", "co"),
+        ),
     }
 
     # test for all monotonicities
@@ -175,15 +175,15 @@ def test_monotonicity():
                 )
 
 
-# def test_fuzzer_sign_flip():
-#     data = np.array([14, 47, 0, 0, 254, 255, 255, 255, 0, 0], dtype=np.uint8)
-#     decoded = np.array([73, 0, 0, 0, 0, 27, 49, 14, 14, 50], dtype=np.uint8)
+def test_fuzzer_sign_flip():
+    data = np.array([14, 47, 0, 0, 254, 255, 255, 255, 0, 0], dtype=np.uint8)
+    decoded = np.array([73, 0, 0, 0, 0, 27, 49, 14, 14, 50], dtype=np.uint8)
 
-#     encode_decode_mock(
-#         data,
-#         decoded,
-#         safeguards=[
-#             dict(kind="monotonicity", monotonicity="strict_to_weak", window=1),
-#             dict(kind="sign"),
-#         ],
-#     )
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(kind="monotonicity", monotonicity="strict_to_weak", window=1),
+            dict(kind="sign"),
+        ],
+    )

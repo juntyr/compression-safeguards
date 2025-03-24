@@ -21,10 +21,10 @@ from ...intervals import (
 )
 
 
-_STRICT = ((lt, gt, False),) * 2
-_STRICT_WITH_CONSTS = ((lt, gt, True),) * 2
-_STRICT_TO_WEAK = ((lt, gt, False), (le, ge, True))
-_WEAK = ((le, ge, False), (le, ge, True))
+_STRICT = ((lt, gt, False, False),) * 2
+_STRICT_WITH_CONSTS = ((lt, gt, True, False),) * 2
+_STRICT_TO_WEAK = ((lt, gt, False, False), (le, ge, True, True))
+_WEAK = ((le, ge, False, True), (le, ge, True, True))
 
 
 class Monotonicity(Enum):
@@ -52,24 +52,24 @@ class Monotonicity(Enum):
     non-finite values are not affected.
     """
 
-    # strict_to_weak = _STRICT_TO_WEAK
-    # """
-    # Strictly increasing/decreasing sequences in the input array are guaranteed
-    # to be *weakly* increasing/decreasing (or constant) in the decoded array.
+    strict_to_weak = _STRICT_TO_WEAK
+    """
+    Strictly increasing/decreasing sequences in the input array are guaranteed
+    to be *weakly* increasing/decreasing (or constant) in the decoded array.
 
-    # Sequences that are not strictly increasing/decreasing or contain non-finite
-    # values are not affected.
-    # """
+    Sequences that are not strictly increasing/decreasing or contain non-finite
+    values are not affected.
+    """
 
-    # weak = _WEAK
-    # """
-    # Weakly increasing/decreasing (but not constant) sequences in the input
-    # array are guaranteed to be weakly increasing/decreasing (or constant) in
-    # the decoded array.
+    weak = _WEAK
+    """
+    Weakly increasing/decreasing (but not constant) sequences in the input
+    array are guaranteed to be weakly increasing/decreasing (or constant) in
+    the decoded array.
 
-    # Sequences that are not weakly increasing/decreasing or are constant or
-    # contain non-finite values are not affected.
-    # """
+    Sequences that are not weakly increasing/decreasing or are constant or
+    contain non-finite values are not affected.
+    """
 
 
 class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
@@ -172,6 +172,9 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
 
         window = 1 + self._window * 2
 
+        (_lt, _gt, _eq, is_weak) = self._monotonicity.value[1]
+        nudge = 0 if is_weak else 1
+
         valid = Interval.full_like(data)
 
         any_restriction = np.zeros_like(data, dtype=np.bool)
@@ -223,7 +226,7 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
                 any_restriction |= elem_lt_right
                 Lower(
                     _from_total_order(
-                        _to_total_order(np.roll(data, -1, axis=axis)) + 1,
+                        _to_total_order(np.roll(data, -1, axis=axis)) + nudge,
                         dtype=data.dtype,
                     ).flatten()
                 ) <= valid_lt[elem_lt_right.flatten()]
@@ -231,7 +234,7 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
                 any_restriction |= elem_lt_left
                 valid_lt[elem_lt_left.flatten()] <= Upper(
                     _from_total_order(
-                        _to_total_order(np.roll(data, +1, axis=axis)) - 1,
+                        _to_total_order(np.roll(data, +1, axis=axis)) - nudge,
                         dtype=data.dtype,
                     ).flatten()
                 )
@@ -244,7 +247,7 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
                 any_restriction |= elem_gt_left
                 Lower(
                     _from_total_order(
-                        _to_total_order(np.roll(data, +1, axis=axis)) + 1,
+                        _to_total_order(np.roll(data, +1, axis=axis)) + nudge,
                         dtype=data.dtype,
                     ).flatten()
                 ) <= valid_gt[elem_gt_left.flatten()]
@@ -252,7 +255,7 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
                 any_restriction |= elem_gt_right
                 valid_gt[elem_gt_right.flatten()] <= Upper(
                     _from_total_order(
-                        _to_total_order(np.roll(data, -1, axis=axis)) - 1,
+                        _to_total_order(np.roll(data, -1, axis=axis)) - nudge,
                         dtype=data.dtype,
                     ).flatten()
                 )
@@ -264,7 +267,8 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
             _to_total_order(valid._upper),
             _to_total_order(data.flatten()),
         )
-        lt = np.where((lt + 1) > 0, lt + 1, lt)
+        if not is_weak:
+            lt = np.where((lt + 1) > 0, lt + 1, lt)
 
         # Hacker's Delight's algorithm to compute (a + b) / 2:
         #  ((a ^ b) >> 1) + (a & b)
@@ -304,7 +308,7 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
         *,
         is_decoded: bool,
     ) -> np.ndarray:
-        (lt, gt, eq) = self._monotonicity.value[int(is_decoded)]
+        (lt, gt, eq, _is_weak) = self._monotonicity.value[int(is_decoded)]
 
         # default to NaN
         monotonic = np.empty(x.shape[:-1])
@@ -343,11 +347,11 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
                     decoded_monotonic != data_monotonic,
                     False,
                 )
-            # case Monotonicity.strict_to_weak | Monotonicity.weak:
-            #     return np.where(
-            #         np.isfinite(data_monotonic),
-            #         # having the opposite sign or no sign are both not equal
-            #         (decoded_monotonic == -data_monotonic)
-            #         | np.isnan(decoded_monotonic),
-            #         False,
-            #     )
+            case Monotonicity.strict_to_weak | Monotonicity.weak:
+                return np.where(
+                    np.isfinite(data_monotonic),
+                    # having the opposite sign or no sign are both not equal
+                    (decoded_monotonic == -data_monotonic)
+                    | np.isnan(decoded_monotonic),
+                    False,
+                )
