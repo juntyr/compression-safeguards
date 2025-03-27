@@ -160,7 +160,7 @@ def test_monotonicity():
                 )
 
                 # correcting the data must pass both checks
-                corrected = safeguard.compute_safe_intervals(data).encode(decoded)
+                corrected = safeguard.compute_safe_intervals(data).pick(decoded)
                 assert safeguard.check(data, corrected)
             else:
                 # the window doesn't activate the safeguard so the checks must
@@ -170,7 +170,7 @@ def test_monotonicity():
                 # the window doesn't activate the safeguard so the corrected
                 #  array should be bit-equivalent to the decoded array
                 assert np.array_equal(
-                    as_bits(safeguard.compute_safe_intervals(data).encode(decoded)),
+                    as_bits(safeguard.compute_safe_intervals(data).pick(decoded)),
                     as_bits(decoded),
                 )
 

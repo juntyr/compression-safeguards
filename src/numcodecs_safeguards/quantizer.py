@@ -141,7 +141,7 @@ class SafeguardsQuantizer:
         combined_intervals = all_intervals[0]
         for intervals in all_intervals[1:]:
             combined_intervals = combined_intervals.intersect(intervals)
-        correction = combined_intervals.encode(prediction)
+        correction = combined_intervals.pick(prediction)
 
         for safeguard, intervals in zip(self._elementwise_safeguards, all_intervals):
             assert np.all(intervals.contains(correction)), (
