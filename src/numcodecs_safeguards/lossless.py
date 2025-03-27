@@ -1,3 +1,9 @@
+"""
+Helper classes for lossless encoding for the codec and quantizer with safeguards.
+"""
+
+__all__ = ["Lossless"]
+
 from dataclasses import dataclass, field
 from io import BytesIO
 from typing_extensions import Buffer  # MSPV 3.12
@@ -123,12 +129,34 @@ class DeltaHuffmanCodec(HuffmanCodec):
 numcodecs.registry.register_codec(DeltaHuffmanCodec)
 
 
+def _default_lossless_for_safeguards():
+    return CodecStack(
+        DeltaHuffmanCodec(),
+        numcodecs.zstd.Zstd(level=3),
+    )
+
+
 @dataclass
 class Lossless:
+    """
+    Configuration for the lossless encoding used by the
+    [`SafeguardsCodec`][numcodecs_safeguards.codec.SafeguardsCodec] to encode
+    the wrapped codec's encoded data and any safeguards-quantized corrections.
+    """
+
     for_codec: None | dict | Codec = None
+    """
+    Lossless codec (configuration) that is applied to wrapped codec's encoding.
+    
+    By default, no further lossless encoding is applied.
+    """
+
     for_safeguards: dict | Codec = field(
-        default_factory=lambda: CodecStack(
-            DeltaHuffmanCodec(),
-            numcodecs.zstd.Zstd(level=3),
-        )
+        default_factory=_default_lossless_for_safeguards,
     )
+    """
+    Lossless codec (configuration) that is applied to the safeguard-quantized
+    corrections.
+    
+    The default is considered an implementation detail.
+    """
