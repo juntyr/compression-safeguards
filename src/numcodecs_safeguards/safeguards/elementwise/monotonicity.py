@@ -11,13 +11,12 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
 from .abc import ElementwiseSafeguard
+from ...cast import to_total_order, from_total_order
 from ...intervals import (
     IntervalUnion,
     Interval,
     Lower,
     Upper,
-    _to_total_order,
-    _from_total_order,
 )
 
 
@@ -243,16 +242,16 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
             if np.any(elem_lt_right):
                 any_restriction |= elem_lt_right
                 Lower(
-                    _from_total_order(
-                        _to_total_order(np.roll(data, -1, axis=axis)) + nudge,
+                    from_total_order(
+                        to_total_order(np.roll(data, -1, axis=axis)) + nudge,
                         dtype=data.dtype,
                     ).flatten()
                 ) <= valid_lt[elem_lt_right.flatten()]
             if np.any(elem_lt_left):
                 any_restriction |= elem_lt_left
                 valid_lt[elem_lt_left.flatten()] <= Upper(
-                    _from_total_order(
-                        _to_total_order(np.roll(data, +1, axis=axis)) - nudge,
+                    from_total_order(
+                        to_total_order(np.roll(data, +1, axis=axis)) - nudge,
                         dtype=data.dtype,
                     ).flatten()
                 )
@@ -270,16 +269,16 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
             if np.any(elem_gt_left):
                 any_restriction |= elem_gt_left
                 Lower(
-                    _from_total_order(
-                        _to_total_order(np.roll(data, +1, axis=axis)) + nudge,
+                    from_total_order(
+                        to_total_order(np.roll(data, +1, axis=axis)) + nudge,
                         dtype=data.dtype,
                     ).flatten()
                 ) <= valid_gt[elem_gt_left.flatten()]
             if np.any(elem_gt_right):
                 any_restriction |= elem_gt_right
                 valid_gt[elem_gt_right.flatten()] <= Upper(
-                    _from_total_order(
-                        _to_total_order(np.roll(data, -1, axis=axis)) - nudge,
+                    from_total_order(
+                        to_total_order(np.roll(data, -1, axis=axis)) - nudge,
                         dtype=data.dtype,
                     ).flatten()
                 )
@@ -291,18 +290,16 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
         # for strict monotonicity, the lower bound is nudged up to ensure its
         #  midpoint rounds up while the limiting element's corresponding upper
         #  bound will round down
-        lt, ut, dt = (
-            _to_total_order(valid._lower),
-            _to_total_order(valid._upper),
-            _to_total_order(data.flatten()),
-        )
+        lt: np.ndarray = to_total_order(valid._lower)
+        ut: np.ndarray = to_total_order(valid._upper)
+        dt: np.ndarray = to_total_order(data.flatten())
         if not is_weak:
             lt = np.where((lt + 1) > 0, lt + 1, lt)
 
         # Hacker's Delight's algorithm to compute (a + b) / 2:
         #  ((a ^ b) >> 1) + (a & b)
-        valid._lower = _from_total_order(((lt ^ dt) >> 1) + (lt & dt), data.dtype)
-        valid._upper = _from_total_order(((ut ^ dt) >> 1) + (ut & dt), data.dtype)
+        valid._lower = from_total_order(((lt ^ dt) >> 1) + (lt & dt), data.dtype)
+        valid._upper = from_total_order(((ut ^ dt) >> 1) + (ut & dt), data.dtype)
 
         # ensure that finite values remain finite since they can otherwise
         #  invalidate the monotonicity of their window

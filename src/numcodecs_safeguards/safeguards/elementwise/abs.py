@@ -7,15 +7,13 @@ __all__ = ["AbsoluteErrorBoundSafeguard"]
 import numpy as np
 
 from .abc import ElementwiseSafeguard
+from ...cast import to_float, from_float, as_bits, to_total_order, from_total_order
 from ...intervals import (
     IntervalUnion,
     Interval,
     Lower,
     Upper,
-    _to_total_order,
-    _from_total_order,
 )
-from ...cast import to_float, from_float, as_bits
 
 
 class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
@@ -147,12 +145,12 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
                 to_float(valid._upper) - data_float
             ) > self._eb_abs
 
-        valid._lower[np.isfinite(data)] = _from_total_order(
-            _to_total_order(valid._lower) + lower_bound_outside_eb_abs,
+        valid._lower[np.isfinite(data)] = from_total_order(
+            to_total_order(valid._lower) + lower_bound_outside_eb_abs,
             data.dtype,
         )[np.isfinite(data)]
-        valid._upper[np.isfinite(data)] = _from_total_order(
-            _to_total_order(valid._upper) - upper_bound_outside_eb_abs,
+        valid._upper[np.isfinite(data)] = from_total_order(
+            to_total_order(valid._upper) - upper_bound_outside_eb_abs,
             data.dtype,
         )[np.isfinite(data)]
 

@@ -7,14 +7,12 @@ __all__ = ["RelativeOrAbsoluteErrorBoundSafeguard"]
 import numpy as np
 
 from .abc import ElementwiseSafeguard
-from ...cast import to_float, from_float, as_bits
+from ...cast import to_float, from_float, as_bits, to_total_order, from_total_order
 from ...intervals import (
     IntervalUnion,
     Interval,
     Lower,
     Upper,
-    _to_total_order,
-    _from_total_order,
 )
 
 
@@ -188,12 +186,12 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
                 > eb_rel_multipler
             )
 
-        valid._lower[np.isfinite(data)] = _from_total_order(
-            _to_total_order(valid._lower) + lower_bound_outside_eb_decimal,
+        valid._lower[np.isfinite(data)] = from_total_order(
+            to_total_order(valid._lower) + lower_bound_outside_eb_decimal,
             data.dtype,
         )[np.isfinite(data)]
-        valid._upper[np.isfinite(data)] = _from_total_order(
-            _to_total_order(valid._upper) - upper_bound_outside_eb_decimal,
+        valid._upper[np.isfinite(data)] = from_total_order(
+            to_total_order(valid._upper) - upper_bound_outside_eb_decimal,
             data.dtype,
         )[np.isfinite(data)]
 
@@ -228,12 +226,12 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
                 to_float(valid_abs._upper) - data_float
             ) > self._eb_abs
 
-        valid_abs._lower[np.isfinite(data)] = _from_total_order(
-            _to_total_order(valid_abs._lower) + lower_bound_outside_eb_abs,
+        valid_abs._lower[np.isfinite(data)] = from_total_order(
+            to_total_order(valid_abs._lower) + lower_bound_outside_eb_abs,
             data.dtype,
         )[np.isfinite(data)]
-        valid_abs._upper[np.isfinite(data)] = _from_total_order(
-            _to_total_order(valid_abs._upper) - upper_bound_outside_eb_abs,
+        valid_abs._upper[np.isfinite(data)] = from_total_order(
+            to_total_order(valid_abs._upper) - upper_bound_outside_eb_abs,
             data.dtype,
         )[np.isfinite(data)]
 

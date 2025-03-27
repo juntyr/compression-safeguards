@@ -1,8 +1,8 @@
 """
-Utility functions to cast arrays to floating point and binary representation.
+Utility functions to cast arrays to floating point, binary, and total-order representations.
 """
 
-__all__ = ["to_float", "from_float", "as_bits"]
+__all__ = ["to_float", "from_float", "as_bits", "to_total_order", "from_total_order"]
 
 from typing import Any, TypeVar
 
@@ -12,6 +12,8 @@ T = TypeVar("T", bound=np.dtype)
 """ Any numpy [`dtype`][numpy.dtype] type variable. """
 F = TypeVar("F", bound=np.dtype)
 """ Any numpy [`floating`][numpy.floating] dtype type variable. """
+U = TypeVar("U", bound=np.dtype)
+""" Any numpy [`unsigned`][numpy.unsigned] dtype type variable. """
 S = TypeVar("S", bound=tuple[int, ...])
 """ Any array shape. """
 
@@ -99,3 +101,88 @@ def as_bits(a: np.ndarray[S, T], *, kind: str = "u") -> np.ndarray[S, Any]:
     """
 
     return a.view(a.dtype.str.replace("f", kind).replace("i", kind).replace("u", kind))  # type: ignore
+
+
+def to_total_order(a: np.ndarray[S, T]) -> np.ndarray[S, U]:
+    """
+    Reinterprets the array `a` to its total-order unsigned binary
+    representation.
+
+    In their total-order representation, the smallest value is mapped to
+    unsigned zero, and the largest value is mapped to the largest unsigned
+    value.
+
+    For floating point values, this implementation is based on Michael Herf's
+    `FloatFlip` function, see <http://stereopsis.com/radix.html>.
+
+    Parameters
+    ----------
+    a : np.ndarray[S, T]
+        The array to reinterpret to its total-order.
+
+    Returns
+    -------
+    ordered : np.ndarray[S, U]
+        The total-order unsigned binary representation of the array `a`.
+    """
+
+    if np.issubdtype(a.dtype, np.unsignedinteger):
+        return a  # type: ignore
+
+    utype = a.dtype.str.replace("i", "u").replace("f", "u")
+
+    if np.issubdtype(a.dtype, np.signedinteger):
+        return a.view(utype) + np.array(np.iinfo(a.dtype).max, dtype=utype) + 1
+
+    if not np.issubdtype(a.dtype, np.floating):
+        raise TypeError(f"unsupported interval type {a.dtype}")
+
+    itype = a.dtype.str.replace("f", "i")
+    bits = np.iinfo(utype).bits
+
+    mask = (-((a.view(dtype=utype) >> (bits - 1)).view(dtype=itype))).view(
+        dtype=utype
+    ) | (np.array(1, dtype=utype) << (bits - 1))
+
+    return a.view(dtype=utype) ^ mask
+
+
+def from_total_order(a: np.ndarray[S, U], dtype: T) -> np.ndarray[S, T]:
+    """
+    Reverses the reinterpretation of the array `a` back from total-order
+    unsigned binary to the provided `dtype`.
+
+    For floating point values, this implementation is based on Michael Herf's
+    `IFloatFlip` function, see <http://stereopsis.com/radix.html>.
+
+    Parameters
+    ----------
+    a : np.ndarray[S, U]
+        The array to reverse-reinterpret back from its total-order.
+
+    Returns
+    -------
+    array : np.ndarray[S, T]
+        The array with its original `dtype`.
+    """
+
+    assert np.issubdtype(a.dtype, np.unsignedinteger)
+
+    if np.issubdtype(dtype, np.unsignedinteger):
+        return a  # type: ignore
+
+    if np.issubdtype(dtype, np.signedinteger):
+        return a.view(dtype) + np.iinfo(dtype).max + 1  # type: ignore
+
+    if not np.issubdtype(dtype, np.floating):
+        raise TypeError(f"unsupported interval type {dtype}")
+
+    utype = dtype.str.replace("f", "u")
+    itype = dtype.str.replace("f", "i")
+    bits = np.iinfo(utype).bits
+
+    mask = ((a >> (bits - 1)).view(dtype=itype) - 1).view(dtype=utype) | (
+        np.array(1, dtype=utype) << (bits - 1)
+    )
+
+    return (a ^ mask).view(dtype=dtype)

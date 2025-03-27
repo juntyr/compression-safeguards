@@ -9,7 +9,7 @@ from typing_extensions import Self  # MSPV 3.11
 
 import numpy as np
 
-from .cast import as_bits
+from .cast import as_bits, to_total_order, from_total_order
 
 T = TypeVar("T", bound=np.dtype)
 N = TypeVar("N", bound=Literal[1])
@@ -278,14 +278,14 @@ class Interval(Generic[T, N]):
 
         Lower(
             np.array(
-                _from_total_order(
-                    _to_total_order(np.array(-np.inf, dtype=a.dtype)) + 1, a.dtype
+                from_total_order(
+                    to_total_order(np.array(-np.inf, dtype=a.dtype)) + 1, a.dtype
                 )
             )
         ) <= self[np.isfinite(a)] <= Upper(
             np.array(
-                _from_total_order(
-                    _to_total_order(np.array(np.inf, dtype=a.dtype)) - 1, a.dtype
+                from_total_order(
+                    to_total_order(np.array(np.inf, dtype=a.dtype)) - 1, a.dtype
                 )
             )
         )
@@ -318,14 +318,14 @@ class Interval(Generic[T, N]):
         )
 
         intersection_lower = np.maximum(
-            _to_total_order(self._lower), _to_total_order(other._lower)
+            to_total_order(self._lower), to_total_order(other._lower)
         )
         intersection_upper = np.minimum(
-            _to_total_order(self._upper), _to_total_order(other._upper)
+            to_total_order(self._upper), to_total_order(other._upper)
         )
 
-        out._lower[:] = _from_total_order(intersection_lower, out._lower.dtype)
-        out._upper[:] = _from_total_order(intersection_upper, out._upper.dtype)
+        out._lower[:] = from_total_order(intersection_lower, out._lower.dtype)
+        out._upper[:] = from_total_order(intersection_upper, out._upper.dtype)
 
         return out
 
@@ -573,21 +573,21 @@ class IntervalUnion(Generic[T, N, U]):
         for i in range(u):
             for j in range(v):
                 intersection_lower = np.maximum(
-                    _to_total_order(self._lower[i]), _to_total_order(other._lower[j])
+                    to_total_order(self._lower[i]), to_total_order(other._lower[j])
                 )
                 intersection_upper = np.minimum(
-                    _to_total_order(self._upper[i]), _to_total_order(other._upper[j])
+                    to_total_order(self._upper[i]), to_total_order(other._upper[j])
                 )
 
                 has_intersection = intersection_lower <= intersection_upper
 
                 out._lower[n_intervals[has_intersection], has_intersection] = (
-                    _from_total_order(
+                    from_total_order(
                         intersection_lower[has_intersection], out._lower.dtype
                     )
                 )
                 out._upper[n_intervals[has_intersection], has_intersection] = (
-                    _from_total_order(
+                    from_total_order(
                         intersection_upper[has_intersection], out._upper.dtype
                     )
                 )
@@ -614,14 +614,14 @@ class IntervalUnion(Generic[T, N, U]):
             The per-element result of the contains check
         """
 
-        other_flat = _to_total_order(other).flatten()
+        other_flat: np.ndarray = to_total_order(other).flatten()
 
         (u, n) = self._lower.shape
         is_contained = np.zeros((n,), dtype=np.dtype(bool))
 
         for i in range(u):
-            is_contained |= (other_flat >= _to_total_order(self._lower[i])) & (
-                other_flat <= _to_total_order(self._upper[i])
+            is_contained |= (other_flat >= to_total_order(self._lower[i])) & (
+                other_flat <= to_total_order(self._upper[i])
             )
 
         return is_contained.reshape(other.shape)  # type: ignore
@@ -645,11 +645,12 @@ class IntervalUnion(Generic[T, N, U]):
         contains_prediction = self.contains(prediction).flatten()
 
         # 1. convert everything to bits in total order
-        prediction_bits = _to_total_order(prediction).reshape(1, -1)
+        prediction_bits: np.ndarray = to_total_order(prediction).reshape(1, -1)
         todtype = prediction_bits.dtype
         prediction_bits = as_bits(prediction_bits)
 
-        lower, upper = _to_total_order(self._lower), _to_total_order(self._upper)
+        lower: np.ndarray = to_total_order(self._lower)
+        upper: np.ndarray = to_total_order(self._upper)
         interval_nonempty = lower <= upper
         lower, upper = as_bits(lower), as_bits(upper)
 
@@ -721,7 +722,7 @@ class IntervalUnion(Generic[T, N, U]):
         pick = np.where(contains_prediction, prediction_bits, prediction_bits - pick)
 
         # 13. convert everything back from total-ordered bits to value space
-        pick = _from_total_order(pick.view(todtype), prediction.dtype).reshape(
+        pick = from_total_order(pick.view(todtype), prediction.dtype).reshape(
             prediction.shape
         )
         assert np.all(self.contains(pick))
@@ -750,59 +751,6 @@ class IntervalUnion(Generic[T, N, U]):
 
     def __repr__(self) -> str:
         return f"IntervalUnion(lower={self._lower!r}, upper={self._upper!r})"
-
-
-def _to_total_order(x: np.ndarray) -> np.ndarray:
-    """
-    FloatFlip in http://stereopsis.com/radix.html
-    """
-
-    if np.issubdtype(x.dtype, np.unsignedinteger):
-        return x
-
-    utype = x.dtype.str.replace("i", "u").replace("f", "u")
-
-    if np.issubdtype(x.dtype, np.signedinteger):
-        return x.view(utype) + np.array(np.iinfo(x.dtype).max, dtype=utype) + 1
-
-    if not np.issubdtype(x.dtype, np.floating):
-        raise TypeError(f"unsupported interval type {x.dtype}")
-
-    itype = x.dtype.str.replace("f", "i")
-    bits = np.iinfo(utype).bits
-
-    mask = (-((x.view(dtype=utype) >> (bits - 1)).view(dtype=itype))).view(
-        dtype=utype
-    ) | (np.array(1, dtype=utype) << (bits - 1))
-
-    return x.view(dtype=utype) ^ mask
-
-
-def _from_total_order(x: np.ndarray, dtype: np.dtype) -> np.ndarray:
-    """
-    IFloatFlip in http://stereopsis.com/radix.html
-    """
-
-    assert np.issubdtype(x.dtype, np.unsignedinteger)
-
-    if np.issubdtype(dtype, np.unsignedinteger):
-        return x
-
-    if np.issubdtype(dtype, np.signedinteger):
-        return x.view(dtype) + np.iinfo(dtype).max + 1
-
-    if not np.issubdtype(dtype, np.floating):
-        raise TypeError(f"unsupported interval type {dtype}")
-
-    utype = dtype.str.replace("f", "u")
-    itype = dtype.str.replace("f", "i")
-    bits = np.iinfo(utype).bits
-
-    mask = ((x >> (bits - 1)).view(dtype=itype) - 1).view(dtype=utype) | (
-        np.array(1, dtype=utype) << (bits - 1)
-    )
-
-    return (x ^ mask).view(dtype=dtype)
 
 
 def _count_leading_zeros(x: np.ndarray) -> np.ndarray:
