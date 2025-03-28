@@ -12,6 +12,7 @@ dependencies = [
     "numcodecs>=0.13.0,<0.16",
     "numcodecs-combinators~=0.2.3",
     "numpy~=2.0",
+    # "numpy-quaddtype~=0.0.7", # pip install -i https://test.pypi.org/simple/ numpy-quaddtype~=0.0.7
     "varint~=1.0",
     "typing-extensions~=4.6",
     "dahuffman~=0.4.0",
@@ -45,5 +46,5 @@ where = ["src"]
 addopts = ["--import-mode=importlib"]
 
 [[tool.mypy.overrides]]
-module = ["dahuffman.*", "numcodecs.*", "varint.*"]
+module = ["dahuffman.*", "numcodecs.*", "numpy_quaddtype.*", "varint.*"]
 follow_untyped_imports = true

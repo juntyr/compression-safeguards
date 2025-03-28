@@ -7,7 +7,14 @@ __all__ = ["RelativeOrAbsoluteErrorBoundSafeguard"]
 import numpy as np
 
 from .abc import ElementwiseSafeguard
-from ...cast import to_float, from_float, as_bits, to_total_order, from_total_order
+from ...cast import (
+    to_float,
+    from_float,
+    as_bits,
+    to_total_order,
+    from_total_order,
+    to_finite_float,
+)
 from ...intervals import (
     IntervalUnion,
     Interval,
@@ -144,11 +151,10 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_rel_multipler = min(
-                np.array(self._eb_rel).astype(data_float.dtype) + 1,
-                np.finfo(data_float.dtype).max,
+            eb_rel_multipler = to_finite_float(
+                self._eb_rel, data_float.dtype, map=lambda x: x + 1
             )
-        assert eb_rel_multipler >= 1.0 and np.isfinite(eb_rel_multipler)
+        assert eb_rel_multipler >= 1.0
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
@@ -198,14 +204,8 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         # create a separate interval for the absolute error bound
         valid_abs = Interval.empty_like(data)
 
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            eb_abs = min(
-                np.array(self._eb_abs).astype(data_float.dtype),
-                np.finfo(data_float.dtype).max,
-            )
-        assert eb_abs >= 0.0 and np.isfinite(eb_abs)
+        eb_abs = to_finite_float(self._eb_abs, data_float.dtype)
+        assert eb_abs >= 0.0
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"

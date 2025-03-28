@@ -7,7 +7,14 @@ __all__ = ["DecimalErrorBoundSafeguard"]
 import numpy as np
 
 from .abc import ElementwiseSafeguard
-from ...cast import to_float, from_float, as_bits, to_total_order, from_total_order
+from ...cast import (
+    to_float,
+    from_float,
+    as_bits,
+    to_total_order,
+    from_total_order,
+    to_finite_float,
+)
 from ...intervals import (
     IntervalUnion,
     Interval,
@@ -142,13 +149,10 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_decimal_multipler = min(
-                np.power(np.array(10, dtype=data_float.dtype), self._eb_decimal).astype(
-                    data_float.dtype
-                ),
-                np.finfo(data_float.dtype).max,
+            eb_decimal_multipler = to_finite_float(
+                10, data_float.dtype, map=lambda x: np.power(x, self._eb_decimal)
             )
-        assert eb_decimal_multipler >= 1.0 and np.isfinite(eb_decimal_multipler)
+        assert eb_decimal_multipler >= 1.0
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
@@ -220,8 +224,10 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         # abs(log10(x/y)) : otherwise
         return np.where(
             (sign_x == 0) & (sign_y == 0),
-            0.0,
+            to_float(np.array(0.0)),
             np.where(
-                sign_x != sign_y, np.inf, (np.abs(np.log10(to_float(x) / to_float(y))))
+                sign_x != sign_y,
+                to_float(np.array(np.inf)),
+                np.abs(np.log10(to_float(x) / to_float(y))),
             ),
         )

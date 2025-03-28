@@ -4,7 +4,7 @@ Utility functions to cast arrays to floating point, binary, and total-order repr
 
 __all__ = ["to_float", "from_float", "as_bits", "to_total_order", "from_total_order"]
 
-from typing import Any, TypeVar
+from typing import Any, Callable, TypeVar
 
 import numpy as np
 
@@ -28,12 +28,12 @@ def to_float(x: np.ndarray[S, T]) -> np.ndarray[S, F]:
     Parameters
     ----------
     x : np.ndarray[S, T]
-        The array to cast.
+        The array to convert.
 
     Returns
     -------
-    cast : np.ndarray[S, F]
-        The cast array with a floating dtype.
+    converted : np.ndarray[S, F]
+        The converted array with a floating dtype.
     """
 
     if np.issubdtype(x.dtype, np.floating):
@@ -43,19 +43,59 @@ def to_float(x: np.ndarray[S, T]) -> np.ndarray[S, F]:
         np.dtype(np.int8): np.float16,
         np.dtype(np.int16): np.float32,
         np.dtype(np.int32): np.float64,
-        np.dtype(np.int64): np.float128,
+        np.dtype(np.int64): _float128,
         np.dtype(np.uint8): np.float16,
         np.dtype(np.uint16): np.float32,
         np.dtype(np.uint32): np.float64,
-        np.dtype(np.uint64): np.float128,
+        np.dtype(np.uint64): _float128,
     }[x.dtype]
 
     return x.astype(ftype)  # type: ignore
 
 
+def to_finite_float(
+    x: int | float | np.ndarray, dtype: F, *, map: None | Callable = None
+) -> np.ndarray[tuple[int, ...], F]:
+    """
+    Convert `x` to the floating-point dtype `F` and apply an optional `map`ping function.
+
+    The result is clamped between the minimum and maximum floating point values
+    to guarantee that it is finite.
+
+    The dtype `F` should come from a prior use of the
+    [`to_float`][numcodecs_safeguards.cast.to_float] helper function.
+
+    Parameters
+    ----------
+    x : int | float | np.ndarray
+        The value or array to convert.
+    dtype : np.dtype
+        The floating-point dtype to convert `x` to.
+    map : None | Callable
+        The mapping function to apply to `x`.
+
+    Returns
+    -------
+    converted : np.ndarray[tuple[int, ...], F]
+        The converted value or array with `dtype`.
+    """
+
+    xf = np.array(x).astype(dtype)
+
+    if map is not None:
+        xf = np.array(map(xf)).astype(dtype)
+
+    if np.dtype(dtype) == _float128:
+        minv, maxv = _float128_min, _float128_max
+    else:
+        minv, maxv = np.finfo(dtype).min, np.finfo(dtype).max
+
+    return np.maximum(minv, np.minimum(xf, maxv))  # type: ignore
+
+
 def from_float(x: np.ndarray[S, F], dtype: T) -> np.ndarray[S, T]:
     """
-    Reverses the cast of the array `x`, using the
+    Reverses the conversion of the array `x`, using the
     [`to_float`][numcodecs_safeguards.cast.to_float], back to the original
     `dtype`.
 
@@ -65,12 +105,14 @@ def from_float(x: np.ndarray[S, F], dtype: T) -> np.ndarray[S, T]:
     Parameters
     ----------
     x : np.ndarray[S, F]
-        The array to un-cast.
+        The array to re-convert.
+    dtype : np.dtype
+        The original dtype.
 
     Returns
     -------
-    cast : np.ndarray[S, T]
-        The un-cast array with the original `dtype`.
+    converted : np.ndarray[S, T]
+        The re-coverted array with the original `dtype`.
     """
 
     if x.dtype == dtype:
@@ -186,3 +228,23 @@ def from_total_order(a: np.ndarray[S, U], dtype: T) -> np.ndarray[S, T]:
     )
 
     return (a ^ mask).view(dtype=dtype)
+
+
+try:
+    _float128: np.dtype = np.dtype(np.float128)
+    assert np.finfo(np.float128).bits == 128
+    _float128_min = np.finfo(np.float128).min
+    _float128_max = np.finfo(np.float128).max
+except (AttributeError, AssertionError):
+    try:
+        import numpy_quaddtype
+
+        _float128 = numpy_quaddtype.QuadPrecDType("sleef")
+        _float128_min = numpy_quaddtype.min_value
+        _float128_max = numpy_quaddtype.max_value
+    except ImportError:
+        raise TypeError("""
+numcodecs_safeguards requires float128 support:
+- numpy.float128 either does not exist is does not offer 128 bit precision
+- numpy_quaddtype is not installed
+""") from None

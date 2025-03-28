@@ -7,7 +7,14 @@ __all__ = ["AbsoluteErrorBoundSafeguard"]
 import numpy as np
 
 from .abc import ElementwiseSafeguard
-from ...cast import to_float, from_float, as_bits, to_total_order, from_total_order
+from ...cast import (
+    to_float,
+    from_float,
+    as_bits,
+    to_total_order,
+    from_total_order,
+    to_finite_float,
+)
 from ...intervals import (
     IntervalUnion,
     Interval,
@@ -117,14 +124,8 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             .preserve_nan(data, equal_nan=self._equal_nan)
         )
 
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            eb_abs = min(
-                np.array(self._eb_abs).astype(data_float.dtype),
-                np.finfo(data_float.dtype).max,
-            )
-        assert eb_abs >= 0.0 and np.isfinite(eb_abs)
+        eb_abs = to_finite_float(self._eb_abs, data_float.dtype)
+        assert eb_abs >= 0.0
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"

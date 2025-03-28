@@ -9,7 +9,14 @@ from fractions import Fraction
 
 import numpy as np
 
-from ....cast import to_float, from_float, as_bits, to_total_order, from_total_order
+from ....cast import (
+    to_float,
+    from_float,
+    as_bits,
+    to_total_order,
+    from_total_order,
+    to_finite_float,
+)
 from ....intervals import (
     IntervalUnion,
     Interval,
@@ -127,11 +134,10 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
         self._offsets = _finite_difference_offsets(type, order, accuracy)
         self._coefficients = _finite_difference_coefficients(order, self._offsets)
+        self._coefficients_abs_sum = sum(abs(c) for c in self._coefficients)
 
         self._eb_abs_impl = (
-            Fraction(eb_abs)
-            * (Fraction(dx) ** order)
-            / sum(abs(c) for c in self._coefficients)
+            Fraction(eb_abs) * (Fraction(dx) ** order) / self._coefficients_abs_sum
         )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -216,15 +222,22 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            try:
-                eb_abs_impl = min(
-                    np.array(self._eb_abs_impl).astype(data_float.dtype),
-                    np.finfo(data_float.dtype).max,
-                )
-            # converting Fraction to an array may error
-            except OverflowError:
-                eb_abs_impl = np.finfo(data_float.dtype).max
-        assert eb_abs_impl >= 0.0 and np.isfinite(eb_abs_impl)
+            # recompute from parts here to ensure eb_abs, dx, and the
+            #  coefficients are all in (extended-precision) floating point
+            dx = to_finite_float(
+                self._dx, data_float.dtype, map=lambda x: x**self._order
+            )
+            coefficients_abs_sum_inv = to_finite_float(
+                self._coefficients_abs_sum.denominator,
+                data_float.dtype,
+                map=lambda x: x / self._coefficients_abs_sum.numerator,
+            )
+            eb_abs_impl = to_finite_float(
+                self._eb_abs,
+                data_float.dtype,
+                map=lambda x: x * dx * coefficients_abs_sum_inv,
+            )
+        assert eb_abs_impl >= 0.0
 
         valid = (
             Interval.empty_like(data)
