@@ -204,7 +204,10 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         # create a separate interval for the absolute error bound
         valid_abs = Interval.empty_like(data)
 
-        eb_abs = to_finite_float(self._eb_abs, data_float.dtype)
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            eb_abs = to_finite_float(self._eb_abs, data_float.dtype)
         assert eb_abs >= 0.0
 
         with np.errstate(

@@ -124,7 +124,10 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             .preserve_nan(data, equal_nan=self._equal_nan)
         )
 
-        eb_abs = to_finite_float(self._eb_abs, data_float.dtype)
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            eb_abs = to_finite_float(self._eb_abs, data_float.dtype)
         assert eb_abs >= 0.0
 
         with np.errstate(
