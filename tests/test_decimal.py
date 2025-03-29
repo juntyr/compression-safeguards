@@ -128,3 +128,42 @@ def test_fuzzer_int_to_float_precision():
             dict(kind="decimal", eb_decimal=2.2250738585072014e-308, equal_nan=True),
         ],
     )
+
+
+def test_fuzzer_issue_9():
+    data = np.array(
+        [
+            1499027801,
+            1499027801,
+            117922137,
+            482048,
+            117901063,
+            2080835335,
+            117901063,
+            117900551,
+        ],
+        dtype=np.int32,
+    )
+    decoded = np.array(
+        [
+            117901063,
+            117901063,
+            117901063,
+            117901063,
+            117901063,
+            117901092,
+            -1761147129,
+            -1751672937,
+        ],
+        dtype=np.int32,
+    )
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(kind="decimal", eb_decimal=1.0645163269184692e308, equal_nan=True),
+            # neither the findiff-abs nor monotonicity safeguards apply since
+            #  they require windows larger than the data
+        ],
+    )
