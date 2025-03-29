@@ -13,8 +13,6 @@ from ...intervals import (
     Interval,
     Lower,
     Upper,
-    Minimum,
-    Maximum,
 )
 
 
@@ -89,11 +87,10 @@ class ZeroIsZeroSafeguard(ElementwiseSafeguard):
         zero = self._zero_like(data.dtype)
 
         data = data.flatten()
-        valid = Interval.empty_like(data)
+        valid = Interval.full_like(data)
 
         # preserve zero values exactly, do not constrain other values
         Lower(zero) <= valid[as_bits(data) == as_bits(zero)] <= Upper(zero)
-        Minimum <= valid[as_bits(data) != as_bits(zero)] <= Maximum
 
         return valid.into_union()
 

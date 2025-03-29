@@ -7,12 +7,11 @@ __all__ = ["RelativeOrAbsoluteErrorBoundSafeguard"]
 import numpy as np
 
 from .abc import ElementwiseSafeguard
+from .abs import _compute_safe_eb_abs_interval
+from .decimal import _compute_safe_eb_rel_interval
 from ...cast import (
     to_float,
-    from_float,
     as_bits,
-    to_total_order,
-    from_total_order,
     to_finite_float,
 )
 from ...intervals import (
@@ -139,70 +138,7 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             upheld.
         """
 
-        data = data.flatten()
-        data_float: np.ndarray = to_float(data)
-
-        valid = (
-            Interval.empty_like(data)
-            .preserve_inf(data)
-            .preserve_nan(data, equal_nan=self._equal_nan)
-        )
-
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            eb_rel_multipler = to_finite_float(
-                self._eb_rel, data_float.dtype, map=lambda x: x + 1
-            )
-        assert eb_rel_multipler >= 1.0
-
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            data_mul, data_div = (
-                from_float(data_float * eb_rel_multipler, data.dtype),
-                from_float(data_float / eb_rel_multipler, data.dtype),
-            )
-            Lower(np.where(data < 0, data_mul, data_div)) <= valid[
-                np.isfinite(data)
-            ] <= Upper(np.where(data < 0, data_div, data_mul))
-
-        # correct rounding errors in the lower and upper bound
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            lower_bound_outside_eb_decimal = (
-                np.abs(
-                    np.where(
-                        data < 0,
-                        to_float(valid._lower) / data_float,
-                        data_float / to_float(valid._lower),
-                    )
-                )
-                > eb_rel_multipler
-            )
-            upper_bound_outside_eb_decimal = (
-                np.abs(
-                    np.where(
-                        data < 0,
-                        data_float / to_float(valid._upper),
-                        to_float(valid._upper) / data_float,
-                    )
-                )
-                > eb_rel_multipler
-            )
-
-        valid._lower[np.isfinite(data)] = from_total_order(
-            to_total_order(valid._lower) + lower_bound_outside_eb_decimal,
-            data.dtype,
-        )[np.isfinite(data)]
-        valid._upper[np.isfinite(data)] = from_total_order(
-            to_total_order(valid._upper) - upper_bound_outside_eb_decimal,
-            data.dtype,
-        )[np.isfinite(data)]
-
-        # create a separate interval for the absolute error bound
-        valid_abs = Interval.empty_like(data)
+        data_float = to_float(data)
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
@@ -213,35 +149,25 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            Lower(from_float(data_float - eb_abs, data.dtype)) <= valid_abs[
-                np.isfinite(data)
-            ] <= Upper(from_float(data_float + eb_abs, data.dtype))
+            eb_rel_multipler = to_finite_float(
+                self._eb_rel, data_float.dtype, map=lambda x: x + 1
+            )
+        assert eb_rel_multipler >= 1.0
 
-        # correct rounding errors in the lower and upper bound
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            # we don't use abs(data - bound) here to accommodate unsigned ints
-            lower_bound_outside_eb_abs = (
-                data_float - to_float(valid_abs._lower)
-            ) > self._eb_abs
-            upper_bound_outside_eb_abs = (
-                to_float(valid_abs._upper) - data_float
-            ) > self._eb_abs
+        # compute the intervals for the absolute and relative error bounds
+        valid_abs = _compute_safe_eb_abs_interval(
+            data, data_float, eb_abs, equal_nan=self._equal_nan
+        )
+        valid_rel = _compute_safe_eb_rel_interval(
+            data, data_float, eb_rel_multipler, equal_nan=self._equal_nan
+        )
 
-        valid_abs._lower[np.isfinite(data)] = from_total_order(
-            to_total_order(valid_abs._lower) + lower_bound_outside_eb_abs,
-            data.dtype,
-        )[np.isfinite(data)]
-        valid_abs._upper[np.isfinite(data)] = from_total_order(
-            to_total_order(valid_abs._upper) - upper_bound_outside_eb_abs,
-            data.dtype,
-        )[np.isfinite(data)]
-
-        # combine the absolute and relative error bounds
-        Lower(np.minimum(valid._lower, valid_abs._lower)) <= valid[
-            np.isfinite(data)
-        ] <= Upper(np.maximum(valid._upper, valid_abs._upper))
+        # combine (union) the absolute and relative error bounds
+        # we can union since the intervals overlap, at minimum at data
+        valid = valid_abs
+        Lower(np.minimum(valid_abs._lower, valid_rel._lower)) <= valid[
+            np.isfinite(data.flatten())
+        ] <= Upper(np.maximum(valid_abs._upper, valid_rel._upper))
 
         return valid.into_union()
 

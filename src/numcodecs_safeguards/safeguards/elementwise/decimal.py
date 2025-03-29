@@ -4,6 +4,8 @@ Decimal error bound safeguard.
 
 __all__ = ["DecimalErrorBoundSafeguard"]
 
+from typing import TypeVar
+
 import numpy as np
 
 from .abc import ElementwiseSafeguard
@@ -21,6 +23,14 @@ from ...intervals import (
     Lower,
     Upper,
 )
+
+
+T = TypeVar("T", bound=np.dtype)
+""" Any numpy [`dtype`][numpy.dtype] type variable. """
+F = TypeVar("F", bound=np.dtype)
+""" Any numpy [`floating`][numpy.floating] dtype type variable. """
+S = TypeVar("S", bound=tuple[int, ...])
+""" Any array shape. """
 
 
 class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
@@ -137,69 +147,19 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
             Union of intervals in which the decimal error bound is upheld.
         """
 
-        data = data.flatten()
         data_float: np.ndarray = to_float(data)
 
-        valid = (
-            Interval.empty_like(data)
-            .preserve_inf(data)
-            .preserve_nan(data, equal_nan=self._equal_nan)
-        )
-
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_decimal_multipler = to_finite_float(
+            eb_rel_multipler = to_finite_float(
                 10, data_float.dtype, map=lambda x: np.power(x, self._eb_decimal)
             )
-        assert eb_decimal_multipler >= 1.0
+        assert eb_rel_multipler >= 1.0
 
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            data_mul, data_div = (
-                from_float(data_float * eb_decimal_multipler, data.dtype),
-                from_float(data_float / eb_decimal_multipler, data.dtype),
-            )
-            Lower(np.where(data < 0, data_mul, data_div)) <= valid[
-                np.isfinite(data)
-            ] <= Upper(np.where(data < 0, data_div, data_mul))
-
-        # correct rounding errors in the lower and upper bound
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            lower_bound_outside_eb_decimal = (
-                np.abs(
-                    np.where(
-                        data < 0,
-                        to_float(valid._lower) / data_float,
-                        data_float / to_float(valid._lower),
-                    )
-                )
-                > eb_decimal_multipler
-            )
-            upper_bound_outside_eb_decimal = (
-                np.abs(
-                    np.where(
-                        data < 0,
-                        data_float / to_float(valid._upper),
-                        to_float(valid._upper) / data_float,
-                    )
-                )
-                > eb_decimal_multipler
-            )
-
-        valid._lower[np.isfinite(data)] = from_total_order(
-            to_total_order(valid._lower) + lower_bound_outside_eb_decimal,
-            data.dtype,
-        )[np.isfinite(data)]
-        valid._upper[np.isfinite(data)] = from_total_order(
-            to_total_order(valid._upper) - upper_bound_outside_eb_decimal,
-            data.dtype,
-        )[np.isfinite(data)]
-
-        return valid.into_union()
+        return _compute_safe_eb_rel_interval(
+            data, data_float, eb_rel_multipler, equal_nan=self._equal_nan
+        ).into_union()
 
     def get_config(self) -> dict:
         """
@@ -231,3 +191,62 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
                 np.abs(np.log10(to_float(x) / to_float(y))),
             ),
         )
+
+
+def _compute_safe_eb_rel_interval(
+    data: np.ndarray[S, T],
+    data_float: np.ndarray[S, F],
+    eb_rel_multiplier: np.ndarray[tuple[()], F],
+    equal_nan: bool,
+) -> Interval:
+    data = data.flatten()
+    data_float = data_float.flatten()
+
+    valid = (
+        Interval.empty_like(data)
+        .preserve_inf(data)
+        .preserve_nan(data, equal_nan=equal_nan)
+    )
+
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        data_mul, data_div = (
+            from_float(data_float * eb_rel_multiplier, data.dtype),
+            from_float(data_float / eb_rel_multiplier, data.dtype),
+        )
+        Lower(np.where(data < 0, data_mul, data_div)) <= valid[
+            np.isfinite(data)
+        ] <= Upper(np.where(data < 0, data_div, data_mul))
+
+    # correct rounding errors in the lower and upper bound
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        lower_bound_outside_eb_rel = (
+            np.abs(
+                np.where(
+                    data < 0,
+                    to_float(valid._lower) / data_float,
+                    data_float / to_float(valid._lower),
+                )
+            )
+            > eb_rel_multiplier
+        )
+        upper_bound_outside_eb_rel = (
+            np.abs(
+                np.where(
+                    data < 0,
+                    data_float / to_float(valid._upper),
+                    to_float(valid._upper) / data_float,
+                )
+            )
+            > eb_rel_multiplier
+        )
+
+    valid._lower[np.isfinite(data)] = from_total_order(
+        to_total_order(valid._lower) + lower_bound_outside_eb_rel,
+        data.dtype,
+    )[np.isfinite(data)]
+    valid._upper[np.isfinite(data)] = from_total_order(
+        to_total_order(valid._upper) - upper_bound_outside_eb_rel,
+        data.dtype,
+    )[np.isfinite(data)]
+
+    return valid

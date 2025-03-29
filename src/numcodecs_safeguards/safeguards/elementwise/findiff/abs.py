@@ -11,19 +11,12 @@ import numpy as np
 
 from ....cast import (
     to_float,
-    from_float,
     as_bits,
-    to_total_order,
-    from_total_order,
     to_finite_float,
 )
-from ....intervals import (
-    IntervalUnion,
-    Interval,
-    Lower,
-    Upper,
-)
+from ....intervals import IntervalUnion
 from ..abc import ElementwiseSafeguard
+from ..abs import _compute_safe_eb_abs_interval
 from . import (
     FiniteDifference,
     _finite_difference_offsets,
@@ -216,8 +209,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             Union of intervals in which the absolute error bound is upheld.
         """
 
-        data = data.flatten()
-        data_float: np.ndarray = to_float(data)
+        data_float = to_float(data)
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
@@ -239,41 +231,9 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             )
         assert eb_abs_impl >= 0.0
 
-        valid = (
-            Interval.empty_like(data)
-            .preserve_inf(data)
-            .preserve_nan(data, equal_nan=True)
-        )
-
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            Lower(from_float(data_float - eb_abs_impl, data.dtype)) <= valid[
-                np.isfinite(data)
-            ] <= Upper(from_float(data_float + eb_abs_impl, data.dtype))
-
-        # correct rounding errors in the lower and upper bound
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            # we don't use abs(data - bound) here to accommodate unsigned ints
-            lower_bound_outside_eb_abs = (
-                data_float - to_float(valid._lower)
-            ) > eb_abs_impl
-            upper_bound_outside_eb_abs = (
-                to_float(valid._upper) - data_float
-            ) > eb_abs_impl
-
-        valid._lower[np.isfinite(data)] = from_total_order(
-            to_total_order(valid._lower) + lower_bound_outside_eb_abs,
-            data.dtype,
-        )[np.isfinite(data)]
-        valid._upper[np.isfinite(data)] = from_total_order(
-            to_total_order(valid._upper) - upper_bound_outside_eb_abs,
-            data.dtype,
-        )[np.isfinite(data)]
-
-        return valid.into_union()
+        return _compute_safe_eb_abs_interval(
+            data, data_float, eb_abs_impl, equal_nan=True
+        ).into_union()
 
     def get_config(self) -> dict:
         """

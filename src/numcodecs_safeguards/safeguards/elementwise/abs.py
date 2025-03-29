@@ -4,6 +4,8 @@ Absolute error bound safeguard.
 
 __all__ = ["AbsoluteErrorBoundSafeguard"]
 
+from typing import TypeVar
+
 import numpy as np
 
 from .abc import ElementwiseSafeguard
@@ -21,6 +23,14 @@ from ...intervals import (
     Lower,
     Upper,
 )
+
+
+T = TypeVar("T", bound=np.dtype)
+""" Any numpy [`dtype`][numpy.dtype] type variable. """
+F = TypeVar("F", bound=np.dtype)
+""" Any numpy [`floating`][numpy.floating] dtype type variable. """
+S = TypeVar("S", bound=tuple[int, ...])
+""" Any array shape. """
 
 
 class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
@@ -115,14 +125,7 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             Union of intervals in which the absolute error bound is upheld.
         """
 
-        data = data.flatten()
         data_float: np.ndarray = to_float(data)
-
-        valid = (
-            Interval.empty_like(data)
-            .preserve_inf(data)
-            .preserve_nan(data, equal_nan=self._equal_nan)
-        )
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
@@ -130,35 +133,9 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             eb_abs = to_finite_float(self._eb_abs, data_float.dtype)
         assert eb_abs >= 0.0
 
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            Lower(from_float(data_float - eb_abs, data.dtype)) <= valid[
-                np.isfinite(data)
-            ] <= Upper(from_float(data_float + eb_abs, data.dtype))
-
-        # correct rounding errors in the lower and upper bound
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            # we don't use abs(data - bound) here to accommodate unsigned ints
-            lower_bound_outside_eb_abs = (
-                data_float - to_float(valid._lower)
-            ) > self._eb_abs
-            upper_bound_outside_eb_abs = (
-                to_float(valid._upper) - data_float
-            ) > self._eb_abs
-
-        valid._lower[np.isfinite(data)] = from_total_order(
-            to_total_order(valid._lower) + lower_bound_outside_eb_abs,
-            data.dtype,
-        )[np.isfinite(data)]
-        valid._upper[np.isfinite(data)] = from_total_order(
-            to_total_order(valid._upper) - upper_bound_outside_eb_abs,
-            data.dtype,
-        )[np.isfinite(data)]
-
-        return valid.into_union()
+        return _compute_safe_eb_abs_interval(
+            data, data_float, eb_abs, equal_nan=self._equal_nan
+        ).into_union()
 
     def get_config(self) -> dict:
         """
@@ -173,3 +150,41 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         return dict(
             kind=type(self).kind, eb_abs=self._eb_abs, equal_nan=self._equal_nan
         )
+
+
+def _compute_safe_eb_abs_interval(
+    data: np.ndarray[S, T],
+    data_float: np.ndarray[S, F],
+    eb_abs: np.ndarray[tuple[()], F],
+    equal_nan: bool,
+) -> Interval:
+    data = data.flatten()
+    data_float = data_float.flatten()
+
+    valid = (
+        Interval.empty_like(data)
+        .preserve_inf(data)
+        .preserve_nan(data, equal_nan=equal_nan)
+    )
+
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        Lower(from_float(data_float - eb_abs, data.dtype)) <= valid[
+            np.isfinite(data)
+        ] <= Upper(from_float(data_float + eb_abs, data.dtype))
+
+    # correct rounding errors in the lower and upper bound
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        # we don't use abs(data - bound) here to accommodate unsigned ints
+        lower_bound_outside_eb_abs = (data_float - to_float(valid._lower)) > eb_abs
+        upper_bound_outside_eb_abs = (to_float(valid._upper) - data_float) > eb_abs
+
+    valid._lower[np.isfinite(data)] = from_total_order(
+        to_total_order(valid._lower) + lower_bound_outside_eb_abs,
+        data.dtype,
+    )[np.isfinite(data)]
+    valid._upper[np.isfinite(data)] = from_total_order(
+        to_total_order(valid._upper) - upper_bound_outside_eb_abs,
+        data.dtype,
+    )[np.isfinite(data)]
+
+    return valid
