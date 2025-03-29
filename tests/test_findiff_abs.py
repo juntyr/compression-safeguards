@@ -169,3 +169,25 @@ def test_fuzzer_fraction_compare():
             dict(kind="sign"),
         ],
     )
+
+
+def test_fuzzer_eb_abs():
+    data = np.array([[-27, 8, 8], [8, 8, 8], [8, 8, 8]], dtype=np.int8)
+    decoded = np.array([[8, 8, 8], [8, 8, 8], [8, 8, 8]], dtype=np.int8)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(
+                kind="findiff_abs",
+                type="forward",
+                order=8,
+                accuracy=8,
+                dx=8,
+                eb_abs=8,
+                axis=8,
+            ),
+            dict(kind="sign"),
+        ],
+    )

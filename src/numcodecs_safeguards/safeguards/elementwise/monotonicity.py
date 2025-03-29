@@ -12,12 +12,7 @@ from numpy.lib.stride_tricks import sliding_window_view
 
 from .abc import ElementwiseSafeguard
 from ...cast import to_total_order, from_total_order
-from ...intervals import (
-    IntervalUnion,
-    Interval,
-    Lower,
-    Upper,
-)
+from ...intervals import IntervalUnion, Interval, Lower, Upper
 
 
 _STRICT = ((lt, gt, False, False),) * 2

@@ -17,12 +17,7 @@ from ...cast import (
     from_total_order,
     to_finite_float,
 )
-from ...intervals import (
-    IntervalUnion,
-    Interval,
-    Lower,
-    Upper,
-)
+from ...intervals import IntervalUnion, Interval, Lower, Upper
 
 
 T = TypeVar("T", bound=np.dtype)
@@ -199,32 +194,32 @@ def _compute_safe_eb_rel_interval(
     eb_rel_multiplier: np.ndarray[tuple[()], F],
     equal_nan: bool,
 ) -> Interval:
-    data = data.flatten()
-    data_float = data_float.flatten()
+    dataf: np.ndarray[tuple[int], T] = data.flatten()
+    dataf_float: np.ndarray[tuple[int], F] = data_float.flatten()
 
     valid = (
-        Interval.empty_like(data)
-        .preserve_inf(data)
-        .preserve_nan(data, equal_nan=equal_nan)
+        Interval.empty_like(dataf)
+        .preserve_inf(dataf)
+        .preserve_nan(dataf, equal_nan=equal_nan)
     )
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         data_mul, data_div = (
-            from_float(data_float * eb_rel_multiplier, data.dtype),
-            from_float(data_float / eb_rel_multiplier, data.dtype),
+            from_float(dataf_float * eb_rel_multiplier, dataf.dtype),
+            from_float(dataf_float / eb_rel_multiplier, dataf.dtype),
         )
-        Lower(np.where(data < 0, data_mul, data_div)) <= valid[
-            np.isfinite(data)
-        ] <= Upper(np.where(data < 0, data_div, data_mul))
+        Lower(np.where(dataf < 0, data_mul, data_div)) <= valid[
+            np.isfinite(dataf)
+        ] <= Upper(np.where(dataf < 0, data_div, data_mul))
 
     # correct rounding errors in the lower and upper bound
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         lower_bound_outside_eb_rel = (
             np.abs(
                 np.where(
-                    data < 0,
-                    to_float(valid._lower) / data_float,
-                    data_float / to_float(valid._lower),
+                    dataf < 0,
+                    to_float(valid._lower) / dataf_float,
+                    dataf_float / to_float(valid._lower),
                 )
             )
             > eb_rel_multiplier
@@ -232,21 +227,21 @@ def _compute_safe_eb_rel_interval(
         upper_bound_outside_eb_rel = (
             np.abs(
                 np.where(
-                    data < 0,
-                    data_float / to_float(valid._upper),
-                    to_float(valid._upper) / data_float,
+                    dataf < 0,
+                    dataf_float / to_float(valid._upper),
+                    to_float(valid._upper) / dataf_float,
                 )
             )
             > eb_rel_multiplier
         )
 
-    valid._lower[np.isfinite(data)] = from_total_order(
+    valid._lower[np.isfinite(dataf)] = from_total_order(
         to_total_order(valid._lower) + lower_bound_outside_eb_rel,
-        data.dtype,
-    )[np.isfinite(data)]
-    valid._upper[np.isfinite(data)] = from_total_order(
+        dataf.dtype,
+    )[np.isfinite(dataf)]
+    valid._upper[np.isfinite(dataf)] = from_total_order(
         to_total_order(valid._upper) - upper_bound_outside_eb_rel,
-        data.dtype,
-    )[np.isfinite(data)]
+        dataf.dtype,
+    )[np.isfinite(dataf)]
 
     return valid

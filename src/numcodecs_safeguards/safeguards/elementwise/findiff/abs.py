@@ -9,11 +9,7 @@ from fractions import Fraction
 
 import numpy as np
 
-from ....cast import (
-    to_float,
-    as_bits,
-    to_finite_float,
-)
+from ....cast import to_float, as_bits, to_finite_float
 from ....intervals import IntervalUnion
 from ..abc import ElementwiseSafeguard
 from ..abs import _compute_safe_eb_abs_interval
@@ -127,10 +123,11 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
         self._offsets = _finite_difference_offsets(type, order, accuracy)
         self._coefficients = _finite_difference_coefficients(order, self._offsets)
-        self._coefficients_abs_sum = sum(abs(c) for c in self._coefficients)
 
         self._eb_abs_impl = (
-            Fraction(eb_abs) * (Fraction(dx) ** order) / self._coefficients_abs_sum
+            Fraction(eb_abs)
+            * (Fraction(dx) ** order)
+            / sum(abs(c) for c in self._coefficients)
         )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -209,25 +206,13 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             Union of intervals in which the absolute error bound is upheld.
         """
 
-        data_float = to_float(data)
+        data_float: np.ndarray = to_float(data)
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            # recompute from parts here to ensure eb_abs, dx, and the
-            #  coefficients are all in (extended-precision) floating point
-            dx = to_finite_float(
-                self._dx, data_float.dtype, map=lambda x: x**self._order
-            )
-            coefficients_abs_sum_inv = to_finite_float(
-                self._coefficients_abs_sum.denominator,
-                data_float.dtype,
-                map=lambda x: x / self._coefficients_abs_sum.numerator,
-            )
-            eb_abs_impl = to_finite_float(
-                self._eb_abs,
-                data_float.dtype,
-                map=lambda x: x * dx * coefficients_abs_sum_inv,
+            eb_abs_impl: np.ndarray = to_finite_float(
+                float(self._eb_abs_impl), data_float.dtype
             )
         assert eb_abs_impl >= 0.0
 

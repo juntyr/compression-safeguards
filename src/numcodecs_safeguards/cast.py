@@ -54,8 +54,11 @@ def to_float(x: np.ndarray[S, T]) -> np.ndarray[S, F]:
 
 
 def to_finite_float(
-    x: int | float | np.ndarray, dtype: F, *, map: None | Callable = None
-) -> np.ndarray[tuple[int, ...], F]:
+    x: int | float | np.ndarray[S, T],
+    dtype: F,
+    *,
+    map: None | Callable[[np.ndarray[S, F]], np.ndarray[S, F]] = None,
+) -> np.ndarray[S, F]:
     """
     Convert `x` to the floating-point dtype `F` and apply an optional `map`ping function.
 
@@ -80,17 +83,17 @@ def to_finite_float(
         The converted value or array with `dtype`.
     """
 
-    xf = np.array(x).astype(dtype)
+    xf: np.ndarray[S, F] = np.array(x).astype(dtype)  # type: ignore
 
     if map is not None:
-        xf = np.array(map(xf)).astype(dtype)
+        xf = np.array(map(xf)).astype(dtype)  # type: ignore
 
     if np.dtype(dtype) == _float128:
         minv, maxv = _float128_min, _float128_max
     else:
         minv, maxv = np.finfo(dtype).min, np.finfo(dtype).max
 
-    return np.maximum(minv, np.minimum(xf, maxv))  # type: ignore
+    return np.maximum(minv, np.minimum(xf, maxv))
 
 
 def from_float(x: np.ndarray[S, F], dtype: T) -> np.ndarray[S, T]:

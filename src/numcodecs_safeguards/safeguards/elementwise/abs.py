@@ -17,12 +17,7 @@ from ...cast import (
     from_total_order,
     to_finite_float,
 )
-from ...intervals import (
-    IntervalUnion,
-    Interval,
-    Lower,
-    Upper,
-)
+from ...intervals import IntervalUnion, Interval, Lower, Upper
 
 
 T = TypeVar("T", bound=np.dtype)
@@ -130,7 +125,7 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_abs = to_finite_float(self._eb_abs, data_float.dtype)
+            eb_abs: np.ndarray = to_finite_float(self._eb_abs, data_float.dtype)
         assert eb_abs >= 0.0
 
         return _compute_safe_eb_abs_interval(
@@ -158,33 +153,33 @@ def _compute_safe_eb_abs_interval(
     eb_abs: np.ndarray[tuple[()], F],
     equal_nan: bool,
 ) -> Interval:
-    data = data.flatten()
-    data_float = data_float.flatten()
+    dataf: np.ndarray[tuple[int], T] = data.flatten()
+    dataf_float: np.ndarray[tuple[int], F] = data_float.flatten()
 
     valid = (
-        Interval.empty_like(data)
-        .preserve_inf(data)
-        .preserve_nan(data, equal_nan=equal_nan)
+        Interval.empty_like(dataf)
+        .preserve_inf(dataf)
+        .preserve_nan(dataf, equal_nan=equal_nan)
     )
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        Lower(from_float(data_float - eb_abs, data.dtype)) <= valid[
-            np.isfinite(data)
-        ] <= Upper(from_float(data_float + eb_abs, data.dtype))
+        Lower(from_float(dataf_float - eb_abs, dataf.dtype)) <= valid[
+            np.isfinite(dataf)
+        ] <= Upper(from_float(dataf_float + eb_abs, dataf.dtype))
 
     # correct rounding errors in the lower and upper bound
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         # we don't use abs(data - bound) here to accommodate unsigned ints
-        lower_bound_outside_eb_abs = (data_float - to_float(valid._lower)) > eb_abs
-        upper_bound_outside_eb_abs = (to_float(valid._upper) - data_float) > eb_abs
+        lower_bound_outside_eb_abs = (dataf_float - to_float(valid._lower)) > eb_abs
+        upper_bound_outside_eb_abs = (to_float(valid._upper) - dataf_float) > eb_abs
 
-    valid._lower[np.isfinite(data)] = from_total_order(
+    valid._lower[np.isfinite(dataf)] = from_total_order(
         to_total_order(valid._lower) + lower_bound_outside_eb_abs,
-        data.dtype,
-    )[np.isfinite(data)]
-    valid._upper[np.isfinite(data)] = from_total_order(
+        dataf.dtype,
+    )[np.isfinite(dataf)]
+    valid._upper[np.isfinite(dataf)] = from_total_order(
         to_total_order(valid._upper) - upper_bound_outside_eb_abs,
-        data.dtype,
-    )[np.isfinite(data)]
+        dataf.dtype,
+    )[np.isfinite(dataf)]
 
     return valid

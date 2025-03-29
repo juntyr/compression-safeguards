@@ -9,17 +9,8 @@ import numpy as np
 from .abc import ElementwiseSafeguard
 from .abs import _compute_safe_eb_abs_interval
 from .decimal import _compute_safe_eb_rel_interval
-from ...cast import (
-    to_float,
-    as_bits,
-    to_finite_float,
-)
-from ...intervals import (
-    IntervalUnion,
-    Interval,
-    Lower,
-    Upper,
-)
+from ...cast import to_float, as_bits, to_finite_float
+from ...intervals import IntervalUnion, Lower, Upper
 
 
 class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
@@ -138,18 +129,18 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             upheld.
         """
 
-        data_float = to_float(data)
+        data_float: np.ndarray = to_float(data)
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_abs = to_finite_float(self._eb_abs, data_float.dtype)
+            eb_abs: np.ndarray = to_finite_float(self._eb_abs, data_float.dtype)
         assert eb_abs >= 0.0
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_rel_multipler = to_finite_float(
+            eb_rel_multipler: np.ndarray = to_finite_float(
                 self._eb_rel, data_float.dtype, map=lambda x: x + 1
             )
         assert eb_rel_multipler >= 1.0

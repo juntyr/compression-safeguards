@@ -8,12 +8,7 @@ import numpy as np
 
 from .abc import ElementwiseSafeguard
 from ...cast import as_bits
-from ...intervals import (
-    IntervalUnion,
-    Interval,
-    Lower,
-    Upper,
-)
+from ...intervals import IntervalUnion, Interval, Lower, Upper
 
 
 class ZeroIsZeroSafeguard(ElementwiseSafeguard):
