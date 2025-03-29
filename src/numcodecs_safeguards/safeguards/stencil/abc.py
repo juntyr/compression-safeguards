@@ -1,8 +1,8 @@
 """
-Abstract base class for the elementwise safeguards.
+Abstract base class for the stencil safeguards.
 """
 
-__all__ = ["ElementwiseSafeguard"]
+__all__ = ["StencilSafeguard"]
 
 from abc import ABC, abstractmethod
 from typing import Any, TypeVar
@@ -16,12 +16,13 @@ T = TypeVar("T", bound=np.dtype)
 S = TypeVar("S", bound=tuple[int, ...])
 
 
-class ElementwiseSafeguard(Safeguard, ABC):
+class StencilSafeguard(Safeguard, ABC):
     """
-    Elementwise safeguard abstract base class.
+    Stencil safeguard abstract base class.
 
-    Elementwise safeguards describe properties that are satisfied (or not) per
-    element, i.e. independent of other elements.
+    Stencil safeguards describe properties that are computed in a
+    neighbourhood around each element, i.e. whether or not an element satisfies
+    the safeguard is coupled to its neighbouring elements.
     """
 
     @abstractmethod

@@ -174,7 +174,11 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         assert decoded.dtype == data.dtype, "codec must roundtrip dtype"
         assert decoded.shape == data.shape, "codec must roundtrip shape"
 
-        quantized: np.ndarray = self._quantizer.quantize(data, decoded)
+        # the codec's always quantize the full data ... at least chunking is
+        #  not our concern
+        quantized: np.ndarray = self._quantizer.quantize(
+            data, decoded, partial_data=False
+        )
 
         if np.all(quantized == 0):
             correction_bytes = b""

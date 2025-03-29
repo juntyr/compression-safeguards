@@ -13,6 +13,7 @@ from .cast import as_bits
 from .safeguards import Safeguards
 from .safeguards.abc import Safeguard
 from .safeguards.elementwise.abc import ElementwiseSafeguard
+from .safeguards.stencil.abc import StencilSafeguard
 
 T = TypeVar("T", bound=np.dtype)
 """ Any numpy [`dtype`][numpy.dtype] type variable. """
@@ -41,8 +42,9 @@ class SafeguardsQuantizer:
         Internal, do not provide this paramter explicitly.
     """
 
-    __slots__ = ("_elementwise_safeguards",)
+    __slots__ = ("_elementwise_safeguards", "_stencil_safeguards")
     _elementwise_safeguards: tuple[ElementwiseSafeguard, ...]
+    _stencil_safeguards: tuple[StencilSafeguard, ...]
 
     def __init__(
         self,
@@ -67,13 +69,20 @@ class SafeguardsQuantizer:
             for safeguard in safeguards
             if isinstance(safeguard, ElementwiseSafeguard)
         )
-        safeguards = [
+        self._stencil_safeguards = tuple(
             safeguard
             for safeguard in safeguards
-            if not isinstance(safeguard, ElementwiseSafeguard)
+            if isinstance(safeguard, StencilSafeguard)
+        )
+        unsupported_safeguards = [
+            safeguard
+            for safeguard in safeguards
+            if not isinstance(safeguard, (ElementwiseSafeguard, StencilSafeguard))
         ]
 
-        assert len(safeguards) == 0, f"unsupported safeguards {safeguards:!r}"
+        assert len(unsupported_safeguards) == 0, (
+            f"unsupported safeguards {unsupported_safeguards!r}"
+        )
 
     @property
     def safeguards(self) -> tuple[Safeguard, ...]:
@@ -82,7 +91,7 @@ class SafeguardsQuantizer:
         uphold.
         """
 
-        return self._elementwise_safeguards
+        return self._elementwise_safeguards + self._stencil_safeguards
 
     @property
     def version(self) -> str:
@@ -99,7 +108,11 @@ class SafeguardsQuantizer:
         return _FORMAT_VERSION
 
     def quantize(
-        self, data: np.ndarray[S, T], prediction: np.ndarray[S, T]
+        self,
+        data: np.ndarray[S, T],
+        prediction: np.ndarray[S, T],
+        *,
+        partial_data: bool = True,
     ) -> np.ndarray[S, C]:
         """
         Quantize the correction required to make the `prediction` array satisfy the safeguards relative to the `data` array.
@@ -110,6 +123,12 @@ class SafeguardsQuantizer:
             The data array, relative to which the safeguards are enforced.
         prediction : np.ndarray[S, T]
             The prediction array for which the correction is computed.
+        partial_data : bool
+            Whether the provided `data` and `prediction` only cover parts of
+            the full data. While some safeguards can be checked and enforced
+            per-element, others should only be applied to the full data. When
+            only partial data is provided, quantizing with any non-elementwise
+            safeguards fails and raises an exception.
 
         Returns
         -------
@@ -121,8 +140,13 @@ class SafeguardsQuantizer:
             f"can only quantize arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
         )
 
+        assert (not partial_data) or len(self._stencil_safeguards) == 0, (
+            "quantizing partial data with non-elementwise safeguards "
+            + f"{self._stencil_safeguards!r} is not supported"
+        )
+
         all_ok = True
-        for safeguard in self._elementwise_safeguards:
+        for safeguard in self.safeguards:
             if not safeguard.check(data, prediction):
                 all_ok = False
                 break
@@ -131,7 +155,7 @@ class SafeguardsQuantizer:
             return np.zeros_like(as_bits(data))
 
         all_intervals = []
-        for safeguard in self._elementwise_safeguards:
+        for safeguard in self._elementwise_safeguards + self._stencil_safeguards:
             intervals = safeguard.compute_safe_intervals(data)
             assert np.all(intervals.contains(data)), (
                 f"elementwise safeguard {safeguard!r}'s intervals must contain the original data"
@@ -143,7 +167,7 @@ class SafeguardsQuantizer:
             combined_intervals = combined_intervals.intersect(intervals)
         correction = combined_intervals.pick(prediction)
 
-        for safeguard, intervals in zip(self._elementwise_safeguards, all_intervals):
+        for safeguard, intervals in zip(self.safeguards, all_intervals):
             assert np.all(intervals.contains(correction)), (
                 f"{safeguard!r} interval does not contain the correction {correction!r}"
             )

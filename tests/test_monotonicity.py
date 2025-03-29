@@ -2,7 +2,7 @@ from itertools import product
 
 import numpy as np
 
-from numcodecs_safeguards.safeguards.elementwise.monotonicity import (
+from numcodecs_safeguards.safeguards.stencil.monotonicity import (
     Monotonicity,
     MonotonicityPreservingSafeguard,
 )

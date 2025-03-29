@@ -10,7 +10,7 @@ from operator import le, lt, ge, gt
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
-from .abc import ElementwiseSafeguard
+from .abc import StencilSafeguard
 from ...cast import to_total_order, from_total_order
 from ...intervals import IntervalUnion, Interval, Lower, Upper
 
@@ -24,7 +24,7 @@ _WEAK = ((le, ge, False, True), (le, ge, True, True))
 class Monotonicity(Enum):
     """
     Different levels of monotonicity that can be enforced by the
-    [`MonotonicityPreservingSafeguard`][numcodecs_safeguards.safeguards.elementwise.monotonicity.MonotonicityPreservingSafeguard].
+    [`MonotonicityPreservingSafeguard`][numcodecs_safeguards.safeguards.stencil.monotonicity.MonotonicityPreservingSafeguard].
     """
 
     strict = _STRICT
@@ -66,7 +66,7 @@ class Monotonicity(Enum):
     """
 
 
-class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
+class MonotonicityPreservingSafeguard(StencilSafeguard):
     r"""
     The `MonotonicityPreservingSafeguard` guarantees that sequences that are
     monotonic in the input are guaranteed to be monotonic in the decompressed
@@ -78,7 +78,7 @@ class MonotonicityPreservingSafeguard(ElementwiseSafeguard):
     small enough to capture details.
 
     The safeguard supports enforcing four levels of
-    [`Monotonicity`][numcodecs_safeguards.safeguards.elementwise.monotonicity.Monotonicity]:
+    [`Monotonicity`][numcodecs_safeguards.safeguards.stencil.monotonicity.Monotonicity]:
     `strict`, `strict_with_consts`, `strict_to_weak`, `weak`.
 
     Windows that are not monotonic or contain non-finite data are skipped. Axes

@@ -11,10 +11,10 @@ from .elementwise.decimal import DecimalErrorBoundSafeguard
 from .elementwise.findiff.abs import (
     FiniteDifferenceAbsoluteErrorBoundSafeguard,
 )
-from .elementwise.monotonicity import MonotonicityPreservingSafeguard
 from .elementwise.rel_or_abs import RelativeOrAbsoluteErrorBoundSafeguard
 from .elementwise.sign import SignPreservingSafeguard
 from .elementwise.zero import ZeroIsZeroSafeguard
+from .stencil.monotonicity import MonotonicityPreservingSafeguard
 
 
 class Safeguards(Enum):
