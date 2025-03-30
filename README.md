@@ -1,6 +1,20 @@
 # Fearless lossy compression with `numcodecs-safeguards`
 
-Lossy compression can be scary as valuable information may be lost. This package provides the `SafeguardsCodec` adapter and several safeguards that can be applied to *any* existing (lossy) compressor to *guarantee* that certain properties about the compression error are upheld. Note that the wrapped compressor is treated as a blackbox and the decompressed data is postprocessed to re-establish the properties, if necessary. By using the `SafeguardsCodec` adapter, badly behaving lossy compressors become safe to use, at the cost of potentially less efficient compression, and lossy compression can be applied without fear.
+Lossy compression [^1] can be *scary* as valuable information or features of the data may be lost. This package provides several `Safeguards` to express *your* requirements for lossy compression to be safe to use and to *guarantee* that they are upheld by lossy compression. By using safeguards to ensure your safety requirements, lossy compression can be applied safely and *without fear*.
+
+[^1]: Lossy compression methods reduce data size by only storing an approximation of the data. In contrast to lossless compression methods, lossy compression loses information about the data, e.g. by reducing its resolution (only store every $n$th element) precision (only store $n$ digits after the decimal point), smoothing, etc. Therefore, lossy compression methods provide a tradeoff between size reduction and quality preservation.
+
+## (a) Safeguards for users of lossy compression
+
+This package provides the `SafeguardsCodec` adapter that can be wrapped around *any* existing (lossy) compressor to *guarantee* that certain properties about the data are upheld.
+
+Note that the wrapped compressor is treated as a blackbox and the decompressed data is postprocessed to re-establish the properties, if necessary.
+
+By using the `SafeguardsCodec` adapter, badly behaving lossy compressors become safe to use, at the cost of potentially less efficient compression, and lossy compression can be applied *without fear*.
+
+## (b) Safeguards for developers of lossy compressors
+
+Safeguards can fill the role of a quantizer, which is part of many (predictive) (error-bounded) compressors. If you currently use e.g. a linear quantizer module in your compressor to provide an absolute error bound, you could replace it with the `SafeguardsQuantizer`, which provides a larger selection of safeguards that your compressor can then guarantee.
 
 
 ## Design and Guarantees
@@ -55,7 +69,7 @@ This package currently implements the following safeguards
 
 ## Usage
 
-The `SafeguardsCodec` adapter provided by this package can wrap any existing [`Codec`] [^1] implementing the [`numcodecs`] API [^2] that encodes a buffer (e.g. an ndarray or bytes) to bytes. It is desirable to perform lossless compression after applying the safeguards (rather than before).
+The `SafeguardsCodec` adapter provided by this package can wrap any existing [`Codec`] [^2] implementing the [`numcodecs`] API [^3] that encodes a buffer (e.g. an ndarray or bytes) to bytes. It is desirable to perform lossless compression after applying the safeguards (rather than before).
 
 You can wrap an existing codec with e.g. an absolute error bound of $eb_{abs} = 0.1$  as follows:
 
@@ -88,8 +102,10 @@ numcodecs.registry.get_codec(dict(
 ))
 ```
 
-[^1]: If you want to wrap a sequence or stack of codecs, you can use the [`CodecStack`] combinator from the [`numcodecs-combinators`] package.
-[^2]: The method implemented in this package is not specific to the [`numcodecs`] API. Please reach out if you'd like to help bring the safeguards to a different compression API or language.
+Please refer to the [API documentation](https://juntyr.github.io/numcodecs-safeguards/_ref/numcodecs_safeguards/codec/#numcodecs_safeguards.codec.SafeguardsCodec) for further information.
+
+[^2]: If you want to wrap a sequence or stack of codecs, you can use the [`CodecStack`] combinator from the [`numcodecs-combinators`] package.
+[^3]: The method implemented in this package is not specific to the [`numcodecs`] API. Please reach out if you'd like to help bring the safeguards to a different compression API or language.
 
 [`Codec`]: https://numcodecs.readthedocs.io/en/stable/abc.html#numcodecs.abc.Codec
 [`numcodecs`]: https://numcodecs.readthedocs.io/en/stable/
@@ -105,7 +121,7 @@ numcodecs.registry.get_codec(dict(
 
 SZ3's error compression can provide higher compression ratios if most data elements are expected to violate the error bound, e.g. when wrapping a lossy compressor that does *not* bound its errors. However, SZ3 has a higher byte overhead than `numcodecs-safeguards` if all elements already satisfy the bound.
 
-**TLDR:** You can SZ3 to transform a *known* *unbounded* lossy compressor into an (absolute) error-bound compressor. Use `numcodecs-safeguards` to wrap *any* compressor (unbounded, best-effort bounded, or strictly bounded) to guarantee it is error bounded.
+**TLDR:** You can use SZ3 to transform a *known* *unbounded* lossy compressor into an (absolute) error-bound compressor. Use `numcodecs-safeguards` to wrap *any* compressor (unbounded, best-effort bounded, or strictly bounded) to guarantee it is error bounded.
 
 
 ## Citation
