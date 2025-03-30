@@ -70,7 +70,7 @@ class MockCodec(Codec):
         return b""
 
     def decode(self, buf, out=None):
-        assert buf == b""
+        assert len(buf) == 0
         assert out is not None
         out[:] = self.decoded
         return out
@@ -120,6 +120,15 @@ def encode_decode_noise(data: np.ndarray, **kwargs) -> np.ndarray:
 
 def encode_decode_mock(data: np.ndarray, decoded: np.ndarray, **kwargs) -> np.ndarray:
     codec = SafeguardsCodec(codec=MockCodec(data, decoded), **kwargs)
+
+    encoded = codec.encode(data)
+    decoded = codec.decode(encoded, out=np.empty_like(data))
+
+    return decoded
+
+
+def encode_decode_none(data: np.ndarray, **kwargs) -> np.ndarray:
+    codec = SafeguardsCodec(codec=None, **kwargs)
 
     encoded = codec.encode(data)
     decoded = codec.decode(encoded, out=np.empty_like(data))

@@ -68,6 +68,9 @@ jobs:
       - name: Install numcodecs-safeguards
         run: uv sync --only-group typing && uv pip install .
 
+      - name: Install numpy-quaddtype
+        run: uv pip install -i https://test.pypi.org/simple/ numpy-quaddtype~=0.0.7
+
       - name: Typecheck numcodecs-safeguards
         run: uv run mypy -p numcodecs_safeguards
 

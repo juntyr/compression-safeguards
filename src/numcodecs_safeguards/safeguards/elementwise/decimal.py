@@ -4,9 +4,28 @@ Decimal error bound safeguard.
 
 __all__ = ["DecimalErrorBoundSafeguard"]
 
+from typing import TypeVar
+
 import numpy as np
 
-from . import ElementwiseSafeguard, _as_bits
+from .abc import ElementwiseSafeguard
+from ...cast import (
+    to_float,
+    from_float,
+    as_bits,
+    to_total_order,
+    from_total_order,
+    to_finite_float,
+)
+from ...intervals import IntervalUnion, Interval, Lower, Upper
+
+
+T = TypeVar("T", bound=np.dtype)
+""" Any numpy [`dtype`][numpy.dtype] type variable. """
+F = TypeVar("F", bound=np.dtype)
+""" Any numpy [`floating`][numpy.floating] dtype type variable. """
+S = TypeVar("S", bound=tuple[int, ...])
+""" Any array shape. """
 
 
 class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
@@ -32,11 +51,10 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
     each decode value matches the sign of each original value and that a
     decoded value is zero if and only if it is zero in the original data.
 
-    In cases where the arithmetic evaluation of the error bound not well-
-    defined, e.g. for infinite or NaN values, producing the exact same
-    bitpattern is defined to satisfy the error bound. If `equal_nan` is set to
-    [`True`][True], decoding a NaN value to a NaN value with a different
-    bitpattern also satisfies the error bound.
+    Infinite values are preserved with the same bit pattern. If `equal_nan` is
+    set to [`True`][True], decoding a NaN value to a NaN value with a different
+    bitpattern also satisfies the error bound. If `equal_nan` is set to
+    [`False`][False], NaN values are also preserved with the same bit pattern.
 
     [^1]: Gustafson, J. L., & Yonemoto, I. T. (2017). Beating Floating Point at
         its Own Game: Posit Arithmetic. *Supercomputing Frontiers and
@@ -45,39 +63,37 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
 
     [^2]: Klöwer, M., Düben, P. D., & Palmer, T. N. (2019). Posits as an
         alternative to floats for weather and climate models. *CoNGA'19:
-        Proceedings of the Conference for Next Generation Arithmetic 2019*, 1–8.
+        Proceedings of the Conference for Next Generation Arithmetic 2019*, 1-8.
         Available from:
         [doi:10.1145/3316279.3316281](https://doi.org/10.1145/3316279.3316281).
 
     Parameters
     ----------
-    eb_decimal : float
-        The positive decimal error bound that is enforced by this safeguard.
-        `eb_decimal=1.0` corresponds to a 100% relative error bound.
+    eb_decimal : int | float
+        The non-negative decimal error bound that is enforced by this safeguard.
+        `eb_decimal=1.0` corresponds to a 10x relative error bound.
     equal_nan: bool
         Whether decoding a NaN value to a NaN value with a different bit
         pattern satisfies the error bound.
     """
 
     __slots__ = ("_eb_decimal", "_equal_nan")
-    _eb_decimal: float
+    _eb_decimal: int | float
     _equal_nan: bool
 
     kind = "decimal"
-    _priority = 0
 
-    def __init__(self, eb_decimal: float, *, equal_nan: bool = False):
-        assert eb_decimal > 0.0, "eb_decimal must be positive"
+    def __init__(self, eb_decimal: int | float, *, equal_nan: bool = False):
+        assert eb_decimal >= 0, "eb_decimal must be non-negative"
         assert np.isfinite(eb_decimal), "eb_decimal must be finite"
 
         self._eb_decimal = eb_decimal
         self._equal_nan = equal_nan
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
+    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
         """
-        Check which elements have matching signs in the `data` and the
-        `decoded` array.
+        Check if the `decoded` array satisfies the decimal error bound.
 
         Parameters
         ----------
@@ -88,51 +104,57 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
 
         Returns
         -------
-        ok : np.ndarray
-            Per-element, `True` if the check succeeded for this element.
+        ok : bool
+            `True` if the check succeeded.
         """
 
-        return (
-            (self._decimal_error(data, decoded) <= self._eb_decimal)
-            | (_as_bits(data) == _as_bits(decoded))
-            | (self._equal_nan and (np.isnan(data) & np.isnan(decoded)))
+        decimal_bound = self._decimal_error(data, decoded) <= self._eb_decimal
+
+        # bitwise equality for inf and NaNs (unless equal_nan)
+        same_bits = as_bits(data) == as_bits(decoded)
+        both_nan = self._equal_nan and (np.isnan(data) & np.isnan(decoded))
+
+        ok = np.where(
+            np.isfinite(data),
+            decimal_bound,
+            np.where(
+                np.isinf(data),
+                same_bits,
+                both_nan if self._equal_nan else same_bits,
+            ),
         )
 
-    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def _compute_correction(
-        self,
-        data: np.ndarray,
-        decoded: np.ndarray,
-    ) -> np.ndarray:
-        # remember which elements already passed the check
-        already_correct = self.check_elementwise(data, decoded)
+        return bool(np.all(ok))
 
-        # if sign(data) == -sign(decoded), flip the sign
-        decoded_signed = decoded * (1 - (np.sign(data) == -np.sign(decoded)) * 2)
+    def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
+        """
+        Compute the intervals in which the decimal error bound is upheld with
+        respect to the `data`.
 
-        # round the decimal error to the desired precision
-        decimal_error = self._decimal_error(data, decoded_signed)
-        decimal_correction = np.round(decimal_error / (self._eb_decimal * 2.0)) * (
-            self._eb_decimal * 2.0
-        )
+        Parameters
+        ----------
+        data : np.ndarray
+            Data for which the safe intervals should be computed.
 
-        # apply the decimal error correction
-        decimal_corrected = np.log10(
-            np.abs(decoded_signed)
-        ) + decimal_correction * np.sign(np.abs(data) - np.abs(decoded_signed))
-        corrected = np.power(10.0, decimal_corrected) * np.sign(data)
-        corrected = corrected.astype(data.dtype)
+        Returns
+        -------
+        intervals : IntervalUnion
+            Union of intervals in which the decimal error bound is upheld.
+        """
 
-        # don't apply corrections to already-passing elements
-        corrected = np.where(already_correct, decoded, corrected)
+        data_float: np.ndarray = to_float(data)
 
-        # fall back to the original data if the arithmetic evaluation of the
-        #  error correction fails, e.g. for 0 != 0 or infinite or NaN values
-        return np.where(
-            self.check_elementwise(data, corrected),
-            corrected,
-            data,
-        )
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            eb_rel_multipler = to_finite_float(
+                10, data_float.dtype, map=lambda x: np.power(x, self._eb_decimal)
+            )
+        assert eb_rel_multipler >= 1.0
+
+        return _compute_safe_eb_rel_interval(
+            data, data_float, eb_rel_multipler, equal_nan=self._equal_nan
+        ).into_union()
 
     def get_config(self) -> dict:
         """
@@ -150,11 +172,76 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def _decimal_error(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        sign_x, sign_y = np.sign(x), np.sign(y)
+
         # 0               : if x == 0 and y == 0
         # inf             : if sign(x) != sign(y)
         # abs(log10(x/y)) : otherwise
         return np.where(
-            np.sign(x) == np.sign(y),
-            np.abs(np.log10(x / y)),
-            np.inf,
+            (sign_x == 0) & (sign_y == 0),
+            to_float(np.array(0.0)),
+            np.where(
+                sign_x != sign_y,
+                to_float(np.array(np.inf)),
+                np.abs(np.log10(to_float(x) / to_float(y))),
+            ),
         )
+
+
+def _compute_safe_eb_rel_interval(
+    data: np.ndarray[S, T],
+    data_float: np.ndarray[S, F],
+    eb_rel_multiplier: np.ndarray[tuple[()], F],
+    equal_nan: bool,
+) -> Interval:
+    dataf: np.ndarray[tuple[int], T] = data.flatten()
+    dataf_float: np.ndarray[tuple[int], F] = data_float.flatten()
+
+    valid = (
+        Interval.empty_like(dataf)
+        .preserve_inf(dataf)
+        .preserve_nan(dataf, equal_nan=equal_nan)
+    )
+
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        data_mul, data_div = (
+            from_float(dataf_float * eb_rel_multiplier, dataf.dtype),
+            from_float(dataf_float / eb_rel_multiplier, dataf.dtype),
+        )
+        Lower(np.where(dataf < 0, data_mul, data_div)) <= valid[
+            np.isfinite(dataf)
+        ] <= Upper(np.where(dataf < 0, data_div, data_mul))
+
+    # correct rounding errors in the lower and upper bound
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        lower_bound_outside_eb_rel = (
+            np.abs(
+                np.where(
+                    dataf < 0,
+                    to_float(valid._lower) / dataf_float,
+                    dataf_float / to_float(valid._lower),
+                )
+            )
+            > eb_rel_multiplier
+        )
+        upper_bound_outside_eb_rel = (
+            np.abs(
+                np.where(
+                    dataf < 0,
+                    dataf_float / to_float(valid._upper),
+                    to_float(valid._upper) / dataf_float,
+                )
+            )
+            > eb_rel_multiplier
+        )
+
+    valid._lower[np.isfinite(dataf)] = from_total_order(
+        to_total_order(valid._lower) + lower_bound_outside_eb_rel,
+        dataf.dtype,
+    )[np.isfinite(dataf)]
+    valid._upper[np.isfinite(dataf)] = from_total_order(
+        to_total_order(valid._upper) - upper_bound_outside_eb_rel,
+        dataf.dtype,
+    )[np.isfinite(dataf)]
+
+    return valid

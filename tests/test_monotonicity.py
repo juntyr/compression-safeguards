@@ -2,11 +2,11 @@ from itertools import product
 
 import numpy as np
 
-from numcodecs_safeguards.safeguards.elementwise.monotonicity import (
+from numcodecs_safeguards.safeguards.stencil.monotonicity import (
     Monotonicity,
     MonotonicityPreservingSafeguard,
 )
-from numcodecs_safeguards.safeguards.elementwise import _as_bits
+from numcodecs_safeguards.cast import as_bits
 
 
 from .codecs import (
@@ -70,6 +70,8 @@ def test_edge_cases():
                 np.finfo(float).max,
                 np.finfo(float).tiny,
                 -np.finfo(float).tiny,
+                -0.0,
+                +0.0,
             ]
         )
     )
@@ -156,26 +158,20 @@ def test_monotonicity():
                 assert safeguard.check(data, decoded) == (
                     decoded_window in active_allowed[data_window]
                 )
-                # the elementwise check has to return the expected result
-                assert np.all(safeguard.check_elementwise(data, decoded)) == (
-                    decoded_window in active_allowed[data_window]
-                )
 
                 # correcting the data must pass both checks
-                corrected = safeguard._compute_correction(data, decoded)
+                corrected = safeguard.compute_safe_intervals(data).pick(decoded)
                 assert safeguard.check(data, corrected)
-                assert np.all(safeguard.check_elementwise(data, corrected))
             else:
                 # the window doesn't activate the safeguard so the checks must
                 #  succeed
                 assert safeguard.check(data, decoded)
-                assert np.all(safeguard.check_elementwise(data, decoded))
 
                 # the window doesn't activate the safeguard so the corrected
                 #  array should be bit-equivalent to the decoded array
                 assert np.array_equal(
-                    _as_bits(safeguard._compute_correction(data, decoded)),
-                    _as_bits(decoded),
+                    as_bits(safeguard.compute_safe_intervals(data).pick(decoded)),
+                    as_bits(decoded),
                 )
 
 

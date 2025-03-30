@@ -2,78 +2,48 @@
 Implementations for the provided safeguards.
 """
 
-__all__ = ["Safeguard"]
+__all__ = ["Safeguards"]
 
-from abc import ABC, abstractmethod
-from typing_extensions import Self  # MSPV 3.11
+from enum import Enum
 
-import numpy as np
+from .elementwise.abs import AbsoluteErrorBoundSafeguard
+from .elementwise.decimal import DecimalErrorBoundSafeguard
+from .elementwise.findiff.abs import (
+    FiniteDifferenceAbsoluteErrorBoundSafeguard,
+)
+from .elementwise.rel_or_abs import RelativeOrAbsoluteErrorBoundSafeguard
+from .elementwise.sign import SignPreservingSafeguard
+from .elementwise.zero import ZeroIsZeroSafeguard
+from .stencil.monotonicity import MonotonicityPreservingSafeguard
 
 
-class Safeguard(ABC):
+class Safeguards(Enum):
     """
-    Safeguard abstract base class.
+    Enumeration of all supported safeguards:
     """
 
-    kind: str
-    """Safeguard kind."""
-    _priority: int
+    # exact values
+    zero = ZeroIsZeroSafeguard
+    """Enforce that zero (or another constant) is exactly preserved."""
 
-    @abstractmethod
-    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
-        """
-        Check if the `decoded` array upholds the property enforced by this
-        safeguard.
+    # error bounds
+    abs = AbsoluteErrorBoundSafeguard
+    """Enforce an absolute error bound."""
 
-        Parameters
-        ----------
-        data : np.ndarray
-            Data to be encoded.
-        decoded : np.ndarray
-            Decoded data.
+    rel_or_abs = RelativeOrAbsoluteErrorBoundSafeguard
+    """Enforce a relative error bound, fall back to an absolute error bound close to zero."""
 
-        Returns
-        -------
-        ok : bool
-            `True` if the check succeeded.
-        """
-        pass
+    decimal = DecimalErrorBoundSafeguard
+    """Enforce a decimal error bound."""
 
-    @abstractmethod
-    def get_config(self) -> dict:
-        """
-        Returns the configuration of the safeguard.
+    # finite difference error bounds
+    findiff_abs = FiniteDifferenceAbsoluteErrorBoundSafeguard
+    """Enforce an absolute error bound for the finite differences."""
 
-        The config must include a 'kind' field with the safeguard kind. All
-        values must be compatible with JSON encoding.
+    # monotonicity
+    monotonicity = MonotonicityPreservingSafeguard
+    """Enforce that monotonic sequences remain monotonic."""
 
-        Returns
-        -------
-        config : dict
-            Configuration of the safeguard.
-        """
-
-        pass
-
-    @classmethod
-    def from_config(cls, config: dict) -> Self:
-        """
-        Instantiate the safeguard from a configuration [`dict`][dict].
-
-        Parameters
-        ----------
-        config : dict
-            Configuration of the safeguard.
-
-        Returns
-        -------
-        safeguard : Self
-            Instantiated safeguard.
-        """
-
-        return cls(**config)
-
-    def __repr__(self) -> str:
-        config = {k: v for k, v in self.get_config().items() if k != "kind"}
-
-        return f"{type(self).__name__}({', '.join(f'{k}={v!r}' for k, v in config.items())})"
+    # sign
+    sign = SignPreservingSafeguard
+    """Enforce that the sign (-1, 0, +1) of each element is preserved."""

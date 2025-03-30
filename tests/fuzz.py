@@ -14,8 +14,8 @@ with atheris.instrument_imports():
     from numcodecs_safeguards import (
         SafeguardsCodec,
         Safeguards,
-        _SUPPORTED_DTYPES,
     )
+    from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
 
 
 class FuzzCodec(Codec):
@@ -29,7 +29,7 @@ class FuzzCodec(Codec):
         return b""
 
     def decode(self, buf, out=None):
-        assert buf == b""
+        assert len(buf) == 0
         assert out is not None
         out[:] = self.decoded
         return out
@@ -74,7 +74,9 @@ def check_one_input(data):
     dtype: np.ndtype = list(_SUPPORTED_DTYPES)[
         data.ConsumeIntInRange(0, len(Safeguards) - 1)
     ]
-    size: int = data.ConsumeIntInRange(0, 10)
+    sizea: int = data.ConsumeIntInRange(0, 20)
+    sizeb: int = data.ConsumeIntInRange(0, 20 // max(1, sizea))
+    size = sizea * sizeb
 
     # input data and the decoded data
     raw = data.ConsumeBytes(size * dtype.itemsize)
@@ -88,6 +90,10 @@ def check_one_input(data):
 
     raw = np.frombuffer(raw, dtype=dtype)
     decoded = np.frombuffer(decoded, dtype=dtype)
+
+    if sizeb != 0:
+        raw = raw.reshape((sizea, sizeb))
+        decoded = decoded.reshape((sizea, sizeb))
 
     # safeguard parameters
     safeguards = [
@@ -115,13 +121,35 @@ def check_one_input(data):
     gconfig = safeguard.get_config()
 
     safeguard = numcodecs.registry.get_codec(gconfig)
-    assert safeguard.get_config() == gconfig
+    assert safeguard.get_config() == gconfig, (
+        f"{safeguard.get_config()!r} vs {gconfig!r}"
+    )
+    assert repr(safeguard) == grepr, f"{safeguard!r} vs {grepr}"
 
     try:
         encoded = safeguard.encode(raw)
         safeguard.decode(encoded, out=np.empty_like(raw))
     except Exception as err:
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")
+        raise err
+
+    # test using the safeguards without a codec
+    safeguard = SafeguardsCodec(
+        codec=None,
+        safeguards=safeguards,
+    )
+
+    grepr = repr(safeguard)
+    gconfig = safeguard.get_config()
+
+    safeguard = numcodecs.registry.get_codec(gconfig)
+    assert safeguard.get_config() == gconfig
+
+    try:
+        encoded = safeguard.encode(raw)
+        safeguard.decode(encoded, out=np.empty_like(raw))
+    except Exception as err:
+        print(f"\n===\n\ncodec = {grepr}\n\ndata = {raw!r}\n\n===\n")
         raise err
 
 

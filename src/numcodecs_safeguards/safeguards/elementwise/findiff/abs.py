@@ -5,15 +5,19 @@ Finite difference absolute error bound safeguard.
 __all__ = ["FiniteDifferenceAbsoluteErrorBoundSafeguard"]
 
 import warnings
-from typing import Optional
+from fractions import Fraction
 
 import numpy as np
 
-from .. import ElementwiseSafeguard, _as_bits
+from ....cast import to_float, as_bits, to_finite_float
+from ....intervals import IntervalUnion
+from ..abc import ElementwiseSafeguard
+from ..abs import _compute_safe_eb_abs_interval
 from . import (
     FiniteDifference,
     _finite_difference_offsets,
     _finite_difference_coefficients,
+    _finite_difference,
 )
 
 
@@ -43,17 +47,18 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     type : str | FiniteDifference
         The type of finite difference.
     order : int
-        The non-negative order of the derivative that is approximayed by a
+        The non-negative order of the derivative that is approximated by a
         finite difference.
     accuracy : int
         The positive order of accuracy of the finite difference approximation.
 
         The order of accuracy must be even for a central finite difference.
-    dx : float
+    dx : int | float
         The uniform positive grid spacing between each point.
-    eb_abs : float
-        The positive absolute error bound that is enforced by this safeguard.
-    axis : Optional[int]
+    eb_abs : int | float
+        The non-negative absolute error bound on the finite difference that is
+        enforced by this safeguard.
+    axis : None | int
         The axis along which the finite difference is safeguarded. The default,
         [`None`][None], is to safeguard along all axes.
     """
@@ -70,22 +75,23 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     _type: FiniteDifference
     _order: int
     _accuracy: int
-    _dx: float
-    _eb_abs: float
-    _axis: Optional[int]
-    _eb_abs_impl: float
+    _dx: int | float
+    _eb_abs: int | float
+    _axis: None | int
+    _offsets: tuple[int, ...]
+    _coefficients: tuple[Fraction, ...]
+    _eb_abs_impl: Fraction
 
     kind = "findiff_abs"
-    _priority = 0
 
     def __init__(
         self,
         type: str | FiniteDifference,
         order: int,
         accuracy: int,
-        dx: float,
-        eb_abs: float,
-        axis: Optional[int] = None,
+        dx: int | float,
+        eb_abs: int | float,
+        axis: None | int = None,
     ):
         type = type if isinstance(type, FiniteDifference) else FiniteDifference[type]
 
@@ -97,8 +103,9 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
                 "accuracy must be even for a central finite difference"
             )
 
-        assert dx > 0.0, "dx must be positive"
-        assert eb_abs > 0.0, "eb_abs must be positive"
+        assert dx > 0, "dx must be positive"
+        assert np.isfinite(dx), "dx must be finite"
+        assert eb_abs >= 0, "eb_abs must be non-negative"
         assert np.isfinite(eb_abs), "eb_abs must be finite"
 
         if order > 8 or accuracy > 8:
@@ -114,55 +121,108 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         self._eb_abs = eb_abs
         self._axis = axis
 
-        offsets = _finite_difference_offsets(type, order, accuracy)
-        coefficients = _finite_difference_coefficients(order, offsets)
+        self._offsets = _finite_difference_offsets(type, order, accuracy)
+        self._coefficients = _finite_difference_coefficients(order, self._offsets)
 
         self._eb_abs_impl = (
-            eb_abs * np.power(dx, order) / sum(abs(c) for c in coefficients)
+            Fraction(eb_abs)
+            * (Fraction(dx) ** order)
+            / sum(abs(c) for c in self._coefficients)
         )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
+    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
+        axes = list(range(len(data.shape))) if self._axis is None else [self._axis]
+
+        axes = [
+            a
+            for a in axes
+            if ((a >= 0) and (a < len(data.shape)))
+            or ((a < 0) and (a >= -len(data.shape)))
+        ]
+        axes = [a for a in axes if data.shape[a] >= len(self._coefficients)]
+
+        for a in axes:
+            findiff_data = _finite_difference(
+                to_float(data),
+                self._order,
+                self._offsets,
+                self._coefficients,
+                self._dx,
+                axis=a,
+            )
+            findiff_decoded = _finite_difference(
+                to_float(decoded),
+                self._order,
+                self._offsets,
+                self._coefficients,
+                self._dx,
+                axis=a,
+            )
+
+            # abs(findiff_data - findiff_decoded) <= self._eb_abs, but works for
+            # unsigned ints
+            absolute_bound = (
+                np.where(
+                    findiff_data > findiff_decoded,
+                    findiff_data - findiff_decoded,
+                    findiff_decoded - findiff_data,
+                )
+                <= self._eb_abs
+            )
+            same_bits = as_bits(findiff_data, kind="V") == as_bits(
+                findiff_decoded, kind="V"
+            )
+            both_nan = np.isnan(findiff_data) & np.isnan(findiff_decoded)
+
+            ok = np.where(
+                np.isfinite(findiff_data),
+                absolute_bound,
+                np.where(
+                    np.isinf(findiff_data),
+                    same_bits,
+                    both_nan,
+                ),
+            )
+
+            if not np.all(ok):
+                return False
+
+        return True
+
+    def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
         """
-        Check for which elements in the `decoded` array the finite differences
-        satisfy the absolute error bound.
+        Compute the intervals in which the absolute error bound is upheld with
+        respect to the finite differences of the `data`.
 
         Parameters
         ----------
         data : np.ndarray
-            Data to be encoded.
-        decoded : np.ndarray
-            Decoded data.
+            Data for which the safe intervals should be computed.
 
         Returns
         -------
-        ok : np.ndarray
-            Per-element, `True` if the check succeeded for this element.
+        intervals : IntervalUnion
+            Union of intervals in which the absolute error bound is upheld.
         """
 
-        return (
-            (np.abs(data - decoded) <= self._eb_abs_impl)
-            | (_as_bits(data) == _as_bits(decoded))
-            | (np.isnan(data) & np.isnan(decoded))
-        )
+        data_float: np.ndarray = to_float(data)
 
-    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def _compute_correction(
-        self,
-        data: np.ndarray,
-        decoded: np.ndarray,
-    ) -> np.ndarray:
-        error = decoded - data
-        correction = (
-            np.round(error / (self._eb_abs_impl * 2.0)) * (self._eb_abs_impl * 2.0)
-        ).astype(data.dtype)
-        corrected = decoded - correction
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            try:
+                eb_abs_impl_float = float(self._eb_abs_impl)
+            except OverflowError:
+                eb_abs_impl_float = float("inf")
+            eb_abs_impl: np.ndarray = to_finite_float(
+                eb_abs_impl_float, data_float.dtype
+            )
+        assert eb_abs_impl >= 0.0
 
-        return np.where(
-            self.check_elementwise(data, corrected),
-            corrected,
-            data,
-        )
+        return _compute_safe_eb_abs_interval(
+            data, data_float, eb_abs_impl, equal_nan=True
+        ).into_union()
 
     def get_config(self) -> dict:
         """

@@ -12,15 +12,29 @@ dependencies = [
     "numcodecs>=0.13.0,<0.16",
     "numcodecs-combinators~=0.2.3",
     "numpy~=2.0",
+    # "numpy-quaddtype~=0.0.7", # pip install -i https://test.pypi.org/simple/ numpy-quaddtype~=0.0.7
     "varint~=1.0",
     "typing-extensions~=4.6",
+    "dahuffman~=0.4.0",
 ]
 
 [dependency-groups]
+bench = [
+    "numcodecs-wasm~=0.1",
+    "numcodecs-wasm-sz3~=0.5",
+    "numcodecs-wasm-zfp~=0.4",
+    "numcodecs-wasm-zlib~=0.2",
+    "numcodecs-wasm-zstd~=0.2",
+    "xarray~=2025.1",
+    "netcdf4~=1.7.2",
+    "tqdm~=4.0",
+    "matplotlib~=3.10.0",
+    "mpl-ascii~=0.10.0",
+]
 dev = ["ruff~=0.9"]
+fuzz = ["atheris~=2.3"]
 test = ["pytest~=8.3"]
 typing = ["mypy~=1.14"]
-fuzz = ["atheris~=2.3"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -32,5 +46,5 @@ where = ["src"]
 addopts = ["--import-mode=importlib"]
 
 [[tool.mypy.overrides]]
-module = ["numcodecs.*", "varint.*"]
+module = ["dahuffman.*", "numcodecs.*", "numpy_quaddtype.*", "varint.*"]
 follow_untyped_imports = true

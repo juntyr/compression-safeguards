@@ -63,6 +63,8 @@ def test_edge_cases():
                 np.finfo(float).max,
                 np.finfo(float).tiny,
                 -np.finfo(float).tiny,
+                -0.0,
+                +0.0,
             ]
         )
     )
@@ -78,5 +80,90 @@ def test_fuzzer_overcorrect():
         safeguards=[
             dict(kind="zero", zero=-1),
             dict(kind="decimal", eb_decimal=3.567564553293311e293),
+        ],
+    )
+
+
+def test_fuzzer_overflow():
+    data = np.array([506, 0, 64000, 57094, 65535, 255, 65321, 65535], dtype=np.uint16)
+    decoded = np.array(
+        [65535, 65535, 1535, 1285, 64215, 64250, 9731, 10499], dtype=np.uint16
+    )
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(kind="decimal", eb_decimal=61, equal_nan=True),
+        ],
+    )
+
+
+def test_fuzzer_rounding_error():
+    data = np.array(
+        [5723915, 0, 1460076544, -43177, -1, -1, -1, -1, -1, -1], dtype=np.int32
+    )
+    decoded = np.array(
+        [-1, -1, -1, -1, -1, -1, 33554431, -16777216, -1, -1], dtype=np.int32
+    )
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(kind="zero", zero=1.6989962568688874e308),
+            dict(kind="decimal", eb_decimal=2.5924625501554395e303, equal_nan=False),
+        ],
+    )
+
+
+def test_fuzzer_int_to_float_precision():
+    data = np.array([71789313200750347])
+    decoded = np.array([2821266740684990247])
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(kind="decimal", eb_decimal=2.2250738585072014e-308, equal_nan=True),
+        ],
+    )
+
+
+def test_fuzzer_issue_9():
+    data = np.array(
+        [
+            1499027801,
+            1499027801,
+            117922137,
+            482048,
+            117901063,
+            2080835335,
+            117901063,
+            117900551,
+        ],
+        dtype=np.int32,
+    )
+    decoded = np.array(
+        [
+            117901063,
+            117901063,
+            117901063,
+            117901063,
+            117901063,
+            117901092,
+            -1761147129,
+            -1751672937,
+        ],
+        dtype=np.int32,
+    )
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(kind="decimal", eb_decimal=1.0645163269184692e308, equal_nan=True),
+            # neither the findiff-abs nor monotonicity safeguards apply since
+            #  they require windows larger than the data
         ],
     )

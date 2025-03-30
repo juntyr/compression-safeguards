@@ -6,51 +6,51 @@ __all__ = ["RelativeOrAbsoluteErrorBoundSafeguard"]
 
 import numpy as np
 
-from . import ElementwiseSafeguard, _as_bits
+from .abc import ElementwiseSafeguard
+from .abs import _compute_safe_eb_abs_interval
+from .decimal import _compute_safe_eb_rel_interval
+from ...cast import to_float, as_bits, to_finite_float
+from ...intervals import IntervalUnion, Lower, Upper
 
 
 class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     r"""
-    The `RelativeOrAbsoluteErrorBoundSafeguard` guarantees that the elementwise
-    absolute error between the *logarithms*\* of the values is less than or
-    equal to $\log(1 + eb_{rel})$ where `eb_rel` is e.g. 2%.
+    The `RelativeOrAbsoluteErrorBoundSafeguard` guarantees that either the
+    absolute error between the logarithms of the values is less than or
+    equal to $\log$(1 + `eb_rel`), and/or the absolute error between the values
+    is less than or equal to the provided absolute error bound `eb_abs`.
 
-    The logarithm* here is adapted to support positive, negative, and zero
-    values. For values close to zero, where the relative error is not well-
-    defined, the absolute elementwise error is guaranteed to be less than or
-    equal to the absolute error bound.
-
-    Put simply, each element satisfies the relative or the absolute error bound
-    (or both). In cases where the arithmetic evaluation of the error bound is
-    not well-defined, e.g. for infinite or NaN values, producing the exact same
-    bitpattern is defined to satisfy the error bound. If `equal_nan` is set to
-    [`True`][True], decoding a NaN value to a NaN value with a different
-    bitpattern also satisfies the error bound.
+    Infinite values are preserved with the same bit pattern. If `equal_nan` is
+    set to [`True`][True], decoding a NaN value to a NaN value with a different
+    bitpattern also satisfies the error bound. If `equal_nan` is set to
+    [`False`][False], NaN values are also preserved with the same bit pattern.
 
     Parameters
     ----------
-    eb_rel : float
-        The positive relative error bound that is enforced by this safeguard.
-        `eb_rel=0.02` corresponds to a 2% relative bound.
-    eb_abs : float
-        The positive absolute error bound that is enforced by this safeguard.
+    eb_rel : int | float
+        The non-negative relative error bound that is enforced by this
+        safeguard. `eb_rel=0.02` corresponds to a 2% relative bound.
+    eb_abs : int | float
+        The non-negative absolute error bound that is enforced by this
+        safeguard.
     equal_nan: bool
         Whether decoding a NaN value to a NaN value with a different bit
         pattern satisfies the error bound.
     """
 
     __slots__ = ("_eb_rel", "_eb_abs", "_equal_nan")
-    _eb_rel: float
-    _eb_abs: float
+    _eb_rel: int | float
+    _eb_abs: int | float
     _equal_nan: bool
 
     kind = "rel_or_abs"
-    _priority = 0
 
-    def __init__(self, eb_rel: float, eb_abs: float, *, equal_nan: bool = False):
-        assert eb_rel > 0.0, "eb_rel must be positive"
+    def __init__(
+        self, eb_rel: int | float, eb_abs: int | float, *, equal_nan: bool = False
+    ):
+        assert eb_rel >= 0, "eb_rel must be non-negative"
         assert np.isfinite(eb_rel), "eb_rel must be finite"
-        assert eb_abs > 0.0, "eb_abs must be positive"
+        assert eb_abs >= 0, "eb_abs must be non-negative"
         assert np.isfinite(eb_abs), "eb_abs must be finite"
 
         self._eb_rel = eb_rel
@@ -58,10 +58,10 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         self._equal_nan = equal_nan
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def check_elementwise(self, data: np.ndarray, decoded: np.ndarray) -> np.ndarray:
+    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
         """
-        Check which elements in the `decoded` array satisfy the relative or the
-        absolute error bound.
+        Check if the `decoded` array satisfies the relative or the absolute
+        error bound.
 
         Parameters
         ----------
@@ -72,45 +72,95 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
         Returns
         -------
-        ok : np.ndarray
-            Per-element, `True` if the check succeeded for this element.
+        ok : bool
+            `True` if the check succeeded.
         """
 
-        return (
-            (np.abs(self._log(data) - self._log(decoded)) <= np.log(1.0 + self._eb_rel))
-            | (np.abs(data - decoded) <= self._eb_abs)
-            | (_as_bits(data) == _as_bits(decoded))
-            | (self._equal_nan and (np.isnan(data) & np.isnan(decoded)))
+        # abs(data - decoded) <= self._eb_abs, but works for unsigned ints
+        absolute_bound = (
+            np.where(
+                data > decoded,
+                data - decoded,
+                decoded - data,
+            )
+            <= self._eb_abs
+        )
+        relative_bound = (np.sign(data) == np.sign(decoded)) & (
+            (
+                np.where(
+                    np.abs(data) > np.abs(decoded),
+                    to_float(data) / to_float(decoded),
+                    to_float(decoded) / to_float(data),
+                )
+                - 1
+            )
+            <= self._eb_rel
+        )
+        # bitwise equality for inf and NaNs (unless equal_nan)
+        same_bits = as_bits(data) == as_bits(decoded)
+        both_nan = self._equal_nan and (np.isnan(data) & np.isnan(decoded))
+
+        ok = np.where(
+            np.isfinite(data),
+            relative_bound | absolute_bound,
+            np.where(
+                np.isinf(data),
+                same_bits,
+                both_nan if self._equal_nan else same_bits,
+            ),
         )
 
-    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def _compute_correction(
-        self,
-        data: np.ndarray,
-        decoded: np.ndarray,
-    ) -> np.ndarray:
-        # remember which elements already passed the check
-        already_correct = self.check_elementwise(data, decoded)
+        return bool(np.all(ok))
 
-        log_eb_rel = np.log(1.0 + self._eb_rel)
+    def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
+        """
+        Compute the intervals in which the relative or absolute error bound is
+        upheld with respect to the `data`.
 
-        data_log = self._log(data)
-        decoded_log = self._log(decoded)
+        Parameters
+        ----------
+        data : np.ndarray
+            Data for which the safe intervals should be computed.
 
-        error_log = decoded_log - data_log
-        correction_log = np.round(error_log / (log_eb_rel * 2.0)) * (log_eb_rel * 2.0)
+        Returns
+        -------
+        intervals : IntervalUnion
+            Union of intervals in which the relative or absolute error bound is
+            upheld.
+        """
 
-        corrected_log = decoded_log - correction_log
-        corrected = self._exp(corrected_log).astype(data.dtype)
+        data_float: np.ndarray = to_float(data)
 
-        # don't apply corrections to already-passing elements
-        corrected = np.where(already_correct, decoded, corrected)
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            eb_abs: np.ndarray = to_finite_float(self._eb_abs, data_float.dtype)
+        assert eb_abs >= 0.0
 
-        return np.where(
-            self.check_elementwise(data, corrected),
-            corrected,
-            data,
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            eb_rel_multipler: np.ndarray = to_finite_float(
+                self._eb_rel, data_float.dtype, map=lambda x: x + 1
+            )
+        assert eb_rel_multipler >= 1.0
+
+        # compute the intervals for the absolute and relative error bounds
+        valid_abs = _compute_safe_eb_abs_interval(
+            data, data_float, eb_abs, equal_nan=self._equal_nan
         )
+        valid_rel = _compute_safe_eb_rel_interval(
+            data, data_float, eb_rel_multipler, equal_nan=self._equal_nan
+        )
+
+        # combine (union) the absolute and relative error bounds
+        # we can union since the intervals overlap, at minimum at data
+        valid = valid_abs
+        Lower(np.minimum(valid_abs._lower, valid_rel._lower)) <= valid[
+            np.isfinite(data.flatten())
+        ] <= Upper(np.maximum(valid_abs._upper, valid_rel._upper))
+
+        return valid.into_union()
 
     def get_config(self) -> dict:
         """
@@ -128,13 +178,3 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             eb_abs=self._eb_abs,
             equal_nan=self._equal_nan,
         )
-
-    def _log(self, x: np.ndarray) -> np.ndarray:
-        a = 0.5 * self._eb_abs / (1.0 + self._eb_rel)
-
-        return np.sign(x) * np.log(np.maximum(np.abs(x), a) / a)
-
-    def _exp(self, x: np.ndarray) -> np.ndarray:
-        a = 0.5 * self._eb_abs / (1.0 + self._eb_rel)
-
-        return np.sign(x) * np.exp(np.abs(x)) * a
