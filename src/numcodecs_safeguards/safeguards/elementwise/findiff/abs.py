@@ -211,8 +211,12 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
+            try:
+                eb_abs_impl_float = float(self._eb_abs_impl)
+            except OverflowError:
+                eb_abs_impl_float = float("inf")
             eb_abs_impl: np.ndarray = to_finite_float(
-                float(self._eb_abs_impl), data_float.dtype
+                eb_abs_impl_float, data_float.dtype
             )
         assert eb_abs_impl >= 0.0
 

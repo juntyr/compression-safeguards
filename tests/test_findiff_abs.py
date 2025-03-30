@@ -191,3 +191,26 @@ def test_fuzzer_eb_abs():
             dict(kind="sign"),
         ],
     )
+
+
+def test_fuzzer_fraction_float_overflow():
+    data = np.array([[0], [0], [7], [0], [4], [0], [59], [199]], dtype=np.uint16)
+    decoded = np.array(
+        [[1], [1], [0], [30720], [124], [32768], [16427], [3797]], dtype=np.uint16
+    )
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(
+                kind="findiff_abs",
+                type="forward",
+                order=1,
+                accuracy=3,
+                dx=59,
+                eb_abs=8.812221249325077e307,
+            ),
+            dict(kind="sign"),
+        ],
+    )
