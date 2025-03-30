@@ -2,7 +2,14 @@
 Utility functions to cast arrays to floating point, binary, and total-order representations.
 """
 
-__all__ = ["to_float", "from_float", "as_bits", "to_total_order", "from_total_order"]
+__all__ = [
+    "to_float",
+    "to_finite_float",
+    "from_float",
+    "as_bits",
+    "to_total_order",
+    "from_total_order",
+]
 
 from typing import Any, Callable, TypeVar
 
