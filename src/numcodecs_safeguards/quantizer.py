@@ -39,7 +39,7 @@ class SafeguardsQuantizer:
         [`Safeguards`][numcodecs_safeguards.safeguards.Safeguards]
         for an enumeration of all supported safeguards.
     _version : ...
-        Internal, do not provide this paramter explicitly.
+        The quantizer's version. Do not provide this parameter explicitly.
     """
 
     __slots__ = ("_elementwise_safeguards", "_stencil_safeguards")
