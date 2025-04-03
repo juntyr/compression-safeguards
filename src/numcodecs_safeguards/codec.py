@@ -70,7 +70,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
           correction that the safeguards produce. By default, Huffman encoding
           followed by Zstandard is applied.
     _version : ...
-        Internal, do not provide this paramter explicitly.
+        The codecs's version. Do not provide this parameter explicitly.
     """
 
     __slots__ = (
