@@ -36,6 +36,11 @@ fuzz = ["atheris~=2.3"]
 test = ["pytest~=8.3"]
 typing = ["mypy~=1.14"]
 
+[project.entry-points."numcodecs.codecs"]
+"safeguards" = "numcodecs_safeguards.codec:SafeguardsCodec"
+"safeguards.lossless.huffman" = "numcodecs_safeguards.lossless:HuffmanCodec"
+"safeguards.lossless.delta_huffman" = "numcodecs_safeguards.lossless:DeltaHuffmanCodec"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
