@@ -40,7 +40,7 @@ typing = ["mypy~=1.14"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-"climatebenchpress.compressor" = ["py.typed"]
+"numcodecs_safeguards" = ["py.typed"]
 
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]
