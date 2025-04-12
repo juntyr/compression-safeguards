@@ -5,6 +5,7 @@ from .codecs import (
     encode_decode_neg,
     encode_decode_identity,
     encode_decode_noise,
+    encode_decode_mock,
 )
 
 
@@ -62,4 +63,30 @@ def test_edge_cases():
                 +0.0,
             ]
         )
+    )
+
+
+def test_fuzzer_inf_times_zero():
+    data = np.array(
+        [
+            0,
+            0,
+        ],
+        dtype=np.uint16,
+    )
+    decoded = np.array(
+        [
+            0,
+            0,
+        ],
+        dtype=np.uint16,
+    )
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(kind="zero", zero=0.0),
+            dict(kind="rel", eb_rel=4.287938165015999e290, equal_nan=False),
+        ],
     )

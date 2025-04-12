@@ -98,7 +98,10 @@ class RelativeErrorBoundSafeguard(ElementwiseSafeguard):
                 data_float.dtype,
                 map=lambda eb_rel: np.abs(data_float) * eb_rel,
             )
-        assert np.all((eb_rel_as_abs >= 0.0) | np.isnan(data))
+            eb_rel_as_abs = np.nan_to_num(
+                eb_rel_as_abs, nan=0.0, posinf=np.inf, neginf=-np.inf
+            )
+        assert np.all((eb_rel_as_abs >= 0.0) & np.isfinite(eb_rel_as_abs))
 
         relative_bound = np.abs(data_float - decoded_float) <= eb_rel_as_abs
 
@@ -144,7 +147,10 @@ class RelativeErrorBoundSafeguard(ElementwiseSafeguard):
                 data_float.dtype,
                 map=lambda eb_rel: np.abs(data_float) * eb_rel,
             )
-        assert np.all((eb_rel_as_abs >= 0.0) | np.isnan(data))
+            eb_rel_as_abs = np.nan_to_num(
+                eb_rel_as_abs, nan=0.0, posinf=np.inf, neginf=-np.inf
+            )
+        assert np.all((eb_rel_as_abs >= 0.0) & np.isfinite(eb_rel_as_abs))
 
         return _compute_safe_eb_rel_interval(
             data, data_float, eb_rel_as_abs, equal_nan=self._equal_nan
