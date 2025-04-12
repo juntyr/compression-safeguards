@@ -46,6 +46,10 @@ This package currently implements the following safeguards
 
     The elementwise absolute error is guaranteed to be less than or equal to the provided bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
 
+- `rel` (relative error bound):
+
+    The elementwise relative error is guaranteed to be less than or equal to the provided bound. Zero values are preserved with the same bit pattern. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
+
 - `ratio_or_abs` (ratio [or absolute] error bound):
 
     It is guaranteed that either (a) both the ratios between the original and the decoded values and their inverses are less than or equal to the provided ratio error bound, and/or that (b) their absolute error is less than or equal to the provided absolute error bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.

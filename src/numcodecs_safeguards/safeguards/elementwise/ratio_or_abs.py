@@ -17,9 +17,8 @@ class RatioOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     r"""
     The `RatioOrAbsoluteErrorBoundSafeguard` guarantees that either (a) both
     the ratios between the original and the decoded values and their inverses
-    are less than or equal to the provided ratio error bound, and/or that (b)
-    their absolute error is less than or equal to the provided absolute error
-    bound.
+    are less than or equal to the provided `eb_ratio`, and/or that (b) their
+    absolute error is less than or equal to the provided `eb_abs`.
 
     Infinite values are preserved with the same bit pattern. If `equal_nan` is
     set to [`True`][True], decoding a NaN value to a NaN value with a different

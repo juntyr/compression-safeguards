@@ -12,6 +12,7 @@ from .elementwise.findiff.abs import (
     FiniteDifferenceAbsoluteErrorBoundSafeguard,
 )
 from .elementwise.ratio_or_abs import RatioOrAbsoluteErrorBoundSafeguard
+from .elementwise.rel import RelativeErrorBoundSafeguard
 from .elementwise.sign import SignPreservingSafeguard
 from .elementwise.zero import ZeroIsZeroSafeguard
 from .stencil.monotonicity import MonotonicityPreservingSafeguard
@@ -29,6 +30,9 @@ class Safeguards(Enum):
     # error bounds
     abs = AbsoluteErrorBoundSafeguard
     """Enforce an absolute error bound."""
+
+    rel = RelativeErrorBoundSafeguard
+    """Enforce a relative error bound."""
 
     ratio_or_abs = RatioOrAbsoluteErrorBoundSafeguard
     """Enforce a ratio error bound, fall back to an absolute error bound close to zero."""
