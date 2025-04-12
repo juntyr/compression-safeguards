@@ -147,13 +147,13 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_rel_multipler = to_finite_float(
+            eb_ratio = to_finite_float(
                 10, data_float.dtype, map=lambda x: np.power(x, self._eb_decimal)
             )
-        assert eb_rel_multipler >= 1.0
+        assert eb_ratio >= 1.0
 
-        return _compute_safe_eb_rel_interval(
-            data, data_float, eb_rel_multipler, equal_nan=self._equal_nan
+        return _compute_safe_eb_ratio_interval(
+            data, data_float, eb_ratio, equal_nan=self._equal_nan
         ).into_union()
 
     def get_config(self) -> dict:
@@ -188,10 +188,10 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         )
 
 
-def _compute_safe_eb_rel_interval(
+def _compute_safe_eb_ratio_interval(
     data: np.ndarray[S, T],
     data_float: np.ndarray[S, F],
-    eb_rel_multiplier: np.ndarray[tuple[()], F],
+    eb_ratio: np.ndarray[tuple[()], F],
     equal_nan: bool,
 ) -> Interval:
     dataf: np.ndarray[tuple[int], T] = data.flatten()
@@ -205,8 +205,8 @@ def _compute_safe_eb_rel_interval(
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         data_mul, data_div = (
-            from_float(dataf_float * eb_rel_multiplier, dataf.dtype),
-            from_float(dataf_float / eb_rel_multiplier, dataf.dtype),
+            from_float(dataf_float * eb_ratio, dataf.dtype),
+            from_float(dataf_float / eb_ratio, dataf.dtype),
         )
         Lower(np.where(dataf < 0, data_mul, data_div)) <= valid[
             np.isfinite(dataf)
@@ -214,7 +214,7 @@ def _compute_safe_eb_rel_interval(
 
     # correct rounding errors in the lower and upper bound
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        lower_bound_outside_eb_rel = (
+        lower_bound_outside_eb_ratio = (
             np.abs(
                 np.where(
                     dataf < 0,
@@ -222,9 +222,9 @@ def _compute_safe_eb_rel_interval(
                     dataf_float / to_float(valid._lower),
                 )
             )
-            > eb_rel_multiplier
+            > eb_ratio
         )
-        upper_bound_outside_eb_rel = (
+        upper_bound_outside_eb_ratio = (
             np.abs(
                 np.where(
                     dataf < 0,
@@ -232,15 +232,15 @@ def _compute_safe_eb_rel_interval(
                     to_float(valid._upper) / dataf_float,
                 )
             )
-            > eb_rel_multiplier
+            > eb_ratio
         )
 
     valid._lower[np.isfinite(dataf)] = from_total_order(
-        to_total_order(valid._lower) + lower_bound_outside_eb_rel,
+        to_total_order(valid._lower) + lower_bound_outside_eb_ratio,
         dataf.dtype,
     )[np.isfinite(dataf)]
     valid._upper[np.isfinite(dataf)] = from_total_order(
-        to_total_order(valid._upper) - upper_bound_outside_eb_rel,
+        to_total_order(valid._upper) - upper_bound_outside_eb_ratio,
         dataf.dtype,
     )[np.isfinite(dataf)]
 

@@ -1,24 +1,25 @@
 """
-Relative (or absolute) error bound safeguard.
+Ratio (or absolute) error bound safeguard.
 """
 
-__all__ = ["RelativeOrAbsoluteErrorBoundSafeguard"]
+__all__ = ["RatioOrAbsoluteErrorBoundSafeguard"]
 
 import numpy as np
 
 from .abc import ElementwiseSafeguard
 from .abs import _compute_safe_eb_abs_interval
-from .decimal import _compute_safe_eb_rel_interval
+from .decimal import _compute_safe_eb_ratio_interval
 from ...cast import to_float, as_bits, to_finite_float
 from ...intervals import IntervalUnion, Lower, Upper
 
 
-class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
+class RatioOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
     r"""
-    The `RelativeOrAbsoluteErrorBoundSafeguard` guarantees that either the
-    absolute error between the logarithms of the values is less than or
-    equal to $\log$(1 + `eb_rel`), and/or the absolute error between the values
-    is less than or equal to the provided absolute error bound `eb_abs`.
+    The `RatioOrAbsoluteErrorBoundSafeguard` guarantees that either (a) both
+    the ratios between the original and the decoded values and their inverses
+    are less than or equal to the provided ratio error bound, and/or that (b)
+    their absolute error is less than or equal to the provided absolute error
+    bound.
 
     Infinite values are preserved with the same bit pattern. If `equal_nan` is
     set to [`True`][True], decoding a NaN value to a NaN value with a different
@@ -27,9 +28,10 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
     Parameters
     ----------
-    eb_rel : int | float
-        The non-negative relative error bound that is enforced by this
-        safeguard. `eb_rel=0.02` corresponds to a 2% relative bound.
+    eb_ratio : int | float
+        The >= 1 ratio error bound that is enforced by this safeguard.
+
+        `eb_ratio=1.02` corresponds to a 2% relative error bound.
     eb_abs : int | float
         The non-negative absolute error bound that is enforced by this
         safeguard.
@@ -38,29 +40,29 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         pattern satisfies the error bound.
     """
 
-    __slots__ = ("_eb_rel", "_eb_abs", "_equal_nan")
-    _eb_rel: int | float
+    __slots__ = ("_eb_ratio", "_eb_abs", "_equal_nan")
+    _eb_ratio: int | float
     _eb_abs: int | float
     _equal_nan: bool
 
-    kind = "rel_or_abs"
+    kind = "ratio_or_abs"
 
     def __init__(
-        self, eb_rel: int | float, eb_abs: int | float, *, equal_nan: bool = False
+        self, eb_ratio: int | float, eb_abs: int | float, *, equal_nan: bool = False
     ):
-        assert eb_rel >= 0, "eb_rel must be non-negative"
-        assert np.isfinite(eb_rel), "eb_rel must be finite"
+        assert eb_ratio >= 1, "eb_ratio must be a >= 1 ratio"
+        assert np.isfinite(eb_ratio), "eb_ratio must be finite"
         assert eb_abs >= 0, "eb_abs must be non-negative"
         assert np.isfinite(eb_abs), "eb_abs must be finite"
 
-        self._eb_rel = eb_rel
+        self._eb_ratio = eb_ratio
         self._eb_abs = eb_abs
         self._equal_nan = equal_nan
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
         """
-        Check if the `decoded` array satisfies the relative or the absolute
+        Check if the `decoded` array satisfies the ratio or the absolute
         error bound.
 
         Parameters
@@ -85,16 +87,13 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             )
             <= self._eb_abs
         )
-        relative_bound = (np.sign(data) == np.sign(decoded)) & (
-            (
-                np.where(
-                    np.abs(data) > np.abs(decoded),
-                    to_float(data) / to_float(decoded),
-                    to_float(decoded) / to_float(data),
-                )
-                - 1
+        ratio_bound = (np.sign(data) == np.sign(decoded)) & (
+            np.where(
+                np.abs(data) > np.abs(decoded),
+                to_float(data) / to_float(decoded),
+                to_float(decoded) / to_float(data),
             )
-            <= self._eb_rel
+            <= self._eb_ratio
         )
         # bitwise equality for inf and NaNs (unless equal_nan)
         same_bits = as_bits(data) == as_bits(decoded)
@@ -102,7 +101,7 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
         ok = np.where(
             np.isfinite(data),
-            relative_bound | absolute_bound,
+            ratio_bound | absolute_bound,
             np.where(
                 np.isinf(data),
                 same_bits,
@@ -114,7 +113,7 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
     def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
         """
-        Compute the intervals in which the relative or absolute error bound is
+        Compute the intervals in which the ratio or absolute error bound is
         upheld with respect to the `data`.
 
         Parameters
@@ -125,7 +124,7 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         Returns
         -------
         intervals : IntervalUnion
-            Union of intervals in which the relative or absolute error bound is
+            Union of intervals in which the ratio or absolute error bound is
             upheld.
         """
 
@@ -140,25 +139,23 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_rel_multipler: np.ndarray = to_finite_float(
-                self._eb_rel, data_float.dtype, map=lambda x: x + 1
-            )
-        assert eb_rel_multipler >= 1.0
+            eb_ratio: np.ndarray = to_finite_float(self._eb_ratio, data_float.dtype)
+        assert eb_ratio >= 1.0
 
-        # compute the intervals for the absolute and relative error bounds
+        # compute the intervals for the absolute and ratio error bounds
         valid_abs = _compute_safe_eb_abs_interval(
             data, data_float, eb_abs, equal_nan=self._equal_nan
         )
-        valid_rel = _compute_safe_eb_rel_interval(
-            data, data_float, eb_rel_multipler, equal_nan=self._equal_nan
+        valid_ratio = _compute_safe_eb_ratio_interval(
+            data, data_float, eb_ratio, equal_nan=self._equal_nan
         )
 
-        # combine (union) the absolute and relative error bounds
+        # combine (union) the absolute and ratio error bounds
         # we can union since the intervals overlap, at minimum at data
         valid = valid_abs
-        Lower(np.minimum(valid_abs._lower, valid_rel._lower)) <= valid[
+        Lower(np.minimum(valid_abs._lower, valid_ratio._lower)) <= valid[
             np.isfinite(data.flatten())
-        ] <= Upper(np.maximum(valid_abs._upper, valid_rel._upper))
+        ] <= Upper(np.maximum(valid_abs._upper, valid_ratio._upper))
 
         return valid.into_union()
 
@@ -174,7 +171,7 @@ class RelativeOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
         return dict(
             kind=type(self).kind,
-            eb_rel=self._eb_rel,
+            eb_ratio=self._eb_ratio,
             eb_abs=self._eb_abs,
             equal_nan=self._equal_nan,
         )
