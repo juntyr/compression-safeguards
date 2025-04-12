@@ -9,7 +9,7 @@ description = "Fearless lossy compression using safeguards"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "numcodecs>=0.13.0,<0.16",
+    "numcodecs>=0.13.0,<0.17",
     "numcodecs-combinators~=0.2.3",
     "numpy~=2.0",
     # "numpy-quaddtype~=0.0.7", # pip install -i https://test.pypi.org/simple/ numpy-quaddtype~=0.0.7
