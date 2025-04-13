@@ -602,15 +602,15 @@ class IntervalUnion(Generic[T, N, U]):
 
                 has_intersection = intersection_lower <= intersection_upper
 
-                out._lower[n_intervals[has_intersection], has_intersection] = (
-                    from_total_order(
-                        intersection_lower[has_intersection], out._lower.dtype
-                    )
+                out._lower[
+                    np.minimum(n_intervals[has_intersection], uv - 1), has_intersection
+                ] = from_total_order(
+                    intersection_lower[has_intersection], out._lower.dtype
                 )
-                out._upper[n_intervals[has_intersection], has_intersection] = (
-                    from_total_order(
-                        intersection_upper[has_intersection], out._upper.dtype
-                    )
+                out._upper[
+                    np.minimum(n_intervals[has_intersection], uv - 1), has_intersection
+                ] = from_total_order(
+                    intersection_upper[has_intersection], out._upper.dtype
                 )
 
                 n_intervals += has_intersection
@@ -640,7 +640,7 @@ class IntervalUnion(Generic[T, N, U]):
             uv: int = min(u, v)  # type: ignore
             return IntervalUnion.empty(self._lower.dtype, n, uv)
 
-        uv: int = max(u, v)  # type: ignore
+        uv: int = u + v  # type: ignore
         out: IntervalUnion[T, N, int] = IntervalUnion.empty(
             self._lower.dtype,
             n,
@@ -652,39 +652,65 @@ class IntervalUnion(Generic[T, N, U]):
         j_s = np.zeros(n, dtype=int)
 
         while (np.amin(i_s) < u) or (np.amin(j_s) < v):
-            lower_i: np.ndarray = to_total_order(self._lower[np.minimum(i_s, u)])
-            upper_i: np.ndarray = to_total_order(self._upper[np.minimum(i_s, u)])
-
-            lower_j: np.ndarray = to_total_order(self._lower[np.minimum(j_s, v)])
-            upper_j: np.ndarray = to_total_order(self._upper[np.minimum(j_s, v)])
-
-            has_intersection = (
-                ((upper_i >= lower_j) | (upper_j >= lower_i)) & (i_s < u) & (j_s < v)
+            lower_i: np.ndarray = to_total_order(
+                np.take_along_axis(
+                    self._lower, np.minimum(i_s, u - 1).reshape(1, -1), axis=0
+                ).flatten()
+            )
+            upper_i: np.ndarray = to_total_order(
+                np.take_along_axis(
+                    self._upper, np.minimum(i_s, u - 1).reshape(1, -1), axis=0
+                ).flatten()
             )
 
-            has_left = (upper_i < lower_j) & (i_s < u)
-            has_right = (upper_j < lower_i) & (j_s < v)
+            lower_j: np.ndarray = to_total_order(
+                np.take_along_axis(
+                    other._lower, np.minimum(j_s, v - 1).reshape(1, -1), axis=0
+                ).flatten()
+            )
+            upper_j: np.ndarray = to_total_order(
+                np.take_along_axis(
+                    other._upper, np.minimum(j_s, v - 1).reshape(1, -1), axis=0
+                ).flatten()
+            )
 
-            next_lower = np.minimum(lower_i, lower_j)
+            # only valid if in-bounds and non-empty
+            valid_i = (i_s < u) & (lower_i <= upper_i)
+            valid_j = (j_s < v) & (lower_j <= upper_j)
+
+            has_intersection = (
+                valid_i
+                & valid_j
+                & (np.maximum(lower_i, lower_j) <= np.minimum(upper_i, upper_j))
+            )
+
+            choose_i = valid_i & ((lower_i < lower_j) | ~valid_j)
+            choose_j = valid_j & ((lower_i >= lower_j) | ~valid_i)
+
+            next_lower = np.where(
+                has_intersection,
+                np.minimum(lower_i, lower_j),
+                np.where(choose_i, lower_i, lower_j),
+            )
             next_upper = np.where(
                 has_intersection,
                 np.maximum(upper_i, upper_j),
-                np.minimum(upper_i, upper_j),
+                np.where(choose_i, upper_i, upper_j),
             )
 
-            has_next = has_intersection | has_left | has_right
+            has_next = has_intersection | choose_i | choose_j
 
-            out._lower[n_intervals[has_next], has_next] = from_total_order(
-                next_lower[has_next], out._lower.dtype
+            out._lower[np.minimum(n_intervals[has_next], uv - 1), has_next] = (
+                from_total_order(next_lower[has_next], out._lower.dtype)
             )
-            out._upper[n_intervals[has_next], has_next] = from_total_order(
-                next_upper[has_next], out._upper.dtype
+            out._upper[np.minimum(n_intervals[has_next], uv - 1), has_next] = (
+                from_total_order(next_upper[has_next], out._upper.dtype)
             )
 
             n_intervals += has_next
 
-            i_s += has_left | has_intersection
-            j_s += has_right | has_intersection
+            i_s += has_intersection | choose_i | (~valid_j)
+            j_s += has_intersection | choose_j | (~valid_i)
 
         uv = np.amax(n_intervals)
 
