@@ -65,11 +65,13 @@ class Interval(Generic[T, N]):
 
     ## Interval operations
 
-    Two intervals can be intersected using
-    [`Interval.intersect`][numcodecs_safeguards.intervals.Interval.intersect]
-    and converted into a single-member union of intervals using
-    [`Interval.into_union`][numcodecs_safeguards.intervals.Interval.into_union].
+    Two intervals can be
 
+    - intersected using [`Interval.intersect`][numcodecs_safeguards.intervals.Interval.intersect]
+    - unioned using [`Interval.union`][numcodecs_safeguards.intervals.Interval.union]
+
+    or converted into a single-member union of intervals using
+    [`Interval.into_union`][numcodecs_safeguards.intervals.Interval.into_union].
     """
 
     _lower: np.ndarray[tuple[N], T]
@@ -525,6 +527,11 @@ class IntervalUnion(Generic[T, N, U]):
     Union of `U` intervals, each over a `N`-sized [`ndarray`][numpy.ndarray] of dtype `T`.
     """
 
+    # invariants:
+    # - the lower/upper bounds are in sorted order
+    # - no non-empty intervals come after empty intervals
+    # - no intervals intersect within the union
+    #   (but they can be adjacent, e.g. [1..3] and [4..5])
     _lower: np.ndarray[tuple[U, N], T]
     _upper: np.ndarray[tuple[U, N], T]
 
