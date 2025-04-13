@@ -48,13 +48,9 @@ This package currently implements the following safeguards:
 
     The elementwise relative error is guaranteed to be less than or equal to the provided bound. Zero values are preserved with the same bit pattern. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
 
-- `ratio_or_abs` (ratio [or absolute] error bound):
+- `ratio` (ratio [decimal] error bound):
 
-    It is guaranteed that either (a) both the ratios between the original and the decoded values and their inverses are less than or equal to the provided ratio error bound, and/or that (b) their absolute error is less than or equal to the provided absolute error bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
-
-- `decimal` (decimal error bound):
-
-    The elementwise decimal error is guaranteed to be less than or equal to the provided bound. The decimal error quantifies the orders of magnitude that the lossy-decoded value is away from the original value, i.e. the difference in their decimal logarithms. It is defined to be infinite if the signs of the data and decoded data do not match. Since the decimal error bound must be finite, this safeguard also guarantees that the sign of each decode value matches the sign of each original value and that a decoded value is zero if and only if it is zero in the original data. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
+    It is guaranteed that the ratios between the original and the decoded values and their inverse ratios are less than or equal to the provided bound. The ratio error is defined to be infinite if the signs of the data and decoded data do not match. Since the provided error bound must be finite, this safeguard also guarantees that the sign of each decoded value matches the sign of each original value and that a decoded value is zero if and only if it is zero in the original data. The ratio error bound is sometimes also known as a decimal error bound if the ratio is expressed as the difference in orders of magnitude. This safeguard can also be used to guarantee a relative-like error bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
 
 ### Error Bounds on Finite Differences (~per element)
 

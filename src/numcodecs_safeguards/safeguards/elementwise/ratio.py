@@ -1,8 +1,8 @@
 """
-Decimal error bound safeguard.
+Ratio (decimal) error bound safeguard.
 """
 
-__all__ = ["DecimalErrorBoundSafeguard"]
+__all__ = ["RatioErrorBoundSafeguard"]
 
 import numpy as np
 
@@ -19,28 +19,25 @@ from ...cast import (
 from ...intervals import IntervalUnion, Interval, Lower, Upper
 
 
-class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
-    r"""
-    The `DecimalErrorBoundSafeguard` guarantees that the elementwise decimal
-    error is less than or equal to the provided bound `eb_decimal`.
+class RatioErrorBoundSafeguard(ElementwiseSafeguard):
+    """
+    The `RatioErrorBoundSafeguard` guarantees that the ratios between the
+    original and the decoded values and their inverse ratios are less than
+    or equal to the provided `eb_ratio`.
 
-    The decimal error quantifies the orders of magnitude that the lossy-decoded
-    value $\hat{x}$ is away from the original value $x$. It is defined as
-    follows[^1] [^2]:
-
-    \[
-        \text{decimal error} = \begin{cases}
-            0 & \quad \text{if } x = \hat{x} = 0 \\
-            \inf & \quad \text{if } \text{sign}(x) \neq \text{sign}(\hat{x}) \\
-            \left| \log_{10}{\left( \frac{x}{\hat{x}} \right)} \right| & \quad \text{otherwise}
-        \end{cases}
-    \]
-
-    The decimal error is defined to be infinite if the signs of the data and
-    decoded data do not match. Since the `eb_decimal` error bound must be
-    finite, the `DecimalErrorBoundSafeguard` also guarantees that the sign of
-    each decode value matches the sign of each original value and that a
+    The ratio error is defined to be infinite if the signs of the data and
+    decoded data do not match. Since the `eb_ratio` error bound must be
+    finite, the `RatioErrorBoundSafeguard` also guarantees that the sign of
+    each decoded value matches the sign of each original value and that a
     decoded value is zero if and only if it is zero in the original data.
+
+    The ratio error bound is sometimes also known as a decimal error bound[^1]
+    [^2] if the ratio is expressed as the difference in orders of magnitude. A
+    decimal error bound of e.g. `2` (two orders of magnitude difference / x100
+    ratio) can be expressed using `eb_ratio = 10**eb_decimal`.
+
+    This safeguard can also be used to guarantee a relative-like error bound,
+    e.g. `eb_ratio=1.02` corresponds to a 2% relative error bound.
 
     Infinite values are preserved with the same bit pattern. If `equal_nan` is
     set to [`True`][True], decoding a NaN value to a NaN value with a different
@@ -60,25 +57,26 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
 
     Parameters
     ----------
-    eb_decimal : int | float
-        The non-negative decimal error bound that is enforced by this safeguard.
-        `eb_decimal=1.0` corresponds to a 10x relative error bound.
+    eb_ratio : int | float
+        The >= 1 ratio error bound that is enforced by this safeguard.
     equal_nan: bool
         Whether decoding a NaN value to a NaN value with a different bit
         pattern satisfies the error bound.
     """
 
-    __slots__ = ("_eb_decimal", "_equal_nan")
-    _eb_decimal: int | float
+    __slots__ = ("_eb_ratio", "_equal_nan")
+    _eb_ratio: int | float
     _equal_nan: bool
 
-    kind = "decimal"
+    kind = "ratio"
 
-    def __init__(self, eb_decimal: int | float, *, equal_nan: bool = False):
-        assert eb_decimal >= 0, "eb_decimal must be non-negative"
-        assert np.isfinite(eb_decimal), "eb_decimal must be finite"
+    def __init__(self, eb_ratio: int | float, *, equal_nan: bool = False):
+        assert eb_ratio >= 1, "eb_ratio must be a >= 1 ratio"
+        assert isinstance(eb_ratio, int) or np.isfinite(eb_ratio), (
+            "eb_ratio must be finite"
+        )
 
-        self._eb_decimal = eb_decimal
+        self._eb_ratio = eb_ratio
         self._equal_nan = equal_nan
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -86,7 +84,7 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check which elements in the `decoded` array satisfy the decimal error
+        Check which elements in the `decoded` array satisfy the ratio error
         bound.
 
         Parameters
@@ -102,19 +100,38 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
             Per-element, `True` if the check succeeded for this element.
         """
 
-        decimal_bound = self._decimal_error(data, decoded) <= self._eb_decimal
+        data_float: np.ndarray = to_float(data)
+        decoded_float: np.ndarray = to_float(decoded)
 
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            eb_ratio: np.ndarray = to_finite_float(self._eb_ratio, data_float.dtype)
+        assert eb_ratio >= 1.0
+
+        ratio_bound = (np.sign(data) == np.sign(decoded)) & (
+            np.where(
+                np.abs(data) > np.abs(decoded),
+                data_float / decoded_float,
+                decoded_float / data_float,
+            )
+            <= eb_ratio
+        )
         # bitwise equality for inf and NaNs (unless equal_nan)
         same_bits = as_bits(data) == as_bits(decoded)
         both_nan = self._equal_nan and (np.isnan(data) & np.isnan(decoded))
 
         ok = np.where(
-            np.isfinite(data),
-            decimal_bound,
+            data == 0,
+            decoded == 0,
             np.where(
-                np.isinf(data),
-                same_bits,
-                both_nan if self._equal_nan else same_bits,
+                np.isfinite(data),
+                ratio_bound,
+                np.where(
+                    np.isinf(data),
+                    same_bits,
+                    both_nan if self._equal_nan else same_bits,
+                ),
             ),
         )
 
@@ -124,7 +141,7 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         self, data: np.ndarray[S, T]
     ) -> IntervalUnion[T, int, int]:
         """
-        Compute the intervals in which the decimal error bound is upheld with
+        Compute the intervals in which the ratio error bound is upheld with
         respect to the `data`.
 
         Parameters
@@ -135,7 +152,7 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         Returns
         -------
         intervals : IntervalUnion
-            Union of intervals in which the decimal error bound is upheld.
+            Union of intervals in which the ratio error bound is upheld.
         """
 
         data_float: np.ndarray = to_float(data)
@@ -143,9 +160,7 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_ratio = to_finite_float(
-                10, data_float.dtype, map=lambda x: np.power(x, self._eb_decimal)
-            )
+            eb_ratio: np.ndarray = to_finite_float(self._eb_ratio, data_float.dtype)
         assert eb_ratio >= 1.0
 
         return _compute_safe_eb_ratio_interval(
@@ -163,27 +178,10 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         """
 
         return dict(
-            kind=type(self).kind, eb_decimal=self._eb_decimal, equal_nan=self._equal_nan
+            kind=type(self).kind,
+            eb_ratio=self._eb_ratio,
+            equal_nan=self._equal_nan,
         )
-
-    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def _decimal_error(
-        self, x: np.ndarray[S, T], y: np.ndarray[S, T]
-    ) -> np.ndarray[S, F]:
-        sign_x, sign_y = np.sign(x), np.sign(y)
-
-        # 0               : if x == 0 and y == 0
-        # inf             : if sign(x) != sign(y)
-        # abs(log10(x/y)) : otherwise
-        return np.where(
-            (sign_x == 0) & (sign_y == 0),
-            to_float(np.array(0.0)),
-            np.where(
-                sign_x != sign_y,
-                to_float(np.array(np.inf)),
-                np.abs(np.log10(to_float(x) / to_float(y))),
-            ),
-        )  # type: ignore
 
 
 def _compute_safe_eb_ratio_interval(

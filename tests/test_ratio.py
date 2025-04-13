@@ -12,28 +12,28 @@ from .codecs import (
 def check_all_codecs(data: np.ndarray):
     decoded = encode_decode_zero(
         data,
-        safeguards=[dict(kind="decimal", eb_decimal=1.0)],
+        safeguards=[dict(kind="ratio", eb_ratio=10**1.0)],
     )
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         np.testing.assert_allclose(decoded, data, rtol=10.0, atol=0.0)
 
     decoded = encode_decode_neg(
         data,
-        safeguards=[dict(kind="decimal", eb_decimal=1.0)],
+        safeguards=[dict(kind="ratio", eb_ratio=10**1.0)],
     )
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         np.testing.assert_allclose(decoded, data, rtol=10.0, atol=0.0)
 
     decoded = encode_decode_identity(
         data,
-        safeguards=[dict(kind="decimal", eb_decimal=1.0)],
+        safeguards=[dict(kind="ratio", eb_ratio=10**1.0)],
     )
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         np.testing.assert_allclose(decoded, data, rtol=10.0, atol=0.0)
 
     decoded = encode_decode_noise(
         data,
-        safeguards=[dict(kind="decimal", eb_decimal=1.0)],
+        safeguards=[dict(kind="ratio", eb_ratio=10**1.0)],
     )
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         np.testing.assert_allclose(decoded, data, rtol=10.0, atol=0.0)
@@ -79,7 +79,7 @@ def test_fuzzer_overcorrect():
         decoded,
         safeguards=[
             dict(kind="zero", zero=-1),
-            dict(kind="decimal", eb_decimal=3.567564553293311e293),
+            dict(kind="ratio", eb_ratio=3.567564553293311e293),
         ],
     )
 
@@ -94,7 +94,7 @@ def test_fuzzer_overflow():
         data,
         decoded,
         safeguards=[
-            dict(kind="decimal", eb_decimal=61, equal_nan=True),
+            dict(kind="ratio", eb_ratio=10**61, equal_nan=True),
         ],
     )
 
@@ -112,7 +112,7 @@ def test_fuzzer_rounding_error():
         decoded,
         safeguards=[
             dict(kind="zero", zero=1.6989962568688874e308),
-            dict(kind="decimal", eb_decimal=2.5924625501554395e303, equal_nan=False),
+            dict(kind="ratio", eb_ratio=2.5924625501554395e303, equal_nan=False),
         ],
     )
 
@@ -125,7 +125,7 @@ def test_fuzzer_int_to_float_precision():
         data,
         decoded,
         safeguards=[
-            dict(kind="decimal", eb_decimal=2.2250738585072014e-308, equal_nan=True),
+            dict(kind="ratio", eb_ratio=10**2.2250738585072014e-308, equal_nan=True),
         ],
     )
 
@@ -162,7 +162,7 @@ def test_fuzzer_issue_9():
         data,
         decoded,
         safeguards=[
-            dict(kind="decimal", eb_decimal=1.0645163269184692e308, equal_nan=True),
+            dict(kind="ratio", eb_ratio=1.0645163269184692e308, equal_nan=True),
             # neither the findiff-abs nor monotonicity safeguards apply since
             #  they require windows larger than the data
         ],

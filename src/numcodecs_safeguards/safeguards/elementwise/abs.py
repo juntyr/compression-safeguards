@@ -47,7 +47,7 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
     def __init__(self, eb_abs: int | float, *, equal_nan: bool = False):
         assert eb_abs >= 0, "eb_abs must be non-negative"
-        assert np.isfinite(eb_abs), "eb_abs must be finite"
+        assert isinstance(eb_abs, int) or np.isfinite(eb_abs), "eb_abs must be finite"
 
         self._eb_abs = eb_abs
         self._equal_nan = equal_nan

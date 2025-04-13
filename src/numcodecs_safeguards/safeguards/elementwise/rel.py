@@ -55,7 +55,7 @@ class RelativeErrorBoundSafeguard(ElementwiseSafeguard):
 
     def __init__(self, eb_rel: int | float, *, equal_nan: bool = False):
         assert eb_rel >= 0, "eb_rel must be non-negative"
-        assert np.isfinite(eb_rel), "eb_rel must be finite"
+        assert isinstance(eb_rel, int) or np.isfinite(eb_rel), "eb_rel must be finite"
 
         self._eb_rel = eb_rel
         self._equal_nan = equal_nan

@@ -104,9 +104,9 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
             )
 
         assert dx > 0, "dx must be positive"
-        assert np.isfinite(dx), "dx must be finite"
+        assert isinstance(dx, int) or np.isfinite(dx), "dx must be finite"
         assert eb_abs >= 0, "eb_abs must be non-negative"
-        assert np.isfinite(eb_abs), "eb_abs must be finite"
+        assert isinstance(eb_abs, int) or np.isfinite(eb_abs), "eb_abs must be finite"
 
         if order > 8 or accuracy > 8:
             warnings.warn(

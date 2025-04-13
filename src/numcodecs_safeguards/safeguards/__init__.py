@@ -7,10 +7,9 @@ __all__ = ["Safeguards"]
 from enum import Enum
 
 from .elementwise.abs import AbsoluteErrorBoundSafeguard
-from .elementwise.decimal import DecimalErrorBoundSafeguard
 from .elementwise.logical.all import AllSafeguards
 from .elementwise.logical.any import AnySafeguard
-from .elementwise.ratio_or_abs import RatioOrAbsoluteErrorBoundSafeguard
+from .elementwise.ratio import RatioErrorBoundSafeguard
 from .elementwise.rel import RelativeErrorBoundSafeguard
 from .elementwise.sign import SignPreservingSafeguard
 from .elementwise.zero import ZeroIsZeroSafeguard
@@ -36,11 +35,8 @@ class Safeguards(Enum):
     rel = RelativeErrorBoundSafeguard
     """Enforce a relative error bound."""
 
-    ratio_or_abs = RatioOrAbsoluteErrorBoundSafeguard
-    """Enforce a ratio error bound, fall back to an absolute error bound close to zero."""
-
-    decimal = DecimalErrorBoundSafeguard
-    """Enforce a decimal error bound."""
+    ratio = RatioErrorBoundSafeguard
+    """Enforce a ratio (decimal) error bound."""
 
     # finite difference error bounds
     findiff_abs = FiniteDifferenceAbsoluteErrorBoundSafeguard

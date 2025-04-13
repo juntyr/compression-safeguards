@@ -11,25 +11,57 @@ from .codecs import (
 def check_all_codecs(data: np.ndarray):
     decoded = encode_decode_zero(
         data,
-        safeguards=[dict(kind="ratio_or_abs", eb_ratio=1.1, eb_abs=0.1)],
+        safeguards=[
+            dict(
+                kind="any",
+                safeguards=[
+                    dict(kind="ratio", eb_ratio=1.1),
+                    dict(kind="abs", eb_abs=0.1),
+                ],
+            )
+        ],
     )
     np.testing.assert_allclose(decoded, data, rtol=0.1, atol=0.1)
 
     decoded = encode_decode_neg(
         data,
-        safeguards=[dict(kind="ratio_or_abs", eb_ratio=1.1, eb_abs=0.1)],
+        safeguards=[
+            dict(
+                kind="any",
+                safeguards=[
+                    dict(kind="ratio", eb_ratio=1.1),
+                    dict(kind="abs", eb_abs=0.1),
+                ],
+            )
+        ],
     )
     np.testing.assert_allclose(decoded, data, rtol=0.1, atol=0.1)
 
     decoded = encode_decode_identity(
         data,
-        safeguards=[dict(kind="ratio_or_abs", eb_ratio=1.1, eb_abs=0.1)],
+        safeguards=[
+            dict(
+                kind="any",
+                safeguards=[
+                    dict(kind="ratio", eb_ratio=1.1),
+                    dict(kind="abs", eb_abs=0.1),
+                ],
+            )
+        ],
     )
     np.testing.assert_allclose(decoded, data, rtol=0.0, atol=0.0)
 
     decoded = encode_decode_noise(
         data,
-        safeguards=[dict(kind="ratio_or_abs", eb_ratio=1.1, eb_abs=0.1)],
+        safeguards=[
+            dict(
+                kind="any",
+                safeguards=[
+                    dict(kind="ratio", eb_ratio=1.1),
+                    dict(kind="abs", eb_abs=0.1),
+                ],
+            )
+        ],
     )
     np.testing.assert_allclose(decoded, data, rtol=0.1, atol=0.1)
 
