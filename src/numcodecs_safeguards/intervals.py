@@ -590,7 +590,7 @@ class IntervalUnion(Generic[T, N, U]):
             uv: int = min(u, v)  # type: ignore
             return IntervalUnion.empty(self._lower.dtype, n, uv)
 
-        uv: int = max(u, v) + 1  # type: ignore
+        uv: int = u + v - 1  # type: ignore
         out: IntervalUnion[T, N, int] = IntervalUnion.empty(
             self._lower.dtype,
             n,
