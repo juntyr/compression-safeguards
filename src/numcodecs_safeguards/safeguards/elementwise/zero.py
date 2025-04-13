@@ -6,7 +6,7 @@ __all__ = ["ZeroIsZeroSafeguard"]
 
 import numpy as np
 
-from .abc import ElementwiseSafeguard
+from .abc import ElementwiseSafeguard, S, T
 from ...cast import as_bits
 from ...intervals import IntervalUnion, Interval, Lower, Upper
 
@@ -38,9 +38,11 @@ class ZeroIsZeroSafeguard(ElementwiseSafeguard):
     def __init__(self, zero: int | float = 0):
         self._zero = zero
 
-    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
+    def check_elementwise(
+        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check that the elements are either
+        Check which elements are either
         - non-zero in the `data` array,
         - or zero in the `data` *and* the `decoded` array.
 
@@ -53,17 +55,17 @@ class ZeroIsZeroSafeguard(ElementwiseSafeguard):
 
         Returns
         -------
-        ok : bool
-            `True` if the check succeeded.
+        ok : np.ndarray
+            Per-element, `True` if the check succeeded for this element.
         """
 
         zero_bits = as_bits(self._zero_like(data.dtype))
 
-        return bool(
-            np.all((as_bits(data) != zero_bits) | (as_bits(decoded) == zero_bits))
-        )
+        return (as_bits(data) != zero_bits) | (as_bits(decoded) == zero_bits)
 
-    def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
+    def compute_safe_intervals(
+        self, data: np.ndarray[S, T]
+    ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the zero-is-zero guarantee is upheld with
         respect to the `data`.
@@ -81,13 +83,13 @@ class ZeroIsZeroSafeguard(ElementwiseSafeguard):
 
         zero = self._zero_like(data.dtype)
 
-        data = data.flatten()
-        valid = Interval.full_like(data)
+        dataf = data.flatten()
+        valid = Interval.full_like(dataf)
 
         # preserve zero values exactly, do not constrain other values
-        Lower(zero) <= valid[as_bits(data) == as_bits(zero)] <= Upper(zero)
+        Lower(zero) <= valid[as_bits(dataf) == as_bits(zero)] <= Upper(zero)
 
-        return valid.into_union()
+        return valid.into_union()  # type: ignore
 
     def get_config(self) -> dict:
         """
@@ -101,11 +103,11 @@ class ZeroIsZeroSafeguard(ElementwiseSafeguard):
 
         return dict(kind=type(self).kind, zero=self._zero)
 
-    def _zero_like(self, dtype: np.dtype) -> np.ndarray:
+    def _zero_like(self, dtype: T) -> np.ndarray[tuple[()], T]:
         zero = np.array(self._zero)
         if zero.dtype != dtype:
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
                 zero = zero.astype(dtype)
-        return zero
+        return zero  # type: ignore

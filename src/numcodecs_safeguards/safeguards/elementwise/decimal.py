@@ -4,11 +4,9 @@ Decimal error bound safeguard.
 
 __all__ = ["DecimalErrorBoundSafeguard"]
 
-from typing import TypeVar
-
 import numpy as np
 
-from .abc import ElementwiseSafeguard
+from .abc import ElementwiseSafeguard, S, T
 from ...cast import (
     to_float,
     from_float,
@@ -16,16 +14,9 @@ from ...cast import (
     to_total_order,
     from_total_order,
     to_finite_float,
+    F,
 )
 from ...intervals import IntervalUnion, Interval, Lower, Upper
-
-
-T = TypeVar("T", bound=np.dtype)
-""" Any numpy [`dtype`][numpy.dtype] type variable. """
-F = TypeVar("F", bound=np.dtype)
-""" Any numpy [`floating`][numpy.floating] dtype type variable. """
-S = TypeVar("S", bound=tuple[int, ...])
-""" Any array shape. """
 
 
 class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
@@ -91,9 +82,12 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         self._equal_nan = equal_nan
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
+    def check_elementwise(
+        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check if the `decoded` array satisfies the decimal error bound.
+        Check which elements in the `decoded` array satisfy the decimal error
+        bound.
 
         Parameters
         ----------
@@ -104,8 +98,8 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
 
         Returns
         -------
-        ok : bool
-            `True` if the check succeeded.
+        ok : np.ndarray
+            Per-element, `True` if the check succeeded for this element.
         """
 
         decimal_bound = self._decimal_error(data, decoded) <= self._eb_decimal
@@ -124,9 +118,11 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
             ),
         )
 
-        return bool(np.all(ok))
+        return ok  # type: ignore
 
-    def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
+    def compute_safe_intervals(
+        self, data: np.ndarray[S, T]
+    ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the decimal error bound is upheld with
         respect to the `data`.
@@ -154,7 +150,7 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
 
         return _compute_safe_eb_ratio_interval(
             data, data_float, eb_ratio, equal_nan=self._equal_nan
-        ).into_union()
+        ).into_union()  # type: ignore
 
     def get_config(self) -> dict:
         """
@@ -171,7 +167,9 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
         )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def _decimal_error(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    def _decimal_error(
+        self, x: np.ndarray[S, T], y: np.ndarray[S, T]
+    ) -> np.ndarray[S, F]:
         sign_x, sign_y = np.sign(x), np.sign(y)
 
         # 0               : if x == 0 and y == 0
@@ -185,7 +183,7 @@ class DecimalErrorBoundSafeguard(ElementwiseSafeguard):
                 to_float(np.array(np.inf)),
                 np.abs(np.log10(to_float(x) / to_float(y))),
             ),
-        )
+        )  # type: ignore
 
 
 def _compute_safe_eb_ratio_interval(
@@ -193,7 +191,7 @@ def _compute_safe_eb_ratio_interval(
     data_float: np.ndarray[S, F],
     eb_ratio: np.ndarray[tuple[()], F],
     equal_nan: bool,
-) -> Interval:
+) -> Interval[T, int]:
     dataf: np.ndarray[tuple[int], T] = data.flatten()
     dataf_float: np.ndarray[tuple[int], F] = data_float.flatten()
 

@@ -12,9 +12,9 @@ import numpy as np
 from .cast import as_bits, to_total_order, from_total_order
 
 T = TypeVar("T", bound=np.dtype)
-N = TypeVar("N", bound=Literal[1])
-U = TypeVar("U", bound=Literal[1])
-V = TypeVar("V", bound=Literal[1])
+N = TypeVar("N", bound=int)
+U = TypeVar("U", bound=int)
+V = TypeVar("V", bound=int)
 S = TypeVar("S", bound=tuple[int, ...])
 
 
@@ -109,7 +109,7 @@ class Interval(Generic[T, N]):
         )
 
     @staticmethod
-    def empty_like(a: np.ndarray[tuple[int, ...], T]) -> "Interval[T, Any]":
+    def empty_like(a: np.ndarray[tuple[int, ...], T]) -> "Interval[T, int]":
         """
         Create an empty interval that contains no values and has the same dtype and size as `a`.
 
@@ -150,7 +150,7 @@ class Interval(Generic[T, N]):
         )
 
     @staticmethod
-    def full_like(a: np.ndarray[tuple[int, ...], T]) -> "Interval[T, Any]":
+    def full_like(a: np.ndarray[tuple[int, ...], T]) -> "Interval[T, int]":
         """
         Create a full interval that contains all possible values and has the same dtype and size as `a`.
 
@@ -167,7 +167,7 @@ class Interval(Generic[T, N]):
 
         return Interval.full(a.dtype, a.size)
 
-    def __getitem__(self, key) -> "IndexedInterval[T, Any]":
+    def __getitem__(self, key) -> "IndexedInterval[T, N]":
         return IndexedInterval(_lower=self._lower, _upper=self._upper, _index=key)
 
     def preserve_inf(self, a: np.ndarray[tuple[N], T]) -> Self:
@@ -545,7 +545,7 @@ class IntervalUnion(Generic[T, N, U]):
             _upper=np.full((u, n), _minimum(dtype), dtype=dtype),
         )
 
-    def intersect(self, other: "IntervalUnion[T, N, V]") -> "IntervalUnion[T, N, Any]":
+    def intersect(self, other: "IntervalUnion[T, N, V]") -> "IntervalUnion[T, N, int]":
         """
         Computes the intersection with the `other` interval union.
 
@@ -563,10 +563,14 @@ class IntervalUnion(Generic[T, N, U]):
         ((u, n), (v, _)) = self._lower.shape, other._lower.shape
 
         if n == 0:
-            return IntervalUnion.empty(self._lower.dtype, n, min(u, v))
+            uv: int = min(u, v)  # type: ignore
+            return IntervalUnion.empty(self._lower.dtype, n, uv)
 
-        out: IntervalUnion[T, N, Any] = IntervalUnion.empty(
-            self._lower.dtype, n, max(u, v)
+        uv: int = max(u, v)  # type: ignore
+        out: IntervalUnion[T, N, int] = IntervalUnion.empty(
+            self._lower.dtype,
+            n,
+            uv,
         )
         n_intervals = np.zeros(n, dtype=int)
 

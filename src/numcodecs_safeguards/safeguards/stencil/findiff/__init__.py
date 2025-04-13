@@ -14,7 +14,7 @@ from numpy.lib.stride_tricks import sliding_window_view
 class FiniteDifference(Enum):
     """
     Different types of finite difference that can be safeguarded by the
-    [`FiniteDifferenceAbsoluteErrorBoundSafeguard`][numcodecs_safeguards.safeguards.elementwise.findiff.abs.FiniteDifferenceAbsoluteErrorBoundSafeguard].
+    [`FiniteDifferenceAbsoluteErrorBoundSafeguard`][numcodecs_safeguards.safeguards.stencil.findiff.abs.FiniteDifferenceAbsoluteErrorBoundSafeguard].
     """
 
     central = auto()

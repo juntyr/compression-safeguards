@@ -8,13 +8,13 @@ from enum import Enum
 
 from .elementwise.abs import AbsoluteErrorBoundSafeguard
 from .elementwise.decimal import DecimalErrorBoundSafeguard
-from .elementwise.findiff.abs import (
-    FiniteDifferenceAbsoluteErrorBoundSafeguard,
-)
 from .elementwise.ratio_or_abs import RatioOrAbsoluteErrorBoundSafeguard
 from .elementwise.rel import RelativeErrorBoundSafeguard
 from .elementwise.sign import SignPreservingSafeguard
 from .elementwise.zero import ZeroIsZeroSafeguard
+from .stencil.findiff.abs import (
+    FiniteDifferenceAbsoluteErrorBoundSafeguard,
+)
 from .stencil.monotonicity import MonotonicityPreservingSafeguard
 
 

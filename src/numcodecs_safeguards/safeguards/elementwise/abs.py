@@ -4,11 +4,9 @@ Absolute error bound safeguard.
 
 __all__ = ["AbsoluteErrorBoundSafeguard"]
 
-from typing import TypeVar
-
 import numpy as np
 
-from .abc import ElementwiseSafeguard
+from .abc import ElementwiseSafeguard, S, T
 from ...cast import (
     to_float,
     from_float,
@@ -16,16 +14,9 @@ from ...cast import (
     to_total_order,
     from_total_order,
     to_finite_float,
+    F,
 )
 from ...intervals import IntervalUnion, Interval, Lower, Upper
-
-
-T = TypeVar("T", bound=np.dtype)
-""" Any numpy [`dtype`][numpy.dtype] type variable. """
-F = TypeVar("F", bound=np.dtype)
-""" Any numpy [`floating`][numpy.floating] dtype type variable. """
-S = TypeVar("S", bound=tuple[int, ...])
-""" Any array shape. """
 
 
 class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
@@ -62,9 +53,12 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         self._equal_nan = equal_nan
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
+    def check_elementwise(
+        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check if the `decoded` array satisfies the absolute error bound.
+        Check which elements in the `decoded` array satisfy the absolute error
+        bound.
 
         Parameters
         ----------
@@ -75,8 +69,8 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
         Returns
         -------
-        ok : bool
-            `True` if the check succeeded.
+        ok : np.ndarray
+            Per-element, `True` if the check succeeded for this element.
         """
 
         # abs(data - decoded) <= self._eb_abs, but works for unsigned ints
@@ -102,9 +96,11 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             ),
         )
 
-        return bool(np.all(ok))
+        return ok  # type: ignore
 
-    def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
+    def compute_safe_intervals(
+        self, data: np.ndarray[S, T]
+    ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the absolute error bound is upheld with
         respect to the `data`.
@@ -130,7 +126,7 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
         return _compute_safe_eb_abs_interval(
             data, data_float, eb_abs, equal_nan=self._equal_nan
-        ).into_union()
+        ).into_union()  # type: ignore
 
     def get_config(self) -> dict:
         """
@@ -152,7 +148,7 @@ def _compute_safe_eb_abs_interval(
     data_float: np.ndarray[S, F],
     eb_abs: np.ndarray[tuple[()], F],
     equal_nan: bool,
-) -> Interval:
+) -> Interval[T, int]:
     dataf: np.ndarray[tuple[int], T] = data.flatten()
     dataf_float: np.ndarray[tuple[int], F] = data_float.flatten()
 

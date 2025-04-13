@@ -11,8 +11,8 @@ import numpy as np
 
 from ....cast import to_float, as_bits, to_finite_float
 from ....intervals import IntervalUnion
-from ..abc import ElementwiseSafeguard
-from ..abs import _compute_safe_eb_abs_interval
+from ..abc import StencilSafeguard, S, T
+from ...elementwise.abs import _compute_safe_eb_abs_interval
 from . import (
     FiniteDifference,
     _finite_difference_offsets,
@@ -21,14 +21,14 @@ from . import (
 )
 
 
-class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
+class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
     """
     The `FiniteDifferenceAbsoluteErrorBoundSafeguard` guarantees that the
     elementwise absolute error of the finite-difference-approximated derivative
     is less than or equal to the provided bound `eb_abs`.
 
     The safeguard supports three types of
-    [`FiniteDifference`][numcodecs_safeguards.safeguards.elementwise.findiff.FiniteDifference]:
+    [`FiniteDifference`][numcodecs_safeguards.safeguards.stencil.findiff.FiniteDifference]:
     `central`, `forward`, `backward`.
 
     The fininite difference is computed with respect to the provided uniform
@@ -131,7 +131,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
+    def check(self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]) -> bool:
         axes = list(range(len(data.shape))) if self._axis is None else [self._axis]
 
         axes = [
@@ -190,7 +190,9 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
         return True
 
-    def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
+    def compute_safe_intervals(
+        self, data: np.ndarray[S, T]
+    ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the absolute error bound is upheld with
         respect to the finite differences of the `data`.
@@ -222,7 +224,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
         return _compute_safe_eb_abs_interval(
             data, data_float, eb_abs_impl, equal_nan=True
-        ).into_union()
+        ).into_union()  # type: ignore
 
     def get_config(self) -> dict:
         """

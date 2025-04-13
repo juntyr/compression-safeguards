@@ -10,7 +10,7 @@ from operator import le, lt, ge, gt
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
-from .abc import StencilSafeguard
+from .abc import StencilSafeguard, S, T
 from ...cast import to_total_order, from_total_order
 from ...intervals import IntervalUnion, Interval, Lower, Upper
 
@@ -110,7 +110,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         assert window > 0, "window size must be positive"
         self._window = window
 
-    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
+    def check(self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]) -> bool:
         """
         Check if monotonic sequences in the `data` array are preserved in the
         `decoded` array.
@@ -148,7 +148,9 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         return True
 
-    def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
+    def compute_safe_intervals(
+        self, data: np.ndarray[S, T]
+    ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the monotonicity of the `data` is
         preserved.
@@ -310,7 +312,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             valid._upper
         )
 
-        return filtered_valid.into_union()
+        return filtered_valid.into_union()  # type: ignore
 
     def get_config(self) -> dict:
         """

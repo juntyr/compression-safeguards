@@ -6,7 +6,7 @@ __all__ = ["RatioOrAbsoluteErrorBoundSafeguard"]
 
 import numpy as np
 
-from .abc import ElementwiseSafeguard
+from .abc import ElementwiseSafeguard, S, T
 from .abs import _compute_safe_eb_abs_interval
 from .decimal import _compute_safe_eb_ratio_interval
 from ...cast import to_float, as_bits, to_finite_float
@@ -59,10 +59,12 @@ class RatioOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         self._equal_nan = equal_nan
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
+    def check_elementwise(
+        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check if the `decoded` array satisfies the ratio or the absolute
-        error bound.
+        Check which elements in the `decoded` array satisfy either the ratio,
+        and/or the absolute error bound.
 
         Parameters
         ----------
@@ -73,8 +75,8 @@ class RatioOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
 
         Returns
         -------
-        ok : bool
-            `True` if the check succeeded.
+        ok : np.ndarray
+            Per-element, `True` if the check succeeded for this element.
         """
 
         # abs(data - decoded) <= self._eb_abs, but works for unsigned ints
@@ -108,9 +110,11 @@ class RatioOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             ),
         )
 
-        return bool(np.all(ok))
+        return ok  # type: ignore
 
-    def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
+    def compute_safe_intervals(
+        self, data: np.ndarray[S, T]
+    ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the ratio or absolute error bound is
         upheld with respect to the `data`.
@@ -156,7 +160,7 @@ class RatioOrAbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
             np.isfinite(data.flatten())
         ] <= Upper(np.maximum(valid_abs._upper, valid_ratio._upper))
 
-        return valid.into_union()
+        return valid.into_union()  # type: ignore
 
     def get_config(self) -> dict:
         """

@@ -6,7 +6,7 @@ __all__ = ["SignPreservingSafeguard"]
 
 import numpy as np
 
-from .abc import ElementwiseSafeguard
+from .abc import ElementwiseSafeguard, S, T
 from ...intervals import IntervalUnion, Interval, Lower, Upper, Minimum, Maximum
 
 
@@ -28,10 +28,12 @@ class SignPreservingSafeguard(ElementwiseSafeguard):
     def __init__(self):
         pass
 
-    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
+    def check_elementwise(
+        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check if the signs of the `decoded` array elements match the signs of
-        the `data` array elements'.
+        Check for which elements in the `decoded` array the signs match the
+        signs of the `data` array elements'.
 
         Parameters
         ----------
@@ -42,13 +44,15 @@ class SignPreservingSafeguard(ElementwiseSafeguard):
 
         Returns
         -------
-        ok : bool
-            `True` if the check succeeded.
+        ok : np.ndarray
+            Per-element, `True` if the check succeeded for this element.
         """
 
-        return bool(np.all(self._sign(data) == self._sign(decoded)))
+        return self._sign(data) == self._sign(decoded)
 
-    def compute_safe_intervals(self, data: np.ndarray) -> IntervalUnion:
+    def compute_safe_intervals(
+        self, data: np.ndarray[S, T]
+    ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the `data`'s sign is preserved.
 
@@ -66,17 +70,17 @@ class SignPreservingSafeguard(ElementwiseSafeguard):
         # tiny: the smallest-in-magnitude non-zero value
         tiny, neg_tiny = self._tiny_like(data)
 
-        data = data.flatten()
-        valid = Interval.empty_like(data)
+        dataf = data.flatten()
+        valid = Interval.empty_like(dataf)
 
-        sign = self._sign(data)
+        sign = self._sign(dataf)
 
         # preserve zero-sign values exactly
-        Lower(data) <= valid[sign == 0] <= Upper(data)
+        Lower(dataf) <= valid[sign == 0] <= Upper(dataf)
         Minimum <= valid[sign == -1] <= Upper(neg_tiny)
         Lower(tiny) <= valid[sign == +1] <= Maximum
 
-        return valid.into_union()
+        return valid.into_union()  # type: ignore
 
     def get_config(self) -> dict:
         """
@@ -90,7 +94,7 @@ class SignPreservingSafeguard(ElementwiseSafeguard):
 
         return dict(kind=type(self).kind)
 
-    def _sign(self, x: np.ndarray) -> np.ndarray:
+    def _sign(self, x: np.ndarray[S, T]) -> np.ndarray[S, np.dtype[np.int_]]:
         zero = np.array(0, dtype=x.dtype)
 
         # if >0: (true) * (1 - 0*2) = 1
@@ -98,7 +102,9 @@ class SignPreservingSafeguard(ElementwiseSafeguard):
         # if <0: (true) * (1 - 1*2) = -1
         return (x != zero) * (1 - np.signbit(x) * 2)
 
-    def _tiny_like(self, a: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def _tiny_like(
+        self, a: np.ndarray[S, T]
+    ) -> tuple[np.ndarray[tuple[()], T], np.ndarray[tuple[()], T]]:
         if np.issubdtype(a.dtype, np.integer):
             tiny = np.array(1, dtype=a.dtype)
             neg_tiny = np.array(-tiny)
@@ -107,4 +113,4 @@ class SignPreservingSafeguard(ElementwiseSafeguard):
             tiny = np.array(info.smallest_subnormal)
             neg_tiny = np.array(-info.smallest_subnormal)
 
-        return tiny, neg_tiny
+        return tiny, neg_tiny  # type: ignore
