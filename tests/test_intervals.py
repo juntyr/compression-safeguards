@@ -1,6 +1,6 @@
 import numpy as np
 from numcodecs_safeguards.cast import as_bits
-from numcodecs_safeguards.intervals import _minimum, _maximum
+from numcodecs_safeguards.intervals import _minimum, _maximum, IntervalUnion, Interval, Lower, Upper
 from numcodecs_safeguards.safeguards.elementwise.abs import AbsoluteErrorBoundSafeguard
 from numcodecs_safeguards.safeguards.elementwise.sign import SignPreservingSafeguard
 from numcodecs_safeguards.safeguards.elementwise.zero import ZeroIsZeroSafeguard
@@ -204,3 +204,37 @@ def test_zero_abs():
         intervals._upper,
         np.array([[-2.0, -1.0, 0.0, -1.0, 2.0, 3.0, 4.0, 5.0, 6.0]]),
     )
+
+
+def test_union():
+    def random_interval_union_set() -> tuple[IntervalUnion, set]:
+        n = np.random.randint(1, 5)
+
+        pivots = np.sort(np.random.randint(0, 100, n*2))
+
+        intervals = IntervalUnion.empty(np.dtype(int), 1, 1)
+        elems = set()
+
+        for i in range(n):
+            low, high = pivots[i*2], pivots[i*2+1]
+            interval = Interval.empty(np.dtype(int), 1)
+            Lower(np.array(low)) <= interval[:] <= Upper(np.array(high))
+            print(intervals, interval, intervals.union(interval.into_union()))
+            intervals = intervals.union(interval.into_union())
+            elems = elems.union(range(low, high+1))
+
+        return (intervals, elems)
+    
+    intervals = IntervalUnion.empty(np.dtype(int), 1, 1)
+    elems = set()
+
+    for _ in range(3):
+        i, e = random_interval_union_set()
+        # print(i, sorted(e))
+        intervals = intervals.union(i)
+        elems = elems.union(e)
+    
+    print(intervals)
+    print(sorted(elems))
+
+    assert False
