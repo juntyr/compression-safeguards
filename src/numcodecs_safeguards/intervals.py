@@ -531,7 +531,7 @@ class IntervalUnion(Generic[T, N, U]):
     # - the lower/upper bounds are in sorted order
     # - no non-empty intervals come after empty intervals
     # - no intervals intersect within the union
-    #   (but they can be adjacent, e.g. [1..3] and [4..5])
+    # - no intervals can be adjacent within the union, e.g. [1..3] and [4..5]
     _lower: np.ndarray[tuple[U, N], T]
     _upper: np.ndarray[tuple[U, N], T]
 
@@ -590,7 +590,7 @@ class IntervalUnion(Generic[T, N, U]):
             uv: int = min(u, v)  # type: ignore
             return IntervalUnion.empty(self._lower.dtype, n, uv)
 
-        uv: int = max(u, v)  # type: ignore
+        uv: int = max(u, v) + 1  # type: ignore
         out: IntervalUnion[T, N, int] = IntervalUnion.empty(
             self._lower.dtype,
             n,
@@ -610,12 +610,12 @@ class IntervalUnion(Generic[T, N, U]):
                 has_intersection = intersection_lower <= intersection_upper
 
                 out._lower[
-                    np.minimum(n_intervals[has_intersection], uv - 1), has_intersection
+                    n_intervals[has_intersection], has_intersection
                 ] = from_total_order(
                     intersection_lower[has_intersection], out._lower.dtype
                 )
                 out._upper[
-                    np.minimum(n_intervals[has_intersection], uv - 1), has_intersection
+                    n_intervals[has_intersection], has_intersection
                 ] = from_total_order(
                     intersection_upper[has_intersection], out._upper.dtype
                 )
@@ -707,10 +707,19 @@ class IntervalUnion(Generic[T, N, U]):
 
             has_next = has_intersection | choose_i | choose_j
 
-            out._lower[np.minimum(n_intervals[has_next], uv - 1), has_next] = (
-                from_total_order(next_lower[has_next], out._lower.dtype)
+            # we have to combine adjacent intervals,
+            #  e.g. [1..3] u [4..5] into [1..5]
+            should_extend_previous = (n_intervals > 0) & (to_total_order(
+                np.take_along_axis(
+                    out._upper, np.minimum(np.maximum(0, n_intervals - 1), uv - 1).reshape(1, -1), axis=0
+                ).flatten()
+            ) == (next_lower - 1))
+
+            has_next_lower = has_next & (~should_extend_previous)
+            out._lower[np.minimum(n_intervals[has_next_lower], uv - 1), has_next_lower] = (
+                from_total_order(next_lower[has_next_lower], out._lower.dtype)
             )
-            out._upper[np.minimum(n_intervals[has_next], uv - 1), has_next] = (
+            out._upper[np.minimum(n_intervals[has_next] - should_extend_previous, uv - 1), has_next] = (
                 from_total_order(next_upper[has_next], out._upper.dtype)
             )
 
