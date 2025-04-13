@@ -5,8 +5,9 @@ with atheris.instrument_imports():
     import types
     import typing
     import warnings
+    from collections.abc import Sequence
     from enum import Enum
-    from inspect import signature, Parameter
+    from inspect import signature
 
     import numcodecs.registry
     import numpy as np
@@ -15,6 +16,7 @@ with atheris.instrument_imports():
         SafeguardsCodec,
         Safeguards,
     )
+    from numcodecs_safeguards.safeguards.abc import Safeguard
     from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
 
 
@@ -38,41 +40,60 @@ class FuzzCodec(Codec):
 numcodecs.registry.register_codec(FuzzCodec)
 
 
-def generate_parameter(data: atheris.FuzzedDataProvider, p: Parameter):
-    if p.annotation is float:
+def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
+    if ty is types.NoneType:
+        return None
+    if ty is float:
         return data.ConsumeFloat()
-    if p.annotation is int:
+    if ty is int:
         return data.ConsumeInt(1)
-    if p.annotation is bool:
+    if ty is bool:
         return data.ConsumeBool()
 
-    if typing.get_origin(p.annotation) in (typing.Union, types.UnionType):
-        tys = typing.get_args(p.annotation)
+    if typing.get_origin(ty) is Sequence:
+        if len(typing.get_args(ty)) == 1:
+            return [
+                generate_parameter(data, typing.get_args(ty)[0], depth)
+                for _ in range(data.ConsumeIntInRange(0, 3 - depth))
+            ]
+
+    if typing.get_origin(ty) in (typing.Union, types.UnionType):
+        tys = typing.get_args(ty)
 
         if len(tys) == 2 and tys[0] is str and issubclass(tys[1], Enum):
             return list(tys[1])[data.ConsumeIntInRange(0, len(tys[1]) - 1)]
 
+        if len(tys) == 2 and tys[0] is dict and issubclass(tys[1], Safeguard):
+            return generate_safeguard_config(data, depth + 1)
+
         ty = tys[data.ConsumeIntInRange(0, len(tys) - 1)]
 
-        if ty is types.NoneType:
-            return None
-        if ty is float:
-            return data.ConsumeFloat()
-        if ty is int:
-            return data.ConsumeInt(1)
-        if ty is bool:
-            return data.ConsumeBool()
+        return generate_parameter(data, ty, depth)
 
-    assert False, f"unknown parameter type {p.annotation!r}"
+    assert False, f"unknown parameter type {ty!r}"
+
+
+def generate_safeguard_config(data: atheris.FuzzedDataProvider, depth: int):
+    kind = list(Safeguards)[data.ConsumeIntInRange(0, len(Safeguards) - 1)]
+
+    return {
+        "kind": kind.name,
+        **{
+            p: generate_parameter(data, v.annotation, depth)
+            for p, v in signature(kind.value).parameters.items()
+        },
+    }
 
 
 def check_one_input(data):
     data = atheris.FuzzedDataProvider(data)
 
-    # top-level metadata: which safeguards and what type of data
-    kinds: list[Safeguards] = [kind for kind in Safeguards if data.ConsumeBool()]
+    safeguards = [
+        generate_safeguard_config(data, 0) for _ in range(data.ConsumeIntInRange(0, 8))
+    ]
+
     dtype: np.ndtype = list(_SUPPORTED_DTYPES)[
-        data.ConsumeIntInRange(0, len(Safeguards) - 1)
+        data.ConsumeIntInRange(0, len(_SUPPORTED_DTYPES) - 1)
     ]
     sizea: int = data.ConsumeIntInRange(0, 20)
     sizeb: int = data.ConsumeIntInRange(0, 20 // max(1, sizea))
@@ -94,18 +115,6 @@ def check_one_input(data):
     if sizeb != 0:
         raw = raw.reshape((sizea, sizeb))
         decoded = decoded.reshape((sizea, sizeb))
-
-    # safeguard parameters
-    safeguards = [
-        {
-            "kind": kind.name,
-            **{
-                p: generate_parameter(data, v)
-                for p, v in signature(kind.value).parameters.items()
-            },
-        }
-        for kind in kinds
-    ]
 
     warnings.filterwarnings("error")
 

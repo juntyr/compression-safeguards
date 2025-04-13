@@ -8,6 +8,8 @@ from enum import Enum
 
 from .elementwise.abs import AbsoluteErrorBoundSafeguard
 from .elementwise.decimal import DecimalErrorBoundSafeguard
+from .elementwise.logical.all import AllSafeguards
+from .elementwise.logical.any import AnySafeguard
 from .elementwise.ratio_or_abs import RatioOrAbsoluteErrorBoundSafeguard
 from .elementwise.rel import RelativeErrorBoundSafeguard
 from .elementwise.sign import SignPreservingSafeguard
@@ -51,3 +53,11 @@ class Safeguards(Enum):
     # sign
     sign = SignPreservingSafeguard
     """Enforce that the sign (-1, 0, +1) of each element is preserved."""
+
+    # logical and combinator
+    all = AllSafeguards
+    """Enforce that all of the inner safeguards' guarantees are met."""
+
+    # logical or combinator
+    any = AnySafeguard
+    """Enforce that any one of the inner safeguards' guarantees are met."""

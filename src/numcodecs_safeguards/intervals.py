@@ -329,6 +329,23 @@ class Interval(Generic[T, N]):
 
         return out
 
+    def union(self, other: "Interval[T, N]") -> "IntervalUnion[T, N, int]":
+        """
+        Computes the union with the `other` interval.
+
+        Parameters
+        ----------
+        other : Self
+            The other interval to union with
+
+        Returns
+        -------
+        intersection : IntervalUnion[T, N, int]
+            The union of `self` and `other`
+        """
+
+        return self.into_union().union(other.into_union())
+
     def into_union(self) -> "IntervalUnion[T, N, Literal[1]]":
         """
         Convert this interval into a single-member union of exactly this one interval.
@@ -597,6 +614,77 @@ class IntervalUnion(Generic[T, N, U]):
                 )
 
                 n_intervals += has_intersection
+
+        uv = np.amax(n_intervals)
+
+        return IntervalUnion(_lower=out._lower[:uv], _upper=out._upper[:uv])  # type: ignore
+
+    def union(self, other: "IntervalUnion[T, N, V]") -> "IntervalUnion[T, N, int]":
+        """
+        Computes the union with the `other` interval union.
+
+        Parameters
+        ----------
+        other : Self
+            The other interval union to union with
+
+        Returns
+        -------
+        union : IntervalUnion[T, N, ..]
+            The union of `self` and `other`
+        """
+
+        ((u, n), (v, _)) = self._lower.shape, other._lower.shape
+
+        if n == 0:
+            uv: int = min(u, v)  # type: ignore
+            return IntervalUnion.empty(self._lower.dtype, n, uv)
+
+        uv: int = max(u, v)  # type: ignore
+        out: IntervalUnion[T, N, int] = IntervalUnion.empty(
+            self._lower.dtype,
+            n,
+            uv,
+        )
+        n_intervals = np.zeros(n, dtype=int)
+
+        i_s = np.zeros(n, dtype=int)
+        j_s = np.zeros(n, dtype=int)
+
+        while (np.amin(i_s) < u) or (np.amin(j_s) < v):
+            lower_i: np.ndarray = to_total_order(self._lower[np.minimum(i_s, u)])
+            upper_i: np.ndarray = to_total_order(self._upper[np.minimum(i_s, u)])
+
+            lower_j: np.ndarray = to_total_order(self._lower[np.minimum(j_s, v)])
+            upper_j: np.ndarray = to_total_order(self._upper[np.minimum(j_s, v)])
+
+            has_intersection = (
+                ((upper_i >= lower_j) | (upper_j >= lower_i)) & (i_s < u) & (j_s < v)
+            )
+
+            has_left = (upper_i < lower_j) & (i_s < u)
+            has_right = (upper_j < lower_i) & (j_s < v)
+
+            next_lower = np.minimum(lower_i, lower_j)
+            next_upper = np.where(
+                has_intersection,
+                np.maximum(upper_i, upper_j),
+                np.minimum(upper_i, upper_j),
+            )
+
+            has_next = has_intersection | has_left | has_right
+
+            out._lower[n_intervals[has_next], has_next] = from_total_order(
+                next_lower[has_next], out._lower.dtype
+            )
+            out._upper[n_intervals[has_next], has_next] = from_total_order(
+                next_upper[has_next], out._upper.dtype
+            )
+
+            n_intervals += has_next
+
+            i_s += has_left | has_intersection
+            j_s += has_right | has_intersection
 
         uv = np.amax(n_intervals)
 
