@@ -652,11 +652,27 @@ class IntervalUnion(Generic[T, N, U]):
         j_s = np.zeros(n, dtype=int)
 
         while (np.amin(i_s) < u) or (np.amin(j_s) < v):
-            lower_i: np.ndarray = to_total_order(self._lower[np.minimum(i_s, u)])
-            upper_i: np.ndarray = to_total_order(self._upper[np.minimum(i_s, u)])
+            lower_i: np.ndarray = to_total_order(
+                np.take_along_axis(
+                    self._lower, np.minimum(i_s, u).reshape(1, -1), axis=0
+                ).flatten()
+            )
+            upper_i: np.ndarray = to_total_order(
+                np.take_along_axis(
+                    self._upper, np.minimum(i_s, u).reshape(1, -1), axis=0
+                ).flatten()
+            )
 
-            lower_j: np.ndarray = to_total_order(self._lower[np.minimum(j_s, v)])
-            upper_j: np.ndarray = to_total_order(self._upper[np.minimum(j_s, v)])
+            lower_j: np.ndarray = to_total_order(
+                np.take_along_axis(
+                    other._lower, np.minimum(j_s, v).reshape(1, -1), axis=0
+                ).flatten()
+            )
+            upper_j: np.ndarray = to_total_order(
+                np.take_along_axis(
+                    other._upper, np.minimum(j_s, v).reshape(1, -1), axis=0
+                ).flatten()
+            )
 
             has_intersection = (
                 ((upper_i >= lower_j) | (upper_j >= lower_i)) & (i_s < u) & (j_s < v)
