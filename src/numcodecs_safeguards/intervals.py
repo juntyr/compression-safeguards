@@ -587,8 +587,7 @@ class IntervalUnion(Generic[T, N, U]):
         ((u, n), (v, _)) = self._lower.shape, other._lower.shape
 
         if n == 0:
-            uv: int = min(u, v)  # type: ignore
-            return IntervalUnion.empty(self._lower.dtype, n, uv)
+            return IntervalUnion.empty(self._lower.dtype, n, 0)
 
         uv: int = u + v - 1  # type: ignore
         out: IntervalUnion[T, N, int] = IntervalUnion.empty(
@@ -644,8 +643,13 @@ class IntervalUnion(Generic[T, N, U]):
         ((u, n), (v, _)) = self._lower.shape, other._lower.shape
 
         if n == 0:
-            uv: int = min(u, v)  # type: ignore
-            return IntervalUnion.empty(self._lower.dtype, n, uv)
+            return IntervalUnion.empty(self._lower.dtype, n, 0)
+        
+        if u == 0:
+            return other
+        
+        if v == 0:
+            return self
 
         uv: int = u + v  # type: ignore
         out: IntervalUnion[T, N, int] = IntervalUnion.empty(
@@ -707,6 +711,9 @@ class IntervalUnion(Generic[T, N, U]):
 
             has_next = has_intersection | choose_i | choose_j
 
+            # FIXME: we need to merge into the prior interval in general,
+            # otherwise one big overlap with many small keeps all small ones
+
             # we have to combine adjacent intervals,
             #  e.g. [1..3] u [4..5] into [1..5]
             should_extend_previous = (n_intervals > 0) & (
@@ -724,14 +731,15 @@ class IntervalUnion(Generic[T, N, U]):
 
             has_next_lower = has_next & (~should_extend_previous)
             out._lower[
-                np.minimum(n_intervals[has_next_lower], uv - 1), has_next_lower
+                n_intervals[has_next_lower],
+                has_next_lower,
             ] = from_total_order(next_lower[has_next_lower], out._lower.dtype)
             out._upper[
-                np.minimum(n_intervals[has_next] - should_extend_previous, uv - 1),
+                n_intervals[has_next] - should_extend_previous,
                 has_next,
             ] = from_total_order(next_upper[has_next], out._upper.dtype)
 
-            n_intervals += has_next
+            n_intervals += has_next & (~should_extend_previous)
 
             i_s += has_intersection | choose_i | (~valid_j)
             j_s += has_intersection | choose_j | (~valid_i)

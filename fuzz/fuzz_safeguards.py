@@ -20,6 +20,9 @@ with atheris.instrument_imports():
     from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
 
 
+warnings.filterwarnings("error")
+
+
 class FuzzCodec(Codec):
     codec_id = "fuzz"
 
@@ -115,8 +118,6 @@ def check_one_input(data):
     if sizeb != 0:
         raw = raw.reshape((sizea, sizeb))
         decoded = decoded.reshape((sizea, sizeb))
-
-    warnings.filterwarnings("error")
 
     try:
         safeguard = SafeguardsCodec(

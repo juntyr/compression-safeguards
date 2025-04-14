@@ -231,41 +231,28 @@ def generate_random_interval_union() -> tuple[IntervalUnion, set]:
     return (intervals, elems)
 
 
-def test_random_interval_union():
-    for _ in range(10):
-        intervals = IntervalUnion.empty(np.dtype(int), 1, 1)
-        elems = set()
+def test_union():
+    z = Interval.empty(np.dtype(int), 1)
+    Lower(np.array(0)) <= z[:] <= Upper(np.array(0))
 
-        for _ in range(3):
-            i, e = generate_random_interval_union()
-            intervals = intervals.union(i)
-            elems = elems.union(e)
+    a = Interval.empty(np.dtype(int), 1)
+    Lower(np.array(0)) <= a[:] <= Upper(np.array(53))
 
-        check_elems = set()
+    b = Interval.empty(np.dtype(int), 1)
+    Lower(np.array(53)) <= b[:] <= Upper(np.array(53))
 
-        for i in range(intervals._lower.shape[0]):
-            low, high = intervals._lower[i, 0], intervals._upper[i, 0]
-            if low <= high:
-                check_elems = check_elems.union(range(low, high + 1))
+    print(a, b)
 
-        assert sorted(elems) == sorted(check_elems)
+    c = a.union(b)
 
+    print(c)
 
-def test_random_interval_intersection():
-    for _ in range(10):
-        intervals = Interval.full(np.dtype(int), 1).into_union()
-        elems = set(range(100))
+    d = c.union(b.into_union())
 
-        for _ in range(3):
-            i, e = generate_random_interval_union()
-            intervals = intervals.intersect(i)
-            elems.intersection_update(e)
+    print(d)
 
-        check_elems = set()
+    e = c.union(z.into_union())
 
-        for i in range(intervals._lower.shape[0]):
-            low, high = intervals._lower[i, 0], intervals._upper[i, 0]
-            if low <= high:
-                check_elems = check_elems.union(range(low, high + 1))
+    print(e)
 
-        assert sorted(elems) == sorted(check_elems)
+    assert False
