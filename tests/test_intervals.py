@@ -231,28 +231,23 @@ def generate_random_interval_union() -> tuple[IntervalUnion, set]:
     return (intervals, elems)
 
 
-def test_union():
+def test_union_no_overlap():
     z = Interval.empty(np.dtype(int), 1)
     Lower(np.array(0)) <= z[:] <= Upper(np.array(0))
 
     a = Interval.empty(np.dtype(int), 1)
-    Lower(np.array(0)) <= a[:] <= Upper(np.array(53))
+    Lower(np.array(53)) <= a[:] <= Upper(np.array(53))
+
+    az = a.union(z)
+
+    np.testing.assert_array_equal(az._lower, np.array([[0], [53]]))
+    np.testing.assert_array_equal(az._upper, np.array([[0], [53]]))
 
     b = Interval.empty(np.dtype(int), 1)
-    Lower(np.array(53)) <= b[:] <= Upper(np.array(53))
+    Lower(np.array(0)) <= b[:] <= Upper(np.array(53))
+    b = b.into_union()
 
-    print(a, b)
+    abz = az.union(b)
 
-    c = a.union(b)
-
-    print(c)
-
-    d = c.union(b.into_union())
-
-    print(d)
-
-    e = c.union(z.into_union())
-
-    print(e)
-
-    assert False
+    np.testing.assert_array_equal(abz._lower, np.array([[0]]))
+    np.testing.assert_array_equal(abz._upper, np.array([[53]]))

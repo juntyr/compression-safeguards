@@ -58,7 +58,7 @@ def check_one_input(data):
                 info.insert(-2, "&")
                 intervals = intervals.intersect(ins)
                 elems = elems.intersection(els)
-            
+
             info.append("=")
             info.append(intervals)
             info.append(sorted(elems))
@@ -80,7 +80,7 @@ def check_one_input(data):
             lows.append(e)
         if i is not None:
             highs.append(i)
-        
+
         info.append(lows)
         info.append(highs)
 
