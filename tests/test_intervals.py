@@ -251,3 +251,16 @@ def test_union_no_overlap():
 
     np.testing.assert_array_equal(abz._lower, np.array([[0]]))
     np.testing.assert_array_equal(abz._upper, np.array([[53]]))
+
+
+def test_union_adjacent():
+    a = Interval.empty(np.dtype(int), 1)
+    Lower(np.array(1)) <= a[:] <= Upper(np.array(3))
+
+    b = Interval.empty(np.dtype(int), 1)
+    Lower(np.array(4)) <= b[:] <= Upper(np.array(5))
+
+    ab = a.union(b)
+
+    np.testing.assert_array_equal(ab._lower, np.array([[1]]))
+    np.testing.assert_array_equal(ab._upper, np.array([[5]]))

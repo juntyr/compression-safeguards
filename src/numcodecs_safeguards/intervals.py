@@ -724,7 +724,7 @@ class IntervalUnion(Generic[T, N, U]):
                     (np.maximum(lower_ij, lower_o) <= np.minimum(upper_ij, upper_o))
                     |
                     # check for adjacent intervals, e.g [1..3] | [4..5] -> [1..5]
-                    ((lower_ij > upper_o) & (lower_ij == (upper_o - 1)))
+                    ((lower_ij > upper_o) & (lower_ij == (upper_o + 1)))
                 )
             )
 
