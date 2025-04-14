@@ -331,14 +331,16 @@ class Interval(Generic[T, N]):
 
         return out
 
-    def union(self, other: "Interval[T, N]") -> "IntervalUnion[T, N, int]":
+    def union(
+        self, other: "Interval[T, N] | IntervalUnion[T, N, int]"
+    ) -> "IntervalUnion[T, N, int]":
         """
-        Computes the union with the `other` interval.
+        Computes the union with the `other` interval (union).
 
         Parameters
         ----------
-        other : Self
-            The other interval to union with
+        other : Interval[T, N] | IntervalUnion[T, N, int]
+            The other interval (union) to union with
 
         Returns
         -------
@@ -346,7 +348,7 @@ class Interval(Generic[T, N]):
             The union of `self` and `other`
         """
 
-        return self.into_union().union(other.into_union())
+        return self.into_union().union(other)
 
     def into_union(self) -> "IntervalUnion[T, N, Literal[1]]":
         """
@@ -587,8 +589,7 @@ class IntervalUnion(Generic[T, N, U]):
         ((u, n), (v, _)) = self._lower.shape, other._lower.shape
 
         if n == 0:
-            uv: int = min(u, v)  # type: ignore
-            return IntervalUnion.empty(self._lower.dtype, n, uv)
+            return IntervalUnion.empty(self._lower.dtype, n, 0)
 
         uv: int = u + v - 1  # type: ignore
         out: IntervalUnion[T, N, int] = IntervalUnion.empty(
@@ -626,14 +627,16 @@ class IntervalUnion(Generic[T, N, U]):
 
         return IntervalUnion(_lower=out._lower[:uv], _upper=out._upper[:uv])  # type: ignore
 
-    def union(self, other: "IntervalUnion[T, N, V]") -> "IntervalUnion[T, N, int]":
+    def union(
+        self, other: "Interval[T, N] | IntervalUnion[T, N, V]"
+    ) -> "IntervalUnion[T, N, int]":
         """
-        Computes the union with the `other` interval union.
+        Computes the union with the `other` interval (union).
 
         Parameters
         ----------
-        other : Self
-            The other interval union to union with
+        other : Interval[T, N] | IntervalUnion[T, N, V]
+            The other interval (union) to union with
 
         Returns
         -------
@@ -641,11 +644,18 @@ class IntervalUnion(Generic[T, N, U]):
             The union of `self` and `other`
         """
 
-        ((u, n), (v, _)) = self._lower.shape, other._lower.shape
+        otheru = other if isinstance(other, IntervalUnion) else other.into_union()
+
+        ((u, n), (v, _)) = self._lower.shape, otheru._lower.shape
 
         if n == 0:
-            uv: int = min(u, v)  # type: ignore
-            return IntervalUnion.empty(self._lower.dtype, n, uv)
+            return IntervalUnion.empty(self._lower.dtype, n, 0)
+
+        if u == 0:
+            return otheru  # type: ignore
+
+        if v == 0:
+            return self  # type: ignore
 
         uv: int = u + v  # type: ignore
         out: IntervalUnion[T, N, int] = IntervalUnion.empty(
@@ -672,69 +682,82 @@ class IntervalUnion(Generic[T, N, U]):
 
             lower_j: np.ndarray = to_total_order(
                 np.take_along_axis(
-                    other._lower, np.minimum(j_s, v - 1).reshape(1, -1), axis=0
+                    otheru._lower, np.minimum(j_s, v - 1).reshape(1, -1), axis=0
                 ).flatten()
             )
             upper_j: np.ndarray = to_total_order(
                 np.take_along_axis(
-                    other._upper, np.minimum(j_s, v - 1).reshape(1, -1), axis=0
+                    otheru._upper, np.minimum(j_s, v - 1).reshape(1, -1), axis=0
+                ).flatten()
+            )
+
+            lower_o: np.ndarray = to_total_order(
+                np.take_along_axis(
+                    out._lower, np.maximum(n_intervals - 1, 0).reshape(1, -1), axis=0
+                ).flatten()
+            )
+            upper_o: np.ndarray = to_total_order(
+                np.take_along_axis(
+                    out._upper, np.maximum(n_intervals - 1, 0).reshape(1, -1), axis=0
                 ).flatten()
             )
 
             # only valid if in-bounds and non-empty
             valid_i = (i_s < u) & (lower_i <= upper_i)
             valid_j = (j_s < v) & (lower_j <= upper_j)
+            valid_o = (n_intervals > 0) & (lower_o <= upper_o)
 
-            has_intersection = (
-                valid_i
-                & valid_j
-                & (np.maximum(lower_i, lower_j) <= np.minimum(upper_i, upper_j))
-            )
-
+            # choose the next valid interval with the lower lower bound
             choose_i = valid_i & ((lower_i < lower_j) | ~valid_j)
             choose_j = valid_j & ((lower_i >= lower_j) | ~valid_i)
 
+            lower_ij = np.where(choose_i, lower_i, lower_j)
+            upper_ij = np.where(choose_i, upper_i, upper_j)
+
+            # check if the selected interval intersects with the previously
+            #  output interval
+            has_intersection_with_out = (
+                (valid_i | valid_j)
+                & valid_o
+                & (
+                    # check for normal intersection
+                    (np.maximum(lower_ij, lower_o) <= np.minimum(upper_ij, upper_o))
+                    |
+                    # check for adjacent intervals, e.g [1..3] | [4..5] -> [1..5]
+                    ((lower_ij > upper_o) & (lower_ij == (upper_o + 1)))
+                )
+            )
+
+            # - intersection -> next is intersection
+            # - no intersection -> next is next interval
             next_lower = np.where(
-                has_intersection,
-                np.minimum(lower_i, lower_j),
+                has_intersection_with_out,
+                np.minimum(lower_o, lower_ij),
                 np.where(choose_i, lower_i, lower_j),
             )
             next_upper = np.where(
-                has_intersection,
-                np.maximum(upper_i, upper_j),
+                has_intersection_with_out,
+                np.maximum(upper_o, upper_ij),
                 np.where(choose_i, upper_i, upper_j),
             )
 
-            has_next = has_intersection | choose_i | choose_j
-
-            # we have to combine adjacent intervals,
-            #  e.g. [1..3] u [4..5] into [1..5]
-            should_extend_previous = (n_intervals > 0) & (
-                to_total_order(
-                    np.take_along_axis(
-                        out._upper,
-                        np.minimum(np.maximum(0, n_intervals - 1), uv - 1).reshape(
-                            1, -1
-                        ),
-                        axis=0,
-                    ).flatten()
-                )
-                == (next_lower - 1)
-            )
-
-            has_next_lower = has_next & (~should_extend_previous)
+            # update either the previous or the next output interval
+            has_next = has_intersection_with_out | choose_i | choose_j
             out._lower[
-                np.minimum(n_intervals[has_next_lower], uv - 1), has_next_lower
-            ] = from_total_order(next_lower[has_next_lower], out._lower.dtype)
+                n_intervals[has_next] - has_intersection_with_out,
+                has_next,
+            ] = from_total_order(next_lower[has_next], out._lower.dtype)
             out._upper[
-                np.minimum(n_intervals[has_next] - should_extend_previous, uv - 1),
+                n_intervals[has_next] - has_intersection_with_out,
                 has_next,
             ] = from_total_order(next_upper[has_next], out._upper.dtype)
 
-            n_intervals += has_next
+            # advance to the next interval if we wrote out a new one
+            n_intervals += has_next & (~has_intersection_with_out)
 
-            i_s += has_intersection | choose_i | (~valid_j)
-            j_s += has_intersection | choose_j | (~valid_i)
+            # advance the interval that was chosen earlier
+            i_s += choose_i | (~valid_j)
+            j_s += choose_j | (~valid_i)
 
         uv = np.amax(n_intervals)
 

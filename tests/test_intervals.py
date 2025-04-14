@@ -231,41 +231,36 @@ def generate_random_interval_union() -> tuple[IntervalUnion, set]:
     return (intervals, elems)
 
 
-def test_random_interval_union():
-    for _ in range(10):
-        intervals = IntervalUnion.empty(np.dtype(int), 1, 1)
-        elems = set()
+def test_union_no_overlap():
+    z = Interval.empty(np.dtype(int), 1)
+    Lower(np.array(0)) <= z[:] <= Upper(np.array(0))
 
-        for _ in range(3):
-            i, e = generate_random_interval_union()
-            intervals = intervals.union(i)
-            elems = elems.union(e)
+    a = Interval.empty(np.dtype(int), 1)
+    Lower(np.array(53)) <= a[:] <= Upper(np.array(53))
 
-        check_elems = set()
+    az = a.union(z)
 
-        for i in range(intervals._lower.shape[0]):
-            low, high = intervals._lower[i, 0], intervals._upper[i, 0]
-            if low <= high:
-                check_elems = check_elems.union(range(low, high + 1))
+    np.testing.assert_array_equal(az._lower, np.array([[0], [53]]))
+    np.testing.assert_array_equal(az._upper, np.array([[0], [53]]))
 
-        assert sorted(elems) == sorted(check_elems)
+    b = Interval.empty(np.dtype(int), 1)
+    Lower(np.array(0)) <= b[:] <= Upper(np.array(53))
+    b = b.into_union()
+
+    abz = az.union(b)
+
+    np.testing.assert_array_equal(abz._lower, np.array([[0]]))
+    np.testing.assert_array_equal(abz._upper, np.array([[53]]))
 
 
-def test_random_interval_intersection():
-    for _ in range(10):
-        intervals = Interval.full(np.dtype(int), 1).into_union()
-        elems = set(range(100))
+def test_union_adjacent():
+    a = Interval.empty(np.dtype(int), 1)
+    Lower(np.array(1)) <= a[:] <= Upper(np.array(3))
 
-        for _ in range(3):
-            i, e = generate_random_interval_union()
-            intervals = intervals.intersect(i)
-            elems.intersection_update(e)
+    b = Interval.empty(np.dtype(int), 1)
+    Lower(np.array(4)) <= b[:] <= Upper(np.array(5))
 
-        check_elems = set()
+    ab = a.union(b)
 
-        for i in range(intervals._lower.shape[0]):
-            low, high = intervals._lower[i, 0], intervals._upper[i, 0]
-            if low <= high:
-                check_elems = check_elems.union(range(low, high + 1))
-
-        assert sorted(elems) == sorted(check_elems)
+    np.testing.assert_array_equal(ab._lower, np.array([[1]]))
+    np.testing.assert_array_equal(ab._upper, np.array([[5]]))

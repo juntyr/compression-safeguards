@@ -101,10 +101,14 @@ jobs:
           key: fuzzer-corpus
 
       - name: Ensure the fuzzer corpus exists
-        run: mkdir -p ./corpus
+        run: |
+          mkdir -p ./corpus/safeguards
+          mkdir -p ./corpus/intervals
 
-      - name: Run the fuzzer
-        run: uv run tests/fuzz.py ./corpus -max_total_time=60
+      - name: Run the fuzzers
+        run: |
+          uv run fuzz/fuzz_safeguards.py ./corpus/safeguards -max_total_time=45
+          uv run fuzz/fuzz_safeguards.py ./corpus/intervals -max_total_time=15
 
       - name: Delete the previous fuzzer corpus
         if: always() && steps.fuzzer-corpus-restore.outputs.cache-hit == 'true'
