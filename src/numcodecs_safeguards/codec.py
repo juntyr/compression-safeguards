@@ -12,7 +12,6 @@ from typing_extensions import Buffer  # MSPV 3.12
 import numcodecs
 import numcodecs.compat
 import numcodecs.registry
-import numcodecs.zlib
 import numpy as np
 import varint
 

@@ -1,11 +1,13 @@
 from abc import ABC, abstractmethod
 from collections.abc import Generator
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Callable
 
 import numcodecs
 import numcodecs.compat
 import numpy as np
+import pandas as pd
 import xarray as xr
 from numcodecs.abc import Codec
 from numcodecs_safeguards.codec import SafeguardsCodec
@@ -15,7 +17,6 @@ from numcodecs_safeguards.quantizer import SafeguardsQuantizer
 from numcodecs_safeguards.safeguards.elementwise.abs import AbsoluteErrorBoundSafeguard
 from numcodecs_wasm_sz3 import Sz3
 from numcodecs_wasm_zfp import Zfp
-from numcodecs_wasm_zlib import Zlib
 from numcodecs_wasm_zstd import Zstd
 from tqdm import tqdm
 
@@ -47,7 +48,9 @@ def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
 
     yield (
         "N(0,10)",
-        np.random.default_rng(seed=42).normal(loc=0.0, scale=10.0, size=t2m.shape),
+        np.random.default_rng(seed=42)
+        .normal(loc=0.0, scale=10.0, size=t2m.shape)
+        .astype(t2m.dtype),
     )
 
     yield "+t2mi", np.round(t2m.values * 1000).astype(np.int32)
@@ -55,6 +58,9 @@ def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
 
     yield "+tpi", np.round(tp.values * 100 * 1000).astype(np.int32)
     yield "-tpi", np.round(-tp.values * 100 * 1000).astype(np.int32)
+
+    yield "+o3i", np.round(o3.values * 1e6 * 1000).astype(np.int32)  # mg/mg
+    yield "-o3i", np.round(-o3.values * 1e6 * 1000).astype(np.int32)  # mg/mg
 
     yield (
         "N(0,10)i",
@@ -470,6 +476,8 @@ if __name__ == "__main__":
 
     matplotlib.use("module://mpl_ascii")
 
+    results = SimpleNamespace(dataset=[], compressor=[], ratio=[])
+
     for d, codec, result in gen_benchmark(
         gen_data(),
         [
@@ -483,23 +491,31 @@ if __name__ == "__main__":
             gen_codecs_with_eb_abs(
                 lambda eb_abs: Zfp(mode="fixed-accuracy", tolerance=eb_abs)
             ),
-            gen_single_codec(Zlib(level=9)),
-            gen_single_codec(Zstd(level=20)),
+            gen_single_codec(Zstd(level=3)),
             gen_codecs_with_eb_abs(
                 lambda eb_abs: SafeguardsCodec(
                     codec=None, safeguards=[dict(kind="abs", eb_abs=eb_abs)]
                 )
             ),
-            gen_codecs_with_eb_abs(
-                lambda eb_abs: LorenzoPredictor(
-                    quantizer=MyLinearQuantizer(eb_abs=eb_abs)
-                )
-            ),
-            gen_codecs_with_eb_abs(
-                lambda eb_abs: LorenzoPredictor(
-                    quantizer=MySafeguardsQuantizer(eb_abs=eb_abs)
-                )
-            ),
+            # gen_codecs_with_eb_abs(
+            #     lambda eb_abs: LorenzoPredictor(
+            #         quantizer=MyLinearQuantizer(eb_abs=eb_abs)
+            #     )
+            # ),
+            # gen_codecs_with_eb_abs(
+            #     lambda eb_abs: LorenzoPredictor(
+            #         quantizer=MySafeguardsQuantizer(eb_abs=eb_abs)
+            #     )
+            # ),
         ],
     ):
+        results.dataset.append(d)
+        results.compressor.append(repr(codec))
+        results.ratio.append(result)
+
         print(f"- {d} {codec}: {result}", flush=True)
+
+    pd.DataFrame(results.__dict__).to_csv(
+        Path(__file__).parent / "compression.csv",
+        index=False,
+    )

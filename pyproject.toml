@@ -24,7 +24,6 @@ bench = [
     "numcodecs-wasm~=0.1.6",
     "numcodecs-wasm-sz3~=0.6.0",
     "numcodecs-wasm-zfp~=0.5.1",
-    "numcodecs-wasm-zlib~=0.3.0",
     "numcodecs-wasm-zstd~=0.3.0",
     "xarray~=2025.1",
     "netcdf4~=1.7.2",

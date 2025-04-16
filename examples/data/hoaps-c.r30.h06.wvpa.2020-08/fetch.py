@@ -7,7 +7,7 @@ request = {
     "temporal_aggregation": "6_hourly",
     "year": ["2020"],
     "month": ["08"],
-    "variable": "all"
+    "variable": "all",
 }
 
 client = cdsapi.Client()
