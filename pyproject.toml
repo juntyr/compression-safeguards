@@ -20,11 +20,12 @@ dependencies = [
 
 [dependency-groups]
 bench = [
-    "numcodecs-wasm~=0.1",
-    "numcodecs-wasm-sz3~=0.5",
-    "numcodecs-wasm-zfp~=0.4",
-    "numcodecs-wasm-zlib~=0.2",
-    "numcodecs-wasm-zstd~=0.2",
+    "earthkit-plots~=0.3.1",
+    "numcodecs-wasm~=0.1.6",
+    "numcodecs-wasm-sz3~=0.6.0",
+    "numcodecs-wasm-zfp~=0.5.1",
+    "numcodecs-wasm-zlib~=0.3.0",
+    "numcodecs-wasm-zstd~=0.3.0",
     "xarray~=2025.1",
     "netcdf4~=1.7.2",
     "tqdm~=4.0",
@@ -32,6 +33,16 @@ bench = [
     "mpl-ascii~=0.10.0",
 ]
 dev = ["ruff~=0.9"]
+examples = [
+    "cdsapi~=0.7.5",
+    "jupyterlab",
+    "numcodecs-wasm~=0.1.6",
+    "numcodecs-wasm-sz3~=0.6.0",
+    "numcodecs-wasm-zfp-classic~=0.3.1",
+    "xarray~=2025.1",
+    "netcdf4~=1.7.2",
+    "matplotlib~=3.10.0",
+]
 fuzz = ["atheris~=2.3"]
 test = ["pytest~=8.3"]
 typing = ["mypy~=1.14"]
