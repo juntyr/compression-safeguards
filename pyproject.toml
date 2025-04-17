@@ -37,6 +37,7 @@ examples = [
     "jupyterlab",
     "numcodecs-wasm~=0.1.6",
     "numcodecs-wasm-sz3~=0.6.0",
+    "numcodecs-wasm-tthresh~=0.2.0",
     "numcodecs-wasm-zfp-classic~=0.3.1",
     "xarray~=2025.1",
     "netcdf4~=1.7.2",
