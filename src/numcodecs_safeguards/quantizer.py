@@ -14,6 +14,7 @@ from .safeguards import Safeguards
 from .safeguards.abc import Safeguard
 from .safeguards.elementwise.abc import ElementwiseSafeguard
 from .safeguards.stencil.abc import StencilSafeguard
+from .safeguards.stochastic.abc import StochasticSafeguard
 
 T = TypeVar("T", bound=np.dtype)
 """ Any numpy [`dtype`][numpy.dtype] type variable. """
@@ -42,8 +43,13 @@ class SafeguardsQuantizer:
         The quantizer's version. Do not provide this parameter explicitly.
     """
 
-    __slots__ = ("_elementwise_safeguards", "_stencil_safeguards")
+    __slots__ = (
+        "_elementwise_safeguards",
+        "_stochastic_safeguards",
+        "_stencil_safeguards",
+    )
     _elementwise_safeguards: tuple[ElementwiseSafeguard, ...]
+    _stochastic_safeguards: tuple[StochasticSafeguard, ...]
     _stencil_safeguards: tuple[StencilSafeguard, ...]
 
     def __init__(
@@ -69,6 +75,11 @@ class SafeguardsQuantizer:
             for safeguard in safeguards
             if isinstance(safeguard, ElementwiseSafeguard)
         )
+        self._stochastic_safeguards = tuple(
+            safeguard
+            for safeguard in safeguards
+            if isinstance(safeguard, StochasticSafeguard)
+        )
         self._stencil_safeguards = tuple(
             safeguard
             for safeguard in safeguards
@@ -77,7 +88,9 @@ class SafeguardsQuantizer:
         unsupported_safeguards = [
             safeguard
             for safeguard in safeguards
-            if not isinstance(safeguard, (ElementwiseSafeguard, StencilSafeguard))
+            if not isinstance(
+                safeguard, (ElementwiseSafeguard, StencilSafeguard, StochasticSafeguard)
+            )
         ]
 
         assert len(unsupported_safeguards) == 0, (
@@ -91,7 +104,11 @@ class SafeguardsQuantizer:
         uphold.
         """
 
-        return self._elementwise_safeguards + self._stencil_safeguards
+        return (
+            self._elementwise_safeguards
+            + self._stochastic_safeguards
+            + self._stencil_safeguards
+        )
 
     @property
     def version(self) -> str:
@@ -155,7 +172,11 @@ class SafeguardsQuantizer:
             return np.zeros_like(as_bits(data))
 
         all_intervals = []
-        for safeguard in self._elementwise_safeguards + self._stencil_safeguards:
+        for safeguard in (
+            self._elementwise_safeguards
+            + self._stochastic_safeguards
+            + self._stencil_safeguards
+        ):
             intervals = safeguard.compute_safe_intervals(data)
             assert np.all(intervals.contains(data)), (
                 f"elementwise safeguard {safeguard!r}'s intervals must contain the original data"
@@ -171,9 +192,10 @@ class SafeguardsQuantizer:
             assert np.all(intervals.contains(correction)), (
                 f"{safeguard!r} interval does not contain the correction {correction!r}"
             )
-            assert safeguard.check(data, correction), (
-                f"{safeguard!r} check fails after correction {correction!r}"
-            )
+            if not isinstance(safeguard, StochasticSafeguard):
+                assert safeguard.check(data, correction), (
+                    f"{safeguard!r} check fails after correction {correction!r}"
+                )
 
         prediction_bits = as_bits(prediction)
         correction_bits = as_bits(correction)

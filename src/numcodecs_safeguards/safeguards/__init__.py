@@ -17,6 +17,7 @@ from .stencil.findiff.abs import (
     FiniteDifferenceAbsoluteErrorBoundSafeguard,
 )
 from .stencil.monotonicity import MonotonicityPreservingSafeguard
+from .stochastic.bias import BiasReductionSafeguard
 
 
 class Safeguards(Enum):
@@ -57,3 +58,5 @@ class Safeguards(Enum):
     # logical or combinator
     any = AnySafeguard
     """Enforce that any one of the inner safeguards' guarantees are met."""
+
+    bias = BiasReductionSafeguard
