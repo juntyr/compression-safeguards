@@ -13,6 +13,7 @@ from .elementwise.ratio import RatioErrorBoundSafeguard
 from .elementwise.rel import RelativeErrorBoundSafeguard
 from .elementwise.sign import SignPreservingSafeguard
 from .elementwise.zero import ZeroIsZeroSafeguard
+from .global_.rmse import RootMeanSquareErrorBoundSafeguard
 from .stencil.findiff.abs import (
     FiniteDifferenceAbsoluteErrorBoundSafeguard,
 )
@@ -37,6 +38,9 @@ class Safeguards(Enum):
 
     ratio = RatioErrorBoundSafeguard
     """Enforce a ratio (decimal) error bound."""
+
+    rmse = RootMeanSquareErrorBoundSafeguard
+    """Enforce a global root mean square errror (RMSE) bound."""
 
     # finite difference error bounds
     findiff_abs = FiniteDifferenceAbsoluteErrorBoundSafeguard

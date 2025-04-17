@@ -5,7 +5,7 @@ Abstract base class for the elementwise safeguards.
 __all__ = ["ElementwiseSafeguard"]
 
 from abc import ABC, abstractmethod
-from typing import Any, final, TypeVar
+from typing import final, TypeVar
 
 import numpy as np
 
@@ -71,7 +71,7 @@ class ElementwiseSafeguard(Safeguard, ABC):
     @abstractmethod
     def compute_safe_intervals(
         self, data: np.ndarray[S, T]
-    ) -> IntervalUnion[T, Any, Any]:
+    ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the safeguard's guarantees with respect
         to the `data` are upheld.
@@ -81,12 +81,12 @@ class ElementwiseSafeguard(Safeguard, ABC):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, T]
             Data for which the safe intervals should be computed.
 
         Returns
         -------
-        intervals : IntervalUnion
+        intervals : IntervalUnion[T, int, int]
             Union of intervals in which the safeguard's guarantees are upheld.
         """
 

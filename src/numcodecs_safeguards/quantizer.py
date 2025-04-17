@@ -10,9 +10,11 @@ from typing import TypeVar
 import numpy as np
 
 from .cast import as_bits
+from .intervals import Interval, IntervalUnion
 from .safeguards import Safeguards
 from .safeguards.abc import Safeguard
 from .safeguards.elementwise.abc import ElementwiseSafeguard
+from .safeguards.global_.abc import GlobalSafeguard
 from .safeguards.stencil.abc import StencilSafeguard
 
 T = TypeVar("T", bound=np.dtype)
@@ -42,9 +44,10 @@ class SafeguardsQuantizer:
         The quantizer's version. Do not provide this parameter explicitly.
     """
 
-    __slots__ = ("_elementwise_safeguards", "_stencil_safeguards")
+    __slots__ = ("_elementwise_safeguards", "_stencil_safeguards", "_global_safeguards")
     _elementwise_safeguards: tuple[ElementwiseSafeguard, ...]
     _stencil_safeguards: tuple[StencilSafeguard, ...]
+    _global_safeguards: tuple[GlobalSafeguard, ...]
 
     def __init__(
         self,
@@ -74,10 +77,17 @@ class SafeguardsQuantizer:
             for safeguard in safeguards
             if isinstance(safeguard, StencilSafeguard)
         )
+        self._global_safeguards = tuple(
+            safeguard
+            for safeguard in safeguards
+            if isinstance(safeguard, GlobalSafeguard)
+        )
         unsupported_safeguards = [
             safeguard
             for safeguard in safeguards
-            if not isinstance(safeguard, (ElementwiseSafeguard, StencilSafeguard))
+            if not isinstance(
+                safeguard, (ElementwiseSafeguard, StencilSafeguard, GlobalSafeguard)
+            )
         ]
 
         assert len(unsupported_safeguards) == 0, (
@@ -91,7 +101,11 @@ class SafeguardsQuantizer:
         uphold.
         """
 
-        return self._elementwise_safeguards + self._stencil_safeguards
+        return (
+            self._elementwise_safeguards
+            + self._stencil_safeguards
+            + self._global_safeguards
+        )
 
     @property
     def version(self) -> str:
@@ -140,9 +154,11 @@ class SafeguardsQuantizer:
             f"can only quantize arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
         )
 
-        assert (not partial_data) or len(self._stencil_safeguards) == 0, (
+        assert (not partial_data) or len(
+            self._stencil_safeguards + self._global_safeguards
+        ) == 0, (
             "quantizing partial data with non-elementwise safeguards "
-            + f"{self._stencil_safeguards!r} is not supported"
+            + f"{(self._stencil_safeguards + self._global_safeguards)!r} is not supported"
         )
 
         all_ok = True
@@ -158,13 +174,26 @@ class SafeguardsQuantizer:
         for safeguard in self._elementwise_safeguards + self._stencil_safeguards:
             intervals = safeguard.compute_safe_intervals(data)
             assert np.all(intervals.contains(data)), (
-                f"elementwise safeguard {safeguard!r}'s intervals must contain the original data"
+                f"safeguard {safeguard!r}'s intervals must contain the original data"
             )
             all_intervals.append(intervals)
 
-        combined_intervals = all_intervals[0]
-        for intervals in all_intervals[1:]:
+        combined_intervals: IntervalUnion[T, int, int] = Interval.full_like(
+            data
+        ).into_union()  # type: ignore
+        for intervals in all_intervals:
             combined_intervals = combined_intervals.intersect(intervals)
+
+        for safeguard in self._global_safeguards:
+            intervals = safeguard.compute_safe_intervals_with_priors(
+                data, combined_intervals
+            )
+            assert np.all(intervals.contains(data)), (
+                f"safeguard {safeguard!r}'s intervals must contain the original data"
+            )
+            all_intervals.append(intervals)
+            combined_intervals = combined_intervals.intersect(intervals)
+
         correction = combined_intervals.pick(prediction)
 
         for safeguard, intervals in zip(self.safeguards, all_intervals):

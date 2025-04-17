@@ -5,7 +5,7 @@ Abstract base class for the stencil safeguards.
 __all__ = ["StencilSafeguard"]
 
 from abc import ABC, abstractmethod
-from typing import Any, TypeVar
+from typing import TypeVar
 
 import numpy as np
 
@@ -28,7 +28,7 @@ class StencilSafeguard(Safeguard, ABC):
     @abstractmethod
     def compute_safe_intervals(
         self, data: np.ndarray[S, T]
-    ) -> IntervalUnion[T, Any, Any]:
+    ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the safeguard's guarantees with respect
         to the `data` are upheld.
@@ -38,12 +38,12 @@ class StencilSafeguard(Safeguard, ABC):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, T]
             Data for which the safe intervals should be computed.
 
         Returns
         -------
-        intervals : IntervalUnion
+        intervals : IntervalUnion[T, int, int]
             Union of intervals in which the safeguard's guarantees are upheld.
         """
 
