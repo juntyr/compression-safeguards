@@ -20,6 +20,50 @@ from numcodecs_combinators.stack import CodecStack
 from .cast import as_bits
 
 
+class BytesCodec(Codec):
+    __slots__ = ()
+
+    codec_id: str = "safeguards.lossless.bytes"  # type: ignore
+
+    def encode(self, buf: Buffer) -> bytes:
+        a = numcodecs.compat.ensure_ndarray(buf)
+        dtype, shape = a.dtype, a.shape
+
+        # message: dtype shape table encoded
+        message = []
+
+        message.append(varint.encode(len(dtype.str)))
+        message.append(dtype.str.encode("ascii"))
+
+        message.append(varint.encode(len(shape)))
+        for s in shape:
+            message.append(varint.encode(s))
+
+        message.append(a.tobytes())
+
+        return b"".join(message)
+
+    def decode(self, buf: Buffer, out: None | Buffer = None) -> Buffer:
+        b = numcodecs.compat.ensure_bytes(buf)
+
+        b_io = BytesIO(b)
+
+        dtype = np.dtype(b_io.read(varint.decode_stream(b_io)).decode("ascii"))
+
+        shape = tuple(
+            varint.decode_stream(b_io) for _ in range(varint.decode_stream(b_io))
+        )
+
+        decoded = np.frombuffer(b_io.read(), dtype=dtype, count=np.prod(shape)).reshape(
+            shape
+        )
+
+        return numcodecs.compat.ndarray_copy(decoded, out)  # type: ignore
+
+
+numcodecs.registry.register_codec(BytesCodec)
+
+
 class HuffmanCodec(Codec):
     __slots__ = ()
 
