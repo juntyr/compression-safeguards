@@ -31,6 +31,7 @@ class RootMeanSquareErrorBoundSafeguard(GlobalSafeguard):
 
         self._eb_rmse = eb_rmse
         self._equal_nan = equal_nan
+        # TODO: add an ignore-non-finite option to ignore them in the sse
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check(self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]) -> bool:
@@ -127,6 +128,8 @@ class RootMeanSquareErrorBoundSafeguard(GlobalSafeguard):
         if index == 0:
             eb_abs = eb_rmse
         else:
+            # TODO: can we get a tighter bound by taking into account how many
+            #       are left?
             eb_abs = np.array(np.sqrt(square_errors_pessimistic_sorted[index - 1]))
 
         valid = _compute_safe_eb_abs_interval(
