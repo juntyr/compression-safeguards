@@ -6,12 +6,12 @@ __all__ = ["ZeroIsZeroSafeguard"]
 
 import numpy as np
 
-from .abc import ElementwiseSafeguard, S, T
+from .abc import PointwiseSafeguard, S, T
 from ...cast import as_bits
 from ...intervals import IntervalUnion, Interval, Lower, Upper
 
 
-class ZeroIsZeroSafeguard(ElementwiseSafeguard):
+class ZeroIsZeroSafeguard(PointwiseSafeguard):
     """
     The `ZeroIsZeroSafeguard` guarantees that values that are zero in the input
     are also *exactly* zero in the decompressed output.
@@ -38,7 +38,7 @@ class ZeroIsZeroSafeguard(ElementwiseSafeguard):
     def __init__(self, zero: int | float = 0):
         self._zero = zero
 
-    def check_elementwise(
+    def check_pointwise(
         self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """

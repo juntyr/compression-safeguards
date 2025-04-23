@@ -6,13 +6,13 @@ __all__ = ["Safeguards"]
 
 from enum import Enum
 
-from .elementwise.abs import AbsoluteErrorBoundSafeguard
-from .elementwise.logical.all import AllSafeguards
-from .elementwise.logical.any import AnySafeguard
-from .elementwise.ratio import RatioErrorBoundSafeguard
-from .elementwise.rel import RelativeErrorBoundSafeguard
-from .elementwise.sign import SignPreservingSafeguard
-from .elementwise.zero import ZeroIsZeroSafeguard
+from .pointwise.abs import AbsoluteErrorBoundSafeguard
+from .pointwise.logical.all import AllSafeguards
+from .pointwise.logical.any import AnySafeguard
+from .pointwise.ratio import RatioErrorBoundSafeguard
+from .pointwise.rel import RelativeErrorBoundSafeguard
+from .pointwise.sign import SignPreservingSafeguard
+from .pointwise.zero import ZeroIsZeroSafeguard
 from .stencil.findiff.abs import (
     FiniteDifferenceAbsoluteErrorBoundSafeguard,
 )

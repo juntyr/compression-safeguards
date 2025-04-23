@@ -6,7 +6,7 @@ __all__ = ["RatioErrorBoundSafeguard"]
 
 import numpy as np
 
-from .abc import ElementwiseSafeguard, S, T
+from .abc import PointwiseSafeguard, S, T
 from ...cast import (
     to_float,
     from_float,
@@ -19,7 +19,7 @@ from ...cast import (
 from ...intervals import IntervalUnion, Interval, Lower, Upper
 
 
-class RatioErrorBoundSafeguard(ElementwiseSafeguard):
+class RatioErrorBoundSafeguard(PointwiseSafeguard):
     """
     The `RatioErrorBoundSafeguard` guarantees that the ratios between the
     original and the decoded values and their inverse ratios are less than
@@ -80,7 +80,7 @@ class RatioErrorBoundSafeguard(ElementwiseSafeguard):
         self._equal_nan = equal_nan
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def check_elementwise(
+    def check_pointwise(
         self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """

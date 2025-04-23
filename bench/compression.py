@@ -14,7 +14,7 @@ from numcodecs_safeguards.codec import SafeguardsCodec
 from numcodecs_safeguards.cast import as_bits
 from numcodecs_safeguards.lossless import Lossless
 from numcodecs_safeguards.quantizer import SafeguardsQuantizer
-from numcodecs_safeguards.safeguards.elementwise.abs import AbsoluteErrorBoundSafeguard
+from numcodecs_safeguards.safeguards.pointwise.abs import AbsoluteErrorBoundSafeguard
 from numcodecs_wasm_sz3 import Sz3
 from numcodecs_wasm_zfp import Zfp
 from numcodecs_wasm_zstd import Zstd

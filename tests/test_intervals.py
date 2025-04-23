@@ -8,9 +8,9 @@ from numcodecs_safeguards.intervals import (
     Lower,
     Upper,
 )
-from numcodecs_safeguards.safeguards.elementwise.abs import AbsoluteErrorBoundSafeguard
-from numcodecs_safeguards.safeguards.elementwise.sign import SignPreservingSafeguard
-from numcodecs_safeguards.safeguards.elementwise.zero import ZeroIsZeroSafeguard
+from numcodecs_safeguards.safeguards.pointwise.abs import AbsoluteErrorBoundSafeguard
+from numcodecs_safeguards.safeguards.pointwise.sign import SignPreservingSafeguard
+from numcodecs_safeguards.safeguards.pointwise.zero import ZeroIsZeroSafeguard
 
 
 def test_sign():

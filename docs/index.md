@@ -39,15 +39,15 @@ This package currently implements the following [safeguards][numcodecs_safeguard
 
 ### Error Bounds (per element)
 
-- [`abs`][numcodecs_safeguards.safeguards.elementwise.abs.AbsoluteErrorBoundSafeguard] (absolute error bound):
+- [`abs`][numcodecs_safeguards.safeguards.pointwise.abs.AbsoluteErrorBoundSafeguard] (absolute error bound):
 
-    The elementwise absolute error is guaranteed to be less than or equal to the provided bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
+    The pointwise absolute error is guaranteed to be less than or equal to the provided bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
 
-- [`rel`][numcodecs_safeguards.safeguards.elementwise.rel.RelativeErrorBoundSafeguard] (relative error bound):
+- [`rel`][numcodecs_safeguards.safeguards.pointwise.rel.RelativeErrorBoundSafeguard] (relative error bound):
 
-    The elementwise relative error is guaranteed to be less than or equal to the provided bound. Zero values are preserved with the same bit pattern. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
+    The pointwise relative error is guaranteed to be less than or equal to the provided bound. Zero values are preserved with the same bit pattern. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
 
-- [`ratio`][numcodecs_safeguards.safeguards.elementwise.ratio.RatioErrorBoundSafeguard] (ratio [decimal] error bound):
+- [`ratio`][numcodecs_safeguards.safeguards.pointwise.ratio.RatioErrorBoundSafeguard] (ratio [decimal] error bound):
 
     It is guaranteed that the ratios between the original and the decoded values and their inverse ratios are less than or equal to the provided bound. The ratio error is defined to be infinite if the signs of the data and decoded data do not match. Since the provided error bound must be finite, this safeguard also guarantees that the sign of each decoded value matches the sign of each original value and that a decoded value is zero if and only if it is zero in the original data. The ratio error bound is sometimes also known as a decimal error bound if the ratio is expressed as the difference in orders of magnitude. This safeguard can also be used to guarantee a relative-like error bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
 
@@ -55,15 +55,15 @@ This package currently implements the following [safeguards][numcodecs_safeguard
 
 - [`findiff_abs`][numcodecs_safeguards.safeguards.stencil.findiff.abs.FiniteDifferenceAbsoluteErrorBoundSafeguard] (absolute error bound on finite differences):
 
-    The elementwise absolute error of the finite-difference-approximated derivative is guaranteed to be less than or equal to the provided bound. The safeguard supports three types of [`FiniteDifference`][numcodecs_safeguards.safeguards.stencil.findiff.FiniteDifference]: `central`, `forward`, `backward`. The fininite difference is computed with respect to the provided uniform grid spacing. If the spacing is different along different axes, multiple safeguards along specific axes with different spacing can be combined. If the finite difference for an element evaluates to an infinite value, this safeguard guarantees that the finite difference on the decoded value produces the exact same infinite value. For a NaN finite difference, this safeguard guarantees that the finite difference on the decoded value is also NaN, but does not guarantee that it has the same bitpattern.
+    The pointwise absolute error of the finite-difference-approximated derivative is guaranteed to be less than or equal to the provided bound. The safeguard supports three types of [`FiniteDifference`][numcodecs_safeguards.safeguards.stencil.findiff.FiniteDifference]: `central`, `forward`, `backward`. The fininite difference is computed with respect to the provided uniform grid spacing. If the spacing is different along different axes, multiple safeguards along specific axes with different spacing can be combined. If the finite difference for an element evaluates to an infinite value, this safeguard guarantees that the finite difference on the decoded value produces the exact same infinite value. For a NaN finite difference, this safeguard guarantees that the finite difference on the decoded value is also NaN, but does not guarantee that it has the same bitpattern.
 
 ### Per-element properties
 
-- [`zero`][numcodecs_safeguards.safeguards.elementwise.zero.ZeroIsZeroSafeguard] (zero/constant preserving):
+- [`zero`][numcodecs_safeguards.safeguards.pointwise.zero.ZeroIsZeroSafeguard] (zero/constant preserving):
 
     Values that are zero in the input are guaranteed to also be *exactly* zero in the decompressed output. This safeguard can also be used to enforce that another constant value is bitwise preserved, e.g. a missing value constant or a semantic "zero" value that is represented as a non-zero number. Beware that +0.0 and -0.0 are semantically equivalent in floating point but have different bitwise patterns. If you want to preserve both, you need to use two safeguards, one configured for each zero.
 
-- [`sign`][numcodecs_safeguards.safeguards.elementwise.sign.SignPreservingSafeguard] (sign-preserving):
+- [`sign`][numcodecs_safeguards.safeguards.pointwise.sign.SignPreservingSafeguard] (sign-preserving):
 
     Values are guaranteed to have the same sign (-1, 0, +1) in the decompressed output as they have in the input data. The sign for NaNs is derived from their sign bit, e.g. sign(-NaN) = -1. This safeguard should be combined with e.g. an error bound, as it by itself accepts *any* value with the same sign.
 
@@ -75,13 +75,13 @@ This package currently implements the following [safeguards][numcodecs_safeguard
 
 ### Logical combinators (per element)
 
-- [`all`][numcodecs_safeguards.safeguards.elementwise.logical.all.AllSafeguards] (logical all / and):
+- [`all`][numcodecs_safeguards.safeguards.pointwise.logical.all.AllSafeguards] (logical all / and):
 
-    For each element, all of the combined safeguards' guarantees are upheld. At the moment, only elementwise safeguards can be combined by this all-combinator.
+    For each element, all of the combined safeguards' guarantees are upheld. At the moment, only pointwise safeguards can be combined by this all-combinator.
 
-- [`any`][numcodecs_safeguards.safeguards.elementwise.logical.any.AnySafeguard] (logical any / or):
+- [`any`][numcodecs_safeguards.safeguards.pointwise.logical.any.AnySafeguard] (logical any / or):
 
-    For each element, at least one of the combined safeguards' guarantees is upheld. At the moment, only elementwise safeguards can be combined by this any-combinator.
+    For each element, at least one of the combined safeguards' guarantees is upheld. At the moment, only pointwise safeguards can be combined by this any-combinator.
 
 ## Usage
 

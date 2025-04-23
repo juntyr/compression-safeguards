@@ -12,7 +12,7 @@ import numpy as np
 from .cast import as_bits
 from .safeguards import Safeguards
 from .safeguards.abc import Safeguard
-from .safeguards.elementwise.abc import ElementwiseSafeguard
+from .safeguards.pointwise.abc import PointwiseSafeguard
 from .safeguards.stencil.abc import StencilSafeguard
 
 T = TypeVar("T", bound=np.dtype)
@@ -42,8 +42,8 @@ class SafeguardsQuantizer:
         The quantizer's version. Do not provide this parameter explicitly.
     """
 
-    __slots__ = ("_elementwise_safeguards", "_stencil_safeguards")
-    _elementwise_safeguards: tuple[ElementwiseSafeguard, ...]
+    __slots__ = ("_pointwise_safeguards", "_stencil_safeguards")
+    _pointwise_safeguards: tuple[PointwiseSafeguard, ...]
     _stencil_safeguards: tuple[StencilSafeguard, ...]
 
     def __init__(
@@ -64,10 +64,10 @@ class SafeguardsQuantizer:
             for safeguard in safeguards
         ]
 
-        self._elementwise_safeguards = tuple(
+        self._pointwise_safeguards = tuple(
             safeguard
             for safeguard in safeguards
-            if isinstance(safeguard, ElementwiseSafeguard)
+            if isinstance(safeguard, PointwiseSafeguard)
         )
         self._stencil_safeguards = tuple(
             safeguard
@@ -77,7 +77,7 @@ class SafeguardsQuantizer:
         unsupported_safeguards = [
             safeguard
             for safeguard in safeguards
-            if not isinstance(safeguard, (ElementwiseSafeguard, StencilSafeguard))
+            if not isinstance(safeguard, (PointwiseSafeguard, StencilSafeguard))
         ]
 
         assert len(unsupported_safeguards) == 0, (
@@ -91,7 +91,7 @@ class SafeguardsQuantizer:
         uphold.
         """
 
-        return self._elementwise_safeguards + self._stencil_safeguards
+        return self._pointwise_safeguards + self._stencil_safeguards
 
     @property
     def version(self) -> str:
@@ -127,7 +127,7 @@ class SafeguardsQuantizer:
             Whether the provided `data` and `prediction` only cover parts of
             the full data. While some safeguards can be checked and enforced
             per-element, others should only be applied to the full data. When
-            only partial data is provided, quantizing with any non-elementwise
+            only partial data is provided, quantizing with any non-pointwise
             safeguards fails and raises an exception.
 
         Returns
@@ -141,7 +141,7 @@ class SafeguardsQuantizer:
         )
 
         assert (not partial_data) or len(self._stencil_safeguards) == 0, (
-            "quantizing partial data with non-elementwise safeguards "
+            "quantizing partial data with non-pointwise safeguards "
             + f"{self._stencil_safeguards!r} is not supported"
         )
 
@@ -155,10 +155,10 @@ class SafeguardsQuantizer:
             return np.zeros_like(as_bits(data))
 
         all_intervals = []
-        for safeguard in self._elementwise_safeguards + self._stencil_safeguards:
+        for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
             intervals = safeguard.compute_safe_intervals(data)
             assert np.all(intervals.contains(data)), (
-                f"elementwise safeguard {safeguard!r}'s intervals must contain the original data"
+                f"pointwise safeguard {safeguard!r}'s intervals must contain the original data"
             )
             all_intervals.append(intervals)
 

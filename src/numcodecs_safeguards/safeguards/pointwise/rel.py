@@ -6,7 +6,7 @@ __all__ = ["RelativeErrorBoundSafeguard"]
 
 import numpy as np
 
-from .abc import ElementwiseSafeguard, S, T
+from .abc import PointwiseSafeguard, S, T
 from ...cast import (
     to_float,
     from_float,
@@ -19,9 +19,9 @@ from ...cast import (
 from ...intervals import IntervalUnion, Interval, Lower, Upper
 
 
-class RelativeErrorBoundSafeguard(ElementwiseSafeguard):
+class RelativeErrorBoundSafeguard(PointwiseSafeguard):
     r"""
-    The `RelativeErrorBoundSafeguard` guarantees that the elementwise relative
+    The `RelativeErrorBoundSafeguard` guarantees that the pointwise relative
     error is less than or equal to the provided bound `eb_rel`.
 
     The relative error bound is defined as follows:
@@ -61,7 +61,7 @@ class RelativeErrorBoundSafeguard(ElementwiseSafeguard):
         self._equal_nan = equal_nan
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def check_elementwise(
+    def check_pointwise(
         self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """

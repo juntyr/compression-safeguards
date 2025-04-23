@@ -8,39 +8,39 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from ..abc import ElementwiseSafeguard, S, T
+from ..abc import PointwiseSafeguard, S, T
 from ....intervals import IntervalUnion
 
 
-class AllSafeguards(ElementwiseSafeguard):
+class AllSafeguards(PointwiseSafeguard):
     """
     The `AllSafeguards` guarantees that, for each element, all of the combined
     safeguards' guarantees are upheld.
 
-    At the moment, only elementwise safeguards can be combined by this all-
+    At the moment, only pointwise safeguards can be combined by this all-
     combinator.
 
     Parameters
     ----------
-    safeguards : Sequence[dict | ElementwiseSafeguard]
+    safeguards : Sequence[dict | PointwiseSafeguard]
         At least one safeguard configuration [`dict`][dict]s or already
         initialized
-        [`ElementwiseSafeguard`][numcodecs_safeguards.safeguards.elementwise.abc.ElementwiseSafeguard].
+        [`PointwiseSafeguard`][numcodecs_safeguards.safeguards.pointwise.abc.PointwiseSafeguard].
     """
 
     __slots__ = ("_safeguards",)
-    _safeguards: tuple[ElementwiseSafeguard, ...]
+    _safeguards: tuple[PointwiseSafeguard, ...]
 
     kind = "all"
 
-    def __init__(self, *, safeguards: Sequence[dict | ElementwiseSafeguard]):
+    def __init__(self, *, safeguards: Sequence[dict | PointwiseSafeguard]):
         from ... import Safeguards
 
         assert len(safeguards) > 1, "can only combine over at least one safeguard"
 
         self._safeguards = tuple(
             safeguard
-            if isinstance(safeguard, ElementwiseSafeguard)
+            if isinstance(safeguard, PointwiseSafeguard)
             else Safeguards[safeguard["kind"]].value(
                 **{p: v for p, v in safeguard.items() if p != "kind"}
             )
@@ -48,12 +48,12 @@ class AllSafeguards(ElementwiseSafeguard):
         )
 
         for safeguard in self._safeguards:
-            assert isinstance(safeguard, ElementwiseSafeguard), (
-                f"{safeguard!r} is not an elementwise safeguard"
+            assert isinstance(safeguard, PointwiseSafeguard), (
+                f"{safeguard!r} is not a pointwise safeguard"
             )
 
     @property
-    def safeguards(self) -> tuple[ElementwiseSafeguard, ...]:
+    def safeguards(self) -> tuple[PointwiseSafeguard, ...]:
         """
         The set of safeguards that this any combinator has been configured to
         uphold.
@@ -61,7 +61,7 @@ class AllSafeguards(ElementwiseSafeguard):
 
         return self._safeguards
 
-    def check_elementwise(
+    def check_pointwise(
         self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
@@ -83,10 +83,10 @@ class AllSafeguards(ElementwiseSafeguard):
 
         front, *tail = self._safeguards
 
-        ok = front.check_elementwise(data, decoded)
+        ok = front.check_pointwise(data, decoded)
 
         for safeguard in tail:
-            ok &= safeguard.check_elementwise(data, decoded)
+            ok &= safeguard.check_pointwise(data, decoded)
 
         return ok
 

@@ -1,8 +1,8 @@
 """
-Abstract base class for the elementwise safeguards.
+Abstract base class for the pointwise safeguards.
 """
 
-__all__ = ["ElementwiseSafeguard"]
+__all__ = ["PointwiseSafeguard"]
 
 from abc import ABC, abstractmethod
 from typing import Any, final, TypeVar
@@ -16,11 +16,11 @@ T = TypeVar("T", bound=np.dtype)
 S = TypeVar("S", bound=tuple[int, ...])
 
 
-class ElementwiseSafeguard(Safeguard, ABC):
+class PointwiseSafeguard(Safeguard, ABC):
     """
-    Elementwise safeguard abstract base class.
+    Pointwise safeguard abstract base class.
 
-    Elementwise safeguards describe properties that are satisfied (or not) per
+    Pointwise safeguards describe properties that are satisfied (or not) per
     element, i.e. independent of other elements.
     """
 
@@ -43,10 +43,10 @@ class ElementwiseSafeguard(Safeguard, ABC):
             `True` if the check succeeded.
         """
 
-        return bool(np.all(self.check_elementwise(data, decoded)))
+        return bool(np.all(self.check_pointwise(data, decoded)))
 
     @abstractmethod
-    def check_elementwise(
+    def check_pointwise(
         self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """

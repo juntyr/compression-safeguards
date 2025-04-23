@@ -12,7 +12,7 @@ import numpy as np
 from ....cast import to_float, as_bits, to_finite_float
 from ....intervals import IntervalUnion
 from ..abc import StencilSafeguard, S, T
-from ...elementwise.abs import _compute_safe_eb_abs_interval
+from ...pointwise.abs import _compute_safe_eb_abs_interval
 from . import (
     FiniteDifference,
     _finite_difference_offsets,
@@ -24,7 +24,7 @@ from . import (
 class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
     """
     The `FiniteDifferenceAbsoluteErrorBoundSafeguard` guarantees that the
-    elementwise absolute error of the finite-difference-approximated derivative
+    pointwise absolute error of the finite-difference-approximated derivative
     is less than or equal to the provided bound `eb_abs`.
 
     The safeguard supports three types of

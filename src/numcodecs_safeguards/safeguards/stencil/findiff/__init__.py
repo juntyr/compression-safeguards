@@ -1,5 +1,5 @@
 """
-Implementations for the provided elementwise safeguards on finite differences.
+Implementations for the provided safeguards on finite differences.
 """
 
 __all__ = ["FiniteDifference"]

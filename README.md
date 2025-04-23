@@ -42,11 +42,11 @@ This package currently implements the following safeguards:
 
 - `abs` (absolute error bound):
 
-    The elementwise absolute error is guaranteed to be less than or equal to the provided bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
+    The pointwise absolute error is guaranteed to be less than or equal to the provided bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
 
 - `rel` (relative error bound):
 
-    The elementwise relative error is guaranteed to be less than or equal to the provided bound. Zero values are preserved with the same bit pattern. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
+    The pointwise relative error is guaranteed to be less than or equal to the provided bound. Zero values are preserved with the same bit pattern. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
 
 - `ratio` (ratio [decimal] error bound):
 
@@ -56,7 +56,7 @@ This package currently implements the following safeguards:
 
 - `findiff_abs` (absolute error bound for finite differences):
 
-    The elementwise absolute error of the finite-difference-approximated derivative is guaranteed to be less than or equal to the provided bound. The safeguard supports three types of finite difference: `central`, `forward`, `backward`. The fininite difference is computed with respect to the provided uniform grid spacing. If the spacing is different along different axes, multiple safeguards along specific axes with different spacing can be combined. If the finite difference for an element evaluates to an infinite value, this safeguard guarantees that the finite difference on the decoded value produces the exact same infinite value. For a NaN finite difference, this safeguard guarantees that the finite difference on the decoded value is also NaN, but does not guarantee that it has the same bitpattern.
+    The pointwise absolute error of the finite-difference-approximated derivative is guaranteed to be less than or equal to the provided bound. The safeguard supports three types of finite difference: `central`, `forward`, `backward`. The fininite difference is computed with respect to the provided uniform grid spacing. If the spacing is different along different axes, multiple safeguards along specific axes with different spacing can be combined. If the finite difference for an element evaluates to an infinite value, this safeguard guarantees that the finite difference on the decoded value produces the exact same infinite value. For a NaN finite difference, this safeguard guarantees that the finite difference on the decoded value is also NaN, but does not guarantee that it has the same bitpattern.
 
 ### Per-element properties
 
@@ -78,11 +78,11 @@ This package currently implements the following safeguards:
 
 - `all` (logical all / and):
 
-    For each element, all of the combined safeguards' guarantees are upheld. At the moment, only elementwise safeguards can be combined by this all-combinator.
+    For each element, all of the combined safeguards' guarantees are upheld. At the moment, only pointwise safeguards can be combined by this all-combinator.
 
 - `any` (logical any / or):
 
-    For each element, at least one of the combined safeguards' guarantees is upheld. At the moment, only elementwise safeguards can be combined by this any-combinator.
+    For each element, at least one of the combined safeguards' guarantees is upheld. At the moment, only pointwise safeguards can be combined by this any-combinator.
 
 ## Usage
 

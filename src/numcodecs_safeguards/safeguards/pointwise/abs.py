@@ -6,7 +6,7 @@ __all__ = ["AbsoluteErrorBoundSafeguard"]
 
 import numpy as np
 
-from .abc import ElementwiseSafeguard, S, T
+from .abc import PointwiseSafeguard, S, T
 from ...cast import (
     to_float,
     from_float,
@@ -19,9 +19,9 @@ from ...cast import (
 from ...intervals import IntervalUnion, Interval, Lower, Upper
 
 
-class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
+class AbsoluteErrorBoundSafeguard(PointwiseSafeguard):
     """
-    The `AbsoluteErrorBoundSafeguard` guarantees that the elementwise absolute
+    The `AbsoluteErrorBoundSafeguard` guarantees that the pointwise absolute
     error is less than or equal to the provided bound `eb_abs`.
 
     Infinite values are preserved with the same bit pattern. If `equal_nan` is
@@ -53,7 +53,7 @@ class AbsoluteErrorBoundSafeguard(ElementwiseSafeguard):
         self._equal_nan = equal_nan
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def check_elementwise(
+    def check_pointwise(
         self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """

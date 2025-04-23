@@ -6,11 +6,11 @@ __all__ = ["SignPreservingSafeguard"]
 
 import numpy as np
 
-from .abc import ElementwiseSafeguard, S, T
+from .abc import PointwiseSafeguard, S, T
 from ...intervals import IntervalUnion, Interval, Lower, Upper, Minimum, Maximum
 
 
-class SignPreservingSafeguard(ElementwiseSafeguard):
+class SignPreservingSafeguard(PointwiseSafeguard):
     r"""
     The `SignPreservingSafeguard` guarantees that values have the same sign
     (-1, 0, +1) in the decompressed output as they have in the input data.
@@ -28,7 +28,7 @@ class SignPreservingSafeguard(ElementwiseSafeguard):
     def __init__(self):
         pass
 
-    def check_elementwise(
+    def check_pointwise(
         self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
