@@ -35,6 +35,7 @@ dev = ["ruff~=0.9"]
 examples = [
     "cdsapi~=0.7.5",
     "jupyterlab",
+    "numcodecs-observers~=0.1.2",
     "numcodecs-wasm~=0.1.6",
     "numcodecs-wasm-sz3~=0.6.0",
     "numcodecs-wasm-tthresh~=0.2.0",
