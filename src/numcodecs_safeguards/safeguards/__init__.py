@@ -9,6 +9,7 @@ from enum import Enum
 from .pointwise.abs import AbsoluteErrorBoundSafeguard
 from .pointwise.logical.all import AllSafeguards
 from .pointwise.logical.any import AnySafeguard
+from .pointwise.qoi import QuantityOfInterestSafeguard
 from .pointwise.ratio import RatioErrorBoundSafeguard
 from .pointwise.rel import RelativeErrorBoundSafeguard
 from .pointwise.sign import SignPreservingSafeguard
@@ -57,3 +58,5 @@ class Safeguards(Enum):
     # logical or combinator
     any = AnySafeguard
     """Enforce that any one of the inner safeguards' guarantees are met."""
+
+    qoi = QuantityOfInterestSafeguard
