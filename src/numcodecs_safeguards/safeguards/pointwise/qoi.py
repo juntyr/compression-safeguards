@@ -37,9 +37,11 @@ class QuantityOfInterestSafeguard(PointwiseSafeguard):
         qoi_expr = parse_expr(
             self._qoi, local_dict=dict(x=x), transformations=(auto_number,)
         ).simplify()
+        print(qoi_expr)
         self._qoi_lambda = lambdify(x, qoi_expr, modules="numpy", cse=True)
 
         eb_abs_qoi = _derive_eb_abs_qoi(qoi_expr, x, sp.sympify(self._eb_abs))
+        print(eb_abs_qoi)
         if eb_abs_qoi is None:
             self._eb_abs_qoi_lambda = lambda x: np.full_like(x, None)
         else:
@@ -142,6 +144,9 @@ def _derive_eb_abs_qoi(expr: Basic, x: Symbol, eb_abs: Basic) -> None | Basic:
             )
         )
         return sp.Min(*res) if len(res) > 0 else None  # type: ignore
+    # TODO: handle ax+b better
+    # TODO: should we try to decompose polynomials into linear QoIs?
+    # TODO: handle log and sqrt
     # elif expr.is_Mul and len(expr.args) == 2 and expr.args[0].is_Number and expr.args[1] == x:
     #     if expr.args[0] == 0:
     #         return None
