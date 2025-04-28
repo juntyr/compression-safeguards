@@ -127,15 +127,15 @@ def _derive_eb_abs_qoi(expr: Basic, x: Symbol, eb_abs: Basic) -> None | Basic:
     """
 
     # Q(const, tau, x) = any
-    if expr.is_Number:
+    if len(expr.free_symbols) == 0:
         return None
     # Q(x, tau, x) = tau
     if expr.is_Symbol and expr == x:
         return eb_abs
     # Q(sum(...), tau, x)
     elif expr.is_Add:
-        # optimisation: only count the non-number entries
-        num_non_const = sum(arg.is_Number for arg in expr.args)
+        # optimisation: only count the entries without x
+        num_non_const = sum(len(arg.free_symbols) > 0 for arg in expr.args)
         eb_abs = eb_abs / sp.Integer(num_non_const)
         res = list(
             filter(
@@ -146,7 +146,6 @@ def _derive_eb_abs_qoi(expr: Basic, x: Symbol, eb_abs: Basic) -> None | Basic:
         return sp.Min(*res) if len(res) > 0 else None  # type: ignore
     # TODO: handle ax+b better
     # TODO: should we try to decompose polynomials into linear QoIs?
-    # TODO: handle log and sqrt
     # elif expr.is_Mul and len(expr.args) == 2 and expr.args[0].is_Number and expr.args[1] == x:
     #     if expr.args[0] == 0:
     #         return None
@@ -185,5 +184,27 @@ def _derive_eb_abs_qoi(expr: Basic, x: Symbol, eb_abs: Basic) -> None | Basic:
             x,
             eb_abs,
         )
+    # Q(sqrt(x), tau, x) = tau^2 - 2*tau*sqrt(x)
+    elif (
+        expr.is_Pow
+        and len(expr.args) == 2
+        and expr.args[0] == x
+        and expr.args[1] == sp.Rational(1, 2)
+    ):
+        return eb_abs**2 - 2 * eb_abs * sp.sqrt(x)  # type: ignore
+    elif (
+        expr.func is sp.functions.elementary.exponential.log
+        and (len(expr.args) >= 1)
+        and (len(expr.args) <= 2)
+        and expr.args[0] == x
+        and (
+            len(expr.args) == 1
+            or (
+                expr.args[1].is_Number and expr.args[1] > 1  # type: ignore
+            )
+        )
+    ):
+        b = sp.E if len(expr.args) == 1 else expr.args[1]
+        return abs(x) * sp.Min(1 - b ** (-eb_abs), b**eb_abs - 1)  # type: ignore
     else:
-        raise TypeError(f"unsupported expression kind {expr}")
+        raise TypeError(f"unsupported expression kind {expr} ({sp.srepr(expr)})")

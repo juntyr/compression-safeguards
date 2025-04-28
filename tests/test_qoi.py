@@ -2,5 +2,5 @@ from numcodecs_safeguards.safeguards.pointwise.qoi import QuantityOfInterestSafe
 
 
 def test():
-    safeguard = QuantityOfInterestSafeguard(qoi="3*x**3 + 2*x**2 + x", eb_abs=1)
+    safeguard = QuantityOfInterestSafeguard(qoi="log(x, 2)", eb_abs=1)
     assert False, f"{safeguard}"
