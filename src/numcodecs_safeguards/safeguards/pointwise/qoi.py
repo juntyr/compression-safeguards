@@ -32,7 +32,8 @@ class QuantityOfInterestSafeguard(PointwiseSafeguard):
         self._qoi = qoi
         self._eb_abs = eb_abs
 
-        x = Symbol("x")
+        x = Symbol("x", real=True)
+        tau = Symbol("tau", real=True, positive=True)
 
         qoi_expr = parse_expr(
             self._qoi, local_dict=dict(x=x), transformations=(auto_number,)
@@ -40,13 +41,17 @@ class QuantityOfInterestSafeguard(PointwiseSafeguard):
         print(qoi_expr)
         self._qoi_lambda = lambdify(x, qoi_expr, modules="numpy", cse=True)
 
-        eb_abs_qoi = _derive_eb_abs_qoi(qoi_expr, x, sp.sympify(self._eb_abs))
+        eb_abs_qoi = _derive_eb_abs_qoi(qoi_expr, x, tau)
         print(eb_abs_qoi)
         if eb_abs_qoi is None:
             self._eb_abs_qoi_lambda = lambda x: np.full_like(x, None)
         else:
+            eb_abs_qoi_abs = sp.Min(*[abs(eb) for eb in eb_abs_qoi])  # type: ignore
             self._eb_abs_qoi_lambda = lambdify(
-                x, eb_abs_qoi.simplify(), modules="numpy", cse=True
+                x,
+                eb_abs_qoi_abs.subs(tau, self._eb_abs).simplify(),
+                modules="numpy",
+                cse=True,
             )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -117,7 +122,9 @@ class QuantityOfInterestSafeguard(PointwiseSafeguard):
         return dict(kind=type(self).kind, qoi=self._qoi, eb_abs=self._eb_abs)
 
 
-def _derive_eb_abs_qoi(expr: Basic, x: Symbol, eb_abs: Basic) -> None | Basic:
+def _derive_eb_abs_qoi(
+    expr: Basic, x: Symbol, tau: Basic
+) -> None | tuple[Basic, Basic]:
     """
     Based on:
     Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
@@ -126,85 +133,62 @@ def _derive_eb_abs_qoi(expr: Basic, x: Symbol, eb_abs: Basic) -> None | Basic:
     2022), 697–710. Available from: https://doi.org/10.14778/3574245.3574255.
     """
 
-    # Q(const, tau, x) = any
+    # constants have no error bounds
     if len(expr.free_symbols) == 0:
         return None
-    # Q(x, tau, x) = tau
-    if expr.is_Symbol and expr == x:
-        return eb_abs
-    # Q(sum(...), tau, x)
-    elif expr.is_Add:
-        # optimisation: only count the entries without x
-        num_non_const = sum(len(arg.free_symbols) > 0 for arg in expr.args)
-        eb_abs = eb_abs / sp.Integer(num_non_const)
-        res = list(
-            filter(
-                lambda x: x is not None,
-                (_derive_eb_abs_qoi(arg, x, eb_abs) for arg in expr.args),
+
+    # first try to solve symbolically
+    eb_abs_sym = _try_solve_eb_abs_qoi(expr, x, tau)
+    if eb_abs_sym is not None:
+        return eb_abs_sym
+
+    raise TypeError(f"unsupported expression kind {expr} ({sp.srepr(expr)})")
+
+
+def _try_solve_eb_abs_qoi(
+    expr: Basic, x: Symbol, tau: Basic
+) -> None | tuple[Basic, Basic]:
+    # symbol for the error bound on the raw data
+    e = sp.Symbol("e", real=True)
+
+    with sp.evaluate(False):
+        f_x = expr
+        f_xe = expr.subs(x, x + e)
+
+    # try to solve |f(x+e) - f(x)| <= tau
+    #  using squares since sympy better supports them
+    # if solving fails, return None
+    try:
+        ebs: list[Basic] = sp.solve((f_xe - f_x) ** 2 - tau**2, e)  # type: ignore
+    except NotImplementedError:
+        return None
+
+    # if there are no solutions, return None
+    if len(ebs) == 0:
+        return None
+
+    # lower eb: largest non-positive error bound, or zero
+    eb_lower_inf = sp.Max(
+        *[
+            sp.Piecewise(
+                (eb, eb <= 0),  # type: ignore
+                (-sp.oo, True),
             )
-        )
-        return sp.Min(*res) if len(res) > 0 else None  # type: ignore
-    # TODO: handle ax+b better
-    # TODO: should we try to decompose polynomials into linear QoIs?
-    # elif expr.is_Mul and len(expr.args) == 2 and expr.args[0].is_Number and expr.args[1] == x:
-    #     if expr.args[0] == 0:
-    #         return None
-    #     return eb_abs / abs(expr.args[0])
-    elif expr.is_Mul:
-        if len(expr.args) == 0:
-            return None
-        if len(expr.args) == 1:
-            return _derive_eb_abs_qoi(expr.args[0], x, eb_abs)
-        left, right = expr.args[: len(expr.args) // 2], expr.args[len(expr.args) // 2 :]
-        fp = abs(sp.Mul(*left)) + abs(sp.Mul(*right))  # type: ignore
-        eb_abs = (-fp + sp.sqrt(eb_abs * sp.Integer(4) + fp * fp)) / sp.Integer(2)
-        res = list(
-            filter(
-                lambda x: x is not None,
-                (
-                    _derive_eb_abs_qoi(sp.Mul(*args), x, eb_abs)
-                    for args in (left, right)
-                ),
+            for eb in ebs
+        ]
+    )
+    eb_lower = sp.Piecewise((eb_lower_inf, eb_lower_inf > (-sp.oo)), (0, True))
+
+    # upper eb: smallest non-negative error bound, or zero
+    eb_upper_inf = sp.Min(
+        *[
+            sp.Piecewise(
+                (eb, eb >= 0),  # type: ignore
+                (sp.oo, True),
             )
-        )
-        return sp.Min(*res) if len(res) > 0 else None  # type: ignore
-    elif (
-        expr.is_Pow
-        and len(expr.args) == 2
-        and expr.args[1].is_Integer
-        and expr.args[1] >= 0  # type: ignore
-    ):
-        if expr.args[1] == 0:
-            return None
-        return _derive_eb_abs_qoi(
-            sp.Mul(
-                *[expr.args[0]] * int(expr.args[1]),  # type: ignore
-                evaluate=False,
-            ),
-            x,
-            eb_abs,
-        )
-    # Q(sqrt(x), tau, x) = tau^2 - 2*tau*sqrt(x)
-    elif (
-        expr.is_Pow
-        and len(expr.args) == 2
-        and expr.args[0] == x
-        and expr.args[1] == sp.Rational(1, 2)
-    ):
-        return eb_abs**2 - 2 * eb_abs * sp.sqrt(x)  # type: ignore
-    elif (
-        expr.func is sp.functions.elementary.exponential.log
-        and (len(expr.args) >= 1)
-        and (len(expr.args) <= 2)
-        and expr.args[0] == x
-        and (
-            len(expr.args) == 1
-            or (
-                expr.args[1].is_Number and expr.args[1] > 1  # type: ignore
-            )
-        )
-    ):
-        b = sp.E if len(expr.args) == 1 else expr.args[1]
-        return abs(x) * sp.Min(1 - b ** (-eb_abs), b**eb_abs - 1)  # type: ignore
-    else:
-        raise TypeError(f"unsupported expression kind {expr} ({sp.srepr(expr)})")
+            for eb in ebs
+        ]
+    )
+    eb_upper = sp.Piecewise((eb_upper_inf, eb_upper_inf < sp.oo), (0, True))
+
+    return (eb_lower, eb_upper)
