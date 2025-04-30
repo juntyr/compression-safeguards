@@ -126,7 +126,7 @@ def _derive_eb_abs_qoi(
     expr: Basic, x: Symbol, tau: Basic
 ) -> None | tuple[Basic, Basic]:
     """
-    Based on:
+    Inspired by:
     Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
     Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
     Lossy Compression for Scientific Data. Proc. VLDB Endow. 16, 4 (December
@@ -181,6 +181,57 @@ def _derive_eb_abs_qoi(
         # - minimum of all (non-negative) upper bounds
         return sp.Max(*ebls), sp.Min(*ebus)
 
+    # support multiplication through recursion
+    if expr.is_Mul:
+        # extract the constant factor and reduce tau
+        factor = sp.Mul(*[arg for arg in expr.args if len(arg.free_symbols) == 0])
+        tau = tau / abs(factor)  # type: ignore
+
+        # find all non-constant terms
+        terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
+
+        if len(terms) == 1:
+            return _derive_eb_abs_qoi(terms[0], x, tau)
+
+        # recurse as if the multiplication was a binary tree
+        tleft, tright = terms[: len(terms) // 2], terms[len(terms) // 2 :]
+        fp = abs(sp.Mul(*tleft)) + abs(sp.Mul(*tright))  # type: ignore
+
+        # conservative error bound for multiplication (Jiao et al.)
+        tau = (-fp + sp.sqrt(4 * tau + fp**2)) / 2  # type: ignore
+
+        ebls, ebus = [], []
+        for tbranch in (tleft, tright):
+            # recurse into the terms with the adapted error bound
+            # we have already checked that the terms are non-const,
+            #  so the returned error bound must not be None
+            ebl, ebu = _derive_eb_abs_qoi(sp.Mul(*tbranch), x, tau)  # type: ignore
+            ebls.append(ebl)
+            ebus.append(ebu)
+
+        # combine the inner error bounds:
+        # - maximum of all (non-positive) lower bounds
+        # - minimum of all (non-negative) upper bounds
+        return sp.Max(*ebls), sp.Min(*ebus)
+
+    # support positive integer powers via multiplication
+    if (
+        expr.is_Pow
+        and len(expr.args) == 2
+        and expr.args[1].is_Integer
+        and expr.args[1] > 1  # type: ignore
+    ):
+        # split the power into the product of two terms
+        return _derive_eb_abs_qoi(
+            sp.Mul(
+                sp.Pow(expr.args[0], expr.args[1] // 2),  # type: ignore
+                sp.Pow(expr.args[0], expr.args[1] - (expr.args[1] // 2)),  # type: ignore
+                evaluate=False,
+            ),
+            x,
+            tau,
+        )
+
     raise TypeError(f"unsupported expression kind {expr} ({sp.srepr(expr)})")
 
 
@@ -206,16 +257,13 @@ def _try_solve_eb_abs_qoi(
     if len(ebs) == 0:
         return None
 
-    # bail if any solution contains imaginary numbers
-    if any(eb.has(sp.I) for eb in ebs):
-        return None
-
     # lower eb: largest non-positive error bound, or zero
-    eb_lower_inf = sp.Max(
+    # we need to handle imaginary values somehow
+    eb_lower_inf = -sp.Min(
         *[
             sp.Piecewise(
-                (eb, eb <= 0),  # type: ignore
-                (-sp.oo, True),
+                (sp.Abs(eb, evaluate=False), sp.re(eb, evaluate=False) <= 0),  # type: ignore
+                (sp.oo, True),
             )
             for eb in ebs
         ]
@@ -223,10 +271,11 @@ def _try_solve_eb_abs_qoi(
     eb_lower = sp.Piecewise((eb_lower_inf, eb_lower_inf > (-sp.oo)), (0, True))
 
     # upper eb: smallest non-negative error bound, or zero
+    # we need to handle imaginary values somehow
     eb_upper_inf = sp.Min(
         *[
             sp.Piecewise(
-                (eb, eb >= 0),  # type: ignore
+                (sp.Abs(eb, evaluate=False), sp.re(eb, evaluate=False) >= 0),  # type: ignore
                 (sp.oo, True),
             )
             for eb in ebs

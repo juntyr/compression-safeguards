@@ -30,8 +30,8 @@ def check_qoi_example(f, xv: int | float, tauv: int | float):
 
 
 def check_qoi_examples(f):
-    for x in [-10, -0.5, 0.0, 0.5, 10]:
-        for tau in [1.0, 0.1, 0.01, 0.0]:
+    for x in [-2, -0.5, 0.0, 0.5, 2]:
+        for tau in [10.0, 1.0, 0.1, 0.01, 0.0]:
             check_qoi_example(f, x, tau)
 
 
@@ -52,16 +52,16 @@ def test_weighted_sum():
 
 def test_product():
     check_qoi_examples(lambda x: x**2)
-    # TODO: add support for below
     check_qoi_examples(lambda x: x**3)
     check_qoi_examples(lambda x: x**4)
     check_qoi_examples(lambda x: x**5)
+    check_qoi_examples(lambda x: x**6)
 
 
 def test_application():
     check_qoi_examples(lambda x: 0.5 / sp.sqrt(x))
     check_qoi_examples(lambda x: 1 / x)
     check_qoi_examples(lambda x: 2 / (x**2))
-    # TODO: add support for below
     check_qoi_examples(lambda x: 3 / (x**3))
+    # TODO: add support for below
     check_qoi_examples(lambda x: 2 / (sp.ln(x) + sp.sqrt(x)))
