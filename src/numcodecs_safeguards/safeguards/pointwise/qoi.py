@@ -142,6 +142,45 @@ def _derive_eb_abs_qoi(
     if eb_abs_sym is not None:
         return eb_abs_sym
 
+    # support weighted sums through recursion
+    if expr.is_Add:
+        # find all non-constant terms
+        terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
+
+        abs_factors = []
+        for term in terms:
+            # extract the weighting factor of the term
+            # and take its absolute value
+            if term.is_Mul:
+                abs_factors.append(
+                    abs(
+                        sp.Mul(
+                            *[arg for arg in term.args if len(arg.free_symbols) == 0]
+                        )
+                    )
+                )
+            else:
+                abs_factors.append(sp.Integer(1))
+        total_abs_factor = sp.Add(*abs_factors)
+
+        ebls, ebus = [], []
+        for term, factor in zip(terms, abs_factors):
+            # recurse into the terms with a weighted error bound
+            # we have already checked that the terms are non-const,
+            #  so the returned error bound must not be None
+            ebl, ebu = _derive_eb_abs_qoi(
+                term,
+                x,
+                tau * factor / total_abs_factor,
+            )  # type: ignore
+            ebls.append(ebl)
+            ebus.append(ebu)
+
+        # combine the inner error bounds:
+        # - maximum of all (non-positive) lower bounds
+        # - minimum of all (non-negative) upper bounds
+        return sp.Max(*ebls), sp.Min(*ebus)
+
     raise TypeError(f"unsupported expression kind {expr} ({sp.srepr(expr)})")
 
 

@@ -7,7 +7,7 @@ def check_qoi_example(f, xv: int | float, tauv: int | float):
     x = sp.Symbol("x", real=True)
     tau = sp.Symbol("tau", real=True, positive=True)
 
-    print(f(x), xv, tauv)
+    print(f"f(x) = {f(x)}   for x={xv} and tau={tauv}")
 
     eb = _derive_eb_abs_qoi(f(x), x, tau)
 
@@ -44,3 +44,7 @@ def test_solve():
     check_qoi_examples(lambda x: sp.sqrt(x))
     check_qoi_examples(lambda x: 3 / x)
     check_qoi_examples(lambda x: x**2 + x)
+
+
+def test_weighted_sum():
+    check_qoi_examples(lambda x: 2 * x**2 - x + 0.5 * sp.sqrt(x))
