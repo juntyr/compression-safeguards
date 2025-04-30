@@ -48,3 +48,20 @@ def test_solve():
 
 def test_weighted_sum():
     check_qoi_examples(lambda x: 2 * x**2 - x + 0.5 * sp.sqrt(x))
+
+
+def test_product():
+    check_qoi_examples(lambda x: x**2)
+    # TODO: add support for below
+    check_qoi_examples(lambda x: x**3)
+    check_qoi_examples(lambda x: x**4)
+    check_qoi_examples(lambda x: x**5)
+
+
+def test_application():
+    check_qoi_examples(lambda x: 0.5 / sp.sqrt(x))
+    check_qoi_examples(lambda x: 1 / x)
+    check_qoi_examples(lambda x: 2 / (x**2))
+    # TODO: add support for below
+    check_qoi_examples(lambda x: 3 / (x**3))
+    check_qoi_examples(lambda x: 2 / (sp.ln(x) + sp.sqrt(x)))

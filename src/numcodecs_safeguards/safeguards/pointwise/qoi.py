@@ -206,6 +206,10 @@ def _try_solve_eb_abs_qoi(
     if len(ebs) == 0:
         return None
 
+    # bail if any solution contains imaginary numbers
+    if any(eb.has(sp.I) for eb in ebs):
+        return None
+
     # lower eb: largest non-positive error bound, or zero
     eb_lower_inf = sp.Max(
         *[
