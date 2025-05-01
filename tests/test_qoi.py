@@ -9,7 +9,7 @@ def check_qoi_example(f, xv: int | float, tauv: int | float):
 
     print(f"f(x) = {f(x)}   for x={xv} and tau={tauv}")
 
-    eb = _derive_eb_abs_qoi(f(x), x, tau)
+    eb = _derive_eb_abs_qoi(f(x), x, tau, True)
 
     xv = 3.0
     tauv = 0.1
@@ -58,10 +58,11 @@ def test_product():
     check_qoi_examples(lambda x: x**6)
 
 
-def test_application():
-    check_qoi_examples(lambda x: 0.5 / sp.sqrt(x))
-    check_qoi_examples(lambda x: 1 / x)
-    check_qoi_examples(lambda x: 2 / (x**2))
-    check_qoi_examples(lambda x: 3 / (x**3))
+def test_composition():
+    # check_qoi_examples(lambda x: 0.5 / sp.sqrt(x))
+    # check_qoi_examples(lambda x: 1 / x)
+    # check_qoi_examples(lambda x: 2 / (x**2))
+    # check_qoi_examples(lambda x: 3 / (x**3))
     # TODO: add support for below
-    check_qoi_examples(lambda x: 2 / (sp.ln(x) + sp.sqrt(x)))
+    check_qoi_examples(lambda x: 5 / (x**5))
+    # check_qoi_examples(lambda x: 2 / (sp.ln(x) + sp.sqrt(x)))

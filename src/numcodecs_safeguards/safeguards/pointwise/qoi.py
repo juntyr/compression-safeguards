@@ -41,7 +41,7 @@ class QuantityOfInterestSafeguard(PointwiseSafeguard):
         print(qoi_expr)
         self._qoi_lambda = lambdify(x, qoi_expr, modules="numpy", cse=True)
 
-        eb_abs_qoi = _derive_eb_abs_qoi(qoi_expr, x, tau)
+        eb_abs_qoi = _derive_eb_abs_qoi(qoi_expr, x, tau, True)
         print(eb_abs_qoi)
         if eb_abs_qoi is None:
             self._eb_abs_qoi_lambda = lambda x: np.full_like(x, None)
@@ -123,7 +123,10 @@ class QuantityOfInterestSafeguard(PointwiseSafeguard):
 
 
 def _derive_eb_abs_qoi(
-    expr: Basic, x: Symbol, tau: Basic
+    expr: Basic,
+    x: Symbol,
+    tau: Basic,
+    allow_composition: bool,
 ) -> None | tuple[Basic, Basic]:
     """
     Inspired by:
@@ -172,6 +175,7 @@ def _derive_eb_abs_qoi(
                 term,
                 x,
                 tau * factor / total_abs_factor,
+                True,
             )  # type: ignore
             ebls.append(ebl)
             ebus.append(ebu)
@@ -191,7 +195,7 @@ def _derive_eb_abs_qoi(
         terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
 
         if len(terms) == 1:
-            return _derive_eb_abs_qoi(terms[0], x, tau)
+            return _derive_eb_abs_qoi(terms[0], x, tau, True)
 
         # recurse as if the multiplication was a binary tree
         tleft, tright = terms[: len(terms) // 2], terms[len(terms) // 2 :]
@@ -205,7 +209,7 @@ def _derive_eb_abs_qoi(
             # recurse into the terms with the adapted error bound
             # we have already checked that the terms are non-const,
             #  so the returned error bound must not be None
-            ebl, ebu = _derive_eb_abs_qoi(sp.Mul(*tbranch), x, tau)  # type: ignore
+            ebl, ebu = _derive_eb_abs_qoi(sp.Mul(*tbranch), x, tau, True)  # type: ignore
             ebls.append(ebl)
             ebus.append(ebu)
 
@@ -219,7 +223,7 @@ def _derive_eb_abs_qoi(
         expr.is_Pow
         and len(expr.args) == 2
         and expr.args[1].is_Integer
-        and expr.args[1] > 1  # type: ignore
+        and expr.args[1] != 0  # type: ignore
     ):
         # split the power into the product of two terms
         return _derive_eb_abs_qoi(
@@ -230,14 +234,34 @@ def _derive_eb_abs_qoi(
             ),
             x,
             tau,
+            True,
         )
+
+    if allow_composition:
+        if (
+            expr.is_Pow
+            and len(expr.args) == 2
+            and (
+                len(expr.args[0].free_symbols) == 0
+                or len(expr.args[1].free_symbols) == 0
+            )
+        ):
+            expr_inner = expr.args[int(len(expr.args[0].free_symbols) == 0)]
+
+            ebs = _derive_eb_abs_qoi(expr, expr_inner, tau, False)
+
+            eb = sp.Min(*[abs(eb) for eb in ebs])
+
+            return _derive_eb_abs_qoi(expr_inner, x, eb, True)
 
     raise TypeError(f"unsupported expression kind {expr} ({sp.srepr(expr)})")
 
 
 def _try_solve_eb_abs_qoi(
-    expr: Basic, x: Symbol, tau: Basic
+    expr: Basic, x: Basic, tau: Basic
 ) -> None | tuple[Basic, Basic]:
+    print(f"Try solve {expr} with x=({x}) for tau=({tau})")
+
     # symbol for the error bound on the raw data
     e = sp.Symbol("e", real=True)
 
@@ -245,16 +269,20 @@ def _try_solve_eb_abs_qoi(
         f_x = expr
         f_xe = expr.subs(x, x + e)
 
+    print(f"  for {f_xe}")
+
     # try to solve |f(x+e) - f(x)| <= tau
     #  using squares since sympy better supports them
     # if solving fails, return None
     try:
         ebs: list[Basic] = sp.solve((f_xe - f_x) ** 2 - tau**2, e)  # type: ignore
     except NotImplementedError:
+        print("nope")
         return None
 
     # if there are no solutions, return None
     if len(ebs) == 0:
+        print("nope")
         return None
 
     # lower eb: largest non-positive error bound, or zero
