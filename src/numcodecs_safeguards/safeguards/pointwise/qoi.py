@@ -46,10 +46,9 @@ class QuantityOfInterestSafeguard(PointwiseSafeguard):
         if eb_abs_qoi is None:
             self._eb_abs_qoi_lambda = lambda x: np.full_like(x, None)
         else:
-            eb_abs_qoi_abs = sp.Min(*[abs(eb) for eb in eb_abs_qoi])  # type: ignore
             self._eb_abs_qoi_lambda = lambdify(
                 x,
-                eb_abs_qoi_abs.subs(tau, self._eb_abs).simplify(),
+                eb_abs_qoi.subs(tau, self._eb_abs).simplify(),
                 modules="numpy",
                 cse=True,
             )
@@ -127,7 +126,7 @@ def _derive_eb_abs_qoi(
     x: Symbol,
     tau: Basic,
     allow_composition: bool,
-) -> None | tuple[Basic, Basic]:
+) -> None | Basic:
     """
     Inspired by:
     Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
@@ -141,7 +140,7 @@ def _derive_eb_abs_qoi(
         return None
 
     if expr == x:
-        return (-tau, tau)
+        return tau
 
     # first try to solve symbolically
     # but only for simple expressions
@@ -151,7 +150,7 @@ def _derive_eb_abs_qoi(
             (expr.args[0] == x and len(expr.args[1].free_symbols) == 0)
             or (expr.args[1] == x and len(expr.args[0].free_symbols) == 0)
         )
-        and (not expr.is_Pow or not expr.args[1].is_Number or abs(expr.args[1]) <= 2)
+        and (not expr.is_Pow or not expr.args[1].is_Number or abs(expr.args[1]) <= 1)
     ):
         eb_abs_sym = _try_solve_eb_abs_qoi(expr, x, tau)
         if eb_abs_sym is not None:
@@ -178,24 +177,22 @@ def _derive_eb_abs_qoi(
                 abs_factors.append(sp.Integer(1))
         total_abs_factor = sp.Add(*abs_factors)
 
-        ebls, ebus = [], []
+        ebs = []
         for term, factor in zip(terms, abs_factors):
             # recurse into the terms with a weighted error bound
             # we have already checked that the terms are non-const,
             #  so the returned error bound must not be None
-            ebl, ebu = _derive_eb_abs_qoi(
-                term,
-                x,
-                tau * factor / total_abs_factor,
-                True,
+            ebs.append(
+                _derive_eb_abs_qoi(
+                    term,
+                    x,
+                    tau * factor / total_abs_factor,
+                    True,
+                )
             )
-            ebls.append(ebl)
-            ebus.append(ebu)
 
-        # combine the inner error bounds:
-        # - maximum of all (non-positive) lower bounds
-        # - minimum of all (non-negative) upper bounds
-        return sp.Max(*ebls), sp.Min(*ebus)
+        # combine the inner error bounds
+        return sp.Min(*ebs)
 
     # support multiplication through recursion
     if expr.is_Mul:
@@ -216,19 +213,15 @@ def _derive_eb_abs_qoi(
         # conservative error bound for multiplication (Jiao et al.)
         tau = abs((-fp + sp.sqrt(4 * tau + fp**2)) / 2)  # type: ignore
 
-        ebls, ebus = [], []
+        ebs = []
         for tbranch in (tleft, tright):
             # recurse into the terms with the adapted error bound
             # we have already checked that the terms are non-const,
             #  so the returned error bound must not be None
-            ebl, ebu = _derive_eb_abs_qoi(sp.Mul(*tbranch), x, tau, True)
-            ebls.append(ebl)
-            ebus.append(ebu)
+            ebs.append(_derive_eb_abs_qoi(sp.Mul(*tbranch), x, tau, True))
 
-        # combine the inner error bounds:
-        # - maximum of all (non-positive) lower bounds
-        # - minimum of all (non-negative) upper bounds
-        return sp.Max(*ebls), sp.Min(*ebus)
+        # combine the inner error bounds
+        return sp.Min(*ebs)
 
     # support positive integer powers via multiplication
     if (
@@ -260,9 +253,7 @@ def _derive_eb_abs_qoi(
         ):
             expr_inner = expr.args[int(len(expr.args[0].free_symbols) == 0)]
 
-            ebs = _derive_eb_abs_qoi(expr, expr_inner, tau, False)
-
-            eb = sp.Min(*[abs(eb) for eb in ebs])
+            eb = _derive_eb_abs_qoi(expr, expr_inner, tau, False)
 
             return _derive_eb_abs_qoi(expr_inner, x, eb, True)
 
@@ -276,7 +267,7 @@ def _try_solve_eb_abs_qoi(
     expr: Basic,
     x: Basic,
     tau: Basic,
-) -> None | tuple[Basic, Basic]:
+) -> None | Basic:
     global _SOLVE_CACHE
 
     # symbol for tau without including tau's complexity in the solve
@@ -286,45 +277,16 @@ def _try_solve_eb_abs_qoi(
         ebs = _SOLVE_CACHE[expr]
     else:
         ebs = _try_solve_eb_abs_qoi_inner(expr, x, t)
-        print(f"{expr}  =>  {ebs}")
+        # print("\n".join(f" = {eb} [{eb.is_real}]" for eb in ebs))
         _SOLVE_CACHE[expr] = ebs
 
     # if there are no solutions, return None
     if ebs is None or len(ebs) == 0:
         return None
 
-    ebs = [eb.subs(t, sp.UnevaluatedExpr(tau)).simplify() for eb in ebs]
+    ebs = [eb.subs(t, sp.Abs(tau)).simplify() for eb in ebs]
 
-    # eb = sp.Min(*[abs(eb) for eb in ebs])
-    # return -eb, eb
-
-    # lower eb: largest non-positive error bound, or zero
-    # we need to handle imaginary values somehow
-    eb_lower_inf = -sp.Min(
-        *[
-            sp.Piecewise(
-                (sp.Abs(eb, evaluate=False), sp.re(eb, evaluate=False) <= 0),  # type: ignore
-                (sp.oo, True),
-            )
-            for eb in ebs
-        ]
-    )
-    eb_lower = sp.Piecewise((eb_lower_inf, eb_lower_inf > (-sp.oo)), (0, True))
-
-    # upper eb: smallest non-negative error bound, or zero
-    # we need to handle imaginary values somehow
-    eb_upper_inf = sp.Min(
-        *[
-            sp.Piecewise(
-                (sp.Abs(eb, evaluate=False), sp.re(eb, evaluate=False) >= 0),  # type: ignore
-                (sp.oo, True),
-            )
-            for eb in ebs
-        ]
-    )
-    eb_upper = sp.Piecewise((eb_upper_inf, eb_upper_inf < sp.oo), (0, True))
-
-    return (eb_lower, eb_upper)
+    return sp.Min(*[abs(eb) for eb in ebs])
 
 
 def _try_solve_eb_abs_qoi_inner(
@@ -344,17 +306,14 @@ def _try_solve_eb_abs_qoi_inner(
     # try to solve |f(x+e) - f(x)| <= tau
     #  using squares since sympy better supports them
     # if solving fails, return None
-    #
-    #
-    # TODO: look into https://docs.sympy.org/latest/modules/solvers/solveset.html
     try:
         ebs: list[Basic] = sp.solve((f_xe - f_x) ** 2 - t**2, e)  # type: ignore
     except NotImplementedError:
         print("nope")
         return None
 
-    print(ebs)
-    print(sp.solveset((f_xe - f_x) ** 2 - t**2, e, sp.S.Reals))
+    # print(ebs)
+    # print(sp.solveset((f_xe - f_x) ** 2 - t**2, e, sp.S.Reals))
 
     if len(ebs) == 0:
         print("nope")
