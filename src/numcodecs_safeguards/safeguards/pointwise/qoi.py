@@ -41,17 +41,14 @@ class QuantityOfInterestSafeguard(PointwiseSafeguard):
         print(qoi_expr)
         self._qoi_lambda = lambdify(x, qoi_expr, modules="numpy", cse=True)
 
-        eb_abs_qoi = _derive_eb_abs_qoi(qoi_expr, x, tau, True)
+        eb_abs_qoi = _derive_eb_abs_qoi(qoi_expr, x, tau, True).simplify()
         print(eb_abs_qoi)
-        if eb_abs_qoi is None:
-            self._eb_abs_qoi_lambda = lambda x: np.full_like(x, None)
-        else:
-            self._eb_abs_qoi_lambda = lambdify(
-                x,
-                eb_abs_qoi.subs(tau, self._eb_abs).simplify(),
-                modules="numpy",
-                cse=True,
-            )
+        self._eb_abs_qoi_lambda = lambdify(
+            [x, tau],
+            eb_abs_qoi,
+            modules="numpy",
+            cse=True,
+        )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
@@ -126,7 +123,7 @@ def _derive_eb_abs_qoi(
     x: Symbol,
     tau: Basic,
     allow_composition: bool,
-) -> None | Basic:
+) -> Basic:
     """
     Inspired by:
     Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
@@ -135,26 +132,40 @@ def _derive_eb_abs_qoi(
     2022), 697–710. Available from: https://doi.org/10.14778/3574245.3574255.
     """
 
-    # constants have no error bounds
-    if len(expr.free_symbols) == 0:
-        return None
+    assert len(expr.free_symbols) > 0, "constants have no error bounds"
 
     if expr == x:
         return tau
 
-    # first try to solve symbolically
-    # but only for simple expressions
-    if (len(expr.args) == 1 and expr.args[0] == x) or (
-        len(expr.args) == 2
-        and (
-            (expr.args[0] == x and len(expr.args[1].free_symbols) == 0)
-            or (expr.args[1] == x and len(expr.args[0].free_symbols) == 0)
-        )
-        and (not expr.is_Pow or not expr.args[1].is_Number or abs(expr.args[1]) <= 1)
+    # support sqrt(x) using Jiao et al.
+    # modified s.t. we never have sqrt(-...)
+    if expr.is_Pow and expr.args == (x, sp.Rational(1, 2)):
+        return sp.Min(abs(tau**2 - 2 * tau * sp.sqrt(x)), abs(x))
+
+    # support ln(x) using Jiao et al.
+    if expr.func is sp.functions.elementary.exponential.log and expr.args == (x,):
+        return abs(x) * sp.Min(1 - sp.exp(-tau), sp.exp(tau) - 1)
+
+    # support exp(x), derived using sympy
+    if expr.func is sp.functions.elementary.exponential.exp and expr.args == (x,):
+        return sp.log(tau * sp.exp(-x) + 1)
+
+    # support (const)**(x), derived using sympy
+    if (
+        expr.is_Pow
+        and len(expr.args) == 2
+        and len(expr.args[0].free_symbols) == 0
+        and expr.args[1] == x
     ):
-        eb_abs_sym = _try_solve_eb_abs_qoi(expr, x, tau)
-        if eb_abs_sym is not None:
-            return eb_abs_sym
+        b = expr.args[0]
+        return -x + sp.log(b**x + tau, b)
+
+    # support 1/x, derived using sympy
+    if expr.is_Pow and expr.args == (x, sp.Integer(-1)):
+        return sp.Min(
+            abs(-tau * x**2 / (tau * x - 1)),
+            abs(-tau * x**2 / (tau * x + 1)),
+        )
 
     # support weighted sums through recursion
     if expr.is_Add:
@@ -223,7 +234,7 @@ def _derive_eb_abs_qoi(
         # combine the inner error bounds
         return sp.Min(*ebs)
 
-    # support positive integer powers via multiplication
+    # support integer powers via multiplication
     if (
         expr.is_Pow
         and len(expr.args) == 2
@@ -244,6 +255,20 @@ def _derive_eb_abs_qoi(
 
     if allow_composition:
         if (
+            expr.func
+            in (
+                sp.functions.elementary.exponential.exp,
+                sp.functions.elementary.exponential.log,
+            )
+            and len(expr.args) == 1
+        ):
+            expr_inner = expr.args[0]
+
+            eb = _derive_eb_abs_qoi(expr, expr_inner, tau, False)
+
+            return _derive_eb_abs_qoi(expr_inner, x, eb, True)
+
+        if (
             expr.is_Pow
             and len(expr.args) == 2
             and (
@@ -258,64 +283,3 @@ def _derive_eb_abs_qoi(
             return _derive_eb_abs_qoi(expr_inner, x, eb, True)
 
     raise TypeError(f"unsupported expression kind {expr} ({sp.srepr(expr)})")
-
-
-_SOLVE_CACHE: dict[Basic, None | list[Basic]] = dict()
-
-
-def _try_solve_eb_abs_qoi(
-    expr: Basic,
-    x: Basic,
-    tau: Basic,
-) -> None | Basic:
-    global _SOLVE_CACHE
-
-    # symbol for tau without including tau's complexity in the solve
-    t = sp.Symbol("t", real=True, positive=True)
-
-    if expr in _SOLVE_CACHE:
-        ebs = _SOLVE_CACHE[expr]
-    else:
-        ebs = _try_solve_eb_abs_qoi_inner(expr, x, t)
-        # print("\n".join(f" = {eb} [{eb.is_real}]" for eb in ebs))
-        _SOLVE_CACHE[expr] = ebs
-
-    # if there are no solutions, return None
-    if ebs is None or len(ebs) == 0:
-        return None
-
-    ebs = [eb.subs(t, sp.Abs(tau)).simplify() for eb in ebs]
-
-    return sp.Min(*[abs(eb) for eb in ebs])
-
-
-def _try_solve_eb_abs_qoi_inner(
-    expr: Basic,
-    x: Basic,
-    t: Symbol,
-) -> None | list[Basic]:
-    # symbol for the error bound on the raw data
-    e = sp.Symbol("e", real=True)
-
-    with sp.evaluate(False):
-        f_x = expr
-        f_xe = expr.subs(x, x + e)
-
-    print(f"Try solve {f_x} with x=({x}) for {f_xe}")
-
-    # try to solve |f(x+e) - f(x)| <= tau
-    #  using squares since sympy better supports them
-    # if solving fails, return None
-    try:
-        ebs: list[Basic] = sp.solve((f_xe - f_x) ** 2 - t**2, e)  # type: ignore
-    except NotImplementedError:
-        print("nope")
-        return None
-
-    # print(ebs)
-    # print(sp.solveset((f_xe - f_x) ** 2 - t**2, e, sp.S.Reals))
-
-    if len(ebs) == 0:
-        print("nope")
-
-    return ebs

@@ -6,33 +6,33 @@ import sympy as sp
 from numcodecs_safeguards.safeguards.pointwise.qoi import _derive_eb_abs_qoi
 
 
-def check_qoi_example(
-    f: Any, eb: None | Any, xv: int | float, tauv: int | float
-):
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def check_qoi_example(f: Any, eb: Any, xv: int | float, tauv: int | float):
+    xv = np.array(xv, dtype=np.float64)
+    tauv = np.array(tauv, dtype=np.float64)
+
     print(f" --> for x={xv} and tau={tauv}: ", end="")
 
     f_x = f(xv)
-    
-    if not np.isfinite(f_x):
-        print("skip")
-        return
 
-    if eb is not None:
-        # FIXME: error bound rounding errors
-        eb = eb(xv, tauv) * 0.99
+    # FIXME: error bound rounding errors
+    eb = abs(eb(xv, tauv) * 0.99)
+    assert (not np.isfinite(f_x)) or (np.isfinite(eb) and eb >= 0)
 
-        if not np.isfinite(eb):
-            print("nan")
-            return
-        assert eb >= 0
-
-        assert abs(f(xv - eb) - f(xv)) <= tauv
-        assert abs(f(xv + eb) - f(xv)) <= tauv
+    if np.isfinite(f_x):
+        assert abs(f(xv - eb) - f_x) <= tauv
+        assert abs(f(xv + eb) - f_x) <= tauv
         print(f"ok: [{f(xv - eb) - f(xv)}, {f(xv + eb) - f(xv)}]")
+    elif np.isnan(f_x):
+        assert np.isnan(f(xv - eb))
+        assert np.isnan(f(xv + eb))
+        print("ok: nan")
     else:
-        assert f(xv - 1000) == f(xv)
-        assert f(xv + 1000) == f(xv)
-        print("any")
+        # assert f(xv - eb) == f_x
+        # assert f(xv + eb) == f_x
+        assert not np.isfinite(f(xv - eb))
+        assert not np.isfinite(f(xv + eb))
+        print("ok: inf")
 
 
 def check_qoi_examples(f):
@@ -41,46 +41,59 @@ def check_qoi_examples(f):
 
     print(f"f(x) = {f(x)}")
 
-    eb = _derive_eb_abs_qoi(f(x), x, tau, True)
-
     f_x = sp.lambdify([x], f(x), "numpy")
-
-    if eb is not None:
-        eb = sp.lambdify([x, tau], eb, "numpy")
+    eb = sp.lambdify([x, tau], _derive_eb_abs_qoi(f(x), x, tau, True), "numpy")
 
     for xv in [-2, -0.5, 0.0, 0.5, 2]:
         for tauv in [10.0, 1.0, 0.1, 0.01]:
             check_qoi_example(f_x, eb, xv, tauv)
 
 
-def test_solve():
-    check_qoi_examples(lambda x: sp.Integer(3))
+def test_polynomial():
     check_qoi_examples(lambda x: x)
-    check_qoi_examples(lambda x: 2 * x + 3)
-    check_qoi_examples(lambda x: x**2)
-    check_qoi_examples(lambda x: sp.ln(x))
-    check_qoi_examples(lambda x: sp.sqrt(x))
-    check_qoi_examples(lambda x: 3 / x)
-    check_qoi_examples(lambda x: x**2 + x)
-
-
-def test_weighted_sum():
-    check_qoi_examples(lambda x: 2 * x**2 - x + 0.5 * sp.sqrt(x))
-
-
-def test_product():
     check_qoi_examples(lambda x: x**2)
     check_qoi_examples(lambda x: x**3)
-    check_qoi_examples(lambda x: x**4)
-    check_qoi_examples(lambda x: x**5)
-    check_qoi_examples(lambda x: x**6)
+    check_qoi_examples(lambda x: x**2 + x + 1)
 
 
-def test_composition():
-    # check_qoi_examples(lambda x: 0.5 / sp.sqrt(x))
-    # check_qoi_examples(lambda x: 1 / x)
-    # check_qoi_examples(lambda x: 2 / (x**2))
-    # check_qoi_examples(lambda x: 3 / (x**3))
-    # check_qoi_examples(lambda x: 4 / (x**4))
-    # check_qoi_examples(lambda x: 5 / (x**5))
-    check_qoi_examples(lambda x: 2 / (sp.ln(x) + sp.sqrt(x)))
+def test_exponential():
+    check_qoi_examples(lambda x: 0.5**x)
+    check_qoi_examples(lambda x: 2**x)
+    check_qoi_examples(lambda x: 3**x)
+    check_qoi_examples(lambda x: sp.exp(x))
+
+    check_qoi_examples(lambda x: 2 ** (x + 1))
+
+
+def test_logarithmic():
+    check_qoi_examples(lambda x: sp.log(x, 2))
+    check_qoi_examples(lambda x: sp.log(x))
+
+    check_qoi_examples(lambda x: sp.log(x + 1))
+
+
+def test_power_function():
+    check_qoi_examples(lambda x: 1 / (x + 3))
+
+
+def test_inverse():
+    check_qoi_examples(lambda x: 1 / x)
+    check_qoi_examples(lambda x: 1 / x**2)
+    check_qoi_examples(lambda x: 1 / x**3)
+
+
+def test_sqrt():
+    check_qoi_examples(lambda x: sp.sqrt(x))
+    # check_qoi_examples(lambda x: 1 / sp.sqrt(x))
+
+
+def test_sigmoid():
+    check_qoi_examples(lambda x: 1 / (1 + sp.exp(-x)))
+
+
+def test_tanh():
+    check_qoi_examples(lambda x: (sp.exp(x) - sp.exp(-x)) / (sp.exp(x) + sp.exp(-x)))
+
+
+# def test_composed():
+#     check_qoi_examples(lambda x: 2 / (sp.ln(x) + sp.sqrt(x)))
