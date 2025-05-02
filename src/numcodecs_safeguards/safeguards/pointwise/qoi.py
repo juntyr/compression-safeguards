@@ -140,10 +140,22 @@ def _derive_eb_abs_qoi(
     if len(expr.free_symbols) == 0:
         return None
 
+    if expr == x:
+        return (-tau, tau)
+
     # first try to solve symbolically
-    eb_abs_sym = _try_solve_eb_abs_qoi(expr, x, tau)
-    if eb_abs_sym is not None:
-        return eb_abs_sym
+    # but only for simple expressions
+    if (len(expr.args) == 1 and expr.args[0] == x) or (
+        len(expr.args) == 2
+        and (
+            (expr.args[0] == x and len(expr.args[1].free_symbols) == 0)
+            or (expr.args[1] == x and len(expr.args[0].free_symbols) == 0)
+        )
+        and (not expr.is_Pow or not expr.args[1].is_Number or abs(expr.args[1]) <= 2)
+    ):
+        eb_abs_sym = _try_solve_eb_abs_qoi(expr, x, tau)
+        if eb_abs_sym is not None:
+            return eb_abs_sym
 
     # support weighted sums through recursion
     if expr.is_Add:
@@ -176,7 +188,7 @@ def _derive_eb_abs_qoi(
                 x,
                 tau * factor / total_abs_factor,
                 True,
-            )  # type: ignore
+            )
             ebls.append(ebl)
             ebus.append(ebu)
 
@@ -202,14 +214,14 @@ def _derive_eb_abs_qoi(
         fp = abs(sp.Mul(*tleft)) + abs(sp.Mul(*tright))  # type: ignore
 
         # conservative error bound for multiplication (Jiao et al.)
-        tau = (-fp + sp.sqrt(4 * tau + fp**2)) / 2  # type: ignore
+        tau = abs((-fp + sp.sqrt(4 * tau + fp**2)) / 2)  # type: ignore
 
         ebls, ebus = [], []
         for tbranch in (tleft, tright):
             # recurse into the terms with the adapted error bound
             # we have already checked that the terms are non-const,
             #  so the returned error bound must not be None
-            ebl, ebu = _derive_eb_abs_qoi(sp.Mul(*tbranch), x, tau, True)  # type: ignore
+            ebl, ebu = _derive_eb_abs_qoi(sp.Mul(*tbranch), x, tau, True)
             ebls.append(ebl)
             ebus.append(ebu)
 
@@ -223,7 +235,7 @@ def _derive_eb_abs_qoi(
         expr.is_Pow
         and len(expr.args) == 2
         and expr.args[1].is_Integer
-        and expr.args[1] != 0  # type: ignore
+        and abs(expr.args[1]) > 1  # type: ignore
     ):
         # split the power into the product of two terms
         return _derive_eb_abs_qoi(
@@ -257,33 +269,34 @@ def _derive_eb_abs_qoi(
     raise TypeError(f"unsupported expression kind {expr} ({sp.srepr(expr)})")
 
 
+_SOLVE_CACHE: dict[Basic, None | list[Basic]] = dict()
+
+
 def _try_solve_eb_abs_qoi(
-    expr: Basic, x: Basic, tau: Basic
+    expr: Basic,
+    x: Basic,
+    tau: Basic,
 ) -> None | tuple[Basic, Basic]:
-    print(f"Try solve {expr} with x=({x}) for tau=({tau})")
+    global _SOLVE_CACHE
 
-    # symbol for the error bound on the raw data
-    e = sp.Symbol("e", real=True)
+    # symbol for tau without including tau's complexity in the solve
+    t = sp.Symbol("t", real=True, positive=True)
 
-    with sp.evaluate(False):
-        f_x = expr
-        f_xe = expr.subs(x, x + e)
-
-    print(f"  for {f_xe}")
-
-    # try to solve |f(x+e) - f(x)| <= tau
-    #  using squares since sympy better supports them
-    # if solving fails, return None
-    try:
-        ebs: list[Basic] = sp.solve((f_xe - f_x) ** 2 - tau**2, e)  # type: ignore
-    except NotImplementedError:
-        print("nope")
-        return None
+    if expr in _SOLVE_CACHE:
+        ebs = _SOLVE_CACHE[expr]
+    else:
+        ebs = _try_solve_eb_abs_qoi_inner(expr, x, t)
+        print(f"{expr}  =>  {ebs}")
+        _SOLVE_CACHE[expr] = ebs
 
     # if there are no solutions, return None
-    if len(ebs) == 0:
-        print("nope")
+    if ebs is None or len(ebs) == 0:
         return None
+
+    ebs = [eb.subs(t, sp.UnevaluatedExpr(tau)).simplify() for eb in ebs]
+
+    # eb = sp.Min(*[abs(eb) for eb in ebs])
+    # return -eb, eb
 
     # lower eb: largest non-positive error bound, or zero
     # we need to handle imaginary values somehow
@@ -312,3 +325,38 @@ def _try_solve_eb_abs_qoi(
     eb_upper = sp.Piecewise((eb_upper_inf, eb_upper_inf < sp.oo), (0, True))
 
     return (eb_lower, eb_upper)
+
+
+def _try_solve_eb_abs_qoi_inner(
+    expr: Basic,
+    x: Basic,
+    t: Symbol,
+) -> None | list[Basic]:
+    # symbol for the error bound on the raw data
+    e = sp.Symbol("e", real=True)
+
+    with sp.evaluate(False):
+        f_x = expr
+        f_xe = expr.subs(x, x + e)
+
+    print(f"Try solve {f_x} with x=({x}) for {f_xe}")
+
+    # try to solve |f(x+e) - f(x)| <= tau
+    #  using squares since sympy better supports them
+    # if solving fails, return None
+    #
+    #
+    # TODO: look into https://docs.sympy.org/latest/modules/solvers/solveset.html
+    try:
+        ebs: list[Basic] = sp.solve((f_xe - f_x) ** 2 - t**2, e)  # type: ignore
+    except NotImplementedError:
+        print("nope")
+        return None
+
+    print(ebs)
+    print(sp.solveset((f_xe - f_x) ** 2 - t**2, e, sp.S.Reals))
+
+    if len(ebs) == 0:
+        print("nope")
+
+    return ebs
