@@ -16,7 +16,7 @@ dependencies = [
     "varint~=1.0",
     "typing-extensions~=4.6",
     "dahuffman~=0.4.0",
-    "sympy~=1.13.0",
+    "sympy~=1.14.0",
 ]
 
 [dependency-groups]

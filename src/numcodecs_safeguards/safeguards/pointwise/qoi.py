@@ -234,12 +234,12 @@ def _derive_eb_abs_qoi(
         # combine the inner error bounds
         return sp.Min(*ebs)
 
-    # support integer powers via multiplication
+    # support positive integer powers via multiplication
     if (
         expr.is_Pow
         and len(expr.args) == 2
         and expr.args[1].is_Integer
-        and abs(expr.args[1]) > 1  # type: ignore
+        and expr.args[1] > 1  # type: ignore
     ):
         # split the power into the product of two terms
         return _derive_eb_abs_qoi(
@@ -248,6 +248,22 @@ def _derive_eb_abs_qoi(
                 sp.Pow(expr.args[0], expr.args[1] - (expr.args[1] // 2)),  # type: ignore
                 evaluate=False,
             ),
+            x,
+            tau,
+            True,
+        )
+    
+    # support negative powers via inverse
+    if (
+        expr.is_Pow
+        and len(expr.args) == 2
+        and expr.args[1].is_Number
+        and expr.args[1] < 0  # type: ignore
+        and expr.args[1] != -1
+    ):
+        # split the power into its inverse
+        return _derive_eb_abs_qoi(
+            sp.Pow(sp.Pow(expr.args[0], -expr.args[1]), -1, evaluate=False),
             x,
             tau,
             True,

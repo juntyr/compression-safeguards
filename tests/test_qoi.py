@@ -84,7 +84,7 @@ def test_inverse():
 
 def test_sqrt():
     check_qoi_examples(lambda x: sp.sqrt(x))
-    # check_qoi_examples(lambda x: 1 / sp.sqrt(x))
+    check_qoi_examples(lambda x: 1 / sp.sqrt(x))
 
 
 def test_sigmoid():
