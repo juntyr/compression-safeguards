@@ -6,9 +6,6 @@ __all__ = ["QuantityOfInterestSafeguard"]
 
 import numpy as np
 import sympy as sp
-from sympy import Symbol, Basic
-from sympy.parsing.sympy_parser import parse_expr, auto_number
-from sympy.utilities.lambdify import lambdify
 
 from .abc import PointwiseSafeguard, S, T
 from .abs import _compute_safe_eb_abs_interval
@@ -32,18 +29,20 @@ class QuantityOfInterestSafeguard(PointwiseSafeguard):
         self._qoi = qoi
         self._eb_abs = eb_abs
 
-        x = Symbol("x", real=True)
-        tau = Symbol("tau", real=True, positive=True)
+        x = sp.Symbol("x", real=True)
+        tau = sp.Symbol("tau", real=True, positive=True)
 
-        qoi_expr = parse_expr(
-            self._qoi, local_dict=dict(x=x), transformations=(auto_number,)
+        qoi_expr = sp.parse_expr(
+            self._qoi,
+            local_dict=dict(x=x),
+            transformations=(sp.parsing.sympy_parser.auto_number,),
         ).simplify()
         print(qoi_expr)
-        self._qoi_lambda = lambdify(x, qoi_expr, modules="numpy", cse=True)
+        self._qoi_lambda = sp.lambdify(x, qoi_expr, modules="numpy", cse=True)
 
         eb_abs_qoi = _derive_eb_abs_qoi(qoi_expr, x, tau, True).simplify()
         print(eb_abs_qoi)
-        self._eb_abs_qoi_lambda = lambdify(
+        self._eb_abs_qoi_lambda = sp.lambdify(
             [x, tau],
             eb_abs_qoi,
             modules="numpy",
@@ -88,9 +87,13 @@ class QuantityOfInterestSafeguard(PointwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_abs_qoi = (self._eb_abs_qoi_lambda)(data_float)
+            eb_abs: np.ndarray = to_finite_float(self._eb_abs, data_float.dtype)
+        assert eb_abs >= 0.0
 
-        # TODO: handle None error bounds
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            eb_abs_qoi = (self._eb_abs_qoi_lambda)(data_float, eb_abs)
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
@@ -119,11 +122,11 @@ class QuantityOfInterestSafeguard(PointwiseSafeguard):
 
 
 def _derive_eb_abs_qoi(
-    expr: Basic,
-    x: Symbol,
-    tau: Basic,
+    expr: sp.Basic,
+    x: sp.Basic,
+    tau: sp.Basic,
     allow_composition: bool,
-) -> Basic:
+) -> sp.Basic:
     """
     Inspired by:
     Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
@@ -140,15 +143,17 @@ def _derive_eb_abs_qoi(
     # support sqrt(x) using Jiao et al.
     # modified s.t. we never have sqrt(-...)
     if expr.is_Pow and expr.args == (x, sp.Rational(1, 2)):
-        return sp.Min(abs(tau**2 - 2 * tau * sp.sqrt(x)), abs(x))
+        return sp.Min(
+            sp.Abs(tau ** sp.Integer(2) - sp.Integer(2) * tau * sp.sqrt(x)), sp.Abs(x)
+        )
 
     # support ln(x) using Jiao et al.
     if expr.func is sp.functions.elementary.exponential.log and expr.args == (x,):
-        return abs(x) * sp.Min(1 - sp.exp(-tau), sp.exp(tau) - 1)
+        return sp.Abs(x) * sp.Min(1 - sp.exp(tau * sp.Integer(-1)), sp.exp(tau) - 1)
 
     # support exp(x), derived using sympy
     if expr.func is sp.functions.elementary.exponential.exp and expr.args == (x,):
-        return sp.log(tau * sp.exp(-x) + 1)
+        return sp.log(tau * sp.exp(x * sp.Integer(-1)) + 1)
 
     # support (const)**(x), derived using sympy
     if (
@@ -158,13 +163,13 @@ def _derive_eb_abs_qoi(
         and expr.args[1] == x
     ):
         b = expr.args[0]
-        return -x + sp.log(b**x + tau, b)
+        return sp.Abs(x * sp.Integer(-1) + sp.log(sp.Pow(b, x) + tau, b))
 
     # support 1/x, derived using sympy
     if expr.is_Pow and expr.args == (x, sp.Integer(-1)):
         return sp.Min(
-            abs(-tau * x**2 / (tau * x - 1)),
-            abs(-tau * x**2 / (tau * x + 1)),
+            sp.Abs(tau * sp.Pow(x, 2) / (tau * x - 1)),  # type: ignore
+            sp.Abs(tau * sp.Pow(x, 2) / (tau * x + 1)),  # type: ignore
         )
 
     # support weighted sums through recursion
@@ -178,9 +183,9 @@ def _derive_eb_abs_qoi(
             # and take its absolute value
             if term.is_Mul:
                 abs_factors.append(
-                    abs(
+                    sp.Abs(
                         sp.Mul(
-                            *[arg for arg in term.args if len(arg.free_symbols) == 0]
+                            *[arg for arg in term.args if len(arg.free_symbols) == 0]  # type: ignore
                         )
                     )
                 )
@@ -208,8 +213,8 @@ def _derive_eb_abs_qoi(
     # support multiplication through recursion
     if expr.is_Mul:
         # extract the constant factor and reduce tau
-        factor = sp.Mul(*[arg for arg in expr.args if len(arg.free_symbols) == 0])
-        tau = tau / abs(factor)  # type: ignore
+        factor = sp.Mul(*[arg for arg in expr.args if len(arg.free_symbols) == 0])  # type: ignore
+        tau = tau / sp.Abs(factor)
 
         # find all non-constant terms
         terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
@@ -219,17 +224,17 @@ def _derive_eb_abs_qoi(
 
         # recurse as if the multiplication was a binary tree
         tleft, tright = terms[: len(terms) // 2], terms[len(terms) // 2 :]
-        fp = abs(sp.Mul(*tleft)) + abs(sp.Mul(*tright))  # type: ignore
+        fp = sp.Abs(sp.Mul(*tleft)) + sp.Abs(sp.Mul(*tright))  # type: ignore
 
         # conservative error bound for multiplication (Jiao et al.)
-        tau = abs((-fp + sp.sqrt(4 * tau + fp**2)) / 2)  # type: ignore
+        tau = sp.Abs((-fp + sp.sqrt(sp.Integer(4) * tau + fp**2)) / 2)
 
         ebs = []
         for tbranch in (tleft, tright):
             # recurse into the terms with the adapted error bound
             # we have already checked that the terms are non-const,
             #  so the returned error bound must not be None
-            ebs.append(_derive_eb_abs_qoi(sp.Mul(*tbranch), x, tau, True))
+            ebs.append(_derive_eb_abs_qoi(sp.Mul(*tbranch), x, tau, True))  # type: ignore
 
         # combine the inner error bounds
         return sp.Min(*ebs)
@@ -239,31 +244,33 @@ def _derive_eb_abs_qoi(
         expr.is_Pow
         and len(expr.args) == 2
         and expr.args[1].is_Integer
-        and expr.args[1] > 1  # type: ignore
+        and expr.args[1] > sp.Integer(1)
     ):
         # split the power into the product of two terms
         return _derive_eb_abs_qoi(
             sp.Mul(
-                sp.Pow(expr.args[0], expr.args[1] // 2),  # type: ignore
-                sp.Pow(expr.args[0], expr.args[1] - (expr.args[1] // 2)),  # type: ignore
+                sp.Pow(expr.args[0], expr.args[1] // sp.Integer(2)),
+                sp.Pow(expr.args[0], expr.args[1] - (expr.args[1] // sp.Integer(2))),
                 evaluate=False,
             ),
             x,
             tau,
             True,
         )
-    
+
     # support negative powers via inverse
     if (
         expr.is_Pow
         and len(expr.args) == 2
         and expr.args[1].is_Number
-        and expr.args[1] < 0  # type: ignore
+        and expr.args[1] < sp.Integer(0)
         and expr.args[1] != -1
     ):
         # split the power into its inverse
         return _derive_eb_abs_qoi(
-            sp.Pow(sp.Pow(expr.args[0], -expr.args[1]), -1, evaluate=False),
+            sp.Pow(
+                sp.Pow(expr.args[0], expr.args[1] * sp.Integer(-1)), -1, evaluate=False
+            ),
             x,
             tau,
             True,
