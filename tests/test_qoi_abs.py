@@ -3,7 +3,7 @@ from typing import Any
 import numpy as np
 import sympy as sp
 
-from numcodecs_safeguards.safeguards.pointwise.qoi import _derive_eb_abs_qoi
+from numcodecs_safeguards.safeguards.pointwise.qoi.abs import _derive_eb_abs_qoi
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
