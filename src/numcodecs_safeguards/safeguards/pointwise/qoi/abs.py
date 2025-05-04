@@ -46,6 +46,14 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
     decoded value is also NaN, but does not guarantee that it has the same
     bitpattern.
 
+    The implementation of the absolute error bound on pointwise quantities of
+    interest is based on:
+
+    > Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
+    Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
+    Lossy Compression for Scientific Data. Proc. VLDB Endow. 16, 4 (December
+    2022), 697-710. Available from: <https://doi.org/10.14778/3574245.3574255>.
+
     Parameters
     ----------
     qoi : str
@@ -203,10 +211,11 @@ def _derive_eb_abs_qoi(
 ) -> sp.Basic:
     """
     Inspired by:
+
     Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
     Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
     Lossy Compression for Scientific Data. Proc. VLDB Endow. 16, 4 (December
-    2022), 697–710. Available from: https://doi.org/10.14778/3574245.3574255.
+    2022), 697-710. Available from: https://doi.org/10.14778/3574245.3574255.
     """
 
     assert len(expr.free_symbols) > 0, "constants have no error bounds"
