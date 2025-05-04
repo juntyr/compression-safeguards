@@ -36,7 +36,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
       - either the base or the exponent must be constant
       - if the exponent is constant, it must be an integer (or 1/2 for `sqrt`)
     - exponential `exp(...)`
-    - natural logarithm `log(...)`
+    - natural logarithm `ln(...)`
       - optionally a different base can be provided second in `log(..., ...)`
 
     If the derived quantity of interest for an element evaluates to an infinite
@@ -176,7 +176,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
             eb_abs_qoi = (self._eb_abs_qoi_lambda)(data_float, eb_abs)
-        eb_abs_qoi = np.nan_to_num(eb_abs_qoi, nan=0.0, posinf=None, neginf=None)
+        eb_abs_qoi = np.nan_to_num(eb_abs_qoi, nan=0.0, posinf=0.0, neginf=None)
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"

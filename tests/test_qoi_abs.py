@@ -29,23 +29,24 @@ def check_all_codecs(data: np.ndarray):
             # "2 ** (x + 1)",
             # logarithm
             "log(x, 2)",
-            "log(x)",
-            "log(x + 1)",
-            # # power function
-            # "1 / (x + 3)",
+            "ln(x)",
+            "ln(x + 1)",
+            "log(2, x)",
+            # power function
+            "1 / (x + 3)",
             # # inverse
-            # "1 / x",
-            # "1 / x**2",
-            # "1 / x**3",
-            # # sqrt
-            # "sqrt(x)",
-            # "1 / sqrt(x)",
+            "1 / x",
+            "1 / x**2",
+            "1 / x**3",
+            # sqrt
+            "sqrt(x)",
+            "1 / sqrt(x)",
             # # sigmoid
             # "1 / (1 + exp(-x))",
-            # tanh
+            # # tanh
             # "(exp(x) - exp(-x)) / (exp(x) + exp(-x))",
             # composed
-            # "2 / (ln(x) + sqrt(x))",
+            "2 / (ln(x) + sqrt(x))",
         ]:
             for eb_abs in [10.0, 1.0, 0.1, 0.01]:
                 encode_decode(
