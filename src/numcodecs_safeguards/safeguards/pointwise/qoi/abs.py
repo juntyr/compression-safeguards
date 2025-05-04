@@ -1,19 +1,61 @@
 """
-Quantity of interest (QOI) safeguard.
+Quantity of interest (QOI) absolute error bound safeguard.
 """
 
-__all__ = ["QuantityOfInterestSafeguard"]
+__all__ = ["QuantityOfInterestAbsoluteErrorBoundSafeguard"]
+
+from typing import Callable
 
 import numpy as np
 import sympy as sp
 
-from .abc import PointwiseSafeguard, S, T
-from .abs import _compute_safe_eb_abs_interval
-from ...cast import as_bits, to_float, to_finite_float
-from ...intervals import IntervalUnion
+from ..abc import PointwiseSafeguard, S, T
+from ..abs import _compute_safe_eb_abs_interval
+from ....cast import as_bits, to_float, to_finite_float
+from ....intervals import IntervalUnion
 
 
-class QuantityOfInterestSafeguard(PointwiseSafeguard):
+class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
+    """
+    The `QuantityOfInterestAbsoluteErrorBoundSafeguard` guarantees that the
+    pointwise absolute error for a derived quantity of interest (QOI) is less
+    than or equal to the provided bound `eb_abs`.
+
+    The quantity of interest is specified as a non-constant expression, in
+    string form, on the pointwise value `x`. For example, to bound the error on
+    the square of `x`, set `qoi="x**2"`. The following operations are
+    supported, where `...` denotes any expression:
+
+    - integer and floating point constants
+    - pointwise value `x`
+    - addition `(...) + (...)`
+    - multiplication `(...) * (...)`
+    - division `(...) / (...)`
+    - square root `sqrt(...)`
+    - exponentiation `(...) ** (...)`
+      - either the base or the exponent must be constant
+      - if the exponent is constant, it must be an integer (or 1/2 for `sqrt`)
+    - exponential `exp(...)`
+    - natural logarithm `log(...)`
+      - optionally a different base can be provided second in `log(..., ...)`
+
+    If the derived quantity of interest for an element evaluates to an infinite
+    value, this safeguard guarantees that the quantity of interest on the
+    decoded value produces the exact same infinite value. For a NaN quantity of
+    interest, this safeguard guarantees that the quantity of interest on the
+    decoded value is also NaN, but does not guarantee that it has the same
+    bitpattern.
+
+    Parameters
+    ----------
+    qoi : str
+        The non-constant expression for computing the derived quantity of
+        interest for a pointwise value `x`.
+    eb_abs : int | float
+        The non-negative absolute error bound on the quantity of interest that
+        is enforced by this safeguard.
+    """
+
     __slots__ = (
         "_qoi",
         "_eb_abs",
@@ -22,8 +64,10 @@ class QuantityOfInterestSafeguard(PointwiseSafeguard):
     )
     _qoi: str
     _eb_abs: int | float
+    _qoi_lambda: Callable[[np.ndarray], np.ndarray]
+    _eb_abs_qoi_lambda: Callable[[np.ndarray, np.ndarray], np.ndarray]
 
-    kind = "qoi"
+    kind = "qoi_abs"
 
     def __init__(self, qoi: str, eb_abs: int | float):
         self._qoi = qoi
@@ -37,11 +81,9 @@ class QuantityOfInterestSafeguard(PointwiseSafeguard):
             local_dict=dict(x=x),
             transformations=(sp.parsing.sympy_parser.auto_number,),
         ).simplify()
-        print(qoi_expr)
         self._qoi_lambda = sp.lambdify(x, qoi_expr, modules="numpy", cse=True)
 
         eb_abs_qoi = _derive_eb_abs_qoi(qoi_expr, x, tau, True).simplify()
-        print(eb_abs_qoi)
         self._eb_abs_qoi_lambda = sp.lambdify(
             [x, tau],
             eb_abs_qoi,
@@ -53,6 +95,23 @@ class QuantityOfInterestSafeguard(PointwiseSafeguard):
     def check_pointwise(
         self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Check which elements in the `decoded` array satisfy the absolute error
+        bound for the quantity of interest on the `data`.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data to be encoded.
+        decoded : np.ndarray
+            Decoded data.
+
+        Returns
+        -------
+        ok : np.ndarray
+            Per-element, `True` if the check succeeded for this element.
+        """
+
         qoi_data = (self._qoi_lambda)(to_float(data))
         qoi_decoded = (self._qoi_lambda)(to_float(decoded))
 
@@ -82,6 +141,21 @@ class QuantityOfInterestSafeguard(PointwiseSafeguard):
     def compute_safe_intervals(
         self, data: np.ndarray[S, T]
     ) -> IntervalUnion[T, int, int]:
+        """
+        Compute the intervals in which the absolute error bound is upheld with
+        respect to the quantity of interest on the `data`.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data for which the safe intervals should be computed.
+
+        Returns
+        -------
+        intervals : IntervalUnion
+            Union of intervals in which the absolute error bound is upheld.
+        """
+
         data_float: np.ndarray = to_float(data)
 
         with np.errstate(
@@ -144,7 +218,7 @@ def _derive_eb_abs_qoi(
     # modified s.t. we never have sqrt(-...)
     if expr.is_Pow and expr.args == (x, sp.Rational(1, 2)):
         return sp.Min(
-            sp.Abs(tau ** sp.Integer(2) - sp.Integer(2) * tau * sp.sqrt(x)), sp.Abs(x)
+            sp.Abs(sp.Pow(tau, 2) - sp.Integer(2) * tau * sp.sqrt(x)), sp.Abs(x)
         )
 
     # support ln(x) using Jiao et al.
@@ -227,7 +301,7 @@ def _derive_eb_abs_qoi(
         fp = sp.Abs(sp.Mul(*tleft)) + sp.Abs(sp.Mul(*tright))  # type: ignore
 
         # conservative error bound for multiplication (Jiao et al.)
-        tau = sp.Abs((-fp + sp.sqrt(sp.Integer(4) * tau + fp**2)) / 2)
+        tau = sp.Abs((-fp + sp.sqrt(sp.Integer(4) * tau + sp.Pow(fp, 2))) / 2)
 
         ebs = []
         for tbranch in (tleft, tright):

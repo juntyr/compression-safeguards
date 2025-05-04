@@ -9,7 +9,7 @@ from enum import Enum
 from .pointwise.abs import AbsoluteErrorBoundSafeguard
 from .pointwise.logical.all import AllSafeguards
 from .pointwise.logical.any import AnySafeguard
-from .pointwise.qoi import QuantityOfInterestSafeguard
+from .pointwise.qoi.abs import QuantityOfInterestAbsoluteErrorBoundSafeguard
 from .pointwise.ratio import RatioErrorBoundSafeguard
 from .pointwise.rel import RelativeErrorBoundSafeguard
 from .pointwise.sign import SignPreservingSafeguard
@@ -39,6 +39,10 @@ class Safeguards(Enum):
     ratio = RatioErrorBoundSafeguard
     """Enforce a ratio (decimal) error bound."""
 
+    # quantity of interest error bounds
+    qoi_abs = QuantityOfInterestAbsoluteErrorBoundSafeguard
+    """Enforce an absolute error bound on a pointwise derived quantity of interest."""
+
     # finite difference error bounds
     findiff_abs = FiniteDifferenceAbsoluteErrorBoundSafeguard
     """Enforce an absolute error bound for the finite differences."""
@@ -58,5 +62,3 @@ class Safeguards(Enum):
     # logical or combinator
     any = AnySafeguard
     """Enforce that any one of the inner safeguards' guarantees are met."""
-
-    qoi = QuantityOfInterestSafeguard
