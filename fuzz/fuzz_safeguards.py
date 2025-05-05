@@ -18,6 +18,7 @@ with atheris.instrument_imports():
     )
     from numcodecs_safeguards.safeguards.abc import Safeguard
     from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
+    from numcodecs_safeguards.safeguards.pointwise.qoi import Expr
 
 
 warnings.filterwarnings("error")
@@ -72,6 +73,45 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
         ty = tys[data.ConsumeIntInRange(0, len(tys) - 1)]
 
         return generate_parameter(data, ty, depth)
+
+    if ty is Expr:
+        ATOMS = ["x", int, float]
+        OPS = ["+", "-", "*", "/", "**"]
+
+        atoms = []
+        for _ in range(data.ConsumeIntInRange(2, 4)):
+            atom = ATOMS[data.ConsumeIntInRange(0, len(ATOMS) - 1)]
+            if atom is int:
+                atom = str(data.ConsumeInt(2))
+            elif atom is float:
+                atom = str(data.ConsumeRegularFloat())
+            atoms.append(atom)
+
+        its = 0
+        while len(atoms) > 1:
+            atom1 = atoms.pop(data.ConsumeIntInRange(0, len(atoms) - 1))
+            its += 1
+            p = data.ConsumeProbability() if its <= 2 else 1.0
+            if p < 0.1:
+                atoms.append(f"sqrt({atom1})")
+            elif p < 0.2:
+                atoms.append(f"log({atom1})")
+            elif p < 0.3:
+                atoms.append(f"(-{atom1})")
+            else:
+                its = 0
+                atom2 = atoms.pop(data.ConsumeIntInRange(0, len(atoms) - 1))
+                op = OPS[data.ConsumeIntInRange(0, len(OPS) - 1)]
+                atoms.append(f"({atom1}{op}{atom2})")
+        [atom] = atoms
+        p = data.ConsumeProbability()
+        if p < 0.1:
+            atom = f"sqrt({atom})"
+        elif p < 0.2:
+            atom = f"log({atom})"
+        elif p < 0.3:
+            atom = f"(-{atom})"
+        return atom
 
     assert False, f"unknown parameter type {ty!r}"
 

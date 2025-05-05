@@ -9,6 +9,7 @@ from typing import Callable
 import numpy as np
 import sympy as sp
 
+from . import Expr
 from ..abc import PointwiseSafeguard, S, T
 from ..abs import _compute_safe_eb_abs_interval
 from ....cast import as_bits, to_float, to_finite_float
@@ -23,7 +24,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
 
     The quantity of interest is specified as a non-constant expression, in
     string form, on the pointwise value `x`. For example, to bound the error on
-    the square of `x`, set `qoi="x**2"`. The following operations are
+    the square of `x`, set `qoi=Expr("x**2")`. The following operations are
     supported, where `...` denotes any expression:
 
     - integer and floating point constants
@@ -56,7 +57,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
 
     Parameters
     ----------
-    qoi : str
+    qoi : Expr
         The non-constant expression for computing the derived quantity of
         interest for a pointwise value `x`.
     eb_abs : int | float
@@ -70,14 +71,14 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         "_qoi_lambda",
         "_eb_abs_qoi_lambda",
     )
-    _qoi: str
+    _qoi: Expr
     _eb_abs: int | float
     _qoi_lambda: Callable[[np.ndarray], np.ndarray]
     _eb_abs_qoi_lambda: Callable[[np.ndarray, np.ndarray], np.ndarray]
 
     kind = "qoi_abs"
 
-    def __init__(self, qoi: str, eb_abs: int | float):
+    def __init__(self, qoi: Expr, eb_abs: int | float):
         assert eb_abs >= 0, "eb_abs must be non-negative"
         assert isinstance(eb_abs, int) or np.isfinite(eb_abs), "eb_abs must be finite"
 
@@ -414,4 +415,4 @@ def _derive_eb_abs_qoi(
 
             return _derive_eb_abs_qoi(expr_inner, x, eb, True)
 
-    raise TypeError(f"unsupported expression kind {expr} ({sp.srepr(expr)})")
+    assert False, f"unsupported expression kind {expr} (= {sp.srepr(expr)} =)"
