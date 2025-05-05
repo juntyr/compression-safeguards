@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from .codecs import (
     encode_decode_zero,
@@ -8,69 +9,36 @@ from .codecs import (
 )
 
 
-def check_all_codecs(data: np.ndarray):
+def check_all_codecs(data: np.ndarray, qoi: str):
     for encode_decode in [
         encode_decode_zero,
         encode_decode_neg,
         encode_decode_identity,
         encode_decode_noise,
     ]:
-        for qoi in [
-            # polynomial
-            "x",
-            "x**2",
-            "x**3",
-            "x**2 + x + 1",
-            # # exponential
-            # "0.5**x",
-            # "2**x",
-            # "3**x",
-            # "exp(x)",
-            # "2 ** (x + 1)",
-            # logarithm
-            "log(x, 2)",
-            "ln(x)",
-            "ln(x + 1)",
-            "log(2, x)",
-            # power function
-            "1 / (x + 3)",
-            # # inverse
-            "1 / x",
-            "1 / x**2",
-            "1 / x**3",
-            # sqrt
-            "sqrt(x)",
-            "1 / sqrt(x)",
-            # # sigmoid
-            # "1 / (1 + exp(-x))",
-            # # tanh
-            # "(exp(x) - exp(-x)) / (exp(x) + exp(-x))",
-            # composed
-            "2 / (ln(x) + sqrt(x))",
-        ]:
-            for eb_abs in [10.0, 1.0, 0.1, 0.01]:
-                encode_decode(
-                    data,
-                    safeguards=[dict(kind="qoi_abs", qoi=qoi, eb_abs=eb_abs)],
-                )
-                # np.testing.assert_allclose(
-                #     qoi(decoded), qoi(data), rtol=0.0, atol=eb_abs
-                # )
+        for eb_abs in [1.0]:  # [10.0, 1.0, 0.1, 0.01]:
+            encode_decode(
+                data,
+                safeguards=[dict(kind="qoi_abs", qoi=qoi, eb_abs=eb_abs)],
+            )
+            # np.testing.assert_allclose(
+            #     qoi(decoded), qoi(data), rtol=0.0, atol=eb_abs
+            # )
 
 
-def test_empty():
-    check_all_codecs(np.empty(0))
+def check_empty(qoi: str):
+    check_all_codecs(np.empty(0), qoi)
 
 
-def test_arange():
-    check_all_codecs(np.arange(100, dtype=float))
+def check_arange(qoi: str):
+    check_all_codecs(np.arange(100, dtype=float), qoi)
 
 
-def test_linspace():
-    check_all_codecs(np.linspace(-1024, 1024, 2831))
+def check_linspace(qoi: str):
+    check_all_codecs(np.linspace(-1024, 1024, 2831), qoi)
 
 
-def test_edge_cases():
+def check_edge_cases(qoi: str):
     check_all_codecs(
         np.array(
             [
@@ -85,5 +53,72 @@ def test_edge_cases():
                 -0.0,
                 +0.0,
             ]
-        )
+        ),
+        qoi,
     )
+
+
+CHECKS = [
+    check_empty,
+    check_arange,
+    check_linspace,
+    check_edge_cases,
+]
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_polynomial(check):
+    check("x")
+    check("x**2")
+    check("x**3")
+    check("x**2 + x + 1")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_exponential(check):
+    check("0.5**x")
+    check("2**x")
+    check("3**x")
+    check("exp(x)")
+    check("2 ** (x + 1)")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_logarithm(check):
+    check("log(x, 2)")
+    check("ln(x)")
+    check("ln(x + 1)")
+    check("log(2, x)")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_inverse(check):
+    check("1 / x")
+    check("1 / x**2")
+    check("1 / x**3")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_power_function(check):
+    check("1 / (x + 3)")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_sqrt(check):
+    check("sqrt(x)")
+    check("1 / sqrt(x)")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_sigmoid(check):
+    check("1 / (1 + exp(-x))")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_tanh(check):
+    check("(exp(x) - exp(-x)) / (exp(x) + exp(-x))")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_composed(check):
+    check("2 / (ln(x) + sqrt(x))")

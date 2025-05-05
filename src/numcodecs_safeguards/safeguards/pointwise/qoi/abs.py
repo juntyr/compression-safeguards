@@ -87,11 +87,25 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         qoi_expr = sp.parse_expr(
             self._qoi,
             local_dict=dict(x=x),
+            global_dict=dict(
+                # literals
+                Integer=sp.Integer,
+                Float=sp.Float,
+                Rational=sp.Rational,
+                # constants
+                pi=sp.pi,
+                e=sp.E,
+                # operators
+                sqrt=sp.sqrt,
+                exp=sp.exp,
+                ln=sp.ln,
+                log=sp.log,
+            ),
             transformations=(sp.parsing.sympy_parser.auto_number,),
-        ).simplify()
+        )
         self._qoi_lambda = sp.lambdify(x, qoi_expr, modules="numpy", cse=True)
 
-        eb_abs_qoi = _derive_eb_abs_qoi(qoi_expr, x, tau, True).simplify()
+        eb_abs_qoi = _derive_eb_abs_qoi(qoi_expr, x, tau, True)
         self._eb_abs_qoi_lambda = sp.lambdify(
             [x, tau],
             eb_abs_qoi,
@@ -171,6 +185,14 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         ):
             eb_abs: np.ndarray = to_finite_float(self._eb_abs, data_float.dtype)
         assert eb_abs >= 0.0
+
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            data_qoi = (self._qoi_lambda)(data_float)
+            eb_abs_lower = data_qoi - (data_qoi - eb_abs)
+            eb_abs_upper = (data_qoi + eb_abs) - data_qoi
+            eb_abs = np.minimum(eb_abs_lower, eb_abs_upper)
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
