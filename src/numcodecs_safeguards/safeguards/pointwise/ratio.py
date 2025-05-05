@@ -240,4 +240,8 @@ def _compute_safe_eb_ratio_interval(
         dataf.dtype,
     )[np.isfinite(dataf)]
 
+    # a ratio of 1 bound must preserve exactly, e.g. even for -0.0
+    if np.any(eb_ratio == 1):
+        Lower(dataf) <= valid[np.isfinite(dataf) & (eb_ratio == 1)] <= Upper(dataf)
+
     return valid

@@ -178,4 +178,8 @@ def _compute_safe_eb_abs_interval(
         dataf.dtype,
     )[np.isfinite(dataf)]
 
+    # a zero-error bound must preserve exactly, e.g. even for -0.0
+    if np.any(eb_abs == 0):
+        Lower(dataf) <= valid[np.isfinite(dataf) & (eb_abs == 0)] <= Upper(dataf)
+
     return valid

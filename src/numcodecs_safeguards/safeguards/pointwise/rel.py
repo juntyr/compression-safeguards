@@ -210,4 +210,8 @@ def _compute_safe_eb_rel_interval(
     # special case zero to handle +0.0 and -0.0
     Lower(dataf) <= valid[dataf == 0] <= Upper(dataf)
 
+    # a zero-error bound must preserve exactly, e.g. even for -0.0
+    if np.any(eb_rel_as_abs == 0):
+        Lower(dataf) <= valid[np.isfinite(dataf) & (eb_rel_as_abs == 0)] <= Upper(dataf)
+
     return valid

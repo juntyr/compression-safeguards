@@ -78,6 +78,9 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
     kind = "qoi_abs"
 
     def __init__(self, qoi: str, eb_abs: int | float):
+        assert eb_abs >= 0, "eb_abs must be non-negative"
+        assert isinstance(eb_abs, int) or np.isfinite(eb_abs), "eb_abs must be finite"
+
         self._qoi = qoi
         self._eb_abs = eb_abs
 
@@ -205,9 +208,6 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         ):
             eb_abs_qoi_float: np.ndarray = to_finite_float(eb_abs_qoi, data_float.dtype)
         assert np.all(eb_abs_qoi_float >= 0.0)
-
-        # FIXME: qoi error bound rounding problems
-        eb_abs_qoi_float *= 0.99
 
         return _compute_safe_eb_abs_interval(
             data.flatten(),

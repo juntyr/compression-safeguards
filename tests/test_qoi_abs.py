@@ -16,14 +16,11 @@ def check_all_codecs(data: np.ndarray, qoi: str):
         encode_decode_identity,
         encode_decode_noise,
     ]:
-        for eb_abs in [1.0]:  # [10.0, 1.0, 0.1, 0.01]:
+        for eb_abs in [10.0, 1.0, 0.1, 0.01, 0.0]:
             encode_decode(
                 data,
                 safeguards=[dict(kind="qoi_abs", qoi=qoi, eb_abs=eb_abs)],
             )
-            # np.testing.assert_allclose(
-            #     qoi(decoded), qoi(data), rtol=0.0, atol=eb_abs
-            # )
 
 
 def check_empty(qoi: str):
