@@ -124,36 +124,44 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
 
         x = sp.Symbol("x", real=True)
 
-        qoi_expr = sp.parse_expr(
-            self._qoi,
-            local_dict=dict(x=x),
-            global_dict=dict(
-                # literals
-                Integer=sp.Integer,
-                Float=sp.Float,
-                Rational=sp.Rational,
-                # constants
-                pi=sp.pi,
-                e=sp.E,
-                # operators
-                sqrt=sp.sqrt,
-                exp=sp.exp,
-                ln=sp.ln,
-                log=sp.log,
-            ),
-            transformations=(sp.parsing.sympy_parser.auto_number,),
-        )
-        self._qoi_lambda = sp.lambdify(x, qoi_expr, modules="numpy", cse=True)
+        try:
+            qoi_expr = sp.parse_expr(
+                self._qoi,
+                local_dict=dict(x=x),
+                global_dict=dict(
+                    # literals
+                    Integer=sp.Integer,
+                    Float=sp.Float,
+                    Rational=sp.Rational,
+                    # constants
+                    pi=sp.pi,
+                    e=sp.E,
+                    # operators
+                    sqrt=sp.sqrt,
+                    exp=sp.exp,
+                    ln=sp.ln,
+                    log=sp.log,
+                ),
+                transformations=(sp.parsing.sympy_parser.auto_number,),
+            )
+            self._qoi_lambda = sp.lambdify(x, qoi_expr, modules="numpy", cse=True)
+        except Exception as err:
+            raise AssertionError(f"failed to parse qoi expression {qoi!r}") from err
 
         tau = sp.Symbol("tau", real=True, nonnegative=True)
 
-        eb_abs_qoi = _derive_eb_abs_qoi(qoi_expr, x, tau)
-        self._eb_abs_qoi_lambda = sp.lambdify(
-            [x, tau],
-            eb_abs_qoi,
-            modules="numpy",
-            cse=True,
-        )
+        try:
+            eb_abs_qoi = _derive_eb_abs_qoi(qoi_expr, x, tau)
+            self._eb_abs_qoi_lambda = sp.lambdify(
+                [x, tau],
+                eb_abs_qoi,
+                modules="numpy",
+                cse=True,
+            )
+        except Exception as err:
+            raise AssertionError(
+                f"failed to derive error bound for qoi expression {qoi!r}"
+            ) from err
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
@@ -410,4 +418,4 @@ def _derive_eb_abs_qoi(
         # combine the inner error bounds
         return sp.Min(*ebs)
 
-    assert False, f"unsupported expression kind {expr} (= {sp.srepr(expr)} =)"
+    raise ValueError(f"unsupported expression kind {expr} (= {sp.srepr(expr)} =)")
