@@ -263,7 +263,7 @@ def _derive_eb_abs_qoi(
 
     # support exp(x), derived using sympy
     if expr.func is sp.functions.elementary.exponential.exp and expr.args == (x,):
-        return sp.log(tau * sp.exp(x * sp.Integer(-1)) + 1)
+        return sp.Abs(sp.log(tau * sp.exp(x * sp.Integer(-1)) + 1))
 
     # support (const)**(x), derived using sympy
     if (
@@ -273,7 +273,7 @@ def _derive_eb_abs_qoi(
         and expr.args[1] == x
     ):
         b = expr.args[0]
-        return sp.Abs(x * sp.Integer(-1) + sp.log(sp.Pow(b, x) + tau, b))
+        return sp.Abs(sp.log(tau * sp.Pow(b, x * sp.Integer(-1)) + 1, b))
 
     # support 1/x, derived using sympy
     if expr.is_Pow and expr.args == (x, sp.Integer(-1)):
