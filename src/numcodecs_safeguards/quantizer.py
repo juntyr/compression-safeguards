@@ -172,7 +172,7 @@ class SafeguardsQuantizer:
                 f"{safeguard!r} interval does not contain the correction {correction!r}"
             )
             assert safeguard.check(data, correction), (
-                f"{safeguard!r} check fails after correction {correction!r}"
+                f"{safeguard!r} check fails after correction {correction!r} on data {data!r}"
             )
 
         prediction_bits = as_bits(prediction)

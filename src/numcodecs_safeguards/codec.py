@@ -228,7 +228,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             correction = b""
 
         if self._codec is None:
-            assert encoded == b"", "can only decode empy message without a codec"
+            assert encoded == b"", "can only decode empty message without a codec"
             decoded = np.zeros_like(out)
         else:
             if self._lossless_for_codec is not None:

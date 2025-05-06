@@ -1,6 +1,12 @@
 import atheris
 
 with atheris.instrument_imports():
+    import numcodecs
+    import numpy as np
+
+import sympy as sympy
+
+with atheris.instrument_imports():
     import sys
     import types
     import typing
@@ -18,6 +24,7 @@ with atheris.instrument_imports():
     )
     from numcodecs_safeguards.safeguards.abc import Safeguard
     from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
+    from numcodecs_safeguards.safeguards.pointwise.qoi import Expr
 
 
 warnings.filterwarnings("error")
@@ -72,6 +79,40 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
         ty = tys[data.ConsumeIntInRange(0, len(tys) - 1)]
 
         return generate_parameter(data, ty, depth)
+
+    if ty is Expr:
+        ATOMS = ["x", int, float, "e", "pi"]
+        OPS = ["neg", "+", "-", "*", "/", "**", "log", "sqrt", "ln", "exp"]
+
+        atoms = []
+        for _ in range(data.ConsumeIntInRange(2, 4)):
+            atom = ATOMS[data.ConsumeIntInRange(0, len(ATOMS) - 1)]
+            if atom is int:
+                atom = str(data.ConsumeInt(2))
+            elif atom is float:
+                atom = str(data.ConsumeRegularFloat())
+            atoms.append(atom)
+
+        done = False
+        while not done:
+            done = len(atoms) == 1
+            atom1 = atoms.pop(data.ConsumeIntInRange(0, len(atoms) - 1))
+            atom2 = (
+                atoms.pop(data.ConsumeIntInRange(0, len(atoms) - 1))
+                if len(atoms) > 0
+                else "1"
+            )
+            op = OPS[data.ConsumeIntInRange(0, len(OPS) - 1)]
+            if op == "neg":
+                atoms.append(f"(-{atom1})")
+            elif op in ("sqrt", "ln", "exp"):
+                atoms.append(f"{op}({atom1})")
+            elif op == "log":
+                atoms.append(f"log({atom1},{atom2})")
+            else:
+                atoms.append(f"({atom1}{op}{atom2})")
+        [atom] = atoms
+        return atom
 
     assert False, f"unknown parameter type {ty!r}"
 

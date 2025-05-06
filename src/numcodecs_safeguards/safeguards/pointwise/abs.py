@@ -26,7 +26,7 @@ class AbsoluteErrorBoundSafeguard(PointwiseSafeguard):
 
     Infinite values are preserved with the same bit pattern. If `equal_nan` is
     set to [`True`][True], decoding a NaN value to a NaN value with a different
-    bitpattern also satisfies the error bound. If `equal_nan` is set to
+    bit pattern also satisfies the error bound. If `equal_nan` is set to
     [`False`][False], NaN values are also preserved with the same bit pattern.
 
     Parameters
@@ -177,5 +177,9 @@ def _compute_safe_eb_abs_interval(
         to_total_order(valid._upper) - upper_bound_outside_eb_abs,
         dataf.dtype,
     )[np.isfinite(dataf)]
+
+    # a zero-error bound must preserve exactly, e.g. even for -0.0
+    if np.any(eb_abs == 0):
+        Lower(dataf) <= valid[np.isfinite(dataf) & (eb_abs == 0)] <= Upper(dataf)
 
     return valid

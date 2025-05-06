@@ -100,7 +100,7 @@ def to_finite_float(
     else:
         minv, maxv = np.finfo(dtype).min, np.finfo(dtype).max
 
-    return np.maximum(minv, np.minimum(xf, maxv))
+    return np.maximum(minv, np.minimum(xf, maxv))  # type: ignore
 
 
 def from_float(x: np.ndarray[S, F], dtype: T) -> np.ndarray[S, T]:
@@ -122,7 +122,7 @@ def from_float(x: np.ndarray[S, F], dtype: T) -> np.ndarray[S, T]:
     Returns
     -------
     converted : np.ndarray[S, T]
-        The re-coverted array with the original `dtype`.
+        The re-converted array with the original `dtype`.
     """
 
     if x.dtype == dtype:

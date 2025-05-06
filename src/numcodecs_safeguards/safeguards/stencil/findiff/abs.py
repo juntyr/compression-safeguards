@@ -40,7 +40,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
     this safeguard guarantees that the finite difference on the decoded value
     produces the exact same infinite value. For a NaN finite difference, this
     safeguard guarantees that the finite difference on the decoded value is
-    also NaN, but does not guarantee that it has the same bitpattern.
+    also NaN, but does not guarantee that it has the same bit pattern.
 
     Parameters
     ----------

@@ -41,7 +41,7 @@ class RatioErrorBoundSafeguard(PointwiseSafeguard):
 
     Infinite values are preserved with the same bit pattern. If `equal_nan` is
     set to [`True`][True], decoding a NaN value to a NaN value with a different
-    bitpattern also satisfies the error bound. If `equal_nan` is set to
+    bit pattern also satisfies the error bound. If `equal_nan` is set to
     [`False`][False], NaN values are also preserved with the same bit pattern.
 
     [^1]: Gustafson, J. L., & Yonemoto, I. T. (2017). Beating Floating Point at
@@ -239,5 +239,9 @@ def _compute_safe_eb_ratio_interval(
         to_total_order(valid._upper) - upper_bound_outside_eb_ratio,
         dataf.dtype,
     )[np.isfinite(dataf)]
+
+    # a ratio of 1 bound must preserve exactly, e.g. even for -0.0
+    if np.any(eb_ratio == 1):
+        Lower(dataf) <= valid[np.isfinite(dataf) & (eb_ratio == 1)] <= Upper(dataf)
 
     return valid

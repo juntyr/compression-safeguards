@@ -37,27 +37,33 @@ If applied to
 
 This package currently implements the following [safeguards][numcodecs_safeguards.Safeguards]:
 
-### Error Bounds (per element)
+### Error Bounds (pointwise)
 
 - [`abs`][numcodecs_safeguards.safeguards.pointwise.abs.AbsoluteErrorBoundSafeguard] (absolute error bound):
 
-    The pointwise absolute error is guaranteed to be less than or equal to the provided bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
+    The pointwise absolute error is guaranteed to be less than or equal to the provided bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bit pattern also satisfies the error bound.
 
 - [`rel`][numcodecs_safeguards.safeguards.pointwise.rel.RelativeErrorBoundSafeguard] (relative error bound):
 
-    The pointwise relative error is guaranteed to be less than or equal to the provided bound. Zero values are preserved with the same bit pattern. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
+    The pointwise relative error is guaranteed to be less than or equal to the provided bound. Zero values are preserved with the same bit pattern. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bit pattern also satisfies the error bound.
 
 - [`ratio`][numcodecs_safeguards.safeguards.pointwise.ratio.RatioErrorBoundSafeguard] (ratio [decimal] error bound):
 
-    It is guaranteed that the ratios between the original and the decoded values and their inverse ratios are less than or equal to the provided bound. The ratio error is defined to be infinite if the signs of the data and decoded data do not match. Since the provided error bound must be finite, this safeguard also guarantees that the sign of each decoded value matches the sign of each original value and that a decoded value is zero if and only if it is zero in the original data. The ratio error bound is sometimes also known as a decimal error bound if the ratio is expressed as the difference in orders of magnitude. This safeguard can also be used to guarantee a relative-like error bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bitpattern also satisfies the error bound.
+    It is guaranteed that the ratios between the original and the decoded values and their inverse ratios are less than or equal to the provided bound. The ratio error is defined to be infinite if the signs of the data and decoded data do not match. Since the provided error bound must be finite, this safeguard also guarantees that the sign of each decoded value matches the sign of each original value and that a decoded value is zero if and only if it is zero in the original data. The ratio error bound is sometimes also known as a decimal error bound if the ratio is expressed as the difference in orders of magnitude. This safeguard can also be used to guarantee a relative-like error bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bit pattern also satisfies the error bound.
 
-### Error Bounds on Finite Differences (~per element)
+### Error Bounds on Finite Differences (~pointwise)
 
 - [`findiff_abs`][numcodecs_safeguards.safeguards.stencil.findiff.abs.FiniteDifferenceAbsoluteErrorBoundSafeguard] (absolute error bound on finite differences):
 
-    The pointwise absolute error of the finite-difference-approximated derivative is guaranteed to be less than or equal to the provided bound. The safeguard supports three types of [`FiniteDifference`][numcodecs_safeguards.safeguards.stencil.findiff.FiniteDifference]: `central`, `forward`, `backward`. The fininite difference is computed with respect to the provided uniform grid spacing. If the spacing is different along different axes, multiple safeguards along specific axes with different spacing can be combined. If the finite difference for an element evaluates to an infinite value, this safeguard guarantees that the finite difference on the decoded value produces the exact same infinite value. For a NaN finite difference, this safeguard guarantees that the finite difference on the decoded value is also NaN, but does not guarantee that it has the same bitpattern.
+    The pointwise absolute error of the finite-difference-approximated derivative is guaranteed to be less than or equal to the provided bound. The safeguard supports three types of [`FiniteDifference`][numcodecs_safeguards.safeguards.stencil.findiff.FiniteDifference]: `central`, `forward`, `backward`. The fininite difference is computed with respect to the provided uniform grid spacing. If the spacing is different along different axes, multiple safeguards along specific axes with different spacing can be combined. Infinite finite differences are preserved with the same bit pattern. NaN finite differences remain NaN though not necessarily with the same bit pattern.
 
-### Per-element properties
+### Error Bounds on derived Quantities of Interest (pointwise QOIs)
+
+- [`qoi_abs`][numcodecs_safeguards.safeguards.pointwise.qoi.abs.QuantityOfInterestAbsoluteErrorBoundSafeguard] (absolute error bound on quantities of interest):
+
+    The pointwise absolute error on a derived quantity of interest (QOI) is guaranteed to be less than or equal to the provided bound. The non-constant quantity of interest expression can contain the addition, multiplication, division, square root, exponentiation and logarithm operations over integer and floating point constants and the pointwise data value. Infinite quantities of interest are preserved with the same bit pattern. NaN quantities of interest remain NaN though not necessarily with the same bit pattern.
+
+### Pointwise properties
 
 - [`zero`][numcodecs_safeguards.safeguards.pointwise.zero.ZeroIsZeroSafeguard] (zero/constant preserving):
 
@@ -65,15 +71,15 @@ This package currently implements the following [safeguards][numcodecs_safeguard
 
 - [`sign`][numcodecs_safeguards.safeguards.pointwise.sign.SignPreservingSafeguard] (sign-preserving):
 
-    Values are guaranteed to have the same sign (-1, 0, +1) in the decompressed output as they have in the input data. The sign for NaNs is derived from their sign bit, e.g. sign(-NaN) = -1. This safeguard should be combined with e.g. an error bound, as it by itself accepts *any* value with the same sign.
+    Values are guaranteed to have the same sign (-1, 0, +1) in the decompressed output as they have in the input data. The sign for NaNs is derived from their sign bit, e.g. sign(-NaN) = -1. Sign-preservation should be combined with e.g. an error bound, as it by itself accepts *any* value with the same sign.
 
 ### Relationships between neighboring elements
 
 - [`monotonicity`][numcodecs_safeguards.safeguards.stencil.monotonicity.MonotonicityPreservingSafeguard] (monotonicity-preserving):
 
-    Sequences that are monotonic in the input are guaranteed to be monotonic in the decompressed output. Monotonic sequences are detected using per-axis moving windows of constant size. Typically, the window size should be chosen to be large enough to ignore noise but small enough to capture details. The safeguard supports enforcing four levels of [monotonicity][numcodecs_safeguards.safeguards.stencil.monotonicity.Monotonicity]: `strict`, `strict_with_consts`, `strict_to_weak`, `weak`. Windows that are not monotonic or contain non-finite data are skipped. Axes that have fewer elements than the window size are skipped as well.
+    Sequences that are monotonic in the input are guaranteed to be monotonic in the decompressed output. Monotonic sequences are detected using per-axis moving windows of constant size. Typically, the window size should be chosen to be large enough to ignore noise but small enough to capture details. Four levels of [monotonicity][numcodecs_safeguards.safeguards.stencil.monotonicity.Monotonicity] can be enforced: `strict`, `strict_with_consts`, `strict_to_weak`, `weak`. Windows that are not monotonic or contain non-finite data are skipped. Axes that have fewer elements than the window size are skipped as well.
 
-### Logical combinators (per element)
+### Logical combinators (pointwise)
 
 - [`all`][numcodecs_safeguards.safeguards.pointwise.logical.all.AllSafeguards] (logical all / and):
 

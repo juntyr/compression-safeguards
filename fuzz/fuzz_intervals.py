@@ -1,10 +1,15 @@
 import atheris
 
 with atheris.instrument_imports():
+    import numcodecs as numcodecs
+    import numpy as np
+
+import sympy as sympy
+
+with atheris.instrument_imports():
     import sys
     import warnings
 
-    import numpy as np
     from numcodecs_safeguards.intervals import Interval, IntervalUnion, Lower, Upper
 
 

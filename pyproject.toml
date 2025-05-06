@@ -16,6 +16,7 @@ dependencies = [
     "varint~=1.0",
     "typing-extensions~=4.6",
     "dahuffman~=0.4.0",
+    "sympy~=1.14.0",
 ]
 
 [dependency-groups]
@@ -62,5 +63,11 @@ where = ["src"]
 addopts = ["--import-mode=importlib"]
 
 [[tool.mypy.overrides]]
-module = ["dahuffman.*", "numcodecs.*", "numpy_quaddtype.*", "varint.*"]
+module = [
+    "dahuffman.*",
+    "numcodecs.*",
+    "numpy_quaddtype.*",
+    "sympy.*",
+    "varint.*",
+]
 follow_untyped_imports = true
