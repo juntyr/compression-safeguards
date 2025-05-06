@@ -122,7 +122,7 @@ def from_float(x: np.ndarray[S, F], dtype: T) -> np.ndarray[S, T]:
     Returns
     -------
     converted : np.ndarray[S, T]
-        The re-coverted array with the original `dtype`.
+        The re-converted array with the original `dtype`.
     """
 
     if x.dtype == dtype:

@@ -1,0 +1,4 @@
+[default.extend-identifiers]
+check_arange = "check_arange"
+dout = "dout"
+test_arange = "test_arange"

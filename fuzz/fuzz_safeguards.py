@@ -75,8 +75,8 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
         return generate_parameter(data, ty, depth)
 
     if ty is Expr:
-        ATOMS = ["x", int, float]
-        OPS = ["+", "-", "*", "/", "**"]
+        ATOMS = ["x", int, float, "e", "pi"]
+        OPS = ["neg", "+", "-", "*", "/", "**", "log", "sqrt", "ln", "exp"]
 
         atoms = []
         for _ in range(data.ConsumeIntInRange(2, 4)):
@@ -87,30 +87,25 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
                 atom = str(data.ConsumeRegularFloat())
             atoms.append(atom)
 
-        its = 0
-        while len(atoms) > 1:
+        done = False
+        while not done:
+            done = len(atoms) == 1
             atom1 = atoms.pop(data.ConsumeIntInRange(0, len(atoms) - 1))
-            its += 1
-            p = data.ConsumeProbability() if its <= 2 else 1.0
-            if p < 0.1:
-                atoms.append(f"sqrt({atom1})")
-            elif p < 0.2:
-                atoms.append(f"log({atom1})")
-            elif p < 0.3:
+            atom2 = (
+                atoms.pop(data.ConsumeIntInRange(0, len(atoms) - 1))
+                if len(atoms) > 0
+                else "1"
+            )
+            op = OPS[data.ConsumeIntInRange(0, len(OPS) - 1)]
+            if op == "neg":
                 atoms.append(f"(-{atom1})")
+            elif op in ("sqrt", "ln", "exp"):
+                atoms.append(f"{op}({atom1})")
+            elif op == "log":
+                atoms.append(f"log({atom1},{atom2})")
             else:
-                its = 0
-                atom2 = atoms.pop(data.ConsumeIntInRange(0, len(atoms) - 1))
-                op = OPS[data.ConsumeIntInRange(0, len(OPS) - 1)]
                 atoms.append(f"({atom1}{op}{atom2})")
         [atom] = atoms
-        p = data.ConsumeProbability()
-        if p < 0.1:
-            atom = f"sqrt({atom})"
-        elif p < 0.2:
-            atom = f"log({atom})"
-        elif p < 0.3:
-            atom = f"(-{atom})"
         return atom
 
     assert False, f"unknown parameter type {ty!r}"
