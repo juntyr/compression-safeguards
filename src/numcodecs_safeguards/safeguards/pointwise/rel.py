@@ -34,7 +34,7 @@ class RelativeErrorBoundSafeguard(PointwiseSafeguard):
 
     Infinite values are preserved with the same bit pattern. If `equal_nan` is
     set to [`True`][True], decoding a NaN value to a NaN value with a different
-    bitpattern also satisfies the error bound. If `equal_nan` is set to
+    bit pattern also satisfies the error bound. If `equal_nan` is set to
     [`False`][False], NaN values are also preserved with the same bit pattern.
 
     Parameters

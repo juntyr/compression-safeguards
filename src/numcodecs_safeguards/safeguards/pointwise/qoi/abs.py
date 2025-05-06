@@ -37,7 +37,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
     decoded value produces the exact same infinite value. For a NaN quantity of
     interest, this safeguard guarantees that the quantity of interest on the
     decoded value is also NaN, but does not guarantee that it has the same
-    bitpattern.
+    bit pattern.
 
     The qoi expression is written using the following EBNF grammar for `expr`:
 
