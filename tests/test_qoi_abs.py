@@ -66,6 +66,8 @@ CHECKS = [
 @pytest.mark.parametrize("check", CHECKS)
 def test_polynomial(check):
     check("x")
+    check("2*x")
+    check("3*x + 1")
     check("x**2")
     check("x**3")
     check("x**2 + x + 1")
@@ -76,6 +78,7 @@ def test_exponential(check):
     check("0.5**x")
     check("2**x")
     check("3**x")
+    check("e**(x)")
     check("exp(x)")
     check("2 ** (x + 1)")
 
@@ -104,6 +107,7 @@ def test_power_function(check):
 def test_sqrt(check):
     check("sqrt(x)")
     check("1 / sqrt(x)")
+    check("sqrt(sqrt(x))")
 
 
 @pytest.mark.parametrize("check", CHECKS)

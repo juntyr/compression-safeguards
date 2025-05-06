@@ -109,7 +109,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         )
         self._qoi_lambda = sp.lambdify(x, qoi_expr, modules="numpy", cse=True)
 
-        eb_abs_qoi = _derive_eb_abs_qoi(qoi_expr, x, tau, True)
+        eb_abs_qoi = _derive_eb_abs_qoi(qoi_expr, x, tau)
         self._eb_abs_qoi_lambda = sp.lambdify(
             [x, tau],
             eb_abs_qoi,
@@ -197,7 +197,6 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             eb_abs_lower = data_qoi - (data_qoi - eb_abs)
             eb_abs_upper = (data_qoi + eb_abs) - data_qoi
             eb_abs = np.minimum(eb_abs_lower, eb_abs_upper)
-
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
@@ -234,7 +233,6 @@ def _derive_eb_abs_qoi(
     expr: sp.Basic,
     x: sp.Basic,
     tau: sp.Basic,
-    allow_composition: bool,
 ) -> sp.Basic:
     """
     Inspired by:
@@ -247,42 +245,45 @@ def _derive_eb_abs_qoi(
 
     assert len(expr.free_symbols) > 0, "constants have no error bounds"
 
+    # x
     if expr == x:
         return tau
 
-    # support sqrt(x) using Jiao et al.
-    # modified s.t. we never have sqrt(-...)
-    if expr.is_Pow and expr.args == (x, sp.Rational(1, 2)):
-        return sp.Min(
-            sp.Abs(sp.Pow(tau, 2) - sp.Integer(2) * tau * sp.sqrt(x)), sp.Abs(x)
-        )
+    # ln(...)
+    # sympy automatically transforms log(..., base) into ln(...)/ln(base)
+    if expr.func is sp.log and len(expr.args) == 1:
+        (arg,) = expr.args
+        if arg == x:
+            # base case ln(x), derived using sympy
+            return sp.Abs(x) * sp.Min(
+                sp.Abs(sp.exp(tau) - 1), sp.Abs(sp.exp(tau * sp.Integer(-1)) - 1)
+            )
+        else:
+            # composition using Lemma 3 from Jiao et al.
+            tau = _derive_eb_abs_qoi(expr, arg, tau)
+            return _derive_eb_abs_qoi(arg, x, tau)
 
-    # support ln(x) using Jiao et al.
-    if expr.func is sp.functions.elementary.exponential.log and expr.args == (x,):
-        return sp.Abs(x) * sp.Min(1 - sp.exp(tau * sp.Integer(-1)), sp.exp(tau) - 1)
+    # e^(...)
+    if expr.func is sp.exp and len(expr.args) == 1:
+        (arg,) = expr.args
+        if arg == x:
+            # base case exp(x), derived using sympy
+            return sp.Min(
+                sp.Abs(sp.log(tau * sp.exp(x * sp.Integer(-1)) + 1)),
+                sp.Abs(sp.log(tau * sp.Integer(-1) * sp.exp(x * sp.Integer(-1)) + 1)),
+            )
+        else:
+            # composition using Lemma 3 from Jiao et al.
+            tau = _derive_eb_abs_qoi(expr, arg, tau)
+            return _derive_eb_abs_qoi(arg, x, tau)
 
-    # support exp(x), derived using sympy
-    if expr.func is sp.functions.elementary.exponential.exp and expr.args == (x,):
-        return sp.Abs(sp.log(tau * sp.exp(x * sp.Integer(-1)) + 1))
+    # rewrite a ** b as e^(b*log(a))
+    if expr.is_Pow and len(expr.args) == 2:
+        a, b = expr.args
+        return _derive_eb_abs_qoi(sp.exp(b * sp.ln(a), evaluate=False), x, tau)
 
-    # support (const)**(x), derived using sympy
-    if (
-        expr.is_Pow
-        and len(expr.args) == 2
-        and len(expr.args[0].free_symbols) == 0
-        and expr.args[1] == x
-    ):
-        b = expr.args[0]
-        return sp.Abs(sp.log(tau * sp.Pow(b, x * sp.Integer(-1)) + 1, b))
-
-    # support 1/x, derived using sympy
-    if expr.is_Pow and expr.args == (x, sp.Integer(-1)):
-        return sp.Min(
-            sp.Abs(tau * sp.Pow(x, 2) / (tau * x - 1)),  # type: ignore
-            sp.Abs(tau * sp.Pow(x, 2) / (tau * x + 1)),  # type: ignore
-        )
-
-    # support weighted sums through recursion
+    # a_1 * e_1 + ... + a_n * e_n + c (weighted sum)
+    # using Corollary 2 and Lemma 4 from Jiao et al.
     if expr.is_Add:
         # find all non-constant terms
         terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
@@ -313,14 +314,13 @@ def _derive_eb_abs_qoi(
                     term,
                     x,
                     tau * factor / total_abs_factor,
-                    True,
                 )
             )
 
         # combine the inner error bounds
         return sp.Min(*ebs)
 
-    # support multiplication through recursion
+    # e_1 * ... * e_n (product) using Corollary 3 from Jiao et al.
     if expr.is_Mul:
         # extract the constant factor and reduce tau
         factor = sp.Mul(*[arg for arg in expr.args if len(arg.free_symbols) == 0])  # type: ignore
@@ -330,7 +330,7 @@ def _derive_eb_abs_qoi(
         terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
 
         if len(terms) == 1:
-            return _derive_eb_abs_qoi(terms[0], x, tau, True)
+            return _derive_eb_abs_qoi(terms[0], x, tau)
 
         # recurse as if the multiplication was a binary tree
         tleft, tright = terms[: len(terms) // 2], terms[len(terms) // 2 :]
@@ -344,75 +344,9 @@ def _derive_eb_abs_qoi(
             # recurse into the terms with the adapted error bound
             # we have already checked that the terms are non-const,
             #  so the returned error bound must not be None
-            ebs.append(_derive_eb_abs_qoi(sp.Mul(*tbranch), x, tau, True))  # type: ignore
+            ebs.append(_derive_eb_abs_qoi(sp.Mul(*tbranch), x, tau))  # type: ignore
 
         # combine the inner error bounds
         return sp.Min(*ebs)
-
-    # support positive integer powers via multiplication
-    if (
-        expr.is_Pow
-        and len(expr.args) == 2
-        and expr.args[1].is_Integer
-        and expr.args[1] > sp.Integer(1)
-    ):
-        # split the power into the product of two terms
-        return _derive_eb_abs_qoi(
-            sp.Mul(
-                sp.Pow(expr.args[0], expr.args[1] // sp.Integer(2)),
-                sp.Pow(expr.args[0], expr.args[1] - (expr.args[1] // sp.Integer(2))),
-                evaluate=False,
-            ),
-            x,
-            tau,
-            True,
-        )
-
-    # support negative powers via inverse
-    if (
-        expr.is_Pow
-        and len(expr.args) == 2
-        and expr.args[1].is_Number
-        and expr.args[1] < sp.Integer(0)
-        and expr.args[1] != -1
-    ):
-        # split the power into its inverse
-        return _derive_eb_abs_qoi(
-            sp.Pow(
-                sp.Pow(expr.args[0], expr.args[1] * sp.Integer(-1)), -1, evaluate=False
-            ),
-            x,
-            tau,
-            True,
-        )
-
-    if allow_composition:
-        if (
-            expr.func
-            in (
-                sp.functions.elementary.exponential.exp,
-                sp.functions.elementary.exponential.log,
-            )
-            and len(expr.args) == 1
-        ):
-            expr_inner = expr.args[0]
-
-            eb = _derive_eb_abs_qoi(expr, expr_inner, tau, False)
-
-            return _derive_eb_abs_qoi(expr_inner, x, eb, True)
-
-        if (
-            expr.is_Pow
-            and len(expr.args) == 2
-            and (
-                len(expr.args[0].free_symbols) == 0
-                or len(expr.args[1].free_symbols) == 0
-            )
-        ):
-            expr_inner = expr.args[int(len(expr.args[0].free_symbols) == 0)]
-
-            eb = _derive_eb_abs_qoi(expr, expr_inner, tau, False)
-
-            return _derive_eb_abs_qoi(expr_inner, x, eb, True)
 
     assert False, f"unsupported expression kind {expr} (= {sp.srepr(expr)} =)"
