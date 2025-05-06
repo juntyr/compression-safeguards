@@ -62,7 +62,7 @@ This package currently implements the following safeguards:
 
 - `qoi_abs` (absolute error bound on quantities of interest):
 
-    The pointwise absolute error for a derived quantity of interest (QOI) is guaranteed to be less than or equal to the provided bound. The non-constant quantity of interest expression can contain the addition, multiplication, division, square root, exponentiation and logarithm operations over integer and floating point constants and the pointwise data value. Infinite quantities of interest are preserved with the same bitpattern. NaN quantities of interest remain NaN though not necessarily with the same bitpattern.
+    The pointwise absolute error on a derived quantity of interest (QOI) is guaranteed to be less than or equal to the provided bound. The non-constant quantity of interest expression can contain the addition, multiplication, division, square root, exponentiation and logarithm operations over integer and floating point constants and the pointwise data value. Infinite quantities of interest are preserved with the same bitpattern. NaN quantities of interest remain NaN though not necessarily with the same bitpattern.
 
 ### Pointwise properties
 

@@ -12,33 +12,25 @@ import sympy as sp
 from . import Expr
 from ..abc import PointwiseSafeguard, S, T
 from ..abs import _compute_safe_eb_abs_interval
-from ....cast import as_bits, to_float, to_finite_float
+from ....cast import (
+    as_bits,
+    to_float,
+    to_finite_float,
+    from_total_order,
+    to_total_order,
+)
 from ....intervals import IntervalUnion
 
 
 class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
     """
     The `QuantityOfInterestAbsoluteErrorBoundSafeguard` guarantees that the
-    pointwise absolute error for a derived quantity of interest (QOI) is less
+    pointwise absolute error on a derived quantity of interest (QOI) is less
     than or equal to the provided bound `eb_abs`.
 
     The quantity of interest is specified as a non-constant expression, in
     string form, on the pointwise value `x`. For example, to bound the error on
-    the square of `x`, set `qoi=Expr("x**2")`. The following operations are
-    supported, where `...` denotes any expression:
-
-    - integer and floating point constants
-    - pointwise value `x`
-    - addition `(...) + (...)`
-    - multiplication `(...) * (...)`
-    - division `(...) / (...)`
-    - square root `sqrt(...)`
-    - exponentiation `(...) ** (...)`
-      - either the base or the exponent must be constant
-      - if the exponent is constant, it must be an integer (or 1/2 for `sqrt`)
-    - exponential `exp(...)`
-    - natural logarithm `ln(...)`
-      - optionally a different base can be provided second in `log(..., ...)`
+    the square of `x`, set `qoi=Expr("x**2")`.
 
     If the derived quantity of interest for an element evaluates to an infinite
     value, this safeguard guarantees that the quantity of interest on the
@@ -47,13 +39,58 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
     decoded value is also NaN, but does not guarantee that it has the same
     bitpattern.
 
+    The qoi expression is written using the following EBNF grammar for `expr`:
+
+    ```ebnf
+    expr    =
+        literal
+      | const
+      | var
+      | unary
+      | binary
+    ;
+
+    literal =
+        int
+      | float
+    ;
+
+    int     = ? integer literal ?;
+    float   = ? floating point literal ?;
+
+    const   =
+        "e"                               (* Euler's number *)
+      | "pi"                              (* pi *)
+    ;
+
+    var     = "x";                        (* pointwise data value *)
+
+    unary   =
+        "(", expr, ")"                    (* parenthesis *)
+      | "-", expr                         (* negation *)
+      | "sqrt", "(", expr, ")"            (* square root *)
+      | "ln", "(", expr, ")"              (* natural logarithm *)
+      | "exp", "(", expr, ")"             (* exponential e^x *)
+    ;
+
+    binary  =
+        expr, "+", expr                   (* addition *)
+      | expr, "-", expr                   (* subtraction *)
+      | expr, "*", expr                   (* multiplication *)
+      | expr, "/", expr                   (* division *)
+      | expr, "**", expr                  (* exponentiation *)
+      | "log", "(", expr, ",", expr, ")"  (* logarithm log(a, base) *)
+    ;
+    ```
+
     The implementation of the absolute error bound on pointwise quantities of
     interest is based on:
 
     > Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
     Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
-    Lossy Compression for Scientific Data. Proc. VLDB Endow. 16, 4 (December
-    2022), 697-710. Available from: <https://doi.org/10.14778/3574245.3574255>.
+    Lossy Compression for Scientific Data. *Proceedings of the VLDB Endowment*.
+    16, 4 (December 2022), 697-710. Available from:
+    <https://doi.org/10.14778/3574245.3574255>.
 
     Parameters
     ----------
@@ -86,7 +123,6 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         self._eb_abs = eb_abs
 
         x = sp.Symbol("x", real=True)
-        tau = sp.Symbol("tau", real=True, positive=True)
 
         qoi_expr = sp.parse_expr(
             self._qoi,
@@ -108,6 +144,8 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             transformations=(sp.parsing.sympy_parser.auto_number,),
         )
         self._qoi_lambda = sp.lambdify(x, qoi_expr, modules="numpy", cse=True)
+
+        tau = sp.Symbol("tau", real=True, nonnegative=True)
 
         eb_abs_qoi = _derive_eb_abs_qoi(qoi_expr, x, tau)
         self._eb_abs_qoi_lambda = sp.lambdify(
@@ -190,13 +228,36 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             eb_abs: np.ndarray = to_finite_float(self._eb_abs, data_float.dtype)
         assert eb_abs >= 0.0
 
+        # ensure the error bounds are representable in QOI space
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
+            # compute the error-bound adjusted QOIs
             data_qoi = (self._qoi_lambda)(data_float)
-            eb_abs_lower = data_qoi - (data_qoi - eb_abs)
-            eb_abs_upper = (data_qoi + eb_abs) - data_qoi
+            qoi_lower = data_qoi - eb_abs
+            qoi_upper = data_qoi + eb_abs
+
+            # check if they're representable within the error bound
+            qoi_lower_outside_eb_abs = (data_qoi - qoi_lower) > eb_abs
+            qoi_upper_outside_eb_abs = (qoi_upper - data_qoi) > eb_abs
+
+            # otherwise nudge the error-bound adjusted QOIs
+            qoi_lower = from_total_order(
+                to_total_order(qoi_lower) + qoi_lower_outside_eb_abs,
+                data_float.dtype,
+            )
+            qoi_upper = from_total_order(
+                to_total_order(qoi_upper) - qoi_upper_outside_eb_abs,
+                data_float.dtype,
+            )
+
+            # compute the adjusted error bound
+            eb_abs_lower = data_qoi - qoi_lower
+            eb_abs_upper = qoi_upper - data_qoi
             eb_abs = np.minimum(eb_abs_lower, eb_abs_upper)
+        eb_abs = np.nan_to_num(eb_abs, nan=0.0, posinf=0.0, neginf=None)
+        assert np.all(eb_abs >= 0.0)
+
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
