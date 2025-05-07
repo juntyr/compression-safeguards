@@ -105,13 +105,13 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
     __slots__ = (
         "_qoi",
         "_eb_abs",
+        "_qoi_expr",
         "_qoi_lambda",
-        "_eb_abs_qoi_lambda",
     )
     _qoi: Expr
     _eb_abs: int | float
+    _qoi_expr: sp.Basic
     _qoi_lambda: Callable[[np.ndarray], np.ndarray]
-    _eb_abs_qoi_lambda: Callable[[np.ndarray, np.ndarray], np.ndarray]
 
     kind = "qoi_abs"
 
@@ -125,7 +125,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         x = sp.Symbol("x", real=True)
 
         try:
-            qoi_expr = sp.parse_expr(
+            self._qoi_expr = sp.parse_expr(
                 self._qoi,
                 local_dict=dict(x=x),
                 global_dict=dict(
@@ -144,23 +144,10 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
                 ),
                 transformations=(sp.parsing.sympy_parser.auto_number,),
             )
-            self._qoi_lambda = sp.lambdify(x, qoi_expr, modules="numpy", cse=True)
-        except Exception as err:
-            raise AssertionError(f"failed to parse qoi expression {qoi!r}") from err
-
-        tau = sp.Symbol("tau", real=True, nonnegative=True)
-
-        try:
-            eb_abs_qoi = _derive_eb_abs_qoi(qoi_expr, x, tau)
-            self._eb_abs_qoi_lambda = sp.lambdify(
-                [x, tau],
-                eb_abs_qoi,
-                modules="numpy",
-                cse=True,
-            )
+            self._qoi_lambda = sp.lambdify(x, self._qoi_expr, modules="numpy", cse=True)
         except Exception as err:
             raise AssertionError(
-                f"failed to derive error bound for qoi expression {qoi!r}"
+                f"failed to parse qoi expression {qoi!r}: {err}"
             ) from err
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -269,8 +256,11 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_abs_qoi = (self._eb_abs_qoi_lambda)(data_float, eb_abs)
+            eb_abs_qoi = _compute_eb_abs_qoi(
+                self._qoi_expr, sp.Symbol("x", real=True), data_float, eb_abs
+            )
         eb_abs_qoi = np.nan_to_num(eb_abs_qoi, nan=0.0, posinf=0.0, neginf=None)
+        print(self._eb_abs, eb_abs_qoi)
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
@@ -298,11 +288,12 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         return dict(kind=type(self).kind, qoi=self._qoi, eb_abs=self._eb_abs)
 
 
-def _derive_eb_abs_qoi(
+def _compute_eb_abs_qoi(
     expr: sp.Basic,
     x: sp.Basic,
-    tau: sp.Basic,
-) -> sp.Basic:
+    xv: np.ndarray,
+    tauv: np.ndarray,
+) -> np.ndarray:
     """
     Inspired by:
 
@@ -316,40 +307,38 @@ def _derive_eb_abs_qoi(
 
     # x
     if expr == x:
-        return tau
+        return tauv
 
     # ln(...)
     # sympy automatically transforms log(..., base) into ln(...)/ln(base)
     if expr.func is sp.log and len(expr.args) == 1:
         (arg,) = expr.args
+        argv = sp.lambdify([x], arg, "numpy")(xv)
+        # base case ln(x), derived using sympy
+        tauv = argv * np.minimum(
+            np.abs(np.exp(tauv) - 1), np.abs(np.exp(tauv * -1) - 1)
+        )
         if arg == x:
-            # base case ln(x), derived using sympy
-            return sp.Abs(x) * sp.Min(
-                sp.Abs(sp.exp(tau) - 1), sp.Abs(sp.exp(tau * sp.Integer(-1)) - 1)
-            )
-        else:
-            # composition using Lemma 3 from Jiao et al.
-            tau = _derive_eb_abs_qoi(expr, arg, tau)
-            return _derive_eb_abs_qoi(arg, x, tau)
+            return tauv
+        return _compute_eb_abs_qoi(arg, x, xv, tauv)
 
     # e^(...)
     if expr.func is sp.exp and len(expr.args) == 1:
         (arg,) = expr.args
+        argv = sp.lambdify([x], arg, "numpy")(xv)
+        # base case exp(x), derived using sympy
+        tauv = np.minimum(
+            np.abs(np.log(tauv * np.exp(-argv) + 1)),
+            np.abs(np.log(-tauv * np.exp(-argv) + 1)),
+        )
         if arg == x:
-            # base case exp(x), derived using sympy
-            return sp.Min(
-                sp.Abs(sp.log(tau * sp.exp(x * sp.Integer(-1)) + 1)),
-                sp.Abs(sp.log(tau * sp.Integer(-1) * sp.exp(x * sp.Integer(-1)) + 1)),
-            )
-        else:
-            # composition using Lemma 3 from Jiao et al.
-            tau = _derive_eb_abs_qoi(expr, arg, tau)
-            return _derive_eb_abs_qoi(arg, x, tau)
+            return tauv
+        return _compute_eb_abs_qoi(arg, x, xv, tauv)
 
     # rewrite a ** b as e^(b*log(a))
     if expr.is_Pow and len(expr.args) == 2:
         a, b = expr.args
-        return _derive_eb_abs_qoi(sp.exp(b * sp.ln(a), evaluate=False), x, tau)
+        return _compute_eb_abs_qoi(sp.exp(b * sp.ln(a), evaluate=False), x, xv, tauv)
 
     # a_1 * e_1 + ... + a_n * e_n + c (weighted sum)
     # using Corollary 2 and Lemma 4 from Jiao et al.
@@ -363,59 +352,64 @@ def _derive_eb_abs_qoi(
             # and take its absolute value
             if term.is_Mul:
                 abs_factors.append(
-                    sp.Abs(
-                        sp.Mul(
-                            *[arg for arg in term.args if len(arg.free_symbols) == 0]  # type: ignore
-                        )
-                    )
+                    sp.lambdify(
+                        [],
+                        sp.Abs(
+                            sp.Mul(
+                                *[
+                                    arg
+                                    for arg in term.args
+                                    if len(arg.free_symbols) == 0
+                                ]  # type: ignore
+                            )
+                        ),
+                        "numpy",
+                    )()
                 )
             else:
-                abs_factors.append(sp.Integer(1))
-        total_abs_factor = sp.Add(*abs_factors)
+                abs_factors.append(1)
+        total_abs_factor = np.sum(abs_factors)
 
-        ebs = []
+        ebs = None
         for term, factor in zip(terms, abs_factors):
             # recurse into the terms with a weighted error bound
             # we have already checked that the terms are non-const,
             #  so the returned error bound must not be None
-            ebs.append(
-                _derive_eb_abs_qoi(
-                    term,
-                    x,
-                    tau * factor / total_abs_factor,
-                )
+            eb = _compute_eb_abs_qoi(
+                term,
+                x,
+                xv,
+                tauv * factor / total_abs_factor,
             )
+            if ebs is None:
+                ebs = eb
+            else:
+                ebs = np.minimum(ebs, eb)
 
         # combine the inner error bounds
-        return sp.Min(*ebs)
+        return ebs
 
     # e_1 * ... * e_n (product) using Corollary 3 from Jiao et al.
     if expr.is_Mul:
         # extract the constant factor and reduce tau
-        factor = sp.Mul(*[arg for arg in expr.args if len(arg.free_symbols) == 0])  # type: ignore
-        tau = tau / sp.Abs(factor)
+        factor = sp.lambdify(
+            [],
+            sp.Mul(*[arg for arg in expr.args if len(arg.free_symbols) == 0]),
+            "numpy",
+        )()  # type: ignore
+        tauv = tauv / np.abs(factor)
 
         # find all non-constant terms
         terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
 
         if len(terms) == 1:
-            return _derive_eb_abs_qoi(terms[0], x, tau)
+            return _compute_eb_abs_qoi(terms[0], x, xv, tauv)
 
-        # recurse as if the multiplication was a binary tree
-        tleft, tright = terms[: len(terms) // 2], terms[len(terms) // 2 :]
-        fp = sp.Abs(sp.Mul(*tleft)) + sp.Abs(sp.Mul(*tright))  # type: ignore
-
-        # conservative error bound for multiplication (Jiao et al.)
-        tau = sp.Abs((-fp + sp.sqrt(sp.Integer(4) * tau + sp.Pow(fp, 2))) / 2)
-
-        ebs = []
-        for tbranch in (tleft, tright):
-            # recurse into the terms with the adapted error bound
-            # we have already checked that the terms are non-const,
-            #  so the returned error bound must not be None
-            ebs.append(_derive_eb_abs_qoi(sp.Mul(*tbranch), x, tau))  # type: ignore
-
-        # combine the inner error bounds
-        return sp.Min(*ebs)
+        return _compute_eb_abs_qoi(
+            sp.exp(sp.Add(*[sp.log(term) for term in terms]), evaluate=False),
+            x,
+            xv,
+            tauv,
+        )
 
     raise ValueError(f"unsupported expression kind {expr} (= {sp.srepr(expr)} =)")
