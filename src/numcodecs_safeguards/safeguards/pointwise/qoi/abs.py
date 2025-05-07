@@ -247,7 +247,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             )
 
             # compute the adjusted error bound
-            eb_abs_lower = data_qoi - qoi_lower
+            eb_abs_lower = qoi_lower - data_qoi
             eb_abs_upper = qoi_upper - data_qoi
         eb_abs_lower = np.nan_to_num(eb_abs_lower, nan=0.0, posinf=None, neginf=0.0)
         eb_abs_upper = np.nan_to_num(eb_abs_upper, nan=0.0, posinf=0.0, neginf=None)
@@ -262,7 +262,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             )
         eb_abs_qoi_lower = np.nan_to_num(eb_abs_qoi_lower, nan=0.0, posinf=None, neginf=0.0)
         eb_abs_qoi_upper = np.nan_to_num(eb_abs_qoi_upper, nan=0.0, posinf=0.0, neginf=None)
-        print(self._eb_abs, np.abs((self._qoi_lambda)(data_float + eb_abs_qoi_lower) - data_float), np.abs((self._qoi_lambda)(data_float + eb_abs_qoi_upper) - data_float))
+        print(self._eb_abs, eb_abs_qoi_lower, eb_abs_qoi_upper, np.abs((self._qoi_lambda)(data_float + eb_abs_qoi_lower) - (self._qoi_lambda)(data_float)), np.abs((self._qoi_lambda)(data_float + eb_abs_qoi_upper) - (self._qoi_lambda)(data_float)))
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
@@ -299,6 +299,8 @@ def _compute_eb_abs_qoi(
     tauv_lower: np.ndarray,
     tauv_upper: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
+    print(f"Compute for {expr} with x={xv} for {tauv_lower} <= e <= {tauv_upper}")
+
     """
     Inspired by:
 
@@ -313,6 +315,10 @@ def _compute_eb_abs_qoi(
     # x
     if expr == x:
         return (tauv_lower, tauv_upper)
+    
+    if expr.func is sp.Abs and len(expr.args) == 1:
+        (arg,) = expr.args
+        return _compute_eb_abs_qoi(arg, x, xv, tauv_lower, tauv_upper)
 
     # ln(...)
     # sympy automatically transforms log(..., base) into ln(...)/ln(base)
@@ -320,30 +326,28 @@ def _compute_eb_abs_qoi(
         (arg,) = expr.args
         argv = sp.lambdify([x], arg, "numpy")(xv)
         # base case ln(x), derived using sympy
-        tauv = argv * np.minimum(
-            np.abs(np.exp(tauv) - 1), np.abs(np.exp(-tauv) - 1)
-        )
+        # FIXME: we need to also ensure that x doesn't become an invalid non-positive input
+        tauv_lower = -np.abs(argv * (np.exp(-tauv_lower) - 1))
+        tauv_upper = np.abs(argv * (np.exp(tauv_upper) - 1))
         if arg == x:
-            return tauv
-        return _compute_eb_abs_qoi(arg, x, xv, tauv)
+            return tauv_lower, tauv_upper
+        return _compute_eb_abs_qoi(arg, x, xv, tauv_lower, tauv_upper)
 
     # e^(...)
     if expr.func is sp.exp and len(expr.args) == 1:
         (arg,) = expr.args
         argv = sp.lambdify([x], arg, "numpy")(xv)
         # base case exp(x), derived using sympy
-        tauv = np.minimum(
-            np.abs(np.log(tauv * np.exp(-argv) + 1)),
-            np.abs(np.log(-tauv * np.exp(-argv) + 1)),
-        )
+        tauv_lower = -np.abs(np.log(-tauv_lower * np.exp(-argv) + 1))
+        tauv_upper = np.abs(np.log(tauv_upper * np.exp(-argv) + 1))
         if arg == x:
-            return tauv
-        return _compute_eb_abs_qoi(arg, x, xv, tauv)
+            return tauv_lower, tauv_upper
+        return _compute_eb_abs_qoi(arg, x, xv, tauv_lower, tauv_upper)
 
     # rewrite a ** b as e^(b*log(a))
     if expr.is_Pow and len(expr.args) == 2:
         a, b = expr.args
-        return _compute_eb_abs_qoi(sp.exp(b * sp.ln(a), evaluate=False), x, xv, tauv)
+        return _compute_eb_abs_qoi(sp.exp(b * sp.ln(sp.Abs(a)), evaluate=False), x, xv, tauv_lower, tauv_upper)
 
     # a_1 * e_1 + ... + a_n * e_n + c (weighted sum)
     # using Corollary 2 and Lemma 4 from Jiao et al.
@@ -375,24 +379,25 @@ def _compute_eb_abs_qoi(
                 abs_factors.append(1)
         total_abs_factor = np.sum(abs_factors)
 
-        ebs = None
+        ebs_lower, ebs_upper = None, None
         for term, factor in zip(terms, abs_factors):
             # recurse into the terms with a weighted error bound
-            # we have already checked that the terms are non-const,
-            #  so the returned error bound must not be None
-            eb = _compute_eb_abs_qoi(
+            eb_lower, eb_upper = _compute_eb_abs_qoi(
                 term,
                 x,
                 xv,
-                tauv * factor / total_abs_factor,
+                tauv_lower * factor / total_abs_factor,
+                tauv_upper * factor / total_abs_factor,
             )
-            if ebs is None:
-                ebs = eb
+            if ebs_lower is None:
+                ebs_lower = eb_lower
+                ebs_upper = eb_upper
             else:
-                ebs = np.minimum(ebs, eb)
+                ebs_lower = np.maximum(ebs_lower, eb_lower)
+                ebs_upper = np.minimum(ebs_upper, eb_upper)
 
         # combine the inner error bounds
-        return ebs
+        return ebs_lower, ebs_upper
 
     # e_1 * ... * e_n (product) using Corollary 3 from Jiao et al.
     if expr.is_Mul:
@@ -402,19 +407,21 @@ def _compute_eb_abs_qoi(
             sp.Mul(*[arg for arg in expr.args if len(arg.free_symbols) == 0]),
             "numpy",
         )()  # type: ignore
-        tauv = tauv / np.abs(factor)
+        tauv_lower = tauv_lower / np.abs(factor)
+        tauv_upper = tauv_upper / np.abs(factor)
 
         # find all non-constant terms
         terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
 
         if len(terms) == 1:
-            return _compute_eb_abs_qoi(terms[0], x, xv, tauv)
+            return _compute_eb_abs_qoi(terms[0], x, xv, tauv_lower, tauv_upper)
 
         return _compute_eb_abs_qoi(
             sp.exp(sp.Add(*[sp.log(term) for term in terms]), evaluate=False),
             x,
             xv,
-            tauv,
+            tauv_lower,
+            tauv_upper,
         )
 
     raise ValueError(f"unsupported expression kind {expr} (= {sp.srepr(expr)} =)")
