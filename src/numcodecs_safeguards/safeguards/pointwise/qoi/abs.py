@@ -249,29 +249,33 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             # compute the adjusted error bound
             eb_abs_lower = data_qoi - qoi_lower
             eb_abs_upper = qoi_upper - data_qoi
-            eb_abs = np.minimum(eb_abs_lower, eb_abs_upper)
-        eb_abs = np.nan_to_num(eb_abs, nan=0.0, posinf=0.0, neginf=None)
-        assert np.all(eb_abs >= 0.0)
+        eb_abs_lower = np.nan_to_num(eb_abs_lower, nan=0.0, posinf=None, neginf=0.0)
+        eb_abs_upper = np.nan_to_num(eb_abs_upper, nan=0.0, posinf=0.0, neginf=None)
+        assert np.all(eb_abs_lower <= 0.0)
+        assert np.all(eb_abs_upper >= 0.0)
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_abs_qoi = _compute_eb_abs_qoi(
-                self._qoi_expr, sp.Symbol("x", real=True), data_float, eb_abs
+            eb_abs_qoi_lower, eb_abs_qoi_upper = _compute_eb_abs_qoi(
+                self._qoi_expr, sp.Symbol("x", real=True), data_float, eb_abs_lower, eb_abs_upper,
             )
-        eb_abs_qoi = np.nan_to_num(eb_abs_qoi, nan=0.0, posinf=0.0, neginf=None)
-        print(self._eb_abs, eb_abs_qoi)
+        eb_abs_qoi_lower = np.nan_to_num(eb_abs_qoi_lower, nan=0.0, posinf=None, neginf=0.0)
+        eb_abs_qoi_upper = np.nan_to_num(eb_abs_qoi_upper, nan=0.0, posinf=0.0, neginf=None)
+        print(self._eb_abs, np.abs((self._qoi_lambda)(data_float + eb_abs_qoi_lower) - data_float), np.abs((self._qoi_lambda)(data_float + eb_abs_qoi_upper) - data_float))
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_abs_qoi_float: np.ndarray = to_finite_float(eb_abs_qoi, data_float.dtype)
-        assert np.all(eb_abs_qoi_float >= 0.0)
+            eb_abs_qoi_lower_float: np.ndarray = to_finite_float(eb_abs_qoi_lower, data_float.dtype)
+            eb_abs_qoi_upper_float: np.ndarray = to_finite_float(eb_abs_qoi_upper, data_float.dtype)
+        assert np.all(eb_abs_qoi_lower_float <= 0.0)
+        assert np.all(eb_abs_qoi_upper_float >= 0.0)
 
         return _compute_safe_eb_abs_interval(
             data.flatten(),
             data_float.flatten(),
-            eb_abs_qoi_float.flatten(),  # type: ignore
+            np.minimum(np.abs(eb_abs_qoi_lower_float), np.abs(eb_abs_qoi_upper_float)).flatten(),  # type: ignore
             equal_nan=True,
         ).into_union()
 
@@ -292,8 +296,9 @@ def _compute_eb_abs_qoi(
     expr: sp.Basic,
     x: sp.Basic,
     xv: np.ndarray,
-    tauv: np.ndarray,
-) -> np.ndarray:
+    tauv_lower: np.ndarray,
+    tauv_upper: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Inspired by:
 
@@ -307,7 +312,7 @@ def _compute_eb_abs_qoi(
 
     # x
     if expr == x:
-        return tauv
+        return (tauv_lower, tauv_upper)
 
     # ln(...)
     # sympy automatically transforms log(..., base) into ln(...)/ln(base)
@@ -316,7 +321,7 @@ def _compute_eb_abs_qoi(
         argv = sp.lambdify([x], arg, "numpy")(xv)
         # base case ln(x), derived using sympy
         tauv = argv * np.minimum(
-            np.abs(np.exp(tauv) - 1), np.abs(np.exp(tauv * -1) - 1)
+            np.abs(np.exp(tauv) - 1), np.abs(np.exp(-tauv) - 1)
         )
         if arg == x:
             return tauv
