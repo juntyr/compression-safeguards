@@ -124,5 +124,6 @@ def test_tanh(check):
 def test_composed(check):
     check("2 / (ln(x) + sqrt(x))")
 
+
 def test_test():
-    check_all_codecs(np.arange(11, dtype=np.float64) - 5, "log(x,2)")
+    check_all_codecs(np.arange(11, dtype=np.float64) - 5, "sqrt(x)")
