@@ -264,6 +264,9 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
                 eb_abs_lower,
                 eb_abs_upper,
             )
+        # FIXME: handle nan to num in the computation s.t. -inf and +inf are
+        #        valid to express any non-NaN value
+        #        and so that no NaNs appear
         eb_abs_qoi_lower = np.nan_to_num(
             eb_abs_qoi_lower, nan=0.0, posinf=None, neginf=0.0
         )
@@ -285,6 +288,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
                     (self._qoi_lambda)(data_float + eb_abs_qoi_upper)
                     - (self._qoi_lambda)(data_float)
                 ),
+                flush=True,
             )
 
         with np.errstate(
@@ -329,7 +333,10 @@ def _compute_eb_abs_qoi(
     tauv_lower: np.ndarray,
     tauv_upper: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
-    # print(f"Compute for {expr} with x={xv} for {tauv_lower} <= e <= {tauv_upper}")
+    # print(
+    #     f"Compute for {expr} with x={xv} for {tauv_lower} <= e <= {tauv_upper}",
+    #     flush=True,
+    # )
 
     """
     Inspired by:
@@ -364,8 +371,28 @@ def _compute_eb_abs_qoi(
         argv = sp.lambdify([x], arg, "numpy")(xv)
         exprv = np.log(argv)
         # update the error bounds
-        tauv_lower = np.exp(exprv + tauv_lower) - argv
-        tauv_upper = np.exp(exprv + tauv_upper) - argv
+        tl = np.where(tauv_lower == 0, 0, np.exp(exprv + tauv_lower) - argv)
+        tu = np.where(tauv_upper == 0, 0, np.exp(exprv + tauv_upper) - argv)
+
+        # FIXME: handle rounding better
+        while True:
+            tauv_lower_outside = (np.log(argv + tl) - exprv) < tauv_lower
+            if not np.any(tauv_lower_outside & np.isfinite(exprv)):
+                break
+            tl = from_total_order(
+                to_total_order(tl) + tauv_lower_outside,
+                xv.dtype,
+            )
+        while True:
+            tauv_upper_outside = (np.log(argv + tu) - exprv) > tauv_upper
+            if not np.any(tauv_upper_outside & np.isfinite(exprv)):
+                break
+            tu = from_total_order(
+                to_total_order(tu) - tauv_upper_outside,
+                xv.dtype,
+            )
+        tauv_lower, tauv_upper = tl, tu
+
         # base case for ln(x)
         if arg == x:
             return tauv_lower, tauv_upper
@@ -380,8 +407,34 @@ def _compute_eb_abs_qoi(
         exprv = np.exp(argv)
         # update the error bounds
         # ensure that ln is not passed a negative argument
-        tauv_lower = np.log(np.maximum(0, exprv + tauv_lower)) - argv
-        tauv_upper = np.log(np.maximum(0, exprv + tauv_upper)) - argv
+        tl = np.where(
+            tauv_lower == 0, 0, np.log(np.maximum(0, exprv + tauv_lower)) - argv
+        )
+        tu = np.where(
+            tauv_upper == 0, 0, np.log(np.maximum(0, exprv + tauv_upper)) - argv
+        )
+
+        # FIXME: handle rounding better
+        while True:
+            tauv_lower_outside = (np.exp(argv + tl) - exprv) < tauv_lower
+            if not np.any(tauv_lower_outside & np.isfinite(exprv)):
+                break
+            tl *= 0.99999
+            # tl = from_total_order(
+            #     to_total_order(tl) + tauv_lower_outside,
+            #     xv.dtype,
+            # )
+        while True:
+            tauv_upper_outside = (np.exp(argv + tu) - exprv) > tauv_upper
+            if not np.any(tauv_upper_outside & np.isfinite(exprv)):
+                break
+            tu *= 0.99999
+            # tu = from_total_order(
+            #     to_total_order(tu) - tauv_upper_outside,
+            #     xv.dtype,
+            # )
+        tauv_lower, tauv_upper = tl, tu
+
         # base case for e^x
         if arg == x:
             return tauv_lower, tauv_upper
@@ -415,14 +468,9 @@ def _compute_eb_abs_qoi(
                         "numpy",
                     )()
                 )
-                # TODO: check
-                # terms[i] = sp.Mul(
-                #     *[
-                #         arg
-                #         for arg in term.args
-                #         if len(arg.free_symbols) > 0
-                #     ]  # type: ignore
-                # )
+                terms[i] = sp.Mul(
+                    *[arg for arg in term.args if len(arg.free_symbols) > 0]  # type: ignore
+                )
             else:
                 factors.append(1)
         total_abs_factor = np.sum(np.abs(factors))
@@ -434,10 +482,8 @@ def _compute_eb_abs_qoi(
                 term,
                 x,
                 xv,
-                # flip the lower/upper error bound if the factor is negative
-                # TODO: check, as above
-                (tauv_upper if factor < 0 else tauv_lower) * factor / total_abs_factor,
-                (tauv_lower if factor < 0 else tauv_upper) * factor / total_abs_factor,
+                (-tauv_upper if factor < 0 else tauv_lower) / total_abs_factor,
+                (-tauv_lower if factor < 0 else tauv_upper) / total_abs_factor,
             )
             # combine the inner error bounds
             if ebs_lower is None:
@@ -458,9 +504,7 @@ def _compute_eb_abs_qoi(
         # extract the constant factor and reduce tauv
         factor = sp.lambdify(
             [],
-            sp.Mul(*[
-                arg for arg in expr.args if len(arg.free_symbols) == 0
-            ]), # type: ignore
+            sp.Mul(*[arg for arg in expr.args if len(arg.free_symbols) == 0]),  # type: ignore
             "numpy",
         )()  # type: ignore
 
