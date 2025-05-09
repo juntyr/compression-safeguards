@@ -4,7 +4,7 @@ Quantity of interest (QOI) absolute error bound safeguard.
 
 __all__ = ["QuantityOfInterestAbsoluteErrorBoundSafeguard"]
 
-from typing import Callable
+import functools
 
 import numpy as np
 import sympy as sp
@@ -106,12 +106,12 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         "_qoi",
         "_eb_abs",
         "_qoi_expr",
-        "_qoi_lambda",
+        "_x",
     )
     _qoi: Expr
     _eb_abs: int | float
     _qoi_expr: sp.Basic
-    _qoi_lambda: Callable[[np.ndarray], np.ndarray]
+    _x: sp.Symbol
 
     kind = "qoi_abs"
 
@@ -122,12 +122,12 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         self._qoi = qoi
         self._eb_abs = eb_abs
 
-        x = sp.Symbol("x", real=True)
+        self._x = sp.Symbol("x", real=True)
 
         try:
             self._qoi_expr = sp.parse_expr(
                 self._qoi,
-                local_dict=dict(x=x),
+                local_dict=dict(x=self._x),
                 global_dict=dict(
                     # literals
                     Integer=sp.Integer,
@@ -144,7 +144,6 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
                 ),
                 transformations=(sp.parsing.sympy_parser.auto_number,),
             )
-            self._qoi_lambda = sp.lambdify(x, self._qoi_expr, modules="numpy", cse=True)
         except Exception as err:
             raise AssertionError(
                 f"failed to parse qoi expression {qoi!r}: {err}"
@@ -171,8 +170,18 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             Per-element, `True` if the check succeeded for this element.
         """
 
-        qoi_data = (self._qoi_lambda)(to_float(data))
-        qoi_decoded = (self._qoi_lambda)(to_float(decoded))
+        data_float: np.ndarray = to_float(data)
+
+        qoi_lambda = sp.lambdify(
+            self._x,
+            self._qoi_expr,
+            modules="numpy",
+            printer=_create_sympy_numpy_printer(data_float.dtype),
+            docstring_limit=0,
+        )
+
+        qoi_data = (qoi_lambda)(data_float)
+        qoi_decoded = (qoi_lambda)(to_float(decoded))
 
         absolute_bound = (
             np.where(
@@ -223,12 +232,20 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             eb_abs: np.ndarray = to_finite_float(self._eb_abs, data_float.dtype)
         assert eb_abs >= 0
 
+        qoi_lambda = sp.lambdify(
+            self._x,
+            self._qoi_expr,
+            modules="numpy",
+            printer=_create_sympy_numpy_printer(data_float.dtype),
+            docstring_limit=0,
+        )
+
         # ensure the error bounds are representable in QOI space
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
             # compute the error-bound adjusted QOIs
-            data_qoi = (self._qoi_lambda)(data_float)
+            data_qoi = (qoi_lambda)(data_float)
             qoi_lower = data_qoi - eb_abs
             qoi_upper = data_qoi + eb_abs
 
@@ -278,10 +295,8 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
                 self._eb_abs,
                 eb_abs_qoi_lower,
                 eb_abs_qoi_upper,
-                (self._qoi_lambda)(data_float + eb_abs_qoi_lower)
-                - (self._qoi_lambda)(data_float),
-                (self._qoi_lambda)(data_float + eb_abs_qoi_upper)
-                - (self._qoi_lambda)(data_float),
+                (qoi_lambda)(data_float + eb_abs_qoi_lower) - (qoi_lambda)(data_float),
+                (qoi_lambda)(data_float + eb_abs_qoi_upper) - (qoi_lambda)(data_float),
                 flush=True,
             )
 
@@ -338,7 +353,9 @@ def _compute_eb_abs_qoi(
     if expr.func is sp.Abs and len(expr.args) == 1:
         # evaluate arg
         (arg,) = expr.args
-        argv = sp.lambdify([x], arg, "numpy")(xv)
+        argv = sp.lambdify(
+            [x], arg, modules="numpy", printer=_create_sympy_numpy_printer(xv.dtype)
+        )(xv)
         # flip the lower/upper error bound if the arg is negative
         tl = np.where(argv < 0, -tauv_upper, tauv_lower)
         tu = np.where(argv < 0, -tauv_lower, tauv_upper)
@@ -349,7 +366,9 @@ def _compute_eb_abs_qoi(
     if expr.func is sp.log and len(expr.args) == 1:
         # evaluate arg and ln(arg)
         (arg,) = expr.args
-        argv = sp.lambdify([x], arg, "numpy")(xv)
+        argv = sp.lambdify(
+            [x], arg, modules="numpy", printer=_create_sympy_numpy_printer(xv.dtype)
+        )(xv)
         exprv = np.log(argv)
 
         # update the error bounds
@@ -392,7 +411,9 @@ def _compute_eb_abs_qoi(
     if expr.func is sp.exp and len(expr.args) == 1:
         # evaluate arg and e^arg
         (arg,) = expr.args
-        argv = sp.lambdify([x], arg, "numpy")(xv)
+        argv = sp.lambdify(
+            [x], arg, modules="numpy", printer=_create_sympy_numpy_printer(xv.dtype)
+        )(xv)
         exprv = np.exp(argv)
 
         # update the error bounds
@@ -456,7 +477,8 @@ def _compute_eb_abs_qoi(
                         sp.Mul(
                             *[arg for arg in term.args if len(arg.free_symbols) == 0]  # type: ignore
                         ),
-                        "numpy",
+                        modules="numpy",
+                        printer=_create_sympy_numpy_printer(xv.dtype),
                     )()
                 )
                 terms[i] = sp.Mul(
@@ -506,7 +528,8 @@ def _compute_eb_abs_qoi(
         factor = sp.lambdify(
             [],
             sp.Mul(*[arg for arg in expr.args if len(arg.free_symbols) == 0]),  # type: ignore
-            "numpy",
+            modules="numpy",
+            printer=_create_sympy_numpy_printer(xv.dtype),
         )()  # type: ignore
 
         # flip the lower/upper error bound if the factor is negative
@@ -535,3 +558,29 @@ def _compute_eb_abs_qoi(
         )
 
     raise ValueError(f"unsupported expression kind {expr} (= {sp.srepr(expr)} =)")
+
+
+@functools.cache
+def _create_sympy_numpy_printer(dtype: np.dtype):
+    class NumPyDtypePrinter(sp.printing.numpy.NumPyPrinter):
+        def __init__(self, settings=None):
+            self._dtype = dtype.name
+            if settings is None:
+                settings = dict()
+            settings["precision"] = np.finfo(dtype).precision + 1
+            super().__init__(settings)
+
+        def _print_Integer(self, expr):
+            return str(expr.p)
+
+        def _print_Rational(self, expr):
+            if expr.q == 1:
+                return str(expr.p)
+            else:
+                return f"{self._dtype}({expr.p}) / {self._dtype}({expr.q})"
+
+        def _print_Float(self, expr):
+            s = super()._print_Float(expr)
+            return f"{self._dtype}({s!r})"
+
+    return NumPyDtypePrinter
