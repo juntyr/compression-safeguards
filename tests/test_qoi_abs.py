@@ -82,6 +82,8 @@ def test_exponential(check):
     check("exp(x)")
     check("2 ** (x + 1)")
 
+    check_all_codecs(np.array([51.0]), "2**x")
+
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_logarithm(check):

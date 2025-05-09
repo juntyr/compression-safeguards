@@ -288,17 +288,17 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         assert np.all((eb_abs_qoi_lower <= 0) & np.isfinite(eb_abs_qoi_lower))
         assert np.all((eb_abs_qoi_upper >= 0) & np.isfinite(eb_abs_qoi_upper))
 
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            print(
-                self._eb_abs,
-                eb_abs_qoi_lower,
-                eb_abs_qoi_upper,
-                (qoi_lambda)(data_float + eb_abs_qoi_lower) - (qoi_lambda)(data_float),
-                (qoi_lambda)(data_float + eb_abs_qoi_upper) - (qoi_lambda)(data_float),
-                flush=True,
-            )
+        # with np.errstate(
+        #     divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        # ):
+        #     print(
+        #         self._eb_abs,
+        #         eb_abs_qoi_lower,
+        #         eb_abs_qoi_upper,
+        #         (qoi_lambda)(data_float + eb_abs_qoi_lower) - (qoi_lambda)(data_float),
+        #         (qoi_lambda)(data_float + eb_abs_qoi_upper) - (qoi_lambda)(data_float),
+        #         flush=True,
+        #     )
 
         return _compute_safe_eb_diff_interval(
             data,
@@ -329,10 +329,10 @@ def _compute_eb_abs_qoi(
     tauv_lower: np.ndarray,
     tauv_upper: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
-    print(
-        f"Compute for {expr} with x={xv} for {tauv_lower} <= e <= {tauv_upper}",
-        flush=True,
-    )
+    # print(
+    #     f"Compute for {expr} with x={xv} for {tauv_lower} <= e <= {tauv_upper}",
+    #     flush=True,
+    # )
 
     """
     Inspired by:
@@ -457,9 +457,28 @@ def _compute_eb_abs_qoi(
     # this is mathematically incorrect for a < 0 but works for deriving error bounds
     if expr.is_Pow and len(expr.args) == 2:
         a, b = expr.args
-        return _compute_eb_abs_qoi(
+        tl, tu = _compute_eb_abs_qoi(
             sp.exp(b * sp.ln(sp.Abs(a)), evaluate=False), x, xv, tauv_lower, tauv_upper
         )
+
+        exprl = sp.lambdify(
+            [x], expr, modules="numpy", printer=_create_sympy_numpy_printer(xv.dtype)
+        )
+        exprv = (exprl)(xv)
+
+        # FIXME: handle rounding better
+        while True:
+            tauv_lower_outside = ((exprl)(xv + tl) - exprv) < tauv_lower
+            if not np.any(tauv_lower_outside & np.isfinite(exprv)):
+                break
+            tl *= 0.5
+        while True:
+            tauv_upper_outside = ((exprl)(xv + tu) - exprv) > tauv_upper
+            if not np.any(tauv_upper_outside & np.isfinite(exprv)):
+                break
+            tu *= 0.5
+
+        return tl, tu
 
     # a_1 * e_1 + ... + a_n * e_n + c (weighted sum)
     # using Corollary 2 and Lemma 4 from Jiao et al.
