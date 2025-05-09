@@ -220,7 +220,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
             eb_abs_impl: np.ndarray = to_finite_float(
                 eb_abs_impl_float, data_float.dtype
             )
-        assert eb_abs_impl >= 0.0
+        assert eb_abs_impl >= 0
 
         return _compute_safe_eb_abs_interval(
             data, data_float, eb_abs_impl, equal_nan=True

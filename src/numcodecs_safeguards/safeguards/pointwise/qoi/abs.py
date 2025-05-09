@@ -221,7 +221,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
             eb_abs: np.ndarray = to_finite_float(self._eb_abs, data_float.dtype)
-        assert eb_abs >= 0.0
+        assert eb_abs >= 0
 
         # ensure the error bounds are representable in QOI space
         with np.errstate(
@@ -247,12 +247,16 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             )
 
             # compute the adjusted error bound
-            eb_abs_lower = qoi_lower - data_qoi
-            eb_abs_upper = qoi_upper - data_qoi
-        eb_abs_lower = np.nan_to_num(eb_abs_lower, nan=0.0, posinf=None, neginf=0.0)
-        eb_abs_upper = np.nan_to_num(eb_abs_upper, nan=0.0, posinf=0.0, neginf=None)
-        assert np.all(eb_abs_lower <= 0.0)
-        assert np.all(eb_abs_upper >= 0.0)
+            eb_abs_lower: np.ndarray = to_finite_float(
+                qoi_lower - data_qoi, data_float.dtype
+            )
+            eb_abs_upper: np.ndarray = to_finite_float(
+                qoi_upper - data_qoi, data_float.dtype
+            )
+            eb_abs_lower = np.nan_to_num(eb_abs_lower, nan=0)
+            eb_abs_upper = np.nan_to_num(eb_abs_upper, nan=0)
+        assert np.all((eb_abs_lower <= 0) & np.isfinite(eb_abs_lower))
+        assert np.all((eb_abs_upper >= 0) & np.isfinite(eb_abs_upper))
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
@@ -264,51 +268,32 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
                 eb_abs_lower,
                 eb_abs_upper,
             )
-        # FIXME: handle nan to num in the computation s.t. -inf and +inf are
-        #        valid to express any non-NaN value
-        #        and so that no NaNs appear
-        eb_abs_qoi_lower = np.nan_to_num(
-            eb_abs_qoi_lower, nan=0.0, posinf=None, neginf=0.0
-        )
-        eb_abs_qoi_upper = np.nan_to_num(
-            eb_abs_qoi_upper, nan=0.0, posinf=0.0, neginf=None
-        )
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            print(
-                self._eb_abs,
-                eb_abs_qoi_lower,
-                eb_abs_qoi_upper,
-                np.abs(
-                    (self._qoi_lambda)(data_float + eb_abs_qoi_lower)
-                    - (self._qoi_lambda)(data_float)
-                ),
-                np.abs(
-                    (self._qoi_lambda)(data_float + eb_abs_qoi_upper)
-                    - (self._qoi_lambda)(data_float)
-                ),
-                flush=True,
-            )
+        assert np.all((eb_abs_qoi_lower <= 0) & np.isfinite(eb_abs_qoi_lower))
+        assert np.all((eb_abs_qoi_upper >= 0) & np.isfinite(eb_abs_qoi_upper))
 
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            eb_abs_qoi_lower_float: np.ndarray = to_finite_float(
-                eb_abs_qoi_lower, data_float.dtype
-            )
-            eb_abs_qoi_upper_float: np.ndarray = to_finite_float(
-                eb_abs_qoi_upper, data_float.dtype
-            )
-        assert np.all(eb_abs_qoi_lower_float <= 0.0)
-        assert np.all(eb_abs_qoi_upper_float >= 0.0)
+        # with np.errstate(
+        #     divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        # ):
+        #     print(
+        #         self._eb_abs,
+        #         eb_abs_qoi_lower,
+        #         eb_abs_qoi_upper,
+        #         np.abs(
+        #             (self._qoi_lambda)(data_float + eb_abs_qoi_lower)
+        #             - (self._qoi_lambda)(data_float)
+        #         ),
+        #         np.abs(
+        #             (self._qoi_lambda)(data_float + eb_abs_qoi_upper)
+        #             - (self._qoi_lambda)(data_float)
+        #         ),
+        #         flush=True,
+        #     )
 
         return _compute_safe_eb_abs_interval(
             data.flatten(),
             data_float.flatten(),
-            np.minimum(
-                np.abs(eb_abs_qoi_lower_float), np.abs(eb_abs_qoi_upper_float)
-            ).flatten(),  # type: ignore
+            # FIXME: support asymmetric error bounds
+            np.minimum(np.abs(eb_abs_qoi_lower), np.abs(eb_abs_qoi_upper)).flatten(),  # type: ignore
             equal_nan=True,
         ).into_union()
 
@@ -370,27 +355,35 @@ def _compute_eb_abs_qoi(
         (arg,) = expr.args
         argv = sp.lambdify([x], arg, "numpy")(xv)
         exprv = np.log(argv)
+
         # update the error bounds
-        tl = np.where(tauv_lower == 0, 0, np.exp(exprv + tauv_lower) - argv)
-        tu = np.where(tauv_upper == 0, 0, np.exp(exprv + tauv_upper) - argv)
+        tl = np.where(
+            (tauv_lower == 0) | (argv <= 0) | ~np.isfinite(argv),
+            0,
+            np.exp(exprv + tauv_lower) - argv,
+        )
+        tl = to_finite_float(tl, xv.dtype)
+        tl = np.nan_to_num(tl, nan=0)
+
+        tu = np.where(
+            (tauv_upper == 0) | (argv <= 0) | ~np.isfinite(argv),
+            0,
+            np.exp(exprv + tauv_upper) - argv,
+        )
+        tu = to_finite_float(tu, xv.dtype)
+        tu = np.nan_to_num(tu, nan=0)
 
         # FIXME: handle rounding better
         while True:
             tauv_lower_outside = (np.log(argv + tl) - exprv) < tauv_lower
             if not np.any(tauv_lower_outside & np.isfinite(exprv)):
                 break
-            tl = from_total_order(
-                to_total_order(tl) + tauv_lower_outside,
-                xv.dtype,
-            )
+            tl *= 0.5
         while True:
             tauv_upper_outside = (np.log(argv + tu) - exprv) > tauv_upper
             if not np.any(tauv_upper_outside & np.isfinite(exprv)):
                 break
-            tu = from_total_order(
-                to_total_order(tu) - tauv_upper_outside,
-                xv.dtype,
-            )
+            tu *= 0.5
         tauv_lower, tauv_upper = tl, tu
 
         # base case for ln(x)
@@ -405,34 +398,36 @@ def _compute_eb_abs_qoi(
         (arg,) = expr.args
         argv = sp.lambdify([x], arg, "numpy")(xv)
         exprv = np.exp(argv)
+
         # update the error bounds
         # ensure that ln is not passed a negative argument
         tl = np.where(
-            tauv_lower == 0, 0, np.log(np.maximum(0, exprv + tauv_lower)) - argv
+            (tauv_lower == 0) | ~np.isfinite(argv),
+            0,
+            np.log(np.maximum(0, exprv + tauv_lower)) - argv,
         )
+        tl = to_finite_float(tl, xv.dtype)
+        tl = np.nan_to_num(tl, nan=0)
+
         tu = np.where(
-            tauv_upper == 0, 0, np.log(np.maximum(0, exprv + tauv_upper)) - argv
+            (tauv_upper == 0) | ~np.isfinite(argv),
+            0,
+            np.log(np.maximum(0, exprv + tauv_upper)) - argv,
         )
+        tu = to_finite_float(tu, xv.dtype)
+        tu = np.nan_to_num(tu, nan=0)
 
         # FIXME: handle rounding better
         while True:
             tauv_lower_outside = (np.exp(argv + tl) - exprv) < tauv_lower
             if not np.any(tauv_lower_outside & np.isfinite(exprv)):
                 break
-            tl *= 0.99999
-            # tl = from_total_order(
-            #     to_total_order(tl) + tauv_lower_outside,
-            #     xv.dtype,
-            # )
+            tl *= 0.5
         while True:
             tauv_upper_outside = (np.exp(argv + tu) - exprv) > tauv_upper
             if not np.any(tauv_upper_outside & np.isfinite(exprv)):
                 break
-            tu *= 0.99999
-            # tu = from_total_order(
-            #     to_total_order(tu) - tauv_upper_outside,
-            #     xv.dtype,
-            # )
+            tu *= 0.5
         tauv_lower, tauv_upper = tl, tu
 
         # base case for e^x
@@ -477,13 +472,22 @@ def _compute_eb_abs_qoi(
 
         ebs_lower, ebs_upper = None, None
         for term, factor in zip(terms, factors):
+            tl = to_finite_float(
+                (-tauv_upper if factor < 0 else tauv_lower) / total_abs_factor, xv.dtype
+            )
+            tu = to_finite_float(
+                (-tauv_lower if factor < 0 else tauv_upper) / total_abs_factor, xv.dtype
+            )
+            tl = np.nan_to_num(tl, nan=0)
+            tu = np.nan_to_num(tu, nan=0)
+
             # recurse into the terms with a weighted error bound
             eb_lower, eb_upper = _compute_eb_abs_qoi(
                 term,
                 x,
                 xv,
-                (-tauv_upper if factor < 0 else tauv_lower) / total_abs_factor,
-                (-tauv_lower if factor < 0 else tauv_upper) / total_abs_factor,
+                tl,
+                tu,
             )
             # combine the inner error bounds
             if ebs_lower is None:
@@ -509,25 +513,27 @@ def _compute_eb_abs_qoi(
         )()  # type: ignore
 
         # flip the lower/upper error bound if the factor is negative
-        if factor < 0:
-            tauv_lower = tauv_upper / factor
-            tauv_upper = tauv_lower / factor
-        else:
-            tauv_lower = tauv_lower / factor
-            tauv_upper = tauv_upper / factor
+        tl = to_finite_float(
+            (tauv_upper if factor < 0 else tauv_lower) / factor, xv.dtype
+        )
+        tu = to_finite_float(
+            (tauv_lower if factor < 0 else tauv_upper) / factor, xv.dtype
+        )
+        tl = np.nan_to_num(tl, nan=0)
+        tu = np.nan_to_num(tu, nan=0)
 
         # find all non-constant terms
         terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
 
         if len(terms) == 1:
-            return _compute_eb_abs_qoi(terms[0], x, xv, tauv_lower, tauv_upper)
+            return _compute_eb_abs_qoi(terms[0], x, xv, tl, tu)
 
         return _compute_eb_abs_qoi(
             sp.exp(sp.Add(*[sp.log(sp.Abs(term)) for term in terms]), evaluate=False),
             x,
             xv,
-            tauv_lower,
-            tauv_upper,
+            tl,
+            tu,
         )
 
     raise ValueError(f"unsupported expression kind {expr} (= {sp.srepr(expr)} =)")

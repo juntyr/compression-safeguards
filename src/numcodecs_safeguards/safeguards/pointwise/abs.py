@@ -122,7 +122,7 @@ class AbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
             eb_abs: np.ndarray = to_finite_float(self._eb_abs, data_float.dtype)
-        assert eb_abs >= 0.0
+        assert eb_abs >= 0
 
         return _compute_safe_eb_abs_interval(
             data, data_float, eb_abs, equal_nan=self._equal_nan
