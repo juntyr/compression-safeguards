@@ -7,16 +7,9 @@ __all__ = ["RelativeErrorBoundSafeguard"]
 import numpy as np
 
 from .abc import PointwiseSafeguard, S, T
-from ...cast import (
-    to_float,
-    from_float,
-    as_bits,
-    to_total_order,
-    from_total_order,
-    to_finite_float,
-    F,
-)
-from ...intervals import IntervalUnion, Interval, Lower, Upper
+from .abs import _compute_safe_eb_diff_interval
+from ...cast import to_float, as_bits, to_finite_float
+from ...intervals import IntervalUnion, Lower, Upper
 
 
 class RelativeErrorBoundSafeguard(PointwiseSafeguard):
@@ -148,9 +141,15 @@ class RelativeErrorBoundSafeguard(PointwiseSafeguard):
             )
         assert np.all((eb_rel_as_abs >= 0) & np.isfinite(eb_rel_as_abs))
 
-        return _compute_safe_eb_rel_interval(
-            data, data_float, eb_rel_as_abs, equal_nan=self._equal_nan
-        ).into_union()  # type: ignore
+        valid = _compute_safe_eb_diff_interval(
+            data, data_float, -eb_rel_as_abs, eb_rel_as_abs, equal_nan=self._equal_nan
+        )
+
+        # special case zero to handle +0.0 and -0.0
+        dataf = data.flatten()
+        Lower(dataf) <= valid[dataf == 0] <= Upper(dataf)
+
+        return valid.into_union()  # type: ignore
 
     def get_config(self) -> dict:
         """
@@ -165,53 +164,3 @@ class RelativeErrorBoundSafeguard(PointwiseSafeguard):
         return dict(
             kind=type(self).kind, eb_rel=self._eb_rel, equal_nan=self._equal_nan
         )
-
-
-def _compute_safe_eb_rel_interval(
-    data: np.ndarray[S, T],
-    data_float: np.ndarray[S, F],
-    eb_rel_as_abs: np.ndarray[S, F],
-    equal_nan: bool,
-) -> Interval[T, int]:
-    dataf: np.ndarray[tuple[int], T] = data.flatten()
-    dataf_float: np.ndarray[tuple[int], F] = data_float.flatten()
-    eb_rel_as_absf: np.ndarray[tuple[int], F] = eb_rel_as_abs.flatten()
-
-    valid = (
-        Interval.empty_like(dataf)
-        .preserve_inf(dataf)
-        .preserve_nan(dataf, equal_nan=equal_nan)
-    )
-
-    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        Lower(from_float(dataf_float - eb_rel_as_absf, dataf.dtype)) <= valid[
-            np.isfinite(dataf)
-        ] <= Upper(from_float(dataf_float + eb_rel_as_absf, dataf.dtype))
-
-    # correct rounding errors in the lower and upper bound
-    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        # we don't use abs(data - bound) here to accommodate unsigned ints
-        lower_bound_outside_eb_rel_as_abs = (
-            dataf_float - to_float(valid._lower)
-        ) > eb_rel_as_absf
-        upper_bound_outside_eb_rel_as_abs = (
-            to_float(valid._upper) - dataf_float
-        ) > eb_rel_as_absf
-
-    valid._lower[np.isfinite(dataf)] = from_total_order(
-        to_total_order(valid._lower) + lower_bound_outside_eb_rel_as_abs,
-        dataf.dtype,
-    )[np.isfinite(dataf)]
-    valid._upper[np.isfinite(dataf)] = from_total_order(
-        to_total_order(valid._upper) - upper_bound_outside_eb_rel_as_abs,
-        dataf.dtype,
-    )[np.isfinite(dataf)]
-
-    # special case zero to handle +0.0 and -0.0
-    Lower(dataf) <= valid[dataf == 0] <= Upper(dataf)
-
-    # a zero-error bound must preserve exactly, e.g. even for -0.0
-    if np.any(eb_rel_as_abs == 0):
-        Lower(dataf) <= valid[np.isfinite(dataf) & (eb_rel_as_abs == 0)] <= Upper(dataf)
-
-    return valid

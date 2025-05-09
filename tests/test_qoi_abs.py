@@ -123,3 +123,7 @@ def test_tanh(check):
 @pytest.mark.parametrize("check", CHECKS)
 def test_composed(check):
     check("2 / (ln(x) + sqrt(x))")
+
+
+def test_test():
+    check_arange("2**x")

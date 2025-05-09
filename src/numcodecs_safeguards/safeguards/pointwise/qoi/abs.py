@@ -11,7 +11,7 @@ import sympy as sp
 
 from . import Expr
 from ..abc import PointwiseSafeguard, S, T
-from ..abs import _compute_safe_eb_abs_interval
+from ..abs import _compute_safe_eb_diff_interval
 from ....cast import (
     as_bits,
     to_float,
@@ -271,31 +271,27 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         assert np.all((eb_abs_qoi_lower <= 0) & np.isfinite(eb_abs_qoi_lower))
         assert np.all((eb_abs_qoi_upper >= 0) & np.isfinite(eb_abs_qoi_upper))
 
-        # with np.errstate(
-        #     divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        # ):
-        #     print(
-        #         self._eb_abs,
-        #         eb_abs_qoi_lower,
-        #         eb_abs_qoi_upper,
-        #         np.abs(
-        #             (self._qoi_lambda)(data_float + eb_abs_qoi_lower)
-        #             - (self._qoi_lambda)(data_float)
-        #         ),
-        #         np.abs(
-        #             (self._qoi_lambda)(data_float + eb_abs_qoi_upper)
-        #             - (self._qoi_lambda)(data_float)
-        #         ),
-        #         flush=True,
-        #     )
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            print(
+                self._eb_abs,
+                eb_abs_qoi_lower,
+                eb_abs_qoi_upper,
+                (self._qoi_lambda)(data_float + eb_abs_qoi_lower)
+                - (self._qoi_lambda)(data_float),
+                (self._qoi_lambda)(data_float + eb_abs_qoi_upper)
+                - (self._qoi_lambda)(data_float),
+                flush=True,
+            )
 
-        return _compute_safe_eb_abs_interval(
-            data.flatten(),
-            data_float.flatten(),
-            # FIXME: support asymmetric error bounds
-            np.minimum(np.abs(eb_abs_qoi_lower), np.abs(eb_abs_qoi_upper)).flatten(),  # type: ignore
+        return _compute_safe_eb_diff_interval(
+            data,
+            data_float,
+            eb_abs_qoi_lower,
+            eb_abs_qoi_upper,
             equal_nan=True,
-        ).into_union()
+        ).into_union()  # type: ignore
 
     def get_config(self) -> dict:
         """
@@ -318,10 +314,10 @@ def _compute_eb_abs_qoi(
     tauv_lower: np.ndarray,
     tauv_upper: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
-    # print(
-    #     f"Compute for {expr} with x={xv} for {tauv_lower} <= e <= {tauv_upper}",
-    #     flush=True,
-    # )
+    print(
+        f"Compute for {expr} with x={xv} for {tauv_lower} <= e <= {tauv_upper}",
+        flush=True,
+    )
 
     """
     Inspired by:
@@ -472,6 +468,7 @@ def _compute_eb_abs_qoi(
 
         ebs_lower, ebs_upper = None, None
         for term, factor in zip(terms, factors):
+            # FIXME: ensure we round towards zero here
             tl = to_finite_float(
                 (-tauv_upper if factor < 0 else tauv_lower) / total_abs_factor, xv.dtype
             )
@@ -513,6 +510,7 @@ def _compute_eb_abs_qoi(
         )()  # type: ignore
 
         # flip the lower/upper error bound if the factor is negative
+        # FIXME: ensure we round towards zero here
         tl = to_finite_float(
             (tauv_upper if factor < 0 else tauv_lower) / factor, xv.dtype
         )

@@ -12,7 +12,7 @@ import numpy as np
 from ....cast import to_float, as_bits, to_finite_float
 from ....intervals import IntervalUnion
 from ..abc import StencilSafeguard, S, T
-from ...pointwise.abs import _compute_safe_eb_abs_interval
+from ...pointwise.abs import _compute_safe_eb_diff_interval
 from . import (
     FiniteDifference,
     _finite_difference_offsets,
@@ -222,8 +222,8 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
             )
         assert eb_abs_impl >= 0
 
-        return _compute_safe_eb_abs_interval(
-            data, data_float, eb_abs_impl, equal_nan=True
+        return _compute_safe_eb_diff_interval(
+            data, data_float, -eb_abs_impl, eb_abs_impl, equal_nan=True
         ).into_union()  # type: ignore
 
     def get_config(self) -> dict:

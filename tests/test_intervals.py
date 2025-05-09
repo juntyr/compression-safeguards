@@ -114,8 +114,6 @@ def test_abs():
         np.array([[-126, -125, -124, -123, 126, 127, 127, 127]], dtype=np.int8),
     )
 
-    # TODO: test with floats
-
 
 def test_sign_abs():
     data = np.arange(-4, 5, dtype=np.int8)
