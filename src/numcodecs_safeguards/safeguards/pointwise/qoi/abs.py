@@ -145,6 +145,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
                 ),
                 transformations=(sp.parsing.sympy_parser.auto_number,),
             )
+            _canary = str(qoi_expr)
         except Exception as err:
             raise AssertionError(
                 f"failed to parse qoi expression {qoi!r}: {err}"

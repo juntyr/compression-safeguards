@@ -64,9 +64,14 @@ CHECKS = [
 
 
 @pytest.mark.parametrize("check", CHECKS)
-def test_constant(check):
+def test_empty(check):
     with pytest.raises(AssertionError, match="empty"):
         check("")
+        check("  \t   \n   ")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_constant(check):
     with pytest.raises(AssertionError, match="constant"):
         check("0")
     with pytest.raises(AssertionError, match="constant"):
@@ -139,3 +144,9 @@ def test_tanh(check):
 @pytest.mark.parametrize("check", CHECKS)
 def test_composed(check):
     check("2 / (ln(x) + sqrt(x))")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_fuzzer_found(check):
+    with pytest.raises(AssertionError, match="failed to parse"):
+        check("(((-8054**5852)-x)-1)")
