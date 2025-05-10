@@ -254,7 +254,9 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             qoi_lower = data_qoi - eb_abs
             qoi_upper = data_qoi + eb_abs
 
-            print(f"eb_abs={eb_abs} data_qoi={data_qoi} qoi_lower={qoi_lower} qoi_upper={qoi_upper}")
+            print(
+                f"eb_abs={eb_abs} data_qoi={data_qoi} qoi_lower={qoi_lower} qoi_upper={qoi_upper}"
+            )
 
             # check if they're representable within the error bound
             qoi_lower_outside_eb_abs = (data_qoi - qoi_lower) > eb_abs
@@ -334,6 +336,47 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 def _compute_eb_abs_qoi(
+    expr: sp.Basic,
+    x: sp.Symbol,
+    xv: np.ndarray,
+    tauv_lower: np.ndarray,
+    tauv_upper: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    tl, tu = _compute_eb_abs_qoi_inner(expr, x, xv, tauv_lower, tauv_upper)
+
+    exprl = sp.lambdify(
+        [x], expr, modules="numpy", printer=_create_sympy_numpy_printer(xv.dtype)
+    )
+    exprv = (exprl)(xv)
+
+    # TODO: first try nextafter on the correction, then on xv, then back off
+    tauv_lower_outside = ((exprl)(xv + tl) - exprv) < tauv_lower
+    tl = np.where(
+        tauv_lower_outside & np.isfinite(exprv), np.nextafter(xv + tl, xv) - xv, tl
+    )
+
+    tauv_upper_outside = ((exprl)(xv + tu) - exprv) > tauv_upper
+    tu = np.where(
+        tauv_upper_outside & np.isfinite(exprv), np.nextafter(xv + tu, xv) - xv, tu
+    )
+
+    # FIXME: handle rounding better
+    while True:
+        tauv_lower_outside = ((exprl)(xv + tl) - exprv) < tauv_lower
+        if not np.any(tauv_lower_outside & np.isfinite(exprv)):
+            break
+        tl = np.where(tauv_lower_outside & np.isfinite(exprv), tl * 0.5, tl)
+    while True:
+        tauv_upper_outside = ((exprl)(xv + tu) - exprv) > tauv_upper
+        if not np.any(tauv_upper_outside & np.isfinite(exprv)):
+            break
+        tu = np.where(tauv_upper_outside & np.isfinite(exprv), tu * 0.5, tu)
+
+    return tl, tu
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def _compute_eb_abs_qoi_inner(
     expr: sp.Basic,
     x: sp.Symbol,
     xv: np.ndarray,
@@ -518,25 +561,40 @@ def _compute_eb_abs_qoi(
                 factors.append(1)
         total_abs_factor = np.sum(np.abs(factors))
 
+        tl = np.nan_to_num(
+            to_finite_float(tauv_lower / total_abs_factor, xv.dtype), nan=0
+        )
+        tu = np.nan_to_num(
+            to_finite_float(tauv_upper / total_abs_factor, xv.dtype), nan=0
+        )
+
+        # FIXME: handle rounding better
+        while True:
+            tauv_lower_outside = (tl * total_abs_factor) < tauv_lower
+            if not np.any(tauv_lower_outside):
+                break
+            tl = from_total_order(
+                to_total_order(tl) + tauv_lower_outside,
+                xv.dtype,
+            )
+        while True:
+            tauv_upper_outside = (tu * total_abs_factor) > tauv_upper
+            if not np.any(tauv_upper_outside):
+                break
+            tu = from_total_order(
+                to_total_order(tu) - tauv_upper_outside,
+                xv.dtype,
+            )
+
         ebs_lower, ebs_upper = None, None
         for term, factor in zip(terms, factors):
-            # FIXME: ensure we round towards zero here
-            tl = to_finite_float(
-                (-tauv_upper if factor < 0 else tauv_lower) / total_abs_factor, xv.dtype
-            )
-            tu = to_finite_float(
-                (-tauv_lower if factor < 0 else tauv_upper) / total_abs_factor, xv.dtype
-            )
-            tl = np.nan_to_num(tl, nan=0)
-            tu = np.nan_to_num(tu, nan=0)
-
             # recurse into the terms with a weighted error bound
             eb_lower, eb_upper = _compute_eb_abs_qoi(
                 term,
                 x,
                 xv,
-                tl,
-                tu,
+                -tu if factor < 0 else tl,
+                -tl if factor < 0 else tu,
             )
             # combine the inner error bounds
             if ebs_lower is None:
@@ -562,30 +620,67 @@ def _compute_eb_abs_qoi(
             printer=_create_sympy_numpy_printer(xv.dtype),
         )()  # type: ignore
 
+        tl = np.nan_to_num(
+            to_finite_float(tauv_lower / np.abs(factor), xv.dtype), nan=0
+        )
+        tu = np.nan_to_num(
+            to_finite_float(tauv_upper / np.abs(factor), xv.dtype), nan=0
+        )
+
+        # FIXME: handle rounding better
+        while True:
+            tauv_lower_outside = (tl * np.abs(factor)) < tauv_lower
+            if not np.any(tauv_lower_outside):
+                break
+            tl = from_total_order(
+                to_total_order(tl) + tauv_lower_outside,
+                xv.dtype,
+            )
+        while True:
+            tauv_upper_outside = (tu * np.abs(factor)) > tauv_upper
+            if not np.any(tauv_upper_outside):
+                break
+            tu = from_total_order(
+                to_total_order(tu) - tauv_upper_outside,
+                xv.dtype,
+            )
+
         # flip the lower/upper error bound if the factor is negative
-        # FIXME: ensure we round towards zero here
-        tl = to_finite_float(
-            (tauv_upper if factor < 0 else tauv_lower) / factor, xv.dtype
-        )
-        tu = to_finite_float(
-            (tauv_lower if factor < 0 else tauv_upper) / factor, xv.dtype
-        )
-        tl = np.nan_to_num(tl, nan=0)
-        tu = np.nan_to_num(tu, nan=0)
+        tauv_lower = -tu if factor < 0 else tl
+        tauv_upper = -tl if factor < 0 else tu
 
         # find all non-constant terms
         terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
 
         if len(terms) == 1:
-            return _compute_eb_abs_qoi(terms[0], x, xv, tl, tu)
+            return _compute_eb_abs_qoi(terms[0], x, xv, tauv_lower, tauv_upper)
 
-        return _compute_eb_abs_qoi(
+        tl, tu = _compute_eb_abs_qoi(
             sp.exp(sp.Add(*[sp.log(sp.Abs(term)) for term in terms]), evaluate=False),
             x,
             xv,
-            tl,
-            tu,
+            tauv_lower,
+            tauv_upper,
         )
+
+        exprl = sp.lambdify(
+            [x], expr, modules="numpy", printer=_create_sympy_numpy_printer(xv.dtype)
+        )
+        exprv = (exprl)(xv)
+
+        # FIXME: handle rounding better
+        while True:
+            tauv_lower_outside = ((exprl)(xv + tl) - exprv) < tauv_lower
+            if not np.any(tauv_lower_outside & np.isfinite(exprv)):
+                break
+            tl *= 0.5
+        while True:
+            tauv_upper_outside = ((exprl)(xv + tu) - exprv) > tauv_upper
+            if not np.any(tauv_upper_outside & np.isfinite(exprv)):
+                break
+            tu *= 0.5
+
+        return tl, tu
 
     raise ValueError(f"unsupported expression kind {expr} (= {sp.srepr(expr)} =)")
 
