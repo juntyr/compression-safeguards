@@ -64,10 +64,24 @@ CHECKS = [
 
 
 @pytest.mark.parametrize("check", CHECKS)
+def test_constant(check):
+    with pytest.raises(AssertionError, match="empty"):
+        check("")
+    with pytest.raises(AssertionError, match="constant"):
+        check("0")
+    with pytest.raises(AssertionError, match="constant"):
+        check("pi")
+    with pytest.raises(AssertionError, match="constant"):
+        check("e")
+    with pytest.raises(AssertionError, match="constant"):
+        check("-(-(-e))")
+
+
+@pytest.mark.parametrize("check", CHECKS)
 def test_polynomial(check):
     check("x")
     check("2*x")
-    check("3*x + 1")
+    check("3*x + pi")
     check("x**2")
     check("x**3")
     check("x**2 + x + 1")

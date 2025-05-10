@@ -124,8 +124,9 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
 
         self._x = sp.Symbol("x", real=True)
 
+        assert len(qoi.strip()) > 0, "qoi expression must not be empty"
         try:
-            self._qoi_expr = sp.parse_expr(
+            qoi_expr = sp.parse_expr(
                 self._qoi,
                 local_dict=dict(x=self._x),
                 global_dict=dict(
@@ -148,6 +149,9 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             raise AssertionError(
                 f"failed to parse qoi expression {qoi!r}: {err}"
             ) from err
+        assert len(qoi_expr.free_symbols) > 0, "qoi expression must not be constant"
+
+        self._qoi_expr = qoi_expr
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
