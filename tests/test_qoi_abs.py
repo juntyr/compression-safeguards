@@ -148,5 +148,8 @@ def test_composed(check):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_fuzzer_found(check):
-    with pytest.raises(AssertionError, match="failed to parse"):
-        check("(((-8054**5852)-x)-1)")
+    # with pytest.raises(AssertionError, match="failed to parse"):
+    #     check("(((-8054**5852)-x)-1)")
+
+    # FIXME: needs mul rounding check
+    check_all_codecs(np.array([[1]], dtype=np.uint8), "x/sqrt(pi)")

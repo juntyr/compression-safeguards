@@ -254,6 +254,8 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             qoi_lower = data_qoi - eb_abs
             qoi_upper = data_qoi + eb_abs
 
+            print(f"eb_abs={eb_abs} data_qoi={data_qoi} qoi_lower={qoi_lower} qoi_upper={qoi_upper}")
+
             # check if they're representable within the error bound
             qoi_lower_outside_eb_abs = (data_qoi - qoi_lower) > eb_abs
             qoi_upper_outside_eb_abs = (qoi_upper - data_qoi) > eb_abs
@@ -277,6 +279,10 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             )
             eb_abs_lower = np.nan_to_num(eb_abs_lower, nan=0)
             eb_abs_upper = np.nan_to_num(eb_abs_upper, nan=0)
+        assert eb_abs_lower.shape == data.shape
+        assert eb_abs_lower.dtype == data_float.dtype
+        assert eb_abs_upper.shape == data.shape
+        assert eb_abs_upper.dtype == data_float.dtype
         assert np.all((eb_abs_lower <= 0) & np.isfinite(eb_abs_lower))
         assert np.all((eb_abs_upper >= 0) & np.isfinite(eb_abs_upper))
 
@@ -293,17 +299,17 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         assert np.all((eb_abs_qoi_lower <= 0) & np.isfinite(eb_abs_qoi_lower))
         assert np.all((eb_abs_qoi_upper >= 0) & np.isfinite(eb_abs_qoi_upper))
 
-        # with np.errstate(
-        #     divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        # ):
-        #     print(
-        #         self._eb_abs,
-        #         eb_abs_qoi_lower,
-        #         eb_abs_qoi_upper,
-        #         (qoi_lambda)(data_float + eb_abs_qoi_lower) - (qoi_lambda)(data_float),
-        #         (qoi_lambda)(data_float + eb_abs_qoi_upper) - (qoi_lambda)(data_float),
-        #         flush=True,
-        #     )
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            print(
+                self._eb_abs,
+                eb_abs_qoi_lower,
+                eb_abs_qoi_upper,
+                (qoi_lambda)(data_float + eb_abs_qoi_lower) - (qoi_lambda)(data_float),
+                (qoi_lambda)(data_float + eb_abs_qoi_upper) - (qoi_lambda)(data_float),
+                flush=True,
+            )
 
         return _compute_safe_eb_diff_interval(
             data,
@@ -334,10 +340,10 @@ def _compute_eb_abs_qoi(
     tauv_lower: np.ndarray,
     tauv_upper: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
-    # print(
-    #     f"Compute for {expr} with x={xv} for {tauv_lower} <= e <= {tauv_upper}",
-    #     flush=True,
-    # )
+    print(
+        f"Compute for {expr} with x={xv} for {tauv_lower} <= e <= {tauv_upper}",
+        flush=True,
+    )
 
     """
     Inspired by:
@@ -587,6 +593,8 @@ def _compute_eb_abs_qoi(
 @functools.cache
 def _create_sympy_numpy_printer(dtype: np.dtype):
     class NumPyDtypePrinter(sp.printing.numpy.NumPyPrinter):
+        _kc = dict()
+
         def __init__(self, settings=None):
             self._dtype = dtype.name
             if settings is None:
@@ -606,5 +614,17 @@ def _create_sympy_numpy_printer(dtype: np.dtype):
         def _print_Float(self, expr):
             s = super()._print_Float(expr)
             return f"{self._dtype}({s!r})"
+
+        def _print_Exp1(self, expr):
+            return self._print_NumberSymbol(expr)
+
+        def _print_Pi(self, expr):
+            return self._print_NumberSymbol(expr)
+
+        def _print_NaN(self, expr):
+            return f"{self._dtype}(nan)"
+
+        def _print_Infinity(self, expr):
+            return f"{self._dtype}(inf)"
 
     return NumPyDtypePrinter
