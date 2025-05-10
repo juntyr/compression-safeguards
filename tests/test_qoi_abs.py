@@ -146,10 +146,13 @@ def test_composed(check):
     check("2 / (ln(x) + sqrt(x))")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_fuzzer_found(check):
-#     # with pytest.raises(AssertionError, match="failed to parse"):
-#     #     check("(((-8054**5852)-x)-1)")
+# TODO: add a test for all dtypes
+# TODO: add a test that forces the float128 fallback
 
-#     # FIXME: needs from float to int rounding correction
-#     check_all_codecs(np.array([[1]], dtype=np.uint8), "x/sqrt(pi)")
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_fuzzer_found(check):
+    with pytest.raises(AssertionError, match="failed to parse"):
+        check("(((-8054**5852)-x)-1)")
+
+    check_all_codecs(np.array([[1]], dtype=np.uint8), "x/sqrt(pi)")

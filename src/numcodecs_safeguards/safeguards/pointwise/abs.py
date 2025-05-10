@@ -172,7 +172,7 @@ def _compute_safe_eb_diff_interval(
     # correct rounding errors in the lower and upper bound
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         # we don't use abs(data - bound) here to accommodate unsigned ints
-        lower_bound_outside_eb_abs = (dataf_float - to_float(valid._lower)) < eb_lowerf
+        lower_bound_outside_eb_abs = (to_float(valid._lower) - dataf_float) < eb_lowerf
         upper_bound_outside_eb_abs = (to_float(valid._upper) - dataf_float) > eb_upperf
 
     valid._lower[np.isfinite(dataf)] = from_total_order(

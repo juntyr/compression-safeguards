@@ -313,13 +313,17 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
                 flush=True,
             )
 
-        return _compute_safe_eb_diff_interval(
+        valid = _compute_safe_eb_diff_interval(
             data,
             data_float,
             eb_abs_qoi_lower,
             eb_abs_qoi_upper,
             equal_nan=True,
-        ).into_union()  # type: ignore
+        )
+
+        print(valid)
+
+        return valid.into_union()  # type: ignore
 
     def get_config(self) -> dict:
         """
