@@ -16,6 +16,8 @@ from ....cast import (
     as_bits,
     to_float,
     to_finite_float,
+    _float128,
+    _float128_precision,
 )
 from ....intervals import IntervalUnion
 
@@ -181,13 +183,23 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         qoi_lambda = sp.lambdify(
             self._x,
             self._qoi_expr,
-            modules="numpy",
+            modules=["numpy", {_float128.name: _float128}],
             printer=_create_sympy_numpy_printer(data_float.dtype),
             docstring_limit=0,
         )
 
         qoi_data = (qoi_lambda)(data_float)
         qoi_decoded = (qoi_lambda)(to_float(decoded))
+
+        # print("======")
+        # print(qoi_data)
+        # print(qoi_decoded)
+        # print(type(qoi_data.dtype))
+        # print(type(qoi_decoded.dtype))
+        # print(as_bits(qoi_data, kind="V"))
+        # print(as_bits(qoi_decoded, kind="V"))
+        # print(qoi_data.tobytes())
+        # print(qoi_decoded.tobytes())
 
         absolute_bound = (
             np.where(
@@ -199,6 +211,10 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         )
         same_bits = as_bits(qoi_data, kind="V") == as_bits(qoi_decoded, kind="V")
         both_nan = np.isnan(qoi_data) & np.isnan(qoi_decoded)
+
+        # print(absolute_bound)
+        # print(same_bits)
+        # print(both_nan)
 
         ok = np.where(
             np.isfinite(qoi_data),
@@ -241,7 +257,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         qoi_lambda = sp.lambdify(
             self._x,
             self._qoi_expr,
-            modules="numpy",
+            modules=["numpy", {_float128.name: _float128}],
             printer=_create_sympy_numpy_printer(data_float.dtype),
             docstring_limit=0,
         )
@@ -352,7 +368,7 @@ def _compute_checked_eb_abs_qoi(
     tl, tu = _compute_eb_abs_qoi_inner(expr, x, xv, tauv_lower, tauv_upper)
 
     exprl = sp.lambdify(
-        [x], expr, modules="numpy", printer=_create_sympy_numpy_printer(xv.dtype)
+        [x], expr, modules=["numpy", {_float128.name: _float128}], printer=_create_sympy_numpy_printer(xv.dtype)
     )
     exprv = (exprl)(xv)
 
@@ -432,7 +448,7 @@ def _compute_eb_abs_qoi_inner(
         # evaluate arg
         (arg,) = expr.args
         argv = sp.lambdify(
-            [x], arg, modules="numpy", printer=_create_sympy_numpy_printer(xv.dtype)
+            [x], arg, modules=["numpy", {_float128.name: _float128}], printer=_create_sympy_numpy_printer(xv.dtype)
         )(xv)
         # flip the lower/upper error bound if the arg is negative
         tl = np.where(argv < 0, -tauv_upper, tauv_lower)
@@ -445,7 +461,7 @@ def _compute_eb_abs_qoi_inner(
         # evaluate arg and ln(arg)
         (arg,) = expr.args
         argv = sp.lambdify(
-            [x], arg, modules="numpy", printer=_create_sympy_numpy_printer(xv.dtype)
+            [x], arg, modules=["numpy", {_float128.name: _float128}], printer=_create_sympy_numpy_printer(xv.dtype)
         )(xv)
         exprv = np.log(argv)
 
@@ -490,7 +506,7 @@ def _compute_eb_abs_qoi_inner(
         # evaluate arg and e^arg
         (arg,) = expr.args
         argv = sp.lambdify(
-            [x], arg, modules="numpy", printer=_create_sympy_numpy_printer(xv.dtype)
+            [x], arg, modules=["numpy", {_float128.name: _float128}], printer=_create_sympy_numpy_printer(xv.dtype)
         )(xv)
         exprv = np.exp(argv)
 
@@ -555,7 +571,7 @@ def _compute_eb_abs_qoi_inner(
                         sp.Mul(
                             *[arg for arg in term.args if len(arg.free_symbols) == 0]  # type: ignore
                         ),
-                        modules="numpy",
+                        modules=["numpy", {_float128.name: _float128}],
                         printer=_create_sympy_numpy_printer(xv.dtype),
                     )()
                 )
@@ -615,7 +631,7 @@ def _compute_eb_abs_qoi_inner(
         factor = sp.lambdify(
             [],
             sp.Mul(*[arg for arg in expr.args if len(arg.free_symbols) == 0]),  # type: ignore
-            modules="numpy",
+            modules=["numpy", {_float128.name: _float128}],
             printer=_create_sympy_numpy_printer(xv.dtype),
         )()  # type: ignore
 
@@ -668,7 +684,10 @@ def _create_sympy_numpy_printer(dtype: np.dtype):
             self._dtype = dtype.name
             if settings is None:
                 settings = dict()
-            settings["precision"] = np.finfo(dtype).precision + 1
+            if dtype == _float128:
+                settings["precision"] = _float128_precision + 1
+            else:
+                settings["precision"] = np.finfo(dtype).precision + 1
             super().__init__(settings)
 
         def _print_Integer(self, expr):
@@ -678,11 +697,11 @@ def _create_sympy_numpy_printer(dtype: np.dtype):
             if expr.q == 1:
                 return str(expr.p)
             else:
-                return f"{self._dtype}({expr.p}) / {self._dtype}({expr.q})"
+                return f"array({expr.p}, dtype={self._dtype}) / array({expr.q}, dtype={self._dtype})"
 
         def _print_Float(self, expr):
             s = super()._print_Float(expr)
-            return f"{self._dtype}({s!r})"
+            return f"array({s!r}, dtype={self._dtype})"
 
         def _print_Exp1(self, expr):
             return self._print_NumberSymbol(expr)
@@ -691,9 +710,9 @@ def _create_sympy_numpy_printer(dtype: np.dtype):
             return self._print_NumberSymbol(expr)
 
         def _print_NaN(self, expr):
-            return f"{self._dtype}(nan)"
+            return f"array(nan, dtype={self._dtype})"
 
         def _print_Infinity(self, expr):
-            return f"{self._dtype}(inf)"
+            return f"array(inf, dtype={self._dtype})"
 
     return NumPyDtypePrinter

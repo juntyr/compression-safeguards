@@ -157,3 +157,7 @@ def test_dtypes(dtype):
 def test_fuzzer_found(check):
     with pytest.raises(AssertionError, match="failed to parse"):
         check("(((-8054**5852)-x)-1)")
+    # check("((pi**(x**(x+x)))**1)")
+
+def test_test():
+    check_all_codecs(np.array([[18312761160228738559]], dtype=np.uint64), "((pi**(x**(x+x)))**1)")

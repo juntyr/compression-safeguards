@@ -242,9 +242,10 @@ def from_total_order(a: np.ndarray[S, U], dtype: T) -> np.ndarray[S, T]:
 
 try:
     _float128: np.dtype = np.dtype(np.float128)
-    assert np.finfo(np.float128).bits == 128
+    assert (np.finfo(np.float128).nmant + np.finfo(np.float128).nexp + 1) == 128
     _float128_min = np.finfo(np.float128).min
     _float128_max = np.finfo(np.float128).max
+    _float128_precision = np.finfo(np.float128).precision
 except (AttributeError, AssertionError):
     try:
         import numpy_quaddtype
@@ -252,9 +253,10 @@ except (AttributeError, AssertionError):
         _float128 = numpy_quaddtype.QuadPrecDType("sleef")
         _float128_min = numpy_quaddtype.min_value
         _float128_max = numpy_quaddtype.max_value
+        _float128_precision = 33
     except ImportError:
         raise TypeError("""
 numcodecs_safeguards requires float128 support:
-- numpy.float128 either does not exist is does not offer 128 bit precision
+- numpy.float128 either does not exist is does not offer true 128 bit precision
 - numpy_quaddtype is not installed
 """) from None
