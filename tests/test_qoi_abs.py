@@ -1,6 +1,8 @@
 import numpy as np
 import pytest
 
+from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
+
 from .codecs import (
     encode_decode_zero,
     encode_decode_neg,
@@ -146,13 +148,12 @@ def test_composed(check):
     check("2 / (ln(x) + sqrt(x))")
 
 
-# TODO: add a test for all dtypes
-# TODO: add a test that forces the float128 fallback
+@pytest.mark.parametrize("dtype", sorted(d.name for d in _SUPPORTED_DTYPES))
+def test_dtypes(dtype):
+    check_all_codecs(np.array([[1]], dtype=dtype), "x/sqrt(pi)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_fuzzer_found(check):
     with pytest.raises(AssertionError, match="failed to parse"):
         check("(((-8054**5852)-x)-1)")
-
-    check_all_codecs(np.array([[1]], dtype=np.uint8), "x/sqrt(pi)")

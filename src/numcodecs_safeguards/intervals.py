@@ -278,19 +278,9 @@ class Interval(Generic[T, N]):
         if not np.issubdtype(a.dtype, np.floating):
             return self
 
-        Lower(
-            np.array(
-                from_total_order(
-                    to_total_order(np.array(-np.inf, dtype=a.dtype)) + 1, a.dtype
-                )
-            )
-        ) <= self[np.isfinite(a)] <= Upper(
-            np.array(
-                from_total_order(
-                    to_total_order(np.array(np.inf, dtype=a.dtype)) - 1, a.dtype
-                )
-            )
-        )
+        Lower(np.array(np.nextafter(np.array(-np.inf, dtype=a.dtype), 0))) <= self[
+            np.isfinite(a)
+        ] <= Upper(np.array(np.nextafter(np.array(np.inf, dtype=a.dtype), 0)))
 
         return self
 

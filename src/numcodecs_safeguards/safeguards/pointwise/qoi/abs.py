@@ -16,8 +16,6 @@ from ....cast import (
     as_bits,
     to_float,
     to_finite_float,
-    from_total_order,
-    to_total_order,
 )
 from ....intervals import IntervalUnion
 
@@ -145,7 +143,10 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
                 ),
                 transformations=(sp.parsing.sympy_parser.auto_number,),
             )
-            _canary = str(qoi_expr)
+            _canary_repr = str(qoi_expr)
+            _canary_eb_abs = _compute_eb_abs_qoi(
+                qoi_expr, self._x, np.empty(0), np.empty(0), np.empty(0)
+            )
         except Exception as err:
             raise AssertionError(
                 f"failed to parse qoi expression {qoi!r}: {err}"
@@ -263,13 +264,15 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             qoi_upper_outside_eb_abs = (qoi_upper - data_qoi) > eb_abs
 
             # otherwise nudge the error-bound adjusted QOIs
-            qoi_lower = from_total_order(
-                to_total_order(qoi_lower) + qoi_lower_outside_eb_abs,
-                data_float.dtype,
+            qoi_lower = np.where(
+                qoi_lower_outside_eb_abs & np.isfinite(data_qoi),
+                np.nextafter(qoi_lower, 0),
+                qoi_lower,
             )
-            qoi_upper = from_total_order(
-                to_total_order(qoi_upper) - qoi_upper_outside_eb_abs,
-                data_float.dtype,
+            qoi_upper = np.where(
+                qoi_upper_outside_eb_abs & np.isfinite(data_qoi),
+                np.nextafter(qoi_upper, 0),
+                qoi_upper,
             )
 
             # compute the adjusted error bound
@@ -577,18 +580,12 @@ def _compute_eb_abs_qoi_inner(
             tauv_lower_outside = (tl * total_abs_factor) < tauv_lower
             if not np.any(tauv_lower_outside):
                 break
-            tl = from_total_order(
-                to_total_order(tl) + tauv_lower_outside,
-                xv.dtype,
-            )
+            tl = np.where(tauv_lower_outside, np.nextafter(tl, 0), tl)
         while True:
             tauv_upper_outside = (tu * total_abs_factor) > tauv_upper
             if not np.any(tauv_upper_outside):
                 break
-            tu = from_total_order(
-                to_total_order(tu) - tauv_upper_outside,
-                xv.dtype,
-            )
+            tu = np.where(tauv_upper_outside, np.nextafter(tu, 0), tu)
 
         ebs_lower, ebs_upper = None, None
         for term, factor in zip(terms, factors):
@@ -636,18 +633,12 @@ def _compute_eb_abs_qoi_inner(
             tauv_lower_outside = (tl * np.abs(factor)) < tauv_lower
             if not np.any(tauv_lower_outside):
                 break
-            tl = from_total_order(
-                to_total_order(tl) + tauv_lower_outside,
-                xv.dtype,
-            )
+            tl = np.where(tauv_lower_outside, np.nextafter(tl, 0), tl)
         while True:
             tauv_upper_outside = (tu * np.abs(factor)) > tauv_upper
             if not np.any(tauv_upper_outside):
                 break
-            tu = from_total_order(
-                to_total_order(tu) - tauv_upper_outside,
-                xv.dtype,
-            )
+            tu = np.where(tauv_upper_outside, np.nextafter(tu, 0), tu)
 
         # flip the lower/upper error bound if the factor is negative
         tauv_lower = -tu if factor < 0 else tl
