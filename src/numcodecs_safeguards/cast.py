@@ -152,7 +152,12 @@ def as_bits(a: np.ndarray[S, T], *, kind: str = "u") -> np.ndarray[S, Any]:
         The binary representation of the array `a`.
     """
 
-    return a.view(a.dtype.str.replace("f", kind).replace("i", kind).replace("u", kind))  # type: ignore
+    return a.view(
+        a.dtype.str.replace("f", kind)
+        .replace("i", kind)
+        .replace("u", kind)
+        .replace(_float128.kind, kind)
+    )  # type: ignore
 
 
 def to_total_order(a: np.ndarray[S, T]) -> np.ndarray[S, U]:
