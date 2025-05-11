@@ -82,7 +82,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
     ```
 
     The implementation of the absolute error bound on pointwise quantities of
-    interest is based on:
+    interest is inspired by:
 
     > Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
     Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
@@ -144,7 +144,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
                 transformations=(sp.parsing.sympy_parser.auto_number,),
             )
             _canary_repr = str(qoi_expr)
-            _canary_eb_abs = _compute_eb_abs_qoi(
+            _canary_eb_abs = _compute_checked_eb_abs_qoi(
                 qoi_expr, self._x, np.empty(0), np.empty(0), np.empty(0)
             )
         except Exception as err:
@@ -255,9 +255,9 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             qoi_lower = data_qoi - eb_abs
             qoi_upper = data_qoi + eb_abs
 
-            print(
-                f"eb_abs={eb_abs} data_qoi={data_qoi} qoi_lower={qoi_lower} qoi_upper={qoi_upper}"
-            )
+            # print(
+            #     f"eb_abs={eb_abs} data_qoi={data_qoi} qoi_lower={qoi_lower} qoi_upper={qoi_upper}"
+            # )
 
             # check if they're representable within the error bound
             qoi_lower_outside_eb_abs = (data_qoi - qoi_lower) > eb_abs
@@ -294,7 +294,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_abs_qoi_lower, eb_abs_qoi_upper = _compute_eb_abs_qoi(
+            eb_abs_qoi_lower, eb_abs_qoi_upper = _compute_checked_eb_abs_qoi(
                 self._qoi_expr,
                 sp.Symbol("x", real=True),
                 data_float,
@@ -304,17 +304,17 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         assert np.all((eb_abs_qoi_lower <= 0) & np.isfinite(eb_abs_qoi_lower))
         assert np.all((eb_abs_qoi_upper >= 0) & np.isfinite(eb_abs_qoi_upper))
 
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            print(
-                self._eb_abs,
-                eb_abs_qoi_lower,
-                eb_abs_qoi_upper,
-                (qoi_lambda)(data_float + eb_abs_qoi_lower) - (qoi_lambda)(data_float),
-                (qoi_lambda)(data_float + eb_abs_qoi_upper) - (qoi_lambda)(data_float),
-                flush=True,
-            )
+        # with np.errstate(
+        #     divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        # ):
+        #     print(
+        #         self._eb_abs,
+        #         eb_abs_qoi_lower,
+        #         eb_abs_qoi_upper,
+        #         (qoi_lambda)(data_float + eb_abs_qoi_lower) - (qoi_lambda)(data_float),
+        #         (qoi_lambda)(data_float + eb_abs_qoi_upper) - (qoi_lambda)(data_float),
+        #         flush=True,
+        #     )
 
         valid = _compute_safe_eb_diff_interval(
             data,
@@ -324,7 +324,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             equal_nan=True,
         )
 
-        print(valid)
+        # print(valid)
 
         return valid.into_union()  # type: ignore
 
@@ -342,7 +342,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def _compute_eb_abs_qoi(
+def _compute_checked_eb_abs_qoi(
     expr: sp.Basic,
     x: sp.Symbol,
     xv: np.ndarray,
@@ -356,28 +356,45 @@ def _compute_eb_abs_qoi(
     )
     exprv = (exprl)(xv)
 
-    # TODO: first try nextafter on the correction, then on xv, then back off
-    tauv_lower_outside = ((exprl)(xv + tl) - exprv) < tauv_lower
-    tl = np.where(
-        tauv_lower_outside & np.isfinite(exprv), np.nextafter(xv + tl, xv) - xv, tl
-    )
+    # handle rounding errors in the lower error bound computation
+    tauv_lower_outside = (((exprl)(xv + tl) - exprv) < tauv_lower) & np.isfinite(exprv)
+    if np.any(tauv_lower_outside):
+        # first try to nudge the error bound itself
+        tl = np.where(tauv_lower_outside, np.nextafter(tl, 0), tl)
+        tauv_lower_outside = (((exprl)(xv + tl) - exprv) < tauv_lower) & np.isfinite(
+            exprv
+        )
+        if np.any(tauv_lower_outside):
+            # then try to nudge it with respect to the data
+            tl = np.where(tauv_lower_outside, np.nextafter(xv + tl, xv) - xv, tl)
+            while True:
+                tauv_lower_outside = (
+                    ((exprl)(xv + tl) - exprv) < tauv_lower
+                ) & np.isfinite(exprv)
+                if not np.any(tauv_lower_outside):
+                    break
+                # finally fall back to repeatedly cutting it in half
+                tl = np.where(tauv_lower_outside, tl * 0.5, tl)
 
-    tauv_upper_outside = ((exprl)(xv + tu) - exprv) > tauv_upper
-    tu = np.where(
-        tauv_upper_outside & np.isfinite(exprv), np.nextafter(xv + tu, xv) - xv, tu
-    )
-
-    # FIXME: handle rounding better
-    while True:
-        tauv_lower_outside = ((exprl)(xv + tl) - exprv) < tauv_lower
-        if not np.any(tauv_lower_outside & np.isfinite(exprv)):
-            break
-        tl = np.where(tauv_lower_outside & np.isfinite(exprv), tl * 0.5, tl)
-    while True:
-        tauv_upper_outside = ((exprl)(xv + tu) - exprv) > tauv_upper
-        if not np.any(tauv_upper_outside & np.isfinite(exprv)):
-            break
-        tu = np.where(tauv_upper_outside & np.isfinite(exprv), tu * 0.5, tu)
+    # handle rounding errors in the upper error bound computation
+    tauv_upper_outside = (((exprl)(xv + tu) - exprv) > tauv_upper) & np.isfinite(exprv)
+    if np.any(tauv_upper_outside):
+        # first try to nudge the error bound itself
+        tu = np.where(tauv_upper_outside, np.nextafter(tu, 0), tu)
+        tauv_upper_outside = (((exprl)(xv + tu) - exprv) > tauv_upper) & np.isfinite(
+            exprv
+        )
+        if np.any(tauv_upper_outside):
+            # then try to nudge it with respect to the data
+            tu = np.where(tauv_upper_outside, np.nextafter(xv + tu, xv) - xv, tu)
+            while True:
+                tauv_upper_outside = (
+                    ((exprl)(xv + tu) - exprv) > tauv_upper
+                ) & np.isfinite(exprv)
+                if not np.any(tauv_upper_outside):
+                    break
+                # finally fall back to repeatedly cutting it in half
+                tu = np.where(tauv_upper_outside, tu * 0.5, tu)
 
     return tl, tu
 
@@ -390,10 +407,10 @@ def _compute_eb_abs_qoi_inner(
     tauv_lower: np.ndarray,
     tauv_upper: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
-    print(
-        f"Compute for {expr} with x={xv} for {tauv_lower} <= e <= {tauv_upper}",
-        flush=True,
-    )
+    # print(
+    #     f"Compute for {expr} with x={xv} for {tauv_lower} <= e <= {tauv_upper}",
+    #     flush=True,
+    # )
 
     """
     Inspired by:
@@ -420,7 +437,7 @@ def _compute_eb_abs_qoi_inner(
         # flip the lower/upper error bound if the arg is negative
         tl = np.where(argv < 0, -tauv_upper, tauv_lower)
         tu = np.where(argv < 0, -tauv_lower, tauv_upper)
-        return _compute_eb_abs_qoi(arg, x, xv, tl, tu)
+        return _compute_checked_eb_abs_qoi(arg, x, xv, tl, tu)
 
     # ln(...)
     # sympy automatically transforms log(..., base) into ln(...)/ln(base)
@@ -466,7 +483,7 @@ def _compute_eb_abs_qoi_inner(
         if arg == x:
             return tauv_lower, tauv_upper
         # composition using Lemma 3 from Jiao et al.
-        return _compute_eb_abs_qoi(arg, x, xv, tauv_lower, tauv_upper)
+        return _compute_checked_eb_abs_qoi(arg, x, xv, tauv_lower, tauv_upper)
 
     # e^(...)
     if expr.func is sp.exp and len(expr.args) == 1:
@@ -512,34 +529,15 @@ def _compute_eb_abs_qoi_inner(
         if arg == x:
             return tauv_lower, tauv_upper
         # composition using Lemma 3 from Jiao et al.
-        return _compute_eb_abs_qoi(arg, x, xv, tauv_lower, tauv_upper)
+        return _compute_checked_eb_abs_qoi(arg, x, xv, tauv_lower, tauv_upper)
 
     # rewrite a ** b as e^(b*ln(abs(a)))
     # this is mathematically incorrect for a < 0 but works for deriving error bounds
     if expr.is_Pow and len(expr.args) == 2:
         a, b = expr.args
-        tl, tu = _compute_eb_abs_qoi(
+        return _compute_checked_eb_abs_qoi(
             sp.exp(b * sp.ln(sp.Abs(a)), evaluate=False), x, xv, tauv_lower, tauv_upper
         )
-
-        exprl = sp.lambdify(
-            [x], expr, modules="numpy", printer=_create_sympy_numpy_printer(xv.dtype)
-        )
-        exprv = (exprl)(xv)
-
-        # FIXME: handle rounding better
-        while True:
-            tauv_lower_outside = ((exprl)(xv + tl) - exprv) < tauv_lower
-            if not np.any(tauv_lower_outside & np.isfinite(exprv)):
-                break
-            tl *= 0.5
-        while True:
-            tauv_upper_outside = ((exprl)(xv + tu) - exprv) > tauv_upper
-            if not np.any(tauv_upper_outside & np.isfinite(exprv)):
-                break
-            tu *= 0.5
-
-        return tl, tu
 
     # a_1 * e_1 + ... + a_n * e_n + c (weighted sum)
     # using Corollary 2 and Lemma 4 from Jiao et al.
@@ -590,7 +588,7 @@ def _compute_eb_abs_qoi_inner(
         ebs_lower, ebs_upper = None, None
         for term, factor in zip(terms, factors):
             # recurse into the terms with a weighted error bound
-            eb_lower, eb_upper = _compute_eb_abs_qoi(
+            eb_lower, eb_upper = _compute_checked_eb_abs_qoi(
                 term,
                 x,
                 xv,
@@ -648,34 +646,15 @@ def _compute_eb_abs_qoi_inner(
         terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
 
         if len(terms) == 1:
-            return _compute_eb_abs_qoi(terms[0], x, xv, tauv_lower, tauv_upper)
+            return _compute_checked_eb_abs_qoi(terms[0], x, xv, tauv_lower, tauv_upper)
 
-        tl, tu = _compute_eb_abs_qoi(
+        return _compute_checked_eb_abs_qoi(
             sp.exp(sp.Add(*[sp.log(sp.Abs(term)) for term in terms]), evaluate=False),
             x,
             xv,
             tauv_lower,
             tauv_upper,
         )
-
-        exprl = sp.lambdify(
-            [x], expr, modules="numpy", printer=_create_sympy_numpy_printer(xv.dtype)
-        )
-        exprv = (exprl)(xv)
-
-        # FIXME: handle rounding better
-        while True:
-            tauv_lower_outside = ((exprl)(xv + tl) - exprv) < tauv_lower
-            if not np.any(tauv_lower_outside & np.isfinite(exprv)):
-                break
-            tl *= 0.5
-        while True:
-            tauv_upper_outside = ((exprl)(xv + tu) - exprv) > tauv_upper
-            if not np.any(tauv_upper_outside & np.isfinite(exprv)):
-                break
-            tu *= 0.5
-
-        return tl, tu
 
     raise ValueError(f"unsupported expression kind {expr} (= {sp.srepr(expr)} =)")
 
