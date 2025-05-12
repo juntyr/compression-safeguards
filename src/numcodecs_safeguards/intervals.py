@@ -9,7 +9,15 @@ from typing_extensions import Self  # MSPV 3.11
 
 import numpy as np
 
-from .cast import as_bits, to_total_order, from_total_order
+from .cast import (
+    as_bits,
+    to_total_order,
+    from_total_order,
+    _isnan,
+    _isinf,
+    _isfinite,
+    _nextafter,
+)
 
 T = TypeVar("T", bound=np.dtype)
 N = TypeVar("N", bound=int)
@@ -52,7 +60,7 @@ class Interval(Generic[T, N]):
 
     ```py
     # bound infinite values to be exactly themselves
-    Lower(data) <= interval[np.isinf(data)] <= Upper(data)
+    Lower(data) <= interval[_isinf(data)] <= Upper(data)
     ```
 
     ## Common lower and upper bounds
@@ -182,7 +190,7 @@ class Interval(Generic[T, N]):
         Equivalent to
 
         ```python
-        Lower(a) <= self[np.isinf(a)] <= Upper(a)
+        Lower(a) <= self[_isinf(a)] <= Upper(a)
         ```
 
         Parameters
@@ -200,7 +208,7 @@ class Interval(Generic[T, N]):
             return self
 
         # bitwise preserve infinite values
-        Lower(a) <= self[np.isinf(a)] <= Upper(a)
+        Lower(a) <= self[_isinf(a)] <= Upper(a)
 
         return self
 
@@ -229,7 +237,7 @@ class Interval(Generic[T, N]):
 
         if not equal_nan:
             # bitwise preserve NaN values
-            Lower(a) <= self[np.isnan(a)] <= Upper(a)
+            Lower(a) <= self[_isnan(a)] <= Upper(a)
             return self
 
         # smallest (positive) NaN bit pattern: 0b s 1..1 0..0
@@ -246,7 +254,7 @@ class Interval(Generic[T, N]):
                 np.copysign(nan_max, -1),
                 np.copysign(nan_min, +1),
             )
-        ) <= self[np.isnan(a)] <= Upper(
+        ) <= self[_isnan(a)] <= Upper(
             np.where(
                 np.signbit(a),
                 np.copysign(nan_min, -1),
@@ -278,9 +286,9 @@ class Interval(Generic[T, N]):
         if not np.issubdtype(a.dtype, np.floating):
             return self
 
-        Lower(np.array(np.nextafter(np.array(-np.inf, dtype=a.dtype), 0))) <= self[
-            np.isfinite(a)
-        ] <= Upper(np.array(np.nextafter(np.array(np.inf, dtype=a.dtype), 0)))
+        Lower(np.array(_nextafter(np.array(-np.inf, dtype=a.dtype), 0))) <= self[
+            _isfinite(a)
+        ] <= Upper(np.array(_nextafter(np.array(np.inf, dtype=a.dtype), 0)))
 
         return self
 

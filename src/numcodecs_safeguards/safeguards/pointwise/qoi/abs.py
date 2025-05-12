@@ -18,6 +18,11 @@ from ....cast import (
     to_finite_float,
     _float128,
     _float128_precision,
+    _isinf,
+    _isfinite,
+    _isnan,
+    _nan_to_zero,
+    _nextafter,
 )
 from ....intervals import IntervalUnion
 
@@ -117,7 +122,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
 
     def __init__(self, qoi: Expr, eb_abs: int | float):
         assert eb_abs >= 0, "eb_abs must be non-negative"
-        assert isinstance(eb_abs, int) or np.isfinite(eb_abs), "eb_abs must be finite"
+        assert isinstance(eb_abs, int) or _isfinite(eb_abs), "eb_abs must be finite"
 
         self._qoi = qoi
         self._eb_abs = eb_abs
@@ -191,16 +196,6 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         qoi_data = (qoi_lambda)(data_float)
         qoi_decoded = (qoi_lambda)(to_float(decoded))
 
-        # print("======")
-        # print(qoi_data)
-        # print(qoi_decoded)
-        # print(type(qoi_data.dtype))
-        # print(type(qoi_decoded.dtype))
-        # print(as_bits(qoi_data, kind="V"))
-        # print(as_bits(qoi_decoded, kind="V"))
-        # print(qoi_data.tobytes())
-        # print(qoi_decoded.tobytes())
-
         absolute_bound = (
             np.where(
                 qoi_data > qoi_decoded,
@@ -211,10 +206,6 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         )
         same_bits = as_bits(qoi_data, kind="V") == as_bits(qoi_decoded, kind="V")
         both_nan = _isnan(qoi_data) & _isnan(qoi_decoded)
-
-        # print(absolute_bound)
-        # print(same_bits)
-        # print(both_nan)
 
         ok = np.where(
             _isfinite(qoi_data),
@@ -298,8 +289,8 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             eb_abs_upper: np.ndarray = to_finite_float(
                 qoi_upper - data_qoi, data_float.dtype
             )
-            eb_abs_lower = np.nan_to_num(eb_abs_lower, nan=0)
-            eb_abs_upper = np.nan_to_num(eb_abs_upper, nan=0)
+            eb_abs_lower = _nan_to_zero(eb_abs_lower)
+            eb_abs_upper = _nan_to_zero(eb_abs_upper)
         assert eb_abs_lower.shape == data.shape
         assert eb_abs_lower.dtype == data_float.dtype
         assert eb_abs_upper.shape == data.shape
@@ -442,6 +433,8 @@ def _compute_eb_abs_qoi_inner(
 
     assert len(expr.free_symbols) > 0, "constants have no error bounds"
 
+    zero = np.array(0, dtype=xv.dtype)
+
     # x
     if expr == x:
         return (tauv_lower, tauv_upper)
@@ -477,19 +470,19 @@ def _compute_eb_abs_qoi_inner(
         # update the error bounds
         tl = np.where(
             (tauv_lower == 0) | (argv <= 0) | ~_isfinite(argv),
-            0,
+            zero,
             np.exp(exprv + tauv_lower) - argv,
         )
         tl = to_finite_float(tl, xv.dtype)
-        tl = np.nan_to_num(tl, nan=0)
+        tl = _nan_to_zero(tl)
 
         tu = np.where(
             (tauv_upper == 0) | (argv <= 0) | ~_isfinite(argv),
-            0,
+            zero,
             np.exp(exprv + tauv_upper) - argv,
         )
         tu = to_finite_float(tu, xv.dtype)
-        tu = np.nan_to_num(tu, nan=0)
+        tu = _nan_to_zero(tu)
 
         # FIXME: handle rounding better
         while True:
@@ -526,19 +519,19 @@ def _compute_eb_abs_qoi_inner(
         # ensure that ln is not passed a negative argument
         tl = np.where(
             (tauv_lower == 0) | ~_isfinite(argv),
-            0,
-            np.log(np.maximum(0, exprv + tauv_lower)) - argv,
+            zero,
+            np.log(np.maximum(zero, exprv + tauv_lower)) - argv,
         )
         tl = to_finite_float(tl, xv.dtype)
-        tl = np.nan_to_num(tl, nan=0)
+        tl = _nan_to_zero(tl)
 
         tu = np.where(
             (tauv_upper == 0) | ~_isfinite(argv),
-            0,
-            np.log(np.maximum(0, exprv + tauv_upper)) - argv,
+            zero,
+            np.log(np.maximum(zero, exprv + tauv_upper)) - argv,
         )
         tu = to_finite_float(tu, xv.dtype)
-        tu = np.nan_to_num(tu, nan=0)
+        tu = _nan_to_zero(tu)
 
         # FIXME: handle rounding better
         while True:
@@ -594,12 +587,8 @@ def _compute_eb_abs_qoi_inner(
                 factors.append(1)
         total_abs_factor = np.sum(np.abs(factors))
 
-        tl = np.nan_to_num(
-            to_finite_float(tauv_lower / total_abs_factor, xv.dtype), nan=0
-        )
-        tu = np.nan_to_num(
-            to_finite_float(tauv_upper / total_abs_factor, xv.dtype), nan=0
-        )
+        tl = _nan_to_zero(to_finite_float(tauv_lower / total_abs_factor, xv.dtype))
+        tu = _nan_to_zero(to_finite_float(tauv_upper / total_abs_factor, xv.dtype))
 
         # FIXME: handle rounding better
         while True:
@@ -647,12 +636,8 @@ def _compute_eb_abs_qoi_inner(
             printer=_create_sympy_numpy_printer(xv.dtype),
         )()  # type: ignore
 
-        tl = np.nan_to_num(
-            to_finite_float(tauv_lower / np.abs(factor), xv.dtype), nan=0
-        )
-        tu = np.nan_to_num(
-            to_finite_float(tauv_upper / np.abs(factor), xv.dtype), nan=0
-        )
+        tl = _nan_to_zero(to_finite_float(tauv_lower / np.abs(factor), xv.dtype))
+        tu = _nan_to_zero(to_finite_float(tauv_upper / np.abs(factor), xv.dtype))
 
         # FIXME: handle rounding better
         while True:
@@ -728,19 +713,3 @@ def _create_sympy_numpy_printer(dtype: np.dtype):
             return f"array(inf, dtype={self._dtype})"
 
     return NumPyDtypePrinter
-
-
-def _isnan(a: np.ndarray) -> np.ndarray:
-    return a != a
-
-
-def _isinf(a: np.ndarray) -> np.ndarray:
-    return np.abs(a) == np.inf
-
-
-def _isfinite(a: np.ndarray) -> np.ndarray:
-    return np.abs(a) < np.inf
-
-
-def _nextafter(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    return np.nextafter(a, b)

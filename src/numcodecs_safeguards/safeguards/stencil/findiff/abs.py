@@ -9,7 +9,7 @@ from fractions import Fraction
 
 import numpy as np
 
-from ....cast import to_float, as_bits, to_finite_float
+from ....cast import to_float, as_bits, to_finite_float, _isnan, _isinf, _isfinite
 from ....intervals import IntervalUnion
 from ..abc import StencilSafeguard, S, T
 from ...pointwise.abs import _compute_safe_eb_diff_interval
@@ -104,9 +104,9 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
             )
 
         assert dx > 0, "dx must be positive"
-        assert isinstance(dx, int) or np.isfinite(dx), "dx must be finite"
+        assert isinstance(dx, int) or _isfinite(dx), "dx must be finite"
         assert eb_abs >= 0, "eb_abs must be non-negative"
-        assert isinstance(eb_abs, int) or np.isfinite(eb_abs), "eb_abs must be finite"
+        assert isinstance(eb_abs, int) or _isfinite(eb_abs), "eb_abs must be finite"
 
         if order > 8 or accuracy > 8:
             warnings.warn(
@@ -173,13 +173,13 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
             same_bits = as_bits(findiff_data, kind="V") == as_bits(
                 findiff_decoded, kind="V"
             )
-            both_nan = np.isnan(findiff_data) & np.isnan(findiff_decoded)
+            both_nan = _isnan(findiff_data) & _isnan(findiff_decoded)
 
             ok = np.where(
-                np.isfinite(findiff_data),
+                _isfinite(findiff_data),
                 absolute_bound,
                 np.where(
-                    np.isinf(findiff_data),
+                    _isinf(findiff_data),
                     same_bits,
                     both_nan,
                 ),

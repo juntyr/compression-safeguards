@@ -15,6 +15,9 @@ from ...cast import (
     from_total_order,
     to_finite_float,
     F,
+    _isfinite,
+    _isinf,
+    _isnan,
 )
 from ...intervals import IntervalUnion, Interval, Lower, Upper
 
@@ -47,7 +50,7 @@ class AbsoluteErrorBoundSafeguard(PointwiseSafeguard):
 
     def __init__(self, eb_abs: int | float, *, equal_nan: bool = False):
         assert eb_abs >= 0, "eb_abs must be non-negative"
-        assert isinstance(eb_abs, int) or np.isfinite(eb_abs), "eb_abs must be finite"
+        assert isinstance(eb_abs, int) or _isfinite(eb_abs), "eb_abs must be finite"
 
         self._eb_abs = eb_abs
         self._equal_nan = equal_nan
@@ -84,13 +87,13 @@ class AbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         )
         # bitwise equality for inf and NaNs (unless equal_nan)
         same_bits = as_bits(data) == as_bits(decoded)
-        both_nan = self._equal_nan and (np.isnan(data) & np.isnan(decoded))
+        both_nan = self._equal_nan and (_isnan(data) & _isnan(decoded))
 
         ok = np.where(
-            np.isfinite(data),
+            _isfinite(data),
             absolute_bound,
             np.where(
-                np.isinf(data),
+                _isinf(data),
                 same_bits,
                 both_nan if self._equal_nan else same_bits,
             ),
@@ -152,11 +155,11 @@ def _compute_safe_eb_diff_interval(
 ) -> Interval[T, int]:
     dataf: np.ndarray[tuple[int], T] = data.flatten()
     dataf_float: np.ndarray[tuple[int], F] = data_float.flatten()
-    eb_lowerf: np.ndarray[tuple[int], F] = eb_lower.flatten()
-    eb_upperf: np.ndarray[tuple[int], F] = eb_upper.flatten()
+    eb_lowerf: np.ndarray[tuple[int], F] = np.array(eb_lower).flatten()
+    eb_upperf: np.ndarray[tuple[int], F] = np.array(eb_upper).flatten()
 
-    assert np.all(np.isfinite(eb_lowerf) & (eb_lowerf <= 0))
-    assert np.all(np.isfinite(eb_upperf) & (eb_upperf >= 0))
+    assert np.all(_isfinite(eb_lowerf) & (eb_lowerf <= 0))
+    assert np.all(_isfinite(eb_upperf) & (eb_upperf >= 0))
 
     valid = (
         Interval.empty_like(dataf)
@@ -166,7 +169,7 @@ def _compute_safe_eb_diff_interval(
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         Lower(from_float(dataf_float + eb_lowerf, dataf.dtype)) <= valid[
-            np.isfinite(dataf)
+            _isfinite(dataf)
         ] <= Upper(from_float(dataf_float + eb_upperf, dataf.dtype))
 
     # correct rounding errors in the lower and upper bound
@@ -175,19 +178,19 @@ def _compute_safe_eb_diff_interval(
         lower_bound_outside_eb_abs = (to_float(valid._lower) - dataf_float) < eb_lowerf
         upper_bound_outside_eb_abs = (to_float(valid._upper) - dataf_float) > eb_upperf
 
-    valid._lower[np.isfinite(dataf)] = from_total_order(
+    valid._lower[_isfinite(dataf)] = from_total_order(
         to_total_order(valid._lower) + lower_bound_outside_eb_abs,
         dataf.dtype,
-    )[np.isfinite(dataf)]
-    valid._upper[np.isfinite(dataf)] = from_total_order(
+    )[_isfinite(dataf)]
+    valid._upper[_isfinite(dataf)] = from_total_order(
         to_total_order(valid._upper) - upper_bound_outside_eb_abs,
         dataf.dtype,
-    )[np.isfinite(dataf)]
+    )[_isfinite(dataf)]
 
     # a zero-error bound must preserve exactly, e.g. even for -0.0
     if np.any(eb_lowerf == 0):
-        Lower(dataf) <= valid[np.isfinite(dataf) & (eb_lowerf == 0)]
+        Lower(dataf) <= valid[_isfinite(dataf) & (eb_lowerf == 0)]
     if np.any(eb_upperf == 0):
-        valid[np.isfinite(dataf) & (eb_upperf == 0)] <= Upper(dataf)
+        valid[_isfinite(dataf) & (eb_upperf == 0)] <= Upper(dataf)
 
     return valid

@@ -8,7 +8,15 @@ import numpy as np
 
 from .abc import PointwiseSafeguard, S, T
 from .abs import _compute_safe_eb_diff_interval
-from ...cast import to_float, as_bits, to_finite_float
+from ...cast import (
+    to_float,
+    as_bits,
+    to_finite_float,
+    _isinf,
+    _isfinite,
+    _isnan,
+    _nan_to_zero,
+)
 from ...intervals import IntervalUnion, Lower, Upper
 
 
@@ -48,7 +56,7 @@ class RelativeErrorBoundSafeguard(PointwiseSafeguard):
 
     def __init__(self, eb_rel: int | float, *, equal_nan: bool = False):
         assert eb_rel >= 0, "eb_rel must be non-negative"
-        assert isinstance(eb_rel, int) or np.isfinite(eb_rel), "eb_rel must be finite"
+        assert isinstance(eb_rel, int) or _isfinite(eb_rel), "eb_rel must be finite"
 
         self._eb_rel = eb_rel
         self._equal_nan = equal_nan
@@ -85,22 +93,20 @@ class RelativeErrorBoundSafeguard(PointwiseSafeguard):
                 data_float.dtype,
                 map=lambda eb_rel: np.abs(data_float) * eb_rel,
             )
-            eb_rel_as_abs = np.nan_to_num(
-                eb_rel_as_abs, nan=0, posinf=np.inf, neginf=-np.inf
-            )
-        assert np.all((eb_rel_as_abs >= 0) & np.isfinite(eb_rel_as_abs))
+            eb_rel_as_abs = _nan_to_zero(eb_rel_as_abs)
+        assert np.all((eb_rel_as_abs >= 0) & _isfinite(eb_rel_as_abs))
 
         relative_bound = np.abs(data_float - decoded_float) <= eb_rel_as_abs
 
         # bitwise equality for inf and NaNs (unless equal_nan)
         same_bits = as_bits(data) == as_bits(decoded)
-        both_nan = self._equal_nan and (np.isnan(data) & np.isnan(decoded))
+        both_nan = self._equal_nan and (_isnan(data) & _isnan(decoded))
 
         ok = np.where(
-            np.isfinite(data),
+            _isfinite(data),
             relative_bound,
             np.where(
-                np.isinf(data),
+                _isinf(data),
                 same_bits,
                 both_nan if self._equal_nan else same_bits,
             ),
@@ -136,10 +142,8 @@ class RelativeErrorBoundSafeguard(PointwiseSafeguard):
                 data_float.dtype,
                 map=lambda eb_rel: np.abs(data_float) * eb_rel,
             )
-            eb_rel_as_abs = np.nan_to_num(
-                eb_rel_as_abs, nan=0, posinf=np.inf, neginf=-np.inf
-            )
-        assert np.all((eb_rel_as_abs >= 0) & np.isfinite(eb_rel_as_abs))
+            eb_rel_as_abs = _nan_to_zero(eb_rel_as_abs)
+        assert np.all((eb_rel_as_abs >= 0) & _isfinite(eb_rel_as_abs))
 
         valid = _compute_safe_eb_diff_interval(
             data, data_float, -eb_rel_as_abs, eb_rel_as_abs, equal_nan=self._equal_nan
