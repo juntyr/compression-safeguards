@@ -155,8 +155,8 @@ def _compute_safe_eb_diff_interval(
 ) -> Interval[T, int]:
     dataf: np.ndarray[tuple[int], T] = data.flatten()
     dataf_float: np.ndarray[tuple[int], F] = data_float.flatten()
-    eb_lowerf: np.ndarray[tuple[int], F] = np.array(eb_lower).flatten()
-    eb_upperf: np.ndarray[tuple[int], F] = np.array(eb_upper).flatten()
+    eb_lowerf: np.ndarray[tuple[int], F] = np.array(eb_lower).flatten()  # type: ignore
+    eb_upperf: np.ndarray[tuple[int], F] = np.array(eb_upper).flatten()  # type: ignore
 
     assert np.all(_isfinite(eb_lowerf) & (eb_lowerf <= 0))
     assert np.all(_isfinite(eb_upperf) & (eb_upperf >= 0))
