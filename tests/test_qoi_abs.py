@@ -104,6 +104,7 @@ def test_exponential(check):
     check("2 ** (x + 1)")
 
     check_all_codecs(np.array([51.0]), "2**x")
+    check_all_codecs(np.array([31.0]), "exp(x)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -157,10 +158,10 @@ def test_dtypes(dtype):
 def test_fuzzer_found(check):
     with pytest.raises(AssertionError, match="failed to parse"):
         check("(((-8054**5852)-x)-1)")
-    # check("((pi**(x**(x+x)))**1)")
 
-
-def test_test():
     check_all_codecs(
         np.array([[18312761160228738559]], dtype=np.uint64), "((pi**(x**(x+x)))**1)"
     )
+    check_all_codecs(np.array([-1024.0]), "((pi**(x**(x+x)))**1)")
+
+    check("((pi**(x**(x+x)))**1)")
