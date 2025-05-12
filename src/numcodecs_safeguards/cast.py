@@ -100,7 +100,7 @@ def to_finite_float(
     else:
         minv, maxv = np.finfo(dtype).min, np.finfo(dtype).max
 
-    return np.where(~(np.abs(xf) <= np.inf), xf, np.maximum(minv, np.minimum(xf, maxv)))  # type: ignore
+    return np.where(~_isnan(xf), xf, np.maximum(minv, np.minimum(xf, maxv)))  # type: ignore
 
 
 def from_float(x: np.ndarray[S, F], dtype: T) -> np.ndarray[S, T]:

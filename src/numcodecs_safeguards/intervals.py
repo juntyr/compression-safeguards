@@ -60,7 +60,7 @@ class Interval(Generic[T, N]):
 
     ```py
     # bound infinite values to be exactly themselves
-    Lower(data) <= interval[_isinf(data)] <= Upper(data)
+    Lower(data) <= interval[np.isinf(data)] <= Upper(data)
     ```
 
     ## Common lower and upper bounds
@@ -190,7 +190,7 @@ class Interval(Generic[T, N]):
         Equivalent to
 
         ```python
-        Lower(a) <= self[_isinf(a)] <= Upper(a)
+        Lower(a) <= self[np.isinf(a)] <= Upper(a)
         ```
 
         Parameters
