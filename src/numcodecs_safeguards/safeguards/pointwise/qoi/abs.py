@@ -5,6 +5,7 @@ Quantity of interest (QOI) absolute error bound safeguard.
 __all__ = ["QuantityOfInterestAbsoluteErrorBoundSafeguard"]
 
 import functools
+from typing import Callable
 
 import numpy as np
 import sympy as sp
@@ -381,54 +382,12 @@ def _compute_checked_eb_abs_qoi(
     exprv = (exprl)(xv)
 
     # handle rounding errors in the lower error bound computation
-    tauv_lower_outside = ~(
-        (((exprl)(xv + tl) - exprv) >= tauv_lower)
-        & (((exprl)(xv + tl) - exprv) <= tauv_upper)
-    ) & _isfinite(exprv)
-    if np.any(tauv_lower_outside):
-        # first try to nudge the error bound itself
-        tl = np.where(tauv_lower_outside, _nextafter(tl, 0), tl)
-        tauv_lower_outside = ~(
-            (((exprl)(xv + tl) - exprv) >= tauv_lower)
-            & (((exprl)(xv + tl) - exprv) <= tauv_upper)
-        ) & _isfinite(exprv)
-        if np.any(tauv_lower_outside):
-            # then try to nudge it with respect to the data
-            tl = np.where(tauv_lower_outside, _nextafter(xv + tl, xv) - xv, tl)
-            while True:
-                tauv_lower_outside = ~(
-                    (((exprl)(xv + tl) - exprv) >= tauv_lower)
-                    & (((exprl)(xv + tl) - exprv) <= tauv_upper)
-                ) & _isfinite(exprv)
-                if not np.any(tauv_lower_outside):
-                    break
-                # finally fall back to repeatedly cutting it in half
-                tl = np.where(tauv_lower_outside, tl * 0.5, tl)
-
-    # handle rounding errors in the upper error bound computation
-    tauv_upper_outside = ~(
-        (((exprl)(xv + tu) - exprv) >= tauv_lower)
-        & (((exprl)(xv + tu) - exprv) <= tauv_upper)
-    ) & _isfinite(exprv)
-    if np.any(tauv_upper_outside):
-        # first try to nudge the error bound itself
-        tu = np.where(tauv_upper_outside, _nextafter(tu, 0), tu)
-        tauv_upper_outside = ~(
-            (((exprl)(xv + tu) - exprv) >= tauv_lower)
-            & (((exprl)(xv + tu) - exprv) <= tauv_upper)
-        ) & _isfinite(exprv)
-        if np.any(tauv_upper_outside):
-            # then try to nudge it with respect to the data
-            tu = np.where(tauv_upper_outside, _nextafter(xv + tu, xv) - xv, tu)
-            while True:
-                tauv_upper_outside = ~(
-                    (((exprl)(xv + tu) - exprv) >= tauv_lower)
-                    & (((exprl)(xv + tu) - exprv) <= tauv_upper)
-                ) & _isfinite(exprv)
-                if not np.any(tauv_upper_outside):
-                    break
-                # finally fall back to repeatedly cutting it in half
-                tu = np.where(tauv_upper_outside, tu * 0.5, tu)
+    tl = _ensure_bounded_derived_error(
+        lambda tl: (exprl)(xv + tl), exprv, xv, tl, tauv_lower, tauv_upper
+    )
+    tu = _ensure_bounded_derived_error(
+        lambda tu: (exprl)(xv + tu), exprv, xv, tu, tauv_lower, tauv_upper
+    )
 
     # print(expr, tauv_lower, tauv_upper, tl, tu, ((exprl)(xv + tl) - exprv), ((exprl)(xv + tu) - exprv))
 
@@ -510,17 +469,13 @@ def _compute_eb_abs_qoi_inner(
         tu = to_finite_float(tu, xv.dtype)
         tu = _nan_to_zero(tu)
 
-        # # FIXME: handle rounding better
-        # while True:
-        #     tauv_lower_outside = (np.log(argv + tl) - exprv) < tauv_lower
-        #     if not np.any(tauv_lower_outside & _isfinite(exprv)):
-        #         break
-        #     tl *= 0.5
-        # while True:
-        #     tauv_upper_outside = (np.log(argv + tu) - exprv) > tauv_upper
-        #     if not np.any(tauv_upper_outside & _isfinite(exprv)):
-        #         break
-        #     tu *= 0.5
+        # handle rounding errors in ln(e^(...)) early
+        tl = _ensure_bounded_derived_error(
+            lambda tl: np.log(argv + tl), exprv, argv, tl, tauv_lower, tauv_upper
+        )
+        tu = _ensure_bounded_derived_error(
+            lambda tu: np.log(argv + tu), exprv, argv, tu, tauv_lower, tauv_upper
+        )
         tauv_lower, tauv_upper = tl, tu
 
         # base case for ln(x)
@@ -559,17 +514,13 @@ def _compute_eb_abs_qoi_inner(
         tu = to_finite_float(tu, xv.dtype)
         tu = _nan_to_zero(tu)
 
-        # # FIXME: handle rounding better
-        # while True:
-        #     tauv_lower_outside = (np.exp(argv + tl) - exprv) < tauv_lower
-        #     if not np.any(tauv_lower_outside & _isfinite(exprv)):
-        #         break
-        #     tl *= 0.5
-        # while True:
-        #     tauv_upper_outside = (np.exp(argv + tu) - exprv) > tauv_upper
-        #     if not np.any(tauv_upper_outside & _isfinite(exprv)):
-        #         break
-        #     tu *= 0.5
+        # handle rounding errors in e^(ln(...)) early
+        tl = _ensure_bounded_derived_error(
+            lambda tl: np.exp(argv + tl), exprv, argv, tl, tauv_lower, tauv_upper
+        )
+        tu = _ensure_bounded_derived_error(
+            lambda tu: np.exp(argv + tu), exprv, argv, tu, tauv_lower, tauv_upper
+        )
         tauv_lower, tauv_upper = tl, tu
 
         # base case for e^x
@@ -616,17 +567,23 @@ def _compute_eb_abs_qoi_inner(
         tl = _nan_to_zero(to_finite_float(tauv_lower / total_abs_factor, xv.dtype))
         tu = _nan_to_zero(to_finite_float(tauv_upper / total_abs_factor, xv.dtype))
 
-        # # FIXME: handle rounding better
-        # while True:
-        #     tauv_lower_outside = (tl * total_abs_factor) < tauv_lower
-        #     if not np.any(tauv_lower_outside):
-        #         break
-        #     tl = np.where(tauv_lower_outside, _nextafter(tl, 0), tl)
-        # while True:
-        #     tauv_upper_outside = (tu * total_abs_factor) > tauv_upper
-        #     if not np.any(tauv_upper_outside):
-        #         break
-        #     tu = np.where(tauv_upper_outside, _nextafter(tu, 0), tu)
+        # handle rounding errors in the total absolute factor early
+        tl = _ensure_bounded_derived_error(
+            lambda tl: tl * total_abs_factor,
+            np.zeros_like(xv),
+            None,
+            tl,
+            tauv_lower,
+            tauv_upper,
+        )
+        tu = _ensure_bounded_derived_error(
+            lambda tu: tu * total_abs_factor,
+            np.zeros_like(xv),
+            None,
+            tu,
+            tauv_lower,
+            tauv_upper,
+        )
 
         ebs_lower, ebs_upper = None, None
         for term, factor in zip(terms, factors):
@@ -666,17 +623,23 @@ def _compute_eb_abs_qoi_inner(
         tl = _nan_to_zero(to_finite_float(tauv_lower / np.abs(factor), xv.dtype))
         tu = _nan_to_zero(to_finite_float(tauv_upper / np.abs(factor), xv.dtype))
 
-        # # FIXME: handle rounding better
-        # while True:
-        #     tauv_lower_outside = (tl * np.abs(factor)) < tauv_lower
-        #     if not np.any(tauv_lower_outside):
-        #         break
-        #     tl = np.where(tauv_lower_outside, _nextafter(tl, 0), tl)
-        # while True:
-        #     tauv_upper_outside = (tu * np.abs(factor)) > tauv_upper
-        #     if not np.any(tauv_upper_outside):
-        #         break
-        #     tu = np.where(tauv_upper_outside, _nextafter(tu, 0), tu)
+        # handle rounding errors in the factor early
+        tl = _ensure_bounded_derived_error(
+            lambda tl: tl * np.abs(factor),
+            np.zeros_like(xv),
+            None,
+            tl,
+            tauv_lower,
+            tauv_upper,
+        )
+        tu = _ensure_bounded_derived_error(
+            lambda tu: tu * np.abs(factor),
+            np.zeros_like(xv),
+            None,
+            tu,
+            tauv_lower,
+            tauv_upper,
+        )
 
         # flip the lower/upper error bound if the factor is negative
         tauv_lower = -tu if factor < 0 else tl
@@ -697,6 +660,61 @@ def _compute_eb_abs_qoi_inner(
         )
 
     raise ValueError(f"unsupported expression kind {expr} (= {sp.srepr(expr)} =)")
+
+
+def _ensure_bounded_derived_error(
+    expr: Callable[[np.ndarray], np.ndarray],
+    exprv: np.ndarray,
+    xv: None | np.ndarray,
+    eb_guess: np.ndarray,
+    tauv_lower: np.ndarray,
+    tauv_upper: np.ndarray,
+) -> np.ndarray:
+    # check if any derived expression exceeds the error bound
+    eb_outside = ~(
+        ((expr(eb_guess) - exprv) >= tauv_lower)
+        & ((expr(eb_guess) - exprv) <= tauv_upper)
+    ) & _isfinite(exprv)
+
+    if not np.any(eb_outside):
+        return eb_guess
+
+    # first try to nudge the error bound itself
+    eb_guess = np.where(eb_outside, _nextafter(eb_guess, 0), eb_guess)
+
+    # check again
+    eb_outside = ~(
+        ((expr(eb_guess) - exprv) >= tauv_lower)
+        & ((expr(eb_guess) - exprv) <= tauv_upper)
+    ) & _isfinite(exprv)
+
+    if not np.any(eb_outside):
+        return eb_guess
+
+    if xv is not None:
+        # second try to nudge it with respect to the data
+        eb_guess = np.where(eb_outside, _nextafter(xv + eb_guess, xv) - xv, eb_guess)
+
+        # check again
+        eb_outside = ~(
+            ((expr(eb_guess) - exprv) >= tauv_lower)
+            & ((expr(eb_guess) - exprv) <= tauv_upper)
+        ) & _isfinite(exprv)
+
+        if not np.any(eb_outside):
+            return eb_guess
+
+    while True:
+        # finally fall back to repeatedly cutting it in half
+        eb_guess = np.where(eb_outside, eb_guess * 0.5, eb_guess)
+
+        eb_outside = ~(
+            ((expr(eb_guess) - exprv) >= tauv_lower)
+            & ((expr(eb_guess) - exprv) <= tauv_upper)
+        ) & _isfinite(exprv)
+
+        if not np.any(eb_outside):
+            return eb_guess
 
 
 @functools.cache
