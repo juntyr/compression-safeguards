@@ -86,6 +86,14 @@ def test_constant(check):
 
 
 @pytest.mark.parametrize("check", CHECKS)
+def test_imaginary(check):
+    with pytest.raises(AssertionError, match="imaginary"):
+        check_all_codecs(np.array([2], dtype=np.uint64), "(-log(-20417,ln(x)))")
+    with pytest.raises(AssertionError, match="imaginary"):
+        check("(-log(-20417,ln(x)))")
+
+
+@pytest.mark.parametrize("check", CHECKS)
 def test_polynomial(check):
     check("x")
     check("2*x")

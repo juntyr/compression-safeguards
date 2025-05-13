@@ -164,6 +164,9 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
                 f"failed to parse qoi expression {qoi!r}: {err}"
             ) from err
         assert len(qoi_expr.free_symbols) > 0, "qoi expression must not be constant"
+        assert not qoi_expr.has(sp.I), (
+            "qoi expression must not contain imaginary numbers"
+        )
 
         self._qoi_expr = qoi_expr
 
@@ -843,5 +846,10 @@ def _create_sympy_numpy_printer_class(
 
         def _print_Infinity(self, expr):
             return f"{self._dtype}(inf)"
+
+        def _print_ImaginaryUnit(self, expr):
+            raise ValueError(
+                "cannot evaluate an expression containing an imaginary number"
+            )
 
     return NumPyDtypePrinter
