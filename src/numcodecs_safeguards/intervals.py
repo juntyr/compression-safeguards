@@ -286,6 +286,8 @@ class Interval(Generic[T, N]):
         if not np.issubdtype(a.dtype, np.floating):
             return self
 
+        # nextafter produces the largest and smallest finite floating point
+        #  values
         Lower(np.array(_nextafter(np.array(-np.inf, dtype=a.dtype), 0))) <= self[
             _isfinite(a)
         ] <= Upper(np.array(_nextafter(np.array(np.inf, dtype=a.dtype), 0)))

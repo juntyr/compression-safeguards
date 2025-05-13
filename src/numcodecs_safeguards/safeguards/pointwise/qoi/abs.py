@@ -153,8 +153,10 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
                 ),
                 transformations=(sp.parsing.sympy_parser.auto_number,),
             )
+            # check if the expression is well-formed (e.g. no int's that cannot
+            #  be printed) and if an error bound can be computed
             _canary_repr = str(qoi_expr)
-            _canary_eb_abs = _compute_checked_eb_abs_qoi(
+            _canary_eb_abs = _compute_data_eb_for_qoi_eb(
                 qoi_expr, self._x, np.empty(0), np.empty(0), np.empty(0)
             )
         except Exception as err:
@@ -252,7 +254,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            # compute the error-bound adjusted QOIs
+            # compute the error-bound adjusted QoIs
             data_qoi = (qoi_lambda)(data_float)
             qoi_lower = data_qoi - eb_abs
             qoi_upper = data_qoi + eb_abs
@@ -261,7 +263,9 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             qoi_lower_outside_eb_abs = (data_qoi - qoi_lower) > eb_abs
             qoi_upper_outside_eb_abs = (qoi_upper - data_qoi) > eb_abs
 
-            # otherwise nudge the error-bound adjusted QOIs
+            # otherwise nudge the error-bound adjusted QoIs
+            # we can nudge with nextafter since the QoIs are floating point and
+            #  only finite QoIs are nudged
             qoi_lower = np.where(
                 qoi_lower_outside_eb_abs & _isfinite(data_qoi),
                 _nextafter(qoi_lower, data_qoi),
@@ -292,9 +296,9 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_abs_qoi_lower, eb_abs_qoi_upper = _compute_checked_eb_abs_qoi(
+            eb_abs_qoi_lower, eb_abs_qoi_upper = _compute_data_eb_for_qoi_eb(
                 self._qoi_expr,
-                sp.Symbol("x", real=True),
+                self._x,
                 data_float,
                 eb_abs_lower,
                 eb_abs_upper,
@@ -324,14 +328,47 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def _compute_checked_eb_abs_qoi(
+def _compute_data_eb_for_qoi_eb(
     expr: sp.Basic,
     x: sp.Symbol,
     xv: np.ndarray,
     tauv_lower: np.ndarray,
     tauv_upper: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
-    tl, tu = _compute_data_eb_for_qoi_eb_inner(expr, x, xv, tauv_lower, tauv_upper)
+    """
+    Translate an error bound on a derived quantity of interest (QoI) into an
+    error bound on the input data.
+
+    This function checks the computed error bound before returning to correct
+    any rounding errors.
+
+    Parameters
+    ----------
+    expr : sp.Basic
+        Symbolic SymPy expression that defines the QoI.
+    x : sp.Symbol
+        Symbol for the pointwise input data.
+    xv : np.ndarray[S, F]
+        Actual values of the input data.
+    eb_expr_lower : np.ndarray[S, F]
+        Finite pointwise lower bound on the QoI error, must be negative or zero.
+    eb_expr_upper : np.ndarray[S, F]
+        Finite pointwise upper bound on the QoI error, must be positive or zero.
+
+    Returns
+    -------
+    eb_x_lower, eb_x_upper : tuple[np.ndarray[S, F], np.ndarray[S, F]]
+        Finite pointwise lower and upper error bound on the input data `x`.
+
+    Inspired by:
+
+    Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
+    Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
+    Lossy Compression for Scientific Data. Proc. VLDB Endow. 16, 4 (December
+    2022), 697-710. Available from: https://doi.org/10.14778/3574245.3574255.
+    """
+
+    tl, tu = _compute_data_eb_for_qoi_eb_unchecked(expr, x, xv, tauv_lower, tauv_upper)
 
     exprl = _compile_sympy_expr_to_numpy([x], expr, xv.dtype)
     exprv = (exprl)(xv)
@@ -348,7 +385,7 @@ def _compute_checked_eb_abs_qoi(
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def _compute_data_eb_for_qoi_eb_inner(
+def _compute_data_eb_for_qoi_eb_unchecked(
     expr: sp.Basic,
     x: sp.Symbol,
     xv: np.ndarray[S, F],
@@ -359,6 +396,9 @@ def _compute_data_eb_for_qoi_eb_inner(
     Translate an error bound on a derived quantity of interest (QoI) into an
     error bound on the input data.
 
+    This function does not check the returned error bound on the input data,
+    use `_compute_data_eb_for_qoi_eb` instead.
+
     Parameters
     ----------
     expr : sp.Basic
@@ -367,15 +407,15 @@ def _compute_data_eb_for_qoi_eb_inner(
         Symbol for the pointwise input data.
     xv : np.ndarray[S, F]
         Actual values of the input data.
-    eb_qoi_lower : np.ndarray[S, F]
+    eb_expr_lower : np.ndarray[S, F]
         Finite pointwise lower bound on the QoI error, must be negative or zero.
-    eb_qoi_upper : np.ndarray[S, F]
+    eb_expr_upper : np.ndarray[S, F]
         Finite pointwise upper bound on the QoI error, must be positive or zero.
 
     Returns
     -------
     eb_x_lower, eb_x_upper : tuple[np.ndarray[S, F], np.ndarray[S, F]]
-        Finite pointwise lower and upper bound on the input data `x`.
+        Finite pointwise lower and upper error bound on the input data `x`.
 
     Inspired by:
 
@@ -401,7 +441,7 @@ def _compute_data_eb_for_qoi_eb_inner(
         # flip the lower/upper error bound if the arg is negative
         eql = np.where(argv < 0, -eb_expr_upper, eb_expr_lower)
         equ = np.where(argv < 0, -eb_expr_lower, eb_expr_upper)
-        return _compute_checked_eb_abs_qoi(arg, x, xv, eql, equ)
+        return _compute_data_eb_for_qoi_eb(arg, x, xv, eql, equ)
 
     # ln(...)
     # sympy automatically transforms log(..., base) into ln(...)/ln(base)
@@ -449,7 +489,7 @@ def _compute_data_eb_for_qoi_eb_inner(
         if arg == x:
             return eb_arg_lower, eb_arg_upper  # type: ignore
         # composition using Lemma 3 from Jiao et al.
-        return _compute_checked_eb_abs_qoi(arg, x, xv, eb_arg_lower, eb_arg_upper)
+        return _compute_data_eb_for_qoi_eb(arg, x, xv, eb_arg_lower, eb_arg_upper)
 
     # e^(...)
     if expr.func is sp.exp and len(expr.args) == 1:
@@ -497,13 +537,13 @@ def _compute_data_eb_for_qoi_eb_inner(
         if arg == x:
             return eb_arg_lower, eb_arg_upper  # type: ignore
         # composition using Lemma 3 from Jiao et al.
-        return _compute_checked_eb_abs_qoi(arg, x, xv, eb_arg_lower, eb_arg_upper)
+        return _compute_data_eb_for_qoi_eb(arg, x, xv, eb_arg_lower, eb_arg_upper)
 
     # rewrite a ** b as e^(b*ln(abs(a)))
     # this is mathematically incorrect for a <= 0 but works for deriving error bounds
     if expr.is_Pow and len(expr.args) == 2:
         a, b = expr.args
-        return _compute_checked_eb_abs_qoi(
+        return _compute_data_eb_for_qoi_eb(
             sp.exp(b * sp.ln(sp.Abs(a)), evaluate=False),
             x,
             xv,
@@ -565,7 +605,7 @@ def _compute_data_eb_for_qoi_eb_inner(
         eb_x_lower, eb_x_upper = None, None
         for term, factor in zip(terms, factors):
             # recurse into the terms with a weighted error bound
-            exl, exu = _compute_checked_eb_abs_qoi(
+            exl, exu = _compute_data_eb_for_qoi_eb(
                 term,
                 x,
                 xv,
@@ -629,11 +669,11 @@ def _compute_data_eb_for_qoi_eb_inner(
         terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
 
         if len(terms) == 1:
-            return _compute_checked_eb_abs_qoi(
+            return _compute_data_eb_for_qoi_eb(
                 terms[0], x, xv, eb_factor_lower, eb_factor_upper
             )
 
-        return _compute_checked_eb_abs_qoi(
+        return _compute_data_eb_for_qoi_eb(
             sp.exp(sp.Add(*[sp.log(sp.Abs(term)) for term in terms]), evaluate=False),
             x,
             xv,
@@ -645,58 +685,93 @@ def _compute_data_eb_for_qoi_eb_inner(
 
 
 def _ensure_bounded_derived_error(
-    expr: Callable[[np.ndarray], np.ndarray],
-    exprv: np.ndarray,
-    xv: None | np.ndarray,
-    eb_guess: np.ndarray,
-    tauv_lower: np.ndarray,
-    tauv_upper: np.ndarray,
-) -> np.ndarray:
+    expr: Callable[[np.ndarray[S, F]], np.ndarray[S, F]],
+    exprv: np.ndarray[S, F],
+    xv: None | np.ndarray[S, F],
+    eb_x_guess: np.ndarray[S, F],
+    eb_expr_lower: np.ndarray[S, F],
+    eb_expr_upper: np.ndarray[S, F],
+) -> np.ndarray[S, F]:
+    """
+    Ensure that an error bound on an expression is met by an error bound on
+    the input data by nudging the provided guess.
+
+    Parameters
+    ----------
+    expr : Callable[[np.ndarray[S, F]], np.ndarray[S, F]]
+        Expression over which the error bound will be ensured.
+
+        The expression takes in the error bound guess and returns the value of
+        the expression for this error.
+    exprv : np.ndarray[S, F]
+        Evaluation of the expression for the zero-error case.
+    xv : None | np.ndarray[S, F]
+        Actual values of the input data, which are only used for better
+        refinement of the error bound guess.
+    eb_x_guess : np.ndarray[S, F]
+        Provided guess for the error bound on the initial data.
+    eb_expr_lower : np.ndarray[S, F]
+        Finite pointwise lower bound on the expression error, must be negative
+        or zero.
+    eb_expr_upper : np.ndarray[S, F]
+        Finite pointwise upper bound on the expression error, must be positive
+        or zero.
+
+    Returns
+    -------
+    eb_x : np.ndarray[S, F]
+        Finite pointwise error bound on the input data.
+    """
+
     # check if any derived expression exceeds the error bound
     eb_outside = ~(
-        ((expr(eb_guess) - exprv) >= tauv_lower)
-        & ((expr(eb_guess) - exprv) <= tauv_upper)
+        ((expr(eb_x_guess) - exprv) >= eb_expr_lower)
+        & ((expr(eb_x_guess) - exprv) <= eb_expr_upper)
     ) & _isfinite(exprv)
 
     if not np.any(eb_outside):
-        return eb_guess
+        return eb_x_guess
 
     # first try to nudge the error bound itself
-    eb_guess = np.where(eb_outside, _nextafter(eb_guess, 0), eb_guess)
+    # we can nudge with nextafter since the expression values are floating
+    #  point and only finite values are nudged
+    eb_x_guess = np.where(eb_outside, _nextafter(eb_x_guess, 0), eb_x_guess)  # type: ignore
 
     # check again
     eb_outside = ~(
-        ((expr(eb_guess) - exprv) >= tauv_lower)
-        & ((expr(eb_guess) - exprv) <= tauv_upper)
+        ((expr(eb_x_guess) - exprv) >= eb_expr_lower)
+        & ((expr(eb_x_guess) - exprv) <= eb_expr_upper)
     ) & _isfinite(exprv)
 
     if not np.any(eb_outside):
-        return eb_guess
+        return eb_x_guess
 
     if xv is not None:
         # second try to nudge it with respect to the data
-        eb_guess = np.where(eb_outside, _nextafter(xv + eb_guess, xv) - xv, eb_guess)
+        eb_x_guess = np.where(
+            eb_outside, _nextafter(xv + eb_x_guess, xv) - xv, eb_x_guess
+        )  # type: ignore
 
         # check again
         eb_outside = ~(
-            ((expr(eb_guess) - exprv) >= tauv_lower)
-            & ((expr(eb_guess) - exprv) <= tauv_upper)
+            ((expr(eb_x_guess) - exprv) >= eb_expr_lower)
+            & ((expr(eb_x_guess) - exprv) <= eb_expr_upper)
         ) & _isfinite(exprv)
 
         if not np.any(eb_outside):
-            return eb_guess
+            return eb_x_guess
 
     while True:
         # finally fall back to repeatedly cutting it in half
-        eb_guess = np.where(eb_outside, eb_guess * 0.5, eb_guess)
+        eb_x_guess = np.where(eb_outside, eb_x_guess * 0.5, eb_x_guess)  # type: ignore
 
         eb_outside = ~(
-            ((expr(eb_guess) - exprv) >= tauv_lower)
-            & ((expr(eb_guess) - exprv) <= tauv_upper)
+            ((expr(eb_x_guess) - exprv) >= eb_expr_lower)
+            & ((expr(eb_x_guess) - exprv) <= eb_expr_upper)
         ) & _isfinite(exprv)
 
         if not np.any(eb_outside):
-            return eb_guess
+            return eb_x_guess
 
 
 def _compile_sympy_expr_to_numpy(

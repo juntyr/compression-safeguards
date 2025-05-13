@@ -100,6 +100,7 @@ def to_finite_float(
     else:
         minv, maxv = np.finfo(dtype).min, np.finfo(dtype).max
 
+    # explicitly handle NaNs here for numpy_quaddtype
     return np.where(_isnan(xf), xf, np.maximum(minv, np.minimum(xf, maxv)))  # type: ignore
 
 
@@ -156,6 +157,7 @@ def as_bits(a: np.ndarray[S, T], *, kind: str = "u") -> np.ndarray[S, Any]:
         a.dtype.str.replace("f", kind)
         .replace("i", kind)
         .replace("u", kind)
+        # numpy_quaddtype currently does not set its kind properly
         .replace(_float128_dtype.kind, kind)
     )  # type: ignore
 
@@ -245,6 +247,7 @@ def from_total_order(a: np.ndarray[S, U], dtype: T) -> np.ndarray[S, T]:
     return (a ^ mask).view(dtype=dtype)
 
 
+# wrapper around np.isnan that also works for numpy_quaddtype
 @np.errstate(invalid="ignore")
 def _isnan(
     a: int | float | np.ndarray[S, T],
@@ -254,6 +257,7 @@ def _isnan(
     return ~(np.abs(a) <= np.inf)
 
 
+# wrapper around np.isinf that also works for numpy_quaddtype
 @np.errstate(invalid="ignore")
 def _isinf(
     a: int | float | np.ndarray[S, T],
@@ -263,6 +267,7 @@ def _isinf(
     return np.abs(a) == np.inf
 
 
+# wrapper around np.isfinite that also works for numpy_quaddtype
 @np.errstate(invalid="ignore")
 def _isfinite(
     a: int | float | np.ndarray[S, T],
@@ -272,6 +277,7 @@ def _isfinite(
     return np.abs(a) < np.inf
 
 
+# wrapper around np.nan_to_num that also works for numpy_quaddtype
 @np.errstate(invalid="ignore")
 def _nan_to_zero(a: np.ndarray[S, T]) -> np.ndarray[S, T]:
     if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
@@ -279,7 +285,8 @@ def _nan_to_zero(a: np.ndarray[S, T]) -> np.ndarray[S, T]:
     return np.where(_isnan(a), _float128(0), a)  # type: ignore
 
 
-# variant 2 from https://stackoverflow.com/a/70512834
+# wrapper around np.nextafter that also works for numpy_quaddtype
+# Implementation is variant 2 from https://stackoverflow.com/a/70512834
 @np.errstate(invalid="ignore")
 def _nextafter(
     a: np.ndarray[S, T], b: int | float | np.ndarray[S, T]
@@ -292,17 +299,17 @@ def _nextafter(
     _float128_neg_zero = -_float128(0)
     _float128_one_m_ulp = _float128(1) - _float128_eps * _float128(0.5)
 
-    incr = np.where(a >= 0, _float128_smallest_subnormal, -_float128_smallest_subnormal)
+    incr = np.where(a < 0, -_float128_smallest_subnormal, _float128_smallest_subnormal)
 
     r = np.where(
-        (~(np.array(np.abs(a)) <= np.inf)) | (~(np.array(np.abs(b)) <= np.inf)),
+        _isnan(a) | _isnan(b),
         a + b,  # unordered, at least one is NaN
         np.where(
             a == b,
             b,  # equal
             np.where(
-                np.abs(a) == np.inf,
-                np.where(a >= 0, _float128_max, _float128_min),  # infinity
+                _isinf(a),
+                np.where(a < 0, _float128_min, _float128_max),  # infinity
                 np.where(
                     np.abs(a) > _float128_smallest_normal,
                     np.where(

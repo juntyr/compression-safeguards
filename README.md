@@ -58,7 +58,7 @@ This package currently implements the following safeguards:
 
     The pointwise absolute error of the finite-difference-approximated derivative is guaranteed to be less than or equal to the provided bound. The safeguard supports three types of finite difference: `central`, `forward`, `backward`. The fininite difference is computed with respect to the provided uniform grid spacing. If the spacing is different along different axes, multiple safeguards along specific axes with different spacing can be combined. Infinite finite differences are preserved with the same bit pattern. NaN finite differences remain NaN though not necessarily with the same bit pattern.
 
-### Error Bounds on derived Quantities of Interest (pointwise QOIs)
+### Error Bounds on derived Quantities of Interest (pointwise QoIs)
 
 - `qoi_abs` (absolute error bound on quantities of interest):
 
