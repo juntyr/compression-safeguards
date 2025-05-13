@@ -1,5 +1,5 @@
 """
-Quantity of interest (QOI) absolute error bound safeguard.
+Quantity of interest (QoI) absolute error bound safeguard.
 """
 
 __all__ = ["QuantityOfInterestAbsoluteErrorBoundSafeguard"]
@@ -25,6 +25,7 @@ from ....cast import (
     _isnan,
     _nan_to_zero,
     _nextafter,
+    F,
 )
 from ....intervals import IntervalUnion
 
@@ -32,7 +33,7 @@ from ....intervals import IntervalUnion
 class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
     """
     The `QuantityOfInterestAbsoluteErrorBoundSafeguard` guarantees that the
-    pointwise absolute error on a derived quantity of interest (QOI) is less
+    pointwise absolute error on a derived quantity of interest (QoI) is less
     than or equal to the provided bound `eb_abs`.
 
     The quantity of interest is specified as a non-constant expression, in
@@ -187,7 +188,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
 
         data_float: np.ndarray = to_float(data)
 
-        qoi_lambda = _lambdify_sympy_to_numpy(
+        qoi_lambda = _compile_sympy_expr_to_numpy(
             [self._x], self._qoi_expr, data_float.dtype
         )
 
@@ -243,11 +244,11 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             eb_abs: np.ndarray = to_finite_float(self._eb_abs, data_float.dtype)
         assert eb_abs >= 0
 
-        qoi_lambda = _lambdify_sympy_to_numpy(
+        qoi_lambda = _compile_sympy_expr_to_numpy(
             [self._x], self._qoi_expr, data_float.dtype
         )
 
-        # ensure the error bounds are representable in QOI space
+        # ensure the error bounds are representable in QoI space
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
@@ -301,15 +302,13 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         assert np.all((eb_abs_qoi_lower <= 0) & _isfinite(eb_abs_qoi_lower))
         assert np.all((eb_abs_qoi_upper >= 0) & _isfinite(eb_abs_qoi_upper))
 
-        valid = _compute_safe_eb_diff_interval(
+        return _compute_safe_eb_diff_interval(
             data,
             data_float,
             eb_abs_qoi_lower,
             eb_abs_qoi_upper,
             equal_nan=True,
-        )
-
-        return valid.into_union()  # type: ignore
+        ).into_union()  # type: ignore
 
     def get_config(self) -> dict:
         """
@@ -332,9 +331,9 @@ def _compute_checked_eb_abs_qoi(
     tauv_lower: np.ndarray,
     tauv_upper: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
-    tl, tu = _compute_eb_abs_qoi_inner(expr, x, xv, tauv_lower, tauv_upper)
+    tl, tu = _compute_data_eb_for_qoi_eb_inner(expr, x, xv, tauv_lower, tauv_upper)
 
-    exprl = _lambdify_sympy_to_numpy([x], expr, xv.dtype)
+    exprl = _compile_sympy_expr_to_numpy([x], expr, xv.dtype)
     exprv = (exprl)(xv)
 
     # handle rounding errors in the lower error bound computation
@@ -349,14 +348,35 @@ def _compute_checked_eb_abs_qoi(
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def _compute_eb_abs_qoi_inner(
+def _compute_data_eb_for_qoi_eb_inner(
     expr: sp.Basic,
     x: sp.Symbol,
-    xv: np.ndarray,
-    tauv_lower: np.ndarray,
-    tauv_upper: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
+    xv: np.ndarray[S, F],
+    eb_expr_lower: np.ndarray[S, F],
+    eb_expr_upper: np.ndarray[S, F],
+) -> tuple[np.ndarray[S, F], np.ndarray[S, F]]:
     """
+    Translate an error bound on a derived quantity of interest (QoI) into an
+    error bound on the input data.
+
+    Parameters
+    ----------
+    expr : sp.Basic
+        Symbolic SymPy expression that defines the QoI.
+    x : sp.Symbol
+        Symbol for the pointwise input data.
+    xv : np.ndarray[S, F]
+        Actual values of the input data.
+    eb_qoi_lower : np.ndarray[S, F]
+        Finite pointwise lower bound on the QoI error, must be negative or zero.
+    eb_qoi_upper : np.ndarray[S, F]
+        Finite pointwise upper bound on the QoI error, must be positive or zero.
+
+    Returns
+    -------
+    eb_x_lower, eb_x_upper : tuple[np.ndarray[S, F], np.ndarray[S, F]]
+        Finite pointwise lower and upper bound on the input data `x`.
+
     Inspired by:
 
     Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
@@ -371,104 +391,124 @@ def _compute_eb_abs_qoi_inner(
 
     # x
     if expr == x:
-        return (tauv_lower, tauv_upper)
+        return (eb_expr_lower, eb_expr_upper)
 
     # abs(...) is only used internally in exp(ln(abs(...)))
     if expr.func is sp.Abs and len(expr.args) == 1:
         # evaluate arg
         (arg,) = expr.args
-        argv = _lambdify_sympy_to_numpy([x], arg, xv.dtype)(xv)
+        argv = _compile_sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
         # flip the lower/upper error bound if the arg is negative
-        tl = np.where(argv < 0, -tauv_upper, tauv_lower)
-        tu = np.where(argv < 0, -tauv_lower, tauv_upper)
-        return _compute_checked_eb_abs_qoi(arg, x, xv, tl, tu)
+        eql = np.where(argv < 0, -eb_expr_upper, eb_expr_lower)
+        equ = np.where(argv < 0, -eb_expr_lower, eb_expr_upper)
+        return _compute_checked_eb_abs_qoi(arg, x, xv, eql, equ)
 
     # ln(...)
     # sympy automatically transforms log(..., base) into ln(...)/ln(base)
     if expr.func is sp.log and len(expr.args) == 1:
         # evaluate arg and ln(arg)
         (arg,) = expr.args
-        argv = _lambdify_sympy_to_numpy([x], arg, xv.dtype)(xv)
+        argv = _compile_sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
         exprv = np.log(argv)
 
         # update the error bounds
-        tl = np.where(
-            (tauv_lower == 0) | (argv <= 0) | ~_isfinite(argv),
+        eal = np.where(
+            (eb_expr_lower == 0) | (argv <= 0) | ~_isfinite(argv),
             zero,
-            np.exp(exprv + tauv_lower) - argv,
+            np.exp(exprv + eb_expr_lower) - argv,
         )
-        tl = to_finite_float(tl, xv.dtype)
-        tl = _nan_to_zero(tl)
+        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
 
-        tu = np.where(
-            (tauv_upper == 0) | (argv <= 0) | ~_isfinite(argv),
+        eau = np.where(
+            (eb_expr_upper == 0) | (argv <= 0) | ~_isfinite(argv),
             zero,
-            np.exp(exprv + tauv_upper) - argv,
+            np.exp(exprv + eb_expr_upper) - argv,
         )
-        tu = to_finite_float(tu, xv.dtype)
-        tu = _nan_to_zero(tu)
+        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
 
         # handle rounding errors in ln(e^(...)) early
-        tl = _ensure_bounded_derived_error(
-            lambda tl: np.log(argv + tl), exprv, argv, tl, tauv_lower, tauv_upper
+        eal = _ensure_bounded_derived_error(
+            lambda eal: np.log(argv + eal),
+            exprv,
+            argv,
+            eal,
+            eb_expr_lower,
+            eb_expr_upper,
         )
-        tu = _ensure_bounded_derived_error(
-            lambda tu: np.log(argv + tu), exprv, argv, tu, tauv_lower, tauv_upper
+        eau = _ensure_bounded_derived_error(
+            lambda eau: np.log(argv + eau),
+            exprv,
+            argv,
+            eau,
+            eb_expr_lower,
+            eb_expr_upper,
         )
-        tauv_lower, tauv_upper = tl, tu
+        eb_arg_lower, eb_arg_upper = eal, eau
 
         # base case for ln(x)
         if arg == x:
-            return tauv_lower, tauv_upper
+            return eb_arg_lower, eb_arg_upper  # type: ignore
         # composition using Lemma 3 from Jiao et al.
-        return _compute_checked_eb_abs_qoi(arg, x, xv, tauv_lower, tauv_upper)
+        return _compute_checked_eb_abs_qoi(arg, x, xv, eb_arg_lower, eb_arg_upper)
 
     # e^(...)
     if expr.func is sp.exp and len(expr.args) == 1:
         # evaluate arg and e^arg
         (arg,) = expr.args
-        argv = _lambdify_sympy_to_numpy([x], arg, xv.dtype)(xv)
+        argv = _compile_sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
         exprv = np.exp(argv)
 
         # update the error bounds
         # ensure that ln is not passed a negative argument
-        tl = np.where(
-            (tauv_lower == 0) | ~_isfinite(argv),
+        eal = np.where(
+            (eb_expr_lower == 0) | ~_isfinite(argv),
             zero,
-            np.log(np.maximum(zero, exprv + tauv_lower)) - argv,
+            np.log(np.maximum(zero, exprv + eb_expr_lower)) - argv,
         )
-        tl = to_finite_float(tl, xv.dtype)
-        tl = _nan_to_zero(tl)
+        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
 
-        tu = np.where(
-            (tauv_upper == 0) | ~_isfinite(argv),
+        eau = np.where(
+            (eb_expr_upper == 0) | ~_isfinite(argv),
             zero,
-            np.log(np.maximum(zero, exprv + tauv_upper)) - argv,
+            np.log(np.maximum(zero, exprv + eb_expr_upper)) - argv,
         )
-        tu = to_finite_float(tu, xv.dtype)
-        tu = _nan_to_zero(tu)
+        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
 
         # handle rounding errors in e^(ln(...)) early
-        tl = _ensure_bounded_derived_error(
-            lambda tl: np.exp(argv + tl), exprv, argv, tl, tauv_lower, tauv_upper
+        eal = _ensure_bounded_derived_error(
+            lambda eal: np.exp(argv + eal),
+            exprv,
+            argv,
+            eal,
+            eb_expr_lower,
+            eb_expr_upper,
         )
-        tu = _ensure_bounded_derived_error(
-            lambda tu: np.exp(argv + tu), exprv, argv, tu, tauv_lower, tauv_upper
+        eau = _ensure_bounded_derived_error(
+            lambda eau: np.exp(argv + eau),
+            exprv,
+            argv,
+            eau,
+            eb_expr_lower,
+            eb_expr_upper,
         )
-        tauv_lower, tauv_upper = tl, tu
+        eb_arg_lower, eb_arg_upper = eal, eau
 
         # base case for e^x
         if arg == x:
-            return tauv_lower, tauv_upper
+            return eb_arg_lower, eb_arg_upper  # type: ignore
         # composition using Lemma 3 from Jiao et al.
-        return _compute_checked_eb_abs_qoi(arg, x, xv, tauv_lower, tauv_upper)
+        return _compute_checked_eb_abs_qoi(arg, x, xv, eb_arg_lower, eb_arg_upper)
 
     # rewrite a ** b as e^(b*ln(abs(a)))
-    # this is mathematically incorrect for a < 0 but works for deriving error bounds
+    # this is mathematically incorrect for a <= 0 but works for deriving error bounds
     if expr.is_Pow and len(expr.args) == 2:
         a, b = expr.args
         return _compute_checked_eb_abs_qoi(
-            sp.exp(b * sp.ln(sp.Abs(a)), evaluate=False), x, xv, tauv_lower, tauv_upper
+            sp.exp(b * sp.ln(sp.Abs(a)), evaluate=False),
+            x,
+            xv,
+            eb_expr_lower,
+            eb_expr_upper,
         )
 
     # a_1 * e_1 + ... + a_n * e_n + c (weighted sum)
@@ -482,7 +522,7 @@ def _compute_eb_abs_qoi_inner(
             # extract the weighting factor of the term
             if term.is_Mul:
                 factors.append(
-                    _lambdify_sympy_to_numpy(
+                    _compile_sympy_expr_to_numpy(
                         [],
                         sp.Mul(
                             *[arg for arg in term.args if len(arg.free_symbols) == 0]  # type: ignore
@@ -494,101 +534,111 @@ def _compute_eb_abs_qoi_inner(
                     *[arg for arg in term.args if len(arg.free_symbols) > 0]  # type: ignore
                 )
             else:
-                factors.append(1)
+                factors.append(np.array(1))
         total_abs_factor = np.sum(np.abs(factors))
 
-        tl = _nan_to_zero(to_finite_float(tauv_lower / total_abs_factor, xv.dtype))
-        tu = _nan_to_zero(to_finite_float(tauv_upper / total_abs_factor, xv.dtype))
+        etl: np.ndarray = _nan_to_zero(
+            to_finite_float(eb_expr_lower / total_abs_factor, xv.dtype)
+        )
+        etu: np.ndarray = _nan_to_zero(
+            to_finite_float(eb_expr_upper / total_abs_factor, xv.dtype)
+        )
 
         # handle rounding errors in the total absolute factor early
-        tl = _ensure_bounded_derived_error(
-            lambda tl: tl * total_abs_factor,
+        etl = _ensure_bounded_derived_error(
+            lambda etl: etl * total_abs_factor,
             np.zeros_like(xv),
             None,
-            tl,
-            tauv_lower,
-            tauv_upper,
+            etl,
+            eb_expr_lower,
+            eb_expr_upper,
         )
-        tu = _ensure_bounded_derived_error(
-            lambda tu: tu * total_abs_factor,
+        etu = _ensure_bounded_derived_error(
+            lambda etu: etu * total_abs_factor,
             np.zeros_like(xv),
             None,
-            tu,
-            tauv_lower,
-            tauv_upper,
+            etu,
+            eb_expr_lower,
+            eb_expr_upper,
         )
 
-        ebs_lower, ebs_upper = None, None
+        eb_x_lower, eb_x_upper = None, None
         for term, factor in zip(terms, factors):
             # recurse into the terms with a weighted error bound
-            eb_lower, eb_upper = _compute_checked_eb_abs_qoi(
+            exl, exu = _compute_checked_eb_abs_qoi(
                 term,
                 x,
                 xv,
                 # flip the lower/upper error bound if the factor is negative
-                -tu if factor < 0 else tl,
-                -tl if factor < 0 else tu,
+                -etu if factor < 0 else etl,
+                -etl if factor < 0 else etu,
             )
             # combine the inner error bounds
-            if ebs_lower is None:
-                ebs_lower = eb_lower
+            if eb_x_lower is None:
+                eb_x_lower = exl
             else:
-                ebs_lower = np.maximum(ebs_lower, eb_lower)
-            if ebs_upper is None:
-                ebs_upper = eb_upper
+                eb_x_lower = np.maximum(eb_x_lower, exl)
+            if eb_x_upper is None:
+                eb_x_upper = exu
             else:
-                ebs_upper = np.minimum(ebs_upper, eb_upper)
+                eb_x_upper = np.minimum(eb_x_upper, exu)
 
-        return ebs_lower, ebs_upper  # type: ignore
+        return eb_x_lower, eb_x_upper  # type: ignore
 
     # rewrite f * e_1 * ... * e_n (product) as f * e^(ln(abs(e_1) + ... + ln(abs(e_n)))
-    # this is mathematically incorrect if the product is negative,
+    # this is mathematically incorrect if the product is non-positive,
     #  but works for deriving error bounds
     if expr.is_Mul:
         # extract the constant factor and reduce tauv
-        factor = _lambdify_sympy_to_numpy(
+        factor = _compile_sympy_expr_to_numpy(
             [],
             sp.Mul(*[arg for arg in expr.args if len(arg.free_symbols) == 0]),  # type: ignore
             xv.dtype,
         )()
 
-        tl = _nan_to_zero(to_finite_float(tauv_lower / np.abs(factor), xv.dtype))
-        tu = _nan_to_zero(to_finite_float(tauv_upper / np.abs(factor), xv.dtype))
+        efl: np.ndarray = _nan_to_zero(
+            to_finite_float(eb_expr_lower / np.abs(factor), xv.dtype)
+        )
+        efu: np.ndarray = _nan_to_zero(
+            to_finite_float(eb_expr_upper / np.abs(factor), xv.dtype)
+        )
 
         # handle rounding errors in the factor early
-        tl = _ensure_bounded_derived_error(
-            lambda tl: tl * np.abs(factor),
+        efl = _ensure_bounded_derived_error(
+            lambda efl: efl * np.abs(factor),
             np.zeros_like(xv),
             None,
-            tl,
-            tauv_lower,
-            tauv_upper,
+            efl,
+            eb_expr_lower,
+            eb_expr_upper,
         )
-        tu = _ensure_bounded_derived_error(
-            lambda tu: tu * np.abs(factor),
+        efu = _ensure_bounded_derived_error(
+            lambda efu: efu * np.abs(factor),
             np.zeros_like(xv),
             None,
-            tu,
-            tauv_lower,
-            tauv_upper,
+            efu,
+            eb_expr_lower,
+            eb_expr_upper,
         )
 
         # flip the lower/upper error bound if the factor is negative
-        tauv_lower = -tu if factor < 0 else tl
-        tauv_upper = -tl if factor < 0 else tu
+        eb_factor_lower = -efu if factor < 0 else efl
+        eb_factor_upper = -efl if factor < 0 else efu
 
         # find all non-constant terms
         terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
 
         if len(terms) == 1:
-            return _compute_checked_eb_abs_qoi(terms[0], x, xv, tauv_lower, tauv_upper)
+            return _compute_checked_eb_abs_qoi(
+                terms[0], x, xv, eb_factor_lower, eb_factor_upper
+            )
 
         return _compute_checked_eb_abs_qoi(
             sp.exp(sp.Add(*[sp.log(sp.Abs(term)) for term in terms]), evaluate=False),
             x,
             xv,
-            tauv_lower,
-            tauv_upper,
+            eb_factor_lower,
+            eb_factor_upper,
         )
 
     raise ValueError(f"unsupported expression kind {expr} (= {sp.srepr(expr)} =)")
@@ -649,24 +699,40 @@ def _ensure_bounded_derived_error(
             return eb_guess
 
 
-def _lambdify_sympy_to_numpy(
+def _compile_sympy_expr_to_numpy(
     symbols: list[sp.Symbol],
     expr: sp.Basic,
     dtype: np.dtype,
-) -> Callable:
+) -> Callable[..., np.ndarray]:
+    """
+    Compile the SymPy expression `expr` over a list of `variables` into a
+    function that uses NumPy for numerical evaluation.
+
+    The function evaluates to a numpy array of the provided `dtype` if all
+    variable inputs are numpy arrays of the same `dtype`.
+    """
+
     return sp.lambdify(
         symbols,
         expr,
         modules=["numpy"]
         + ([{_float128_dtype.name: _float128}] if dtype == _float128_dtype else []),
-        printer=_create_sympy_numpy_printer(dtype),
+        printer=_create_sympy_numpy_printer_class(dtype),
         docstring_limit=0,
     )
 
 
 @functools.cache
-def _create_sympy_numpy_printer(dtype: np.dtype):
+def _create_sympy_numpy_printer_class(
+    dtype: np.dtype,
+) -> type[sp.printing.numpy.NumPyPrinter]:
+    """
+    Create a SymPy to NumPy printer class that outputs numerical values and
+    constants with the provided `dtype` and sufficient precision.
+    """
+
     class NumPyDtypePrinter(sp.printing.numpy.NumPyPrinter):
+        # remove default printing of known constants
         _kc = dict()
 
         def __init__(self, settings=None):
@@ -674,21 +740,20 @@ def _create_sympy_numpy_printer(dtype: np.dtype):
             if settings is None:
                 settings = dict()
             if dtype == _float128_dtype:
-                settings["precision"] = _float128_precision + 1
+                settings["precision"] = _float128_precision * 2
             else:
-                settings["precision"] = np.finfo(dtype).precision + 1
+                settings["precision"] = np.finfo(dtype).precision * 2
             super().__init__(settings)
 
         def _print_Integer(self, expr):
             return str(expr.p)
 
         def _print_Rational(self, expr):
-            if expr.q == 1:
-                return str(expr.p)
-            else:
-                return f"{self._dtype}({expr.p}) / {self._dtype}({expr.q})"
+            return f"{self._dtype}({expr.p}) / {self._dtype}({expr.q})"
 
         def _print_Float(self, expr):
+            # explicitly create the float from its string representation
+            #  e.g. 1.2 -> float16('1.2')
             s = super()._print_Float(expr)
             return f"{self._dtype}({s!r})"
 

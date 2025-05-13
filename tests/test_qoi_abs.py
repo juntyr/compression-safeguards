@@ -69,6 +69,7 @@ CHECKS = [
 def test_empty(check):
     with pytest.raises(AssertionError, match="empty"):
         check("")
+    with pytest.raises(AssertionError, match="empty"):
         check("  \t   \n   ")
 
 
@@ -165,3 +166,24 @@ def test_fuzzer_found(check):
     check_all_codecs(np.array([-1024.0]), "((pi**(x**(x+x)))**1)")
 
     check("((pi**(x**(x+x)))**1)")
+
+
+def test_lambdify_dtype():
+    import inspect
+
+    import sympy as sp
+    from numcodecs_safeguards.safeguards.pointwise.qoi.abs import (
+        _compile_sympy_expr_to_numpy,
+    )
+
+    x = sp.Symbol("x", real=True)
+
+    fn = _compile_sympy_expr_to_numpy([x], x + sp.pi + sp.E, np.dtype(np.float16))
+
+    assert (
+        inspect.getsource(fn)
+        == "def _lambdifygenerated(x):\n    return x + float16('2.71828') + float16('3.14159')\n"
+    )
+
+    assert np.float16("2.71828") == np.float16(np.e)
+    assert np.float16("3.14159") == np.float16(np.pi)

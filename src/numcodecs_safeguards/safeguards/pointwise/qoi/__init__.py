@@ -1,5 +1,5 @@
 """
-Implementations for the provided pointwise quantity of interest (QOI) safeguards.
+Implementations for the provided pointwise quantity of interest (QoI) safeguards.
 """
 
 __all__ = ["Expr"]
