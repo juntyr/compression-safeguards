@@ -1,6 +1,27 @@
 import numpy as np
 
-from numcodecs_safeguards.cast import _float128, _isnan, _nextafter
+from numcodecs_safeguards.cast import (
+    _float128,
+    _float128_eps,
+    _float128_max,
+    _float128_min,
+    _float128_precision,
+    _float128_smallest_normal,
+    _float128_smallest_subnormal,
+    _isnan,
+    _nextafter,
+)
+
+
+def test_float128():
+    assert _float128_max == _float128("1.189731495357231765085759326628007e+4932")
+    assert _float128_min == _float128("-1.189731495357231765085759326628007e+4932")
+    assert _float128_precision == 33
+    assert _float128_smallest_subnormal == _float128("6e-4966")
+    assert _float128_smallest_normal == _float128(
+        "3.3621031431120935062626778173217526e-4932"
+    )
+    assert _float128_eps == _float128("1.9259299443872358530559779425849273e-34")
 
 
 def test_nextafter_float128():
