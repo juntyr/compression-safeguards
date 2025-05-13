@@ -5,15 +5,14 @@ Monotonicity-preserving safeguard.
 __all__ = ["Monotonicity", "MonotonicityPreservingSafeguard"]
 
 from enum import Enum
-from operator import le, lt, ge, gt
+from operator import ge, gt, le, lt
 
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
-from .abc import StencilSafeguard, S, T
-from ...cast import to_total_order, from_total_order, _isfinite, _isnan
-from ...intervals import IntervalUnion, Interval, Lower, Upper
-
+from ...cast import _isfinite, _isnan, from_total_order, to_total_order
+from ...intervals import Interval, IntervalUnion, Lower, Upper
+from .abc import S, StencilSafeguard, T
 
 _STRICT = ((lt, gt, False, False),) * 2
 _STRICT_WITH_CONSTS = ((lt, gt, True, False),) * 2

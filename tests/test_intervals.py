@@ -1,12 +1,13 @@
 import numpy as np
+
 from numcodecs_safeguards.cast import as_bits
 from numcodecs_safeguards.intervals import (
-    _minimum,
-    _maximum,
-    IntervalUnion,
     Interval,
+    IntervalUnion,
     Lower,
     Upper,
+    _maximum,
+    _minimum,
 )
 from numcodecs_safeguards.safeguards.pointwise.abs import AbsoluteErrorBoundSafeguard
 from numcodecs_safeguards.safeguards.pointwise.sign import SignPreservingSafeguard

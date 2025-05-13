@@ -6,7 +6,6 @@ __all__ = ["Lossless"]
 
 from dataclasses import dataclass, field
 from io import BytesIO
-from typing_extensions import Buffer  # MSPV 3.12
 
 import numcodecs.compat
 import numcodecs.registry
@@ -16,6 +15,7 @@ from dahuffman import HuffmanCodec as DaHuffmanCodec
 from dahuffman.huffmancodec import _EOF
 from numcodecs.abc import Codec
 from numcodecs_combinators.stack import CodecStack
+from typing_extensions import Buffer  # MSPV 3.12
 
 from .cast import as_bits
 

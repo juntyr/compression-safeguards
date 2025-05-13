@@ -5,12 +5,12 @@ Abstract base class for the pointwise safeguards.
 __all__ = ["PointwiseSafeguard"]
 
 from abc import ABC, abstractmethod
-from typing import Any, final, TypeVar
+from typing import Any, TypeVar, final
 
 import numpy as np
 
-from ..abc import Safeguard
 from ...intervals import IntervalUnion
+from ..abc import Safeguard
 
 T = TypeVar("T", bound=np.dtype)
 S = TypeVar("S", bound=tuple[int, ...])

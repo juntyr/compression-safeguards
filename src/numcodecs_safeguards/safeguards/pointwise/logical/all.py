@@ -8,8 +8,8 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from ..abc import PointwiseSafeguard, S, T
 from ....intervals import IntervalUnion
+from ..abc import PointwiseSafeguard, S, T
 
 
 class AllSafeguards(PointwiseSafeguard):

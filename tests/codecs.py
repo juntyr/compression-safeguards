@@ -1,7 +1,7 @@
 import numpy as np
+from numcodecs.abc import Codec
 
 from numcodecs_safeguards import SafeguardsCodec
-from numcodecs.abc import Codec
 
 
 class ZeroCodec(Codec):

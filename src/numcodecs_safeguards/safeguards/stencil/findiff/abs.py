@@ -9,15 +9,15 @@ from fractions import Fraction
 
 import numpy as np
 
-from ....cast import to_float, as_bits, to_finite_float, _isnan, _isinf, _isfinite
+from ....cast import _isfinite, _isinf, _isnan, as_bits, to_finite_float, to_float
 from ....intervals import IntervalUnion
-from ..abc import StencilSafeguard, S, T
 from ...pointwise.abs import _compute_safe_eb_diff_interval
+from ..abc import S, StencilSafeguard, T
 from . import (
     FiniteDifference,
-    _finite_difference_offsets,
-    _finite_difference_coefficients,
     _finite_difference,
+    _finite_difference_coefficients,
+    _finite_difference_offsets,
 )
 
 

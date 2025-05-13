@@ -5,18 +5,18 @@ Types and helpers to construct safe intervals for the safeguards.
 __all__ = ["Interval", "IntervalUnion", "Minimum", "Maximum", "Lower", "Upper"]
 
 from typing import Any, Generic, Literal, TypeVar
-from typing_extensions import Self  # MSPV 3.11
 
 import numpy as np
+from typing_extensions import Self  # MSPV 3.11
 
 from .cast import (
-    as_bits,
-    to_total_order,
-    from_total_order,
-    _isnan,
-    _isinf,
     _isfinite,
+    _isinf,
+    _isnan,
     _nextafter,
+    as_bits,
+    from_total_order,
+    to_total_order,
 )
 
 T = TypeVar("T", bound=np.dtype)

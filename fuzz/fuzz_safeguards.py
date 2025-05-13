@@ -18,12 +18,13 @@ with atheris.instrument_imports():
     import numcodecs.registry
     import numpy as np
     from numcodecs.abc import Codec
+
     from numcodecs_safeguards import (
-        SafeguardsCodec,
         Safeguards,
+        SafeguardsCodec,
     )
-    from numcodecs_safeguards.safeguards.abc import Safeguard
     from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
+    from numcodecs_safeguards.safeguards.abc import Safeguard
     from numcodecs_safeguards.safeguards.pointwise.qoi import Expr
 
 

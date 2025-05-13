@@ -6,18 +6,18 @@ __all__ = ["RelativeErrorBoundSafeguard"]
 
 import numpy as np
 
-from .abc import PointwiseSafeguard, S, T
-from .abs import _compute_safe_eb_diff_interval
 from ...cast import (
-    to_float,
-    as_bits,
-    to_finite_float,
-    _isinf,
     _isfinite,
+    _isinf,
     _isnan,
     _nan_to_zero,
+    as_bits,
+    to_finite_float,
+    to_float,
 )
 from ...intervals import IntervalUnion, Lower, Upper
+from .abc import PointwiseSafeguard, S, T
+from .abs import _compute_safe_eb_diff_interval
 
 
 class RelativeErrorBoundSafeguard(PointwiseSafeguard):

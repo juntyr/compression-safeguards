@@ -4,7 +4,7 @@ Implementations for the provided safeguards on finite differences.
 
 __all__ = ["FiniteDifference"]
 
-from enum import auto, Enum
+from enum import Enum, auto
 from fractions import Fraction
 
 import numpy as np

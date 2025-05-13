@@ -10,24 +10,24 @@ from typing import Callable
 import numpy as np
 import sympy as sp
 
-from . import Expr
-from ..abc import PointwiseSafeguard, S, T
-from ..abs import _compute_safe_eb_diff_interval
 from ....cast import (
-    as_bits,
-    to_float,
-    to_finite_float,
+    F,
     _float128,
     _float128_dtype,
     _float128_precision,
-    _isinf,
     _isfinite,
+    _isinf,
     _isnan,
     _nan_to_zero,
     _nextafter,
-    F,
+    as_bits,
+    to_finite_float,
+    to_float,
 )
 from ....intervals import IntervalUnion
+from ..abc import PointwiseSafeguard, S, T
+from ..abs import _compute_safe_eb_diff_interval
+from . import Expr
 
 
 class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):

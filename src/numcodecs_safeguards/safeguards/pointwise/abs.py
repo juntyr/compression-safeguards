@@ -6,20 +6,20 @@ __all__ = ["AbsoluteErrorBoundSafeguard"]
 
 import numpy as np
 
-from .abc import PointwiseSafeguard, S, T
 from ...cast import (
-    to_float,
-    from_float,
-    as_bits,
-    to_total_order,
-    from_total_order,
-    to_finite_float,
     F,
     _isfinite,
     _isinf,
     _isnan,
+    as_bits,
+    from_float,
+    from_total_order,
+    to_finite_float,
+    to_float,
+    to_total_order,
 )
-from ...intervals import IntervalUnion, Interval, Lower, Upper
+from ...intervals import Interval, IntervalUnion, Lower, Upper
+from .abc import PointwiseSafeguard, S, T
 
 
 class AbsoluteErrorBoundSafeguard(PointwiseSafeguard):

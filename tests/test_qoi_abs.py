@@ -4,10 +4,10 @@ import pytest
 from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
 
 from .codecs import (
-    encode_decode_zero,
-    encode_decode_neg,
     encode_decode_identity,
+    encode_decode_neg,
     encode_decode_noise,
+    encode_decode_zero,
 )
 
 
@@ -172,6 +172,7 @@ def test_lambdify_dtype():
     import inspect
 
     import sympy as sp
+
     from numcodecs_safeguards.safeguards.pointwise.qoi.abs import (
         _compile_sympy_expr_to_numpy,
     )
