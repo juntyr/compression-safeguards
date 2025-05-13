@@ -254,7 +254,7 @@ def _isnan(
 ) -> bool | np.ndarray[S, np.dtype[np.bool]]:
     if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
         return np.isnan(a)  # type: ignore
-    return ~(np.abs(a) <= np.inf)
+    return ~np.array(np.abs(a) <= np.inf)
 
 
 # wrapper around np.isinf that also works for numpy_quaddtype
