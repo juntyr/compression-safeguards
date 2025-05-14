@@ -744,11 +744,11 @@ class IntervalUnion(Generic[T, N, U]):
             # update either the previous or the next output interval
             has_next = has_intersection_with_out | choose_i | choose_j
             out._lower[
-                n_intervals[has_next] - has_intersection_with_out,
+                n_intervals[has_next] - has_intersection_with_out[has_next],
                 has_next,
             ] = from_total_order(next_lower[has_next], out._lower.dtype)
             out._upper[
-                n_intervals[has_next] - has_intersection_with_out,
+                n_intervals[has_next] - has_intersection_with_out[has_next],
                 has_next,
             ] = from_total_order(next_upper[has_next], out._upper.dtype)
 

@@ -167,11 +167,14 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             if (
                 self._axis is not None
                 and axis != self._axis
-                and axis != (data.ndim - self._axis)
+                and axis != (data.ndim + self._axis)
             ):
                 continue
 
-            if alen < window:
+            if self._boundary == BoundaryCondition.valid and alen < window:
+                continue
+
+            if alen == 0:
                 continue
 
             data_boundary = _pad_with_boundary(
@@ -228,11 +231,14 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             if (
                 self._axis is not None
                 and axis != self._axis
-                and axis != (data.ndim - self._axis)
+                and axis != (data.ndim + self._axis)
             ):
                 continue
 
-            if alen < window:
+            if self._boundary == BoundaryCondition.valid and alen < window:
+                continue
+
+            if alen == 0:
                 continue
 
             data_boundary = _pad_with_boundary(
@@ -275,18 +281,6 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 if w < (window - 1):
                     elem_gt_right[s] |= data_monotonic[..., 0] == +1
 
-            match self._boundary:
-                case BoundaryCondition.valid | BoundaryCondition.constant:
-                    pass
-                case BoundaryCondition.edge:
-                    # FIXME: apply boundary requirements to the edge
-                case BoundaryCondition.reflect:
-                    # FIXME: apply boundary requirements to the reflection
-                case BoundaryCondition.symmetric:
-                    # FIXME: apply boundary requirements to the symmetric reflection
-                case BoundaryCondition.wrap:
-                    # FIXME: apply boundary requirements to the wrap
-
             if self._boundary == BoundaryCondition.valid:
                 s = tuple([slice(None)] * data.ndim)
             else:
@@ -313,25 +307,74 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             # nudge the lower bound up and upper bound down for strict
             #  monotonicity to ensure that the safe intervals don't overlap
             if np.any(elem_lt_left | elem_lt_right):
-                valid_lt = Interval.full_like(data)
+                valid_lt = Interval.full_like(data_boundary)
             if np.any(elem_lt_right):
-                any_restriction |= elem_lt_right[s]
                 Lower(
                     from_total_order(
                         to_total_order(np.roll(data_boundary, -1, axis=axis)) + nudge,
                         dtype=data.dtype,
-                    )[s].flatten()
-                ) <= valid_lt[elem_lt_right[s].flatten()]
+                    ).flatten()
+                ) <= valid_lt[elem_lt_right.flatten()]
             if np.any(elem_lt_left):
-                any_restriction |= elem_lt_left[s]
-                valid_lt[elem_lt_left[s].flatten()] <= Upper(
+                valid_lt[elem_lt_left.flatten()] <= Upper(
                     from_total_order(
                         to_total_order(np.roll(data_boundary, +1, axis=axis)) - nudge,
                         dtype=data.dtype,
-                    )[s].flatten()
+                    ).flatten()
                 )
             if np.any(elem_lt_left | elem_lt_right):
-                valid = valid.intersect(valid_lt)
+                # temporarily shape the interval bounds like the data
+                #  for easier indexing
+                valid_lt._lower = valid_lt._lower.reshape(data_boundary.shape)
+                valid_lt._upper = valid_lt._upper.reshape(data_boundary.shape)
+
+                if self._boundary in (
+                    BoundaryCondition.reflect,
+                    BoundaryCondition.symmetric,
+                    BoundaryCondition.wrap,
+                ):
+                    # requirements inside the boundary need to be connected
+                    #  back to the original data elements
+                    boundary_indices = _pad_with_boundary(
+                        np.arange(alen), self._boundary, self._window, None, 0
+                    )
+                    for w in [ws for w in range(self._window) for ws in [w, -w - 1]]:
+                        s_boundary = tuple(
+                            [slice(None)] * axis
+                            + [w]
+                            + [slice(None)] * (data_boundary.ndim - axis - 1)
+                        )
+                        s_inner = tuple(
+                            [slice(None)] * axis
+                            + [boundary_indices[w] + self._window]
+                            + [slice(None)] * (data_boundary.ndim - axis - 1)
+                        )
+                        # map the boundary values for the requirement masks and
+                        #  interval back to the inner values
+                        elem_lt_left[s_inner] |= elem_lt_left[s_boundary]
+                        elem_lt_right[s_inner] |= elem_lt_right[s_boundary]
+                        valid_lt._lower[s_inner] = from_total_order(
+                            np.maximum(
+                                to_total_order(valid_lt._lower[s_inner]),
+                                to_total_order(valid_lt._lower[s_boundary]),
+                            ),
+                            dtype=data.dtype,
+                        )
+                        valid_lt._upper[s_inner] = from_total_order(
+                            np.minimum(
+                                to_total_order(valid_lt._upper[s_inner]),
+                                to_total_order(valid_lt._upper[s_boundary]),
+                            ),
+                            dtype=data.dtype,
+                        )
+
+                any_restriction |= elem_lt_left[s] | elem_lt_right[s]
+                valid = valid.intersect(
+                    Interval(
+                        _lower=valid_lt._lower[s].flatten(),
+                        _upper=valid_lt._upper[s].flatten(),
+                    )
+                )
 
             # if any element has an increasing constraint, impose it and
             #  intersect with the overall valid interval
@@ -340,25 +383,74 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             # nudge the lower bound up and upper bound down for strict
             #  monotonicity to ensure that the safe intervals don't overlap
             if np.any(elem_gt_left | elem_gt_right):
-                valid_gt = Interval.full_like(data)
+                valid_gt = Interval.full_like(data_boundary)
             if np.any(elem_gt_left):
-                any_restriction |= elem_gt_left[s]
                 Lower(
                     from_total_order(
                         to_total_order(np.roll(data_boundary, +1, axis=axis)) + nudge,
                         dtype=data.dtype,
-                    )[s].flatten()
-                ) <= valid_gt[elem_gt_left[s].flatten()]
+                    ).flatten()
+                ) <= valid_gt[elem_gt_left.flatten()]
             if np.any(elem_gt_right):
-                any_restriction |= elem_gt_right[s]
-                valid_gt[elem_gt_right[s].flatten()] <= Upper(
+                valid_gt[elem_gt_right.flatten()] <= Upper(
                     from_total_order(
                         to_total_order(np.roll(data_boundary, -1, axis=axis)) - nudge,
                         dtype=data.dtype,
-                    )[s].flatten()
+                    ).flatten()
                 )
             if np.any(elem_gt_left | elem_gt_right):
-                valid = valid.intersect(valid_gt)
+                # temporarily shape the interval bounds like the data
+                #  for easier indexing
+                valid_gt._lower = valid_gt._lower.reshape(data_boundary.shape)
+                valid_gt._upper = valid_gt._upper.reshape(data_boundary.shape)
+
+                if self._boundary in (
+                    BoundaryCondition.reflect,
+                    BoundaryCondition.symmetric,
+                    BoundaryCondition.wrap,
+                ):
+                    # requirements inside the boundary need to be connected
+                    #  back to the original data elements
+                    boundary_indices = _pad_with_boundary(
+                        np.arange(alen), self._boundary, self._window, None, 0
+                    )
+                    for w in [ws for w in range(self._window) for ws in [w, -w - 1]]:
+                        s_boundary = tuple(
+                            [slice(None)] * axis
+                            + [w]
+                            + [slice(None)] * (data_boundary.ndim - axis - 1)
+                        )
+                        s_inner = tuple(
+                            [slice(None)] * axis
+                            + [boundary_indices[w] + self._window]
+                            + [slice(None)] * (data_boundary.ndim - axis - 1)
+                        )
+                        # map the boundary values for the requirement masks and
+                        #  interval back to the inner values
+                        elem_gt_left[s_inner] |= elem_gt_left[s_boundary]
+                        elem_gt_right[s_inner] |= elem_gt_right[s_boundary]
+                        valid_gt._lower[s_inner] = from_total_order(
+                            np.maximum(
+                                to_total_order(valid_gt._lower[s_inner]),
+                                to_total_order(valid_gt._lower[s_boundary]),
+                            ),
+                            dtype=data.dtype,
+                        )
+                        valid_gt._upper[s_inner] = from_total_order(
+                            np.minimum(
+                                to_total_order(valid_gt._upper[s_inner]),
+                                to_total_order(valid_gt._upper[s_boundary]),
+                            ),
+                            dtype=data.dtype,
+                        )
+
+                any_restriction |= elem_gt_left[s] | elem_gt_right[s]
+                valid = valid.intersect(
+                    Interval(
+                        _lower=valid_gt._lower[s].flatten(),
+                        _upper=valid_gt._upper[s].flatten(),
+                    )
+                )
 
         # produce conservative safe intervals by computing the midpoint between
         #  the data and the lower/upper bound
@@ -390,7 +482,16 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             valid._upper
         )
 
-        return filtered_valid.into_union()  # type: ignore
+        # special case for +0.0 and -0.0:
+        # - they compare equal but are ordered in binary
+        # - monotonicity interval can end up empty as [+0.0, -0.0]
+        # so explicitly add restricted zero values to the valid interval
+        zero_valid = Interval.empty_like(data)
+        Lower(data.flatten()) <= zero_valid[
+            (data.flatten() == 0) & any_restriction.flatten()
+        ] <= Upper(data.flatten())
+
+        return filtered_valid.union(zero_valid)
 
     def get_config(self) -> dict:
         """

@@ -3,6 +3,7 @@ from itertools import product
 import numpy as np
 
 from numcodecs_safeguards.cast import as_bits
+from numcodecs_safeguards.safeguards.stencil import BoundaryCondition
 from numcodecs_safeguards.safeguards.stencil.monotonicity import (
     Monotonicity,
     MonotonicityPreservingSafeguard,
@@ -19,7 +20,9 @@ from .codecs import (
 
 def check_all_codecs(data: np.ndarray):
     for monotonicity, window, boundary in product(
-        Monotonicity, range(1, 3 + 1), ["valid", "edge"]
+        Monotonicity,
+        range(1, 3 + 1),
+        [b for b in BoundaryCondition if b != BoundaryCondition.constant],
     ):
         encode_decode_zero(
             data,
