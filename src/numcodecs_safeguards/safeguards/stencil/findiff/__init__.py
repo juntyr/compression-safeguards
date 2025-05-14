@@ -10,6 +10,8 @@ from fractions import Fraction
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
+from ....cast import to_float
+
 
 class FiniteDifference(Enum):
     """
@@ -113,7 +115,7 @@ def _finite_difference(
     )
     window = 1 + omax - omin
 
-    x_windows = sliding_window_view(x, window, axis=axis, writeable=False)
+    x_windows = to_float(sliding_window_view(x, window, axis=axis, writeable=False))
 
     coefficients_ = np.array([float(c) for c in coefficients])
     coefficients_ = coefficients_[np.argsort(offsets)].reshape((1,) * x.ndim + (-1,))

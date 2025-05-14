@@ -58,7 +58,8 @@ class BoundaryCondition(Enum):
 def _pad_with_boundary(
     a: np.ndarray,
     boundary: BoundaryCondition,
-    width: int,
+    pad_before: int,
+    pad_after: int,
     constant: None | int | float,
     axis: None | int,
 ) -> np.ndarray:
@@ -66,10 +67,10 @@ def _pad_with_boundary(
         return a
 
     if axis is None:
-        pad_width = [(width, width)] * a.ndim
+        pad_width = [(pad_before, pad_after)] * a.ndim
     else:
         pad_width = [(0, 0)] * a.ndim
-        pad_width[axis] = (width, width)
+        pad_width[axis] = (pad_before, pad_after)
 
     kwargs = dict()
     match boundary:

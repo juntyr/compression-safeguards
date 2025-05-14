@@ -178,10 +178,20 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 continue
 
             data_boundary = _pad_with_boundary(
-                data, self._boundary, self._window, self._constant_boundary, axis
+                data,
+                self._boundary,
+                self._window,
+                self._window,
+                self._constant_boundary,
+                axis,
             )
             decoded_boundary = _pad_with_boundary(
-                decoded, self._boundary, self._window, self._constant_boundary, axis
+                decoded,
+                self._boundary,
+                self._window,
+                self._window,
+                self._constant_boundary,
+                axis,
             )
 
             data_windows = sliding_window_view(data_boundary, window, axis=axis)
@@ -242,7 +252,12 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 continue
 
             data_boundary = _pad_with_boundary(
-                data, self._boundary, self._window, self._constant_boundary, axis
+                data,
+                self._boundary,
+                self._window,
+                self._window,
+                self._constant_boundary,
+                axis,
             )
             data_windows = sliding_window_view(data_boundary, window, axis=axis)
             data_monotonic = self._monotonic_sign(data_windows, is_decoded=False)
@@ -336,7 +351,12 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                     # requirements inside the boundary need to be connected
                     #  back to the original data elements
                     boundary_indices = _pad_with_boundary(
-                        np.arange(alen), self._boundary, self._window, None, 0
+                        np.arange(alen),
+                        self._boundary,
+                        self._window,
+                        self._window,
+                        None,
+                        0,
                     )
                     for w in [ws for w in range(self._window) for ws in [w, -w - 1]]:
                         s_boundary = tuple(
@@ -412,7 +432,12 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                     # requirements inside the boundary need to be connected
                     #  back to the original data elements
                     boundary_indices = _pad_with_boundary(
-                        np.arange(alen), self._boundary, self._window, None, 0
+                        np.arange(alen),
+                        self._boundary,
+                        self._window,
+                        self._window,
+                        None,
+                        0,
                     )
                     for w in [ws for w in range(self._window) for ws in [w, -w - 1]]:
                         s_boundary = tuple(

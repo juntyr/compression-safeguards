@@ -12,6 +12,7 @@ import numpy as np
 from ....cast import _isfinite, _isinf, _isnan, as_bits, to_finite_float, to_float
 from ....intervals import IntervalUnion
 from ...pointwise.abs import _compute_safe_eb_diff_interval
+from .. import BoundaryCondition, _pad_with_boundary
 from ..abc import S, StencilSafeguard, T
 from . import (
     FiniteDifference,
@@ -58,6 +59,12 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
     eb_abs : int | float
         The non-negative absolute error bound on the finite difference that is
         enforced by this safeguard.
+    boundary : str | BoundaryCondition
+        Boundary condition for evaluating the finite difference near the data
+        domain boundaries, e.g. by extending values.
+    constant_boundary: None | int | float
+        Optional constant value with which the data domain is extended for a
+        constant boundary.
     axis : None | int
         The axis along which the absolute error of the finite difference is
         bounded. The default, [`None`][None], is to bound along all axes.
@@ -69,7 +76,11 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
         "_accuracy",
         "_dx",
         "_eb_abs",
+        "_boundary",
+        "_constant_boundary",
         "_axis",
+        "_offsets",
+        "_coefficients",
         "_eb_abs_impl",
     )
     _type: FiniteDifference
@@ -77,6 +88,8 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
     _accuracy: int
     _dx: int | float
     _eb_abs: int | float
+    _boundary: BoundaryCondition
+    _constant_boundary: None | int | float
     _axis: None | int
     _offsets: tuple[int, ...]
     _coefficients: tuple[Fraction, ...]
@@ -91,6 +104,8 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
         accuracy: int,
         dx: int | float,
         eb_abs: int | float,
+        boundary: str | BoundaryCondition,
+        constant_boundary: None | int | float = None,
         axis: None | int = None,
     ):
         type = type if isinstance(type, FiniteDifference) else FiniteDifference[type]
@@ -119,6 +134,19 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
         self._accuracy = accuracy
         self._dx = dx
         self._eb_abs = eb_abs
+
+        self._boundary = (
+            boundary
+            if isinstance(boundary, BoundaryCondition)
+            else BoundaryCondition[boundary]
+        )
+        assert (self._boundary != BoundaryCondition.constant) == (
+            constant_boundary is None
+        ), (
+            "constant_boundary must be provided if and only if the constant boundary condition is used"
+        )
+        self._constant_boundary = constant_boundary
+
         self._axis = axis
 
         self._offsets = _finite_difference_offsets(type, order, accuracy)
@@ -139,11 +167,37 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
             for a in axes
             if ((a >= 0) and (a < data.ndim)) or ((a < 0) and (a >= -data.ndim))
         ]
-        axes = [a for a in axes if data.shape[a] >= len(self._coefficients)]
+
+        if self._boundary == BoundaryCondition.valid:
+            axes = [a for a in axes if data.shape[a] >= len(self._coefficients)]
 
         for a in axes:
+            if data.shape[a] == 0:
+                continue
+
+            omin, omax = (
+                (min(*self._offsets), max(*self._offsets))
+                if len(self._offsets) > 1
+                else (self._offsets[0], self._offsets[0])
+            )
+
+            pad_before = max(0, -omin)
+            pad_after = max(0, omax)
+
+            data_boundary = _pad_with_boundary(
+                data, self._boundary, pad_before, pad_after, self._constant_boundary, a
+            )
+            decoded_boundary = _pad_with_boundary(
+                decoded,
+                self._boundary,
+                pad_before,
+                pad_after,
+                self._constant_boundary,
+                a,
+            )
+
             findiff_data = _finite_difference(
-                to_float(data),
+                data_boundary,
                 self._order,
                 self._offsets,
                 self._coefficients,
@@ -151,7 +205,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
                 axis=a,
             )
             findiff_decoded = _finite_difference(
-                to_float(decoded),
+                decoded_boundary,
                 self._order,
                 self._offsets,
                 self._coefficients,
@@ -235,12 +289,19 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
             Configuration of the safeguard.
         """
 
-        return dict(
+        config = dict(
             kind=type(self).kind,
             type=self._type.name,
             order=self._order,
             accuracy=self._accuracy,
             dx=self._dx,
             eb_abs=self._eb_abs,
+            boundary=self._boundary.name,
+            constant_boundary=self._constant_boundary,
             axis=self._axis,
         )
+
+        if self._constant_boundary is None:
+            del config["constant_boundary"]
+
+        return config
