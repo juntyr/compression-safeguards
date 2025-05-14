@@ -218,7 +218,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
             ok[s] &= ~axis_ok.reshape(ok[s].shape)
 
-        return ok
+        return ok  # type: ignore
 
     def compute_safe_intervals(
         self, data: np.ndarray[S, T]

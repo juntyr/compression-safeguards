@@ -270,7 +270,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
             ok[s] &= axis_ok
 
-        return ok
+        return ok  # type: ignore
 
     def compute_safe_intervals(
         self, data: np.ndarray[S, T]
