@@ -776,7 +776,7 @@ class IntervalUnion(Generic[T, N, U]):
         Returns
         -------
         contains : np.ndarray[S, bool]
-            The per-element result of the contains check
+            The pointwise result of the contains check
         """
 
         other_flat: np.ndarray = to_total_order(other).flatten()

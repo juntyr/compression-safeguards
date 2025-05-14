@@ -63,7 +63,7 @@ class PointwiseSafeguard(Safeguard, ABC):
         Returns
         -------
         ok : np.ndarray
-            Per-element, `True` if the check succeeded for this element.
+            Pointwise, `True` if the check succeeded for this element.
         """
 
         pass

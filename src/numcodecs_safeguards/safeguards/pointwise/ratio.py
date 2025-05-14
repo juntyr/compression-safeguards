@@ -100,7 +100,7 @@ class RatioErrorBoundSafeguard(PointwiseSafeguard):
         Returns
         -------
         ok : np.ndarray
-            Per-element, `True` if the check succeeded for this element.
+            Pointwise, `True` if the check succeeded for this element.
         """
 
         data_float: np.ndarray = to_float(data)

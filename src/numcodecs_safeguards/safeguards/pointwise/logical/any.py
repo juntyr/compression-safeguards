@@ -78,7 +78,7 @@ class AnySafeguard(PointwiseSafeguard):
         Returns
         -------
         ok : np.ndarray
-            Per-element, `True` if the check succeeded for this element.
+            Pointwise, `True` if the check succeeded for this element.
         """
 
         front, *tail = self._safeguards

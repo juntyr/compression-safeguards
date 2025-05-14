@@ -126,7 +126,7 @@ class SafeguardsQuantizer:
         partial_data : bool
             Whether the provided `data` and `prediction` only cover parts of
             the full data. While some safeguards can be checked and enforced
-            per-element, others should only be applied to the full data. When
+            pointwise, others should only be applied to the full data. When
             only partial data is provided, quantizing with any non-pointwise
             safeguards fails and raises an exception.
 

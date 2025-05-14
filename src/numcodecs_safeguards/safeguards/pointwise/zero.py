@@ -56,7 +56,7 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
         Returns
         -------
         ok : np.ndarray
-            Per-element, `True` if the check succeeded for this element.
+            Pointwise, `True` if the check succeeded for this element.
         """
 
         zero_bits = as_bits(self._zero_like(data.dtype))

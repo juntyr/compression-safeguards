@@ -159,7 +159,26 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
         )
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def check(self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]) -> bool:
+    def check_pointwise(
+        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Check which elements in the `decoded` array satisfy the absolute error
+        bound on the finite difference over the `data`.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data to be encoded.
+        decoded : np.ndarray
+            Decoded data.
+
+        Returns
+        -------
+        ok : np.ndarray
+            Pointwise, `True` if the check succeeded for this element.
+        """
+
         axes = list(range(data.ndim)) if self._axis is None else [self._axis]
 
         axes = [
@@ -170,6 +189,8 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
         if self._boundary == BoundaryCondition.valid:
             axes = [a for a in axes if data.shape[a] >= len(self._coefficients)]
+
+        ok = np.ones_like(data, dtype=np.bool)
 
         for a in axes:
             if data.shape[a] == 0:
@@ -228,7 +249,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
             )
             both_nan = _isnan(findiff_data) & _isnan(findiff_decoded)
 
-            ok = np.where(
+            axis_ok = np.where(
                 _isfinite(findiff_data),
                 absolute_bound,
                 np.where(
@@ -238,10 +259,18 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
                 ),
             )
 
-            if not np.all(ok):
-                return False
+            if self._boundary == BoundaryCondition.valid:
+                s = tuple(
+                    [slice(None)] * a
+                    + [slice(pad_before, -pad_after if pad_after > 0 else None)]
+                    + [slice(None)] * (data.ndim - a - 1)
+                )
+            else:
+                s = tuple([slice(None)] * data.ndim)
 
-        return True
+            ok[s] &= axis_ok
+
+        return ok
 
     def compute_safe_intervals(
         self, data: np.ndarray[S, T]

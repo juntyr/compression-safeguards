@@ -143,10 +143,12 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         self._axis = axis
 
-    def check(self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]) -> bool:
+    def check_pointwise(
+        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check if monotonic sequences in the `data` array are preserved in the
-        `decoded` array.
+        Check which monotonic sequences centred on the points in the `data`
+        array are preserved in the `decoded` array.
 
         Parameters
         ----------
@@ -157,9 +159,11 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         Returns
         -------
-        ok : bool
-            `True` if the check succeeded.
+        ok : np.ndarray
+            Pointwise, `True` if the check succeeded for this element.
         """
+
+        ok = np.ones_like(data, dtype=np.bool)
 
         window = 1 + self._window * 2
 
@@ -201,12 +205,20 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             decoded_monotonic = self._monotonic_sign(decoded_windows, is_decoded=True)
 
             # for monotonic windows, check that the monotonicity matches
-            if np.any(
-                self._monotonic_sign_not_equal(data_monotonic, decoded_monotonic)
-            ):
-                return False
+            axis_ok = self._monotonic_sign_not_equal(data_monotonic, decoded_monotonic)
 
-        return True
+            if self._boundary == BoundaryCondition.valid:
+                s = tuple(
+                    [slice(None)] * axis
+                    + [slice(self._window, -self._window)]
+                    + [slice(None)] * (data.ndim - axis - 1)
+                )
+            else:
+                s = tuple([slice(None)] * data.ndim)
+
+            ok[s] &= ~axis_ok.reshape(ok[s].shape)
+
+        return ok
 
     def compute_safe_intervals(
         self, data: np.ndarray[S, T]
@@ -262,7 +274,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             data_windows = sliding_window_view(data_boundary, window, axis=axis)
             data_monotonic = self._monotonic_sign(data_windows, is_decoded=False)
 
-            # compute, per-element, if the element has a decreasing (lt),
+            # compute, pointwise, if the element has a decreasing (lt),
             #  increasing (gt), or equality (eq) constraint imposed upon it
             # for the lt and gt variants, compute both a mask for accesses to
             #  elements on the left and to elements on the right, since the
