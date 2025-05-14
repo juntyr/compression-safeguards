@@ -91,15 +91,21 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     window : int
         Positive symmetric half-window size; the window has size
         $(1 + window \cdot 2)$.
+    axis : None | int
+        The axis along which the monotonicity is preserved. The default,
+        [`None`][None], is to preserve along all axes.
     """
 
     __slots__ = "_window"
     _window: int
     _monotonicity: Monotonicity
+    _axis: None | int
 
     kind = "monotonicity"
 
-    def __init__(self, monotonicity: str | Monotonicity, window: int):
+    def __init__(
+        self, monotonicity: str | Monotonicity, window: int, axis: None | int = None
+    ):
         self._monotonicity = (
             monotonicity
             if isinstance(monotonicity, Monotonicity)
@@ -108,6 +114,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         assert window > 0, "window size must be positive"
         self._window = window
+        self._axis = axis
 
     def check(self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]) -> bool:
         """
@@ -130,6 +137,9 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         window = 1 + self._window * 2
 
         for axis, alen in enumerate(data.shape):
+            if self._axis is not None and axis != self._axis:
+                continue
+
             if alen < window:
                 continue
 
@@ -177,6 +187,9 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         any_restriction = np.zeros_like(data, dtype=np.bool)
 
         for axis, alen in enumerate(data.shape):
+            if self._axis is not None and axis != self._axis:
+                continue
+
             if alen < window:
                 continue
 

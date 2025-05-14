@@ -59,8 +59,8 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
         The non-negative absolute error bound on the finite difference that is
         enforced by this safeguard.
     axis : None | int
-        The axis along which the finite difference is safeguarded. The default,
-        [`None`][None], is to safeguard along all axes.
+        The axis along which the absolute error of the finite difference is
+        bounded. The default, [`None`][None], is to bound along all axes.
     """
 
     __slots__ = (
