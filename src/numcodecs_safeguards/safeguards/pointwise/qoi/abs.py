@@ -281,39 +281,40 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             )
 
             # compute the adjusted error bound
-            eb_abs_lower: np.ndarray = to_finite_float(
-                qoi_lower - data_qoi, data_float.dtype
-            )
-            eb_abs_upper: np.ndarray = to_finite_float(
-                qoi_upper - data_qoi, data_float.dtype
-            )
-            eb_abs_lower = _nan_to_zero(eb_abs_lower)
-            eb_abs_upper = _nan_to_zero(eb_abs_upper)
-        assert eb_abs_lower.shape == data.shape
-        assert eb_abs_lower.dtype == data_float.dtype
-        assert eb_abs_upper.shape == data.shape
-        assert eb_abs_upper.dtype == data_float.dtype
-        assert np.all((eb_abs_lower <= 0) & _isfinite(eb_abs_lower))
-        assert np.all((eb_abs_upper >= 0) & _isfinite(eb_abs_upper))
+            eb_qoi_lower = _nan_to_zero(qoi_lower - data_qoi)
+            eb_qoi_upper = _nan_to_zero(qoi_upper - data_qoi)
 
+        # check that the adjusted error bounds fulfil all requirements
+        assert eb_qoi_lower.shape == data.shape
+        assert eb_qoi_lower.dtype == data_float.dtype
+        assert eb_qoi_upper.shape == data.shape
+        assert eb_qoi_upper.dtype == data_float.dtype
+        assert np.all(
+            (eb_qoi_lower <= 0) & (eb_qoi_lower >= -eb_abs) & _isfinite(eb_qoi_lower)
+        )
+        assert np.all(
+            (eb_qoi_upper >= 0) & (eb_qoi_upper <= eb_abs) & _isfinite(eb_qoi_upper)
+        )
+
+        # compute the error bound in data space
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_abs_qoi_lower, eb_abs_qoi_upper = _compute_data_eb_for_qoi_eb(
+            eb_x_lower, eb_x_upper = _compute_data_eb_for_qoi_eb(
                 self._qoi_expr,
                 self._x,
                 data_float,
-                eb_abs_lower,
-                eb_abs_upper,
+                eb_qoi_lower,
+                eb_qoi_upper,
             )
-        assert np.all((eb_abs_qoi_lower <= 0) & _isfinite(eb_abs_qoi_lower))
-        assert np.all((eb_abs_qoi_upper >= 0) & _isfinite(eb_abs_qoi_upper))
+        assert np.all((eb_x_lower <= 0) & _isfinite(eb_x_lower))
+        assert np.all((eb_x_upper >= 0) & _isfinite(eb_x_upper))
 
         return _compute_safe_eb_diff_interval(
             data,
             data_float,
-            eb_abs_qoi_lower,
-            eb_abs_qoi_upper,
+            eb_x_lower,
+            eb_x_upper,
             equal_nan=True,
         ).into_union()  # type: ignore
 
@@ -378,10 +379,20 @@ def _compute_data_eb_for_qoi_eb(
 
     # handle rounding errors in the lower error bound computation
     tl = _ensure_bounded_derived_error(
-        lambda tl: (exprl)(xv + tl), exprv, xv, tl, tauv_lower, tauv_upper
+        lambda tl: np.where(tl == 0, exprv, (exprl)(xv + tl)),
+        exprv,
+        xv,
+        tl,
+        tauv_lower,
+        tauv_upper,
     )
     tu = _ensure_bounded_derived_error(
-        lambda tu: (exprl)(xv + tu), exprv, xv, tu, tauv_lower, tauv_upper
+        lambda tu: np.where(tu == 0, exprv, (exprl)(xv + tu)),
+        exprv,
+        xv,
+        tu,
+        tauv_lower,
+        tauv_upper,
     )
 
     return tl, tu
@@ -456,14 +467,14 @@ def _compute_data_eb_for_qoi_eb_unchecked(
 
         # update the error bounds
         eal = np.where(
-            (eb_expr_lower == 0) | (argv <= 0) | ~_isfinite(argv),
+            (eb_expr_lower == 0),
             zero,
             np.exp(exprv + eb_expr_lower) - argv,
         )
         eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
 
         eau = np.where(
-            (eb_expr_upper == 0) | (argv <= 0) | ~_isfinite(argv),
+            (eb_expr_upper == 0),
             zero,
             np.exp(exprv + eb_expr_upper) - argv,
         )
@@ -504,14 +515,14 @@ def _compute_data_eb_for_qoi_eb_unchecked(
         # update the error bounds
         # ensure that ln is not passed a negative argument
         eal = np.where(
-            (eb_expr_lower == 0) | ~_isfinite(argv),
+            (eb_expr_lower == 0),
             zero,
             np.log(np.maximum(zero, exprv + eb_expr_lower)) - argv,
         )
         eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
 
         eau = np.where(
-            (eb_expr_upper == 0) | ~_isfinite(argv),
+            (eb_expr_upper == 0),
             zero,
             np.log(np.maximum(zero, exprv + eb_expr_upper)) - argv,
         )
@@ -727,53 +738,52 @@ def _ensure_bounded_derived_error(
     """
 
     # check if any derived expression exceeds the error bound
-    eb_outside = ~(
+    # this check matches the qoi safeguard's validity check
+    is_eb_exceeded = lambda eb_x_guess: ~np.where(
+        _isfinite(exprv),
         ((expr(eb_x_guess) - exprv) >= eb_expr_lower)
-        & ((expr(eb_x_guess) - exprv) <= eb_expr_upper)
-    ) & _isfinite(exprv)
+        & ((expr(eb_x_guess) - exprv) <= eb_expr_upper),
+        np.where(
+            _isinf(exprv),
+            expr(eb_x_guess) == exprv,
+            _isnan(expr(eb_x_guess)),
+        ),
+    )
+    eb_exceeded = is_eb_exceeded(eb_x_guess)
 
-    if not np.any(eb_outside):
+    if not np.any(eb_exceeded):
         return eb_x_guess
 
     # first try to nudge the error bound itself
     # we can nudge with nextafter since the expression values are floating
-    #  point and only finite values are nudged
-    eb_x_guess = np.where(eb_outside, _nextafter(eb_x_guess, 0), eb_x_guess)  # type: ignore
+    #  point
+    eb_x_guess = np.where(eb_exceeded, _nextafter(eb_x_guess, 0), eb_x_guess)  # type: ignore
 
     # check again
-    eb_outside = ~(
-        ((expr(eb_x_guess) - exprv) >= eb_expr_lower)
-        & ((expr(eb_x_guess) - exprv) <= eb_expr_upper)
-    ) & _isfinite(exprv)
+    eb_exceeded = is_eb_exceeded(eb_x_guess)
 
-    if not np.any(eb_outside):
+    if not np.any(eb_exceeded):
         return eb_x_guess
 
     if xv is not None:
         # second try to nudge it with respect to the data
         eb_x_guess = np.where(
-            eb_outside, _nextafter(xv + eb_x_guess, xv) - xv, eb_x_guess
+            eb_exceeded, _nextafter(xv + eb_x_guess, xv) - xv, eb_x_guess
         )  # type: ignore
 
         # check again
-        eb_outside = ~(
-            ((expr(eb_x_guess) - exprv) >= eb_expr_lower)
-            & ((expr(eb_x_guess) - exprv) <= eb_expr_upper)
-        ) & _isfinite(exprv)
+        eb_exceeded = is_eb_exceeded(eb_x_guess)
 
-        if not np.any(eb_outside):
+        if not np.any(eb_exceeded):
             return eb_x_guess
 
     while True:
         # finally fall back to repeatedly cutting it in half
-        eb_x_guess = np.where(eb_outside, eb_x_guess * 0.5, eb_x_guess)  # type: ignore
+        eb_x_guess = np.where(eb_exceeded, eb_x_guess * 0.5, eb_x_guess)  # type: ignore
 
-        eb_outside = ~(
-            ((expr(eb_x_guess) - exprv) >= eb_expr_lower)
-            & ((expr(eb_x_guess) - exprv) <= eb_expr_upper)
-        ) & _isfinite(exprv)
+        eb_exceeded = is_eb_exceeded(eb_x_guess)
 
-        if not np.any(eb_outside):
+        if not np.any(eb_exceeded):
             return eb_x_guess
 
 

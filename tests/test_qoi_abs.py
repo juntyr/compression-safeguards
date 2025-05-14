@@ -157,6 +157,9 @@ def test_tanh(check):
 def test_composed(check):
     check("2 / (ln(x) + sqrt(x))")
 
+    check_all_codecs(np.array([-1, 0, 1]), "exp(ln(x)+x)")
+    check("exp(ln(x)+x)")
+
 
 @pytest.mark.parametrize("dtype", sorted(d.name for d in _SUPPORTED_DTYPES))
 def test_dtypes(dtype):
