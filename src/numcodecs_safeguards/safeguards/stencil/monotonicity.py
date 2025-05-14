@@ -275,6 +275,18 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 if w < (window - 1):
                     elem_gt_right[s] |= data_monotonic[..., 0] == +1
 
+            match self._boundary:
+                case BoundaryCondition.valid | BoundaryCondition.constant:
+                    pass
+                case BoundaryCondition.edge:
+                    # FIXME: apply boundary requirements to the edge
+                case BoundaryCondition.reflect:
+                    # FIXME: apply boundary requirements to the reflection
+                case BoundaryCondition.symmetric:
+                    # FIXME: apply boundary requirements to the symmetric reflection
+                case BoundaryCondition.wrap:
+                    # FIXME: apply boundary requirements to the wrap
+
             if self._boundary == BoundaryCondition.valid:
                 s = tuple([slice(None)] * data.ndim)
             else:
