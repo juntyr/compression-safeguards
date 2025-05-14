@@ -12,6 +12,7 @@ from numpy.lib.stride_tricks import sliding_window_view
 
 from ...cast import _isfinite, _isnan, from_total_order, to_total_order
 from ...intervals import Interval, IntervalUnion, Lower, Upper
+from . import BoundaryCondition, _pad_with_boundary
 from .abc import S, StencilSafeguard, T
 
 _STRICT = ((lt, gt, False, False),) * 2
@@ -91,20 +92,33 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     window : int
         Positive symmetric half-window size; the window has size
         $(1 + window \cdot 2)$.
+    boundary : str | BoundaryCondition
+        Boundary condition for evaluating the monotonicity near the data domain
+        boundaries, e.g. by extending values.
+    constant_boundary: None | int | float
+        Optional constant value with which the data domain is extended for a
+        constant boundary.
     axis : None | int
         The axis along which the monotonicity is preserved. The default,
         [`None`][None], is to preserve along all axes.
     """
 
-    __slots__ = "_window"
-    _window: int
+    __slots__ = ("_monotonicity", "_window", "_boundary", "_constant_boundary", "_axis")
     _monotonicity: Monotonicity
+    _window: int
+    _boundary: BoundaryCondition
+    _constant_boundary: None | int | float
     _axis: None | int
 
     kind = "monotonicity"
 
     def __init__(
-        self, monotonicity: str | Monotonicity, window: int, axis: None | int = None
+        self,
+        monotonicity: str | Monotonicity,
+        window: int,
+        boundary: str | BoundaryCondition,
+        constant_boundary: None | int | float = None,
+        axis: None | int = None,
     ):
         self._monotonicity = (
             monotonicity
@@ -114,6 +128,19 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         assert window > 0, "window size must be positive"
         self._window = window
+
+        self._boundary = (
+            boundary
+            if isinstance(boundary, BoundaryCondition)
+            else BoundaryCondition[boundary]
+        )
+        assert (self._boundary != BoundaryCondition.constant) == (
+            constant_boundary is None
+        ), (
+            "constant_boundary must be provided if and only if the constant boundary condition is used"
+        )
+        self._constant_boundary = constant_boundary
+
         self._axis = axis
 
     def check(self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]) -> bool:
@@ -137,14 +164,25 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         window = 1 + self._window * 2
 
         for axis, alen in enumerate(data.shape):
-            if self._axis is not None and axis != self._axis:
+            if (
+                self._axis is not None
+                and axis != self._axis
+                and axis != (data.ndim - self._axis)
+            ):
                 continue
 
             if alen < window:
                 continue
 
-            data_windows = sliding_window_view(data, window, axis=axis)
-            decoded_windows = sliding_window_view(decoded, window, axis=axis)
+            data_boundary = _pad_with_boundary(
+                data, self._boundary, self._window, self._constant_boundary, axis
+            )
+            decoded_boundary = _pad_with_boundary(
+                decoded, self._boundary, self._window, self._constant_boundary, axis
+            )
+
+            data_windows = sliding_window_view(data_boundary, window, axis=axis)
+            decoded_windows = sliding_window_view(decoded_boundary, window, axis=axis)
 
             data_monotonic = self._monotonic_sign(data_windows, is_decoded=False)
             decoded_monotonic = self._monotonic_sign(decoded_windows, is_decoded=True)
@@ -187,13 +225,20 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         any_restriction = np.zeros_like(data, dtype=np.bool)
 
         for axis, alen in enumerate(data.shape):
-            if self._axis is not None and axis != self._axis:
+            if (
+                self._axis is not None
+                and axis != self._axis
+                and axis != (data.ndim - self._axis)
+            ):
                 continue
 
             if alen < window:
                 continue
 
-            data_windows = sliding_window_view(data, window, axis=axis)
+            data_boundary = _pad_with_boundary(
+                data, self._boundary, self._window, self._constant_boundary, axis
+            )
+            data_windows = sliding_window_view(data_boundary, window, axis=axis)
             data_monotonic = self._monotonic_sign(data_windows, is_decoded=False)
 
             # compute, per-element, if the element has a decreasing (lt),
@@ -203,11 +248,11 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             #  elements at the left and right edge of the window cannot access
             #  one further element to the left / right, respectively
             elem_lt_left, elem_lt_right, elem_eq, elem_gt_left, elem_gt_right = (
-                np.zeros_like(data, dtype=np.bool),
-                np.zeros_like(data, dtype=np.bool),
-                np.zeros_like(data, dtype=np.bool),
-                np.zeros_like(data, dtype=np.bool),
-                np.zeros_like(data, dtype=np.bool),
+                np.zeros_like(data_boundary, dtype=np.bool),
+                np.zeros_like(data_boundary, dtype=np.bool),
+                np.zeros_like(data_boundary, dtype=np.bool),
+                np.zeros_like(data_boundary, dtype=np.bool),
+                np.zeros_like(data_boundary, dtype=np.bool),
             )
             for w in range(window):
                 # ensure that all members of the window receive their
@@ -215,7 +260,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 s = tuple(
                     [slice(None)] * axis
                     + [slice(w, None if (w + 1) == window else -window + w + 1)]
-                    + [slice(None)] * (len(data.shape) - axis - 1)
+                    + [slice(None)] * (data_boundary.ndim - axis - 1)
                 )
 
                 if w > 0:
@@ -230,12 +275,21 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 if w < (window - 1):
                     elem_gt_right[s] |= data_monotonic[..., 0] == +1
 
+            if self._boundary == BoundaryCondition.valid:
+                s = tuple([slice(None)] * data.ndim)
+            else:
+                s = tuple(
+                    [slice(None)] * axis
+                    + [slice(self._window, -self._window)]
+                    + [slice(None)] * (data_boundary.ndim - axis - 1)
+                )
+
             # if any element has an equality constraint, impose it and
             #  intersect with the overall valid interval
             if np.any(elem_eq):
-                any_restriction |= elem_eq
+                any_restriction |= elem_eq[s]
                 valid_eq = Interval.full_like(data)
-                Lower(data.flatten()) <= valid_eq[elem_eq.flatten()] <= Upper(
+                Lower(data.flatten()) <= valid_eq[elem_eq[s].flatten()] <= Upper(
                     data.flatten()
                 )
                 valid = valid.intersect(valid_eq)
@@ -249,20 +303,20 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             if np.any(elem_lt_left | elem_lt_right):
                 valid_lt = Interval.full_like(data)
             if np.any(elem_lt_right):
-                any_restriction |= elem_lt_right
+                any_restriction |= elem_lt_right[s]
                 Lower(
                     from_total_order(
-                        to_total_order(np.roll(data, -1, axis=axis)) + nudge,
+                        to_total_order(np.roll(data_boundary, -1, axis=axis)) + nudge,
                         dtype=data.dtype,
-                    ).flatten()
-                ) <= valid_lt[elem_lt_right.flatten()]
+                    )[s].flatten()
+                ) <= valid_lt[elem_lt_right[s].flatten()]
             if np.any(elem_lt_left):
-                any_restriction |= elem_lt_left
-                valid_lt[elem_lt_left.flatten()] <= Upper(
+                any_restriction |= elem_lt_left[s]
+                valid_lt[elem_lt_left[s].flatten()] <= Upper(
                     from_total_order(
-                        to_total_order(np.roll(data, +1, axis=axis)) - nudge,
+                        to_total_order(np.roll(data_boundary, +1, axis=axis)) - nudge,
                         dtype=data.dtype,
-                    ).flatten()
+                    )[s].flatten()
                 )
             if np.any(elem_lt_left | elem_lt_right):
                 valid = valid.intersect(valid_lt)
@@ -276,20 +330,20 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             if np.any(elem_gt_left | elem_gt_right):
                 valid_gt = Interval.full_like(data)
             if np.any(elem_gt_left):
-                any_restriction |= elem_gt_left
+                any_restriction |= elem_gt_left[s]
                 Lower(
                     from_total_order(
-                        to_total_order(np.roll(data, +1, axis=axis)) + nudge,
+                        to_total_order(np.roll(data_boundary, +1, axis=axis)) + nudge,
                         dtype=data.dtype,
-                    ).flatten()
-                ) <= valid_gt[elem_gt_left.flatten()]
+                    )[s].flatten()
+                ) <= valid_gt[elem_gt_left[s].flatten()]
             if np.any(elem_gt_right):
-                any_restriction |= elem_gt_right
-                valid_gt[elem_gt_right.flatten()] <= Upper(
+                any_restriction |= elem_gt_right[s]
+                valid_gt[elem_gt_right[s].flatten()] <= Upper(
                     from_total_order(
-                        to_total_order(np.roll(data, -1, axis=axis)) - nudge,
+                        to_total_order(np.roll(data_boundary, -1, axis=axis)) - nudge,
                         dtype=data.dtype,
-                    ).flatten()
+                    )[s].flatten()
                 )
             if np.any(elem_gt_left | elem_gt_right):
                 valid = valid.intersect(valid_gt)
@@ -336,11 +390,19 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             Configuration of the safeguard.
         """
 
-        return dict(
+        config = dict(
             kind=type(self).kind,
             monotonicity=self._monotonicity.name,
             window=self._window,
+            boundary=self._boundary.name,
+            constant_boundary=self._constant_boundary,
+            axis=self._axis,
         )
+
+        if self._constant_boundary is None:
+            del config["constant_boundary"]
+
+        return config
 
     def _monotonic_sign(
         self,

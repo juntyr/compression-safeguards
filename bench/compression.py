@@ -175,11 +175,11 @@ class LorenzoPredictor(Codec):
     def encode(self, buf):
         data = np.asarray(buf).squeeze()
 
-        if len(data.shape) == 1:
+        if data.ndim == 1:
             encoded = self.encode_1d(data)
-        elif len(data.shape) == 2:
+        elif data.ndim == 2:
             encoded = self.encode_2d(data)
-        elif len(data.shape) == 3:
+        elif data.ndim == 3:
             encoded = self.encode_3d(data)
         else:
             raise TypeError("LorenzoPredictor currently only supports 1D-3D data")
@@ -204,11 +204,11 @@ class LorenzoPredictor(Codec):
             .reshape(dout.shape)
         )
 
-        if len(dout.shape) == 1:
+        if dout.ndim == 1:
             decoded = self.decode_1d(encoded, dout.dtype)
-        elif len(dout.shape) == 2:
+        elif dout.ndim == 2:
             decoded = self.decode_2d(encoded, dout.dtype)
-        elif len(dout.shape) == 3:
+        elif dout.ndim == 3:
             decoded = self.decode_3d(encoded, dout.dtype)
         else:
             raise TypeError("LorenzoPredictor currently only supports 1D-3D data")
@@ -216,7 +216,7 @@ class LorenzoPredictor(Codec):
         return numcodecs.compat.ndarray_copy(decoded.reshape(out.shape), out)
 
     def encode_1d(self, data: np.ndarray) -> np.ndarray:
-        assert len(data.shape) == 1
+        assert data.ndim == 1
         (N,) = data.shape
 
         encoded = np.zeros(
@@ -238,7 +238,7 @@ class LorenzoPredictor(Codec):
         return encoded
 
     def decode_1d(self, encoded: np.ndarray, dtype: np.dtype) -> np.ndarray:
-        assert len(encoded.shape) == 1
+        assert encoded.ndim == 1
         (N,) = encoded.shape
 
         decoded = np.zeros_like(encoded, dtype=dtype)
@@ -253,7 +253,7 @@ class LorenzoPredictor(Codec):
         return decoded
 
     def encode_2d(self, data: np.ndarray) -> np.ndarray:
-        assert len(data.shape) == 2
+        assert data.ndim == 2
         M, N = data.shape
 
         encoded = np.zeros(
@@ -290,7 +290,7 @@ class LorenzoPredictor(Codec):
         return encoded
 
     def decode_2d(self, encoded: np.ndarray, dtype: np.dtype) -> np.ndarray:
-        assert len(encoded.shape) == 2
+        assert encoded.ndim == 2
         M, N = encoded.shape
 
         decoded = np.zeros_like(encoded, dtype=dtype)
@@ -318,7 +318,7 @@ class LorenzoPredictor(Codec):
         return decoded
 
     def encode_3d(self, data: np.ndarray) -> np.ndarray:
-        assert len(data.shape) == 3
+        assert data.ndim == 3
         L, M, N = data.shape
 
         encoded = np.zeros(
@@ -401,7 +401,7 @@ class LorenzoPredictor(Codec):
         return encoded
 
     def decode_3d(self, encoded: np.ndarray, dtype: np.dtype) -> np.ndarray:
-        assert len(encoded.shape) == 3
+        assert encoded.ndim == 3
         L, M, N = encoded.shape
 
         decoded = np.zeros_like(encoded, dtype=dtype)

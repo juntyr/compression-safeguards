@@ -18,29 +18,51 @@ from .codecs import (
 
 
 def check_all_codecs(data: np.ndarray):
-    for monotonicity, window in product(Monotonicity, range(1, 3 + 1)):
+    for monotonicity, window, boundary in product(
+        Monotonicity, range(1, 3 + 1), ["valid", "edge"]
+    ):
         encode_decode_zero(
             data,
             safeguards=[
-                dict(kind="monotonicity", monotonicity=monotonicity, window=window)
+                dict(
+                    kind="monotonicity",
+                    monotonicity=monotonicity,
+                    window=window,
+                    boundary=boundary,
+                )
             ],
         )
         encode_decode_neg(
             data,
             safeguards=[
-                dict(kind="monotonicity", monotonicity=monotonicity, window=window)
+                dict(
+                    kind="monotonicity",
+                    monotonicity=monotonicity,
+                    window=window,
+                    boundary=boundary,
+                )
             ],
         )
         encode_decode_identity(
             data,
             safeguards=[
-                dict(kind="monotonicity", monotonicity=monotonicity, window=window)
+                dict(
+                    kind="monotonicity",
+                    monotonicity=monotonicity,
+                    window=window,
+                    boundary=boundary,
+                )
             ],
         )
         encode_decode_noise(
             data,
             safeguards=[
-                dict(kind="monotonicity", monotonicity=monotonicity, window=window)
+                dict(
+                    kind="monotonicity",
+                    monotonicity=monotonicity,
+                    window=window,
+                    boundary=boundary,
+                )
             ],
         )
 
@@ -138,7 +160,9 @@ def test_monotonicity():
 
     # test for all monotonicities
     for monotonicity, active_allowed in monotonicities.items():
-        safeguard = MonotonicityPreservingSafeguard(monotonicity, window=1)
+        safeguard = MonotonicityPreservingSafeguard(
+            monotonicity, window=1, boundary="valid"
+        )
 
         # test for all possible window combinations
         for data_window, decoded_window in product(windows, windows):
@@ -182,7 +206,12 @@ def test_fuzzer_sign_flip():
         data,
         decoded,
         safeguards=[
-            dict(kind="monotonicity", monotonicity="strict_to_weak", window=1),
+            dict(
+                kind="monotonicity",
+                monotonicity="strict_to_weak",
+                window=1,
+                boundary="valid",
+            ),
             dict(kind="sign"),
         ],
     )

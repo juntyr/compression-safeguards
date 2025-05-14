@@ -132,13 +132,12 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check(self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]) -> bool:
-        axes = list(range(len(data.shape))) if self._axis is None else [self._axis]
+        axes = list(range(data.ndim)) if self._axis is None else [self._axis]
 
         axes = [
             a
             for a in axes
-            if ((a >= 0) and (a < len(data.shape)))
-            or ((a < 0) and (a >= -len(data.shape)))
+            if ((a >= 0) and (a < data.ndim)) or ((a < 0) and (a >= -data.ndim))
         ]
         axes = [a for a in axes if data.shape[a] >= len(self._coefficients)]
 

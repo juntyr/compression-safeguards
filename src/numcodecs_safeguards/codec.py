@@ -152,7 +152,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             encoded = numcodecs.compat.ensure_ndarray(encoded)
 
             assert encoded.dtype == np.dtype("uint8"), "codec must encode to bytes"
-            assert len(encoded.shape) <= 1, "codec must encode to 1D bytes"
+            assert encoded.ndim <= 1, "codec must encode to 1D bytes"
             encoded_bytes = numcodecs.compat.ensure_bytes(encoded)
 
             decoded = np.empty_like(data)
@@ -212,7 +212,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         buf_array = numcodecs.compat.ensure_ndarray(buf)
         assert buf_array.dtype == np.dtype("uint8"), "codec must decode from bytes"
-        assert len(buf_array.shape) <= 1, "codec must decode from 1D bytes"
+        assert buf_array.ndim <= 1, "codec must decode from 1D bytes"
         buf_bytes = numcodecs.compat.ensure_bytes(buf)
 
         buf_io = BytesIO(buf_bytes)

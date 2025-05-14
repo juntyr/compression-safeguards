@@ -116,9 +116,7 @@ def _finite_difference(
     x_windows = sliding_window_view(x, window, axis=axis, writeable=False)
 
     coefficients_ = np.array([float(c) for c in coefficients])
-    coefficients_ = coefficients_[np.argsort(offsets)].reshape(
-        (1,) * len(x.shape) + (-1,)
-    )
+    coefficients_ = coefficients_[np.argsort(offsets)].reshape((1,) * x.ndim + (-1,))
 
     findiff = np.sum(x_windows * coefficients_, axis=-1) / np.power(dx, order)
 
