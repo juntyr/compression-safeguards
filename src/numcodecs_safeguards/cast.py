@@ -297,9 +297,22 @@ def _nextafter(
     b = np.array(b, dtype=a.dtype)  # type: ignore
 
     _float128_neg_zero = -_float128(0)
-    _float128_one_m_ulp = _float128(1) - _float128_eps * _float128(0.5)
 
-    incr = np.where(a < 0, -_float128_smallest_subnormal, _float128_smallest_subnormal)
+    _float128_incr_subnormal = np.where(
+        a < 0, -_float128_smallest_subnormal, _float128_smallest_subnormal
+    )
+
+    abs_a_zero_mantissa = (
+        (
+            np.atleast_1d(a).view(np.uint8)
+            & np.atleast_1d(np.full_like(a, np.inf)).view(np.uint8)
+        )
+        .view(a.dtype)
+        .reshape(a.shape)
+    )
+    _float128_incr_normal = abs_a_zero_mantissa / (
+        numpy_quaddtype.QuadPrecision(2) ** 112
+    )
 
     r = np.where(
         _isnan(a) | _isnan(b),
@@ -312,18 +325,29 @@ def _nextafter(
                 np.where(a < 0, _float128_min, _float128_max),  # infinity
                 np.where(
                     np.abs(a) > _float128_smallest_normal,
+                    # note: implementation deviates here since numpy_quaddtype
+                    #       divides/multiplies with error
+                    #       based on https://stackoverflow.com/a/70512041
                     np.where(
-                        (a < b) == (a >= 0),
-                        a / _float128_one_m_ulp,
-                        a * _float128_one_m_ulp,
+                        a < b,
+                        np.where(
+                            a == -abs_a_zero_mantissa,
+                            a + _float128_incr_normal / 2,
+                            a + _float128_incr_normal,
+                        ),
+                        np.where(
+                            a == abs_a_zero_mantissa,
+                            a - _float128_incr_normal / 2,
+                            a - _float128_incr_normal,
+                        ),
                     ),  # normal
                     np.where(  # zero, subnormal, or smallest normal
                         (a < b) == (a >= 0),
-                        (a + incr),
+                        (a + _float128_incr_subnormal),
                         np.where(
                             a == (-_float128_smallest_subnormal),
                             _float128_neg_zero,
-                            a - incr,
+                            a - _float128_incr_subnormal,
                         ),
                     ),
                 ),
