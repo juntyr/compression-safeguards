@@ -6,8 +6,8 @@ __all__ = ["SignPreservingSafeguard"]
 
 import numpy as np
 
+from ...intervals import Interval, IntervalUnion, Lower, Maximum, Minimum, Upper
 from .abc import PointwiseSafeguard, S, T
-from ...intervals import IntervalUnion, Interval, Lower, Upper, Minimum, Maximum
 
 
 class SignPreservingSafeguard(PointwiseSafeguard):

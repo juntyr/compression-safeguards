@@ -1,12 +1,13 @@
 import numpy as np
+
 from numcodecs_safeguards.cast import as_bits
 from numcodecs_safeguards.intervals import (
-    _minimum,
-    _maximum,
-    IntervalUnion,
     Interval,
+    IntervalUnion,
     Lower,
     Upper,
+    _maximum,
+    _minimum,
 )
 from numcodecs_safeguards.safeguards.pointwise.abs import AbsoluteErrorBoundSafeguard
 from numcodecs_safeguards.safeguards.pointwise.sign import SignPreservingSafeguard
@@ -113,8 +114,6 @@ def test_abs():
         intervals._upper,
         np.array([[-126, -125, -124, -123, 126, 127, 127, 127]], dtype=np.int8),
     )
-
-    # TODO: test with floats
 
 
 def test_sign_abs():

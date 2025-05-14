@@ -5,15 +5,14 @@ Monotonicity-preserving safeguard.
 __all__ = ["Monotonicity", "MonotonicityPreservingSafeguard"]
 
 from enum import Enum
-from operator import le, lt, ge, gt
+from operator import ge, gt, le, lt
 
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
-from .abc import StencilSafeguard, S, T
-from ...cast import to_total_order, from_total_order
-from ...intervals import IntervalUnion, Interval, Lower, Upper
-
+from ...cast import _isfinite, _isnan, from_total_order, to_total_order
+from ...intervals import Interval, IntervalUnion, Lower, Upper
+from .abc import S, StencilSafeguard, T
 
 _STRICT = ((lt, gt, False, False),) * 2
 _STRICT_WITH_CONSTS = ((lt, gt, True, False),) * 2
@@ -360,7 +359,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         # non-finite values cannot participate in monotonic sequences
         # NaN: any(!isfinite(x[i]))
-        monotonic = np.where(np.all(np.isfinite(x), axis=-1), monotonic, np.nan)
+        monotonic = np.where(np.all(_isfinite(x), axis=-1), monotonic, np.nan)
 
         # return the result in a shape that's broadcastable to x
         return monotonic[..., np.newaxis]
@@ -371,15 +370,14 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         match self._monotonicity:
             case Monotonicity.strict | Monotonicity.strict_with_consts:
                 return np.where(
-                    np.isfinite(data_monotonic),
+                    _isfinite(data_monotonic),
                     decoded_monotonic != data_monotonic,
                     False,
                 )
             case Monotonicity.strict_to_weak | Monotonicity.weak:
                 return np.where(
-                    np.isfinite(data_monotonic),
+                    _isfinite(data_monotonic),
                     # having the opposite sign or no sign are both not equal
-                    (decoded_monotonic == -data_monotonic)
-                    | np.isnan(decoded_monotonic),
+                    (decoded_monotonic == -data_monotonic) | _isnan(decoded_monotonic),
                     False,
                 )

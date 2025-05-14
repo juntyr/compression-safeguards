@@ -9,8 +9,8 @@ from typing import Any, TypeVar
 
 import numpy as np
 
-from ..abc import Safeguard
 from ...intervals import IntervalUnion
+from ..abc import Safeguard
 
 T = TypeVar("T", bound=np.dtype)
 S = TypeVar("S", bound=tuple[int, ...])

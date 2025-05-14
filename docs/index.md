@@ -57,11 +57,11 @@ This package currently implements the following [safeguards][numcodecs_safeguard
 
     The pointwise absolute error of the finite-difference-approximated derivative is guaranteed to be less than or equal to the provided bound. The safeguard supports three types of [`FiniteDifference`][numcodecs_safeguards.safeguards.stencil.findiff.FiniteDifference]: `central`, `forward`, `backward`. The fininite difference is computed with respect to the provided uniform grid spacing. If the spacing is different along different axes, multiple safeguards along specific axes with different spacing can be combined. Infinite finite differences are preserved with the same bit pattern. NaN finite differences remain NaN though not necessarily with the same bit pattern.
 
-### Error Bounds on derived Quantities of Interest (pointwise QOIs)
+### Error Bounds on derived Quantities of Interest (pointwise QoIs)
 
 - [`qoi_abs`][numcodecs_safeguards.safeguards.pointwise.qoi.abs.QuantityOfInterestAbsoluteErrorBoundSafeguard] (absolute error bound on quantities of interest):
 
-    The pointwise absolute error on a derived quantity of interest (QOI) is guaranteed to be less than or equal to the provided bound. The non-constant quantity of interest expression can contain the addition, multiplication, division, square root, exponentiation and logarithm operations over integer and floating point constants and the pointwise data value. Infinite quantities of interest are preserved with the same bit pattern. NaN quantities of interest remain NaN though not necessarily with the same bit pattern.
+    The pointwise absolute error on a derived quantity of interest (QoI) is guaranteed to be less than or equal to the provided bound. The non-constant quantity of interest expression can contain the addition, multiplication, division, square root, exponentiation and logarithm operations over integer and floating point constants and the pointwise data value. Infinite quantities of interest are preserved with the same bit pattern. NaN quantities of interest remain NaN though not necessarily with the same bit pattern.
 
 ### Pointwise properties
 

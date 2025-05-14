@@ -1,11 +1,13 @@
 import numpy as np
 import pytest
 
+from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
+
 from .codecs import (
-    encode_decode_zero,
-    encode_decode_neg,
     encode_decode_identity,
+    encode_decode_neg,
     encode_decode_noise,
+    encode_decode_zero,
 )
 
 
@@ -64,10 +66,38 @@ CHECKS = [
 
 
 @pytest.mark.parametrize("check", CHECKS)
+def test_empty(check):
+    with pytest.raises(AssertionError, match="empty"):
+        check("")
+    with pytest.raises(AssertionError, match="empty"):
+        check("  \t   \n   ")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_constant(check):
+    with pytest.raises(AssertionError, match="constant"):
+        check("0")
+    with pytest.raises(AssertionError, match="constant"):
+        check("pi")
+    with pytest.raises(AssertionError, match="constant"):
+        check("e")
+    with pytest.raises(AssertionError, match="constant"):
+        check("-(-(-e))")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_imaginary(check):
+    with pytest.raises(AssertionError, match="imaginary"):
+        check_all_codecs(np.array([2], dtype=np.uint64), "(-log(-20417,ln(x)))")
+    with pytest.raises(AssertionError, match="imaginary"):
+        check("(-log(-20417,ln(x)))")
+
+
+@pytest.mark.parametrize("check", CHECKS)
 def test_polynomial(check):
     check("x")
     check("2*x")
-    check("3*x + 1")
+    check("3*x + pi")
     check("x**2")
     check("x**3")
     check("x**2 + x + 1")
@@ -81,6 +111,9 @@ def test_exponential(check):
     check("e**(x)")
     check("exp(x)")
     check("2 ** (x + 1)")
+
+    check_all_codecs(np.array([51.0]), "2**x")
+    check_all_codecs(np.array([31.0]), "exp(x)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -123,3 +156,46 @@ def test_tanh(check):
 @pytest.mark.parametrize("check", CHECKS)
 def test_composed(check):
     check("2 / (ln(x) + sqrt(x))")
+
+    check_all_codecs(np.array([-1, 0, 1]), "exp(ln(x)+x)")
+    check("exp(ln(x)+x)")
+
+
+@pytest.mark.parametrize("dtype", sorted(d.name for d in _SUPPORTED_DTYPES))
+def test_dtypes(dtype):
+    check_all_codecs(np.array([[1]], dtype=dtype), "x/sqrt(pi)")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_fuzzer_found(check):
+    with pytest.raises(AssertionError, match="failed to parse"):
+        check("(((-8054**5852)-x)-1)")
+
+    check_all_codecs(
+        np.array([[18312761160228738559]], dtype=np.uint64), "((pi**(x**(x+x)))**1)"
+    )
+    check_all_codecs(np.array([-1024.0]), "((pi**(x**(x+x)))**1)")
+
+    check("((pi**(x**(x+x)))**1)")
+
+
+def test_lambdify_dtype():
+    import inspect
+
+    import sympy as sp
+
+    from numcodecs_safeguards.safeguards.pointwise.qoi.abs import (
+        _compile_sympy_expr_to_numpy,
+    )
+
+    x = sp.Symbol("x", real=True)
+
+    fn = _compile_sympy_expr_to_numpy([x], x + sp.pi + sp.E, np.dtype(np.float16))
+
+    assert (
+        inspect.getsource(fn)
+        == "def _lambdifygenerated(x):\n    return x + float16('2.71828') + float16('3.14159')\n"
+    )
+
+    assert np.float16("2.71828") == np.float16(np.e)
+    assert np.float16("3.14159") == np.float16(np.pi)

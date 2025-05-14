@@ -50,11 +50,11 @@ def to_float(x: np.ndarray[S, T]) -> np.ndarray[S, F]:
         np.dtype(np.int8): np.float16,
         np.dtype(np.int16): np.float32,
         np.dtype(np.int32): np.float64,
-        np.dtype(np.int64): _float128,
+        np.dtype(np.int64): _float128_dtype,
         np.dtype(np.uint8): np.float16,
         np.dtype(np.uint16): np.float32,
         np.dtype(np.uint32): np.float64,
-        np.dtype(np.uint64): _float128,
+        np.dtype(np.uint64): _float128_dtype,
     }[x.dtype]
 
     return x.astype(ftype)  # type: ignore
@@ -95,12 +95,13 @@ def to_finite_float(
     if map is not None:
         xf = np.array(map(xf)).astype(dtype)  # type: ignore
 
-    if np.dtype(dtype) == _float128:
+    if np.dtype(dtype) == _float128_dtype:
         minv, maxv = _float128_min, _float128_max
     else:
         minv, maxv = np.finfo(dtype).min, np.finfo(dtype).max
 
-    return np.maximum(minv, np.minimum(xf, maxv))  # type: ignore
+    # explicitly handle NaNs here for numpy_quaddtype
+    return np.where(_isnan(xf), xf, np.maximum(minv, np.minimum(xf, maxv)))  # type: ignore
 
 
 def from_float(x: np.ndarray[S, F], dtype: T) -> np.ndarray[S, T]:
@@ -152,7 +153,13 @@ def as_bits(a: np.ndarray[S, T], *, kind: str = "u") -> np.ndarray[S, Any]:
         The binary representation of the array `a`.
     """
 
-    return a.view(a.dtype.str.replace("f", kind).replace("i", kind).replace("u", kind))  # type: ignore
+    return a.view(
+        a.dtype.str.replace("f", kind)
+        .replace("i", kind)
+        .replace("u", kind)
+        # numpy_quaddtype currently does not set its kind properly
+        .replace(_float128_dtype.kind, kind)
+    )  # type: ignore
 
 
 def to_total_order(a: np.ndarray[S, T]) -> np.ndarray[S, U]:
@@ -240,21 +247,143 @@ def from_total_order(a: np.ndarray[S, U], dtype: T) -> np.ndarray[S, T]:
     return (a ^ mask).view(dtype=dtype)
 
 
+# wrapper around np.isnan that also works for numpy_quaddtype
+@np.errstate(invalid="ignore")
+def _isnan(
+    a: int | float | np.ndarray[S, T],
+) -> bool | np.ndarray[S, np.dtype[np.bool]]:
+    if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
+        return np.isnan(a)  # type: ignore
+    return ~np.array(np.abs(a) <= np.inf)  # type: ignore
+
+
+# wrapper around np.isinf that also works for numpy_quaddtype
+@np.errstate(invalid="ignore")
+def _isinf(
+    a: int | float | np.ndarray[S, T],
+) -> bool | np.ndarray[S, np.dtype[np.bool]]:
+    if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
+        return np.isinf(a)  # type: ignore
+    return np.abs(a) == np.inf
+
+
+# wrapper around np.isfinite that also works for numpy_quaddtype
+@np.errstate(invalid="ignore")
+def _isfinite(
+    a: int | float | np.ndarray[S, T],
+) -> bool | np.ndarray[S, np.dtype[np.bool]]:
+    if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
+        return np.isfinite(a)  # type: ignore
+    return np.abs(a) < np.inf
+
+
+# wrapper around np.nan_to_num that also works for numpy_quaddtype
+@np.errstate(invalid="ignore")
+def _nan_to_zero(a: np.ndarray[S, T]) -> np.ndarray[S, T]:
+    if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
+        return np.nan_to_num(a, nan=0, posinf=np.inf, neginf=-np.inf)  # type: ignore
+    return np.where(_isnan(a), _float128(0), a)  # type: ignore
+
+
+# wrapper around np.nextafter that also works for numpy_quaddtype
+# Implementation is variant 2 from https://stackoverflow.com/a/70512834
+@np.errstate(invalid="ignore")
+def _nextafter(
+    a: np.ndarray[S, T], b: int | float | np.ndarray[S, T]
+) -> np.ndarray[S, T]:
+    if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
+        return np.nextafter(a, b)
+
+    b = np.array(b, dtype=a.dtype)  # type: ignore
+
+    _float128_neg_zero = -_float128(0)
+
+    _float128_incr_subnormal = np.where(
+        a < 0, -_float128_smallest_subnormal, _float128_smallest_subnormal
+    )
+
+    abs_a_zero_mantissa = (
+        (
+            np.atleast_1d(a).view(np.uint8)
+            & np.atleast_1d(np.full_like(a, np.inf)).view(np.uint8)
+        )
+        .view(a.dtype)
+        .reshape(a.shape)
+    )
+    _float128_incr_normal = abs_a_zero_mantissa / (
+        numpy_quaddtype.QuadPrecision(2) ** 112
+    )
+
+    r = np.where(
+        _isnan(a) | _isnan(b),
+        a + b,  # unordered, at least one is NaN
+        np.where(
+            a == b,
+            b,  # equal
+            np.where(
+                _isinf(a),
+                np.where(a < 0, _float128_min, _float128_max),  # infinity
+                np.where(
+                    np.abs(a) > _float128_smallest_normal,
+                    # note: implementation deviates here since numpy_quaddtype
+                    #       divides/multiplies with error
+                    #       based on https://stackoverflow.com/a/70512041
+                    np.where(
+                        a < b,
+                        np.where(
+                            a == -abs_a_zero_mantissa,
+                            a + _float128_incr_normal / 2,
+                            a + _float128_incr_normal,
+                        ),
+                        np.where(
+                            a == abs_a_zero_mantissa,
+                            a - _float128_incr_normal / 2,
+                            a - _float128_incr_normal,
+                        ),
+                    ),  # normal
+                    np.where(  # zero, subnormal, or smallest normal
+                        (a < b) == (a >= 0),
+                        (a + _float128_incr_subnormal),
+                        np.where(
+                            a == (-_float128_smallest_subnormal),
+                            _float128_neg_zero,
+                            a - _float128_incr_subnormal,
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    return r  # type: ignore
+
+
 try:
-    _float128: np.dtype = np.dtype(np.float128)
-    assert np.finfo(np.float128).bits == 128
+    _float128: Callable = np.float128
+    _float128_dtype: np.dtype = np.dtype(np.float128)
+    assert (np.finfo(np.float128).nmant + np.finfo(np.float128).nexp + 1) == 128
     _float128_min = np.finfo(np.float128).min
     _float128_max = np.finfo(np.float128).max
+    _float128_eps = np.finfo(np.float128).eps
+    _float128_smallest_normal = np.finfo(np.float128).smallest_normal
+    _float128_smallest_subnormal = np.finfo(np.float128).smallest_subnormal
+    _float128_precision = np.finfo(np.float128).precision
 except (AttributeError, AssertionError):
     try:
         import numpy_quaddtype
 
-        _float128 = numpy_quaddtype.QuadPrecDType("sleef")
-        _float128_min = numpy_quaddtype.min_value
+        _float128 = numpy_quaddtype.SleefQuadPrecision
+        _float128_dtype = numpy_quaddtype.SleefQuadPrecDType()
+        _float128_min = -numpy_quaddtype.max_value
         _float128_max = numpy_quaddtype.max_value
+        _float128_eps = numpy_quaddtype.epsilon
+        _float128_smallest_normal = numpy_quaddtype.min_value
+        # taken from https://sleef.org/quad.xhtml
+        _float128_smallest_subnormal = _float128(2) ** (-16494)  # type: ignore
+        _float128_precision = 33
     except ImportError:
         raise TypeError("""
 numcodecs_safeguards requires float128 support:
-- numpy.float128 either does not exist is does not offer 128 bit precision
+- numpy.float128 either does not exist is does not offer true 128 bit precision
 - numpy_quaddtype is not installed
 """) from None

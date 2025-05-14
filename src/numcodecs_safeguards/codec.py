@@ -7,21 +7,20 @@ __all__ = ["SafeguardsCodec"]
 from collections.abc import Sequence
 from io import BytesIO
 from typing import Callable
-from typing_extensions import Buffer  # MSPV 3.12
 
 import numcodecs
 import numcodecs.compat
 import numcodecs.registry
 import numpy as np
 import varint
-
 from numcodecs.abc import Codec
 from numcodecs_combinators.abc import CodecCombinatorMixin
+from typing_extensions import Buffer  # MSPV 3.12
 
 from .cast import as_bits
 from .lossless import Lossless
+from .quantizer import _SUPPORTED_DTYPES, SafeguardsQuantizer
 from .safeguards.abc import Safeguard
-from .quantizer import SafeguardsQuantizer, _SUPPORTED_DTYPES
 
 
 class SafeguardsCodec(Codec, CodecCombinatorMixin):

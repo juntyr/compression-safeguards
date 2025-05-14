@@ -9,15 +9,15 @@ from fractions import Fraction
 
 import numpy as np
 
-from ....cast import to_float, as_bits, to_finite_float
+from ....cast import _isfinite, _isinf, _isnan, as_bits, to_finite_float, to_float
 from ....intervals import IntervalUnion
-from ..abc import StencilSafeguard, S, T
-from ...pointwise.abs import _compute_safe_eb_abs_interval
+from ...pointwise.abs import _compute_safe_eb_diff_interval
+from ..abc import S, StencilSafeguard, T
 from . import (
     FiniteDifference,
-    _finite_difference_offsets,
-    _finite_difference_coefficients,
     _finite_difference,
+    _finite_difference_coefficients,
+    _finite_difference_offsets,
 )
 
 
@@ -104,9 +104,9 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
             )
 
         assert dx > 0, "dx must be positive"
-        assert isinstance(dx, int) or np.isfinite(dx), "dx must be finite"
+        assert isinstance(dx, int) or _isfinite(dx), "dx must be finite"
         assert eb_abs >= 0, "eb_abs must be non-negative"
-        assert isinstance(eb_abs, int) or np.isfinite(eb_abs), "eb_abs must be finite"
+        assert isinstance(eb_abs, int) or _isfinite(eb_abs), "eb_abs must be finite"
 
         if order > 8 or accuracy > 8:
             warnings.warn(
@@ -173,13 +173,13 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
             same_bits = as_bits(findiff_data, kind="V") == as_bits(
                 findiff_decoded, kind="V"
             )
-            both_nan = np.isnan(findiff_data) & np.isnan(findiff_decoded)
+            both_nan = _isnan(findiff_data) & _isnan(findiff_decoded)
 
             ok = np.where(
-                np.isfinite(findiff_data),
+                _isfinite(findiff_data),
                 absolute_bound,
                 np.where(
-                    np.isinf(findiff_data),
+                    _isinf(findiff_data),
                     same_bits,
                     both_nan,
                 ),
@@ -220,10 +220,10 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
             eb_abs_impl: np.ndarray = to_finite_float(
                 eb_abs_impl_float, data_float.dtype
             )
-        assert eb_abs_impl >= 0.0
+        assert eb_abs_impl >= 0
 
-        return _compute_safe_eb_abs_interval(
-            data, data_float, eb_abs_impl, equal_nan=True
+        return _compute_safe_eb_diff_interval(
+            data, data_float, -eb_abs_impl, eb_abs_impl, equal_nan=True
         ).into_union()  # type: ignore
 
     def get_config(self) -> dict:

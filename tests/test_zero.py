@@ -3,11 +3,11 @@ import numpy as np
 from numcodecs_safeguards.cast import as_bits
 
 from .codecs import (
-    encode_decode_zero,
-    encode_decode_neg,
     encode_decode_identity,
-    encode_decode_noise,
     encode_decode_mock,
+    encode_decode_neg,
+    encode_decode_noise,
+    encode_decode_zero,
 )
 
 

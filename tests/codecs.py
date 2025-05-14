@@ -1,7 +1,7 @@
 import numpy as np
+from numcodecs.abc import Codec
 
 from numcodecs_safeguards import SafeguardsCodec
-from numcodecs.abc import Codec
 
 
 class ZeroCodec(Codec):
@@ -28,8 +28,13 @@ class NegCodec(Codec):
     def decode(self, buf, out=None):
         assert out is not None
         if out.size > 0:
-            np.copyto(out, np.frombuffer(buf, dtype=out.dtype).reshape(out.shape))
-            out *= -1
+            np.copyto(
+                out,
+                np.frombuffer(buf, dtype=out.dtype, count=np.prod(out.shape)).reshape(
+                    out.shape
+                ),
+            )
+            out[:] = np.negative(out)
         return out
 
 
@@ -42,7 +47,12 @@ class IdentityCodec(Codec):
     def decode(self, buf, out=None):
         assert out is not None
         if out.size > 0:
-            np.copyto(out, np.frombuffer(buf, dtype=out.dtype).reshape(out.shape))
+            np.copyto(
+                out,
+                np.frombuffer(buf, dtype=out.dtype, count=np.prod(out.shape)).reshape(
+                    out.shape
+                ),
+            )
         return out
 
 
@@ -55,7 +65,12 @@ class NoiseCodec(Codec):
     def decode(self, buf, out=None):
         assert out is not None
         if out.size > 0:
-            np.copyto(out, np.frombuffer(buf, dtype=out.dtype).reshape(out.shape))
+            np.copyto(
+                out,
+                np.frombuffer(buf, dtype=out.dtype, count=np.prod(out.shape)).reshape(
+                    out.shape
+                ),
+            )
         return out
 
 

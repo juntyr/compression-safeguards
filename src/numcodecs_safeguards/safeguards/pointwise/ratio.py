@@ -6,17 +6,20 @@ __all__ = ["RatioErrorBoundSafeguard"]
 
 import numpy as np
 
-from .abc import PointwiseSafeguard, S, T
 from ...cast import (
-    to_float,
-    from_float,
+    F,
+    _isfinite,
+    _isinf,
+    _isnan,
     as_bits,
-    to_total_order,
+    from_float,
     from_total_order,
     to_finite_float,
-    F,
+    to_float,
+    to_total_order,
 )
-from ...intervals import IntervalUnion, Interval, Lower, Upper
+from ...intervals import Interval, IntervalUnion, Lower, Upper
+from .abc import PointwiseSafeguard, S, T
 
 
 class RatioErrorBoundSafeguard(PointwiseSafeguard):
@@ -72,7 +75,7 @@ class RatioErrorBoundSafeguard(PointwiseSafeguard):
 
     def __init__(self, eb_ratio: int | float, *, equal_nan: bool = False):
         assert eb_ratio >= 1, "eb_ratio must be a >= 1 ratio"
-        assert isinstance(eb_ratio, int) or np.isfinite(eb_ratio), (
+        assert isinstance(eb_ratio, int) or _isfinite(eb_ratio), (
             "eb_ratio must be finite"
         )
 
@@ -119,16 +122,16 @@ class RatioErrorBoundSafeguard(PointwiseSafeguard):
         )
         # bitwise equality for inf and NaNs (unless equal_nan)
         same_bits = as_bits(data) == as_bits(decoded)
-        both_nan = self._equal_nan and (np.isnan(data) & np.isnan(decoded))
+        both_nan = self._equal_nan and (_isnan(data) & _isnan(decoded))
 
         ok = np.where(
             data == 0,
             decoded == 0,
             np.where(
-                np.isfinite(data),
+                _isfinite(data),
                 ratio_bound,
                 np.where(
-                    np.isinf(data),
+                    _isinf(data),
                     same_bits,
                     both_nan if self._equal_nan else same_bits,
                 ),
@@ -205,7 +208,7 @@ def _compute_safe_eb_ratio_interval(
             from_float(dataf_float / eb_ratio, dataf.dtype),
         )
         Lower(np.where(dataf < 0, data_mul, data_div)) <= valid[
-            np.isfinite(dataf)
+            _isfinite(dataf)
         ] <= Upper(np.where(dataf < 0, data_div, data_mul))
 
     # correct rounding errors in the lower and upper bound
@@ -231,17 +234,17 @@ def _compute_safe_eb_ratio_interval(
             > eb_ratio
         )
 
-    valid._lower[np.isfinite(dataf)] = from_total_order(
+    valid._lower[_isfinite(dataf)] = from_total_order(
         to_total_order(valid._lower) + lower_bound_outside_eb_ratio,
         dataf.dtype,
-    )[np.isfinite(dataf)]
-    valid._upper[np.isfinite(dataf)] = from_total_order(
+    )[_isfinite(dataf)]
+    valid._upper[_isfinite(dataf)] = from_total_order(
         to_total_order(valid._upper) - upper_bound_outside_eb_ratio,
         dataf.dtype,
-    )[np.isfinite(dataf)]
+    )[_isfinite(dataf)]
 
     # a ratio of 1 bound must preserve exactly, e.g. even for -0.0
     if np.any(eb_ratio == 1):
-        Lower(dataf) <= valid[np.isfinite(dataf) & (eb_ratio == 1)] <= Upper(dataf)
+        Lower(dataf) <= valid[_isfinite(dataf) & (eb_ratio == 1)] <= Upper(dataf)
 
     return valid

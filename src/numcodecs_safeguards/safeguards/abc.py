@@ -5,9 +5,9 @@ Abstract base class for the safeguards.
 __all__ = ["Safeguard"]
 
 from abc import ABC, abstractmethod
-from typing_extensions import Self  # MSPV 3.11
 
 import numpy as np
+from typing_extensions import Self  # MSPV 3.11
 
 
 class Safeguard(ABC):

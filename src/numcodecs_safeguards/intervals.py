@@ -5,11 +5,19 @@ Types and helpers to construct safe intervals for the safeguards.
 __all__ = ["Interval", "IntervalUnion", "Minimum", "Maximum", "Lower", "Upper"]
 
 from typing import Any, Generic, Literal, TypeVar
-from typing_extensions import Self  # MSPV 3.11
 
 import numpy as np
+from typing_extensions import Self  # MSPV 3.11
 
-from .cast import as_bits, to_total_order, from_total_order
+from .cast import (
+    _isfinite,
+    _isinf,
+    _isnan,
+    _nextafter,
+    as_bits,
+    from_total_order,
+    to_total_order,
+)
 
 T = TypeVar("T", bound=np.dtype)
 N = TypeVar("N", bound=int)
@@ -200,7 +208,7 @@ class Interval(Generic[T, N]):
             return self
 
         # bitwise preserve infinite values
-        Lower(a) <= self[np.isinf(a)] <= Upper(a)
+        Lower(a) <= self[_isinf(a)] <= Upper(a)
 
         return self
 
@@ -229,7 +237,7 @@ class Interval(Generic[T, N]):
 
         if not equal_nan:
             # bitwise preserve NaN values
-            Lower(a) <= self[np.isnan(a)] <= Upper(a)
+            Lower(a) <= self[_isnan(a)] <= Upper(a)
             return self
 
         # smallest (positive) NaN bit pattern: 0b s 1..1 0..0
@@ -246,7 +254,7 @@ class Interval(Generic[T, N]):
                 np.copysign(nan_max, -1),
                 np.copysign(nan_min, +1),
             )
-        ) <= self[np.isnan(a)] <= Upper(
+        ) <= self[_isnan(a)] <= Upper(
             np.where(
                 np.signbit(a),
                 np.copysign(nan_min, -1),
@@ -278,19 +286,11 @@ class Interval(Generic[T, N]):
         if not np.issubdtype(a.dtype, np.floating):
             return self
 
-        Lower(
-            np.array(
-                from_total_order(
-                    to_total_order(np.array(-np.inf, dtype=a.dtype)) + 1, a.dtype
-                )
-            )
-        ) <= self[np.isfinite(a)] <= Upper(
-            np.array(
-                from_total_order(
-                    to_total_order(np.array(np.inf, dtype=a.dtype)) - 1, a.dtype
-                )
-            )
-        )
+        # nextafter produces the largest and smallest finite floating point
+        #  values
+        Lower(np.array(_nextafter(np.array(-np.inf, dtype=a.dtype), 0))) <= self[
+            _isfinite(a)
+        ] <= Upper(np.array(_nextafter(np.array(np.inf, dtype=a.dtype), 0)))
 
         return self
 
