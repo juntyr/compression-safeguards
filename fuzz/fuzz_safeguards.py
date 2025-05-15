@@ -74,7 +74,11 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
         if len(tys) == 2 and tys[0] is str and issubclass(tys[1], Enum):
             return list(tys[1])[data.ConsumeIntInRange(0, len(tys[1]) - 1)]
 
-        if len(tys) == 2 and tys[0] is dict and issubclass(tys[1], Safeguard):
+        if (
+            len(tys) > 1
+            and tys[0] is dict
+            and all(issubclass(t, Safeguard) for t in tys[1:])
+        ):
             return generate_safeguard_config(data, depth + 1)
 
         ty = tys[data.ConsumeIntInRange(0, len(tys) - 1)]

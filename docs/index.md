@@ -83,11 +83,11 @@ This package currently implements the following [safeguards][numcodecs_safeguard
 
 - [`all`][numcodecs_safeguards.safeguards.combinators.all.AllSafeguards] (logical all / and):
 
-    For each element, all of the combined safeguards' guarantees are upheld. At the moment, only pointwise and stencil safeguards can be combined by this all-combinator.
+    For each element, all of the combined safeguards' guarantees are upheld. At the moment, only pointwise and stencil safeguards and combinations thereof can be combined by this all-combinator.
 
 - [`any`][numcodecs_safeguards.safeguards.combinators.any.AnySafeguard] (logical any / or):
 
-    For each element, at least one of the combined safeguards' guarantees is upheld. At the moment, only pointwise and stencil safeguards can be combined by this any-combinator.
+    For each element, at least one of the combined safeguards' guarantees is upheld. At the moment, only pointwise and stencil safeguards and combinations thereof can be combined by this any-combinator.
 
 ## Usage
 

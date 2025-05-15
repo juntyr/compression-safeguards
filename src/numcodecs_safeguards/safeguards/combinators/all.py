@@ -18,8 +18,8 @@ class AllSafeguards:
     The `AllSafeguards` guarantees that, for each element, all of the combined
     safeguards' guarantees are upheld.
 
-    At the moment, only pointwise and stencil safeguards can be combined by
-    this all-combinator.
+    At the moment, only pointwise and stencil safeguards and combinations
+    thereof can be combined by this all-combinator.
 
     Parameters
     ----------

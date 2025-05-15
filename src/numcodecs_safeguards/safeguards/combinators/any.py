@@ -18,8 +18,8 @@ class AnySafeguard:
     The `AnySafeguard` guarantees that, for each element, at least one of the
     combined safeguards' guarantees is upheld.
 
-    At the moment, only pointwise and stencil safeguards can be combined by
-    this any-combinator.
+    At the moment, only pointwise and stencil safeguards and combinations
+    thereof can be combined by this any-combinator.
 
     Parameters
     ----------
