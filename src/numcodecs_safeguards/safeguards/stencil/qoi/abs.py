@@ -183,6 +183,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                 "Integer",
                 "Float",
                 "Rational",
+                "Array",
                 "pi",
                 "e",
                 "sqrt",
@@ -200,6 +201,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
         self._X = sp.tensor.array.expressions.ArraySymbol("X", s)
         X = self._X.as_explicit()
+        X.__class__ = _NumPyLikeArray
         x = X.__getitem__(c)
 
         assert len(axes) == len(shape), (
@@ -228,12 +230,14 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                     Integer=sp.Integer,
                     Float=sp.Float,
                     Rational=sp.Rational,
+                    # arrays
+                    Array=_NumPyLikeArray,
                     # constants
                     pi=sp.pi,
                     e=sp.E,
                     # operators
-                    sqrt=sp.sqrt,
-                    exp=sp.exp,
+                    sqrt=lambda x: x ** sp.Rational(1, 2),
+                    exp=lambda x: sp.E**x,
                     ln=sp.ln,
                     log=sp.log,
                 ),
@@ -740,3 +744,68 @@ def _create_sympy_numpy_printer_class(
             )
 
     return NumPyDtypePrinter
+
+
+class _NumPyLikeArray(sp.Array):
+    def __mul__(self, other):
+        if isinstance(other, _NumPyLikeArray):
+            if self.shape != other.shape:
+                raise ValueError("array shape mismatch")
+            result_list = [
+                i * j
+                for i, j in zip(
+                    sp.tensor.array.arrayop.Flatten(self),
+                    sp.tensor.array.arrayop.Flatten(other),
+                )
+            ]
+            return type(self)(result_list, self.shape)
+        return super().__mul__(other)
+
+    def __truediv__(self, other):
+        if isinstance(other, _NumPyLikeArray):
+            if self.shape != other.shape:
+                raise ValueError("array shape mismatch")
+            result_list = [
+                i / j
+                for i, j in zip(
+                    sp.tensor.array.arrayop.Flatten(self),
+                    sp.tensor.array.arrayop.Flatten(other),
+                )
+            ]
+            return type(self)(result_list, self.shape)
+        return super().__truediv__(other)
+
+    def __pow__(self, other):
+        if isinstance(other, _NumPyLikeArray):
+            if self.shape != other.shape:
+                raise ValueError("array shape mismatch")
+            result_list = [
+                i**j
+                for i, j in zip(
+                    sp.tensor.array.arrayop.Flatten(self),
+                    sp.tensor.array.arrayop.Flatten(other),
+                )
+            ]
+            return type(self)(result_list, self.shape)
+        other = sp.sympify(other)
+        result_list = [i**other for i in sp.tensor.array.arrayop.Flatten(self)]
+        return type(self)(result_list, self.shape)
+
+    def __rpow__(self, other):
+        if isinstance(other, _NumPyLikeArray):
+            if self.shape != other.shape:
+                raise ValueError("array shape mismatch")
+            result_list = [
+                j**i
+                for i, j in zip(
+                    sp.tensor.array.arrayop.Flatten(self),
+                    sp.tensor.array.arrayop.Flatten(other),
+                )
+            ]
+            return type(self)(result_list, self.shape)
+        other = sp.sympify(other)
+        result_list = [other**i for i in sp.tensor.array.arrayop.Flatten(self)]
+        return type(self)(result_list, self.shape)
+
+    # TODO: also support log
+    # TODO: also support "matrix" multiplication

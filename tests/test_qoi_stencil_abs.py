@@ -33,10 +33,16 @@ def check_all_codecs(
             )
 
 
-def test_test():
+def test_mean():
+    # check_all_codecs(
+    #     np.arange(64, dtype=float).reshape(4, 4, 4),
+    #     "(X[i-1,j]+X[i+1,j]+X[i,j-1]+X[i,j+1])/4",
+    #     ((-1, "i", 1), (-1, "j", 1)),
+    # )
+
     check_all_codecs(
         np.arange(64, dtype=float).reshape(4, 4, 4),
-        "(X[i-1,j]+X[i+1,j]+X[i,j-1]+X[i,j+1])/4",
+        "sum(X * Array([[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]]))",
         ((-1, "i", 1), (-1, "j", 1)),
     )
 

@@ -146,8 +146,8 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
                     pi=sp.pi,
                     e=sp.E,
                     # operators
-                    sqrt=sp.sqrt,
-                    exp=sp.exp,
+                    sqrt=lambda x: x ** sp.Rational(1, 2),
+                    exp=lambda x: sp.E**x,
                     ln=sp.ln,
                     log=sp.log,
                 ),
