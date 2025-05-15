@@ -9,8 +9,7 @@ from typing import Callable
 
 import numpy as np
 import sympy as sp
-from sympy.tensor.array import ImmutableDenseNDimArray
-from sympy.tensor.array.expressions import ArrayElement, ArraySymbol
+import sympy.tensor.array.expressions as _
 
 from ....cast import (
     F,
@@ -26,6 +25,7 @@ from ....cast import (
 )
 from ....intervals import IntervalUnion
 from ...pointwise.qoi import Expr
+from ...pointwise.qoi.abs import _ensure_bounded_derived_error
 from .. import BoundaryCondition
 from ..abc import S, StencilSafeguard, T
 
@@ -40,9 +40,10 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     The quantity of interest is specified as a non-constant expression, in
     string form, on the neighbourhood tensor `X` that is centred on the
     pointwise value `x`. For example, to bound the error on the four-neighbour
-    box mean in a 3x3 neighbourhood (where `x = X[0,0]`), set
-    `qoi=Expr("(X[-1,0]+X[+1,0]+X[0,+1]+X[-1,0])/4")`. Note that `X` uses
-    indexing relative to the centred data point `x`.
+    box mean in a 3x3 neighbourhood (where `x = X[i,j]`), set
+    `qoi=Expr("(X[i-1,j]+X[i+1,j]+X[i,j-1]+X[i,j+1])/4")`. Note that `X` can be
+    indexed relative to the centred data point `x` using named indices (defined
+    in the `shape` paramter) or absolute using integer indices.
 
     If the derived quantity of interest for an element evaluates to an infinite
     value, this safeguard guarantees that the quantity of interest on the
@@ -103,21 +104,26 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     qoi : Expr
         The non-constant expression for computing the derived quantity of
         interest for a neighbourhood tensor `X`.
-    shape : tuple[tuple[int, int], ...]
-        The shape of the data neighbourhood, expressed as (before, after)
-        tuples, where before is non-positive and after is non-negative.
+    shape : tuple[tuple[int, str, int], ...]
+        The shape of the data neighbourhood, expressed as (before, index,
+        after) tuples, where before (non-positive) and after (non-negative)
+        specify the range of values relative to the data point to include,
+        and index is a unique per-dimension variable name that can be used
+        in `qoi` to refer to the index of the data point.
 
-        e.g. a neighbourhood of shape `((-1, 2), (-2, 0))` is 2D and contains
-        one element before and two elements after the current one on the first
-        axis, and two elements before on the second axis.
+        e.g. a neighbourhood of shape `((-1, "i", 2), (-2, "j", 0))` is 2D and
+        contains one element before and two elements after the current one on
+        the first axis, and two elements before on the second axis. The
+        neighbourhood values can be indexed relative to the central data point
+        using `i-1`, `i`, `i+1`, `i+2` and `j-2`, `j-1`, `j`.
     axes : tuple[int, ...]
         The axes that the neighbourhood is collected from. The neighbourhood
         window is applied independently to any additional axes. The number of
         axes must match the number of dimensions in the shape.
 
-        e.g. for a 3d data array, 2d shape `((-1, 1), (-1, 1))`, and axes
-        `(0, -1)`, the neighbourhood is created over the first and last axis,
-        and applied independently along the middle axis.
+        e.g. for a 3d data array, 2d shape `((-1, "i", 1), (-1, "j", 1))`, and
+        axes `(0, -1)`, the neighbourhood is created over the first and last
+        axis, and applied independently along the middle axis.
     boundary : str | BoundaryCondition
         Boundary condition for evaluating the quantity of interest near the
         data domain boundaries, e.g. by extending values.
@@ -146,7 +152,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     _eb_abs: int | float
     _constant_boundary: None | int | float
     _qoi_expr: sp.Basic
-    _X: ArraySymbol
+    _X: sp.tensor.array.expressions.ArraySymbol
 
     kind = "qoi_abs_stencil"
 
@@ -166,26 +172,35 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         self._eb_abs = eb_abs
 
         s = []
+        indices = dict()
         c = []
         assert len(shape) > 0, "shape must not be empty"
-        for b, a in shape:
+        for b, i, a in shape:
             assert b <= 0, "shape's before must be non-positive"
+            assert i not in indices and i not in [
+                "x",
+                "X",
+                "Integer",
+                "Float",
+                "Rational",
+                "pi",
+                "e",
+                "sqrt",
+                "exp",
+                "ln",
+                "log",
+            ], (
+                f"index {i} is not unique or clashes with a pre-defined variable or keyword"
+            )
             assert a >= 0, "shape's after must be non-negative"
             s.append(abs(b) + 1 + abs(a))
+            indices[i] = abs(b)
             c.append(abs(b))
         self._shape = shape
 
-        print(shape)
-        print(s)
-        print(c)
-
-        self._X = ArraySymbol("X", s)
+        self._X = sp.tensor.array.expressions.ArraySymbol("X", s)
         X = self._X.as_explicit()
-        X.__class__ = _ImmutableDenseNDimArrayWithRelativeIndexing
         x = X.__getitem__(c)
-
-        print(X)
-        print(x)
 
         assert len(axes) == len(shape), (
             "number of axes must match the number of shape dimensions"
@@ -207,7 +222,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         try:
             qoi_expr = sp.parse_expr(
                 self._qoi,
-                local_dict=dict(x=x, X=X),
+                local_dict=dict(x=x, X=X, **indices),
                 global_dict=dict(
                     # literals
                     Integer=sp.Integer,
@@ -395,7 +410,11 @@ def _compute_data_eb_for_qoi_eb_unchecked(
     zero = np.array(0, dtype=xv.dtype)
 
     # x
-    if expr.func is ArrayElement and len(expr.args) == 2 and expr.args[0] == x:
+    if (
+        expr.func is sp.tensor.array.expressions.ArrayElement
+        and len(expr.args) == 2
+        and expr.args[0] == x
+    ):
         return (eb_expr_lower, eb_expr_upper)
 
     # abs(...) is only used internally in exp(ln(abs(...)))
@@ -641,117 +660,6 @@ def _compute_data_eb_for_qoi_eb_unchecked(
         )
 
     raise ValueError(f"unsupported expression kind {expr} (= {sp.srepr(expr)} =)")
-
-
-def _ensure_bounded_derived_error(
-    expr: Callable[[np.ndarray[S, F]], np.ndarray[S, F]],
-    exprv: np.ndarray[S, F],
-    xv: None | np.ndarray[S, F],
-    eb_x_guess: np.ndarray[S, F],
-    eb_expr_lower: np.ndarray[S, F],
-    eb_expr_upper: np.ndarray[S, F],
-) -> np.ndarray[S, F]:
-    """
-    Ensure that an error bound on an expression is met by an error bound on
-    the input data by nudging the provided guess.
-
-    Parameters
-    ----------
-    expr : Callable[[np.ndarray[S, F]], np.ndarray[S, F]]
-        Expression over which the error bound will be ensured.
-
-        The expression takes in the error bound guess and returns the value of
-        the expression for this error.
-    exprv : np.ndarray[S, F]
-        Evaluation of the expression for the zero-error case.
-    xv : None | np.ndarray[S, F]
-        Actual values of the input data, which are only used for better
-        refinement of the error bound guess.
-    eb_x_guess : np.ndarray[S, F]
-        Provided guess for the error bound on the initial data.
-    eb_expr_lower : np.ndarray[S, F]
-        Finite pointwise lower bound on the expression error, must be negative
-        or zero.
-    eb_expr_upper : np.ndarray[S, F]
-        Finite pointwise upper bound on the expression error, must be positive
-        or zero.
-
-    Returns
-    -------
-    eb_x : np.ndarray[S, F]
-        Finite pointwise error bound on the input data.
-    """
-
-    # check if any derived expression exceeds the error bound
-    # this check matches the qoi safeguard's validity check
-    is_eb_exceeded = lambda eb_x_guess: ~np.where(
-        _isfinite(exprv),
-        ((expr(eb_x_guess) - exprv) >= eb_expr_lower)
-        & ((expr(eb_x_guess) - exprv) <= eb_expr_upper),
-        np.where(
-            _isinf(exprv),
-            expr(eb_x_guess) == exprv,
-            _isnan(expr(eb_x_guess)),
-        ),
-    )
-    eb_exceeded = is_eb_exceeded(eb_x_guess)
-
-    if not np.any(eb_exceeded):
-        return eb_x_guess
-
-    # first try to nudge the error bound itself
-    # we can nudge with nextafter since the expression values are floating
-    #  point
-    eb_x_guess = np.where(eb_exceeded, _nextafter(eb_x_guess, 0), eb_x_guess)  # type: ignore
-
-    # check again
-    eb_exceeded = is_eb_exceeded(eb_x_guess)
-
-    if not np.any(eb_exceeded):
-        return eb_x_guess
-
-    if xv is not None:
-        # second try to nudge it with respect to the data
-        eb_x_guess = np.where(
-            eb_exceeded, _nextafter(xv + eb_x_guess, xv) - xv, eb_x_guess
-        )  # type: ignore
-
-        # check again
-        eb_exceeded = is_eb_exceeded(eb_x_guess)
-
-        if not np.any(eb_exceeded):
-            return eb_x_guess
-
-    while True:
-        # finally fall back to repeatedly cutting it in half
-        eb_x_guess = np.where(eb_exceeded, eb_x_guess * 0.5, eb_x_guess)  # type: ignore
-
-        eb_exceeded = is_eb_exceeded(eb_x_guess)
-
-        if not np.any(eb_exceeded):
-            return eb_x_guess
-
-
-def _create_ndarray_with_relative_indexing(
-    array: ImmutableDenseNDimArray, center: tuple[int, ...]
-) -> ImmutableDenseNDimArray:
-    class _ImmutableDenseNDimArrayWithRelativeIndexing(ImmutableDenseNDimArray):
-        def __getitem__(self, index):
-            if isinstance(index, (int, sp.Integer)):
-                print("index-int", index)
-            elif isinstance(index, (tuple, list)):
-                for i in index:
-                    if isinstance(i, (int, sp.Integer)):
-                        print("index-tuple-int", i)
-                    elif isinstance(i, slice):
-                        assert isinstance(i.start, (None, int, sp.Integer))
-                        assert isinstance(i.stop, (None, int, sp.Integer))
-                        assert isinstance(i.step, (None, int, sp.Integer))
-                    else:
-                        raise ValueError(f"unsupported index kind {i} {sp.srepr(i)}")
-            else:
-                raise ValueError(f"unsupported index kind {index}")
-            return super().__getitem__(index)
 
 
 def _compile_sympy_expr_to_numpy(
