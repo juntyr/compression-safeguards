@@ -62,7 +62,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
     boundary : str | BoundaryCondition
         Boundary condition for evaluating the finite difference near the data
         domain boundaries, e.g. by extending values.
-    constant_boundary: None | int | float
+    constant_boundary : None | int | float
         Optional constant value with which the data domain is extended for a
         constant boundary.
     axis : None | int

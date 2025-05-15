@@ -1,5 +1,5 @@
 """
-Pointwise quantity of interest (QoI) absolute error bound safeguard.
+Stencil quantity of interest (QoI) absolute error bound safeguard.
 """
 
 __all__ = ["QuantityOfInterestAbsoluteErrorBoundSafeguard"]
@@ -9,6 +9,8 @@ from typing import Callable
 
 import numpy as np
 import sympy as sp
+from sympy.tensor.array import ImmutableDenseNDimArray
+from sympy.tensor.array.expressions import ArrayElement, ArraySymbol
 
 from ....cast import (
     F,
@@ -20,25 +22,27 @@ from ....cast import (
     _isnan,
     _nan_to_zero,
     _nextafter,
-    as_bits,
     to_finite_float,
-    to_float,
 )
 from ....intervals import IntervalUnion
-from ..abc import PointwiseSafeguard, S, T
-from ..abs import _compute_safe_eb_diff_interval
-from . import Expr
+from ...pointwise.qoi import Expr
+from .. import BoundaryCondition
+from ..abc import S, StencilSafeguard, T
 
 
-class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
+class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     """
     The `QuantityOfInterestAbsoluteErrorBoundSafeguard` guarantees that the
-    pointwise absolute error on a derived quantity of interest (QoI) is less
-    than or equal to the provided bound `eb_abs`.
+    pointwise absolute error on a derived quantity of interest (QoI) over a
+    neighbourhood of data points is less than or equal to the provided bound
+    `eb_abs`.
 
     The quantity of interest is specified as a non-constant expression, in
-    string form, on the pointwise value `x`. For example, to bound the error on
-    the square of `x`, set `qoi=Expr("x**2")`.
+    string form, on the neighbourhood tensor `X` that is centred on the
+    pointwise value `x`. For example, to bound the error on the four-neighbour
+    box mean in a 3x3 neighbourhood (where `x = X[0,0]`), set
+    `qoi=Expr("(X[-1,0]+X[+1,0]+X[0,+1]+X[-1,0])/4")`. Note that `X` uses
+    indexing relative to the centred data point `x`.
 
     If the derived quantity of interest for an element evaluates to an infinite
     value, this safeguard guarantees that the quantity of interest on the
@@ -71,7 +75,10 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
       | "pi"                              (* pi *)
     ;
 
-    var     = "x";                        (* pointwise data value *)
+    var     =
+        "x";                              (* pointwise data value *)
+      | "X", "[", int, [ ",", int ], "]"  (* neighbourhood data value *)
+    ;
 
     unary   =
         "(", expr, ")"                    (* parenthesis *)
@@ -91,52 +98,116 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
     ;
     ```
 
-    The implementation of the absolute error bound on pointwise quantities of
-    interest is inspired by:
-
-    > Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
-    Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
-    Lossy Compression for Scientific Data. *Proceedings of the VLDB Endowment*.
-    16, 4 (December 2022), 697-710. Available from:
-    <https://doi.org/10.14778/3574245.3574255>.
-
     Parameters
     ----------
     qoi : Expr
         The non-constant expression for computing the derived quantity of
-        interest for a pointwise value `x`.
+        interest for a neighbourhood tensor `X`.
+    shape : tuple[tuple[int, int], ...]
+        The shape of the data neighbourhood, expressed as (before, after)
+        tuples, where before is non-positive and after is non-negative.
+
+        e.g. a neighbourhood of shape `((-1, 2), (-2, 0))` is 2D and contains
+        one element before and two elements after the current one on the first
+        axis, and two elements before on the second axis.
+    axes : tuple[int, ...]
+        The axes that the neighbourhood is collected from. The neighbourhood
+        window is applied independently to any additional axes. The number of
+        axes must match the number of dimensions in the shape.
+
+        e.g. for a 3d data array, 2d shape `((-1, 1), (-1, 1))`, and axes
+        `(0, -1)`, the neighbourhood is created over the first and last axis,
+        and applied independently along the middle axis.
+    boundary : str | BoundaryCondition
+        Boundary condition for evaluating the quantity of interest near the
+        data domain boundaries, e.g. by extending values.
     eb_abs : int | float
         The non-negative absolute error bound on the quantity of interest that
         is enforced by this safeguard.
+    constant_boundary : None | int | float
+        Optional constant value with which the data domain is extended for a
+        constant boundary.
     """
 
     __slots__ = (
         "_qoi",
+        "_shape",
+        "_axes",
+        "_boundary",
         "_eb_abs",
+        "_constant_boundary",
         "_qoi_expr",
-        "_x",
+        "_X",
     )
     _qoi: Expr
+    _shape: tuple[tuple[int, int], ...]
+    _axes: tuple[int, ...]
+    _boundary: BoundaryCondition
     _eb_abs: int | float
+    _constant_boundary: None | int | float
     _qoi_expr: sp.Basic
-    _x: sp.Symbol
+    _X: ArraySymbol
 
-    kind = "qoi_abs"
+    kind = "qoi_abs_stencil"
 
-    def __init__(self, qoi: Expr, eb_abs: int | float):
+    def __init__(
+        self,
+        qoi: Expr,
+        shape: tuple[tuple[int, int], ...],
+        axes: tuple[int, ...],
+        boundary: str | BoundaryCondition,
+        eb_abs: int | float,
+        constant_boundary: None | int | float = None,
+    ):
         assert eb_abs >= 0, "eb_abs must be non-negative"
         assert isinstance(eb_abs, int) or _isfinite(eb_abs), "eb_abs must be finite"
 
         self._qoi = qoi
         self._eb_abs = eb_abs
 
-        self._x = sp.Symbol("x", real=True)
+        s = []
+        c = []
+        assert len(shape) > 0, "shape must not be empty"
+        for b, a in shape:
+            assert b <= 0, "shape's before must be non-positive"
+            assert a >= 0, "shape's after must be non-negative"
+            s.append(abs(b) + 1 + abs(a))
+            c.append(abs(b))
+        self._shape = shape
+
+        print(shape)
+        print(s)
+        print(c)
+
+        self._X = ArraySymbol("X", s)
+        X = self._X.as_explicit()
+        X.__class__ = _ImmutableDenseNDimArrayWithRelativeIndexing
+        x = X.__getitem__(c)
+
+        print(X)
+        print(x)
+
+        assert len(axes) == len(shape), (
+            "number of axes must match the number of shape dimensions"
+        )
+
+        self._boundary = (
+            boundary
+            if isinstance(boundary, BoundaryCondition)
+            else BoundaryCondition[boundary]
+        )
+        assert (self._boundary != BoundaryCondition.constant) == (
+            constant_boundary is None
+        ), (
+            "constant_boundary must be provided if and only if the constant boundary condition is used"
+        )
+        self._constant_boundary = constant_boundary
 
         assert len(qoi.strip()) > 0, "qoi expression must not be empty"
         try:
             qoi_expr = sp.parse_expr(
                 self._qoi,
-                local_dict=dict(x=self._x),
+                local_dict=dict(x=x, X=X),
                 global_dict=dict(
                     # literals
                     Integer=sp.Integer,
@@ -157,7 +228,11 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             #  be printed) and if an error bound can be computed
             _canary_repr = str(qoi_expr)
             _canary_eb_abs = _compute_data_eb_for_qoi_eb(
-                qoi_expr, self._x, np.empty(0), np.empty(0), np.empty(0)
+                qoi_expr,
+                self._X,
+                np.zeros(s),
+                np.zeros(s),
+                np.zeros(s),
             )
         except Exception as err:
             raise AssertionError(
@@ -174,149 +249,12 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
     def check_pointwise(
         self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
-        """
-        Check which elements in the `decoded` array satisfy the absolute error
-        bound for the quantity of interest on the `data`.
-
-        Parameters
-        ----------
-        data : np.ndarray
-            Data to be encoded.
-        decoded : np.ndarray
-            Decoded data.
-
-        Returns
-        -------
-        ok : np.ndarray
-            Pointwise, `True` if the check succeeded for this element.
-        """
-
-        data_float: np.ndarray = to_float(data)
-
-        qoi_lambda = _compile_sympy_expr_to_numpy(
-            [self._x], self._qoi_expr, data_float.dtype
-        )
-
-        qoi_data = (qoi_lambda)(data_float)
-        qoi_decoded = (qoi_lambda)(to_float(decoded))
-
-        absolute_bound = (
-            np.where(
-                qoi_data > qoi_decoded,
-                qoi_data - qoi_decoded,
-                qoi_decoded - qoi_data,
-            )
-            <= self._eb_abs
-        )
-        same_bits = as_bits(qoi_data, kind="V") == as_bits(qoi_decoded, kind="V")
-        both_nan = _isnan(qoi_data) & _isnan(qoi_decoded)
-
-        ok = np.where(
-            _isfinite(qoi_data),
-            absolute_bound,
-            np.where(
-                _isinf(qoi_data),
-                same_bits,
-                both_nan,
-            ),
-        )
-
-        return ok  # type: ignore
+        raise NotImplementedError
 
     def compute_safe_intervals(
         self, data: np.ndarray[S, T]
     ) -> IntervalUnion[T, int, int]:
-        """
-        Compute the intervals in which the absolute error bound is upheld with
-        respect to the quantity of interest on the `data`.
-
-        Parameters
-        ----------
-        data : np.ndarray
-            Data for which the safe intervals should be computed.
-
-        Returns
-        -------
-        intervals : IntervalUnion
-            Union of intervals in which the absolute error bound is upheld.
-        """
-
-        data_float: np.ndarray = to_float(data)
-
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            eb_abs: np.ndarray = to_finite_float(self._eb_abs, data_float.dtype)
-        assert eb_abs >= 0
-
-        qoi_lambda = _compile_sympy_expr_to_numpy(
-            [self._x], self._qoi_expr, data_float.dtype
-        )
-
-        # ensure the error bounds are representable in QoI space
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            # compute the error-bound adjusted QoIs
-            data_qoi = (qoi_lambda)(data_float)
-            qoi_lower = data_qoi - eb_abs
-            qoi_upper = data_qoi + eb_abs
-
-            # check if they're representable within the error bound
-            qoi_lower_outside_eb_abs = (data_qoi - qoi_lower) > eb_abs
-            qoi_upper_outside_eb_abs = (qoi_upper - data_qoi) > eb_abs
-
-            # otherwise nudge the error-bound adjusted QoIs
-            # we can nudge with nextafter since the QoIs are floating point and
-            #  only finite QoIs are nudged
-            qoi_lower = np.where(
-                qoi_lower_outside_eb_abs & _isfinite(data_qoi),
-                _nextafter(qoi_lower, data_qoi),
-                qoi_lower,
-            )
-            qoi_upper = np.where(
-                qoi_upper_outside_eb_abs & _isfinite(data_qoi),
-                _nextafter(qoi_upper, data_qoi),
-                qoi_upper,
-            )
-
-            # compute the adjusted error bound
-            eb_qoi_lower = _nan_to_zero(qoi_lower - data_qoi)
-            eb_qoi_upper = _nan_to_zero(qoi_upper - data_qoi)
-
-        # check that the adjusted error bounds fulfil all requirements
-        assert eb_qoi_lower.shape == data.shape
-        assert eb_qoi_lower.dtype == data_float.dtype
-        assert eb_qoi_upper.shape == data.shape
-        assert eb_qoi_upper.dtype == data_float.dtype
-        assert np.all(
-            (eb_qoi_lower <= 0) & (eb_qoi_lower >= -eb_abs) & _isfinite(eb_qoi_lower)
-        )
-        assert np.all(
-            (eb_qoi_upper >= 0) & (eb_qoi_upper <= eb_abs) & _isfinite(eb_qoi_upper)
-        )
-
-        # compute the error bound in data space
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            eb_x_lower, eb_x_upper = _compute_data_eb_for_qoi_eb(
-                self._qoi_expr,
-                self._x,
-                data_float,
-                eb_qoi_lower,
-                eb_qoi_upper,
-            )
-        assert np.all((eb_x_lower <= 0) & _isfinite(eb_x_lower))
-        assert np.all((eb_x_upper >= 0) & _isfinite(eb_x_upper))
-
-        return _compute_safe_eb_diff_interval(
-            data,
-            data_float,
-            eb_x_lower,
-            eb_x_upper,
-            equal_nan=True,
-        ).into_union()  # type: ignore
+        raise NotImplementedError
 
     def get_config(self) -> dict:
         """
@@ -328,7 +266,20 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             Configuration of the safeguard.
         """
 
-        return dict(kind=type(self).kind, qoi=self._qoi, eb_abs=self._eb_abs)
+        config = dict(
+            kind=type(self).kind,
+            qoi=self._qoi,
+            shape=self._shape,
+            axes=self._axes,
+            boundary=self._boundary.name,
+            eb_abs=self._eb_abs,
+            constant_boundary=self._constant_boundary,
+        )
+
+        if self._constant_boundary is None:
+            del config["constant_boundary"]
+
+        return config
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -444,7 +395,7 @@ def _compute_data_eb_for_qoi_eb_unchecked(
     zero = np.array(0, dtype=xv.dtype)
 
     # x
-    if expr == x:
+    if expr.func is ArrayElement and len(expr.args) == 2 and expr.args[0] == x:
         return (eb_expr_lower, eb_expr_upper)
 
     # abs(...) is only used internally in exp(ln(abs(...)))
@@ -779,6 +730,28 @@ def _ensure_bounded_derived_error(
 
         if not np.any(eb_exceeded):
             return eb_x_guess
+
+
+def _create_ndarray_with_relative_indexing(
+    array: ImmutableDenseNDimArray, center: tuple[int, ...]
+) -> ImmutableDenseNDimArray:
+    class _ImmutableDenseNDimArrayWithRelativeIndexing(ImmutableDenseNDimArray):
+        def __getitem__(self, index):
+            if isinstance(index, (int, sp.Integer)):
+                print("index-int", index)
+            elif isinstance(index, (tuple, list)):
+                for i in index:
+                    if isinstance(i, (int, sp.Integer)):
+                        print("index-tuple-int", i)
+                    elif isinstance(i, slice):
+                        assert isinstance(i.start, (None, int, sp.Integer))
+                        assert isinstance(i.stop, (None, int, sp.Integer))
+                        assert isinstance(i.step, (None, int, sp.Integer))
+                    else:
+                        raise ValueError(f"unsupported index kind {i} {sp.srepr(i)}")
+            else:
+                raise ValueError(f"unsupported index kind {index}")
+            return super().__getitem__(index)
 
 
 def _compile_sympy_expr_to_numpy(

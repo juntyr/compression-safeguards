@@ -18,6 +18,7 @@ from .stencil.findiff.abs import (
     FiniteDifferenceAbsoluteErrorBoundSafeguard,
 )
 from .stencil.monotonicity import MonotonicityPreservingSafeguard
+from .stencil.qoi.abs import QuantityOfInterestAbsoluteErrorBoundSafeguard as Foo
 
 
 class Safeguards(Enum):
@@ -42,6 +43,8 @@ class Safeguards(Enum):
     # quantity of interest error bounds
     qoi_abs = QuantityOfInterestAbsoluteErrorBoundSafeguard
     """Enforce an absolute error bound on a pointwise derived quantity of interest."""
+
+    qoi_abs_stencil = Foo
 
     # finite difference error bounds
     findiff_abs = FiniteDifferenceAbsoluteErrorBoundSafeguard
