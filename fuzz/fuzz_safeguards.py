@@ -11,7 +11,7 @@ with atheris.instrument_imports():
     import types
     import typing
     import warnings
-    from collections.abc import Sequence
+    from collections.abc import Collection
     from enum import Enum
     from inspect import signature
 
@@ -32,6 +32,8 @@ warnings.filterwarnings("error")
 
 
 class FuzzCodec(Codec):
+    __slots__ = ("data", "decoded")
+
     codec_id = "fuzz"
 
     def __init__(self, data, decoded):
@@ -47,6 +49,9 @@ class FuzzCodec(Codec):
         out[:] = self.decoded
         return out
 
+    def get_config(self):
+        return dict(id=type(self).codec_id, data=self.data, decoded=self.decoded)
+
 
 numcodecs.registry.register_codec(FuzzCodec)
 
@@ -61,7 +66,7 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
     if ty is bool:
         return data.ConsumeBool()
 
-    if typing.get_origin(ty) is Sequence:
+    if typing.get_origin(ty) is Collection:
         if len(typing.get_args(ty)) == 1:
             return [
                 generate_parameter(data, typing.get_args(ty)[0], depth)

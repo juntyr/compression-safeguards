@@ -5,6 +5,8 @@ from numcodecs_safeguards import SafeguardsCodec
 
 
 class ZeroCodec(Codec):
+    __slots__ = ()
+
     codec_id = "zero"
 
     def __init__(self):
@@ -20,6 +22,8 @@ class ZeroCodec(Codec):
 
 
 class NegCodec(Codec):
+    __slots__ = ()
+
     codec_id = "neg"
 
     def encode(self, buf):
@@ -39,6 +43,8 @@ class NegCodec(Codec):
 
 
 class IdentityCodec(Codec):
+    __slots__ = ()
+
     codec_id = "identity"
 
     def encode(self, buf):
@@ -57,6 +63,8 @@ class IdentityCodec(Codec):
 
 
 class NoiseCodec(Codec):
+    __slots__ = ()
+
     codec_id = "noise"
 
     def encode(self, buf):
@@ -75,6 +83,8 @@ class NoiseCodec(Codec):
 
 
 class MockCodec(Codec):
+    __slots__ = ("data", "decoded")
+
     codec_id = "mock"
 
     def __init__(self, data, decoded):

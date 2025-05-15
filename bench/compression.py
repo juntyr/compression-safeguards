@@ -116,6 +116,8 @@ def gen_benchmark(
 
 
 class MyQuantizer(ABC):
+    __slots__ = ()
+
     @abstractmethod
     def encoded_dtype(self, dtype: np.dtype) -> np.dtype:
         pass
@@ -130,6 +132,8 @@ class MyQuantizer(ABC):
 
 
 class MyLinearQuantizer(MyQuantizer):
+    __slots__ = ("_eb_abs",)
+
     def __init__(self, eb_abs):
         self._eb_abs = eb_abs
 
@@ -147,6 +151,8 @@ class MyLinearQuantizer(MyQuantizer):
 
 
 class MySafeguardsQuantizer(MyQuantizer):
+    __slots__ = ("_quantizer",)
+
     def __init__(self, eb_abs):
         self._quantizer = SafeguardsQuantizer(
             safeguards=[AbsoluteErrorBoundSafeguard(eb_abs=eb_abs)]
@@ -166,6 +172,8 @@ class MySafeguardsQuantizer(MyQuantizer):
 
 
 class LorenzoPredictor(Codec):
+    __slots__ = ("_quantizer", "_lossless")
+
     codec_id = "lorenzo"
 
     def __init__(self, quantizer: MyQuantizer):

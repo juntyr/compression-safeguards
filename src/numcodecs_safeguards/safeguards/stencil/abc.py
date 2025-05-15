@@ -25,6 +25,8 @@ class StencilSafeguard(Safeguard, ABC):
     the safeguard is coupled to its neighbouring elements.
     """
 
+    __slots__ = ()
+
     @final
     def check(self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]) -> bool:
         """

@@ -4,16 +4,18 @@ Logical all (and) combinator safeguard.
 
 __all__ = ["AllSafeguards"]
 
+from abc import ABC
 from collections.abc import Collection
 
 import numpy as np
 
 from ...intervals import IntervalUnion
+from ..abc import Safeguard
 from ..pointwise.abc import PointwiseSafeguard, S, T
 from ..stencil.abc import StencilSafeguard
 
 
-class AllSafeguards:
+class AllSafeguards(Safeguard):
     """
     The `AllSafeguards` guarantees that, for each element, all of the combined
     safeguards' guarantees are upheld.
@@ -31,19 +33,23 @@ class AllSafeguards:
         [`StencilSafeguard`][numcodecs_safeguards.safeguards.stencil.abc.StencilSafeguard].
     """
 
-    # __slots__ = ("_safeguards",)
-    _safeguards: tuple[PointwiseSafeguard | StencilSafeguard, ...]
+    __slots__ = ()
 
     kind = "all"
 
     def __init__(
         self, *, safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard]
     ):
+        pass
+
+    def __new__(
+        cls, *, safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard]
+    ) -> "_AllPointwiseSafeguards | _AllStencilSafeguards":
         from ... import Safeguards
 
         assert len(safeguards) > 1, "can only combine over at least one safeguard"
 
-        self._safeguards = tuple(
+        safeguards_ = tuple(
             safeguard
             if isinstance(safeguard, (PointwiseSafeguard, StencilSafeguard))
             else Safeguards[safeguard["kind"]].value(
@@ -52,17 +58,15 @@ class AllSafeguards:
             for safeguard in safeguards
         )
 
-        for safeguard in self._safeguards:
+        for safeguard in safeguards_:
             assert isinstance(safeguard, (PointwiseSafeguard, StencilSafeguard)), (
                 f"{safeguard!r} is not a pointwise or stencil safeguard"
             )
 
-        if all(
-            isinstance(safeguard, PointwiseSafeguard) for safeguard in self._safeguards
-        ):
-            self.__class__ = _AllPointwiseSafeguards
+        if all(isinstance(safeguard, PointwiseSafeguard) for safeguard in safeguards_):
+            return _AllPointwiseSafeguards(*safeguards_)
         else:
-            self.__class__ = _AllStencilSafeguards
+            return _AllStencilSafeguards(*safeguards_)
 
     @property
     def safeguards(self) -> tuple[PointwiseSafeguard | StencilSafeguard, ...]:
@@ -71,7 +75,7 @@ class AllSafeguards:
         uphold.
         """
 
-        return self._safeguards
+        ...
 
     def check_pointwise(
         self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
@@ -93,14 +97,7 @@ class AllSafeguards:
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        front, *tail = self._safeguards
-
-        ok = front.check_pointwise(data, decoded)
-
-        for safeguard in tail:
-            ok &= safeguard.check_pointwise(data, decoded)
-
-        return ok
+        ...
 
     def compute_safe_intervals(
         self, data: np.ndarray[S, T]
@@ -120,14 +117,7 @@ class AllSafeguards:
             Intersection of safe intervals.
         """
 
-        front, *tail = self._safeguards
-
-        valid = front.compute_safe_intervals(data)
-
-        for safeguard in tail:
-            valid = valid.intersect(safeguard.compute_safe_intervals(data))
-
-        return valid
+        ...
 
     def get_config(self) -> dict:
         """
@@ -139,6 +129,43 @@ class AllSafeguards:
             Configuration of the safeguard.
         """
 
+        ...
+
+
+class _AllSafeguardsBase(ABC):
+    __slots__ = ()
+
+    kind = "all"
+
+    @property
+    def safeguards(self) -> tuple[PointwiseSafeguard | StencilSafeguard, ...]:
+        return self._safeguards
+
+    def check_pointwise(
+        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        front, *tail = self._safeguards
+
+        ok = front.check_pointwise(data, decoded)
+
+        for safeguard in tail:
+            ok &= safeguard.check_pointwise(data, decoded)
+
+        return ok
+
+    def compute_safe_intervals(
+        self, data: np.ndarray[S, T]
+    ) -> IntervalUnion[T, int, int]:
+        front, *tail = self._safeguards
+
+        valid = front.compute_safe_intervals(data)
+
+        for safeguard in tail:
+            valid = valid.intersect(safeguard.compute_safe_intervals(data))
+
+        return valid
+
+    def get_config(self) -> dict:
         return dict(
             kind=type(self).kind,
             safeguards=[safeguard.get_config() for safeguard in self._safeguards],
@@ -148,11 +175,25 @@ class AllSafeguards:
         return f"{AllSafeguards.__name__}(safeguards={list(self._safeguards)!r})"
 
 
-class _AllPointwiseSafeguards(AllSafeguards, PointwiseSafeguard):
-    # __slots__ = ()
-    pass
+class _AllPointwiseSafeguards(_AllSafeguardsBase, PointwiseSafeguard):
+    __slots__ = "_safeguards"
+    _safeguards: tuple[PointwiseSafeguard, ...]
+
+    def __init__(self, *safeguards: PointwiseSafeguard):
+        for safeguard in safeguards:
+            assert isinstance(safeguard, PointwiseSafeguard), (
+                f"{safeguard!r} is not a pointwise safeguard"
+            )
+        self._safeguards = safeguards
 
 
-class _AllStencilSafeguards(AllSafeguards, StencilSafeguard):
-    # __slots__ = ()
-    pass
+class _AllStencilSafeguards(_AllSafeguardsBase, StencilSafeguard):
+    __slots__ = "_safeguards"
+    _safeguards: tuple[PointwiseSafeguard | StencilSafeguard, ...]
+
+    def __init__(self, *safeguards: PointwiseSafeguard | StencilSafeguard):
+        for safeguard in safeguards:
+            assert isinstance(safeguard, (PointwiseSafeguard, StencilSafeguard)), (
+                f"{safeguard!r} is not a pointwise or stencil safeguard"
+            )
+        self._safeguards = safeguards

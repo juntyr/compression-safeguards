@@ -82,6 +82,7 @@ class Interval(Generic[T, N]):
     [`Interval.into_union`][numcodecs_safeguards.intervals.Interval.into_union].
     """
 
+    __slots__ = ("_lower", "_upper")
     _lower: np.ndarray[tuple[N], T]
     _upper: np.ndarray[tuple[N], T]
 
@@ -370,6 +371,7 @@ class Interval(Generic[T, N]):
 
 
 class IndexedInterval(Generic[T, N]):
+    __slots__ = ("_lower", "_upper", "_index")
     _lower: np.ndarray[tuple[N], T]
     _upper: np.ndarray[tuple[N], T]
     _index: Any
@@ -399,6 +401,8 @@ def _minimum(dtype: np.dtype):
 
 
 class _Minimum:
+    __slots__ = ()
+
     def __le__(self, interval: IndexedInterval[T, N]) -> IndexedInterval[T, N]:
         if not isinstance(interval, IndexedInterval):
             return NotImplemented
@@ -425,6 +429,8 @@ def _maximum(dtype: np.dtype):
 
 
 class _Maximum:
+    __slots__ = ()
+
     def __ge__(self, interval: IndexedInterval[T, N]) -> IndexedInterval[T, N]:
         if not isinstance(interval, IndexedInterval):
             return NotImplemented
@@ -452,6 +458,7 @@ class Lower:
         The lower bound array
     """
 
+    __slots__ = ("_lower",)
     _lower: np.ndarray
 
     def __init__(self, lower: np.ndarray) -> None:
@@ -495,6 +502,7 @@ class Upper:
         The upper bound array
     """
 
+    __slots__ = ("_upper",)
     _upper: np.ndarray
 
     def __init__(self, upper: np.ndarray) -> None:
@@ -529,6 +537,7 @@ class IntervalUnion(Generic[T, N, U]):
     Union of `U` intervals, each over a `N`-sized [`ndarray`][numpy.ndarray] of dtype `T`.
     """
 
+    __slots__ = ("_lower", "_upper")
     # invariants:
     # - the lower/upper bounds are in sorted order
     # - no non-empty intervals come after empty intervals

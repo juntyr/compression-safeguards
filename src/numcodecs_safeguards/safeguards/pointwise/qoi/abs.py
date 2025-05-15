@@ -820,6 +820,8 @@ def _create_sympy_numpy_printer_class(
     """
 
     class NumPyDtypePrinter(sp.printing.numpy.NumPyPrinter):
+        __slots__ = ("_dtype",)
+
         # remove default printing of known constants
         _kc = dict()
 

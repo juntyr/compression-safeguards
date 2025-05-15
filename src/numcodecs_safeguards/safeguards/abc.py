@@ -15,6 +15,7 @@ class Safeguard(ABC):
     Safeguard abstract base class.
     """
 
+    __slots__ = ("kind",)
     kind: str
     """Safeguard kind."""
 
