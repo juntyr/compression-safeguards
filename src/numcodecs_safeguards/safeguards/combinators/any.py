@@ -42,7 +42,7 @@ class AnySafeguard(Safeguard):
     ):
         pass
 
-    def __new__(
+    def __new__(  # type: ignore
         cls, *, safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard]
     ) -> "_AnyPointwiseSafeguard | _AnyStencilSafeguard":
         from ... import Safeguards
@@ -64,12 +64,12 @@ class AnySafeguard(Safeguard):
             )
 
         if all(isinstance(safeguard, PointwiseSafeguard) for safeguard in safeguards_):
-            return _AnyPointwiseSafeguard(*safeguards_)
+            return _AnyPointwiseSafeguard(*safeguards_)  # type: ignore
         else:
             return _AnyStencilSafeguard(*safeguards_)
 
     @property
-    def safeguards(self) -> tuple[PointwiseSafeguard | StencilSafeguard, ...]:
+    def safeguards(self) -> tuple[PointwiseSafeguard | StencilSafeguard, ...]:  # type: ignore
         """
         The set of safeguards that this any combinator has been configured to
         uphold.
@@ -77,7 +77,7 @@ class AnySafeguard(Safeguard):
 
         ...
 
-    def check_pointwise(
+    def check_pointwise(  # type: ignore
         self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
@@ -99,7 +99,7 @@ class AnySafeguard(Safeguard):
 
         ...
 
-    def compute_safe_intervals(
+    def compute_safe_intervals(  # type: ignore
         self, data: np.ndarray[S, T]
     ) -> IntervalUnion[T, int, int]:
         """
@@ -119,7 +119,7 @@ class AnySafeguard(Safeguard):
 
         ...
 
-    def get_config(self) -> dict:
+    def get_config(self) -> dict:  # type: ignore
         """
         Returns the configuration of the safeguard.
 
@@ -139,12 +139,12 @@ class _AnySafeguardBase(ABC):
 
     @property
     def safeguards(self) -> tuple[PointwiseSafeguard | StencilSafeguard, ...]:
-        return self._safeguards
+        return self._safeguards  # type: ignore
 
     def check_pointwise(
         self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
-        front, *tail = self._safeguards
+        front, *tail = self.safeguards
 
         ok = front.check_pointwise(data, decoded)
 
@@ -156,7 +156,7 @@ class _AnySafeguardBase(ABC):
     def compute_safe_intervals(
         self, data: np.ndarray[S, T]
     ) -> IntervalUnion[T, int, int]:
-        front, *tail = self._safeguards
+        front, *tail = self.safeguards
 
         valid = front.compute_safe_intervals(data)
 
@@ -168,11 +168,11 @@ class _AnySafeguardBase(ABC):
     def get_config(self) -> dict:
         return dict(
             kind=type(self).kind,
-            safeguards=[safeguard.get_config() for safeguard in self._safeguards],
+            safeguards=[safeguard.get_config() for safeguard in self.safeguards],
         )
 
     def __repr__(self) -> str:
-        return f"{AnySafeguard.__name__}(safeguards={list(self._safeguards)!r})"
+        return f"{AnySafeguard.__name__}(safeguards={list(self.safeguards)!r})"
 
 
 class _AnyPointwiseSafeguard(_AnySafeguardBase, PointwiseSafeguard):
