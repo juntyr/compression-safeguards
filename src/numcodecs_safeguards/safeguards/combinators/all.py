@@ -1,46 +1,51 @@
 """
-Logical any (or) combinator safeguard.
+Logical all (and) combinator safeguard.
 """
 
-__all__ = ["AnySafeguard"]
+__all__ = ["AllSafeguards"]
 
-from collections.abc import Sequence
+from collections.abc import Collection
 
 import numpy as np
 
-from ....intervals import IntervalUnion
-from ..abc import PointwiseSafeguard, S, T
+from ...intervals import IntervalUnion
+from ..pointwise.abc import PointwiseSafeguard, S, T
+from ..stencil.abc import StencilSafeguard
 
 
-class AnySafeguard(PointwiseSafeguard):
+class AllSafeguards:
     """
-    The `AnySafeguard` guarantees that, for each element, at least one of the
-    combined safeguards' guarantees is upheld.
+    The `AllSafeguards` guarantees that, for each element, all of the combined
+    safeguards' guarantees are upheld.
 
-    At the moment, only pointwise safeguards can be combined by this any-
-    combinator.
+    At the moment, only pointwise and stencil safeguards can be combined by
+    this all-combinator.
 
     Parameters
     ----------
-    safeguards : Sequence[dict | PointwiseSafeguard]
+    safeguards : Collection[dict | PointwiseSafeguard | StencilSafeguard]
         At least one safeguard configuration [`dict`][dict]s or already
         initialized
-        [`PointwiseSafeguard`][numcodecs_safeguards.safeguards.pointwise.abc.PointwiseSafeguard].
+        [`PointwiseSafeguard`][numcodecs_safeguards.safeguards.pointwise.abc.PointwiseSafeguard]
+        or
+        [`StencilSafeguard`][numcodecs_safeguards.safeguards.stencil.abc.StencilSafeguard].
     """
 
-    __slots__ = ("_safeguards",)
-    _safeguards: tuple[PointwiseSafeguard, ...]
+    # __slots__ = ("_safeguards",)
+    _safeguards: tuple[PointwiseSafeguard | StencilSafeguard, ...]
 
-    kind = "any"
+    kind = "all"
 
-    def __init__(self, *, safeguards: Sequence[dict | PointwiseSafeguard]):
+    def __init__(
+        self, *, safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard]
+    ):
         from ... import Safeguards
 
         assert len(safeguards) > 1, "can only combine over at least one safeguard"
 
         self._safeguards = tuple(
             safeguard
-            if isinstance(safeguard, PointwiseSafeguard)
+            if isinstance(safeguard, (PointwiseSafeguard, StencilSafeguard))
             else Safeguards[safeguard["kind"]].value(
                 **{p: v for p, v in safeguard.items() if p != "kind"}
             )
@@ -48,12 +53,19 @@ class AnySafeguard(PointwiseSafeguard):
         )
 
         for safeguard in self._safeguards:
-            assert isinstance(safeguard, PointwiseSafeguard), (
-                f"{safeguard!r} is not a pointwise safeguard"
+            assert isinstance(safeguard, (PointwiseSafeguard, StencilSafeguard)), (
+                f"{safeguard!r} is not a pointwise or stencil safeguard"
             )
 
+        if all(
+            isinstance(safeguard, PointwiseSafeguard) for safeguard in self._safeguards
+        ):
+            self.__class__ = _AllPointwiseSafeguards
+        else:
+            self.__class__ = _AllStencilSafeguards
+
     @property
-    def safeguards(self) -> tuple[PointwiseSafeguard, ...]:
+    def safeguards(self) -> tuple[PointwiseSafeguard | StencilSafeguard, ...]:
         """
         The set of safeguards that this any combinator has been configured to
         uphold.
@@ -65,8 +77,8 @@ class AnySafeguard(PointwiseSafeguard):
         self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check for which elements at least one of the combined safeguards
-        succeeds the check.
+        Check for which elements all of the combined safeguards succeed the
+        check.
 
         Parameters
         ----------
@@ -86,7 +98,7 @@ class AnySafeguard(PointwiseSafeguard):
         ok = front.check_pointwise(data, decoded)
 
         for safeguard in tail:
-            ok |= safeguard.check_pointwise(data, decoded)
+            ok &= safeguard.check_pointwise(data, decoded)
 
         return ok
 
@@ -94,8 +106,8 @@ class AnySafeguard(PointwiseSafeguard):
         self, data: np.ndarray[S, T]
     ) -> IntervalUnion[T, int, int]:
         """
-        Compute the union of the safe intervals of the combined safeguards,
-        i.e. where at least one is safe.
+        Compute the intersection of the safe intervals of the combined
+        safeguards, i.e. where all of them are safe.
 
         Parameters
         ----------
@@ -105,7 +117,7 @@ class AnySafeguard(PointwiseSafeguard):
         Returns
         -------
         intervals : IntervalUnion
-            Union of safe intervals.
+            Intersection of safe intervals.
         """
 
         front, *tail = self._safeguards
@@ -113,7 +125,7 @@ class AnySafeguard(PointwiseSafeguard):
         valid = front.compute_safe_intervals(data)
 
         for safeguard in tail:
-            valid = valid.union(safeguard.compute_safe_intervals(data))
+            valid = valid.intersect(safeguard.compute_safe_intervals(data))
 
         return valid
 
@@ -133,4 +145,14 @@ class AnySafeguard(PointwiseSafeguard):
         )
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(safeguards={list(self._safeguards)!r})"
+        return f"{AllSafeguards.__name__}(safeguards={list(self._safeguards)!r})"
+
+
+class _AllPointwiseSafeguards(AllSafeguards, PointwiseSafeguard):
+    # __slots__ = ()
+    pass
+
+
+class _AllStencilSafeguards(AllSafeguards, StencilSafeguard):
+    # __slots__ = ()
+    pass

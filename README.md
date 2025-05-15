@@ -80,15 +80,15 @@ This package currently implements the following safeguards:
 
     Sequences that are monotonic in the input are guaranteed to be monotonic in the decompressed output. Monotonic sequences are detected using per-axis moving windows of constant size. Typically, the window size should be chosen to be large enough to ignore noise but small enough to capture details. Four levels of monotonicity can be enforced: `strict`, `strict_with_consts`, `strict_to_weak`, `weak`. Windows that are not monotonic or contain non-finite data are skipped. Axes that have fewer elements than the window size are skipped as well.
 
-### Logical combinators (pointwise)
+### Logical combinators (~pointwise)
 
 - `all` (logical all / and):
 
-    For each element, all of the combined safeguards' guarantees are upheld. At the moment, only pointwise safeguards can be combined by this all-combinator.
+    For each element, all of the combined safeguards' guarantees are upheld. At the moment, only pointwise and stencil safeguards can be combined by this all-combinator.
 
 - `any` (logical any / or):
 
-    For each element, at least one of the combined safeguards' guarantees is upheld. At the moment, only pointwise safeguards can be combined by this any-combinator.
+    For each element, at least one of the combined safeguards' guarantees is upheld. At the moment, only pointwise and stencil safeguards can be combined by this any-combinator.
 
 ## Usage
 

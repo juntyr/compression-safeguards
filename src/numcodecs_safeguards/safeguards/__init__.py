@@ -6,9 +6,9 @@ __all__ = ["Safeguards"]
 
 from enum import Enum
 
+from .combinators.all import AllSafeguards
+from .combinators.any import AnySafeguard
 from .pointwise.abs import AbsoluteErrorBoundSafeguard
-from .pointwise.logical.all import AllSafeguards
-from .pointwise.logical.any import AnySafeguard
 from .pointwise.qoi.abs import QuantityOfInterestAbsoluteErrorBoundSafeguard
 from .pointwise.ratio import RatioErrorBoundSafeguard
 from .pointwise.rel import RelativeErrorBoundSafeguard

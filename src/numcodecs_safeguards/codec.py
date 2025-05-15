@@ -4,7 +4,7 @@ Implementation of the [`SafeguardsCodec`][numcodecs_safeguards.codec.SafeguardsC
 
 __all__ = ["SafeguardsCodec"]
 
-from collections.abc import Sequence
+from collections.abc import Collection
 from io import BytesIO
 from typing import Callable
 
@@ -46,7 +46,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         Note that using a codec likely provides a better compression ratio. If
         no safeguards are provided, the encoded data can be decoded to *any*
         output.
-    safeguards : Sequence[dict | Safeguard]
+    safeguards : Collection[dict | Safeguard]
         The safeguards that will be applied to the codec. They can either be
         passed as a safeguard configuration [`dict`][dict] or an already
         initialized
@@ -88,7 +88,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         self,
         *,
         codec: None | dict | Codec,
-        safeguards: Sequence[dict | Safeguard],
+        safeguards: Collection[dict | Safeguard],
         lossless: None | dict | Lossless = None,
         _version: None | str = None,
     ):
