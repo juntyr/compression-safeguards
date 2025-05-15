@@ -192,8 +192,8 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
         ok = np.ones_like(data, dtype=np.bool)
 
-        for a in axes:
-            if data.shape[a] == 0:
+        for axis in axes:
+            if data.shape[axis] == 0:
                 continue
 
             omin, omax = (
@@ -206,7 +206,12 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
             pad_after = max(0, omax)
 
             data_boundary = _pad_with_boundary(
-                data, self._boundary, pad_before, pad_after, self._constant_boundary, a
+                data,
+                self._boundary,
+                pad_before,
+                pad_after,
+                self._constant_boundary,
+                axis,
             )
             decoded_boundary = _pad_with_boundary(
                 decoded,
@@ -214,7 +219,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
                 pad_before,
                 pad_after,
                 self._constant_boundary,
-                a,
+                axis,
             )
 
             findiff_data = _finite_difference(
@@ -223,7 +228,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
                 self._offsets,
                 self._coefficients,
                 self._dx,
-                axis=a,
+                axis=axis,
             )
             findiff_decoded = _finite_difference(
                 decoded_boundary,
@@ -231,7 +236,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
                 self._offsets,
                 self._coefficients,
                 self._dx,
-                axis=a,
+                axis=axis,
             )
 
             # abs(findiff_data - findiff_decoded) <= self._eb_abs, but works for
@@ -261,9 +266,9 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
             if self._boundary == BoundaryCondition.valid:
                 s = tuple(
-                    [slice(None)] * a
+                    [slice(None)] * axis
                     + [slice(pad_before, -pad_after if pad_after > 0 else None)]
-                    + [slice(None)] * (data.ndim - a - 1)
+                    + [slice(None)] * (data.ndim - axis - 1)
                 )
             else:
                 s = tuple([slice(None)] * data.ndim)

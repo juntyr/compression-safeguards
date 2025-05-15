@@ -16,7 +16,7 @@ class BoundaryCondition(Enum):
     [`StencilSafeguard`][numcodecs_safeguards.safeguards.stencil.abc.StencilSafeguard]s.
 
     Since stencil safeguards operate over small neighbourhoods of data points,
-    points at the boundary where part of the neighbourhood may not exist need
+    points at the boundary, where part of the neighbourhood may not exist, need
     to be treated specially.
     """
 

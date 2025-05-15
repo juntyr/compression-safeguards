@@ -21,7 +21,8 @@ class AnySafeguard(Safeguard):
     combined safeguards' guarantees is upheld.
 
     At the moment, only pointwise and stencil safeguards and combinations
-    thereof can be combined by this any-combinator.
+    thereof can be combined by this any-combinator. The combinator is a
+    pointwise or a stencil safeguard, depending on the safeguards it combines.
 
     Parameters
     ----------
