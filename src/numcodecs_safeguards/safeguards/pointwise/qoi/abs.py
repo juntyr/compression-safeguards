@@ -136,6 +136,19 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         assert len(qoi.strip()) > 0, "qoi expression must not be empty"
         assert _QOI_PATTERN.fullmatch(qoi) is not None, "invalid qoi expression"
         try:
+
+            def sqrt(x):
+                return x ** sp.Rational(1, 2)
+
+            def exp(x):
+                return sp.E**x
+
+            def ln(x):
+                return sp.ln(x)
+
+            def log(x, base):
+                return sp.ln(x) / sp.ln(base)
+
             qoi_expr = sp.parse_expr(
                 self._qoi,
                 local_dict=dict(x=self._x),
@@ -148,10 +161,10 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
                     pi=sp.pi,
                     e=sp.E,
                     # operators
-                    sqrt=lambda x: x ** sp.Rational(1, 2),
-                    exp=lambda x: sp.E**x,
-                    ln=sp.ln,
-                    log=sp.log,
+                    sqrt=sqrt,
+                    exp=exp,
+                    ln=ln,
+                    log=log,
                 ),
                 transformations=(sp.parsing.sympy_parser.auto_number,),
             )

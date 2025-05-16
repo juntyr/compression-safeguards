@@ -95,6 +95,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
       | "sqrt", "(", expr, ")"            (* square root *)
       | "ln", "(", expr, ")"              (* natural logarithm *)
       | "exp", "(", expr, ")"             (* exponential e^x *)
+      | "asum", "(", expr, ")"            (* sum over an array *)
     ;
 
     binary  =
@@ -224,6 +225,35 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         assert len(qoi.strip()) > 0, "qoi expression must not be empty"
         assert _QOI_PATTERN.fullmatch(qoi) is not None, "invalid qoi expression"
         try:
+
+            def sqrt(x):
+                return x ** sp.Rational(1, 2)
+
+            def exp(x):
+                return sp.E**x
+
+            def ln(x):
+                if isinstance(x, _NumPyLikeArray):
+                    return x.applyfunc(sp.ln)
+                return sp.ln(x)
+
+            def log(x, base):
+                if isinstance(x, _NumPyLikeArray):
+                    ln_x = x.applyfunc(sp.ln)
+                else:
+                    ln_x = sp.ln(x)
+                if isinstance(base, _NumPyLikeArray):
+                    ln_base = base.applyfunc(sp.ln)
+                else:
+                    ln_base = sp.ln(base)
+                return ln_x / ln_base
+
+            def asum(x):
+                assert isinstance(x, _NumPyLikeArray), (
+                    "can only compute the sum over an array"
+                )
+                return sum(sp.tensor.array.arrayop.Flatten(x), sp.Integer(0))
+
             qoi_expr = sp.parse_expr(
                 self._qoi,
                 local_dict=dict(x=x, X=X, I=_NumPyLikeArray(I)),
@@ -238,10 +268,11 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                     pi=sp.pi,
                     e=sp.E,
                     # operators
-                    sqrt=lambda x: x ** sp.Rational(1, 2),
-                    exp=lambda x: sp.E**x,
-                    ln=sp.ln,
-                    log=sp.log,
+                    sqrt=sqrt,
+                    exp=exp,
+                    ln=ln,
+                    log=log,
+                    asum=asum,
                 ),
                 transformations=(sp.parsing.sympy_parser.auto_number,),
             )
@@ -894,6 +925,7 @@ _QOI_PATTERN = re.compile(
     r"|(?:ln)"
     r"|(?:log)"
     r"|(?:exp)"
+    r"|(?:asum)"
     r")?"
     r"|(?:[ \t\n\(\)\[\],:\+\-\*/])"
     r")*"

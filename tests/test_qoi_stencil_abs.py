@@ -127,17 +127,17 @@ def test_invalid_array():
 
 
 def test_mean():
-    check_all_codecs(
-        np.arange(64, dtype=float).reshape(4, 4, 4),
-        "(X[I+A[-1,0]]+X[I+A[+1,0]]+X[I+A[0,-1]]+X[I+A[0,+1]])/4",
-        ((-1, 1), (-1, 1)),
-    )
-
     # check_all_codecs(
     #     np.arange(64, dtype=float).reshape(4, 4, 4),
-    #     "X * A[[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]]",
+    #     "(X[I+A[-1,0]]+X[I+A[+1,0]]+X[I+A[0,-1]]+X[I+A[0,+1]])/4",
     #     ((-1, 1), (-1, 1)),
     # )
+
+    check_all_codecs(
+        np.arange(64, dtype=float).reshape(4, 4, 4),
+        "asum(X * A[[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])",
+        ((-1, 1), (-1, 1)),
+    )
 
 
 def test_relative_indexing():
