@@ -6,6 +6,7 @@ __all__ = ["QuantityOfInterestAbsoluteErrorBoundSafeguard"]
 
 import functools
 import re
+from itertools import product
 from typing import Callable, TypeVar
 
 import numpy as np
@@ -22,11 +23,13 @@ from ....cast import (
     _isinf,
     _isnan,
     _nan_to_zero,
+    _nextafter,
     as_bits,
     to_finite_float,
     to_float,
 )
-from ....intervals import IntervalUnion
+from ....intervals import Interval, IntervalUnion
+from ...pointwise.abs import _compute_safe_eb_diff_interval
 from ...pointwise.qoi import Expr
 from ...pointwise.qoi.abs import _ensure_bounded_derived_error
 from .. import BoundaryCondition, _pad_with_boundary
@@ -406,7 +409,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                 sl[axis] = slice(start, end)
             s = tuple(sl)
         else:
-            s = s = tuple([slice(None)] * data.ndim)
+            s = tuple([slice(None)] * data.ndim)
 
         ok = np.ones_like(data, dtype=np.bool)
         ok[s] = windows_ok
@@ -416,7 +419,158 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     def compute_safe_intervals(
         self, data: np.ndarray[S, T]
     ) -> IntervalUnion[T, int, int]:
-        raise NotImplementedError
+        """
+        Compute the intervals in which the absolute error bound is upheld with
+        respect to the quantity of interest over a neighbourhood on the `data`.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data for which the safe intervals should be computed.
+
+        Returns
+        -------
+        intervals : IntervalUnion
+            Union of intervals in which the absolute error bound is upheld.
+        """
+
+        all_axes = []
+        for axis in self._axes:
+            if axis >= data.ndim or axis < -data.ndim:
+                raise IndexError(
+                    f"axis index {axis} is out of bounds for array of shape {data.shape}"
+                )
+            naxis = data.ndim - axis if axis < 0 else axis
+            if naxis in all_axes:
+                raise IndexError(
+                    f"duplicate axis index {axis}, normalised to {naxis}, for array of shape {data.shape}"
+                )
+            all_axes.append(naxis)
+
+        window = tuple(-b + 1 + a for b, a in self._shape)
+
+        data_boundary = _pad_with_boundary(
+            data,
+            self._boundary,
+            tuple(-b for b, a in self._shape),
+            tuple(a for b, a in self._shape),
+            self._constant_boundary,
+            self._axes,
+        )
+
+        data_windows_float: np.ndarray = to_float(
+            sliding_window_view(data_boundary, window, axis=self._axes, writeable=False)  # type: ignore
+        )
+
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            eb_abs: np.ndarray = to_finite_float(self._eb_abs, data_windows_float.dtype)
+        assert eb_abs >= 0
+
+        qoi_lambda = _compile_sympy_expr_to_numpy(
+            [self._X], self._qoi_expr, data_windows_float.dtype
+        )
+
+        # ensure the error bounds are representable in QoI space
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            # compute the error-bound adjusted QoIs
+            data_qoi = (qoi_lambda)(data_windows_float)
+            qoi_lower = data_qoi - eb_abs
+            qoi_upper = data_qoi + eb_abs
+
+            # check if they're representable within the error bound
+            qoi_lower_outside_eb_abs = (data_qoi - qoi_lower) > eb_abs
+            qoi_upper_outside_eb_abs = (qoi_upper - data_qoi) > eb_abs
+
+            # otherwise nudge the error-bound adjusted QoIs
+            # we can nudge with nextafter since the QoIs are floating point and
+            #  only finite QoIs are nudged
+            qoi_lower = np.where(
+                qoi_lower_outside_eb_abs & _isfinite(data_qoi),
+                _nextafter(qoi_lower, data_qoi),
+                qoi_lower,
+            )
+            qoi_upper = np.where(
+                qoi_upper_outside_eb_abs & _isfinite(data_qoi),
+                _nextafter(qoi_upper, data_qoi),
+                qoi_upper,
+            )
+
+            # compute the adjusted error bound
+            eb_qoi_lower = _nan_to_zero(qoi_lower - data_qoi)
+            eb_qoi_upper = _nan_to_zero(qoi_upper - data_qoi)
+
+        # check that the adjusted error bounds fulfil all requirements
+        assert eb_qoi_lower.ndim == data.ndim
+        assert eb_qoi_lower.dtype == data_windows_float.dtype
+        assert eb_qoi_upper.ndim == data.ndim
+        assert eb_qoi_upper.dtype == data_windows_float.dtype
+        assert np.all(
+            (eb_qoi_lower <= 0) & (eb_qoi_lower >= -eb_abs) & _isfinite(eb_qoi_lower)
+        )
+        assert np.all(
+            (eb_qoi_upper >= 0) & (eb_qoi_upper <= eb_abs) & _isfinite(eb_qoi_upper)
+        )
+
+        # if no error bounds are imposed, e.g. because we in valid mode and the
+        #  neighbourhood shape exceeds the data shape, allow all values
+        if eb_qoi_lower.size == 0:
+            assert data.size == 0 or self._boundary == BoundaryCondition.valid
+            return Interval.full_like(data).into_union()  # type: ignore
+
+        if self._boundary == BoundaryCondition.valid:
+            sl = [slice(None)] * data.ndim
+            for axis, (b, a) in zip(self._axes, self._shape):
+                start = None if b == 0 else -b
+                end = None if a == 0 else -a
+                sl[axis] = slice(start, end)
+            s = tuple(sl)
+        else:
+            s = tuple([slice(None)] * data.ndim)
+
+        data_float: np.ndarray = to_float(data)
+
+        # compute the error bound in data space
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            eb_x_lower, eb_x_upper = _compute_data_eb_for_stencil_qoi_eb(
+                self._qoi_expr,
+                self._X,
+                data_windows_float,
+                data_float[s],
+                eb_qoi_lower,
+                eb_qoi_upper,
+            )
+        assert np.all((eb_x_lower <= 0) & _isfinite(eb_x_lower))
+        assert np.all((eb_x_upper >= 0) & _isfinite(eb_x_upper))
+
+        # FIXME: need to account for boundary conditions, adapt from monotonicity
+        eb_x_orig_lower = np.full_like(data_float, -np.inf)
+        eb_x_orig_upper = np.full_like(data_float, np.inf)
+        for offset in product(*[range(-b + a + 1) for b, a in self._shape]):
+            sl = [slice(None)] * data.ndim
+            for axis, o in zip(self._axes, offset):
+                sl[axis] = slice(o)
+            eb_x_orig_lower[tuple(sl)] = np.maximum(
+                eb_x_orig_lower[tuple(sl)], eb_x_lower
+            )
+            eb_x_orig_upper[tuple(sl)] = np.minimum(
+                eb_x_upper, eb_x_orig_upper[tuple(sl)]
+            )
+        assert np.all((eb_x_orig_lower <= 0) & _isfinite(eb_x_orig_lower))
+        assert np.all((eb_x_orig_upper >= 0) & _isfinite(eb_x_orig_upper))
+
+        return _compute_safe_eb_diff_interval(
+            data,
+            data_float,
+            eb_x_orig_lower,
+            eb_x_orig_upper,
+            equal_nan=True,
+        ).into_union()  # type: ignore
 
     def get_config(self) -> dict:
         """
@@ -499,7 +653,11 @@ def _compute_data_eb_for_stencil_qoi_eb(
     tl = _ensure_bounded_derived_error(
         # tl has shape Qs and has XvN (*Qs, *Ns), so their sum has (*Qs, *Ns)
         #  and evaluating the expression brings us back to Qs
-        lambda tl: np.where(tl == 0, exprv, (exprl)(XvN + tl)),  # type: ignore
+        lambda tl: np.where(
+            tl == 0,
+            exprv,
+            (exprl)(XvN + tl.reshape(list(tl.shape) + [1] * (XvN.ndim - tl.ndim))),
+        ),  # type: ignore
         exprv,
         Xv,
         tl,
@@ -509,7 +667,11 @@ def _compute_data_eb_for_stencil_qoi_eb(
     tu = _ensure_bounded_derived_error(
         # tu has shape Qs and has XvN (*Qs, *Ns), so their sum has (*Qs, *Ns)
         #  and evaluating the expression brings us back to Qs
-        lambda tu: np.where(tu == 0, exprv, (exprl)(XvN + tu)),  # type: ignore
+        lambda tu: np.where(
+            tu == 0,
+            exprv,
+            (exprl)(XvN + tu.reshape(list(tu.shape) + [1] * (XvN.ndim - tu.ndim))),
+        ),  # type: ignore
         exprv,
         Xv,
         tu,
