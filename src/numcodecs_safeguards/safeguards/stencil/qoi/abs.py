@@ -5,6 +5,7 @@ Stencil quantity of interest (QoI) absolute error bound safeguard.
 __all__ = ["QuantityOfInterestAbsoluteErrorBoundSafeguard"]
 
 import functools
+import re
 from typing import Callable
 
 import numpy as np
@@ -146,7 +147,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         "_X",
     )
     _qoi: Expr
-    _shape: tuple[tuple[int, int], ...]
+    _shape: tuple[tuple[int, str, int], ...]
     _axes: tuple[int, ...]
     _boundary: BoundaryCondition
     _eb_abs: int | float
@@ -159,7 +160,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     def __init__(
         self,
         qoi: Expr,
-        shape: tuple[tuple[int, int], ...],
+        shape: tuple[tuple[int, str, int], ...],
         axes: tuple[int, ...],
         boundary: str | BoundaryCondition,
         eb_abs: int | float,
@@ -221,6 +222,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         self._constant_boundary = constant_boundary
 
         assert len(qoi.strip()) > 0, "qoi expression must not be empty"
+        assert _QOI_PATTERN.fullmatch(qoi) is not None, "invalid qoi expression"
         try:
             qoi_expr = sp.parse_expr(
                 self._qoi,
@@ -809,3 +811,25 @@ class _NumPyLikeArray(sp.Array):
 
     # TODO: also support log
     # TODO: also support "matrix" multiplication
+
+
+# pattern of syntactically weakly valid expressions
+# we only check against forbidden tokens, not for semantic validity
+#  i.e. just enough that it's safe to eval afterwards
+_QOI_PATTERN = re.compile(
+    r"(?:"
+    r"(?:"
+    r"(?:[0-9]+)"
+    r"|(?:[0-9]+\.[0-9]+)"
+    r"|(?:e)"
+    r"|(?:pi)"
+    r"|(?:x)"
+    r"|(?:X)"
+    r"|(?:sqrt)"
+    r"|(?:ln)"
+    r"|(?:log)"
+    r"|(?:exp)"
+    r")?"
+    r"|(?:[ \t\n\(\)\[\],\+\-\*/])"
+    r")*"
+)

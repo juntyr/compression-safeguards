@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from .codecs import (
     encode_decode_identity,
@@ -33,18 +34,100 @@ def check_all_codecs(
             )
 
 
-def test_mean():
-    # check_all_codecs(
-    #     np.arange(64, dtype=float).reshape(4, 4, 4),
-    #     "(X[i-1,j]+X[i+1,j]+X[i,j-1]+X[i,j+1])/4",
-    #     ((-1, "i", 1), (-1, "j", 1)),
-    # )
+def check_empty(qoi: str):
+    check_all_codecs(np.empty(0), qoi, ((0, "i", 0),))
 
+
+def check_arange(qoi: str):
+    check_all_codecs(np.arange(100, dtype=float), qoi, ((0, "i", 0),))
+
+
+def check_linspace(qoi: str):
+    check_all_codecs(np.linspace(-1024, 1024, 2831), qoi, ((0, "i", 0),))
+
+
+def check_edge_cases(qoi: str):
+    check_all_codecs(
+        np.array(
+            [
+                np.inf,
+                np.nan,
+                -np.inf,
+                -np.nan,
+                np.finfo(float).min,
+                np.finfo(float).max,
+                np.finfo(float).tiny,
+                -np.finfo(float).tiny,
+                -0.0,
+                +0.0,
+            ]
+        ),
+        qoi,
+        ((0, "i", 0),),
+    )
+
+
+CHECKS = [
+    check_empty,
+    check_arange,
+    check_linspace,
+    check_edge_cases,
+]
+
+
+def test_sandbox():
+    with pytest.raises(AssertionError, match="invalid qoi expression"):
+        # sandbox escape based on https://stackoverflow.com/q/35804961 and
+        #  https://stackoverflow.com/a/35806044
+        check_all_codecs(
+            np.empty(0),
+            "f\"{[c for c in ().__class__.__base__.__subclasses__() if c.__name__ == 'catch_warnings'][0]()._module.__builtins__['quit']()}\"",
+            ((0, "i", 0),),
+        )
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_empty(check):
+    with pytest.raises(AssertionError, match="empty"):
+        check("")
+    with pytest.raises(AssertionError, match="empty"):
+        check("  \t   \n   ")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_constant(check):
+    with pytest.raises(AssertionError, match="constant"):
+        check("0")
+    with pytest.raises(AssertionError, match="constant"):
+        check("pi")
+    with pytest.raises(AssertionError, match="constant"):
+        check("e")
+    with pytest.raises(AssertionError, match="constant"):
+        check("-(-(-e))")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_imaginary(check):
+    with pytest.raises(AssertionError, match="imaginary"):
+        check_all_codecs(
+            np.array([2], dtype=np.uint64), "(-log(-20417,ln(x)))", ((0, "i", 0),)
+        )
+    with pytest.raises(AssertionError, match="imaginary"):
+        check("(-log(-20417,ln(x)))")
+
+
+def test_mean():
     check_all_codecs(
         np.arange(64, dtype=float).reshape(4, 4, 4),
-        "sum(X * Array([[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]]))",
+        "(X[i-1,j]+X[i+1,j]+X[i,j-1]+X[i,j+1])/4",
         ((-1, "i", 1), (-1, "j", 1)),
     )
+
+    # check_all_codecs(
+    #     np.arange(64, dtype=float).reshape(4, 4, 4),
+    #     "sum(X * Array([[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]]))",
+    #     ((-1, "i", 1), (-1, "j", 1)),
+    # )
 
 
 def test_relative_indexing():

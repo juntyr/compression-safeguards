@@ -65,6 +65,16 @@ CHECKS = [
 ]
 
 
+def test_sandbox():
+    with pytest.raises(AssertionError, match="invalid qoi expression"):
+        # sandbox escape based on https://stackoverflow.com/q/35804961 and
+        #  https://stackoverflow.com/a/35806044
+        check_all_codecs(
+            np.empty(0),
+            "f\"{[c for c in ().__class__.__base__.__subclasses__() if c.__name__ == 'catch_warnings'][0]()._module.__builtins__['quit']()}\"",
+        )
+
+
 @pytest.mark.parametrize("check", CHECKS)
 def test_empty(check):
     with pytest.raises(AssertionError, match="empty"):
