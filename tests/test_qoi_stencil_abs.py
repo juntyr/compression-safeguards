@@ -140,7 +140,7 @@ def test_mean():
     )
 
 
-def test_relative_indexing():
+def test_indexing():
     from numcodecs_safeguards.safeguards.stencil.qoi.abs import (
         QuantityOfInterestAbsoluteErrorBoundSafeguard,
     )
@@ -171,3 +171,50 @@ def test_relative_indexing():
         0,
     )
     assert f"{safeguard._qoi_expr}" == "X[0, 0]"
+
+    safeguard = QuantityOfInterestAbsoluteErrorBoundSafeguard(
+        "(X[I+A[-1,0]]+X[I+A[+1,0]]+X[I+A[0,-1]]+X[I+A[0,+1]])/4",
+        ((-1, 1), (-1, 1)),
+        (0, 1),
+        "valid",
+        0,
+    )
+    assert f"{safeguard._qoi_expr}" == "X[0, 1]/4 + X[1, 0]/4 + X[1, 2]/4 + X[2, 1]/4"
+
+    safeguard = QuantityOfInterestAbsoluteErrorBoundSafeguard(
+        "asum(X * A[[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])",
+        ((-1, 1), (-1, 1)),
+        (0, 1),
+        "valid",
+        0,
+    )
+    assert (
+        f"{safeguard._qoi_expr}"
+        == "0.25*X[0, 0] + 0.5*X[0, 1] + 0.25*X[0, 2] + 0.5*X[1, 0] + 1.0*X[1, 1] + 0.5*X[1, 2] + 0.25*X[2, 0] + 0.5*X[2, 1] + 0.25*X[2, 2]"
+    )
+
+
+def test_lambdify_indexing():
+    import inspect
+
+    from numcodecs_safeguards.safeguards.stencil.qoi.abs import (
+        QuantityOfInterestAbsoluteErrorBoundSafeguard,
+        _compile_sympy_expr_to_numpy,
+    )
+
+    safeguard = QuantityOfInterestAbsoluteErrorBoundSafeguard(
+        "asum(X * A[[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])",
+        ((-1, 1), (-1, 1)),
+        (0, 1),
+        "valid",
+        0,
+    )
+
+    fn = _compile_sympy_expr_to_numpy(
+        [safeguard._X], safeguard._qoi_expr, np.dtype(np.float16)
+    )
+
+    assert (
+        inspect.getsource(fn)
+        == "def _lambdifygenerated(X):\n    return float16('0.25')*X[..., 0, 0] + float16('0.5')*X[..., 0, 1] + float16('0.25')*X[..., 0, 2] + float16('0.5')*X[..., 1, 0] + float16('1.0')*X[..., 1, 1] + float16('0.5')*X[..., 1, 2] + float16('0.25')*X[..., 2, 0] + float16('0.5')*X[..., 2, 1] + float16('0.25')*X[..., 2, 2]\n"
+    )

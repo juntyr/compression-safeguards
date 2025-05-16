@@ -11,6 +11,7 @@ from typing import Callable
 import numpy as np
 import sympy as sp
 import sympy.tensor.array.expressions as _
+from numpy.lib.stride_tricks import sliding_window_view
 
 from ....cast import (
     F,
@@ -22,12 +23,14 @@ from ....cast import (
     _isnan,
     _nan_to_zero,
     _nextafter,
+    as_bits,
     to_finite_float,
+    to_float,
 )
 from ....intervals import IntervalUnion
 from ...pointwise.qoi import Expr
 from ...pointwise.qoi.abs import _ensure_bounded_derived_error
-from .. import BoundaryCondition
+from .. import BoundaryCondition, _pad_with_boundary
 from ..abc import S, StencilSafeguard, T
 
 
@@ -282,9 +285,10 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             # check if the expression is well-formed (e.g. no int's that cannot
             #  be printed) and if an error bound can be computed
             _canary_repr = str(qoi_expr)
-            _canary_eb_abs = _compute_data_eb_for_qoi_eb(
+            _canary_eb_abs = _compute_data_eb_for_stencil_qoi_eb(
                 qoi_expr,
                 self._X,
+                np.zeros(s),
                 np.zeros(s),
                 np.zeros(s),
                 np.zeros(s),
@@ -304,7 +308,69 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     def check_pointwise(
         self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
-        raise NotImplementedError
+        """
+        Check which elements in the `decoded` array satisfy the absolute error
+        bound for the quantity of interest over a neighbourhood on the `data`.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data to be encoded.
+        decoded : np.ndarray
+            Decoded data.
+
+        Returns
+        -------
+        ok : np.ndarray
+            Pointwise, `True` if the check succeeded for this element.
+        """
+
+        window = tuple(abs(b) + 1 + abs(a) for b, a in self._shape)
+
+        # FIXME: handle axes and boundary conditions
+        data_windows_float: np.ndarray = to_float(
+            sliding_window_view(data, window, axis=self._axes, writeable=False)  # type: ignore
+        )
+        decoded_windows_float: np.ndarray = to_float(
+            sliding_window_view(decoded, window, axis=self._axes, writeable=False)  # type: ignore
+        )
+
+        print(data.shape, window, data_windows_float.shape)
+
+        qoi_lambda = _compile_sympy_expr_to_numpy(
+            [self._X], self._qoi_expr, data_windows_float.dtype
+        )
+
+        qoi_data = (qoi_lambda)(data_windows_float)
+        qoi_decoded = (qoi_lambda)(to_float(decoded_windows_float))
+
+        print(qoi_data.shape)
+
+        absolute_bound = (
+            np.where(
+                qoi_data > qoi_decoded,
+                qoi_data - qoi_decoded,
+                qoi_decoded - qoi_data,
+            )
+            <= self._eb_abs
+        )
+        same_bits = as_bits(qoi_data, kind="V") == as_bits(qoi_decoded, kind="V")
+        both_nan = _isnan(qoi_data) & _isnan(qoi_decoded)
+
+        windows_ok = np.where(
+            _isfinite(qoi_data),
+            absolute_bound,
+            np.where(
+                _isinf(qoi_data),
+                same_bits,
+                both_nan,
+            ),
+        )
+
+        # FIXME: connect windows_ok back to the original data indices
+        if np.all(windows_ok):
+            return np.ones_like(data, dtype=np.bool)  # type: ignore
+        return np.zeros_like(data, dtype=np.bool)  # type: ignore
 
     def compute_safe_intervals(
         self, data: np.ndarray[S, T]
@@ -338,13 +404,14 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def _compute_data_eb_for_qoi_eb(
+def _compute_data_eb_for_stencil_qoi_eb(
     expr: sp.Basic,
-    x: sp.Symbol,
-    xv: np.ndarray,
-    tauv_lower: np.ndarray,
-    tauv_upper: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
+    X: sp.tensor.array.expressions.ArraySymbol,
+    XvN: np.ndarray[tuple[int, ...], F],
+    Xv: np.ndarray[S, F],
+    tauv_lower: np.ndarray[S, F],
+    tauv_upper: np.ndarray[S, F],
+) -> tuple[np.ndarray[S, F], np.ndarray[S, F]]:
     """
     Translate an error bound on a derived quantity of interest (QoI) into an
     error bound on the input data.
@@ -356,9 +423,11 @@ def _compute_data_eb_for_qoi_eb(
     ----------
     expr : sp.Basic
         Symbolic SymPy expression that defines the QoI.
-    x : sp.Symbol
-        Symbol for the pointwise input data.
-    xv : np.ndarray[S, F]
+    X : sp.tensor.array.expressions.ArraySymbol
+        Symbol for the input data neighbourhood.
+    XvN : np.ndarray[tuple[int, ...], F]
+        Actual values of the input data, with the neighbourhood on the last axes.
+    Xv : np.ndarray[S, F]
         Actual values of the input data.
     eb_expr_lower : np.ndarray[S, F]
         Finite pointwise lower bound on the QoI error, must be negative or zero.
@@ -378,24 +447,28 @@ def _compute_data_eb_for_qoi_eb(
     2022), 697-710. Available from: https://doi.org/10.14778/3574245.3574255.
     """
 
-    tl, tu = _compute_data_eb_for_qoi_eb_unchecked(expr, x, xv, tauv_lower, tauv_upper)
+    tl, tu = _compute_data_eb_for_stencil_qoi_eb_unchecked(
+        expr, X, XvN, Xv, tauv_lower, tauv_upper
+    )
 
-    exprl = _compile_sympy_expr_to_numpy([x], expr, xv.dtype)
-    exprv = (exprl)(xv)
+    exprl = _compile_sympy_expr_to_numpy([X], expr, Xv.dtype)
+    exprv = (exprl)(XvN)
 
     # handle rounding errors in the lower error bound computation
     tl = _ensure_bounded_derived_error(
-        lambda tl: np.where(tl == 0, exprv, (exprl)(xv + tl)),
+        # FIXME: how to add tl to XvN??
+        lambda tl: np.where(tl == 0, exprv, (exprl)(XvN + tl)),
         exprv,
-        xv,
+        Xv,
         tl,
         tauv_lower,
         tauv_upper,
     )
     tu = _ensure_bounded_derived_error(
-        lambda tu: np.where(tu == 0, exprv, (exprl)(xv + tu)),
+        # FIXME: how to add tl to XvN??
+        lambda tu: np.where(tu == 0, exprv, (exprl)(XvN + tu)),
         exprv,
-        xv,
+        Xv,
         tu,
         tauv_lower,
         tauv_upper,
@@ -405,10 +478,11 @@ def _compute_data_eb_for_qoi_eb(
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def _compute_data_eb_for_qoi_eb_unchecked(
+def _compute_data_eb_for_stencil_qoi_eb_unchecked(
     expr: sp.Basic,
-    x: sp.Symbol,
-    xv: np.ndarray[S, F],
+    X: sp.tensor.array.expressions.ArraySymbol,
+    XvN: np.ndarray[tuple[int, ...], F],
+    Xv: np.ndarray[S, F],
     eb_expr_lower: np.ndarray[S, F],
     eb_expr_upper: np.ndarray[S, F],
 ) -> tuple[np.ndarray[S, F], np.ndarray[S, F]]:
@@ -423,9 +497,11 @@ def _compute_data_eb_for_qoi_eb_unchecked(
     ----------
     expr : sp.Basic
         Symbolic SymPy expression that defines the QoI.
-    x : sp.Symbol
-        Symbol for the pointwise input data.
-    xv : np.ndarray[S, F]
+    X : sp.tensor.array.expressions.ArraySymbol
+        Symbol for the input data neighbourhood.
+    XvN : np.ndarray[tuple[int, ...], F]
+        Actual values of the input data, with the neighbourhood on the last axes.
+    Xv : np.ndarray[S, F]
         Actual values of the input data.
     eb_expr_lower : np.ndarray[S, F]
         Finite pointwise lower bound on the QoI error, must be negative or zero.
@@ -447,16 +523,17 @@ def _compute_data_eb_for_qoi_eb_unchecked(
 
     assert len(expr.free_symbols) > 0, "constants have no error bounds"
 
-    zero = np.array(0, dtype=xv.dtype)
+    zero = np.array(0, dtype=Xv.dtype)
 
-    # x
+    # X[...]
     if (
         expr.func is sp.tensor.array.expressions.ArrayElement
         and len(expr.args) == 2
-        and expr.args[0] == x
+        and expr.args[0] == X
     ):
         return (eb_expr_lower, eb_expr_upper)
 
+    # array
     if expr.func in (sp.Array, _NumPyLikeArray):
         raise ValueError("expression must evaluate to a scalar not an array")
 
@@ -464,18 +541,18 @@ def _compute_data_eb_for_qoi_eb_unchecked(
     if expr.func is sp.Abs and len(expr.args) == 1:
         # evaluate arg
         (arg,) = expr.args
-        argv = _compile_sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
+        argv = _compile_sympy_expr_to_numpy([X], arg, Xv.dtype)(XvN)
         # flip the lower/upper error bound if the arg is negative
         eql = np.where(argv < 0, -eb_expr_upper, eb_expr_lower)
         equ = np.where(argv < 0, -eb_expr_lower, eb_expr_upper)
-        return _compute_data_eb_for_qoi_eb(arg, x, xv, eql, equ)
+        return _compute_data_eb_for_stencil_qoi_eb(arg, X, XvN, Xv, eql, equ)  # type: ignore
 
     # ln(...)
     # sympy automatically transforms log(..., base) into ln(...)/ln(base)
     if expr.func is sp.log and len(expr.args) == 1:
         # evaluate arg and ln(arg)
         (arg,) = expr.args
-        argv = _compile_sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
+        argv = _compile_sympy_expr_to_numpy([X], arg, Xv.dtype)(XvN)
         exprv = np.log(argv)
 
         # update the error bounds
@@ -484,14 +561,14 @@ def _compute_data_eb_for_qoi_eb_unchecked(
             zero,
             np.exp(exprv + eb_expr_lower) - argv,
         )
-        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
+        eal = _nan_to_zero(to_finite_float(eal, Xv.dtype))
 
         eau = np.where(
             (eb_expr_upper == 0),
             zero,
             np.exp(exprv + eb_expr_upper) - argv,
         )
-        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
+        eau = _nan_to_zero(to_finite_float(eau, Xv.dtype))
 
         # handle rounding errors in ln(e^(...)) early
         eal = _ensure_bounded_derived_error(
@@ -513,13 +590,20 @@ def _compute_data_eb_for_qoi_eb_unchecked(
         eb_arg_lower, eb_arg_upper = eal, eau
 
         # composition using Lemma 3 from Jiao et al.
-        return _compute_data_eb_for_qoi_eb(arg, x, xv, eb_arg_lower, eb_arg_upper)
+        return _compute_data_eb_for_stencil_qoi_eb(
+            arg,
+            X,
+            XvN,
+            Xv,
+            eb_arg_lower,  # type: ignore
+            eb_arg_upper,  # type: ignore
+        )
 
     # e^(...)
     if expr.func is sp.exp and len(expr.args) == 1:
         # evaluate arg and e^arg
         (arg,) = expr.args
-        argv = _compile_sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
+        argv = _compile_sympy_expr_to_numpy([X], arg, Xv.dtype)(XvN)
         exprv = np.exp(argv)
 
         # update the error bounds
@@ -529,14 +613,14 @@ def _compute_data_eb_for_qoi_eb_unchecked(
             zero,
             np.log(np.maximum(zero, exprv + eb_expr_lower)) - argv,
         )
-        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
+        eal = _nan_to_zero(to_finite_float(eal, Xv.dtype))
 
         eau = np.where(
             (eb_expr_upper == 0),
             zero,
             np.log(np.maximum(zero, exprv + eb_expr_upper)) - argv,
         )
-        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
+        eau = _nan_to_zero(to_finite_float(eau, Xv.dtype))
 
         # handle rounding errors in e^(ln(...)) early
         eal = _ensure_bounded_derived_error(
@@ -558,16 +642,24 @@ def _compute_data_eb_for_qoi_eb_unchecked(
         eb_arg_lower, eb_arg_upper = eal, eau
 
         # composition using Lemma 3 from Jiao et al.
-        return _compute_data_eb_for_qoi_eb(arg, x, xv, eb_arg_lower, eb_arg_upper)
+        return _compute_data_eb_for_stencil_qoi_eb(
+            arg,
+            X,
+            XvN,
+            Xv,
+            eb_arg_lower,  # type: ignore
+            eb_arg_upper,  # type: ignore
+        )
 
     # rewrite a ** b as e^(b*ln(abs(a)))
     # this is mathematically incorrect for a <= 0 but works for deriving error bounds
     if expr.is_Pow and len(expr.args) == 2:
         a, b = expr.args
-        return _compute_data_eb_for_qoi_eb(
+        return _compute_data_eb_for_stencil_qoi_eb(
             sp.exp(b * sp.ln(sp.Abs(a)), evaluate=False),
-            x,
-            xv,
+            X,
+            XvN,
+            Xv,
             eb_expr_lower,
             eb_expr_upper,
         )
@@ -588,7 +680,7 @@ def _compute_data_eb_for_qoi_eb_unchecked(
                         sp.Mul(
                             *[arg for arg in term.args if len(arg.free_symbols) == 0]  # type: ignore
                         ),
-                        xv.dtype,
+                        Xv.dtype,
                     )()
                 )
                 terms[i] = sp.Mul(
@@ -599,16 +691,16 @@ def _compute_data_eb_for_qoi_eb_unchecked(
         total_abs_factor = np.sum(np.abs(factors))
 
         etl: np.ndarray = _nan_to_zero(
-            to_finite_float(eb_expr_lower / total_abs_factor, xv.dtype)
+            to_finite_float(eb_expr_lower / total_abs_factor, Xv.dtype)
         )
         etu: np.ndarray = _nan_to_zero(
-            to_finite_float(eb_expr_upper / total_abs_factor, xv.dtype)
+            to_finite_float(eb_expr_upper / total_abs_factor, Xv.dtype)
         )
 
         # handle rounding errors in the total absolute factor early
         etl = _ensure_bounded_derived_error(
             lambda etl: etl * total_abs_factor,
-            np.zeros_like(xv),
+            np.zeros_like(Xv),
             None,
             etl,
             eb_expr_lower,
@@ -616,7 +708,7 @@ def _compute_data_eb_for_qoi_eb_unchecked(
         )
         etu = _ensure_bounded_derived_error(
             lambda etu: etu * total_abs_factor,
-            np.zeros_like(xv),
+            np.zeros_like(Xv),
             None,
             etu,
             eb_expr_lower,
@@ -626,10 +718,11 @@ def _compute_data_eb_for_qoi_eb_unchecked(
         eb_x_lower, eb_x_upper = None, None
         for term, factor in zip(terms, factors):
             # recurse into the terms with a weighted error bound
-            exl, exu = _compute_data_eb_for_qoi_eb(
+            exl, exu = _compute_data_eb_for_stencil_qoi_eb(
                 term,
-                x,
-                xv,
+                X,
+                XvN,
+                Xv,
                 # flip the lower/upper error bound if the factor is negative
                 -etu if factor < 0 else etl,
                 -etl if factor < 0 else etu,
@@ -654,20 +747,20 @@ def _compute_data_eb_for_qoi_eb_unchecked(
         factor = _compile_sympy_expr_to_numpy(
             [],
             sp.Mul(*[arg for arg in expr.args if len(arg.free_symbols) == 0]),  # type: ignore
-            xv.dtype,
+            Xv.dtype,
         )()
 
         efl: np.ndarray = _nan_to_zero(
-            to_finite_float(eb_expr_lower / np.abs(factor), xv.dtype)
+            to_finite_float(eb_expr_lower / np.abs(factor), Xv.dtype)
         )
         efu: np.ndarray = _nan_to_zero(
-            to_finite_float(eb_expr_upper / np.abs(factor), xv.dtype)
+            to_finite_float(eb_expr_upper / np.abs(factor), Xv.dtype)
         )
 
         # handle rounding errors in the factor early
         efl = _ensure_bounded_derived_error(
             lambda efl: efl * np.abs(factor),
-            np.zeros_like(xv),
+            np.zeros_like(Xv),
             None,
             efl,
             eb_expr_lower,
@@ -675,7 +768,7 @@ def _compute_data_eb_for_qoi_eb_unchecked(
         )
         efu = _ensure_bounded_derived_error(
             lambda efu: efu * np.abs(factor),
-            np.zeros_like(xv),
+            np.zeros_like(Xv),
             None,
             efu,
             eb_expr_lower,
@@ -690,14 +783,15 @@ def _compute_data_eb_for_qoi_eb_unchecked(
         terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
 
         if len(terms) == 1:
-            return _compute_data_eb_for_qoi_eb(
-                terms[0], x, xv, eb_factor_lower, eb_factor_upper
+            return _compute_data_eb_for_stencil_qoi_eb(
+                terms[0], X, XvN, Xv, eb_factor_lower, eb_factor_upper
             )
 
-        return _compute_data_eb_for_qoi_eb(
+        return _compute_data_eb_for_stencil_qoi_eb(
             sp.exp(sp.Add(*[sp.log(sp.Abs(term)) for term in terms]), evaluate=False),
-            x,
-            xv,
+            X,
+            XvN,
+            Xv,
             eb_factor_lower,
             eb_factor_upper,
         )
@@ -706,7 +800,7 @@ def _compute_data_eb_for_qoi_eb_unchecked(
 
 
 def _compile_sympy_expr_to_numpy(
-    symbols: list[sp.Symbol],
+    symbols: list[sp.tensor.array.expressions.ArraySymbol],
     expr: sp.Basic,
     dtype: np.dtype,
 ) -> Callable[..., np.ndarray]:
@@ -780,6 +874,11 @@ def _create_sympy_numpy_printer_class(
         def _print_ImaginaryUnit(self, expr):
             raise ValueError(
                 "cannot evaluate an expression containing an imaginary number"
+            )
+
+        def _print_ArrayElement(self, expr):
+            return (
+                f"{expr.name}[..., {', '.join([self._print(i) for i in expr.indices])}]"
             )
 
     return NumPyDtypePrinter

@@ -353,10 +353,10 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
 def _compute_data_eb_for_qoi_eb(
     expr: sp.Basic,
     x: sp.Symbol,
-    xv: np.ndarray,
-    tauv_lower: np.ndarray,
-    tauv_upper: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
+    xv: np.ndarray[S, F],
+    tauv_lower: np.ndarray[S, F],
+    tauv_upper: np.ndarray[S, F],
+) -> tuple[np.ndarray[S, F], np.ndarray[S, F]]:
     """
     Translate an error bound on a derived quantity of interest (QoI) into an
     error bound on the input data.
@@ -397,7 +397,7 @@ def _compute_data_eb_for_qoi_eb(
 
     # handle rounding errors in the lower error bound computation
     tl = _ensure_bounded_derived_error(
-        lambda tl: np.where(tl == 0, exprv, (exprl)(xv + tl)),
+        lambda tl: np.where(tl == 0, exprv, (exprl)(xv + tl)),  # type: ignore
         exprv,
         xv,
         tl,
@@ -405,7 +405,7 @@ def _compute_data_eb_for_qoi_eb(
         tauv_upper,
     )
     tu = _ensure_bounded_derived_error(
-        lambda tu: np.where(tu == 0, exprv, (exprl)(xv + tu)),
+        lambda tu: np.where(tu == 0, exprv, (exprl)(xv + tu)),  # type: ignore
         exprv,
         xv,
         tu,
@@ -473,7 +473,7 @@ def _compute_data_eb_for_qoi_eb_unchecked(
         # flip the lower/upper error bound if the arg is negative
         eql = np.where(argv < 0, -eb_expr_upper, eb_expr_lower)
         equ = np.where(argv < 0, -eb_expr_lower, eb_expr_upper)
-        return _compute_data_eb_for_qoi_eb(arg, x, xv, eql, equ)
+        return _compute_data_eb_for_qoi_eb(arg, x, xv, eql, equ)  # type: ignore
 
     # ln(...)
     # sympy automatically transforms log(..., base) into ln(...)/ln(base)
@@ -518,7 +518,7 @@ def _compute_data_eb_for_qoi_eb_unchecked(
         eb_arg_lower, eb_arg_upper = eal, eau
 
         # composition using Lemma 3 from Jiao et al.
-        return _compute_data_eb_for_qoi_eb(arg, x, xv, eb_arg_lower, eb_arg_upper)
+        return _compute_data_eb_for_qoi_eb(arg, x, xv, eb_arg_lower, eb_arg_upper)  # type: ignore
 
     # e^(...)
     if expr.func is sp.exp and len(expr.args) == 1:
@@ -563,7 +563,7 @@ def _compute_data_eb_for_qoi_eb_unchecked(
         eb_arg_lower, eb_arg_upper = eal, eau
 
         # composition using Lemma 3 from Jiao et al.
-        return _compute_data_eb_for_qoi_eb(arg, x, xv, eb_arg_lower, eb_arg_upper)
+        return _compute_data_eb_for_qoi_eb(arg, x, xv, eb_arg_lower, eb_arg_upper)  # type: ignore
 
     # rewrite a ** b as e^(b*ln(abs(a)))
     # this is mathematically incorrect for a <= 0 but works for deriving error bounds
