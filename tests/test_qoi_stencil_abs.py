@@ -9,9 +9,7 @@ from .codecs import (
 )
 
 
-def check_all_codecs(
-    data: np.ndarray, qoi: str, shape: tuple[tuple[int, str, int], ...]
-):
+def check_all_codecs(data: np.ndarray, qoi: str, shape: tuple[tuple[int, int], ...]):
     for encode_decode in [
         encode_decode_zero,
         encode_decode_neg,
@@ -35,15 +33,15 @@ def check_all_codecs(
 
 
 def check_empty(qoi: str):
-    check_all_codecs(np.empty(0), qoi, ((0, "i", 0),))
+    check_all_codecs(np.empty(0), qoi, ((0, 0),))
 
 
 def check_arange(qoi: str):
-    check_all_codecs(np.arange(100, dtype=float), qoi, ((0, "i", 0),))
+    check_all_codecs(np.arange(100, dtype=float), qoi, ((0, 0),))
 
 
 def check_linspace(qoi: str):
-    check_all_codecs(np.linspace(-1024, 1024, 2831), qoi, ((0, "i", 0),))
+    check_all_codecs(np.linspace(-1024, 1024, 2831), qoi, ((0, 0),))
 
 
 def check_edge_cases(qoi: str):
@@ -63,7 +61,7 @@ def check_edge_cases(qoi: str):
             ]
         ),
         qoi,
-        ((0, "i", 0),),
+        ((0, 0),),
     )
 
 
@@ -82,7 +80,7 @@ def test_sandbox():
         check_all_codecs(
             np.empty(0),
             "f\"{[c for c in ().__class__.__base__.__subclasses__() if c.__name__ == 'catch_warnings'][0]()._module.__builtins__['quit']()}\"",
-            ((0, "i", 0),),
+            ((0, 0),),
         )
 
 
@@ -92,6 +90,11 @@ def test_empty(check):
         check("")
     with pytest.raises(AssertionError, match="empty"):
         check("  \t   \n   ")
+
+
+def test_non_expression():
+    with pytest.raises(AssertionError, match="numeric expression"):
+        check_all_codecs(np.empty(0), "exp", ((0, 0),))
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -110,23 +113,30 @@ def test_constant(check):
 def test_imaginary(check):
     with pytest.raises(AssertionError, match="imaginary"):
         check_all_codecs(
-            np.array([2], dtype=np.uint64), "(-log(-20417,ln(x)))", ((0, "i", 0),)
+            np.array([2], dtype=np.uint64), "(-log(-20417,ln(x)))", ((0, 0),)
         )
     with pytest.raises(AssertionError, match="imaginary"):
         check("(-log(-20417,ln(x)))")
 
 
+def test_invalid_array():
+    with pytest.raises(AssertionError, match="numeric expression"):
+        check_all_codecs(np.empty(0), "A", ((0, 0),))
+    with pytest.raises(AssertionError, match="array constructor"):
+        check_all_codecs(np.empty(0), "A(1)", ((0, 0),))
+
+
 def test_mean():
     check_all_codecs(
         np.arange(64, dtype=float).reshape(4, 4, 4),
-        "(X[i-1,j]+X[i+1,j]+X[i,j-1]+X[i,j+1])/4",
-        ((-1, "i", 1), (-1, "j", 1)),
+        "(X[I+A[-1,0]]+X[I+A[+1,0]]+X[I+A[0,-1]]+X[I+A[0,+1]])/4",
+        ((-1, 1), (-1, 1)),
     )
 
     # check_all_codecs(
     #     np.arange(64, dtype=float).reshape(4, 4, 4),
-    #     "sum(X * Array([[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]]))",
-    #     ((-1, "i", 1), (-1, "j", 1)),
+    #     "X * A[[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]]",
+    #     ((-1, 1), (-1, 1)),
     # )
 
 
@@ -136,8 +146,8 @@ def test_relative_indexing():
     )
 
     safeguard = QuantityOfInterestAbsoluteErrorBoundSafeguard(
-        "X[i-1] + X[i+2]",
-        ((-1, "i", 4),),
+        "X[I-1] + X[I+2]",
+        ((-1, 4),),
         (0,),
         "valid",
         0,
@@ -145,8 +155,8 @@ def test_relative_indexing():
     assert f"{safeguard._qoi_expr}" == "X[0] + X[3]"
 
     safeguard = QuantityOfInterestAbsoluteErrorBoundSafeguard(
-        "X[i][j]",
-        ((-1, "i", 1), (-1, "j", 1)),
+        "X[I[0]][I[1]]",
+        ((-1, 1), (-1, 1)),
         (0, 1),
         "valid",
         0,
@@ -155,7 +165,7 @@ def test_relative_indexing():
 
     safeguard = QuantityOfInterestAbsoluteErrorBoundSafeguard(
         "X[0][0]",
-        ((-1, "i", 1), (-1, "j", 1)),
+        ((-1, 1), (-1, 1)),
         (0, 1),
         "valid",
         0,

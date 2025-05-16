@@ -41,10 +41,10 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     The quantity of interest is specified as a non-constant expression, in
     string form, on the neighbourhood tensor `X` that is centred on the
     pointwise value `x`. For example, to bound the error on the four-neighbour
-    box mean in a 3x3 neighbourhood (where `x = X[i,j]`), set
-    `qoi=Expr("(X[i-1,j]+X[i+1,j]+X[i,j-1]+X[i,j+1])/4")`. Note that `X` can be
-    indexed relative to the centred data point `x` using named indices (defined
-    in the `shape` paramter) or absolute using integer indices.
+    box mean in a 3x3 neighbourhood (where `x = X[I]`), set
+    `qoi=Expr("(X[I+A[-1,0]]+X[I+A[+1,0]]+X[I+A[0,-1]]+X[I+A[0,+1]])/4")`.
+    Note that `X` can be indexed absolute or relative to the centred data point
+    `x` using the index array `I`.
 
     If the derived quantity of interest for an element evaluates to an infinite
     value, this safeguard guarantees that the quantity of interest on the
@@ -60,6 +60,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         literal
       | const
       | var
+      | array
       | unary
       | binary
     ;
@@ -79,7 +80,13 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
     var     =
         "x";                              (* pointwise data value *)
-      | "X", "[", int, [ ",", int ], "]"  (* neighbourhood data value *)
+      | "X"                               (* data neighbourhood *)
+    ;
+
+    array   =
+        "A", "[", [                       (* n-dimensional array *)
+            expr, { ",", expr }, [","]
+        ], "]"
     ;
 
     unary   =
@@ -97,7 +104,19 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
       | expr, "/", expr                   (* division *)
       | expr, "**", expr                  (* exponentiation *)
       | "log", "(", expr, ",", expr, ")"  (* logarithm log(a, base) *)
+      | expr, "[", indices "]"            (* array indexing *)
     ;
+
+    indices =
+        index, { ",", index }, [","]
+    ;
+
+    index   =
+        "I"                               (* index of the neighbourhood centre *)
+      | expr                              (* index expression *)
+      | [expr], ":", [expr]               (* slicing *)
+    ;
+
     ```
 
     Parameters
@@ -105,26 +124,22 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     qoi : Expr
         The non-constant expression for computing the derived quantity of
         interest for a neighbourhood tensor `X`.
-    shape : tuple[tuple[int, str, int], ...]
-        The shape of the data neighbourhood, expressed as (before, index,
-        after) tuples, where before (non-positive) and after (non-negative)
-        specify the range of values relative to the data point to include,
-        and index is a unique per-dimension variable name that can be used
-        in `qoi` to refer to the index of the data point.
+    shape : tuple[tuple[int, int], ...]
+        The shape of the data neighbourhood, expressed as (before, after)
+        tuples, where before (non-positive) and after (non-negative)
+        specify the range of values relative to the data point to include.
 
-        e.g. a neighbourhood of shape `((-1, "i", 2), (-2, "j", 0))` is 2D and
-        contains one element before and two elements after the current one on
-        the first axis, and two elements before on the second axis. The
-        neighbourhood values can be indexed relative to the central data point
-        using `i-1`, `i`, `i+1`, `i+2` and `j-2`, `j-1`, `j`.
+        e.g. a neighbourhood of shape `((-1, 2), (-2, 0))` is 2D and contains
+        one element before and two elements after the current one on the first
+        axis, and two elements before on the second axis.
     axes : tuple[int, ...]
         The axes that the neighbourhood is collected from. The neighbourhood
         window is applied independently to any additional axes. The number of
         axes must match the number of dimensions in the shape.
 
-        e.g. for a 3d data array, 2d shape `((-1, "i", 1), (-1, "j", 1))`, and
-        axes `(0, -1)`, the neighbourhood is created over the first and last
-        axis, and applied independently along the middle axis.
+        e.g. for a 3d data array, 2d shape `((-1, 1), (-1, 1))`, and axes
+        `(0, -1)`, the neighbourhood is created over the first and last axis,
+        and applied independently along the middle axis.
     boundary : str | BoundaryCondition
         Boundary condition for evaluating the quantity of interest near the
         data domain boundaries, e.g. by extending values.
@@ -147,7 +162,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         "_X",
     )
     _qoi: Expr
-    _shape: tuple[tuple[int, str, int], ...]
+    _shape: tuple[tuple[int, int], ...]
     _axes: tuple[int, ...]
     _boundary: BoundaryCondition
     _eb_abs: int | float
@@ -160,7 +175,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     def __init__(
         self,
         qoi: Expr,
-        shape: tuple[tuple[int, str, int], ...],
+        shape: tuple[tuple[int, int], ...],
         axes: tuple[int, ...],
         boundary: str | BoundaryCondition,
         eb_abs: int | float,
@@ -173,41 +188,26 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         self._eb_abs = eb_abs
 
         s = []
-        indices = dict()
-        c = []
+        I = []
         assert len(shape) > 0, "shape must not be empty"
-        for b, i, a in shape:
+        for b, a in shape:
+            assert type(b) is int, "shape's before must be an integer"
             assert b <= 0, "shape's before must be non-positive"
-            assert i not in indices and i not in [
-                "x",
-                "X",
-                "Integer",
-                "Float",
-                "Rational",
-                "Array",
-                "pi",
-                "e",
-                "sqrt",
-                "exp",
-                "ln",
-                "log",
-            ], (
-                f"index {i} is not unique or clashes with a pre-defined variable or keyword"
-            )
+            assert type(a) is int, "shape's after must be an integer"
             assert a >= 0, "shape's after must be non-negative"
             s.append(abs(b) + 1 + abs(a))
-            indices[i] = abs(b)
-            c.append(abs(b))
+            I.append(abs(b))
         self._shape = shape
 
         self._X = sp.tensor.array.expressions.ArraySymbol("X", s)
         X = self._X.as_explicit()
         X.__class__ = _NumPyLikeArray
-        x = X.__getitem__(c)
+        x = X.__getitem__(I)
 
         assert len(axes) == len(shape), (
             "number of axes must match the number of shape dimensions"
         )
+        self._axes = axes
 
         self._boundary = (
             boundary
@@ -226,14 +226,14 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         try:
             qoi_expr = sp.parse_expr(
                 self._qoi,
-                local_dict=dict(x=x, X=X, **indices),
+                local_dict=dict(x=x, X=X, I=_NumPyLikeArray(I)),
                 global_dict=dict(
                     # literals
                     Integer=sp.Integer,
                     Float=sp.Float,
                     Rational=sp.Rational,
                     # arrays
-                    Array=_NumPyLikeArray,
+                    A=_ArrayConstructor,
                     # constants
                     pi=sp.pi,
                     e=sp.E,
@@ -244,6 +244,9 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                     log=sp.log,
                 ),
                 transformations=(sp.parsing.sympy_parser.auto_number,),
+            )
+            assert isinstance(qoi_expr, sp.Basic), (
+                "qoi expression must evaluate to a numeric expression"
             )
             # check if the expression is well-formed (e.g. no int's that cannot
             #  be printed) and if an error bound can be computed
@@ -422,6 +425,9 @@ def _compute_data_eb_for_qoi_eb_unchecked(
         and expr.args[0] == x
     ):
         return (eb_expr_lower, eb_expr_upper)
+
+    if expr.func in (sp.Array, _NumPyLikeArray):
+        raise ValueError("expression must evaluate to a scalar not an array")
 
     # abs(...) is only used internally in exp(ln(abs(...)))
     if expr.func is sp.Abs and len(expr.args) == 1:
@@ -749,6 +755,50 @@ def _create_sympy_numpy_printer_class(
 
 
 class _NumPyLikeArray(sp.Array):
+    __slots__ = ()
+
+    def __add__(self, other):
+        if isinstance(other, _NumPyLikeArray):
+            if self.shape != other.shape:
+                raise ValueError("array shape mismatch")
+            result_list = [
+                i + j
+                for i, j in zip(
+                    sp.tensor.array.arrayop.Flatten(self),
+                    sp.tensor.array.arrayop.Flatten(other),
+                )
+            ]
+            return type(self)(result_list, self.shape)
+        other = sp.sympify(other)
+        result_list = [i + other for i in sp.tensor.array.arrayop.Flatten(self)]
+        return type(self)(result_list, self.shape)
+
+    def __radd__(self, other):
+        other = sp.sympify(other)
+        result_list = [other + i for i in sp.tensor.array.arrayop.Flatten(self)]
+        return type(self)(result_list, self.shape)
+
+    def __sub__(self, other):
+        if isinstance(other, _NumPyLikeArray):
+            if self.shape != other.shape:
+                raise ValueError("array shape mismatch")
+            result_list = [
+                i - j
+                for i, j in zip(
+                    sp.tensor.array.arrayop.Flatten(self),
+                    sp.tensor.array.arrayop.Flatten(other),
+                )
+            ]
+            return type(self)(result_list, self.shape)
+        other = sp.sympify(other)
+        result_list = [i - other for i in sp.tensor.array.arrayop.Flatten(self)]
+        return type(self)(result_list, self.shape)
+
+    def __rsub__(self, other):
+        other = sp.sympify(other)
+        result_list = [other - i for i in sp.tensor.array.arrayop.Flatten(self)]
+        return type(self)(result_list, self.shape)
+
     def __mul__(self, other):
         if isinstance(other, _NumPyLikeArray):
             if self.shape != other.shape:
@@ -761,7 +811,14 @@ class _NumPyLikeArray(sp.Array):
                 )
             ]
             return type(self)(result_list, self.shape)
-        return super().__mul__(other)
+        other = sp.sympify(other)
+        result_list = [i * other for i in sp.tensor.array.arrayop.Flatten(self)]
+        return type(self)(result_list, self.shape)
+
+    def __rmul__(self, other):
+        other = sp.sympify(other)
+        result_list = [other * i for i in sp.tensor.array.arrayop.Flatten(self)]
+        return type(self)(result_list, self.shape)
 
     def __truediv__(self, other):
         if isinstance(other, _NumPyLikeArray):
@@ -775,7 +832,14 @@ class _NumPyLikeArray(sp.Array):
                 )
             ]
             return type(self)(result_list, self.shape)
-        return super().__truediv__(other)
+        other = sp.sympify(other)
+        result_list = [i / other for i in sp.tensor.array.arrayop.Flatten(self)]
+        return type(self)(result_list, self.shape)
+
+    def __rtruediv__(self, other):
+        other = sp.sympify(other)
+        result_list = [other / i for i in sp.tensor.array.arrayop.Flatten(self)]
+        return type(self)(result_list, self.shape)
 
     def __pow__(self, other):
         if isinstance(other, _NumPyLikeArray):
@@ -794,23 +858,22 @@ class _NumPyLikeArray(sp.Array):
         return type(self)(result_list, self.shape)
 
     def __rpow__(self, other):
-        if isinstance(other, _NumPyLikeArray):
-            if self.shape != other.shape:
-                raise ValueError("array shape mismatch")
-            result_list = [
-                j**i
-                for i, j in zip(
-                    sp.tensor.array.arrayop.Flatten(self),
-                    sp.tensor.array.arrayop.Flatten(other),
-                )
-            ]
-            return type(self)(result_list, self.shape)
         other = sp.sympify(other)
         result_list = [other**i for i in sp.tensor.array.arrayop.Flatten(self)]
         return type(self)(result_list, self.shape)
 
     # TODO: also support log
     # TODO: also support "matrix" multiplication
+
+
+class _ArrayConstructor:
+    __slots__ = ()
+
+    def __new__(cls, *args, **kwargs):
+        raise TypeError("cannot call array constructor")
+
+    def __class_getitem__(cls, index):
+        return _NumPyLikeArray(index)
 
 
 # pattern of syntactically weakly valid expressions
@@ -825,11 +888,13 @@ _QOI_PATTERN = re.compile(
     r"|(?:pi)"
     r"|(?:x)"
     r"|(?:X)"
+    r"|(?:I)"
+    r"|(?:A)"
     r"|(?:sqrt)"
     r"|(?:ln)"
     r"|(?:log)"
     r"|(?:exp)"
     r")?"
-    r"|(?:[ \t\n\(\)\[\],\+\-\*/])"
+    r"|(?:[ \t\n\(\)\[\],:\+\-\*/])"
     r")*"
 )

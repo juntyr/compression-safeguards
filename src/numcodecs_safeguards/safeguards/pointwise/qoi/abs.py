@@ -155,6 +155,9 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
                 ),
                 transformations=(sp.parsing.sympy_parser.auto_number,),
             )
+            assert isinstance(qoi_expr, sp.Basic), (
+                "qoi expression must evaluate to a numeric expression"
+            )
             # check if the expression is well-formed (e.g. no int's that cannot
             #  be printed) and if an error bound can be computed
             _canary_repr = str(qoi_expr)

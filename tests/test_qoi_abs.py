@@ -83,6 +83,11 @@ def test_empty(check):
         check("  \t   \n   ")
 
 
+def test_non_expression():
+    with pytest.raises(AssertionError, match="numeric expression"):
+        check_all_codecs(np.empty(0), "exp")
+
+
 @pytest.mark.parametrize("check", CHECKS)
 def test_constant(check):
     with pytest.raises(AssertionError, match="constant"):
