@@ -12,7 +12,7 @@ from numpy.lib.stride_tricks import sliding_window_view
 
 from ...cast import _isfinite, _isnan, from_total_order, to_total_order
 from ...intervals import Interval, IntervalUnion, Lower, Upper
-from . import BoundaryCondition, _pad_with_boundary
+from . import BoundaryCondition, _pad_with_boundary_single
 from .abc import S, StencilSafeguard, T
 
 _STRICT = ((lt, gt, False, False),) * 2
@@ -181,7 +181,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             if alen == 0:
                 continue
 
-            data_boundary = _pad_with_boundary(
+            data_boundary = _pad_with_boundary_single(
                 data,
                 self._boundary,
                 self._window,
@@ -189,7 +189,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 self._constant_boundary,
                 axis,
             )
-            decoded_boundary = _pad_with_boundary(
+            decoded_boundary = _pad_with_boundary_single(
                 decoded,
                 self._boundary,
                 self._window,
@@ -263,7 +263,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             if alen == 0:
                 continue
 
-            data_boundary = _pad_with_boundary(
+            data_boundary = _pad_with_boundary_single(
                 data,
                 self._boundary,
                 self._window,
@@ -362,7 +362,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 ):
                     # requirements inside the boundary need to be connected
                     #  back to the original data elements
-                    boundary_indices = _pad_with_boundary(
+                    boundary_indices = _pad_with_boundary_single(
                         np.arange(alen),
                         self._boundary,
                         self._window,
@@ -443,7 +443,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 ):
                     # requirements inside the boundary need to be connected
                     #  back to the original data elements
-                    boundary_indices = _pad_with_boundary(
+                    boundary_indices = _pad_with_boundary_single(
                         np.arange(alen),
                         self._boundary,
                         self._window,

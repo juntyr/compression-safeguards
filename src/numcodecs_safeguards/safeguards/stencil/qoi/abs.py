@@ -6,7 +6,7 @@ __all__ = ["QuantityOfInterestAbsoluteErrorBoundSafeguard"]
 
 import functools
 import re
-from typing import Callable
+from typing import Callable, TypeVar
 
 import numpy as np
 import sympy as sp
@@ -22,7 +22,6 @@ from ....cast import (
     _isinf,
     _isnan,
     _nan_to_zero,
-    _nextafter,
     as_bits,
     to_finite_float,
     to_float,
@@ -32,6 +31,9 @@ from ...pointwise.qoi import Expr
 from ...pointwise.qoi.abs import _ensure_bounded_derived_error
 from .. import BoundaryCondition, _pad_with_boundary
 from ..abc import S, StencilSafeguard, T
+
+Qs = TypeVar("Qs", bound=tuple[int, ...])
+Ns = TypeVar("Ns", bound=tuple[int, ...])
 
 
 class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
@@ -199,8 +201,8 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             assert b <= 0, "shape's before must be non-positive"
             assert type(a) is int, "shape's after must be an integer"
             assert a >= 0, "shape's after must be non-negative"
-            s.append(abs(b) + 1 + abs(a))
-            I.append(abs(b))
+            s.append(-b + 1 + abs(a))
+            I.append(-b)
         self._shape = shape
 
         self._X = sp.tensor.array.expressions.ArraySymbol("X", s)
@@ -325,17 +327,46 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        window = tuple(abs(b) + 1 + abs(a) for b, a in self._shape)
+        all_axes = []
+        for axis in self._axes:
+            if axis >= data.ndim or axis < -data.ndim:
+                raise IndexError(
+                    f"axis index {axis} is out of bounds for array of shape {data.shape}"
+                )
+            naxis = data.ndim - axis if axis < 0 else axis
+            if naxis in all_axes:
+                raise IndexError(
+                    f"duplicate axis index {axis}, normalised to {naxis}, for array of shape {data.shape}"
+                )
+            all_axes.append(naxis)
 
-        # FIXME: handle axes and boundary conditions
+        window = tuple(-b + 1 + a for b, a in self._shape)
+
+        data_boundary = _pad_with_boundary(
+            data,
+            self._boundary,
+            tuple(-b for b, a in self._shape),
+            tuple(a for b, a in self._shape),
+            self._constant_boundary,
+            self._axes,
+        )
+        decoded_boundary = _pad_with_boundary(
+            decoded,
+            self._boundary,
+            tuple(-b for b, a in self._shape),
+            tuple(a for b, a in self._shape),
+            self._constant_boundary,
+            self._axes,
+        )
+
         data_windows_float: np.ndarray = to_float(
-            sliding_window_view(data, window, axis=self._axes, writeable=False)  # type: ignore
+            sliding_window_view(data_boundary, window, axis=self._axes, writeable=False)  # type: ignore
         )
         decoded_windows_float: np.ndarray = to_float(
-            sliding_window_view(decoded, window, axis=self._axes, writeable=False)  # type: ignore
+            sliding_window_view(
+                decoded_boundary, window, axis=self._axes, writeable=False
+            )  # type: ignore
         )
-
-        print(data.shape, window, data_windows_float.shape)
 
         qoi_lambda = _compile_sympy_expr_to_numpy(
             [self._X], self._qoi_expr, data_windows_float.dtype
@@ -343,8 +374,6 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
         qoi_data = (qoi_lambda)(data_windows_float)
         qoi_decoded = (qoi_lambda)(to_float(decoded_windows_float))
-
-        print(qoi_data.shape)
 
         absolute_bound = (
             np.where(
@@ -367,10 +396,22 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             ),
         )
 
-        # FIXME: connect windows_ok back to the original data indices
-        if np.all(windows_ok):
-            return np.ones_like(data, dtype=np.bool)  # type: ignore
-        return np.zeros_like(data, dtype=np.bool)  # type: ignore
+        ok = np.ones_like(data, dtype=np.bool)
+
+        if self._boundary == BoundaryCondition.valid:
+            sl = [slice(None)] * data.ndim
+            for axis, (b, a) in zip(self._axes, self._shape):
+                start = None if b == 0 else -b
+                end = None if a == 0 else -a
+                sl[axis] = slice(start, end)
+            s = tuple(sl)
+        else:
+            s = s = tuple([slice(None)] * data.ndim)
+
+        ok = np.ones_like(data, dtype=np.bool)
+        ok[s] = windows_ok
+
+        return ok  # type: ignore
 
     def compute_safe_intervals(
         self, data: np.ndarray[S, T]
@@ -407,11 +448,11 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 def _compute_data_eb_for_stencil_qoi_eb(
     expr: sp.Basic,
     X: sp.tensor.array.expressions.ArraySymbol,
-    XvN: np.ndarray[tuple[int, ...], F],
-    Xv: np.ndarray[S, F],
-    tauv_lower: np.ndarray[S, F],
-    tauv_upper: np.ndarray[S, F],
-) -> tuple[np.ndarray[S, F], np.ndarray[S, F]]:
+    XvN: np.ndarray[tuple[int, ...], F],  # np.ndarray[tuple[*Qs, *Ns], F],
+    Xv: np.ndarray[Qs, F],
+    tauv_lower: np.ndarray[Qs, F],
+    tauv_upper: np.ndarray[Qs, F],
+) -> tuple[np.ndarray[Qs, F], np.ndarray[Qs, F]]:
     """
     Translate an error bound on a derived quantity of interest (QoI) into an
     error bound on the input data.
@@ -425,18 +466,18 @@ def _compute_data_eb_for_stencil_qoi_eb(
         Symbolic SymPy expression that defines the QoI.
     X : sp.tensor.array.expressions.ArraySymbol
         Symbol for the input data neighbourhood.
-    XvN : np.ndarray[tuple[int, ...], F]
+    XvN : np.ndarray[tuple[*Qs, *Ns], F]
         Actual values of the input data, with the neighbourhood on the last axes.
-    Xv : np.ndarray[S, F]
+    Xv : np.ndarray[Qs, F]
         Actual values of the input data.
-    eb_expr_lower : np.ndarray[S, F]
+    eb_expr_lower : np.ndarray[Qs, F]
         Finite pointwise lower bound on the QoI error, must be negative or zero.
-    eb_expr_upper : np.ndarray[S, F]
+    eb_expr_upper : np.ndarray[Qs, F]
         Finite pointwise upper bound on the QoI error, must be positive or zero.
 
     Returns
     -------
-    eb_x_lower, eb_x_upper : tuple[np.ndarray[S, F], np.ndarray[S, F]]
+    eb_x_lower, eb_x_upper : tuple[np.ndarray[Qs, F], np.ndarray[Qs, F]]
         Finite pointwise lower and upper error bound on the input data `x`.
 
     Inspired by:
@@ -456,8 +497,9 @@ def _compute_data_eb_for_stencil_qoi_eb(
 
     # handle rounding errors in the lower error bound computation
     tl = _ensure_bounded_derived_error(
-        # FIXME: how to add tl to XvN??
-        lambda tl: np.where(tl == 0, exprv, (exprl)(XvN + tl)),
+        # tl has shape Qs and has XvN (*Qs, *Ns), so their sum has (*Qs, *Ns)
+        #  and evaluating the expression brings us back to Qs
+        lambda tl: np.where(tl == 0, exprv, (exprl)(XvN + tl)),  # type: ignore
         exprv,
         Xv,
         tl,
@@ -465,8 +507,9 @@ def _compute_data_eb_for_stencil_qoi_eb(
         tauv_upper,
     )
     tu = _ensure_bounded_derived_error(
-        # FIXME: how to add tl to XvN??
-        lambda tu: np.where(tu == 0, exprv, (exprl)(XvN + tu)),
+        # tu has shape Qs and has XvN (*Qs, *Ns), so their sum has (*Qs, *Ns)
+        #  and evaluating the expression brings us back to Qs
+        lambda tu: np.where(tu == 0, exprv, (exprl)(XvN + tu)),  # type: ignore
         exprv,
         Xv,
         tu,
@@ -481,11 +524,11 @@ def _compute_data_eb_for_stencil_qoi_eb(
 def _compute_data_eb_for_stencil_qoi_eb_unchecked(
     expr: sp.Basic,
     X: sp.tensor.array.expressions.ArraySymbol,
-    XvN: np.ndarray[tuple[int, ...], F],
-    Xv: np.ndarray[S, F],
-    eb_expr_lower: np.ndarray[S, F],
-    eb_expr_upper: np.ndarray[S, F],
-) -> tuple[np.ndarray[S, F], np.ndarray[S, F]]:
+    XvN: np.ndarray[tuple[int, ...], F],  # np.ndarray[tuple[*Qs, *Ns], F],
+    Xv: np.ndarray[Qs, F],
+    eb_expr_lower: np.ndarray[Qs, F],
+    eb_expr_upper: np.ndarray[Qs, F],
+) -> tuple[np.ndarray[Qs, F], np.ndarray[Qs, F]]:
     """
     Translate an error bound on a derived quantity of interest (QoI) into an
     error bound on the input data.
@@ -499,18 +542,18 @@ def _compute_data_eb_for_stencil_qoi_eb_unchecked(
         Symbolic SymPy expression that defines the QoI.
     X : sp.tensor.array.expressions.ArraySymbol
         Symbol for the input data neighbourhood.
-    XvN : np.ndarray[tuple[int, ...], F]
+    XvN : np.ndarray[tuple[*Qs, *Ns], F]
         Actual values of the input data, with the neighbourhood on the last axes.
-    Xv : np.ndarray[S, F]
+    Xv : np.ndarray[Qs, F]
         Actual values of the input data.
-    eb_expr_lower : np.ndarray[S, F]
+    eb_expr_lower : np.ndarray[Qs, F]
         Finite pointwise lower bound on the QoI error, must be negative or zero.
-    eb_expr_upper : np.ndarray[S, F]
+    eb_expr_upper : np.ndarray[Qs, F]
         Finite pointwise upper bound on the QoI error, must be positive or zero.
 
     Returns
     -------
-    eb_x_lower, eb_x_upper : tuple[np.ndarray[S, F], np.ndarray[S, F]]
+    eb_x_lower, eb_x_upper : tuple[np.ndarray[Qs, F], np.ndarray[Qs, F]]
         Finite pointwise lower and upper error bound on the input data `x`.
 
     Inspired by:
