@@ -567,14 +567,17 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         # i.e. for each data element, which qoi elements does it contribute to
         #      and thus which error bounds affect it
         reverse_indices_windows = np.full(
-            (data.size, np.prod(window)), indices_windows.shape[0]
+            (data.size, np.prod(window) * 2), indices_windows.shape[0]
         )
+        reverse_indices_counter = np.zeros(data.size, dtype=int)
         for i in range(np.prod(window)):
-            # FIXME: could there be alising here??
-            #        i.e. the same data element in two windows for the same i
-            reverse_indices_windows[indices_windows[:, i], i] = np.arange(
-                indices_windows.shape[0]
-            )
+            # manual loop to account for potential alising:
+            # with a wrapping boundary, more than one j for the same window
+            # position j could refer back to the same data element
+            for j in range(indices_windows.shape[0]):
+                idx = indices_windows[j, i]
+                reverse_indices_windows[idx][reverse_indices_counter[idx]] = j
+                reverse_indices_counter[idx] += 1
 
         # flatten the qoi error bounds and append an infinite value,
         # which is indexed if an element did not contribute to the maximum
