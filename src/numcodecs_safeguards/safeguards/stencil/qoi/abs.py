@@ -548,19 +548,49 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         assert np.all((eb_x_lower <= 0) & _isfinite(eb_x_lower))
         assert np.all((eb_x_upper >= 0) & _isfinite(eb_x_upper))
 
-        # FIXME: need to account for boundary conditions, adapt from monotonicity
-        eb_x_orig_lower = np.full_like(data_float, -np.inf)
-        eb_x_orig_upper = np.full_like(data_float, np.inf)
-        for offset in product(*[range(-b + a + 1) for b, a in self._shape]):
-            sl = [slice(None)] * data.ndim
-            for axis, o in zip(self._axes, offset):
-                sl[axis] = slice(o)
-            eb_x_orig_lower[tuple(sl)] = np.maximum(
-                eb_x_orig_lower[tuple(sl)], eb_x_lower
+        # compute how the data indices are distributed into windows
+        # i.e. for each qoi element, which data does it depend on
+        indices = np.arange(data.size).reshape(data.shape)
+        indices_boundary = _pad_with_boundary(
+            indices,
+            self._boundary,
+            tuple(-b for b, a in self._shape),
+            tuple(a for b, a in self._shape),
+            self._constant_boundary,
+            self._axes,
+        )
+        indices_windows = sliding_window_view(  # type: ignore
+            indices_boundary, window, axis=self._axes, writeable=False
+        ).reshape((-1, np.prod(window)))
+
+        # compute the reverse: for each data element, which windows is it in
+        # i.e. for each data element, which qoi elements does it contribute to
+        #      and thus which error bounds affect it
+        reverse_indices_windows = np.full(
+            (data.size, np.prod(window)), indices_windows.shape[0]
+        )
+        for i in range(np.prod(window)):
+            # FIXME: could there be alising here??
+            #        i.e. the same data element in two windows for the same i
+            reverse_indices_windows[indices_windows[:, i], i] = np.arange(
+                indices_windows.shape[0]
             )
-            eb_x_orig_upper[tuple(sl)] = np.minimum(
-                eb_x_upper, eb_x_orig_upper[tuple(sl)]
-            )
+
+        # flatten the qoi error bounds and append an infinite value,
+        # which is indexed if an element did not contribute to the maximum
+        # number of windows
+        eb_x_lower_flat = np.full(eb_x_lower.size + 1, -np.inf, data_float.dtype)
+        eb_x_lower_flat[:-1] = eb_x_lower.flatten()
+        eb_x_upper_flat = np.full(eb_x_upper.size + 1, np.inf, data_float.dtype)
+        eb_x_upper_flat[:-1] = eb_x_upper.flatten()
+
+        # for each data element, reduce over the error bounds that affect it
+        eb_x_orig_lower = np.amax(
+            eb_x_lower_flat[reverse_indices_windows], axis=1
+        ).reshape(data.shape)
+        eb_x_orig_upper = np.amin(
+            eb_x_upper_flat[reverse_indices_windows], axis=1
+        ).reshape(data.shape)
         assert np.all((eb_x_orig_lower <= 0) & _isfinite(eb_x_orig_lower))
         assert np.all((eb_x_orig_upper >= 0) & _isfinite(eb_x_orig_upper))
 
@@ -653,11 +683,11 @@ def _compute_data_eb_for_stencil_qoi_eb(
     tl = _ensure_bounded_derived_error(
         # tl has shape Qs and has XvN (*Qs, *Ns), so their sum has (*Qs, *Ns)
         #  and evaluating the expression brings us back to Qs
-        lambda tl: np.where(
+        lambda tl: np.where(  # type: ignore
             tl == 0,
             exprv,
             (exprl)(XvN + tl.reshape(list(tl.shape) + [1] * (XvN.ndim - tl.ndim))),
-        ),  # type: ignore
+        ),
         exprv,
         Xv,
         tl,
@@ -667,11 +697,11 @@ def _compute_data_eb_for_stencil_qoi_eb(
     tu = _ensure_bounded_derived_error(
         # tu has shape Qs and has XvN (*Qs, *Ns), so their sum has (*Qs, *Ns)
         #  and evaluating the expression brings us back to Qs
-        lambda tu: np.where(
+        lambda tu: np.where(  # type: ignore
             tu == 0,
             exprv,
             (exprl)(XvN + tu.reshape(list(tu.shape) + [1] * (XvN.ndim - tu.ndim))),
-        ),  # type: ignore
+        ),
         exprv,
         Xv,
         tu,
