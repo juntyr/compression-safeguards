@@ -571,7 +571,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         )
         reverse_indices_counter = np.zeros(data.size, dtype=int)
         for i in range(np.prod(window)):
-            # manual loop to account for potential alising:
+            # manual loop to account for potential aliasing:
             # with a wrapping boundary, more than one j for the same window
             # position j could refer back to the same data element
             for j in range(indices_windows.shape[0]):
