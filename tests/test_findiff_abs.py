@@ -11,11 +11,9 @@ from .codecs import (
     encode_decode_zero,
 )
 
-ALL_BOUNDARIES = [b for b in BoundaryCondition if b != BoundaryCondition.constant]
-
 
 def check_all_codecs(data: np.ndarray):
-    for boundary in ALL_BOUNDARIES:
+    for boundary in BoundaryCondition:
         decoded = encode_decode_zero(
             data,
             safeguards=[
@@ -27,6 +25,9 @@ def check_all_codecs(data: np.ndarray):
                     dx=1,
                     eb_abs=0.1,
                     boundary=boundary,
+                    constant_boundary=4.2
+                    if boundary == BoundaryCondition.constant
+                    else None,
                 )
             ],
         )
@@ -37,7 +38,7 @@ def check_all_codecs(data: np.ndarray):
                 np.diff(decoded), np.diff(data), rtol=0.0, atol=0.1
             )
 
-    for boundary in ALL_BOUNDARIES:
+    for boundary in BoundaryCondition:
         decoded = encode_decode_neg(
             data,
             safeguards=[
@@ -49,6 +50,9 @@ def check_all_codecs(data: np.ndarray):
                     dx=1,
                     eb_abs=0.1,
                     boundary=boundary,
+                    constant_boundary=4.2
+                    if boundary == BoundaryCondition.constant
+                    else None,
                 )
             ],
         )
@@ -59,7 +63,7 @@ def check_all_codecs(data: np.ndarray):
                 np.diff(decoded), np.diff(data), rtol=0.0, atol=0.1
             )
 
-    for boundary in ALL_BOUNDARIES:
+    for boundary in BoundaryCondition:
         decoded = encode_decode_identity(
             data,
             safeguards=[
@@ -71,6 +75,9 @@ def check_all_codecs(data: np.ndarray):
                     dx=1,
                     eb_abs=0.1,
                     boundary=boundary,
+                    constant_boundary=4.2
+                    if boundary == BoundaryCondition.constant
+                    else None,
                 )
             ],
         )
@@ -81,7 +88,7 @@ def check_all_codecs(data: np.ndarray):
                 np.diff(decoded), np.diff(data), rtol=0.0, atol=0.1
             )
 
-    for boundary in ALL_BOUNDARIES:
+    for boundary in BoundaryCondition:
         decoded = encode_decode_noise(
             data,
             safeguards=[
@@ -93,6 +100,9 @@ def check_all_codecs(data: np.ndarray):
                     dx=1,
                     eb_abs=0.1,
                     boundary=boundary,
+                    constant_boundary=4.2
+                    if boundary == BoundaryCondition.constant
+                    else None,
                 )
             ],
         )
@@ -139,7 +149,7 @@ def test_fuzzer_int_iter():
     data = np.array([65373], dtype=np.uint16)
     decoded = np.array([42246], dtype=np.uint16)
 
-    for boundary in ALL_BOUNDARIES:
+    for boundary in BoundaryCondition:
         encode_decode_mock(
             data,
             decoded,
@@ -153,6 +163,9 @@ def test_fuzzer_int_iter():
                     eb_abs=2.2250738585072014e-308,
                     boundary=boundary,
                     axis=0,
+                    constant_boundary=4.2
+                    if boundary == BoundaryCondition.constant
+                    else None,
                 ),
             ],
         )
@@ -162,7 +175,7 @@ def test_fuzzer_fraction_overflow():
     data = np.array([7], dtype=np.int8)
     decoded = np.array([0], dtype=np.int8)
 
-    for boundary in ALL_BOUNDARIES:
+    for boundary in BoundaryCondition:
         encode_decode_mock(
             data,
             decoded,
@@ -176,6 +189,9 @@ def test_fuzzer_fraction_overflow():
                     eb_abs=2.2250738585072014e-308,
                     boundary=boundary,
                     axis=0,
+                    constant_boundary=4.2
+                    if boundary == BoundaryCondition.constant
+                    else None,
                 ),
             ],
         )
@@ -184,7 +200,7 @@ def test_fuzzer_fraction_overflow():
 def test_fuzzer_fraction_compare():
     data = np.array([1978047305655558])
 
-    for boundary in ALL_BOUNDARIES:
+    for boundary in BoundaryCondition:
         encode_decode_none(
             data,
             safeguards=[
@@ -198,6 +214,9 @@ def test_fuzzer_fraction_compare():
                     eb_abs=0,
                     boundary=boundary,
                     axis=None,
+                    constant_boundary=4.2
+                    if boundary == BoundaryCondition.constant
+                    else None,
                 ),
                 dict(kind="sign"),
             ],
@@ -208,7 +227,7 @@ def test_fuzzer_eb_abs():
     data = np.array([[-27, 8, 8], [8, 8, 8], [8, 8, 8]], dtype=np.int8)
     decoded = np.array([[8, 8, 8], [8, 8, 8], [8, 8, 8]], dtype=np.int8)
 
-    for boundary in ALL_BOUNDARIES:
+    for boundary in BoundaryCondition:
         encode_decode_mock(
             data,
             decoded,
@@ -222,6 +241,9 @@ def test_fuzzer_eb_abs():
                     eb_abs=8,
                     boundary=boundary,
                     axis=8,
+                    constant_boundary=4.2
+                    if boundary == BoundaryCondition.constant
+                    else None,
                 ),
                 dict(kind="sign"),
             ],
@@ -234,7 +256,7 @@ def test_fuzzer_fraction_float_overflow():
         [[1], [1], [0], [30720], [124], [32768], [16427], [3797]], dtype=np.uint16
     )
 
-    for boundary in ALL_BOUNDARIES:
+    for boundary in BoundaryCondition:
         encode_decode_mock(
             data,
             decoded,
@@ -247,6 +269,9 @@ def test_fuzzer_fraction_float_overflow():
                     dx=59,
                     eb_abs=8.812221249325077e307,
                     boundary=boundary,
+                    constant_boundary=4.2
+                    if boundary == BoundaryCondition.constant
+                    else None,
                 ),
                 dict(kind="sign"),
             ],

@@ -22,7 +22,7 @@ def check_all_codecs(data: np.ndarray):
     for monotonicity, window, boundary in product(
         Monotonicity,
         range(1, 3 + 1),
-        [b for b in BoundaryCondition if b != BoundaryCondition.constant],
+        BoundaryCondition,
     ):
         encode_decode_zero(
             data,
@@ -32,6 +32,9 @@ def check_all_codecs(data: np.ndarray):
                     monotonicity=monotonicity,
                     window=window,
                     boundary=boundary,
+                    constant_boundary=4.2
+                    if boundary == BoundaryCondition.constant
+                    else None,
                 )
             ],
         )
@@ -43,6 +46,9 @@ def check_all_codecs(data: np.ndarray):
                     monotonicity=monotonicity,
                     window=window,
                     boundary=boundary,
+                    constant_boundary=4.2
+                    if boundary == BoundaryCondition.constant
+                    else None,
                 )
             ],
         )
@@ -54,6 +60,9 @@ def check_all_codecs(data: np.ndarray):
                     monotonicity=monotonicity,
                     window=window,
                     boundary=boundary,
+                    constant_boundary=4.2
+                    if boundary == BoundaryCondition.constant
+                    else None,
                 )
             ],
         )
@@ -65,6 +74,9 @@ def check_all_codecs(data: np.ndarray):
                     monotonicity=monotonicity,
                     window=window,
                     boundary=boundary,
+                    constant_boundary=4.2
+                    if boundary == BoundaryCondition.constant
+                    else None,
                 )
             ],
         )

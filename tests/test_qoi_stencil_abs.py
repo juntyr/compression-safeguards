@@ -1,5 +1,9 @@
+from itertools import permutations
+
 import numpy as np
 import pytest
+
+from numcodecs_safeguards.safeguards.stencil import BoundaryCondition
 
 from .codecs import (
     encode_decode_identity,
@@ -16,20 +20,25 @@ def check_all_codecs(data: np.ndarray, qoi: str, shape: tuple[tuple[int, int], .
         encode_decode_identity,
         encode_decode_noise,
     ]:
-        for eb_abs in [10.0, 1.0, 0.1, 0.01, 0.0]:
-            encode_decode(
-                data,
-                safeguards=[
-                    dict(
-                        kind="qoi_abs_stencil",
-                        qoi=qoi,
-                        shape=shape,
-                        axes=tuple(range(len(shape))),  # FIXME
-                        boundary="wrap",  # FIXME
-                        eb_abs=eb_abs,
+        for axes in permutations(range(data.ndim), len(shape)):
+            for boundary in BoundaryCondition:
+                for eb_abs in [10.0, 1.0, 0.1, 0.01, 0.0]:
+                    encode_decode(
+                        data,
+                        safeguards=[
+                            dict(
+                                kind="qoi_abs_stencil",
+                                qoi=qoi,
+                                shape=shape,
+                                axes=axes,
+                                boundary=boundary,
+                                eb_abs=eb_abs,
+                                constant_boundary=4.2
+                                if boundary == BoundaryCondition.constant
+                                else None,
+                            )
+                        ],
                     )
-                ],
-            )
 
 
 def check_empty(qoi: str):

@@ -556,7 +556,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             self._boundary,
             tuple(-b for b, a in self._shape),
             tuple(a for b, a in self._shape),
-            self._constant_boundary,
+            None if self._constant_boundary is None else data.size,
             self._axes,
         )
         indices_windows = sliding_window_view(  # type: ignore
@@ -576,8 +576,9 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             # position j could refer back to the same data element
             for j in range(indices_windows.shape[0]):
                 idx = indices_windows[j, i]
-                reverse_indices_windows[idx][reverse_indices_counter[idx]] = j
-                reverse_indices_counter[idx] += 1
+                if idx != data.size:
+                    reverse_indices_windows[idx][reverse_indices_counter[idx]] = j
+                    reverse_indices_counter[idx] += 1
 
         # flatten the qoi error bounds and append an infinite value,
         # which is indexed if an element did not contribute to the maximum
@@ -1230,7 +1231,6 @@ class _NumPyLikeArray(sp.Array):
         result_list = [other**i for i in sp.tensor.array.arrayop.Flatten(self)]
         return type(self)(result_list, self.shape)
 
-    # TODO: also support log
     # TODO: also support "matrix" multiplication
 
 
