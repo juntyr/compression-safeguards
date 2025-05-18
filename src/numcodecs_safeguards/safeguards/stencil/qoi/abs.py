@@ -647,7 +647,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         # i.e. for each data element, which qoi elements does it contribute to
         #      and thus which error bounds affect it
         reverse_indices_windows = np.full(
-            (data.size, np.prod(window) * 2), indices_windows.shape[0]
+            (data.size, np.prod(window)), indices_windows.shape[0]
         )
         reverse_indices_counter = np.zeros(data.size, dtype=int)
         for i in range(np.prod(window)):
@@ -657,6 +657,17 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             for j in range(indices_windows.shape[0]):
                 idx = indices_windows[j, i]
                 if idx != data.size:
+                    # lazily allocate more to account for all possible edge cases
+                    if reverse_indices_counter[idx] >= reverse_indices_windows.shape[1]:
+                        new_reverse_indices_windows = np.full(
+                            (data.size, reverse_indices_windows.shape[1] * 2),
+                            indices_windows.shape[0],
+                        )
+                        new_reverse_indices_windows[
+                            :, : reverse_indices_windows.shape[1]
+                        ] = reverse_indices_windows
+                        reverse_indices_windows = new_reverse_indices_windows
+                    # update the reverse mapping
                     reverse_indices_windows[idx][reverse_indices_counter[idx]] = j
                     reverse_indices_counter[idx] += 1
 
