@@ -122,10 +122,10 @@ def test_constant(check):
 def test_imaginary(check):
     with pytest.raises(AssertionError, match="imaginary"):
         check_all_codecs(
-            np.array([2], dtype=np.uint64), "(-log(-20417,ln(x)))", ((0, 0),)
+            np.array([2], dtype=np.uint64), "(-log(-20417, base=ln(x)))", ((0, 0),)
         )
     with pytest.raises(AssertionError, match="imaginary"):
-        check("(-log(-20417,ln(x)))")
+        check("(-log(-20417, base=ln(x)))")
 
 
 def test_invalid_array():
@@ -155,7 +155,7 @@ def test_findiff():
     )
 
     safeguard = QuantityOfInterestAbsoluteErrorBoundSafeguard(
-        "findiff(x,0,2,0,1,0)",
+        "findiff(x,order=0,accuracy=2,type=0,dx=1,axis=0)",
         ((-4, 4), (-4, 4)),
         (0, 1),
         "valid",
@@ -164,12 +164,12 @@ def test_findiff():
     assert f"{safeguard._qoi_expr}" == "X[4, 4]"
     check_all_codecs(
         np.arange(81, dtype=float).reshape(9, 9),
-        "findiff(x,0,2,0,1,0)",
+        "findiff(x,order=0,accuracy=2,type=0,dx=1,axis=0)",
         ((-4, 4), (-4, 4)),
     )
 
     safeguard = QuantityOfInterestAbsoluteErrorBoundSafeguard(
-        "findiff(x,1,2,0,1,0)",
+        "findiff(x,order=1,accuracy=2,type=0,dx=1,axis=0)",
         ((-4, 4), (-4, 4)),
         (0, 1),
         "valid",
@@ -178,12 +178,12 @@ def test_findiff():
     assert f"{safeguard._qoi_expr}" == "-X[3, 4]/2 + X[5, 4]/2"
     check_all_codecs(
         np.arange(81, dtype=float).reshape(9, 9),
-        "findiff(x,1,2,0,1,0)",
+        "findiff(x,order=1,accuracy=2,type=0,dx=1,axis=0)",
         ((-4, 4), (-4, 4)),
     )
 
     safeguard = QuantityOfInterestAbsoluteErrorBoundSafeguard(
-        "findiff(x,1,2,0,1,1)",
+        "findiff(x,order=1,accuracy=2,type=0,dx=1,axis=1)",
         ((-4, 4), (-4, 4)),
         (0, 1),
         "valid",
@@ -192,12 +192,12 @@ def test_findiff():
     assert f"{safeguard._qoi_expr}" == "-X[4, 3]/2 + X[4, 5]/2"
     check_all_codecs(
         np.arange(81, dtype=float).reshape(9, 9),
-        "findiff(x,1,2,0,1,1)",
+        "findiff(x,order=1,accuracy=2,type=0,dx=1,axis=1)",
         ((-4, 4), (-4, 4)),
     )
 
     safeguard = QuantityOfInterestAbsoluteErrorBoundSafeguard(
-        "findiff(x,2,2,0,1,0)",
+        "findiff(x,order=2,accuracy=2,type=0,dx=1,axis=0)",
         ((-4, 4), (-4, 4)),
         (0, 1),
         "valid",
@@ -206,12 +206,12 @@ def test_findiff():
     assert f"{safeguard._qoi_expr}" == "X[3, 4] - 2*X[4, 4] + X[5, 4]"
     check_all_codecs(
         np.arange(81, dtype=float).reshape(9, 9),
-        "findiff(x,2,2,0,1,0)",
+        "findiff(x,order=2,accuracy=2,type=0,dx=1,axis=0)",
         ((-4, 4), (-4, 4)),
     )
 
     safeguard = QuantityOfInterestAbsoluteErrorBoundSafeguard(
-        "findiff(findiff(x,1,2,0,1,0),1,2,0,1,0)",
+        "findiff(findiff(x,order=1,accuracy=2,type=0,dx=1,axis=0),order=1,accuracy=2,type=0,dx=1,axis=0)",
         ((-4, 4), (-4, 4)),
         (0, 1),
         "valid",
@@ -220,12 +220,12 @@ def test_findiff():
     assert f"{safeguard._qoi_expr}" == "X[2, 4]/4 - X[4, 4]/2 + X[6, 4]/4"
     check_all_codecs(
         np.arange(81, dtype=float).reshape(9, 9),
-        "findiff(findiff(x,1,2,0,1,0),1,2,0,1,0)",
+        "findiff(findiff(x,order=1,accuracy=2,type=0,dx=1,axis=0),order=1,accuracy=2,type=0,dx=1,axis=0)",
         ((-4, 4), (-4, 4)),
     )
 
     safeguard = QuantityOfInterestAbsoluteErrorBoundSafeguard(
-        "findiff(findiff(x,1,2,0,1,0),1,2,0,1,1)",
+        "findiff(findiff(x,order=1,accuracy=2,type=0,dx=1,axis=0),order=1,accuracy=2,type=0,dx=1,axis=1)",
         ((-4, 4), (-4, 4)),
         (0, 1),
         "valid",
@@ -234,7 +234,7 @@ def test_findiff():
     assert f"{safeguard._qoi_expr}" == "X[3, 3]/4 - X[3, 5]/4 - X[5, 3]/4 + X[5, 5]/4"
     check_all_codecs(
         np.arange(81, dtype=float).reshape(9, 9),
-        "findiff(findiff(x,1,2,0,1,0),1,2,0,1,1)",
+        "findiff(findiff(x,order=1,accuracy=2,type=0,dx=1,axis=0),order=1,accuracy=2,type=0,dx=1,axis=1)",
         ((-4, 4), (-4, 4)),
     )
 

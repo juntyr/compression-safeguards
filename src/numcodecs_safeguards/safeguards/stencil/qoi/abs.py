@@ -234,18 +234,18 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         assert _QOI_PATTERN.fullmatch(qoi) is not None, "invalid qoi expression"
         try:
 
-            def sqrt(x):
+            def sqrt(x, /):
                 return x ** sp.Rational(1, 2)
 
-            def exp(x):
+            def exp(x, /):
                 return sp.E**x
 
-            def ln(x):
+            def ln(x, /):
                 if isinstance(x, _NumPyLikeArray):
                     return x.applyfunc(sp.ln)
                 return sp.ln(x)
 
-            def log(x, base):
+            def log(x, /, *, base):
                 if isinstance(x, _NumPyLikeArray):
                     ln_x = x.applyfunc(sp.ln)
                 else:
@@ -256,13 +256,13 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                     ln_base = sp.ln(base)
                 return ln_x / ln_base
 
-            def asum(x):
+            def asum(x, /):
                 assert isinstance(x, _NumPyLikeArray), (
                     "can only compute the sum over an array"
                 )
                 return sum(sp.tensor.array.arrayop.Flatten(x), sp.Integer(0))
 
-            def findiff(expr, order, accuracy, type, dx, axis):
+            def findiff(expr, /, *, order, accuracy, type, dx, axis):
                 from ..findiff import (
                     FiniteDifference,
                     _finite_difference_coefficients,
@@ -1341,6 +1341,15 @@ class _ArrayConstructor:
 _QOI_PATTERN = re.compile(
     r"(?:"
     r"(?:"
+    r"(?:"
+    r"(?:base[ \t]*=[ \t]*)"
+    r"|(?:order[ \t]*=[ \t]*)"
+    r"|(?:accuracy[ \t]*=[ \t]*)"
+    r"|(?:type[ \t]*=[ \t]*)"
+    r"|(?:dx[ \t]*=[ \t]*)"
+    r"|(?:axis[ \t]*=[ \t]*)"
+    r")?"
+    r"(?:"
     r"(?:[0-9]+)"
     r"|(?:[0-9]+\.[0-9]+)"
     r"|(?:e)"
@@ -1355,6 +1364,7 @@ _QOI_PATTERN = re.compile(
     r"|(?:exp)"
     r"|(?:asum)"
     r"|(?:findiff)"
+    r")"
     r")?"
     r"|(?:[ \t\n\(\)\[\],:\+\-\*/])"
     r")*"
