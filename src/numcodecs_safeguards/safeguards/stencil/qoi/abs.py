@@ -262,6 +262,85 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                 )
                 return sum(sp.tensor.array.arrayop.Flatten(x), sp.Integer(0))
 
+            def findiff(expr, order, accuracy, type, dx, axis):
+                from ..findiff import (
+                    FiniteDifference,
+                    _finite_difference_coefficients,
+                    _finite_difference_offsets,
+                )
+
+                assert isinstance(expr, sp.Basic), "findiff expr must be an expression"
+                assert len(expr.free_symbols) > 0, "findiff expr must not be constant"
+
+                assert isinstance(order, sp.Integer), "findiff order must be an integer"
+                order = int(order)
+                assert order >= 0, "findiff order must be non-negative"
+                assert isinstance(accuracy, sp.Integer), (
+                    "findiff accuracy must be an integer"
+                )
+                accuracy = int(accuracy)
+                assert accuracy > 0, "findiff accuracy must be positive"
+
+                assert isinstance(type, sp.Integer), "findiff type must be an integer"
+                assert type in (-1, 0, +1), (
+                    "findiff type must be 1 (forward), 0 (central), or -1 (backward)"
+                )
+                type = [
+                    FiniteDifference.central,
+                    FiniteDifference.forward,
+                    FiniteDifference.backwards,
+                ][type]
+
+                if type == FiniteDifference.central:
+                    assert accuracy % 2 == 0, (
+                        "accuracy must be even for a central finite difference"
+                    )
+
+                assert isinstance(dx, sp.Number), "findiff dx must be a number"
+                assert dx > 0, "dx must be positive"
+                assert isinstance(dx, (sp.Integer, sp.Rational)) or _isfinite(
+                    float(dx)
+                ), "findiff dx must be finite"
+
+                assert isinstance(axis, sp.Integer), "findiff axis must be an integer"
+                axis = int(axis)
+                assert axis >= -len(shape) and axis < len(shape), (
+                    "findiff axis must be in range of shape"
+                )
+
+                offsets = _finite_difference_offsets(type, order, accuracy)
+                coefficients = _finite_difference_coefficients(order, offsets)
+
+                def apply_findiff(expr: sp.Basic, axis: int, offset: int):
+                    if expr.is_Number:
+                        return expr
+                    if (
+                        expr.func is sp.tensor.array.expressions.ArrayElement
+                        and len(expr.args) == 2
+                        and expr.args[0] == self._X
+                    ):
+                        name, indices = expr.args
+                        indices = list(indices)
+                        indices[axis] += offset
+                        assert indices[axis] >= 0, (
+                            f"cannot compute the findiff on axis {axis} since the neighbourhood is insufficiently large: before should be at least {indices[axis] - I[axis]}"
+                        )
+                        assert indices[axis] < s[axis], (
+                            f"cannot compute the findiff on axis {axis} since the neighbourhood is insufficiently large: after should be at least {indices[axis] - I[axis]}"
+                        )
+                        return sp.tensor.array.expressions.ArrayElement(name, indices)
+                    return expr.func(
+                        *[apply_findiff(a, axis, offset) for a in expr.args]
+                    )
+
+                return sp.Add(
+                    *[
+                        apply_findiff(expr, axis, o)
+                        * sp.Rational(c.numerator, c.denominator)
+                        for o, c in zip(offsets, coefficients)
+                    ]
+                )
+
             qoi_expr = sp.parse_expr(
                 self._qoi,
                 local_dict=dict(x=x, X=X, I=_NumPyLikeArray(I)),
@@ -281,6 +360,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                     ln=ln,
                     log=log,
                     asum=asum,
+                    findiff=findiff,
                 ),
                 transformations=(sp.parsing.sympy_parser.auto_number,),
             )
@@ -1263,6 +1343,7 @@ _QOI_PATTERN = re.compile(
     r"|(?:log)"
     r"|(?:exp)"
     r"|(?:asum)"
+    r"|(?:findiff)"
     r")?"
     r"|(?:[ \t\n\(\)\[\],:\+\-\*/])"
     r")*"
