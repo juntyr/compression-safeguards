@@ -57,11 +57,15 @@ This package currently implements the following [safeguards][numcodecs_safeguard
 
     The pointwise absolute error of the finite-difference-approximated derivative is guaranteed to be less than or equal to the provided bound. The safeguard supports three types of [`FiniteDifference`][numcodecs_safeguards.safeguards.stencil.findiff.FiniteDifference]: `central`, `forward`, `backward`. The fininite difference is computed with respect to the provided uniform grid spacing. If the spacing is different along different axes, multiple safeguards along specific axes with different spacing can be combined. Infinite finite differences are preserved with the same bit pattern. NaN finite differences remain NaN though not necessarily with the same bit pattern.
 
-### Error Bounds on derived Quantities of Interest (pointwise QoIs)
+### Error Bounds on derived Quantities of Interest (QoIs)
 
-- [`qoi_abs`][numcodecs_safeguards.safeguards.pointwise.qoi.abs.QuantityOfInterestAbsoluteErrorBoundSafeguard] (absolute error bound on quantities of interest):
+- [`qoi_abs_pw`][numcodecs_safeguards.safeguards.pointwise.qoi.abs.PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard] (absolute error bound on pointwise quantities of interest):
 
-    The pointwise absolute error on a derived quantity of interest (QoI) is guaranteed to be less than or equal to the provided bound. The non-constant quantity of interest expression can contain the addition, multiplication, division, square root, exponentiation and logarithm operations over integer and floating point constants and the pointwise data value. Infinite quantities of interest are preserved with the same bit pattern. NaN quantities of interest remain NaN though not necessarily with the same bit pattern.
+    The absolute error on a derived pointwise quantity of interest (QoI) is guaranteed to be less than or equal to the provided bound. The non-constant quantity of interest expression can contain the addition, multiplication, division, square root, exponentiation and logarithm operations over integer and floating point constants and the pointwise data value. Infinite quantities of interest are preserved with the same bit pattern. NaN quantities of interest remain NaN though not necessarily with the same bit pattern.
+
+- [`qoi_abs_stencil`][numcodecs_safeguards.safeguards.stencil.qoi.abs.StencilQuantityOfInterestAbsoluteErrorBoundSafeguard] (absolute error bound on quantities of interest over a neighbourhood):
+
+    The absolute error on a derived quantity of interest (QoI) over a neighbourhood of data points is guaranteed to be less than or equal to the provided bound. The non-constant quantity of interest expression can contain the addition, multiplication, division, square root, exponentiation, logarithm, sum, and finite difference operations over integer and floating point constants and arrays and the data neighbourhood. Infinite quantities of interest are preserved with the same bit pattern. NaN quantities of interest remain NaN though not necessarily with the same bit pattern.
 
 ### Pointwise properties
 

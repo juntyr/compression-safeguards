@@ -18,13 +18,13 @@ class NeighbourhoodAxis:
     axis : int
         The axis along which the boundary condition is applied.
     before : int
-        The non-positive number of values to include before the centre of a
+        The non-negative number of values to include before the centre of a
         data neighbourhood.
 
-        e.g. setting `before=-1` means that the neighbourhood contains the
+        e.g. setting `before=1` means that the neighbourhood contains the
         previous value.
     after : int
-        The non-positive number of values to include after the centre of a
+        The non-negative number of values to include after the centre of a
         data neighbourhood.
 
         e.g. setting `after=2` means that the neighbourhood contains the
@@ -56,7 +56,7 @@ class NeighbourhoodAxis:
         self._axis = axis
 
         assert type(before) is int, "before must be an integer"
-        assert before <= 0, "before must be non-positive"
+        assert before >= 0, "before must be non-negative"
         self._before = before
 
         assert type(after) is int, "after must be an integer"

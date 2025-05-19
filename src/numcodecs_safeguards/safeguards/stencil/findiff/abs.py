@@ -12,7 +12,7 @@ import numpy as np
 from ....cast import _isfinite, _isinf, _isnan, as_bits, to_finite_float, to_float
 from ....intervals import IntervalUnion
 from ...pointwise.abs import _compute_safe_eb_diff_interval
-from .. import BoundaryCondition, _pad_with_boundary_single
+from .. import BoundaryCondition, _pad_with_boundary
 from ..abc import S, StencilSafeguard, T
 from . import (
     FiniteDifference,
@@ -205,7 +205,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
             pad_before = max(0, -omin)
             pad_after = max(0, omax)
 
-            data_boundary = _pad_with_boundary_single(
+            data_boundary = _pad_with_boundary(
                 data,
                 self._boundary,
                 pad_before,
@@ -213,7 +213,7 @@ class FiniteDifferenceAbsoluteErrorBoundSafeguard(StencilSafeguard):
                 self._constant_boundary,
                 axis,
             )
-            decoded_boundary = _pad_with_boundary_single(
+            decoded_boundary = _pad_with_boundary(
                 decoded,
                 self._boundary,
                 pad_before,

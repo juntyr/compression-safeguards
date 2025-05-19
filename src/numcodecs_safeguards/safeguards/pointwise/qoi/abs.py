@@ -2,7 +2,7 @@
 Pointwise quantity of interest (QoI) absolute error bound safeguard.
 """
 
-__all__ = ["QuantityOfInterestAbsoluteErrorBoundSafeguard"]
+__all__ = ["PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard"]
 
 import functools
 import re
@@ -31,11 +31,11 @@ from ..abs import _compute_safe_eb_diff_interval
 from . import Expr
 
 
-class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
+class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
     """
-    The `QuantityOfInterestAbsoluteErrorBoundSafeguard` guarantees that the
-    pointwise absolute error on a derived quantity of interest (QoI) is less
-    than or equal to the provided bound `eb_abs`.
+    The `PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard` guarantees
+    that the absolute error on a derived pointwise quantity of interest (QoI)
+    is less than or equal to the provided bound `eb_abs`.
 
     The quantity of interest is specified as a non-constant expression, in
     string form, on the pointwise value `x`. For example, to bound the error on
@@ -125,7 +125,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
     _qoi_expr: sp.Basic
     _x: sp.Symbol
 
-    kind = "qoi_abs"
+    kind = "qoi_abs_pw"
 
     def __init__(self, qoi: Expr, eb_abs: int | float):
         assert eb_abs >= 0, "eb_abs must be non-negative"
@@ -754,16 +754,18 @@ def _ensure_bounded_derived_error(
 
     # check if any derived expression exceeds the error bound
     # this check matches the qoi safeguard's validity check
-    is_eb_exceeded = lambda eb_x_guess: ~np.where(
-        _isfinite(exprv),
-        ((expr(eb_x_guess) - exprv) >= eb_expr_lower)
-        & ((expr(eb_x_guess) - exprv) <= eb_expr_upper),
-        np.where(
-            _isinf(exprv),
-            expr(eb_x_guess) == exprv,
-            _isnan(expr(eb_x_guess)),
-        ),
-    )
+    def is_eb_exceeded(eb_x_guess):
+        return ~np.where(
+            _isfinite(exprv),
+            ((expr(eb_x_guess) - exprv) >= eb_expr_lower)
+            & ((expr(eb_x_guess) - exprv) <= eb_expr_upper),
+            np.where(
+                _isinf(exprv),
+                expr(eb_x_guess) == exprv,
+                _isnan(expr(eb_x_guess)),
+            ),
+        )
+
     eb_exceeded = is_eb_exceeded(eb_x_guess)
 
     if not np.any(eb_exceeded):

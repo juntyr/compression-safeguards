@@ -55,7 +55,7 @@ class BoundaryCondition(Enum):
     """
 
 
-def _pad_with_boundary_single(
+def _pad_with_boundary(
     a: np.ndarray,
     boundary: BoundaryCondition,
     pad_before: int,
@@ -66,27 +66,8 @@ def _pad_with_boundary_single(
     if (axis >= a.ndim) or (axis < -a.ndim):
         return a
 
-    return _pad_with_boundary(
-        a,
-        boundary,
-        (pad_before,),
-        (pad_after,),
-        constant,
-        axes=(axis,),
-    )
-
-
-def _pad_with_boundary(
-    a: np.ndarray,
-    boundary: BoundaryCondition,
-    pad_before: tuple[int, ...],
-    pad_after: tuple[int, ...],
-    constant: None | int | float,
-    axes: tuple[int, ...],
-) -> np.ndarray:
     pad_width = [(0, 0)] * a.ndim
-    for axis, pb, pa in zip(axes, pad_before, pad_after):
-        pad_width[axis] = (pb, pa)
+    pad_width[axis] = (pad_before, pad_after)
 
     kwargs = dict()
     match boundary:

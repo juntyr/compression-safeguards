@@ -21,7 +21,7 @@ def check_all_codecs(data: np.ndarray, qoi: str):
         for eb_abs in [10.0, 1.0, 0.1, 0.01, 0.0]:
             encode_decode(
                 data,
-                safeguards=[dict(kind="qoi_abs", qoi=qoi, eb_abs=eb_abs)],
+                safeguards=[dict(kind="qoi_abs_pw", qoi=qoi, eb_abs=eb_abs)],
             )
 
 
