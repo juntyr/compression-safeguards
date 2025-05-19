@@ -1204,9 +1204,14 @@ def _create_sympy_numpy_printer_class(
             )
 
         def _print_ArrayElement(self, expr):
-            return (
-                f"{expr.name}[..., {', '.join([self._print(i) for i in expr.indices])}]"
-            )
+            indices = []
+            for i in expr.indices:
+                assert isinstance(i, sp.Integer), (
+                    "data neighbourhood only supports integer indices"
+                )
+                indices.append(i.p)
+            printed = f"{expr.name}[..., {', '.join([str(i) for i in indices])}]"
+            return printed
 
     return NumPyDtypePrinter
 
