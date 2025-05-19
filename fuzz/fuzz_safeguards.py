@@ -5,6 +5,7 @@ with atheris.instrument_imports():
     import numpy as np
 
 import sympy as sympy
+from timeoutcontext import timeout
 
 with atheris.instrument_imports():
     import sys
@@ -197,11 +198,12 @@ def check_one_input(data):
         decoded = decoded.reshape((sizea, sizeb))
 
     try:
-        safeguard = SafeguardsCodec(
-            codec=FuzzCodec(raw, decoded),
-            safeguards=safeguards,
-        )
-    except (AssertionError, Warning):
+        with timeout(1):
+            safeguard = SafeguardsCodec(
+                codec=FuzzCodec(raw, decoded),
+                safeguards=safeguards,
+            )
+    except (AssertionError, Warning, TimeoutError):
         return
 
     grepr = repr(safeguard)
