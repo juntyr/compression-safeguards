@@ -61,18 +61,18 @@ def _pad_with_boundary_single(
     pad_before: int,
     pad_after: int,
     constant: None | int | float,
-    axis: None | int,
+    axis: int,
 ) -> np.ndarray:
-    if axis is not None and ((axis >= a.ndim) or (axis < -a.ndim)):
+    if (axis >= a.ndim) or (axis < -a.ndim):
         return a
 
     return _pad_with_boundary(
         a,
         boundary,
-        ((pad_before,) * (a.ndim if axis is None else 1)),
-        ((pad_after,) * (a.ndim if axis is None else 1)),
+        (pad_before,),
+        (pad_after,),
         constant,
-        axes=(tuple(range(a.ndim)) if axis is None else (axis,)),
+        axes=(axis,),
     )
 
 

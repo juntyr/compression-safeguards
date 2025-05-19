@@ -32,8 +32,9 @@ from ....intervals import Interval, IntervalUnion
 from ...pointwise.abs import _compute_safe_eb_diff_interval
 from ...pointwise.qoi import Expr
 from ...pointwise.qoi.abs import _ensure_bounded_derived_error
-from .. import BoundaryCondition, _pad_with_boundary
+from .. import BoundaryCondition, _pad_with_boundary_single
 from ..abc import S, StencilSafeguard, T
+from . import NeighbourhoodAxis
 
 Qs = TypeVar("Qs", bound=tuple[int, ...])
 Ns = TypeVar("Ns", bound=tuple[int, ...])
@@ -148,49 +149,25 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     qoi : Expr
         The non-constant expression for computing the derived quantity of
         interest for a neighbourhood tensor `X`.
-    shape : tuple[tuple[int, int], ...]
-        The shape of the data neighbourhood, expressed as (before, after)
-        tuples, where before (non-positive) and after (non-negative)
-        specify the range of values relative to the data point to include.
-
-        e.g. a neighbourhood of shape `((-1, 2), (-2, 0))` is 2D and contains
-        one element before and two elements after the current one on the first
-        axis, and two elements before on the second axis.
-    axes : tuple[int, ...]
-        The axes that the neighbourhood is collected from. The neighbourhood
-        window is applied independently to any additional axes. The number of
-        axes must match the number of dimensions in the shape.
-
-        e.g. for a 3d data array, 2d shape `((-1, 1), (-1, 1))`, and axes
-        `(0, -1)`, the neighbourhood is created over the first and last axis,
-        and applied independently along the middle axis.
-    boundary : str | BoundaryCondition
-        Boundary condition for evaluating the quantity of interest near the
-        data domain boundaries, e.g. by extending values.
+    neighbourhood : tuple[dict | NeighbourhoodAxis, ...]
+        The non-empty axes of the data neighbourhood over which the quantity of
+        interest is computed. The neighbourhood window is applied independently
+        over any additional axes in the data.
     eb_abs : int | float
         The non-negative absolute error bound on the quantity of interest that
         is enforced by this safeguard.
-    constant_boundary : None | int | float
-        Optional constant value with which the data domain is extended for a
-        constant boundary.
     """
 
     __slots__ = (
         "_qoi",
-        "_shape",
-        "_axes",
-        "_boundary",
+        "_neighbourhood",
         "_eb_abs",
-        "_constant_boundary",
         "_qoi_expr",
         "_X",
     )
     _qoi: Expr
-    _shape: tuple[tuple[int, int], ...]
-    _axes: tuple[int, ...]
-    _boundary: BoundaryCondition
+    _neighbourhood: tuple[NeighbourhoodAxis, ...]
     _eb_abs: int | float
-    _constant_boundary: None | int | float
     _qoi_expr: sp.Basic
     _X: sp.tensor.array.expressions.ArraySymbol
 
@@ -199,51 +176,32 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     def __init__(
         self,
         qoi: Expr,
-        shape: tuple[tuple[int, int], ...],
-        axes: tuple[int, ...],
-        boundary: str | BoundaryCondition,
+        neighbourhood: tuple[dict | NeighbourhoodAxis, ...],
         eb_abs: int | float,
-        constant_boundary: None | int | float = None,
     ):
+        self._neighbourhood = tuple(
+            axis
+            if isinstance(axis, NeighbourhoodAxis)
+            else NeighbourhoodAxis.from_config(axis)
+            for axis in neighbourhood
+        )
+        assert len(self._neighbourhood) > 0, "neighbourhood must not be empty"
+        assert len(set(axis._axis for axis in self._neighbourhood)) == len(
+            self._neighbourhood
+        ), "neighbourhood axes must be unique"
+
         assert eb_abs >= 0, "eb_abs must be non-negative"
         assert isinstance(eb_abs, int) or _isfinite(eb_abs), "eb_abs must be finite"
-
-        self._qoi = qoi
         self._eb_abs = eb_abs
 
-        s = []
-        I = []
-        assert len(shape) > 0, "shape must not be empty"
-        for b, a in shape:
-            assert type(b) is int, "shape's before must be an integer"
-            assert b <= 0, "shape's before must be non-positive"
-            assert type(a) is int, "shape's after must be an integer"
-            assert a >= 0, "shape's after must be non-negative"
-            s.append(-b + 1 + abs(a))
-            I.append(-b)
-        self._shape = shape
+        shape, I = [], []
+        for axis in self._neighbourhood:
+            shape.append(-axis._before + 1 + axis._after)
+            I.append(-axis._before)
 
-        self._X = sp.tensor.array.expressions.ArraySymbol("X", s)
+        self._X = sp.tensor.array.expressions.ArraySymbol("X", shape)
         X = self._X.as_explicit()
         X.__class__ = _NumPyLikeArray
-        x = X.__getitem__(I)
-
-        assert len(axes) == len(shape), (
-            "number of axes must match the number of shape dimensions"
-        )
-        self._axes = axes
-
-        self._boundary = (
-            boundary
-            if isinstance(boundary, BoundaryCondition)
-            else BoundaryCondition[boundary]
-        )
-        assert (self._boundary != BoundaryCondition.constant) == (
-            constant_boundary is None
-        ), (
-            "constant_boundary must be provided if and only if the constant boundary condition is used"
-        )
-        self._constant_boundary = constant_boundary
 
         assert len(qoi.strip()) > 0, "qoi expression must not be empty"
         assert _QOI_PATTERN.fullmatch(qoi) is not None, "invalid qoi expression"
@@ -319,9 +277,9 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
                 assert isinstance(axis, sp.Integer), "findiff axis must be an integer"
                 axis = int(axis)
-                assert axis >= -len(shape) and axis < len(shape), (
-                    "findiff axis must be in range of shape"
-                )
+                assert axis >= -len(self._neighbourhood) and axis < len(
+                    self._neighbourhood
+                ), "findiff axis must be in range of the dimension of the neighbourhood"
 
                 offsets = _finite_difference_offsets(type, order, accuracy)
                 coefficients = _finite_difference_coefficients(order, offsets)
@@ -340,7 +298,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                         assert indices[axis] >= 0, (
                             f"cannot compute the findiff on axis {axis} since the neighbourhood is insufficiently large: before should be at least {indices[axis] - I[axis]}"
                         )
-                        assert indices[axis] < s[axis], (
+                        assert indices[axis] < shape[axis], (
                             f"cannot compute the findiff on axis {axis} since the neighbourhood is insufficiently large: after should be at least {indices[axis] - I[axis]}"
                         )
                         return sp.tensor.array.expressions.ArrayElement(name, indices)
@@ -357,8 +315,8 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                 )
 
             qoi_expr = sp.parse_expr(
-                self._qoi,
-                local_dict=dict(x=x, X=X, I=_NumPyLikeArray(I)),
+                qoi,
+                local_dict=dict(X=X, x=X.__getitem__(I), I=_NumPyLikeArray(I)),
                 global_dict=dict(
                     # literals
                     Integer=sp.Integer,
@@ -388,10 +346,10 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             _canary_eb_abs = _compute_data_eb_for_stencil_qoi_eb(
                 qoi_expr,
                 self._X,
-                np.zeros(s),
-                np.zeros(s),
-                np.zeros(s),
-                np.zeros(s),
+                np.zeros(shape),
+                np.zeros(shape),
+                np.zeros(shape),
+                np.zeros(shape),
             )
         except Exception as err:
             raise AssertionError(
@@ -402,6 +360,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             "qoi expression must not contain imaginary numbers"
         )
 
+        self._qoi = qoi
         self._qoi_expr = qoi_expr
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -426,43 +385,53 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         """
 
         all_axes = []
-        for axis in self._axes:
-            if axis >= data.ndim or axis < -data.ndim:
+        for axis in self._neighbourhood:
+            if axis._axis >= data.ndim or axis._axis < -data.ndim:
                 raise IndexError(
-                    f"axis index {axis} is out of bounds for array of shape {data.shape}"
+                    f"axis index {axis._axis} is out of bounds for array of shape {data.shape}"
                 )
-            naxis = data.ndim - axis if axis < 0 else axis
+            naxis = data.ndim - axis._axis if axis._axis < 0 else axis._axis
             if naxis in all_axes:
                 raise IndexError(
-                    f"duplicate axis index {axis}, normalised to {naxis}, for array of shape {data.shape}"
+                    f"duplicate axis index {axis._axis}, normalised to {naxis}, for array of shape {data.shape}"
                 )
             all_axes.append(naxis)
 
-        window = tuple(-b + 1 + a for b, a in self._shape)
+        window = tuple(-axis._before + 1 + axis._after for axis in self._neighbourhood)
 
-        data_boundary = _pad_with_boundary(
-            data,
-            self._boundary,
-            tuple(-b for b, a in self._shape),
-            tuple(a for b, a in self._shape),
-            self._constant_boundary,
-            self._axes,
-        )
-        decoded_boundary = _pad_with_boundary(
-            decoded,
-            self._boundary,
-            tuple(-b for b, a in self._shape),
-            tuple(a for b, a in self._shape),
-            self._constant_boundary,
-            self._axes,
-        )
+        data_boundary, decoded_boundary = data, decoded
+        for axis in self._neighbourhood:
+            data_boundary = _pad_with_boundary_single(
+                data_boundary,
+                axis._boundary,
+                -axis._before,
+                axis._after,
+                axis._constant_boundary,
+                axis._axis,
+            )
+            decoded_boundary = _pad_with_boundary_single(
+                decoded_boundary,
+                axis._boundary,
+                -axis._before,
+                axis._after,
+                axis._constant_boundary,
+                axis._axis,
+            )
 
         data_windows_float: np.ndarray = to_float(
-            sliding_window_view(data_boundary, window, axis=self._axes, writeable=False)  # type: ignore
+            sliding_window_view(
+                data_boundary,
+                window,
+                axis=tuple(axis._axis for axis in self._neighbourhood),
+                writeable=False,
+            )  # type: ignore
         )
         decoded_windows_float: np.ndarray = to_float(
             sliding_window_view(
-                decoded_boundary, window, axis=self._axes, writeable=False
+                decoded_boundary,
+                window,
+                axis=tuple(axis._axis for axis in self._neighbourhood),
+                writeable=False,
             )  # type: ignore
         )
 
@@ -496,18 +465,15 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
         ok = np.ones_like(data, dtype=np.bool)
 
-        if self._boundary == BoundaryCondition.valid:
-            sl = [slice(None)] * data.ndim
-            for axis, (b, a) in zip(self._axes, self._shape):
-                start = None if b == 0 else -b
-                end = None if a == 0 else -a
-                sl[axis] = slice(start, end)
-            s = tuple(sl)
-        else:
-            s = tuple([slice(None)] * data.ndim)
+        s = [slice(None)] * data.ndim
+        for axis in self._neighbourhood:
+            if axis._boundary == BoundaryCondition.valid:
+                start = None if axis._before == 0 else -axis._before
+                end = None if axis._after == 0 else -axis._after
+                s[axis._axis] = slice(start, end)
 
         ok = np.ones_like(data, dtype=np.bool)
-        ok[s] = windows_ok
+        ok[tuple(s)] = windows_ok
 
         return ok  # type: ignore
 
@@ -530,31 +496,38 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         """
 
         all_axes = []
-        for axis in self._axes:
-            if axis >= data.ndim or axis < -data.ndim:
+        for axis in self._neighbourhood:
+            if axis._axis >= data.ndim or axis._axis < -data.ndim:
                 raise IndexError(
-                    f"axis index {axis} is out of bounds for array of shape {data.shape}"
+                    f"axis index {axis._axis} is out of bounds for array of shape {data.shape}"
                 )
-            naxis = data.ndim - axis if axis < 0 else axis
+            naxis = data.ndim - axis._axis if axis._axis < 0 else axis._axis
             if naxis in all_axes:
                 raise IndexError(
-                    f"duplicate axis index {axis}, normalised to {naxis}, for array of shape {data.shape}"
+                    f"duplicate axis index {axis._axis}, normalised to {naxis}, for array of shape {data.shape}"
                 )
             all_axes.append(naxis)
 
-        window = tuple(-b + 1 + a for b, a in self._shape)
+        window = tuple(-axis._before + 1 + axis._after for axis in self._neighbourhood)
 
-        data_boundary = _pad_with_boundary(
-            data,
-            self._boundary,
-            tuple(-b for b, a in self._shape),
-            tuple(a for b, a in self._shape),
-            self._constant_boundary,
-            self._axes,
-        )
+        data_boundary = data
+        for axis in self._neighbourhood:
+            data_boundary = _pad_with_boundary_single(
+                data_boundary,
+                axis._boundary,
+                -axis._before,
+                axis._after,
+                axis._constant_boundary,
+                axis._axis,
+            )
 
         data_windows_float: np.ndarray = to_float(
-            sliding_window_view(data_boundary, window, axis=self._axes, writeable=False)  # type: ignore
+            sliding_window_view(
+                data_boundary,
+                window,
+                axis=tuple(axis._axis for axis in self._neighbourhood),
+                writeable=False,
+            )  # type: ignore
         )
 
         with np.errstate(
@@ -613,18 +586,18 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         # if no error bounds are imposed, e.g. because we in valid mode and the
         #  neighbourhood shape exceeds the data shape, allow all values
         if eb_qoi_lower.size == 0:
-            assert data.size == 0 or self._boundary == BoundaryCondition.valid
+            assert data.size == 0 or any(
+                axis._boundary == BoundaryCondition.valid
+                for axis in self._neighbourhood
+            )
             return Interval.full_like(data).into_union()  # type: ignore
 
-        if self._boundary == BoundaryCondition.valid:
-            sl = [slice(None)] * data.ndim
-            for axis, (b, a) in zip(self._axes, self._shape):
-                start = None if b == 0 else -b
-                end = None if a == 0 else -a
-                sl[axis] = slice(start, end)
-            s = tuple(sl)
-        else:
-            s = tuple([slice(None)] * data.ndim)
+        s = [slice(None)] * data.ndim
+        for axis in self._neighbourhood:
+            if axis._boundary == BoundaryCondition.valid:
+                start = None if axis._before == 0 else -axis._before
+                end = None if axis._after == 0 else -axis._after
+                s[axis._axis] = slice(start, end)
 
         data_float: np.ndarray = to_float(data)
 
@@ -636,7 +609,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                 self._qoi_expr,
                 self._X,
                 data_windows_float,
-                data_float[s],
+                data_float[tuple(s)],
                 eb_qoi_lower,
                 eb_qoi_upper,
             )
@@ -645,17 +618,21 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
         # compute how the data indices are distributed into windows
         # i.e. for each qoi element, which data does it depend on
-        indices = np.arange(data.size).reshape(data.shape)
-        indices_boundary = _pad_with_boundary(
-            indices,
-            self._boundary,
-            tuple(-b for b, a in self._shape),
-            tuple(a for b, a in self._shape),
-            None if self._constant_boundary is None else data.size,
-            self._axes,
-        )
+        indices_boundary = np.arange(data.size).reshape(data.shape)
+        for axis in self._neighbourhood:
+            indices_boundary = _pad_with_boundary_single(
+                indices_boundary,
+                axis._boundary,
+                -axis._before,
+                axis._after,
+                None if axis._constant_boundary is None else data.size,
+                axis._axis,
+            )
         indices_windows = sliding_window_view(  # type: ignore
-            indices_boundary, window, axis=self._axes, writeable=False
+            indices_boundary,
+            window,
+            axis=tuple(axis._axis for axis in self._neighbourhood),
+            writeable=False,
         ).reshape((-1, np.prod(window)))
 
         # compute the reverse: for each data element, which windows is it in
@@ -722,20 +699,12 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             Configuration of the safeguard.
         """
 
-        config = dict(
+        return dict(
             kind=type(self).kind,
             qoi=self._qoi,
-            shape=self._shape,
-            axes=self._axes,
-            boundary=self._boundary.name,
+            neighbourhood=[axis.get_config() for axis in self._neighbourhood],
             eb_abs=self._eb_abs,
-            constant_boundary=self._constant_boundary,
         )
-
-        if self._constant_boundary is None:
-            del config["constant_boundary"]
-
-        return config
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
