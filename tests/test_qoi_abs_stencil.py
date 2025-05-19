@@ -8,6 +8,7 @@ from numcodecs_safeguards.safeguards.stencil import BoundaryCondition
 
 from .codecs import (
     encode_decode_identity,
+    encode_decode_mock,
     encode_decode_neg,
     encode_decode_noise,
     encode_decode_zero,
@@ -346,3 +347,18 @@ def test_lambdify_indexing():
 @pytest.mark.parametrize("dtype", sorted(d.name for d in _SUPPORTED_DTYPES))
 def test_dtypes(dtype):
     check_all_codecs(np.array([[1]], dtype=dtype), "x/sqrt(pi)", [(0, 0)])
+
+
+def test_fuzzer_window():
+    encode_decode_mock(
+        np.array([[6584]], dtype=np.int16),
+        np.array([[2049]], dtype=np.int16),
+        safeguards=[
+            dict(
+                kind="qoi_abs_stencil",
+                qoi="ln((x**(x**pi)))",
+                neighbourhood=[dict(axis=1, before=0, after=10, boundary="valid")],
+                eb_abs=1,
+            )
+        ],
+    )

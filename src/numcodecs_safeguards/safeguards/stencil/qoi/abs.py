@@ -385,9 +385,6 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        if data.size == 0:
-            return np.ones_like(data, dtype=np.bool)  # type: ignore
-
         all_axes = []
         for axis in self._neighbourhood:
             if axis._axis >= data.ndim or axis._axis < -data.ndim:
@@ -402,6 +399,14 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             all_axes.append(naxis)
 
         window = tuple(axis._before + 1 + axis._after for axis in self._neighbourhood)
+
+        # if the neighbourhood is empty, e.g. because we in valid mode and the
+        #  neighbourhood shape exceeds the data shape, allow all values
+        for axis, w in zip(self._neighbourhood, window):
+            if data.shape[axis._axis] < w and (
+                data.shape[axis._axis] == 0 or axis._boundary == BoundaryCondition.valid
+            ):
+                return np.ones_like(data, dtype=np.bool)  # type: ignore
 
         data_boundary, decoded_boundary = data, decoded
         for axis in self._neighbourhood:
@@ -514,6 +519,14 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
         window = tuple(axis._before + 1 + axis._after for axis in self._neighbourhood)
 
+        # if the neighbourhood is empty, e.g. because we in valid mode and the
+        #  neighbourhood shape exceeds the data shape, allow all values
+        for axis, w in zip(self._neighbourhood, window):
+            if data.shape[axis._axis] < w and (
+                data.shape[axis._axis] == 0 or axis._boundary == BoundaryCondition.valid
+            ):
+                return Interval.full_like(data).into_union()  # type: ignore
+
         data_boundary = data
         for axis in self._neighbourhood:
             data_boundary = _pad_with_boundary(
@@ -586,15 +599,6 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         assert np.all(
             (eb_qoi_upper >= 0) & (eb_qoi_upper <= eb_abs) & _isfinite(eb_qoi_upper)
         )
-
-        # if no error bounds are imposed, e.g. because we in valid mode and the
-        #  neighbourhood shape exceeds the data shape, allow all values
-        if eb_qoi_lower.size == 0:
-            assert data.size == 0 or any(
-                axis._boundary == BoundaryCondition.valid
-                for axis in self._neighbourhood
-            )
-            return Interval.full_like(data).into_union()  # type: ignore
 
         s = [slice(None)] * data.ndim
         for axis in self._neighbourhood:
