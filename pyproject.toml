@@ -44,7 +44,7 @@ examples = [
     "netcdf4~=1.7.2",
     "matplotlib~=3.10.0",
 ]
-fuzz = ["atheris~=2.3", "timeoutcontext~=1.2"]
+fuzz = ["atheris~=2.3", "timeoutcontext~=1.2", "setuptools~=80.0"]
 test = ["pytest~=8.3"]
 typing = ["mypy~=1.14"]
 
