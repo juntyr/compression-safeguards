@@ -151,7 +151,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     qoi : Expr
         The non-constant expression for computing the derived quantity of
         interest for a neighbourhood tensor `X`.
-    neighbourhood : tuple[dict | NeighbourhoodAxis, ...]
+    neighbourhood : Sequence[dict | NeighbourhoodAxis]
         The non-empty axes of the data neighbourhood over which the quantity of
         interest is computed. The neighbourhood window is applied independently
         over any additional axes in the data.
@@ -168,7 +168,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         "_X",
     )
     _qoi: Expr
-    _neighbourhood: Sequence[NeighbourhoodAxis]
+    _neighbourhood: tuple[NeighbourhoodAxis, ...]
     _eb_abs: int | float
     _qoi_expr: sp.Basic
     _X: sp.tensor.array.expressions.ArraySymbol
@@ -178,7 +178,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     def __init__(
         self,
         qoi: Expr,
-        neighbourhood: tuple[dict | NeighbourhoodAxis, ...],
+        neighbourhood: Sequence[dict | NeighbourhoodAxis],
         eb_abs: int | float,
     ):
         self._neighbourhood = tuple(
@@ -385,6 +385,9 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         ok : np.ndarray
             Pointwise, `True` if the check succeeded for this element.
         """
+
+        if data.size == 0:
+            return np.ones_like(data, dtype=np.bool)  # type: ignore
 
         all_axes = []
         for axis in self._neighbourhood:

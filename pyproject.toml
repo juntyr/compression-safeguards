@@ -45,7 +45,7 @@ examples = [
     "matplotlib~=3.10.0",
 ]
 fuzz = ["atheris~=2.3"]
-test = ["pytest~=8.3", "pytest-xdist~=3.6"]
+test = ["pytest~=8.3", "pytest-xdist~=3.6", "pytest-forked~=1.6"]
 typing = ["mypy~=1.14"]
 
 [project.entry-points."numcodecs.codecs"]

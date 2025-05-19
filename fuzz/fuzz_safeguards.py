@@ -11,7 +11,7 @@ with atheris.instrument_imports():
     import types
     import typing
     import warnings
-    from collections.abc import Collection
+    from collections.abc import Collection, Sequence
     from enum import Enum
     from inspect import signature
 
@@ -26,6 +26,7 @@ with atheris.instrument_imports():
     from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
     from numcodecs_safeguards.safeguards.abc import Safeguard
     from numcodecs_safeguards.safeguards.pointwise.qoi import Expr
+    from numcodecs_safeguards.safeguards.stencil.qoi import NeighbourhoodAxis
 
 
 warnings.filterwarnings("error")
@@ -52,6 +53,10 @@ class FuzzCodec(Codec):
     def get_config(self):
         return dict(id=type(self).codec_id, data=self.data, decoded=self.decoded)
 
+    def __repr__(self):
+        config = {k: v for k, v in self.get_config().items() if k != "id"}
+        return f"{type(self).__name__}({', '.join(f'{k}={v!r}' for k, v in config.items())})"
+
 
 numcodecs.registry.register_codec(FuzzCodec)
 
@@ -66,7 +71,7 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
     if ty is bool:
         return data.ConsumeBool()
 
-    if typing.get_origin(ty) is Collection:
+    if typing.get_origin(ty) in (Collection, Sequence):
         if len(typing.get_args(ty)) == 1:
             return [
                 generate_parameter(data, typing.get_args(ty)[0], depth)
@@ -78,6 +83,12 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
 
         if len(tys) == 2 and tys[0] is str and issubclass(tys[1], Enum):
             return list(tys[1])[data.ConsumeIntInRange(0, len(tys[1]) - 1)]
+
+        if len(tys) == 2 and tys[0] is dict and tys[1] is NeighbourhoodAxis:
+            return {
+                p: generate_parameter(data, v.annotation, depth)
+                for p, v in signature(NeighbourhoodAxis).parameters.items()
+            }
 
         if (
             len(tys) > 1
@@ -191,6 +202,12 @@ def check_one_input(data):
         encoded = safeguard.encode(raw)
         safeguard.decode(encoded, out=np.empty_like(raw))
     except Exception as err:
+        if (
+            isinstance(err, IndexError)
+            and ("axis index" in str(err))
+            and ("out of bounds for array of shape" in str(err))
+        ):
+            return
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")
         raise err
 
@@ -210,6 +227,12 @@ def check_one_input(data):
         encoded = safeguard.encode(raw)
         safeguard.decode(encoded, out=np.empty_like(raw))
     except Exception as err:
+        if (
+            isinstance(err, IndexError)
+            and ("axis index" in str(err))
+            and ("out of bounds for array of shape" in str(err))
+        ):
+            return
         print(f"\n===\n\ncodec = {grepr}\n\ndata = {raw!r}\n\n===\n")
         raise err
 
