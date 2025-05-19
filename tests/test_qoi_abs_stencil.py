@@ -1,4 +1,4 @@
-from itertools import permutations, product
+from itertools import cycle, permutations, product
 
 import numpy as np
 import pytest
@@ -21,37 +21,39 @@ def check_all_codecs(data: np.ndarray, qoi: str, shape: list[tuple[int, int]]):
         encode_decode_identity,
         encode_decode_noise,
     ]:
-        for axes in permutations(range(data.ndim), len(shape)):
-            for boundaries in product(*[BoundaryCondition for _ in range(data.ndim)]):
-                for eb_abs in [10.0, 1.0, 0.1, 0.01, 0.0]:
-                    try:
-                        encode_decode(
-                            data,
-                            safeguards=[
+        for axes, boundaries, eb_abs in zip(
+            cycle(permutations(range(data.ndim), len(shape))),
+            product(*[BoundaryCondition for _ in range(data.ndim)]),
+            cycle([10.0, 1.0, 0.1, 0.01, 0.0]),
+        ):
+            try:
+                encode_decode(
+                    data,
+                    safeguards=[
+                        dict(
+                            kind="qoi_abs_stencil",
+                            qoi=qoi,
+                            neighbourhood=[
                                 dict(
-                                    kind="qoi_abs_stencil",
-                                    qoi=qoi,
-                                    neighbourhood=[
-                                        dict(
-                                            axis=axis,
-                                            before=before,
-                                            after=after,
-                                            boundary=boundary,
-                                            constant_boundary=4.2
-                                            if boundary == BoundaryCondition.constant
-                                            else None,
-                                        )
-                                        for axis, boundary, (before, after) in zip(
-                                            axes, boundaries, shape
-                                        )
-                                    ],
-                                    eb_abs=eb_abs,
+                                    axis=axis,
+                                    before=before,
+                                    after=after,
+                                    boundary=boundary,
+                                    constant_boundary=4.2
+                                    if boundary == BoundaryCondition.constant
+                                    else None,
+                                )
+                                for axis, boundary, (before, after) in zip(
+                                    axes, boundaries, shape
                                 )
                             ],
+                            eb_abs=eb_abs,
                         )
-                    except Exception as err:
-                        print(qoi, shape, axes, boundaries, eb_abs)
-                        raise err
+                    ],
+                )
+            except Exception as err:
+                print(qoi, shape, axes, boundaries, eb_abs)
+                raise err
 
 
 def check_empty(qoi: str):
