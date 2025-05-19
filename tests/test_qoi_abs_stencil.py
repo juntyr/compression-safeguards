@@ -370,7 +370,7 @@ def test_fuzzer_window():
             dict(
                 kind="qoi_abs_stencil",
                 qoi="ln((x**(x**pi)))",
-                neighbourhood=[dict(axis=1, before=0, after=10, boundary="valid")],
+                neighbourhood=[dict(axis=0, before=0, after=10, boundary="valid")],
                 eb_abs=1,
             )
         ],
