@@ -54,6 +54,9 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     Note that `X` can be indexed absolute or relative to the centred data point
     `x` using the index array `I`.
 
+    The stencil QoI safeguard can also be used to bound the pointwise absolute
+    error of the finite-difference-approximated derivative over the data.
+
     If the derived quantity of interest for an element evaluates to an infinite
     value, this safeguard guarantees that the quantity of interest on the
     decoded value produces the exact same infinite value. For a NaN quantity of
@@ -135,8 +138,8 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             expr, ",",
             "order", "=", int, ",",            (* order of the derivative *)
             "accuracy", "=", int, ",",         (* order of accuracy of the approximation *)
-            "type", "=", (                     (* backwards | central | forward difference *)
-                "-1" | "0" | "1"
+            "type", "=", (
+                "-1" | "0" | "1"               (* backwards | central | forward difference *)
             ), ",",
             "dx", "=", ( int | float ), ",",   (* uniform grid spacing *)
             "axis", "=", int                   (* axis, relative to the neighbourhood *)
@@ -1368,6 +1371,6 @@ _QOI_PATTERN = re.compile(
     r"|(?:findiff)"
     r")"
     r")?"
-    r"(?:[ \t\n\(\)\[\],:\+\-\*/])"
+    r"|(?:[ \t\n\(\)\[\],:\+\-\*/])"
     r")*"
 )
