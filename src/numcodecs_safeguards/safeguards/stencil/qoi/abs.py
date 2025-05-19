@@ -1343,9 +1343,7 @@ class _ArrayConstructor:
 # pattern of syntactically weakly valid expressions
 # we only check against forbidden tokens, not for semantic validity
 #  i.e. just enough that it's safe to eval afterwards
-_QOI_PATTERN = re.compile(
-    r"(?:"
-    r"(?:"
+_QOI_KWARG_PATTERN = (
     r"(?:"
     r"(?:base[ \t]*=[ \t]*)"
     r"|(?:order[ \t]*=[ \t]*)"
@@ -1353,7 +1351,9 @@ _QOI_PATTERN = re.compile(
     r"|(?:type[ \t]*=[ \t]*)"
     r"|(?:dx[ \t]*=[ \t]*)"
     r"|(?:axis[ \t]*=[ \t]*)"
-    r")?"
+    r")"
+)
+_QOI_ATOM_PATTERN = (
     r"(?:"
     r"(?:[+-]?[0-9]+)"
     r"|(?:[+-]?[0-9]+\.[0-9]+(?:e[+-]?[0-9]+)?)"
@@ -1370,7 +1370,8 @@ _QOI_PATTERN = re.compile(
     r"|(?:asum)"
     r"|(?:findiff)"
     r")"
-    r")?"
-    r"|(?:[ \t\n\(\)\[\],:\+\-\*/])"
-    r")*"
+)
+_QOI_SEPARATOR_PATTERN = r"(?:[ \t\n\(\)\[\],:\+\-\*/])"
+_QOI_PATTERN = re.compile(
+    rf"{_QOI_SEPARATOR_PATTERN}*{_QOI_ATOM_PATTERN}(?:{_QOI_SEPARATOR_PATTERN}+{_QOI_KWARG_PATTERN}?{_QOI_ATOM_PATTERN})*{_QOI_SEPARATOR_PATTERN}*"
 )
