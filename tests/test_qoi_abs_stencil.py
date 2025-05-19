@@ -11,6 +11,7 @@ from .codecs import (
     encode_decode_mock,
     encode_decode_neg,
     encode_decode_noise,
+    encode_decode_none,
     encode_decode_zero,
 )
 
@@ -201,6 +202,30 @@ def test_findiff():
     )
 
     safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
+        "findiff(x,order=1,accuracy=1,type=1,dx=1,axis=0)",
+        valid_5x5_neighbourhood,
+        0,
+    )
+    assert f"{safeguard._qoi_expr}" == "-X[4, 4] + X[5, 4]"
+    check_all_codecs(
+        data,
+        "findiff(x,order=1,accuracy=1,type=1,dx=1,axis=0)",
+        [(4, 4), (4, 4)],
+    )
+
+    safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
+        "findiff(x,order=1,accuracy=1,type=-1,dx=1,axis=0)",
+        valid_5x5_neighbourhood,
+        0,
+    )
+    assert f"{safeguard._qoi_expr}" == "-X[3, 4] + X[4, 4]"
+    check_all_codecs(
+        data,
+        "findiff(x,order=1,accuracy=1,type=-1,dx=1,axis=0)",
+        [(4, 4), (4, 4)],
+    )
+
+    safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
         "findiff(x,order=1,accuracy=2,type=0,dx=1,axis=0)",
         valid_5x5_neighbourhood,
         0,
@@ -375,3 +400,152 @@ def test_fuzzer_window():
             )
         ],
     )
+
+
+def test_fuzzer_findiff_int_iter():
+    data = np.array([65373], dtype=np.uint16)
+    decoded = np.array([42246], dtype=np.uint16)
+
+    for boundary in BoundaryCondition:
+        encode_decode_mock(
+            data,
+            decoded,
+            safeguards=[
+                dict(
+                    kind="qoi_abs_stencil",
+                    qoi="findiff(x, order=0, accuracy=1, type=-1, dx=2.2250738585072014e-308, axis=0)",
+                    neighbourhood=[
+                        dict(
+                            axis=0,
+                            before=0,
+                            after=0,
+                            boundary=boundary,
+                            constant_boundary=4.2
+                            if boundary == BoundaryCondition.constant
+                            else None,
+                        )
+                    ],
+                    eb_abs=2.2250738585072014e-308,
+                ),
+            ],
+        )
+
+
+def test_fuzzer_findiff_fraction_overflow():
+    data = np.array([7], dtype=np.int8)
+    decoded = np.array([0], dtype=np.int8)
+
+    for boundary in BoundaryCondition:
+        encode_decode_mock(
+            data,
+            decoded,
+            safeguards=[
+                dict(
+                    kind="qoi_abs_stencil",
+                    qoi="findiff(x, order=7, accuracy=6, type=-1, dx=7.215110354450764e305, axis=0)",
+                    neighbourhood=[
+                        dict(
+                            axis=0,
+                            before=12,
+                            after=0,
+                            boundary=boundary,
+                            constant_boundary=4.2
+                            if boundary == BoundaryCondition.constant
+                            else None,
+                        )
+                    ],
+                    eb_abs=2.2250738585072014e-308,
+                ),
+            ],
+        )
+
+
+def test_fuzzer_findiff_fraction_compare():
+    data = np.array([1978047305655558])
+
+    for boundary in BoundaryCondition:
+        encode_decode_none(
+            data,
+            safeguards=[
+                dict(kind="zero", zero=7),
+                dict(
+                    kind="qoi_abs_stencil",
+                    qoi="findiff(x, order=7, accuracy=7, type=1, dx=2.2250738585072014e-308, axis=0)",
+                    neighbourhood=[
+                        dict(
+                            axis=0,
+                            before=0,
+                            after=13,
+                            boundary=boundary,
+                            constant_boundary=4.2
+                            if boundary == BoundaryCondition.constant
+                            else None,
+                        )
+                    ],
+                    eb_abs=2.2250738585072014e-308,
+                ),
+                dict(kind="sign"),
+            ],
+        )
+
+
+def test_fuzzer_findiff_eb_abs():
+    data = np.array([[-27, 8, 8], [8, 8, 8], [8, 8, 8]], dtype=np.int8)
+    decoded = np.array([[8, 8, 8], [8, 8, 8], [8, 8, 8]], dtype=np.int8)
+
+    for boundary in BoundaryCondition:
+        encode_decode_mock(
+            data,
+            decoded,
+            safeguards=[
+                dict(
+                    kind="qoi_abs_stencil",
+                    qoi="findiff(x, order=4, accuracy=4, type=1, dx=4, axis=0)",
+                    neighbourhood=[
+                        dict(
+                            axis=0,
+                            before=0,
+                            after=7,
+                            boundary=boundary,
+                            constant_boundary=4.2
+                            if boundary == BoundaryCondition.constant
+                            else None,
+                        )
+                    ],
+                    eb_abs=1,
+                ),
+                dict(kind="sign"),
+            ],
+        )
+
+
+def test_fuzzer_findiff_fraction_float_overflow():
+    data = np.array([[0], [0], [7], [0], [4], [0], [59], [199]], dtype=np.uint16)
+    decoded = np.array(
+        [[1], [1], [0], [30720], [124], [32768], [16427], [3797]], dtype=np.uint16
+    )
+
+    for boundary in BoundaryCondition:
+        encode_decode_mock(
+            data,
+            decoded,
+            safeguards=[
+                dict(
+                    kind="qoi_abs_stencil",
+                    qoi="findiff(x, order=1, accuracy=3, type=1, dx=59, axis=0)",
+                    neighbourhood=[
+                        dict(
+                            axis=0,
+                            before=0,
+                            after=3,
+                            boundary=boundary,
+                            constant_boundary=4.2
+                            if boundary == BoundaryCondition.constant
+                            else None,
+                        )
+                    ],
+                    eb_abs=8.812221249325077e307,
+                ),
+                dict(kind="sign"),
+            ],
+        )

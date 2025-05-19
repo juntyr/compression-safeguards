@@ -297,7 +297,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                         indices = list(idxs)  # type: ignore
                         indices[axis] += offset
                         assert indices[axis] >= 0, (
-                            f"cannot compute the findiff on axis {axis} since the neighbourhood is insufficiently large: before should be at least {indices[axis] - I[axis]}"
+                            f"cannot compute the findiff on axis {axis} since the neighbourhood is insufficiently large: before should be at least {I[axis] - indices[axis]}"
                         )
                         assert indices[axis] < shape[axis], (
                             f"cannot compute the findiff on axis {axis} since the neighbourhood is insufficiently large: after should be at least {indices[axis] - I[axis]}"
@@ -1352,8 +1352,8 @@ _QOI_PATTERN = re.compile(
     r"|(?:axis[ \t]*=[ \t]*)"
     r")?"
     r"(?:"
-    r"(?:[0-9]+)"
-    r"|(?:[0-9]+\.[0-9]+)"
+    r"(?:[+-]?[0-9]+)"
+    r"|(?:[+-]?[0-9]+\.[0-9]+(?:e[+-]?[0-9]+)?)"
     r"|(?:e)"
     r"|(?:pi)"
     r"|(?:x)"
@@ -1368,6 +1368,6 @@ _QOI_PATTERN = re.compile(
     r"|(?:findiff)"
     r")"
     r")?"
-    r"|(?:[ \t\n\(\)\[\],:\+\-\*/])"
+    r"(?:[ \t\n\(\)\[\],:\+\-\*/])"
     r")*"
 )
