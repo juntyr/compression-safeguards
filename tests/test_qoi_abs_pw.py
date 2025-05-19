@@ -190,8 +190,10 @@ def test_fuzzer_found(check):
         np.array([[18312761160228738559]], dtype=np.uint64), "((pi**(x**(x+x)))**1)"
     )
     check_all_codecs(np.array([-1024.0]), "((pi**(x**(x+x)))**1)")
-
     check("((pi**(x**(x+x)))**1)")
+
+    check_all_codecs(np.array([], np.uint64), "(-((e/(22020**-37))**x))")
+    check("(-((e/(22020**-37))**x))")
 
 
 def test_lambdify_dtype():

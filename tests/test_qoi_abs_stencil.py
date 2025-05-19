@@ -362,3 +362,16 @@ def test_fuzzer_window():
             )
         ],
     )
+
+    encode_decode_mock(
+        np.array([], dtype=np.int16),
+        np.array([], dtype=np.int16),
+        safeguards=[
+            dict(
+                kind="qoi_abs_stencil",
+                qoi="ln((x**(x**pi)))",
+                neighbourhood=[dict(axis=1, before=0, after=10, boundary="valid")],
+                eb_abs=1,
+            )
+        ],
+    )

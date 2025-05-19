@@ -407,6 +407,8 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                 data.shape[axis._axis] == 0 or axis._boundary == BoundaryCondition.valid
             ):
                 return np.ones_like(data, dtype=np.bool)  # type: ignore
+        if data.size == 0:
+            return np.ones_like(data, dtype=np.bool)  # type: ignore
 
         data_boundary, decoded_boundary = data, decoded
         for axis in self._neighbourhood:
@@ -526,6 +528,8 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                 data.shape[axis._axis] == 0 or axis._boundary == BoundaryCondition.valid
             ):
                 return Interval.full_like(data).into_union()  # type: ignore
+        if data.size == 0:
+            return Interval.full_like(data).into_union()  # type: ignore
 
         data_boundary = data
         for axis in self._neighbourhood:
@@ -1171,10 +1175,10 @@ def _create_sympy_numpy_printer_class(
             super().__init__(settings)
 
         def _print_Integer(self, expr):
-            return str(expr.p)
+            return f"{self._dtype}({str(expr.p)!r})"
 
         def _print_Rational(self, expr):
-            return f"{self._dtype}({expr.p}) / {self._dtype}({expr.q})"
+            return f"{self._dtype}({str(expr.p)!r}) / {self._dtype}({str(expr.q)!r})"
 
         def _print_Float(self, expr):
             # explicitly create the float from its string representation
