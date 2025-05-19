@@ -442,7 +442,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         )
 
         qoi_data = (qoi_lambda)(data_windows_float)
-        qoi_decoded = (qoi_lambda)(to_float(decoded_windows_float))
+        qoi_decoded = (qoi_lambda)(decoded_windows_float)
 
         absolute_bound = (
             np.where(
@@ -668,10 +668,11 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         # flatten the qoi error bounds and append an infinite value,
         # which is indexed if an element did not contribute to the maximum
         # number of windows
-        eb_x_lower_flat = np.full(eb_x_lower.size + 1, -np.inf, data_float.dtype)
-        eb_x_lower_flat[:-1] = eb_x_lower.flatten()
-        eb_x_upper_flat = np.full(eb_x_upper.size + 1, np.inf, data_float.dtype)
-        eb_x_upper_flat[:-1] = eb_x_upper.flatten()
+        with np.errstate(invalid="ignore"):
+            eb_x_lower_flat = np.full(eb_x_lower.size + 1, -np.inf, data_float.dtype)
+            eb_x_lower_flat[:-1] = eb_x_lower.flatten()
+            eb_x_upper_flat = np.full(eb_x_upper.size + 1, np.inf, data_float.dtype)
+            eb_x_upper_flat[:-1] = eb_x_upper.flatten()
 
         # for each data element, reduce over the error bounds that affect it
         eb_x_orig_lower = np.amax(
