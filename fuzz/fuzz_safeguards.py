@@ -25,8 +25,11 @@ with atheris.instrument_imports():
     )
     from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
     from numcodecs_safeguards.safeguards.abc import Safeguard
-    from numcodecs_safeguards.safeguards.pointwise.qoi import Expr
-    from numcodecs_safeguards.safeguards.stencil.qoi import NeighbourhoodAxis
+    from numcodecs_safeguards.safeguards.pointwise.qoi import PointwiseExpr
+    from numcodecs_safeguards.safeguards.stencil.qoi import (
+        NeighbourhoodAxis,
+        StencilExpr,
+    )
 
 
 warnings.filterwarnings("error")
@@ -101,9 +104,13 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
 
         return generate_parameter(data, ty, depth)
 
-    if ty is Expr:
+    if ty in (PointwiseExpr, StencilExpr):
         ATOMS = ["x", int, float, "e", "pi"]
         OPS = ["neg", "+", "-", "*", "/", "**", "log", "sqrt", "ln", "exp"]
+
+        if ty is StencilExpr:
+            ATOMS += ["X", "I"]
+            OPS += ["asum", "index", "findiff"]
 
         atoms = []
         for _ in range(data.ConsumeIntInRange(2, 4)):
@@ -126,10 +133,18 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
             op = OPS[data.ConsumeIntInRange(0, len(OPS) - 1)]
             if op == "neg":
                 atoms.append(f"(-{atom1})")
-            elif op in ("sqrt", "ln", "exp"):
+            elif op in ("sqrt", "ln", "exp", "asum"):
                 atoms.append(f"{op}({atom1})")
             elif op == "log":
                 atoms.append(f"log({atom1},{atom2})")
+            elif op == "index":
+                atoms.append(
+                    f"{atom1}[{data.ConsumeIntInRange(0, 20)}, {data.ConsumeIntInRange(0, 20)}]"
+                )
+            elif op == "findiff":
+                atoms.append(
+                    f"findiff({atom1}, order={data.ConsumeIntInRange(0, 3)}, accuracy={data.ConsumeIntInRange(1, 4)}, type={data.ConsumeIntInRange(-1, 1)}, dx={data.ConsumeRegularFloat()}, axis={data.ConsumeIntInRange(0, 1)})"
+                )
             else:
                 atoms.append(f"({atom1}{op}{atom2})")
         [atom] = atoms

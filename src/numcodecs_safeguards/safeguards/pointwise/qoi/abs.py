@@ -28,7 +28,7 @@ from ....cast import (
 from ....intervals import IntervalUnion
 from ..abc import PointwiseSafeguard, S, T
 from ..abs import _compute_safe_eb_diff_interval
-from . import Expr
+from . import PointwiseExpr
 
 
 class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
@@ -39,7 +39,7 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
 
     The quantity of interest is specified as a non-constant expression, in
     string form, on the pointwise value `x`. For example, to bound the error on
-    the square of `x`, set `qoi=Expr("x**2")`.
+    the square of `x`, set `qoi="x**2"`.
 
     If the derived quantity of interest for an element evaluates to an infinite
     value, this safeguard guarantees that the quantity of interest on the
@@ -120,14 +120,14 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
         "_qoi_expr",
         "_x",
     )
-    _qoi: Expr
+    _qoi: PointwiseExpr
     _eb_abs: int | float
     _qoi_expr: sp.Basic
     _x: sp.Symbol
 
     kind = "qoi_abs_pw"
 
-    def __init__(self, qoi: Expr, eb_abs: int | float):
+    def __init__(self, qoi: PointwiseExpr, eb_abs: int | float):
         assert eb_abs >= 0, "eb_abs must be non-negative"
         assert isinstance(eb_abs, int) or _isfinite(eb_abs), "eb_abs must be finite"
 

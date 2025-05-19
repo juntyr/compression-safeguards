@@ -2,11 +2,15 @@
 Implementations for the provided stencil quantity of interest (QoI) safeguards.
 """
 
-__all__ = ["NeighbourhoodAxis"]
+__all__ = ["NeighbourhoodAxis", "StencilExpr"]
+
+from typing import NewType
 
 from typing_extensions import Self  # MSPV 3.11
 
 from .. import BoundaryCondition
+
+StencilExpr = NewType("StencilExpr", str)
 
 
 class NeighbourhoodAxis:

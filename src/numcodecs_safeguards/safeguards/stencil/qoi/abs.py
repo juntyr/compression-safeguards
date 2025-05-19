@@ -30,11 +30,10 @@ from ....cast import (
 )
 from ....intervals import Interval, IntervalUnion
 from ...pointwise.abs import _compute_safe_eb_diff_interval
-from ...pointwise.qoi import Expr
 from ...pointwise.qoi.abs import _ensure_bounded_derived_error
 from .. import BoundaryCondition, _pad_with_boundary
 from ..abc import S, StencilSafeguard, T
-from . import NeighbourhoodAxis
+from . import NeighbourhoodAxis, StencilExpr
 
 Qs = TypeVar("Qs", bound=tuple[int, ...])
 Ns = TypeVar("Ns", bound=tuple[int, ...])
@@ -51,7 +50,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     string form, on the neighbourhood tensor `X` that is centred on the
     pointwise value `x`. For example, to bound the error on the four-neighbour
     box mean in a 3x3 neighbourhood (where `x = X[I]`), set
-    `qoi=Expr("(X[I+A[-1,0]]+X[I+A[+1,0]]+X[I+A[0,-1]]+X[I+A[0,+1]])/4")`.
+    `qoi="(X[I+A[-1,0]]+X[I+A[+1,0]]+X[I+A[0,-1]]+X[I+A[0,+1]])/4"`.
     Note that `X` can be indexed absolute or relative to the centred data point
     `x` using the index array `I`.
 
@@ -167,7 +166,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         "_qoi_expr",
         "_X",
     )
-    _qoi: Expr
+    _qoi: StencilExpr
     _neighbourhood: tuple[NeighbourhoodAxis, ...]
     _eb_abs: int | float
     _qoi_expr: sp.Basic
@@ -177,7 +176,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
     def __init__(
         self,
-        qoi: Expr,
+        qoi: StencilExpr,
         neighbourhood: Sequence[dict | NeighbourhoodAxis],
         eb_abs: int | float,
     ):
