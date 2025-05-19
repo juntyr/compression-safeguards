@@ -88,7 +88,10 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
       | expr, "*", expr                   (* multiplication *)
       | expr, "/", expr                   (* division *)
       | expr, "**", expr                  (* exponentiation *)
-      | "log", "(", expr, ",", expr, ")"  (* logarithm log(a, base) *)
+      | "log", "(",                       (* logarithm with explicit base *)
+            expr, ",",
+            "base", "=", expr,
+        ")"
     ;
     ```
 
@@ -137,16 +140,16 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         assert _QOI_PATTERN.fullmatch(qoi) is not None, "invalid qoi expression"
         try:
 
-            def sqrt(x):
+            def sqrt(x, /):
                 return x ** sp.Rational(1, 2)
 
-            def exp(x):
+            def exp(x, /):
                 return sp.E**x
 
-            def ln(x):
+            def ln(x, /):
                 return sp.ln(x)
 
-            def log(x, base):
+            def log(x, /, *, base):
                 return sp.ln(x) / sp.ln(base)
 
             qoi_expr = sp.parse_expr(
@@ -885,6 +888,10 @@ def _create_sympy_numpy_printer_class(
 _QOI_PATTERN = re.compile(
     r"(?:"
     r"(?:"
+    r"(?:"
+    r"(?:base[ \t]*=[ \t]*)"
+    r")?"
+    r"(?:"
     r"(?:[0-9]+)"
     r"|(?:[0-9]+\.[0-9]+)"
     r"|(?:e)"
@@ -894,6 +901,7 @@ _QOI_PATTERN = re.compile(
     r"|(?:ln)"
     r"|(?:log)"
     r"|(?:exp)"
+    r")"
     r")?"
     r"|(?:[ \t\n\(\),\+\-\*/])"
     r")*"

@@ -103,9 +103,9 @@ def test_constant(check):
 @pytest.mark.parametrize("check", CHECKS)
 def test_imaginary(check):
     with pytest.raises(AssertionError, match="imaginary"):
-        check_all_codecs(np.array([2], dtype=np.uint64), "(-log(-20417,ln(x)))")
+        check_all_codecs(np.array([2], dtype=np.uint64), "(-log(-20417, base=ln(x)))")
     with pytest.raises(AssertionError, match="imaginary"):
-        check("(-log(-20417,ln(x)))")
+        check("(-log(-20417, base=ln(x)))")
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -133,10 +133,10 @@ def test_exponential(check):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_logarithm(check):
-    check("log(x, 2)")
+    check("log(x, base=2)")
     check("ln(x)")
     check("ln(x + 1)")
-    check("log(2, x)")
+    check("log(2, base=x)")
 
 
 @pytest.mark.parametrize("check", CHECKS)

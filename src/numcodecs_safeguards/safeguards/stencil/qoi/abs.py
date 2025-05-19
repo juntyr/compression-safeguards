@@ -71,6 +71,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
       | array
       | unary
       | binary
+      | findiff
     ;
 
     literal =
@@ -112,7 +113,10 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
       | expr, "*", expr                   (* multiplication *)
       | expr, "/", expr                   (* division *)
       | expr, "**", expr                  (* exponentiation *)
-      | "log", "(", expr, ",", expr, ")"  (* logarithm log(a, base) *)
+      | "log", "(",                       (* logarithm with explicit base *)
+            expr, ",",
+            "base", "=", expr,
+        ")"
       | expr, "[", indices "]"            (* array indexing *)
     ;
 
@@ -124,6 +128,17 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         "I"                               (* index of the neighbourhood centre *)
       | expr                              (* index expression *)
       | [expr], ":", [expr]               (* slicing *)
+    ;
+
+    findiff =
+        "findiff", "("                    (* finite difference over an expression *)
+            expr, ",",
+            "order", "=", int, ",",            (* order of the derivative *)
+            "accuracy", "=", int, ",",         (* order of accuracy of the approximation *)
+            "type", "=", ( -1 | 0 | 1 ), ",",  (* backwards | central | forward *)
+            "dx", "=", ( int | float ), ",",   (* uniform grid spacing *)
+            "axis", "=", int                   (* axis, relative to the neighbourhood *)
+        ")"
     ;
 
     ```
@@ -319,8 +334,8 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                         and len(expr.args) == 2
                         and expr.args[0] == self._X
                     ):
-                        name, indices = expr.args
-                        indices = list(indices)
+                        name, idxs = expr.args
+                        indices = list(idxs)  # type: ignore
                         indices[axis] += offset
                         assert indices[axis] >= 0, (
                             f"cannot compute the findiff on axis {axis} since the neighbourhood is insufficiently large: before should be at least {indices[axis] - I[axis]}"
