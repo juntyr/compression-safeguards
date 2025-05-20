@@ -64,6 +64,16 @@ def check_empty(qoi: str):
     check_all_codecs(data, qoi, [(1, 1)])
 
 
+def check_unit(qoi: str):
+    check_all_codecs(np.linspace(-1.0, 1.0, 100), qoi, [(0, 0)])
+    check_all_codecs(np.linspace(-1.0, 1.0, 100), qoi, [(1, 1)])
+
+
+def check_circle(qoi: str):
+    check_all_codecs(np.linspace(-np.pi * 2, np.pi * 2, 100), qoi, [(0, 0)])
+    check_all_codecs(np.linspace(-np.pi * 2, np.pi * 2, 100), qoi, [(1, 1)])
+
+
 def check_arange(qoi: str):
     data = np.arange(100, dtype=float)
     check_all_codecs(data, qoi, [(0, 0)])
@@ -105,6 +115,8 @@ def check_edge_cases(qoi: str):
 
 CHECKS = [
     check_empty,
+    check_unit,
+    check_circle,
     check_arange,
     check_linspace,
     check_edge_cases,

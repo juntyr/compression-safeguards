@@ -80,6 +80,18 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
       | "sqrt", "(", expr, ")"            (* square root *)
       | "ln", "(", expr, ")"              (* natural logarithm *)
       | "exp", "(", expr, ")"             (* exponential e^x *)
+      | "sinh", "(", expr, ")"            (* hyperbolic sine sinh(x) *)
+      | "cosh", "(", expr, ")"            (* hyperbolic cosine cosh(x) *)
+      | "tanh", "(", expr, ")"            (* hyperbolic tangent tanh(x) *)
+      | "coth", "(", expr, ")"            (* hyperbolic cotangent coth(x) *)
+      | "sech", "(", expr, ")"            (* hyperbolic secant sech(x) *)
+      | "csch", "(", expr, ")"            (* hyperbolic cosecant csch(x) *)
+      | "asinh", "(", expr, ")"           (* inverse hyperbolic sine asinh(x) *)
+      | "acosh", "(", expr, ")"           (* inverse hyperbolic cosine acosh(x) *)
+      | "atanh", "(", expr, ")"           (* inverse hyperbolic tangent atanh(x) *)
+      | "acoth", "(", expr, ")"           (* inverse hyperbolic cotangent acoth(x) *)
+      | "asech", "(", expr, ")"           (* inverse hyperbolic secant asech(x) *)
+      | "acsch", "(", expr, ")"           (* inverse hyperbolic cosecant acsch(x) *)
     ;
 
     binary  =
@@ -152,6 +164,42 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
             def log(x, /, *, base):
                 return sp.ln(x) / sp.ln(base)
 
+            def sinh(x, /):
+                return sp.sinh(x)
+
+            def cosh(x, /):
+                return sp.cosh(x)
+
+            def tanh(x, /):
+                return sp.tanh(x)
+
+            def coth(x, /):
+                return sp.coth(x)
+
+            def sech(x, /):
+                return sp.sech(x)
+
+            def csch(x, /):
+                return sp.csch(x)
+
+            def asinh(x, /):
+                return sp.asinh(x)
+
+            def acosh(x, /):
+                return sp.acosh(x)
+
+            def atanh(x, /):
+                return sp.atanh(x)
+
+            def acoth(x, /):
+                return sp.acoth(x)
+
+            def asech(x, /):
+                return sp.asech(x)
+
+            def acsch(x, /):
+                return sp.acsch(x)
+
             qoi_expr = sp.parse_expr(
                 self._qoi,
                 local_dict=dict(x=self._x),
@@ -168,6 +216,19 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
                     exp=exp,
                     ln=ln,
                     log=log,
+                    # hyperbolic functions
+                    sinh=sinh,
+                    cosh=cosh,
+                    tanh=tanh,
+                    coth=coth,
+                    sech=sech,
+                    csch=csch,
+                    asinh=asinh,
+                    acosh=acosh,
+                    atanh=atanh,
+                    acoth=acoth,
+                    asech=asech,
+                    acsch=acsch,
                 ),
                 transformations=(sp.parsing.sympy_parser.auto_number,),
             )
@@ -580,6 +641,35 @@ def _compute_data_eb_for_qoi_eb_unchecked(
             eb_expr_upper,
         )
 
+    HYPERBOLIC = {
+        # basic hyperbolic functions
+        sp.sinh: lambda x: (sp.exp(x) - sp.exp(-x)) / 2,
+        sp.cosh: lambda x: (sp.exp(x) + sp.exp(-x)) / 2,
+        # derived hyperbolic functions
+        sp.tanh: lambda x: (sp.exp(x * 2) - 1) / (sp.exp(x * 2) + 1),
+        sp.csch: lambda x: 2 / (sp.exp(x) - sp.exp(-x)),
+        sp.sech: lambda x: 2 / (sp.exp(x) + sp.exp(-x)),
+        sp.coth: lambda x: (sp.exp(x * 2) + 1) / (sp.exp(x * 2) - 1),
+        # inverse hyperbolic functions
+        sp.asinh: lambda x: sp.ln(x + sp.sqrt(x**2 + 1)),
+        sp.acosh: lambda x: sp.ln(x + sp.sqrt(x**2 - 1)),
+        sp.atanh: lambda x: sp.ln((1 + x) / (1 - x)) / 2,
+        sp.acsch: lambda x: sp.ln((1 / x) + sp.sqrt(x ** (-2) + 1)),
+        sp.asech: lambda x: sp.ln((1 + sp.sqrt(1 - x**2)) / x),
+        sp.acoth: lambda x: sp.ln((x + 1) / (x - 1)) / 2,
+    }
+
+    # rewrite hyperbolic functions using their exponential definitions
+    if expr.func in HYPERBOLIC and len(expr.args) == 1:
+        (arg,) = expr.args
+        return _compute_data_eb_for_qoi_eb(
+            (HYPERBOLIC[expr.func])(arg),
+            x,
+            xv,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+
     # a_1 * e_1 + ... + a_n * e_n + c (weighted sum)
     # using Corollary 2 and Lemma 4 from Jiao et al.
     if expr.is_Add:
@@ -903,6 +993,18 @@ _QOI_ATOM_PATTERN = (
     r"|(?:ln)"
     r"|(?:log)"
     r"|(?:exp)"
+    r"|(?:sinh)"
+    r"|(?:cosh)"
+    r"|(?:tanh)"
+    r"|(?:coth)"
+    r"|(?:sech)"
+    r"|(?:csch)"
+    r"|(?:asinh)"
+    r"|(?:acosh)"
+    r"|(?:atanh)"
+    r"|(?:acoth)"
+    r"|(?:asech)"
+    r"|(?:acsch)"
     r")"
 )
 _QOI_SEPARATOR_PATTERN = r"(?:[ \t\n\(\),\+\-\*/])"

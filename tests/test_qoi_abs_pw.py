@@ -29,6 +29,14 @@ def check_empty(qoi: str):
     check_all_codecs(np.empty(0), qoi)
 
 
+def check_unit(qoi: str):
+    check_all_codecs(np.linspace(-1.0, 1.0, 100), qoi)
+
+
+def check_circle(qoi: str):
+    check_all_codecs(np.linspace(-np.pi * 2, np.pi * 2, 100), qoi)
+
+
 def check_arange(qoi: str):
     check_all_codecs(np.arange(100, dtype=float), qoi)
 
@@ -59,6 +67,8 @@ def check_edge_cases(qoi: str):
 
 CHECKS = [
     check_empty,
+    check_unit,
+    check_circle,
     check_arange,
     check_linspace,
     check_edge_cases,
@@ -166,6 +176,23 @@ def test_sigmoid(check):
 @pytest.mark.parametrize("check", CHECKS)
 def test_tanh(check):
     check("(exp(x) - exp(-x)) / (exp(x) + exp(-x))")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_hyperbolic(check):
+    check("sinh(x)")
+    check("cosh(x)")
+    check("tanh(x)")
+    check("coth(x)")
+    check("sech(x)")
+    check("csch(x)")
+
+    check("asinh(x)")
+    check("acosh(x)")
+    check("atanh(x)")
+    check("acoth(x)")
+    check("asech(x)")
+    check("acsch(x)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
