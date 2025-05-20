@@ -114,6 +114,12 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
             "cot",
             "sec",
             "csc",
+            "asin",
+            "acos",
+            "atan",
+            "acot",
+            "asec",
+            "acsc",
         ]
         HYPERBOLIC_OPS = [
             "sinh",

@@ -86,6 +86,12 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
       | "cot", "(", expr, ")"             (* cotangent cot(x) *)
       | "sec", "(", expr, ")"             (* secant sec(x) *)
       | "csc", "(", expr, ")"             (* cosecant csc(x) *)
+      | "asin", "(", expr, ")"            (* inverse sine asin(x) *)
+      | "acos", "(", expr, ")"            (* inverse cosine acos(x) *)
+      | "atan", "(", expr, ")"            (* inverse tangent atan(x) *)
+      | "acot", "(", expr, ")"            (* inverse cotangent acot(x) *)
+      | "asec", "(", expr, ")"            (* inverse secant asec(x) *)
+      | "acsc", "(", expr, ")"            (* inverse cosecant acsc(x) *)
       | "sinh", "(", expr, ")"            (* hyperbolic sine sinh(x) *)
       | "cosh", "(", expr, ")"            (* hyperbolic cosine cosh(x) *)
       | "tanh", "(", expr, ")"            (* hyperbolic tangent tanh(x) *)
@@ -188,6 +194,24 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
             def csc(x, /):
                 return sp.csc(x)
 
+            def asin(x, /):
+                return sp.asin(x)
+
+            def acos(x, /):
+                return sp.acos(x)
+
+            def atan(x, /):
+                return sp.atan(x)
+
+            def acot(x, /):
+                return sp.acot(x)
+
+            def asec(x, /):
+                return sp.asec(x)
+
+            def acsc(x, /):
+                return sp.acsc(x)
+
             def sinh(x, /):
                 return sp.sinh(x)
 
@@ -247,6 +271,12 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
                     cot=cot,
                     sec=sec,
                     csc=csc,
+                    asin=asin,
+                    acos=acos,
+                    atan=atan,
+                    acot=acot,
+                    asec=asec,
+                    acsc=acsc,
                     # hyperbolic functions
                     sinh=sinh,
                     cosh=cosh,
@@ -677,7 +707,6 @@ def _compute_data_eb_for_qoi_eb_unchecked(
         # evaluate arg and sin(arg)
         (arg,) = expr.args
         argv = _compile_sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
-        argv_2pi = np.mod(argv, np.pi * 2)
         exprv = np.sin(argv)
 
         # update the error bounds
@@ -700,8 +729,8 @@ def _compute_data_eb_for_qoi_eb_unchecked(
         # np.asin maps to [-pi/2, +pi/2] where sin is monotonically increasing
         # flip the argument error bounds where sin is monotonically decreasing
         eal, eau = (
-            np.where((argv_2pi >= np.pi / 2) & (argv_2pi <= np.pi * 3 / 4), -eau, eal),
-            np.where((argv_2pi >= np.pi / 2) & (argv_2pi <= np.pi * 3 / 4), -eal, eau),
+            np.where(np.sin(argv + eal) > exprv, -eau, eal),
+            np.where(np.sin(argv + eau) < exprv, -eal, eau),
         )
 
         # handle rounding errors in sin(asin(...)) early
@@ -726,12 +755,68 @@ def _compute_data_eb_for_qoi_eb_unchecked(
         # composition using Lemma 3 from Jiao et al.
         return _compute_data_eb_for_qoi_eb(arg, x, xv, eb_arg_lower, eb_arg_upper)  # type: ignore
 
+    # asin(...)
+    if expr.func is sp.asin and len(expr.args) == 1:
+        # evaluate arg and asin(arg)
+        (arg,) = expr.args
+        argv = _compile_sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
+        exprv = np.asin(argv)
+
+        # update the error bounds
+        eal = np.where(
+            (eb_expr_lower == 0),
+            zero,
+            # np.sin(max(-np.pi/2, ...)) might not be precise, so explicitly
+            #  bound lower bounds to be <= 0
+            np.minimum(np.sin(np.maximum(-np.pi / 2, exprv + eb_expr_lower)) - argv, 0),
+        )
+        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
+
+        eau = np.where(
+            (eb_expr_upper == 0),
+            zero,
+            # np.sin(min(..., np.pi/2)) might not be precise, so explicitly
+            #  bound upper bounds to be >= 0
+            np.maximum(0, np.sin(np.minimum(exprv + eb_expr_upper, np.pi / 2)) - argv),
+        )
+        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
+
+        # handle rounding errors in asin(sin(...)) early
+        eal = _ensure_bounded_derived_error(
+            lambda eal: np.asin(argv + eal),
+            exprv,
+            argv,
+            eal,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eau = _ensure_bounded_derived_error(
+            lambda eau: np.asin(argv + eau),
+            exprv,
+            argv,
+            eau,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eb_arg_lower, eb_arg_upper = eal, eau
+
+        # composition using Lemma 3 from Jiao et al.
+        return _compute_data_eb_for_qoi_eb(arg, x, xv, eb_arg_lower, eb_arg_upper)  # type: ignore
+
     TRIGONOMETRIC = {
+        # derived trigonometric functions
         sp.cos: lambda x: sp.sin(x + (sp.pi / 2), evaluate=False),
         sp.tan: lambda x: sp.sin(x) / sp.cos(x),
         sp.csc: lambda x: 1 / sp.sin(x),
         sp.sec: lambda x: 1 / sp.cos(x),
         sp.cot: lambda x: sp.cos(x) / sp.sin(x),
+        # inverse trigonometric functions
+        sp.acos: lambda x: (sp.pi / 2) - sp.asin(x),
+        sp.atan: lambda x: ((sp.pi / 2) - sp.asin(1 / sp.sqrt(x**2 + 1)))
+        * (sp.Abs(x) / x),
+        sp.acsc: lambda x: sp.asin(1 / x),
+        sp.asec: lambda x: sp.acos(1 / x),
+        sp.acot: lambda x: sp.atan(1 / x),
     }
 
     # rewrite derived trigonometric functions using sin
@@ -1123,6 +1208,12 @@ _QOI_ATOM_PATTERN = (
     r"|(?:cot)"
     r"|(?:sec)"
     r"|(?:csc)"
+    r"|(?:asin)"
+    r"|(?:acos)"
+    r"|(?:atan)"
+    r"|(?:acot)"
+    r"|(?:asec)"
+    r"|(?:acsc)"
     r"|(?:sinh)"
     r"|(?:cosh)"
     r"|(?:tanh)"

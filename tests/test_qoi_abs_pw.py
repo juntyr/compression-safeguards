@@ -187,6 +187,13 @@ def test_trigonometric(check):
     check("sec(x)")
     check("csc(x)")
 
+    check("asin(x)")
+    check("acos(x)")
+    check("atan(x)")
+    check("acot(x)")
+    check("asec(x)")
+    check("acsc(x)")
+
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_hyperbolic(check):
