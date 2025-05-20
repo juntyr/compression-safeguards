@@ -107,6 +107,14 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
 
     if ty in (PointwiseExpr, StencilExpr):
         ATOMS = ["x", int, float, "e", "pi"]
+        TRIGONOMETRIC_OPS = [
+            "sin",
+            "cos",
+            "tan",
+            "cot",
+            "sec",
+            "csc",
+        ]
         HYPERBOLIC_OPS = [
             "sinh",
             "cosh",
@@ -121,18 +129,22 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
             "asech",
             "acsch",
         ]
-        OPS = [
-            "neg",
-            "+",
-            "-",
-            "*",
-            "/",
-            "**",
-            "log",
-            "sqrt",
-            "ln",
-            "exp",
-        ] + HYPERBOLIC_OPS
+        OPS = (
+            [
+                "neg",
+                "+",
+                "-",
+                "*",
+                "/",
+                "**",
+                "log",
+                "sqrt",
+                "ln",
+                "exp",
+            ]
+            + TRIGONOMETRIC_OPS
+            + HYPERBOLIC_OPS
+        )
 
         if ty is StencilExpr:
             ATOMS += ["X", "I"]
@@ -159,7 +171,11 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
             op = OPS[data.ConsumeIntInRange(0, len(OPS) - 1)]
             if op == "neg":
                 atoms.append(f"(-{atom1})")
-            elif op in (("sqrt", "ln", "exp", "asum") + tuple(HYPERBOLIC_OPS)):
+            elif op in (
+                ("sqrt", "ln", "exp", "asum")
+                + tuple(TRIGONOMETRIC_OPS)
+                + tuple(HYPERBOLIC_OPS)
+            ):
                 atoms.append(f"{op}({atom1})")
             elif op == "log":
                 atoms.append(f"log({atom1},{atom2})")
