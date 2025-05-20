@@ -70,8 +70,12 @@ def check_unit(qoi: str):
 
 
 def check_circle(qoi: str):
-    check_all_codecs(np.linspace(-np.pi * 2, np.pi * 2, 100), qoi, [(0, 0)])
-    check_all_codecs(np.linspace(-np.pi * 2, np.pi * 2, 100), qoi, [(1, 1)])
+    check_all_codecs(
+        np.linspace(-np.pi * 2, np.pi * 2, 100, dtype=np.int64), qoi, [(0, 0)]
+    )
+    check_all_codecs(
+        np.linspace(-np.pi * 2, np.pi * 2, 100, dtype=np.int64), qoi, [(1, 1)]
+    )
 
 
 def check_arange(qoi: str):

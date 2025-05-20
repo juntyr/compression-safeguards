@@ -1014,8 +1014,27 @@ def _compile_sympy_expr_to_numpy(
     return sp.lambdify(
         symbols,
         expr,
-        modules=["numpy"]
-        + ([{_float128_dtype.name: _float128}] if dtype == _float128_dtype else []),
+        modules=(
+            (
+                # polyfill operations that numpy_quaddtype does not yet support
+                #  but that numpy supports (otherwise sympy polyfills)
+                [
+                    dict(
+                        # hyperbolic functions
+                        sinh=lambda x: (np.exp(x) - np.exp(-x)) / 2,
+                        cosh=lambda x: (np.exp(x) + np.exp(-x)) / 2,
+                        tanh=lambda x: (np.exp(x * 2) - 1) / (np.exp(x * 2) + 1),
+                        arcsinh=lambda x: np.log(x + np.sqrt(x**2 + 1)),
+                        arccosh=lambda x: np.log(x + np.sqrt(x**2 - 1)),
+                        arctanh=lambda x: np.log((1 + x) / (1 - x)) / 2,
+                    )
+                ]
+                if dtype == _float128_dtype
+                else []
+            )
+            + ["numpy"]
+            + ([{_float128_dtype.name: _float128}] if dtype == _float128_dtype else [])
+        ),
         printer=_create_sympy_numpy_printer_class(dtype),
         docstring_limit=0,
     )
@@ -1040,6 +1059,7 @@ def _create_sympy_numpy_printer_class(
             self._dtype = dtype.name
             if settings is None:
                 settings = dict()
+            settings["fully_qualified_modules"] = False
             if dtype == _float128_dtype:
                 settings["precision"] = _float128_precision * 2
             else:
