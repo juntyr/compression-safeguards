@@ -179,6 +179,16 @@ def test_tanh(check):
 
 
 @pytest.mark.parametrize("check", CHECKS)
+def test_trigonometric(check):
+    check("sin(x)")
+    check("cos(x)")
+    check("tan(x)")
+    check("cot(x)")
+    check("sec(x)")
+    check("csc(x)")
+
+
+@pytest.mark.parametrize("check", CHECKS)
 def test_hyperbolic(check):
     check("sinh(x)")
     check("cosh(x)")

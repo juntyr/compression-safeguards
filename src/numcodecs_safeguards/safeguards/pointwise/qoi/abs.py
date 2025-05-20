@@ -80,6 +80,12 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
       | "sqrt", "(", expr, ")"            (* square root *)
       | "ln", "(", expr, ")"              (* natural logarithm *)
       | "exp", "(", expr, ")"             (* exponential e^x *)
+      | "sin", "(", expr, ")"             (* sine sin(x) *)
+      | "cos", "(", expr, ")"             (* cosine cos(x) *)
+      | "tan", "(", expr, ")"             (* tangent tan(x) *)
+      | "cot", "(", expr, ")"             (* cotangent cot(x) *)
+      | "sec", "(", expr, ")"             (* secant sec(x) *)
+      | "csc", "(", expr, ")"             (* cosecant csc(x) *)
       | "sinh", "(", expr, ")"            (* hyperbolic sine sinh(x) *)
       | "cosh", "(", expr, ")"            (* hyperbolic cosine cosh(x) *)
       | "tanh", "(", expr, ")"            (* hyperbolic tangent tanh(x) *)
@@ -164,6 +170,24 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
             def log(x, /, *, base):
                 return sp.ln(x) / sp.ln(base)
 
+            def sin(x, /):
+                return sp.sin(x)
+
+            def cos(x, /):
+                return sp.cos(x)
+
+            def tan(x, /):
+                return sp.tan(x)
+
+            def cot(x, /):
+                return sp.cot(x)
+
+            def sec(x, /):
+                return sp.sec(x)
+
+            def csc(x, /):
+                return sp.csc(x)
+
             def sinh(x, /):
                 return sp.sinh(x)
 
@@ -216,6 +240,13 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
                     exp=exp,
                     ln=ln,
                     log=log,
+                    # trigonometric functions
+                    sin=sin,
+                    cos=cos,
+                    tan=tan,
+                    cot=cot,
+                    sec=sec,
+                    csc=csc,
                     # hyperbolic functions
                     sinh=sinh,
                     cosh=cosh,
@@ -641,6 +672,79 @@ def _compute_data_eb_for_qoi_eb_unchecked(
             eb_expr_upper,
         )
 
+    # sin(...)
+    if expr.func is sp.sin and len(expr.args) == 1:
+        # evaluate arg and sin(arg)
+        (arg,) = expr.args
+        argv = _compile_sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
+        argv_2pi = np.mod(argv, np.pi * 2)
+        exprv = np.sin(argv)
+
+        # update the error bounds
+        eal = np.where(
+            (eb_expr_lower == 0),
+            zero,
+            # we need to compare to asin(sin(...)) instead of ... to account
+            #  for asin's output domain
+            np.asin(np.maximum(-1, exprv + eb_expr_lower)) - np.asin(exprv),
+        )
+        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
+
+        eau = np.where(
+            (eb_expr_upper == 0),
+            zero,
+            np.asin(np.minimum(exprv + eb_expr_upper, 1)) - np.asin(exprv),
+        )
+        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
+
+        # np.asin maps to [-pi/2, +pi/2] where sin is monotonically increasing
+        # flip the argument error bounds where sin is monotonically decreasing
+        eal, eau = (
+            np.where((argv_2pi >= np.pi / 2) & (argv_2pi <= np.pi * 3 / 4), -eau, eal),
+            np.where((argv_2pi >= np.pi / 2) & (argv_2pi <= np.pi * 3 / 4), -eal, eau),
+        )
+
+        # handle rounding errors in sin(asin(...)) early
+        eal = _ensure_bounded_derived_error(
+            lambda eal: np.sin(argv + eal),
+            exprv,
+            argv,
+            eal,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eau = _ensure_bounded_derived_error(
+            lambda eau: np.sin(argv + eau),
+            exprv,
+            argv,
+            eau,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eb_arg_lower, eb_arg_upper = eal, eau
+
+        # composition using Lemma 3 from Jiao et al.
+        return _compute_data_eb_for_qoi_eb(arg, x, xv, eb_arg_lower, eb_arg_upper)  # type: ignore
+
+    TRIGONOMETRIC = {
+        sp.cos: lambda x: sp.sin(x + (sp.pi / 2), evaluate=False),
+        sp.tan: lambda x: sp.sin(x) / sp.cos(x),
+        sp.csc: lambda x: 1 / sp.sin(x),
+        sp.sec: lambda x: 1 / sp.cos(x),
+        sp.cot: lambda x: sp.cos(x) / sp.sin(x),
+    }
+
+    # rewrite derived trigonometric functions using sin
+    if expr.func in TRIGONOMETRIC and len(expr.args) == 1:
+        (arg,) = expr.args
+        return _compute_data_eb_for_qoi_eb(
+            (TRIGONOMETRIC[expr.func])(arg),
+            x,
+            xv,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+
     HYPERBOLIC = {
         # basic hyperbolic functions
         sp.sinh: lambda x: (sp.exp(x) - sp.exp(-x)) / 2,
@@ -993,6 +1097,12 @@ _QOI_ATOM_PATTERN = (
     r"|(?:ln)"
     r"|(?:log)"
     r"|(?:exp)"
+    r"|(?:sin)"
+    r"|(?:cos)"
+    r"|(?:tan)"
+    r"|(?:cot)"
+    r"|(?:sec)"
+    r"|(?:csc)"
     r"|(?:sinh)"
     r"|(?:cosh)"
     r"|(?:tanh)"
