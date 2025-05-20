@@ -107,7 +107,32 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
 
     if ty in (PointwiseExpr, StencilExpr):
         ATOMS = ["x", int, float, "e", "pi"]
-        OPS = ["neg", "+", "-", "*", "/", "**", "log", "sqrt", "ln", "exp"]
+        HYPERBOLIC_OPS = [
+            "sinh",
+            "cosh",
+            "tanh",
+            "coth",
+            "sech",
+            "csch",
+            "asinh",
+            "acosh",
+            "atanh",
+            "acoth",
+            "asech",
+            "acsch",
+        ]
+        OPS = [
+            "neg",
+            "+",
+            "-",
+            "*",
+            "/",
+            "**",
+            "log",
+            "sqrt",
+            "ln",
+            "exp",
+        ] + HYPERBOLIC_OPS
 
         if ty is StencilExpr:
             ATOMS += ["X", "I"]
@@ -134,7 +159,7 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
             op = OPS[data.ConsumeIntInRange(0, len(OPS) - 1)]
             if op == "neg":
                 atoms.append(f"(-{atom1})")
-            elif op in ("sqrt", "ln", "exp", "asum"):
+            elif op in (("sqrt", "ln", "exp", "asum") + tuple(HYPERBOLIC_OPS)):
                 atoms.append(f"{op}({atom1})")
             elif op == "log":
                 atoms.append(f"log({atom1},{atom2})")
