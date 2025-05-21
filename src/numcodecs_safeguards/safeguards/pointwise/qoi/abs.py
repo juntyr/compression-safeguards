@@ -45,7 +45,10 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
     decoded value is also NaN, but does not guarantee that it has the same
     bit pattern.
 
-    The qoi expression is written using the following EBNF grammar for `expr`:
+    The qoi expression is written using the following EBNF grammar[^1] for
+    `expr`:
+
+    [^1]: You can visualise the EBNF grammar at <https://matthijsgroen.github.io/ebnf2railroad/try-yourself.html>.
 
     ```ebnf
     expr    =
@@ -61,8 +64,21 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
       | float
     ;
 
-    int     = ? integer literal ?;
-    float   = ? floating point literal ?;
+    int     =                             (* integer literal *)
+        [ sign ], digit, { digit }
+    ;
+    float   =                             (* floating point literal *)
+        [ sign ], digit, { digit }, ".", digit, { digit }, [
+            "e", [ sign ], digit, { digit }
+        ]
+    ;
+
+    sign    =
+        "+" | "-"
+    ;
+    digit   =
+        "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+    ;
 
     const   =
         "e"                               (* Euler's number *)
@@ -109,9 +125,9 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
       | expr, "*", expr                   (* multiplication *)
       | expr, "/", expr                   (* division *)
       | expr, "**", expr                  (* exponentiation *)
-      | "log", "(",                       (* logarithm with explicit base *)
-            expr, ",",
-            "base", "=", expr,
+      | "log", "(",
+            expr, ","                     (* logarithm with explicit base *)
+          , "base", "=", expr,
         ")"
     ;
     ```

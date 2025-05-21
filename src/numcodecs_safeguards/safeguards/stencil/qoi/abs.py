@@ -61,7 +61,10 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     decoded value is also NaN, but does not guarantee that it has the same
     bit pattern.
 
-    The qoi expression is written using the following EBNF grammar for `expr`:
+    The qoi expression is written using the following EBNF grammar[^1] for
+    `expr`:
+
+    [^1]: You can visualise the EBNF grammar at <https://matthijsgroen.github.io/ebnf2railroad/try-yourself.html>.
 
     ```ebnf
     expr    =
@@ -79,8 +82,21 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
       | float
     ;
 
-    int     = ? integer literal ?;
-    float   = ? floating point literal ?;
+    int     =                             (* integer literal *)
+        [ sign ], digit, { digit }
+    ;
+    float   =                             (* floating point literal *)
+        [ sign ], digit, { digit }, ".", digit, { digit }, [
+            "e", [ sign ], digit, { digit }
+        ]
+    ;
+
+    sign    =
+        "+" | "-"
+    ;
+    digit   =
+        "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+    ;
 
     const   =
         "e"                               (* Euler's number *)
@@ -93,8 +109,8 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     ;
 
     array   =
-        "A", "[", [                       (* n-dimensional array *)
-            expr, { ",", expr }, [","]
+        "A", "[", [
+            expr, { ",", expr }, [","]    (* n-dimensional array *)
         ], "]"
     ;
 
@@ -137,11 +153,11 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
       | expr, "*", expr                   (* multiplication *)
       | expr, "/", expr                   (* division *)
       | expr, "**", expr                  (* exponentiation *)
-      | "log", "(",                       (* logarithm with explicit base *)
-            expr, ",",
-            "base", "=", expr,
+      | "log", "(",
+            expr, ","                     (* logarithm with explicit base *)
+          , "base", "=", expr,
         ")"
-      | expr, "[", indices "]"            (* array indexing *)
+      | expr, "[", indices, "]"           (* array indexing *)
     ;
 
     indices =
@@ -156,15 +172,15 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
     findiff =
         "findiff", "("                    (* finite difference over an expression *)
-            expr, ",",
-            "order", "=", int, ",",            (* order of the derivative *)
-            "accuracy", "=", int, ",",         (* order of accuracy of the approximation *)
-            "type", "=", (
-                "-1" | "0" | "1"               (* backwards | central | forward difference *)
-            ), ",",
-            "dx", "=", ( int | float ), ",",   (* uniform grid spacing *)
-            "axis", "=", int                   (* axis, relative to the neighbourhood *)
-        ")"
+          , expr, ","
+          , "order", "=", int, ","           (* order of the derivative *)
+          , "accuracy", "=", int, ","        (* order of accuracy of the approximation *)
+          , "type", "=", (
+                "-1" | "0" | "1"             (* backwards | central | forward difference *)
+            ), ","
+          , "dx", "=", ( int | float ), ","  (* uniform grid spacing *)
+          , "axis", "=", int                 (* axis, relative to the neighbourhood *)
+      , ")"
     ;
 
     ```
