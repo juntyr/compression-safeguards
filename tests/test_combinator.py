@@ -105,13 +105,17 @@ def test_edge_cases():
 def test_inheritance():
     pointwise_config = dict(kind="abs", eb_abs=1)
     stencil_config = dict(
-        kind="findiff_abs",
-        type="forward",
-        order=1,
-        accuracy=1,
-        dx=1,
+        kind="qoi_abs_stencil",
+        qoi="findiff(x, order=1, accuracy=1, type=1, dx=1, axis=0)",
+        neighbourhood=[
+            dict(
+                axis=0,
+                before=0,
+                after=1,
+                boundary="valid",
+            )
+        ],
         eb_abs=1,
-        boundary="valid",
     )
 
     for combinator in ["any", "all"]:
