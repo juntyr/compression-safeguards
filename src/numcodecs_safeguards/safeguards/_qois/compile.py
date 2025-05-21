@@ -14,7 +14,7 @@ def sympy_expr_to_numpy(
     dtype: np.dtype,
 ) -> Callable[..., np.ndarray]:
     """
-    Compile the SymPy expression `expr` over a list of `variables` into a
+    Compile the SymPy expression `expr` over a list of `symbols` into a
     function that uses NumPy for numerical evaluation.
 
     The function evaluates to a numpy array of the provided `dtype` if all
