@@ -4,10 +4,9 @@ Stencil quantity of interest (QoI) absolute error bound safeguard.
 
 __all__ = ["StencilQuantityOfInterestAbsoluteErrorBoundSafeguard"]
 
-import functools
 import re
 from collections.abc import Sequence
-from typing import Callable, TypeVar
+from typing import TypeVar
 
 import numpy as np
 import sympy as sp
@@ -16,9 +15,6 @@ from numpy.lib.stride_tricks import sliding_window_view
 
 from ....cast import (
     F,
-    _float128,
-    _float128_dtype,
-    _float128_precision,
     _isfinite,
     _isinf,
     _isnan,
@@ -29,6 +25,7 @@ from ....cast import (
     to_float,
 )
 from ....intervals import Interval, IntervalUnion
+from ... import _qois
 from ...pointwise.abs import _compute_safe_eb_diff_interval
 from ...pointwise.qoi.abs import _ensure_bounded_derived_error
 from .. import BoundaryCondition, _pad_with_boundary
@@ -222,292 +219,46 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         assert isinstance(eb_abs, int) or _isfinite(eb_abs), "eb_abs must be finite"
         self._eb_abs = eb_abs
 
-        shape, I = [], []  # noqa: E741
+        shapel, Il = [], []  # noqa: E741
         for axis in self._neighbourhood:
-            shape.append(axis._before + 1 + axis._after)
-            I.append(axis._before)
+            shapel.append(axis._before + 1 + axis._after)
+            Il.append(axis._before)
+        shape, I = tuple(shapel), tuple(Il)  # noqa: E741
 
         self._X = sp.tensor.array.expressions.ArraySymbol("X", shape)
         X = self._X.as_explicit()
-        X.__class__ = _NumPyLikeArray
+        X.__class__ = _qois.array.NumPyLikeArray
 
         assert len(qoi.strip()) > 0, "qoi expression must not be empty"
         assert _QOI_PATTERN.fullmatch(qoi) is not None, "invalid qoi expression"
         try:
-
-            def sqrt(x, /):
-                return x ** sp.Rational(1, 2)
-
-            def exp(x, /):
-                return sp.E**x
-
-            def ln(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.ln)
-                return sp.ln(x)
-
-            def log(x, /, *, base):
-                if isinstance(x, _NumPyLikeArray):
-                    ln_x = x.applyfunc(sp.ln)
-                else:
-                    ln_x = sp.ln(x)
-                if isinstance(base, _NumPyLikeArray):
-                    ln_base = base.applyfunc(sp.ln)
-                else:
-                    ln_base = sp.ln(base)
-                return ln_x / ln_base
-
-            def sin(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.sin)
-                return sp.sin(x)
-
-            def cos(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.cos)
-                return sp.cos(x)
-
-            def tan(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.tan)
-                return sp.tan(x)
-
-            def cot(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.cot)
-                return sp.cot(x)
-
-            def sec(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.sec)
-                return sp.sec(x)
-
-            def csc(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.csc)
-                return sp.csc(x)
-
-            def asin(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.asin)
-                return sp.asin(x)
-
-            def acos(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.acos)
-                return sp.acos(x)
-
-            def atan(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.atan)
-                return sp.atan(x)
-
-            def acot(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.acot)
-                return sp.acot(x)
-
-            def asec(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.asec)
-                return sp.asec(x)
-
-            def acsc(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.acsc)
-                return sp.acsc(x)
-
-            def sinh(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.sinh)
-                return sp.sinh(x)
-
-            def cosh(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.cosh)
-                return sp.cosh(x)
-
-            def tanh(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.tanh)
-                return sp.tanh(x)
-
-            def coth(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.coth)
-                return sp.coth(x)
-
-            def sech(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.sech)
-                return sp.sech(x)
-
-            def csch(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.csch)
-                return sp.csch(x)
-
-            def asinh(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.asinh)
-                return sp.asinh(x)
-
-            def acosh(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.acosh)
-                return sp.acosh(x)
-
-            def atanh(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.atanh)
-                return sp.atanh(x)
-
-            def acoth(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.acoth)
-                return sp.acoth(x)
-
-            def asech(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.asech)
-                return sp.asech(x)
-
-            def acsch(x, /):
-                if isinstance(x, _NumPyLikeArray):
-                    return x.applyfunc(sp.acsch)
-                return sp.acsch(x)
-
-            def asum(x, /):
-                assert isinstance(x, _NumPyLikeArray), (
-                    "can only compute the sum over an array"
-                )
-                return sum(sp.tensor.array.arrayop.Flatten(x), sp.Integer(0))
-
-            def findiff(expr, /, *, order, accuracy, type, dx, axis):
-                from ..findiff import (
-                    FiniteDifference,
-                    _finite_difference_coefficients,
-                    _finite_difference_offsets,
-                )
-
-                assert isinstance(expr, sp.Basic), "findiff expr must be an expression"
-                assert len(expr.free_symbols) > 0, "findiff expr must not be constant"
-
-                assert isinstance(order, sp.Integer), "findiff order must be an integer"
-                order = int(order)
-                assert order >= 0, "findiff order must be non-negative"
-                assert isinstance(accuracy, sp.Integer), (
-                    "findiff accuracy must be an integer"
-                )
-                accuracy = int(accuracy)
-                assert accuracy > 0, "findiff accuracy must be positive"
-
-                assert isinstance(type, sp.Integer), "findiff type must be an integer"
-                assert type in (-1, 0, +1), (
-                    "findiff type must be 1 (forward), 0 (central), or -1 (backward)"
-                )
-                type = [
-                    FiniteDifference.central,
-                    FiniteDifference.forward,
-                    FiniteDifference.backwards,
-                ][type]
-
-                if type == FiniteDifference.central:
-                    assert accuracy % 2 == 0, (
-                        "accuracy must be even for a central finite difference"
-                    )
-
-                assert isinstance(dx, sp.Number), "findiff dx must be a number"
-                assert dx > 0, "dx must be positive"
-                assert isinstance(dx, (sp.Integer, sp.Rational)) or _isfinite(
-                    float(dx)
-                ), "findiff dx must be finite"
-
-                assert isinstance(axis, sp.Integer), "findiff axis must be an integer"
-                axis = int(axis)
-                assert axis >= -len(self._neighbourhood) and axis < len(
-                    self._neighbourhood
-                ), "findiff axis must be in range of the dimension of the neighbourhood"
-
-                offsets = _finite_difference_offsets(type, order, accuracy)
-                coefficients = _finite_difference_coefficients(order, offsets)
-
-                def apply_findiff(expr: sp.Basic, axis: int, offset: int):
-                    if expr.is_Number:
-                        return expr
-                    if (
-                        expr.func is sp.tensor.array.expressions.ArrayElement
-                        and len(expr.args) == 2
-                        and expr.args[0] == self._X
-                    ):
-                        name, idxs = expr.args
-                        indices = list(idxs)  # type: ignore
-                        indices[axis] += offset
-                        assert indices[axis] >= 0, (
-                            f"cannot compute the findiff on axis {axis} since the neighbourhood is insufficiently large: before should be at least {I[axis] - indices[axis]}"
-                        )
-                        assert indices[axis] < shape[axis], (
-                            f"cannot compute the findiff on axis {axis} since the neighbourhood is insufficiently large: after should be at least {indices[axis] - I[axis]}"
-                        )
-                        return sp.tensor.array.expressions.ArrayElement(name, indices)
-                    return expr.func(
-                        *[apply_findiff(a, axis, offset) for a in expr.args]
-                    )
-
-                return sp.Add(
-                    *[
-                        apply_findiff(expr, axis, o)
-                        * sp.Rational(c.numerator, c.denominator)
-                        for o, c in zip(offsets, coefficients)
-                    ]
-                )
-
             qoi_expr = sp.parse_expr(
                 qoi,
-                local_dict=dict(X=X, x=X.__getitem__(I), I=_NumPyLikeArray(I)),
+                local_dict=dict(
+                    # === data ===
+                    # data neighbourhood
+                    X=X,
+                    x=X.__getitem__(I),
+                    # neighbourhood index
+                    I=_qois.array.NumPyLikeArray(I),
+                    # === constants ===
+                    **_qois.math.CONSTANTS,
+                    # === operators ===
+                    # poinwise math
+                    **_qois.math.FUNCTIONS,
+                    # array math
+                    **_qois.amath.CONSTRUCTORS,
+                    **_qois.amath.FUNCTIONS,
+                    # finite difference
+                    findiff=_qois.findiff.create_findiff_for_neighbourhood(
+                        self._X, shape, I
+                    ),
+                ),
                 global_dict=dict(
                     # literals
                     Integer=sp.Integer,
                     Float=sp.Float,
                     Rational=sp.Rational,
-                    # arrays
-                    A=_ArrayConstructor,
-                    # constants
-                    pi=sp.pi,
-                    e=sp.E,
-                    # operators
-                    sqrt=sqrt,
-                    exp=exp,
-                    ln=ln,
-                    log=log,
-                    asum=asum,
-                    findiff=findiff,
-                    # trigonometric functions
-                    sin=sin,
-                    cos=cos,
-                    tan=tan,
-                    cot=cot,
-                    sec=sec,
-                    csc=csc,
-                    asin=asin,
-                    acos=acos,
-                    atan=atan,
-                    acot=acot,
-                    asec=asec,
-                    acsc=acsc,
-                    # hyperbolic functions
-                    sinh=sinh,
-                    cosh=cosh,
-                    tanh=tanh,
-                    coth=coth,
-                    sech=sech,
-                    csch=csch,
-                    asinh=asinh,
-                    acosh=acosh,
-                    atanh=atanh,
-                    acoth=acoth,
-                    asech=asech,
-                    acsch=acsch,
                 ),
                 transformations=(sp.parsing.sympy_parser.auto_number,),
             )
@@ -619,7 +370,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             )  # type: ignore
         )
 
-        qoi_lambda = _compile_sympy_expr_to_numpy(
+        qoi_lambda = _qois.compile.sympy_expr_to_numpy(
             [self._X], self._qoi_expr, data_windows_float.dtype
         )
 
@@ -730,7 +481,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             eb_abs: np.ndarray = to_finite_float(self._eb_abs, data_windows_float.dtype)
         assert eb_abs >= 0
 
-        qoi_lambda = _compile_sympy_expr_to_numpy(
+        qoi_lambda = _qois.compile.sympy_expr_to_numpy(
             [self._X], self._qoi_expr, data_windows_float.dtype
         )
 
@@ -941,7 +692,7 @@ def _compute_data_eb_for_stencil_qoi_eb(
         expr, X, XvN, Xv, tauv_lower, tauv_upper
     )
 
-    exprl = _compile_sympy_expr_to_numpy([X], expr, Xv.dtype)
+    exprl = _qois.compile.sympy_expr_to_numpy([X], expr, Xv.dtype)
     exprv = (exprl)(XvN)
 
     # handle rounding errors in the lower error bound computation
@@ -1034,14 +785,14 @@ def _compute_data_eb_for_stencil_qoi_eb_unchecked(
         return (eb_expr_lower, eb_expr_upper)
 
     # array
-    if expr.func in (sp.Array, _NumPyLikeArray):
+    if expr.func in (sp.Array, _qois.array.NumPyLikeArray):
         raise ValueError("expression must evaluate to a scalar not an array")
 
     # abs(...) is only used internally in exp(ln(abs(...)))
     if expr.func is sp.Abs and len(expr.args) == 1:
         # evaluate arg
         (arg,) = expr.args
-        argv = _compile_sympy_expr_to_numpy([X], arg, Xv.dtype)(XvN)
+        argv = _qois.compile.sympy_expr_to_numpy([X], arg, Xv.dtype)(XvN)
         # flip the lower/upper error bound if the arg is negative
         eql = np.where(argv < 0, -eb_expr_upper, eb_expr_lower)
         equ = np.where(argv < 0, -eb_expr_lower, eb_expr_upper)
@@ -1052,7 +803,7 @@ def _compute_data_eb_for_stencil_qoi_eb_unchecked(
     if expr.func is sp.log and len(expr.args) == 1:
         # evaluate arg and ln(arg)
         (arg,) = expr.args
-        argv = _compile_sympy_expr_to_numpy([X], arg, Xv.dtype)(XvN)
+        argv = _qois.compile.sympy_expr_to_numpy([X], arg, Xv.dtype)(XvN)
         exprv = np.log(argv)
 
         # update the error bounds
@@ -1103,7 +854,7 @@ def _compute_data_eb_for_stencil_qoi_eb_unchecked(
     if expr.func is sp.exp and len(expr.args) == 1:
         # evaluate arg and e^arg
         (arg,) = expr.args
-        argv = _compile_sympy_expr_to_numpy([X], arg, Xv.dtype)(XvN)
+        argv = _qois.compile.sympy_expr_to_numpy([X], arg, Xv.dtype)(XvN)
         exprv = np.exp(argv)
 
         # update the error bounds
@@ -1168,7 +919,7 @@ def _compute_data_eb_for_stencil_qoi_eb_unchecked(
     if expr.func is sp.sin and len(expr.args) == 1:
         # evaluate arg and sin(arg)
         (arg,) = expr.args
-        argv = _compile_sympy_expr_to_numpy([X], arg, Xv.dtype)(XvN)
+        argv = _qois.compile.sympy_expr_to_numpy([X], arg, Xv.dtype)(XvN)
         exprv = np.sin(argv)
 
         # update the error bounds
@@ -1228,7 +979,7 @@ def _compute_data_eb_for_stencil_qoi_eb_unchecked(
     if expr.func is sp.asin and len(expr.args) == 1:
         # evaluate arg and asin(arg)
         (arg,) = expr.args
-        argv = _compile_sympy_expr_to_numpy([X], arg, Xv.dtype)(XvN)
+        argv = _qois.compile.sympy_expr_to_numpy([X], arg, Xv.dtype)(XvN)
         exprv = np.asin(argv)
 
         # update the error bounds
@@ -1348,7 +1099,7 @@ def _compute_data_eb_for_stencil_qoi_eb_unchecked(
             # extract the weighting factor of the term
             if term.is_Mul:
                 factors.append(
-                    _compile_sympy_expr_to_numpy(
+                    _qois.compile.sympy_expr_to_numpy(
                         [],
                         sp.Mul(
                             *[arg for arg in term.args if len(arg.free_symbols) == 0]  # type: ignore
@@ -1417,7 +1168,7 @@ def _compute_data_eb_for_stencil_qoi_eb_unchecked(
     #  but works for deriving error bounds
     if expr.is_Mul:
         # extract the constant factor and reduce tauv
-        factor = _compile_sympy_expr_to_numpy(
+        factor = _qois.compile.sympy_expr_to_numpy(
             [],
             sp.Mul(*[arg for arg in expr.args if len(arg.free_symbols) == 0]),  # type: ignore
             Xv.dtype,
@@ -1472,237 +1223,6 @@ def _compute_data_eb_for_stencil_qoi_eb_unchecked(
     raise ValueError(f"unsupported expression kind {expr} (= {sp.srepr(expr)} =)")
 
 
-def _compile_sympy_expr_to_numpy(
-    symbols: list[sp.tensor.array.expressions.ArraySymbol],
-    expr: sp.Basic,
-    dtype: np.dtype,
-) -> Callable[..., np.ndarray]:
-    """
-    Compile the SymPy expression `expr` over a list of `variables` into a
-    function that uses NumPy for numerical evaluation.
-
-    The function evaluates to a numpy array of the provided `dtype` if all
-    variable inputs are numpy arrays of the same `dtype`.
-    """
-
-    return sp.lambdify(
-        symbols,
-        expr,
-        modules=(
-            (
-                # polyfill operations that numpy_quaddtype does not yet support
-                #  but that numpy supports (otherwise sympy polyfills)
-                [
-                    dict(
-                        # hyperbolic functions
-                        sinh=lambda x: (np.exp(x) - np.exp(-x)) / 2,
-                        cosh=lambda x: (np.exp(x) + np.exp(-x)) / 2,
-                        tanh=lambda x: (np.exp(x * 2) - 1) / (np.exp(x * 2) + 1),
-                        arcsinh=lambda x: np.log(x + np.sqrt(x**2 + 1)),
-                        arccosh=lambda x: np.log(x + np.sqrt(x**2 - 1)),
-                        arctanh=lambda x: np.log((1 + x) / (1 - x)) / 2,
-                    )
-                ]
-                if dtype == _float128_dtype
-                else []
-            )
-            + ["numpy"]
-            + ([{_float128_dtype.name: _float128}] if dtype == _float128_dtype else [])
-        ),
-        printer=_create_sympy_numpy_printer_class(dtype),
-        docstring_limit=0,
-    )
-
-
-@functools.cache
-def _create_sympy_numpy_printer_class(
-    dtype: np.dtype,
-) -> type[sp.printing.numpy.NumPyPrinter]:
-    """
-    Create a SymPy to NumPy printer class that outputs numerical values and
-    constants with the provided `dtype` and sufficient precision.
-    """
-
-    class NumPyDtypePrinter(sp.printing.numpy.NumPyPrinter):
-        __slots__ = ("_dtype",)
-
-        # remove default printing of known constants
-        _kc = dict()
-
-        def __init__(self, settings=None):
-            self._dtype = dtype.name
-            if settings is None:
-                settings = dict()
-            settings["fully_qualified_modules"] = False
-            if dtype == _float128_dtype:
-                settings["precision"] = _float128_precision * 2
-            else:
-                settings["precision"] = np.finfo(dtype).precision * 2
-            super().__init__(settings)
-
-        def _print_Integer(self, expr):
-            return f"{self._dtype}({str(expr.p)!r})"
-
-        def _print_Rational(self, expr):
-            return f"{self._dtype}({str(expr.p)!r}) / {self._dtype}({str(expr.q)!r})"
-
-        def _print_Float(self, expr):
-            # explicitly create the float from its string representation
-            #  e.g. 1.2 -> float16('1.2')
-            s = super()._print_Float(expr)
-            return f"{self._dtype}({s!r})"
-
-        def _print_Exp1(self, expr):
-            return self._print_NumberSymbol(expr)
-
-        def _print_Pi(self, expr):
-            return self._print_NumberSymbol(expr)
-
-        def _print_NaN(self, expr):
-            return f"{self._dtype}(nan)"
-
-        def _print_Infinity(self, expr):
-            return f"{self._dtype}(inf)"
-
-        def _print_ImaginaryUnit(self, expr):
-            raise ValueError(
-                "cannot evaluate an expression containing an imaginary number"
-            )
-
-        def _print_ArrayElement(self, expr):
-            indices = []
-            for i in expr.indices:
-                assert isinstance(i, sp.Integer), (
-                    "data neighbourhood only supports integer indices"
-                )
-                indices.append(i.p)
-            printed = f"{expr.name}[..., {', '.join([str(i) for i in indices])}]"
-            return printed
-
-    return NumPyDtypePrinter
-
-
-class _NumPyLikeArray(sp.Array):
-    __slots__ = ()
-
-    def __add__(self, other):
-        if isinstance(other, _NumPyLikeArray):
-            if self.shape != other.shape:
-                raise ValueError("array shape mismatch")
-            result_list = [
-                i + j
-                for i, j in zip(
-                    sp.tensor.array.arrayop.Flatten(self),
-                    sp.tensor.array.arrayop.Flatten(other),
-                )
-            ]
-            return type(self)(result_list, self.shape)
-        other = sp.sympify(other)
-        result_list = [i + other for i in sp.tensor.array.arrayop.Flatten(self)]
-        return type(self)(result_list, self.shape)
-
-    def __radd__(self, other):
-        other = sp.sympify(other)
-        result_list = [other + i for i in sp.tensor.array.arrayop.Flatten(self)]
-        return type(self)(result_list, self.shape)
-
-    def __sub__(self, other):
-        if isinstance(other, _NumPyLikeArray):
-            if self.shape != other.shape:
-                raise ValueError("array shape mismatch")
-            result_list = [
-                i - j
-                for i, j in zip(
-                    sp.tensor.array.arrayop.Flatten(self),
-                    sp.tensor.array.arrayop.Flatten(other),
-                )
-            ]
-            return type(self)(result_list, self.shape)
-        other = sp.sympify(other)
-        result_list = [i - other for i in sp.tensor.array.arrayop.Flatten(self)]
-        return type(self)(result_list, self.shape)
-
-    def __rsub__(self, other):
-        other = sp.sympify(other)
-        result_list = [other - i for i in sp.tensor.array.arrayop.Flatten(self)]
-        return type(self)(result_list, self.shape)
-
-    def __mul__(self, other):
-        if isinstance(other, _NumPyLikeArray):
-            if self.shape != other.shape:
-                raise ValueError("array shape mismatch")
-            result_list = [
-                i * j
-                for i, j in zip(
-                    sp.tensor.array.arrayop.Flatten(self),
-                    sp.tensor.array.arrayop.Flatten(other),
-                )
-            ]
-            return type(self)(result_list, self.shape)
-        other = sp.sympify(other)
-        result_list = [i * other for i in sp.tensor.array.arrayop.Flatten(self)]
-        return type(self)(result_list, self.shape)
-
-    def __rmul__(self, other):
-        other = sp.sympify(other)
-        result_list = [other * i for i in sp.tensor.array.arrayop.Flatten(self)]
-        return type(self)(result_list, self.shape)
-
-    def __truediv__(self, other):
-        if isinstance(other, _NumPyLikeArray):
-            if self.shape != other.shape:
-                raise ValueError("array shape mismatch")
-            result_list = [
-                i / j
-                for i, j in zip(
-                    sp.tensor.array.arrayop.Flatten(self),
-                    sp.tensor.array.arrayop.Flatten(other),
-                )
-            ]
-            return type(self)(result_list, self.shape)
-        other = sp.sympify(other)
-        result_list = [i / other for i in sp.tensor.array.arrayop.Flatten(self)]
-        return type(self)(result_list, self.shape)
-
-    def __rtruediv__(self, other):
-        other = sp.sympify(other)
-        result_list = [other / i for i in sp.tensor.array.arrayop.Flatten(self)]
-        return type(self)(result_list, self.shape)
-
-    def __pow__(self, other):
-        if isinstance(other, _NumPyLikeArray):
-            if self.shape != other.shape:
-                raise ValueError("array shape mismatch")
-            result_list = [
-                i**j
-                for i, j in zip(
-                    sp.tensor.array.arrayop.Flatten(self),
-                    sp.tensor.array.arrayop.Flatten(other),
-                )
-            ]
-            return type(self)(result_list, self.shape)
-        other = sp.sympify(other)
-        result_list = [i**other for i in sp.tensor.array.arrayop.Flatten(self)]
-        return type(self)(result_list, self.shape)
-
-    def __rpow__(self, other):
-        other = sp.sympify(other)
-        result_list = [other**i for i in sp.tensor.array.arrayop.Flatten(self)]
-        return type(self)(result_list, self.shape)
-
-    # TODO: also support "matrix" multiplication
-
-
-class _ArrayConstructor:
-    __slots__ = ()
-
-    def __new__(cls, *args, **kwargs):
-        raise TypeError("cannot call array constructor")
-
-    def __class_getitem__(cls, index):
-        return _NumPyLikeArray(index)
-
-
 # pattern of syntactically weakly valid expressions
 # we only check against forbidden tokens, not for semantic validity
 #  i.e. just enough that it's safe to eval afterwards
@@ -1718,45 +1238,17 @@ _QOI_KWARG_PATTERN = (
 )
 _QOI_ATOM_PATTERN = (
     r"(?:"
-    r"(?:[+-]?[0-9]+)"
-    r"|(?:[+-]?[0-9]+\.[0-9]+(?:e[+-]?[0-9]+)?)"
-    r"|(?:e)"
-    r"|(?:pi)"
-    r"|(?:x)"
-    r"|(?:X)"
-    r"|(?:I)"
-    r"|(?:A)"
-    r"|(?:sqrt)"
-    r"|(?:ln)"
-    r"|(?:log)"
-    r"|(?:exp)"
-    r"|(?:asum)"
-    r"|(?:findiff)"
-    r"|(?:sin)"
-    r"|(?:cos)"
-    r"|(?:tan)"
-    r"|(?:cot)"
-    r"|(?:sec)"
-    r"|(?:csc)"
-    r"|(?:asin)"
-    r"|(?:acos)"
-    r"|(?:atan)"
-    r"|(?:acot)"
-    r"|(?:asec)"
-    r"|(?:acsc)"
-    r"|(?:sinh)"
-    r"|(?:cosh)"
-    r"|(?:tanh)"
-    r"|(?:coth)"
-    r"|(?:sech)"
-    r"|(?:csch)"
-    r"|(?:asinh)"
-    r"|(?:acosh)"
-    r"|(?:atanh)"
-    r"|(?:acoth)"
-    r"|(?:asech)"
-    r"|(?:acsch)"
-    r")"
+    + r"(?:[+-]?[0-9]+)"
+    + r"|(?:[+-]?[0-9]+\.[0-9]+(?:e[+-]?[0-9]+)?)"
+    + r"|(?:x)"
+    + r"|(?:X)"
+    + r"|(?:I)"
+    + r"".join(rf"|(?:{c})" for c in _qois.math.CONSTANTS)
+    + r"".join(rf"|(?:{c})" for c in _qois.math.FUNCTIONS)
+    + r"".join(rf"|(?:{c})" for c in _qois.amath.CONSTRUCTORS)
+    + r"".join(rf"|(?:{c})" for c in _qois.amath.FUNCTIONS)
+    + r"|(?:findiff)"
+    + r")"
 )
 _QOI_SEPARATOR_PATTERN = r"(?:[ \t\n\(\)\[\],:\+\-\*/])"
 _QOI_PATTERN = re.compile(

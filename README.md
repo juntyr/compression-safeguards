@@ -52,12 +52,6 @@ This package currently implements the following safeguards:
 
     It is guaranteed that the ratios between the original and the decoded values and their inverse ratios are less than or equal to the provided bound. The ratio error is defined to be infinite if the signs of the data and decoded data do not match. Since the provided error bound must be finite, this safeguard also guarantees that the sign of each decoded value matches the sign of each original value and that a decoded value is zero if and only if it is zero in the original data. The ratio error bound is sometimes also known as a decimal error bound if the ratio is expressed as the difference in orders of magnitude. This safeguard can also be used to guarantee a relative-like error bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bit pattern also satisfies the error bound.
 
-### Error Bounds on Finite Differences (~pointwise)
-
-- `findiff_abs` (absolute error bound for finite differences):
-
-    The pointwise absolute error of the finite-difference-approximated derivative is guaranteed to be less than or equal to the provided bound. The safeguard supports three types of finite difference: `central`, `forward`, `backward`. The fininite difference is computed with respect to the provided uniform grid spacing. If the spacing is different along different axes, multiple safeguards along specific axes with different spacing can be combined. Infinite finite differences are preserved with the same bit pattern. NaN finite differences remain NaN though not necessarily with the same bit pattern.
-
 ### Error Bounds on derived Quantities of Interest (QoIs)
 
 - `qoi_abs_pw` (absolute error bound on quantities of interest):

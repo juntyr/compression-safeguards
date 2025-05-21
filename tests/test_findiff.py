@@ -6,9 +6,9 @@ spaced grids. Mathematics of Computation, 51(184), 699-706. Available from:
 https://doi.org/10.1090/s0025-5718-1988-0935077-0.
 """
 
-from fractions import Fraction as F
+from sympy import Rational as F
 
-from numcodecs_safeguards.safeguards.stencil.findiff import (
+from numcodecs_safeguards.safeguards._qois.findiff import (
     _finite_difference_coefficients,
 )
 

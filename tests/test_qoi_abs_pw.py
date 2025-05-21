@@ -245,13 +245,13 @@ def test_lambdify_dtype():
 
     import sympy as sp
 
-    from numcodecs_safeguards.safeguards.pointwise.qoi.abs import (
-        _compile_sympy_expr_to_numpy,
+    from numcodecs_safeguards.safeguards._qois.compile import (
+        sympy_expr_to_numpy,
     )
 
     x = sp.Symbol("x", real=True)
 
-    fn = _compile_sympy_expr_to_numpy([x], x + sp.pi + sp.E, np.dtype(np.float16))
+    fn = sympy_expr_to_numpy([x], x + sp.pi + sp.E, np.dtype(np.float16))
 
     assert (
         inspect.getsource(fn)

@@ -4,7 +4,6 @@ Pointwise quantity of interest (QoI) absolute error bound safeguard.
 
 __all__ = ["PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard"]
 
-import functools
 import re
 from typing import Callable
 
@@ -13,9 +12,6 @@ import sympy as sp
 
 from ....cast import (
     F,
-    _float128,
-    _float128_dtype,
-    _float128_precision,
     _isfinite,
     _isinf,
     _isnan,
@@ -26,6 +22,7 @@ from ....cast import (
     to_float,
 )
 from ....intervals import IntervalUnion
+from ... import _qois
 from ..abc import PointwiseSafeguard, S, T
 from ..abs import _compute_safe_eb_diff_interval
 from . import PointwiseExpr
@@ -163,133 +160,23 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
         assert len(qoi.strip()) > 0, "qoi expression must not be empty"
         assert _QOI_PATTERN.fullmatch(qoi) is not None, "invalid qoi expression"
         try:
-
-            def sqrt(x, /):
-                return x ** sp.Rational(1, 2)
-
-            def exp(x, /):
-                return sp.E**x
-
-            def ln(x, /):
-                return sp.ln(x)
-
-            def log(x, /, *, base):
-                return sp.ln(x) / sp.ln(base)
-
-            def sin(x, /):
-                return sp.sin(x)
-
-            def cos(x, /):
-                return sp.cos(x)
-
-            def tan(x, /):
-                return sp.tan(x)
-
-            def cot(x, /):
-                return sp.cot(x)
-
-            def sec(x, /):
-                return sp.sec(x)
-
-            def csc(x, /):
-                return sp.csc(x)
-
-            def asin(x, /):
-                return sp.asin(x)
-
-            def acos(x, /):
-                return sp.acos(x)
-
-            def atan(x, /):
-                return sp.atan(x)
-
-            def acot(x, /):
-                return sp.acot(x)
-
-            def asec(x, /):
-                return sp.asec(x)
-
-            def acsc(x, /):
-                return sp.acsc(x)
-
-            def sinh(x, /):
-                return sp.sinh(x)
-
-            def cosh(x, /):
-                return sp.cosh(x)
-
-            def tanh(x, /):
-                return sp.tanh(x)
-
-            def coth(x, /):
-                return sp.coth(x)
-
-            def sech(x, /):
-                return sp.sech(x)
-
-            def csch(x, /):
-                return sp.csch(x)
-
-            def asinh(x, /):
-                return sp.asinh(x)
-
-            def acosh(x, /):
-                return sp.acosh(x)
-
-            def atanh(x, /):
-                return sp.atanh(x)
-
-            def acoth(x, /):
-                return sp.acoth(x)
-
-            def asech(x, /):
-                return sp.asech(x)
-
-            def acsch(x, /):
-                return sp.acsch(x)
-
             qoi_expr = sp.parse_expr(
                 self._qoi,
-                local_dict=dict(x=self._x),
+                local_dict=dict(
+                    # === data ===
+                    # pointwise data
+                    x=self._x,
+                    # === constants ===
+                    **_qois.math.CONSTANTS,
+                    # === operators ===
+                    # poinwise math
+                    **_qois.math.FUNCTIONS,
+                ),
                 global_dict=dict(
                     # literals
                     Integer=sp.Integer,
                     Float=sp.Float,
                     Rational=sp.Rational,
-                    # constants
-                    pi=sp.pi,
-                    e=sp.E,
-                    # operators
-                    sqrt=sqrt,
-                    exp=exp,
-                    ln=ln,
-                    log=log,
-                    # trigonometric functions
-                    sin=sin,
-                    cos=cos,
-                    tan=tan,
-                    cot=cot,
-                    sec=sec,
-                    csc=csc,
-                    asin=asin,
-                    acos=acos,
-                    atan=atan,
-                    acot=acot,
-                    asec=asec,
-                    acsc=acsc,
-                    # hyperbolic functions
-                    sinh=sinh,
-                    cosh=cosh,
-                    tanh=tanh,
-                    coth=coth,
-                    sech=sech,
-                    csch=csch,
-                    asinh=asinh,
-                    acosh=acosh,
-                    atanh=atanh,
-                    acoth=acoth,
-                    asech=asech,
-                    acsch=acsch,
                 ),
                 transformations=(sp.parsing.sympy_parser.auto_number,),
             )
@@ -336,7 +223,7 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
 
         data_float: np.ndarray = to_float(data)
 
-        qoi_lambda = _compile_sympy_expr_to_numpy(
+        qoi_lambda = _qois.compile.sympy_expr_to_numpy(
             [self._x], self._qoi_expr, data_float.dtype
         )
 
@@ -392,7 +279,7 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
             eb_abs: np.ndarray = to_finite_float(self._eb_abs, data_float.dtype)
         assert eb_abs >= 0
 
-        qoi_lambda = _compile_sympy_expr_to_numpy(
+        qoi_lambda = _qois.compile.sympy_expr_to_numpy(
             [self._x], self._qoi_expr, data_float.dtype
         )
 
@@ -517,7 +404,7 @@ def _compute_data_eb_for_qoi_eb(
 
     tl, tu = _compute_data_eb_for_qoi_eb_unchecked(expr, x, xv, tauv_lower, tauv_upper)
 
-    exprl = _compile_sympy_expr_to_numpy([x], expr, xv.dtype)
+    exprl = _qois.compile.sympy_expr_to_numpy([x], expr, xv.dtype)
     exprv = (exprl)(xv)
 
     # handle rounding errors in the lower error bound computation
@@ -594,7 +481,7 @@ def _compute_data_eb_for_qoi_eb_unchecked(
     if expr.func is sp.Abs and len(expr.args) == 1:
         # evaluate arg
         (arg,) = expr.args
-        argv = _compile_sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
+        argv = _qois.compile.sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
         # flip the lower/upper error bound if the arg is negative
         eql = np.where(argv < 0, -eb_expr_upper, eb_expr_lower)
         equ = np.where(argv < 0, -eb_expr_lower, eb_expr_upper)
@@ -605,7 +492,7 @@ def _compute_data_eb_for_qoi_eb_unchecked(
     if expr.func is sp.log and len(expr.args) == 1:
         # evaluate arg and ln(arg)
         (arg,) = expr.args
-        argv = _compile_sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
+        argv = _qois.compile.sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
         exprv = np.log(argv)
 
         # update the error bounds
@@ -649,7 +536,7 @@ def _compute_data_eb_for_qoi_eb_unchecked(
     if expr.func is sp.exp and len(expr.args) == 1:
         # evaluate arg and e^arg
         (arg,) = expr.args
-        argv = _compile_sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
+        argv = _qois.compile.sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
         exprv = np.exp(argv)
 
         # update the error bounds
@@ -706,7 +593,7 @@ def _compute_data_eb_for_qoi_eb_unchecked(
     if expr.func is sp.sin and len(expr.args) == 1:
         # evaluate arg and sin(arg)
         (arg,) = expr.args
-        argv = _compile_sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
+        argv = _qois.compile.sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
         exprv = np.sin(argv)
 
         # update the error bounds
@@ -759,7 +646,7 @@ def _compute_data_eb_for_qoi_eb_unchecked(
     if expr.func is sp.asin and len(expr.args) == 1:
         # evaluate arg and asin(arg)
         (arg,) = expr.args
-        argv = _compile_sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
+        argv = _qois.compile.sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
         exprv = np.asin(argv)
 
         # update the error bounds
@@ -870,7 +757,7 @@ def _compute_data_eb_for_qoi_eb_unchecked(
             # extract the weighting factor of the term
             if term.is_Mul:
                 factors.append(
-                    _compile_sympy_expr_to_numpy(
+                    _qois.compile.sympy_expr_to_numpy(
                         [],
                         sp.Mul(
                             *[arg for arg in term.args if len(arg.free_symbols) == 0]  # type: ignore
@@ -938,7 +825,7 @@ def _compute_data_eb_for_qoi_eb_unchecked(
     #  but works for deriving error bounds
     if expr.is_Mul:
         # extract the constant factor and reduce tauv
-        factor = _compile_sympy_expr_to_numpy(
+        factor = _qois.compile.sympy_expr_to_numpy(
             [],
             sp.Mul(*[arg for arg in expr.args if len(arg.free_symbols) == 0]),  # type: ignore
             xv.dtype,
@@ -1083,106 +970,6 @@ def _ensure_bounded_derived_error(
             return eb_x_guess
 
 
-def _compile_sympy_expr_to_numpy(
-    symbols: list[sp.Symbol],
-    expr: sp.Basic,
-    dtype: np.dtype,
-) -> Callable[..., np.ndarray]:
-    """
-    Compile the SymPy expression `expr` over a list of `variables` into a
-    function that uses NumPy for numerical evaluation.
-
-    The function evaluates to a numpy array of the provided `dtype` if all
-    variable inputs are numpy arrays of the same `dtype`.
-    """
-
-    return sp.lambdify(
-        symbols,
-        expr,
-        modules=(
-            (
-                # polyfill operations that numpy_quaddtype does not yet support
-                #  but that numpy supports (otherwise sympy polyfills)
-                [
-                    dict(
-                        # hyperbolic functions
-                        sinh=lambda x: (np.exp(x) - np.exp(-x)) / 2,
-                        cosh=lambda x: (np.exp(x) + np.exp(-x)) / 2,
-                        tanh=lambda x: (np.exp(x * 2) - 1) / (np.exp(x * 2) + 1),
-                        arcsinh=lambda x: np.log(x + np.sqrt(x**2 + 1)),
-                        arccosh=lambda x: np.log(x + np.sqrt(x**2 - 1)),
-                        arctanh=lambda x: np.log((1 + x) / (1 - x)) / 2,
-                    )
-                ]
-                if dtype == _float128_dtype
-                else []
-            )
-            + ["numpy"]
-            + ([{_float128_dtype.name: _float128}] if dtype == _float128_dtype else [])
-        ),
-        printer=_create_sympy_numpy_printer_class(dtype),
-        docstring_limit=0,
-    )
-
-
-@functools.cache
-def _create_sympy_numpy_printer_class(
-    dtype: np.dtype,
-) -> type[sp.printing.numpy.NumPyPrinter]:
-    """
-    Create a SymPy to NumPy printer class that outputs numerical values and
-    constants with the provided `dtype` and sufficient precision.
-    """
-
-    class NumPyDtypePrinter(sp.printing.numpy.NumPyPrinter):
-        __slots__ = ("_dtype",)
-
-        # remove default printing of known constants
-        _kc = dict()
-
-        def __init__(self, settings=None):
-            self._dtype = dtype.name
-            if settings is None:
-                settings = dict()
-            settings["fully_qualified_modules"] = False
-            if dtype == _float128_dtype:
-                settings["precision"] = _float128_precision * 2
-            else:
-                settings["precision"] = np.finfo(dtype).precision * 2
-            super().__init__(settings)
-
-        def _print_Integer(self, expr):
-            return f"{self._dtype}({str(expr.p)!r})"
-
-        def _print_Rational(self, expr):
-            return f"{self._dtype}({str(expr.p)!r}) / {self._dtype}({str(expr.q)!r})"
-
-        def _print_Float(self, expr):
-            # explicitly create the float from its string representation
-            #  e.g. 1.2 -> float16('1.2')
-            s = super()._print_Float(expr)
-            return f"{self._dtype}({s!r})"
-
-        def _print_Exp1(self, expr):
-            return self._print_NumberSymbol(expr)
-
-        def _print_Pi(self, expr):
-            return self._print_NumberSymbol(expr)
-
-        def _print_NaN(self, expr):
-            return f"{self._dtype}(nan)"
-
-        def _print_Infinity(self, expr):
-            return f"{self._dtype}(inf)"
-
-        def _print_ImaginaryUnit(self, expr):
-            raise ValueError(
-                "cannot evaluate an expression containing an imaginary number"
-            )
-
-    return NumPyDtypePrinter
-
-
 # pattern of syntactically weakly valid expressions
 # we only check against forbidden tokens, not for semantic validity
 #  i.e. just enough that it's safe to eval afterwards
@@ -1193,40 +980,12 @@ _QOI_KWARG_PATTERN = (
 )
 _QOI_ATOM_PATTERN = (
     r"(?:"
-    r"(?:[+-]?[0-9]+)"
-    r"|(?:[+-]?[0-9]+\.[0-9]+(?:e[+-]?[0-9]+)?)"
-    r"|(?:e)"
-    r"|(?:pi)"
-    r"|(?:x)"
-    r"|(?:sqrt)"
-    r"|(?:ln)"
-    r"|(?:log)"
-    r"|(?:exp)"
-    r"|(?:sin)"
-    r"|(?:cos)"
-    r"|(?:tan)"
-    r"|(?:cot)"
-    r"|(?:sec)"
-    r"|(?:csc)"
-    r"|(?:asin)"
-    r"|(?:acos)"
-    r"|(?:atan)"
-    r"|(?:acot)"
-    r"|(?:asec)"
-    r"|(?:acsc)"
-    r"|(?:sinh)"
-    r"|(?:cosh)"
-    r"|(?:tanh)"
-    r"|(?:coth)"
-    r"|(?:sech)"
-    r"|(?:csch)"
-    r"|(?:asinh)"
-    r"|(?:acosh)"
-    r"|(?:atanh)"
-    r"|(?:acoth)"
-    r"|(?:asech)"
-    r"|(?:acsch)"
-    r")"
+    + r"(?:[+-]?[0-9]+)"
+    + r"|(?:[+-]?[0-9]+\.[0-9]+(?:e[+-]?[0-9]+)?)"
+    + r"|(?:x)"
+    + r"".join(rf"|(?:{c})" for c in _qois.math.CONSTANTS)
+    + r"".join(rf"|(?:{c})" for c in _qois.math.FUNCTIONS)
+    + r")"
 )
 _QOI_SEPARATOR_PATTERN = r"(?:[ \t\n\(\),\+\-\*/])"
 _QOI_PATTERN = re.compile(

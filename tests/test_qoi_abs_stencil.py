@@ -361,9 +361,9 @@ def test_indexing():
 def test_lambdify_indexing():
     import inspect
 
+    from numcodecs_safeguards.safeguards._qois.compile import sympy_expr_to_numpy
     from numcodecs_safeguards.safeguards.stencil.qoi.abs import (
         StencilQuantityOfInterestAbsoluteErrorBoundSafeguard,
-        _compile_sympy_expr_to_numpy,
     )
 
     safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
@@ -375,9 +375,7 @@ def test_lambdify_indexing():
         0,
     )
 
-    fn = _compile_sympy_expr_to_numpy(
-        [safeguard._X], safeguard._qoi_expr, np.dtype(np.float16)
-    )
+    fn = sympy_expr_to_numpy([safeguard._X], safeguard._qoi_expr, np.dtype(np.float16))
 
     assert (
         inspect.getsource(fn)

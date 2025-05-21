@@ -14,9 +14,6 @@ from .pointwise.ratio import RatioErrorBoundSafeguard
 from .pointwise.rel import RelativeErrorBoundSafeguard
 from .pointwise.sign import SignPreservingSafeguard
 from .pointwise.zero import ZeroIsZeroSafeguard
-from .stencil.findiff.abs import (
-    FiniteDifferenceAbsoluteErrorBoundSafeguard,
-)
 from .stencil.monotonicity import MonotonicityPreservingSafeguard
 from .stencil.qoi.abs import StencilQuantityOfInterestAbsoluteErrorBoundSafeguard
 
@@ -46,10 +43,6 @@ class Safeguards(Enum):
 
     qoi_abs_stencil = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard
     """Enforce an absolute error bound on a derived quantity of interest over a data neighbourhood."""
-
-    # finite difference error bounds
-    findiff_abs = FiniteDifferenceAbsoluteErrorBoundSafeguard
-    """Enforce an absolute error bound for the finite differences."""
 
     # monotonicity
     monotonicity = MonotonicityPreservingSafeguard

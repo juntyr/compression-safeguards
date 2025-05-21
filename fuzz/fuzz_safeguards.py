@@ -25,6 +25,7 @@ with atheris.instrument_imports():
         SafeguardsCodec,
     )
     from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
+    from numcodecs_safeguards.safeguards import _qois
     from numcodecs_safeguards.safeguards.abc import Safeguard
     from numcodecs_safeguards.safeguards.pointwise.qoi import PointwiseExpr
     from numcodecs_safeguards.safeguards.stencil.qoi import (
@@ -106,55 +107,19 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
         return generate_parameter(data, ty, depth)
 
     if ty in (PointwiseExpr, StencilExpr):
-        ATOMS = ["x", int, float, "e", "pi"]
-        TRIGONOMETRIC_OPS = [
-            "sin",
-            "cos",
-            "tan",
-            "cot",
-            "sec",
-            "csc",
-            "asin",
-            "acos",
-            "atan",
-            "acot",
-            "asec",
-            "acsc",
-        ]
-        HYPERBOLIC_OPS = [
-            "sinh",
-            "cosh",
-            "tanh",
-            "coth",
-            "sech",
-            "csch",
-            "asinh",
-            "acosh",
-            "atanh",
-            "acoth",
-            "asech",
-            "acsch",
-        ]
-        OPS = (
-            [
-                "neg",
-                "+",
-                "-",
-                "*",
-                "/",
-                "**",
-                "log",
-                "sqrt",
-                "ln",
-                "exp",
-            ]
-            + TRIGONOMETRIC_OPS
-            + HYPERBOLIC_OPS
-        )
+        ATOMS = ["x", int, float] + list(_qois.math.CONSTANTS)
+        OPS = [
+            "neg",
+            "+",
+            "-",
+            "*",
+            "/",
+            "**",
+        ] + list(_qois.math.FUNCTIONS)
 
         if ty is StencilExpr:
             ATOMS += ["X", "I"]
-            OPS += ["asum", "index", "findiff"]
+            OPS += ["index", "findiff"] + list(_qois.amath.FUNCTIONS)
 
         atoms = []
         for _ in range(data.ConsumeIntInRange(2, 4)):
@@ -177,14 +142,10 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
             op = OPS[data.ConsumeIntInRange(0, len(OPS) - 1)]
             if op == "neg":
                 atoms.append(f"(-{atom1})")
-            elif op in (
-                ("sqrt", "ln", "exp", "asum")
-                + tuple(TRIGONOMETRIC_OPS)
-                + tuple(HYPERBOLIC_OPS)
-            ):
-                atoms.append(f"{op}({atom1})")
             elif op == "log":
                 atoms.append(f"log({atom1},{atom2})")
+            elif op in tuple(_qois.math.FUNCTIONS) + tuple(_qois.amath.FUNCTIONS):
+                atoms.append(f"{op}({atom1})")
             elif op == "index":
                 atoms.append(
                     f"{atom1}[{data.ConsumeIntInRange(0, 20)}, {data.ConsumeIntInRange(0, 20)}]"
