@@ -55,6 +55,7 @@ class BoundaryCondition(Enum):
     """
 
 
+@np.errstate(over="ignore", under="ignore", invalid="ignore")
 def _pad_with_boundary(
     a: np.ndarray,
     boundary: BoundaryCondition,
