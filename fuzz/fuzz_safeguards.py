@@ -142,7 +142,7 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
             op = OPS[data.ConsumeIntInRange(0, len(OPS) - 1)]
             if op == "neg":
                 atoms.append(f"(-{atom1})")
-            elif op == "log":
+            elif op in ("log", "matmul"):
                 atoms.append(f"log({atom1},{atom2})")
             elif op in tuple(_qois.math.FUNCTIONS) + tuple(_qois.amath.FUNCTIONS):
                 atoms.append(f"{op}({atom1})")

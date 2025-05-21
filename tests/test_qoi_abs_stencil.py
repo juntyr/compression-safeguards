@@ -302,6 +302,33 @@ def test_findiff():
     )
 
 
+def test_matmul():
+    from numcodecs_safeguards.safeguards.stencil.qoi.abs import (
+        StencilQuantityOfInterestAbsoluteErrorBoundSafeguard,
+    )
+
+    data = np.arange(16, dtype=float).reshape(4, 4)
+    valid_3x3_neighbourhood = [
+        dict(axis=0, before=1, after=1, boundary="valid"),
+        dict(axis=1, before=1, after=1, boundary="valid"),
+    ]
+
+    safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
+        "matmul(A[[-1, -2, -3]], matmul(X, tr(A[[1, 2, 3]])))[0,0]",
+        valid_3x3_neighbourhood,
+        0,
+    )
+    assert (
+        f"{safeguard._qoi_expr}"
+        == "-X[0, 0] - 2*X[0, 1] - 3*X[0, 2] - 2*X[1, 0] - 4*X[1, 1] - 6*X[1, 2] - 3*X[2, 0] - 6*X[2, 1] - 9*X[2, 2]"
+    )
+    check_all_codecs(
+        data,
+        "matmul(A[[-1, -2, -3]], matmul(X, tr(A[[1, 2, 3]])))[0,0]",
+        [(1, 1), (1, 1)],
+    )
+
+
 def test_indexing():
     from numcodecs_safeguards.safeguards.stencil.qoi.abs import (
         StencilQuantityOfInterestAbsoluteErrorBoundSafeguard,

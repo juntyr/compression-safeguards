@@ -121,6 +121,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
       | "ln", "(", expr, ")"              (* natural logarithm *)
       | "exp", "(", expr, ")"             (* exponential e^x *)
       | "asum", "(", expr, ")"            (* sum over an array *)
+      | "tr", "(", expr, ")"              (* transpose of a matrix (2d array) *)
       | "sin", "(", expr, ")"             (* sine sin(x) *)
       | "cos", "(", expr, ")"             (* cosine cos(x) *)
       | "tan", "(", expr, ")"             (* tangent tan(x) *)
@@ -158,6 +159,9 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
           , "base", "=", expr,
         ")"
       | expr, "[", indices, "]"           (* array indexing *)
+      | "matmul", "("                     (* matrix (2d array) multiplication *)
+          , expr, ",", expr,
+        ")"
     ;
 
     indices =
