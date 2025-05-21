@@ -55,7 +55,6 @@ class BoundaryCondition(Enum):
     """
 
 
-@np.errstate(over="ignore", under="ignore", invalid="ignore")
 def _pad_with_boundary(
     a: np.ndarray,
     boundary: BoundaryCondition,
@@ -76,7 +75,13 @@ def _pad_with_boundary(
             return a
         case BoundaryCondition.constant:
             mode = "constant"
-            kwargs["constant_values"] = constant
+            try:
+                with np.errstate(over="raise", under="raise", invalid="raise"):
+                    kwargs["constant_values"] = np.array(constant, dtype=a.dtype)
+            except Exception as err:
+                raise ValueError(
+                    f"constant boundary has invalid value {constant} for data array of dtype {a.dtype.name}"
+                ) from err
         case BoundaryCondition.edge:
             mode = "edge"
         case BoundaryCondition.reflect:

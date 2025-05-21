@@ -1,6 +1,7 @@
 from itertools import product
 
 import numpy as np
+import pytest
 
 from numcodecs_safeguards.cast import as_bits
 from numcodecs_safeguards.safeguards.stencil import BoundaryCondition
@@ -236,18 +237,19 @@ def test_fuzzer_padding_overflow():
     data = np.array([[0.0]], dtype=np.float32)
     decoded = np.array([[-9.444733e21]], dtype=np.float32)
 
-    encode_decode_mock(
-        data,
-        decoded,
-        safeguards=[
-            dict(
-                kind="monotonicity",
-                monotonicity="weak",
-                window=108,
-                boundary="constant",
-                constant_boundary=-1.7976657042415566e308,
-                axis=None,
-            ),
-            dict(kind="sign"),
-        ],
-    )
+    with pytest.raises(ValueError, match="constant boundary has invalid value"):
+        encode_decode_mock(
+            data,
+            decoded,
+            safeguards=[
+                dict(
+                    kind="monotonicity",
+                    monotonicity="weak",
+                    window=108,
+                    boundary="constant",
+                    constant_boundary=-1.7976657042415566e308,
+                    axis=None,
+                ),
+                dict(kind="sign"),
+            ],
+        )

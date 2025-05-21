@@ -231,6 +231,9 @@ def check_one_input(data):
             isinstance(err, IndexError)
             and ("axis index" in str(err))
             and ("out of bounds for array of shape" in str(err))
+        ) or (
+            isinstance(err, ValueError)
+            and ("constant boundary has invalid value" in str(err))
         ):
             return
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")
@@ -252,12 +255,6 @@ def check_one_input(data):
         encoded = safeguard.encode(raw)
         safeguard.decode(encoded, out=np.empty_like(raw))
     except Exception as err:
-        if (
-            isinstance(err, IndexError)
-            and ("axis index" in str(err))
-            and ("out of bounds for array of shape" in str(err))
-        ):
-            return
         print(f"\n===\n\ncodec = {grepr}\n\ndata = {raw!r}\n\n===\n")
         raise err
 
