@@ -165,8 +165,6 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             The shape of the data neighbourhood.
         """
 
-        window = 1 + self._window * 2
-
         neighbourhood: list[None | NeighbourhoodAxis] = [None] * len(data_shape)
 
         for axis, alen in enumerate(data_shape):
@@ -175,9 +173,6 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 and axis != self._axis
                 and axis != (len(data_shape) + self._axis)
             ):
-                continue
-
-            if self._boundary == BoundaryCondition.valid and alen < window:
                 continue
 
             if alen == 0:
