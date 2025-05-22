@@ -108,5 +108,3 @@ class NumPyLikeArray(sp.Array):
         other = sp.sympify(other)
         result_list = [other**i for i in sp.tensor.array.arrayop.Flatten(self)]
         return type(self)(result_list, self.shape)
-
-    # TODO: also support "matrix" multiplication
