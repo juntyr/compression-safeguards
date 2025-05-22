@@ -12,7 +12,7 @@ from numpy.lib.stride_tricks import sliding_window_view
 
 from ...cast import _isfinite, _isnan, from_total_order, to_total_order
 from ...intervals import Interval, IntervalUnion, Lower, Upper
-from . import BoundaryCondition, _pad_with_boundary
+from . import BoundaryCondition, NeighbourhoodAxis, _pad_with_boundary
 from .abc import S, StencilSafeguard, T
 
 _STRICT = ((lt, gt, False, False),) * 2
@@ -142,6 +142,53 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         self._constant_boundary = constant_boundary
 
         self._axis = axis
+
+    def compute_neighbourhood_for_data_shape(
+        self, data_shape: tuple[int, ...]
+    ) -> tuple[None | NeighbourhoodAxis, ...]:
+        """
+        Compute the shape of the data neighbourhood for data of a given shape.
+        [`None`][None] is returned along dimensions for which there is no data
+        neighbourhood.
+
+        This method also checks that the data shape is compatible with this
+        stencil safeguard.
+
+        Parameters
+        ----------
+        data_shape : tuple[int, ...]
+            The shape of the data.
+
+        Returns
+        -------
+        neighbourhood_shape : tuple[None | NeighbourhoodAxis, ...]
+            The shape of the data neighbourhood.
+        """
+
+        window = 1 + self._window * 2
+
+        neighbourhood: list[None | NeighbourhoodAxis] = [None] * len(data_shape)
+
+        for axis, alen in enumerate(data_shape):
+            if (
+                self._axis is not None
+                and axis != self._axis
+                and axis != (len(data_shape) + self._axis)
+            ):
+                continue
+
+            if self._boundary == BoundaryCondition.valid and alen < window:
+                continue
+
+            if alen == 0:
+                continue
+
+            neighbourhood[axis] = NeighbourhoodAxis(
+                self._window,
+                self._window,
+            )
+
+        return tuple(neighbourhood)
 
     def check_pointwise(
         self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]

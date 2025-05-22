@@ -11,6 +11,7 @@ import numpy as np
 
 from ...intervals import IntervalUnion
 from ..abc import Safeguard
+from . import NeighbourhoodAxis
 
 T = TypeVar("T", bound=np.dtype)
 S = TypeVar("S", bound=tuple[int, ...])
@@ -26,6 +27,31 @@ class StencilSafeguard(Safeguard, ABC):
     """
 
     __slots__ = ()
+
+    @abstractmethod
+    def compute_neighbourhood_for_data_shape(
+        self, data_shape: tuple[int, ...]
+    ) -> tuple[None | NeighbourhoodAxis, ...]:
+        """
+        Compute the shape of the data neighbourhood for data of a given shape.
+        [`None`][None] is returned along dimensions for which there is no data
+        neighbourhood.
+
+        This method also checks that the data shape is compatible with this
+        stencil safeguard.
+
+        Parameters
+        ----------
+        data_shape : tuple[int, ...]
+            The shape of the data.
+
+        Returns
+        -------
+        neighbourhood_shape : tuple[None | NeighbourhoodAxis, ...]
+            The shape of the data neighbourhood.
+        """
+
+        pass
 
     @final
     def check(self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]) -> bool:

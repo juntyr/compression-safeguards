@@ -28,9 +28,14 @@ from ....intervals import Interval, IntervalUnion
 from ... import _qois
 from ...pointwise.abs import _compute_safe_eb_diff_interval
 from ...pointwise.qoi.abs import _ensure_bounded_derived_error
-from .. import BoundaryCondition, _pad_with_boundary
+from .. import (
+    BoundaryCondition,
+    NeighbourhoodAxis,
+    NeighbourhoodBoundaryAxis,
+    _pad_with_boundary,
+)
 from ..abc import S, StencilSafeguard, T
-from . import NeighbourhoodAxis, StencilExpr
+from . import StencilExpr
 
 Qs = TypeVar("Qs", bound=tuple[int, ...])
 Ns = TypeVar("Ns", bound=tuple[int, ...])
@@ -211,7 +216,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         "_X",
     )
     _qoi: StencilExpr
-    _neighbourhood: tuple[NeighbourhoodAxis, ...]
+    _neighbourhood: tuple[NeighbourhoodBoundaryAxis, ...]
     _eb_abs: int | float
     _qoi_expr: sp.Basic
     _X: sp.tensor.array.expressions.ArraySymbol
@@ -221,17 +226,17 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     def __init__(
         self,
         qoi: StencilExpr,
-        neighbourhood: Sequence[dict | NeighbourhoodAxis],
+        neighbourhood: Sequence[dict | NeighbourhoodBoundaryAxis],
         eb_abs: int | float,
     ):
         self._neighbourhood = tuple(
             axis
-            if isinstance(axis, NeighbourhoodAxis)
-            else NeighbourhoodAxis.from_config(axis)
+            if isinstance(axis, NeighbourhoodBoundaryAxis)
+            else NeighbourhoodBoundaryAxis.from_config(axis)
             for axis in neighbourhood
         )
         assert len(self._neighbourhood) > 0, "neighbourhood must not be empty"
-        assert len(set(axis._axis for axis in self._neighbourhood)) == len(
+        assert len(set(axis.axis for axis in self._neighbourhood)) == len(
             self._neighbourhood
         ), "neighbourhood axes must be unique"
 
@@ -241,8 +246,8 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
         shapel, Il = [], []  # noqa: E741
         for axis in self._neighbourhood:
-            shapel.append(axis._before + 1 + axis._after)
-            Il.append(axis._before)
+            shapel.append(axis.before + 1 + axis.after)
+            Il.append(axis.before)
         shape, I = tuple(shapel), tuple(Il)  # noqa: E741
 
         self._X = sp.tensor.array.expressions.ArraySymbol("X", shape)
@@ -308,6 +313,58 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         self._qoi = qoi
         self._qoi_expr = qoi_expr
 
+    def compute_neighbourhood_for_data_shape(
+        self, data_shape: tuple[int, ...]
+    ) -> tuple[None | NeighbourhoodAxis, ...]:
+        """
+        Compute the shape of the data neighbourhood for data of a given shape.
+        [`None`][None] is returned along dimensions for which there is no data
+        neighbourhood.
+
+        This method also checks that the data shape is compatible with this
+        stencil safeguard.
+
+        Parameters
+        ----------
+        data_shape : tuple[int, ...]
+            The shape of the data.
+
+        Returns
+        -------
+        neighbourhood_shape : tuple[None | NeighbourhoodAxis, ...]
+            The shape of the data neighbourhood.
+        """
+
+        neighbourhood: list[None | NeighbourhoodAxis] = [None] * len(data_shape)
+
+        all_axes = []
+        for axis in self._neighbourhood:
+            if (axis.axis >= len(data_shape)) or (axis.axis < -len(data_shape)):
+                raise IndexError(
+                    f"axis index {axis.axis} is out of bounds for array of shape {data_shape}"
+                )
+            naxis = len(data_shape) - axis.axis if axis.axis < 0 else axis.axis
+            if naxis in all_axes:
+                raise IndexError(
+                    f"duplicate axis index {axis.axis}, normalised to {naxis}, for array of shape {data_shape}"
+                )
+            all_axes.append(naxis)
+
+            neighbourhood[naxis] = axis.shape
+
+        window = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
+
+        # if the neighbourhood is empty, e.g. because we in valid mode and the
+        #  neighbourhood shape exceeds the data shape,
+        # return an empty neighbourhood
+        for axis, w in zip(self._neighbourhood, window):
+            if data_shape[axis.axis] < w and axis.boundary == BoundaryCondition.valid:
+                return (None,) * len(data_shape)
+        if np.prod(data_shape) == 0:
+            return (None,) * len(data_shape)
+
+        return tuple(neighbourhood)
+
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
         self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
@@ -331,25 +388,23 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
         all_axes = []
         for axis in self._neighbourhood:
-            if axis._axis >= data.ndim or axis._axis < -data.ndim:
+            if (axis.axis >= data.ndim) or (axis.axis < -data.ndim):
                 raise IndexError(
-                    f"axis index {axis._axis} is out of bounds for array of shape {data.shape}"
+                    f"axis index {axis.axis} is out of bounds for array of shape {data.shape}"
                 )
-            naxis = data.ndim - axis._axis if axis._axis < 0 else axis._axis
+            naxis = data.ndim - axis.axis if axis.axis < 0 else axis.axis
             if naxis in all_axes:
                 raise IndexError(
-                    f"duplicate axis index {axis._axis}, normalised to {naxis}, for array of shape {data.shape}"
+                    f"duplicate axis index {axis.axis}, normalised to {naxis}, for array of shape {data.shape}"
                 )
             all_axes.append(naxis)
 
-        window = tuple(axis._before + 1 + axis._after for axis in self._neighbourhood)
+        window = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
 
         # if the neighbourhood is empty, e.g. because we in valid mode and the
         #  neighbourhood shape exceeds the data shape, allow all values
         for axis, w in zip(self._neighbourhood, window):
-            if data.shape[axis._axis] < w and (
-                data.shape[axis._axis] == 0 or axis._boundary == BoundaryCondition.valid
-            ):
+            if data.shape[axis.axis] < w and axis.boundary == BoundaryCondition.valid:
                 return np.ones_like(data, dtype=np.bool)  # type: ignore
         if data.size == 0:
             return np.ones_like(data, dtype=np.bool)  # type: ignore
@@ -358,26 +413,26 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         for axis in self._neighbourhood:
             data_boundary = _pad_with_boundary(
                 data_boundary,
-                axis._boundary,
-                axis._before,
-                axis._after,
-                axis._constant_boundary,
-                axis._axis,
+                axis.boundary,
+                axis.before,
+                axis.after,
+                axis.constant_boundary,
+                axis.axis,
             )
             decoded_boundary = _pad_with_boundary(
                 decoded_boundary,
-                axis._boundary,
-                axis._before,
-                axis._after,
-                axis._constant_boundary,
-                axis._axis,
+                axis.boundary,
+                axis.before,
+                axis.after,
+                axis.constant_boundary,
+                axis.axis,
             )
 
         data_windows_float: np.ndarray = to_float(
             sliding_window_view(
                 data_boundary,
                 window,
-                axis=tuple(axis._axis for axis in self._neighbourhood),
+                axis=tuple(axis.axis for axis in self._neighbourhood),
                 writeable=False,
             )  # type: ignore
         )
@@ -385,7 +440,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             sliding_window_view(
                 decoded_boundary,
                 window,
-                axis=tuple(axis._axis for axis in self._neighbourhood),
+                axis=tuple(axis.axis for axis in self._neighbourhood),
                 writeable=False,
             )  # type: ignore
         )
@@ -422,10 +477,10 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
         s = [slice(None)] * data.ndim
         for axis in self._neighbourhood:
-            if axis._boundary == BoundaryCondition.valid:
-                start = None if axis._before == 0 else axis._before
-                end = None if axis._after == 0 else -axis._after
-                s[axis._axis] = slice(start, end)
+            if axis.boundary == BoundaryCondition.valid:
+                start = None if axis.before == 0 else axis.before
+                end = None if axis.after == 0 else -axis.after
+                s[axis.axis] = slice(start, end)
 
         ok = np.ones_like(data, dtype=np.bool)
         ok[tuple(s)] = windows_ok
@@ -452,25 +507,23 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
         all_axes = []
         for axis in self._neighbourhood:
-            if axis._axis >= data.ndim or axis._axis < -data.ndim:
+            if (axis.axis >= data.ndim) or (axis.axis < -data.ndim):
                 raise IndexError(
-                    f"axis index {axis._axis} is out of bounds for array of shape {data.shape}"
+                    f"axis index {axis.axis} is out of bounds for array of shape {data.shape}"
                 )
-            naxis = data.ndim - axis._axis if axis._axis < 0 else axis._axis
+            naxis = data.ndim - axis.axis if axis.axis < 0 else axis.axis
             if naxis in all_axes:
                 raise IndexError(
-                    f"duplicate axis index {axis._axis}, normalised to {naxis}, for array of shape {data.shape}"
+                    f"duplicate axis index {axis.axis}, normalised to {naxis}, for array of shape {data.shape}"
                 )
             all_axes.append(naxis)
 
-        window = tuple(axis._before + 1 + axis._after for axis in self._neighbourhood)
+        window = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
 
         # if the neighbourhood is empty, e.g. because we in valid mode and the
         #  neighbourhood shape exceeds the data shape, allow all values
         for axis, w in zip(self._neighbourhood, window):
-            if data.shape[axis._axis] < w and (
-                data.shape[axis._axis] == 0 or axis._boundary == BoundaryCondition.valid
-            ):
+            if data.shape[axis.axis] < w and axis.boundary == BoundaryCondition.valid:
                 return Interval.full_like(data).into_union()  # type: ignore
         if data.size == 0:
             return Interval.full_like(data).into_union()  # type: ignore
@@ -479,18 +532,18 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         for axis in self._neighbourhood:
             data_boundary = _pad_with_boundary(
                 data_boundary,
-                axis._boundary,
-                axis._before,
-                axis._after,
-                axis._constant_boundary,
-                axis._axis,
+                axis.boundary,
+                axis.before,
+                axis.after,
+                axis.constant_boundary,
+                axis.axis,
             )
 
         data_windows_float: np.ndarray = to_float(
             sliding_window_view(
                 data_boundary,
                 window,
-                axis=tuple(axis._axis for axis in self._neighbourhood),
+                axis=tuple(axis.axis for axis in self._neighbourhood),
                 writeable=False,
             )  # type: ignore
         )
@@ -550,10 +603,10 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
         s = [slice(None)] * data.ndim
         for axis in self._neighbourhood:
-            if axis._boundary == BoundaryCondition.valid:
-                start = None if axis._before == 0 else axis._before
-                end = None if axis._after == 0 else -axis._after
-                s[axis._axis] = slice(start, end)
+            if axis.boundary == BoundaryCondition.valid:
+                start = None if axis.before == 0 else axis.before
+                end = None if axis.after == 0 else -axis.after
+                s[axis.axis] = slice(start, end)
 
         data_float: np.ndarray = to_float(data)
 
@@ -578,16 +631,16 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         for axis in self._neighbourhood:
             indices_boundary = _pad_with_boundary(
                 indices_boundary,
-                axis._boundary,
-                axis._before,
-                axis._after,
-                None if axis._constant_boundary is None else data.size,
-                axis._axis,
+                axis.boundary,
+                axis.before,
+                axis.after,
+                None if axis.constant_boundary is None else data.size,
+                axis.axis,
             )
         indices_windows = sliding_window_view(  # type: ignore
             indices_boundary,
             window,
-            axis=tuple(axis._axis for axis in self._neighbourhood),
+            axis=tuple(axis.axis for axis in self._neighbourhood),
             writeable=False,
         ).reshape((-1, np.prod(window)))
 

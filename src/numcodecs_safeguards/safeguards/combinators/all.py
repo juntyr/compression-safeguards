@@ -12,6 +12,7 @@ import numpy as np
 from ...intervals import IntervalUnion
 from ..abc import Safeguard
 from ..pointwise.abc import PointwiseSafeguard, S, T
+from ..stencil import NeighbourhoodAxis
 from ..stencil.abc import StencilSafeguard
 
 
@@ -198,3 +199,27 @@ class _AllStencilSafeguards(_AllSafeguardsBase, StencilSafeguard):
                 f"{safeguard!r} is not a pointwise or stencil safeguard"
             )
         self._safeguards = safeguards
+
+    def compute_neighbourhood_for_data_shape(
+        self, data_shape: tuple[int, ...]
+    ) -> tuple[None | NeighbourhoodAxis, ...]:
+        neighbourhood: list[None | NeighbourhoodAxis] = [None] * len(data_shape)
+
+        for safeguard in self._safeguards:
+            if not isinstance(safeguard, StencilSafeguard):
+                continue
+
+            single_neighbourhood = safeguard.compute_neighbourhood_for_data_shape(
+                data_shape
+            )
+
+            for i, n in enumerate(single_neighbourhood):
+                ni = neighbourhood[i]
+                if ni is None:
+                    neighbourhood[i] = n
+                elif n is not None:
+                    neighbourhood[i] = NeighbourhoodAxis(
+                        max(ni.before, n.before), max(ni.after, n.after)
+                    )
+
+        return tuple(neighbourhood)
