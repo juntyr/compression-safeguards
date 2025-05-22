@@ -25,9 +25,18 @@ from ....cast import (
     to_float,
 )
 from ....intervals import Interval, IntervalUnion
-from ... import _qois
+from ..._qois.amath import CONSTRUCTORS as AMATH_CONSTRUCTORS
+from ..._qois.amath import FUNCTIONS as AMATH_FUNCTIONS
+from ..._qois.array import NumPyLikeArray
+from ..._qois.compile import sympy_expr_to_numpy as compile_sympy_expr_to_numpy
+from ..._qois.eb import (
+    compute_data_eb_for_stencil_qoi_eb_unchecked,
+    ensure_bounded_derived_error,
+)
+from ..._qois.findiff import create_findiff_for_neighbourhood
+from ..._qois.math import CONSTANTS as MATH_CONSTANTS
+from ..._qois.math import FUNCTIONS as MATH_FUNCTIONS
 from ...pointwise.abs import _compute_safe_eb_diff_interval
-from ...pointwise.qoi.abs import _ensure_bounded_derived_error
 from .. import (
     BoundaryCondition,
     NeighbourhoodAxis,
@@ -252,7 +261,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
         self._X = sp.tensor.array.expressions.ArraySymbol("X", shape)
         X = self._X.as_explicit()
-        X.__class__ = _qois.array.NumPyLikeArray
+        X.__class__ = NumPyLikeArray
 
         assert len(qoi.strip()) > 0, "qoi expression must not be empty"
         assert _QOI_PATTERN.fullmatch(qoi) is not None, "invalid qoi expression"
@@ -265,19 +274,17 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                     X=X,
                     x=X.__getitem__(I),
                     # neighbourhood index
-                    I=_qois.array.NumPyLikeArray(I),
+                    I=NumPyLikeArray(I),
                     # === constants ===
-                    **_qois.math.CONSTANTS,
+                    **MATH_CONSTANTS,
                     # === operators ===
                     # poinwise math
-                    **_qois.math.FUNCTIONS,
+                    **MATH_FUNCTIONS,
                     # array math
-                    **_qois.amath.CONSTRUCTORS,
-                    **_qois.amath.FUNCTIONS,
+                    **AMATH_CONSTRUCTORS,
+                    **AMATH_FUNCTIONS,
                     # finite difference
-                    findiff=_qois.findiff.create_findiff_for_neighbourhood(
-                        self._X, shape, I
-                    ),
+                    findiff=create_findiff_for_neighbourhood(self._X, shape, I),
                 ),
                 global_dict=dict(
                     # literals
@@ -437,7 +444,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             )  # type: ignore
         )
 
-        qoi_lambda = _qois.compile.sympy_expr_to_numpy(
+        qoi_lambda = compile_sympy_expr_to_numpy(
             [self._X], self._qoi_expr, data_windows_float.dtype
         )
 
@@ -546,7 +553,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             eb_abs: np.ndarray = to_finite_float(self._eb_abs, data_windows_float.dtype)
         assert eb_abs >= 0
 
-        qoi_lambda = _qois.compile.sympy_expr_to_numpy(
+        qoi_lambda = compile_sympy_expr_to_numpy(
             [self._X], self._qoi_expr, data_windows_float.dtype
         )
 
@@ -753,15 +760,37 @@ def _compute_data_eb_for_stencil_qoi_eb(
     2022), 697-710. Available from: https://doi.org/10.14778/3574245.3574255.
     """
 
-    tl, tu = _compute_data_eb_for_stencil_qoi_eb_unchecked(
-        expr, X, XvN, Xv, tauv_lower, tauv_upper
+    tl, tu = compute_data_eb_for_stencil_qoi_eb_unchecked(
+        expr,
+        Xv,
+        tauv_lower,
+        tauv_upper,
+        check_is_x=lambda expr: (
+            expr.func is sp.tensor.array.expressions.ArrayElement
+            and len(expr.args) == 2
+            and expr.args[0] == X
+        ),
+        evaluate_sympy_expr_to_numpy=lambda expr: compile_sympy_expr_to_numpy(
+            [X], expr, Xv.dtype
+        )(XvN),
+        compute_data_eb_for_stencil_qoi_eb=lambda expr,
+        Xv,
+        tauv_lower,
+        tauv_upper: _compute_data_eb_for_stencil_qoi_eb(
+            expr,
+            X,
+            XvN,
+            Xv,
+            tauv_lower,
+            tauv_upper,
+        ),
     )
 
-    exprl = _qois.compile.sympy_expr_to_numpy([X], expr, Xv.dtype)
+    exprl = compile_sympy_expr_to_numpy([X], expr, Xv.dtype)
     exprv = (exprl)(XvN)
 
     # handle rounding errors in the lower error bound computation
-    tl = _ensure_bounded_derived_error(
+    tl = ensure_bounded_derived_error(
         # tl has shape Qs and has XvN (*Qs, *Ns), so their sum has (*Qs, *Ns)
         #  and evaluating the expression brings us back to Qs
         lambda tl: np.where(  # type: ignore
@@ -775,7 +804,7 @@ def _compute_data_eb_for_stencil_qoi_eb(
         tauv_lower,
         tauv_upper,
     )
-    tu = _ensure_bounded_derived_error(
+    tu = ensure_bounded_derived_error(
         # tu has shape Qs and has XvN (*Qs, *Ns), so their sum has (*Qs, *Ns)
         #  and evaluating the expression brings us back to Qs
         lambda tu: np.where(  # type: ignore
@@ -791,501 +820,6 @@ def _compute_data_eb_for_stencil_qoi_eb(
     )
 
     return tl, tu
-
-
-@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def _compute_data_eb_for_stencil_qoi_eb_unchecked(
-    expr: sp.Basic,
-    X: sp.tensor.array.expressions.ArraySymbol,
-    XvN: np.ndarray[tuple[int, ...], F],  # np.ndarray[tuple[*Qs, *Ns], F],
-    Xv: np.ndarray[Qs, F],
-    eb_expr_lower: np.ndarray[Qs, F],
-    eb_expr_upper: np.ndarray[Qs, F],
-) -> tuple[np.ndarray[Qs, F], np.ndarray[Qs, F]]:
-    """
-    Translate an error bound on a derived quantity of interest (QoI) into an
-    error bound on the input data.
-
-    This function does not check the returned error bound on the input data,
-    use `_compute_data_eb_for_qoi_eb` instead.
-
-    Parameters
-    ----------
-    expr : sp.Basic
-        Symbolic SymPy expression that defines the QoI.
-    X : sp.tensor.array.expressions.ArraySymbol
-        Symbol for the input data neighbourhood.
-    XvN : np.ndarray[tuple[*Qs, *Ns], F]
-        Actual values of the input data, with the neighbourhood on the last axes.
-    Xv : np.ndarray[Qs, F]
-        Actual values of the input data.
-    eb_expr_lower : np.ndarray[Qs, F]
-        Finite pointwise lower bound on the QoI error, must be negative or zero.
-    eb_expr_upper : np.ndarray[Qs, F]
-        Finite pointwise upper bound on the QoI error, must be positive or zero.
-
-    Returns
-    -------
-    eb_x_lower, eb_x_upper : tuple[np.ndarray[Qs, F], np.ndarray[Qs, F]]
-        Finite pointwise lower and upper error bound on the input data `x`.
-
-    Inspired by:
-
-    Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
-    Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
-    Lossy Compression for Scientific Data. Proc. VLDB Endow. 16, 4 (December
-    2022), 697-710. Available from: https://doi.org/10.14778/3574245.3574255.
-    """
-
-    assert len(expr.free_symbols) > 0, "constants have no error bounds"
-
-    zero = np.array(0, dtype=Xv.dtype)
-
-    # X[...]
-    if (
-        expr.func is sp.tensor.array.expressions.ArrayElement
-        and len(expr.args) == 2
-        and expr.args[0] == X
-    ):
-        return (eb_expr_lower, eb_expr_upper)
-
-    # array
-    if expr.func in (sp.Array, _qois.array.NumPyLikeArray):
-        raise ValueError("expression must evaluate to a scalar not an array")
-
-    # abs(...) is only used internally in exp(ln(abs(...)))
-    if expr.func is sp.Abs and len(expr.args) == 1:
-        # evaluate arg
-        (arg,) = expr.args
-        argv = _qois.compile.sympy_expr_to_numpy([X], arg, Xv.dtype)(XvN)
-        # flip the lower/upper error bound if the arg is negative
-        eql = np.where(argv < 0, -eb_expr_upper, eb_expr_lower)
-        equ = np.where(argv < 0, -eb_expr_lower, eb_expr_upper)
-        return _compute_data_eb_for_stencil_qoi_eb(arg, X, XvN, Xv, eql, equ)  # type: ignore
-
-    # ln(...)
-    # sympy automatically transforms log(..., base) into ln(...)/ln(base)
-    if expr.func is sp.log and len(expr.args) == 1:
-        # evaluate arg and ln(arg)
-        (arg,) = expr.args
-        argv = _qois.compile.sympy_expr_to_numpy([X], arg, Xv.dtype)(XvN)
-        exprv = np.log(argv)
-
-        # update the error bounds
-        eal = np.where(
-            (eb_expr_lower == 0),
-            zero,
-            np.exp(exprv + eb_expr_lower) - argv,
-        )
-        eal = _nan_to_zero(to_finite_float(eal, Xv.dtype))
-
-        eau = np.where(
-            (eb_expr_upper == 0),
-            zero,
-            np.exp(exprv + eb_expr_upper) - argv,
-        )
-        eau = _nan_to_zero(to_finite_float(eau, Xv.dtype))
-
-        # handle rounding errors in ln(e^(...)) early
-        eal = _ensure_bounded_derived_error(
-            lambda eal: np.log(argv + eal),
-            exprv,
-            argv,
-            eal,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eau = _ensure_bounded_derived_error(
-            lambda eau: np.log(argv + eau),
-            exprv,
-            argv,
-            eau,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eb_arg_lower, eb_arg_upper = eal, eau
-
-        # composition using Lemma 3 from Jiao et al.
-        return _compute_data_eb_for_stencil_qoi_eb(
-            arg,
-            X,
-            XvN,
-            Xv,
-            eb_arg_lower,  # type: ignore
-            eb_arg_upper,  # type: ignore
-        )
-
-    # e^(...)
-    if expr.func is sp.exp and len(expr.args) == 1:
-        # evaluate arg and e^arg
-        (arg,) = expr.args
-        argv = _qois.compile.sympy_expr_to_numpy([X], arg, Xv.dtype)(XvN)
-        exprv = np.exp(argv)
-
-        # update the error bounds
-        # ensure that ln is not passed a negative argument
-        eal = np.where(
-            (eb_expr_lower == 0),
-            zero,
-            np.log(np.maximum(zero, exprv + eb_expr_lower)) - argv,
-        )
-        eal = _nan_to_zero(to_finite_float(eal, Xv.dtype))
-
-        eau = np.where(
-            (eb_expr_upper == 0),
-            zero,
-            np.log(np.maximum(zero, exprv + eb_expr_upper)) - argv,
-        )
-        eau = _nan_to_zero(to_finite_float(eau, Xv.dtype))
-
-        # handle rounding errors in e^(ln(...)) early
-        eal = _ensure_bounded_derived_error(
-            lambda eal: np.exp(argv + eal),
-            exprv,
-            argv,
-            eal,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eau = _ensure_bounded_derived_error(
-            lambda eau: np.exp(argv + eau),
-            exprv,
-            argv,
-            eau,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eb_arg_lower, eb_arg_upper = eal, eau
-
-        # composition using Lemma 3 from Jiao et al.
-        return _compute_data_eb_for_stencil_qoi_eb(
-            arg,
-            X,
-            XvN,
-            Xv,
-            eb_arg_lower,  # type: ignore
-            eb_arg_upper,  # type: ignore
-        )
-
-    # rewrite a ** b as e^(b*ln(abs(a)))
-    # this is mathematically incorrect for a <= 0 but works for deriving error bounds
-    if expr.is_Pow and len(expr.args) == 2:
-        a, b = expr.args
-        return _compute_data_eb_for_stencil_qoi_eb(
-            sp.exp(b * sp.ln(sp.Abs(a)), evaluate=False),
-            X,
-            XvN,
-            Xv,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-
-    # sin(...)
-    if expr.func is sp.sin and len(expr.args) == 1:
-        # evaluate arg and sin(arg)
-        (arg,) = expr.args
-        argv = _qois.compile.sympy_expr_to_numpy([X], arg, Xv.dtype)(XvN)
-        exprv = np.sin(argv)
-
-        # update the error bounds
-        eal = np.where(
-            (eb_expr_lower == 0),
-            zero,
-            # we need to compare to asin(sin(...)) instead of ... to account
-            #  for asin's output domain
-            np.asin(np.maximum(-1, exprv + eb_expr_lower)) - np.asin(exprv),
-        )
-        eal = _nan_to_zero(to_finite_float(eal, Xv.dtype))
-
-        eau = np.where(
-            (eb_expr_upper == 0),
-            zero,
-            np.asin(np.minimum(exprv + eb_expr_upper, 1)) - np.asin(exprv),
-        )
-        eau = _nan_to_zero(to_finite_float(eau, Xv.dtype))
-
-        # np.asin maps to [-pi/2, +pi/2] where sin is monotonically increasing
-        # flip the argument error bounds where sin is monotonically decreasing
-        eal, eau = (
-            np.where(np.sin(argv + eal) > exprv, -eau, eal),
-            np.where(np.sin(argv + eau) < exprv, -eal, eau),
-        )
-
-        # handle rounding errors in sin(asin(...)) early
-        eal = _ensure_bounded_derived_error(
-            lambda eal: np.sin(argv + eal),
-            exprv,
-            argv,
-            eal,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eau = _ensure_bounded_derived_error(
-            lambda eau: np.sin(argv + eau),
-            exprv,
-            argv,
-            eau,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eb_arg_lower, eb_arg_upper = eal, eau
-
-        # composition using Lemma 3 from Jiao et al.
-        return _compute_data_eb_for_stencil_qoi_eb(
-            arg,
-            X,
-            XvN,
-            Xv,
-            eb_arg_lower,  # type: ignore
-            eb_arg_upper,  # type: ignore
-        )
-
-    # asin(...)
-    if expr.func is sp.asin and len(expr.args) == 1:
-        # evaluate arg and asin(arg)
-        (arg,) = expr.args
-        argv = _qois.compile.sympy_expr_to_numpy([X], arg, Xv.dtype)(XvN)
-        exprv = np.asin(argv)
-
-        # update the error bounds
-        eal = np.where(
-            (eb_expr_lower == 0),
-            zero,
-            # np.sin(max(-np.pi/2, ...)) might not be precise, so explicitly
-            #  bound lower bounds to be <= 0
-            np.minimum(np.sin(np.maximum(-np.pi / 2, exprv + eb_expr_lower)) - argv, 0),
-        )
-        eal = _nan_to_zero(to_finite_float(eal, Xv.dtype))
-
-        eau = np.where(
-            (eb_expr_upper == 0),
-            zero,
-            # np.sin(min(..., np.pi/2)) might not be precise, so explicitly
-            #  bound upper bounds to be >= 0
-            np.maximum(0, np.sin(np.minimum(exprv + eb_expr_upper, np.pi / 2)) - argv),
-        )
-        eau = _nan_to_zero(to_finite_float(eau, Xv.dtype))
-
-        # handle rounding errors in asin(sin(...)) early
-        eal = _ensure_bounded_derived_error(
-            lambda eal: np.asin(argv + eal),
-            exprv,
-            argv,
-            eal,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eau = _ensure_bounded_derived_error(
-            lambda eau: np.asin(argv + eau),
-            exprv,
-            argv,
-            eau,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eb_arg_lower, eb_arg_upper = eal, eau
-
-        # composition using Lemma 3 from Jiao et al.
-        return _compute_data_eb_for_stencil_qoi_eb(
-            arg,
-            X,
-            XvN,
-            Xv,
-            eb_arg_lower,  # type: ignore
-            eb_arg_upper,  # type: ignore
-        )
-
-    TRIGONOMETRIC = {
-        # derived trigonometric functions
-        sp.cos: lambda x: sp.sin(x + (sp.pi / 2), evaluate=False),
-        sp.tan: lambda x: sp.sin(x) / sp.cos(x),
-        sp.csc: lambda x: 1 / sp.sin(x),
-        sp.sec: lambda x: 1 / sp.cos(x),
-        sp.cot: lambda x: sp.cos(x) / sp.sin(x),
-        # inverse trigonometric functions
-        sp.acos: lambda x: (sp.pi / 2) - sp.asin(x),
-        sp.atan: lambda x: ((sp.pi / 2) - sp.asin(1 / sp.sqrt(x**2 + 1)))
-        * (sp.Abs(x) / x),
-        sp.acsc: lambda x: sp.asin(1 / x),
-        sp.asec: lambda x: sp.acos(1 / x),
-        sp.acot: lambda x: sp.atan(1 / x),
-    }
-
-    # rewrite derived trigonometric functions using sin
-    if expr.func in TRIGONOMETRIC and len(expr.args) == 1:
-        (arg,) = expr.args
-        return _compute_data_eb_for_stencil_qoi_eb(
-            (TRIGONOMETRIC[expr.func])(arg),
-            X,
-            XvN,
-            Xv,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-
-    HYPERBOLIC = {
-        # basic hyperbolic functions
-        sp.sinh: lambda x: (sp.exp(x) - sp.exp(-x)) / 2,
-        sp.cosh: lambda x: (sp.exp(x) + sp.exp(-x)) / 2,
-        # derived hyperbolic functions
-        sp.tanh: lambda x: (sp.exp(x * 2) - 1) / (sp.exp(x * 2) + 1),
-        sp.csch: lambda x: 2 / (sp.exp(x) - sp.exp(-x)),
-        sp.sech: lambda x: 2 / (sp.exp(x) + sp.exp(-x)),
-        sp.coth: lambda x: (sp.exp(x * 2) + 1) / (sp.exp(x * 2) - 1),
-        # inverse hyperbolic functions
-        sp.asinh: lambda x: sp.ln(x + sp.sqrt(x**2 + 1)),
-        sp.acosh: lambda x: sp.ln(x + sp.sqrt(x**2 - 1)),
-        sp.atanh: lambda x: sp.ln((1 + x) / (1 - x)) / 2,
-        sp.acsch: lambda x: sp.ln((1 / x) + sp.sqrt(x ** (-2) + 1)),
-        sp.asech: lambda x: sp.ln((1 + sp.sqrt(1 - x**2)) / x),
-        sp.acoth: lambda x: sp.ln((x + 1) / (x - 1)) / 2,
-    }
-
-    # rewrite hyperbolic functions using their exponential definitions
-    if expr.func in HYPERBOLIC and len(expr.args) == 1:
-        (arg,) = expr.args
-        return _compute_data_eb_for_stencil_qoi_eb(
-            (HYPERBOLIC[expr.func])(arg),
-            X,
-            XvN,
-            Xv,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-
-    # a_1 * e_1 + ... + a_n * e_n + c (weighted sum)
-    # using Corollary 2 and Lemma 4 from Jiao et al.
-    if expr.is_Add:
-        # find all non-constant terms
-        terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
-
-        factors = []
-        for i, term in enumerate(terms):
-            # extract the weighting factor of the term
-            if term.is_Mul:
-                factors.append(
-                    _qois.compile.sympy_expr_to_numpy(
-                        [],
-                        sp.Mul(
-                            *[arg for arg in term.args if len(arg.free_symbols) == 0]  # type: ignore
-                        ),
-                        Xv.dtype,
-                    )()
-                )
-                terms[i] = sp.Mul(
-                    *[arg for arg in term.args if len(arg.free_symbols) > 0]  # type: ignore
-                )
-            else:
-                factors.append(np.array(1))
-        total_abs_factor = np.sum(np.abs(factors))
-
-        etl: np.ndarray = _nan_to_zero(
-            to_finite_float(eb_expr_lower / total_abs_factor, Xv.dtype)
-        )
-        etu: np.ndarray = _nan_to_zero(
-            to_finite_float(eb_expr_upper / total_abs_factor, Xv.dtype)
-        )
-
-        # handle rounding errors in the total absolute factor early
-        etl = _ensure_bounded_derived_error(
-            lambda etl: etl * total_abs_factor,
-            np.zeros_like(Xv),
-            None,
-            etl,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        etu = _ensure_bounded_derived_error(
-            lambda etu: etu * total_abs_factor,
-            np.zeros_like(Xv),
-            None,
-            etu,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-
-        eb_x_lower, eb_x_upper = None, None
-        for term, factor in zip(terms, factors):
-            # recurse into the terms with a weighted error bound
-            exl, exu = _compute_data_eb_for_stencil_qoi_eb(
-                term,
-                X,
-                XvN,
-                Xv,
-                # flip the lower/upper error bound if the factor is negative
-                -etu if factor < 0 else etl,
-                -etl if factor < 0 else etu,
-            )
-            # combine the inner error bounds
-            if eb_x_lower is None:
-                eb_x_lower = exl
-            else:
-                eb_x_lower = np.maximum(eb_x_lower, exl)
-            if eb_x_upper is None:
-                eb_x_upper = exu
-            else:
-                eb_x_upper = np.minimum(eb_x_upper, exu)
-
-        return eb_x_lower, eb_x_upper  # type: ignore
-
-    # rewrite f * e_1 * ... * e_n (product) as f * e^(ln(abs(e_1) + ... + ln(abs(e_n)))
-    # this is mathematically incorrect if the product is non-positive,
-    #  but works for deriving error bounds
-    if expr.is_Mul:
-        # extract the constant factor and reduce tauv
-        factor = _qois.compile.sympy_expr_to_numpy(
-            [],
-            sp.Mul(*[arg for arg in expr.args if len(arg.free_symbols) == 0]),  # type: ignore
-            Xv.dtype,
-        )()
-
-        efl: np.ndarray = _nan_to_zero(
-            to_finite_float(eb_expr_lower / np.abs(factor), Xv.dtype)
-        )
-        efu: np.ndarray = _nan_to_zero(
-            to_finite_float(eb_expr_upper / np.abs(factor), Xv.dtype)
-        )
-
-        # handle rounding errors in the factor early
-        efl = _ensure_bounded_derived_error(
-            lambda efl: efl * np.abs(factor),
-            np.zeros_like(Xv),
-            None,
-            efl,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        efu = _ensure_bounded_derived_error(
-            lambda efu: efu * np.abs(factor),
-            np.zeros_like(Xv),
-            None,
-            efu,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-
-        # flip the lower/upper error bound if the factor is negative
-        eb_factor_lower = -efu if factor < 0 else efl
-        eb_factor_upper = -efl if factor < 0 else efu
-
-        # find all non-constant terms
-        terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
-
-        if len(terms) == 1:
-            return _compute_data_eb_for_stencil_qoi_eb(
-                terms[0], X, XvN, Xv, eb_factor_lower, eb_factor_upper
-            )
-
-        return _compute_data_eb_for_stencil_qoi_eb(
-            sp.exp(sp.Add(*[sp.log(sp.Abs(term)) for term in terms]), evaluate=False),
-            X,
-            XvN,
-            Xv,
-            eb_factor_lower,
-            eb_factor_upper,
-        )
-
-    raise ValueError(f"unsupported expression kind {expr} (= {sp.srepr(expr)} =)")
 
 
 # pattern of syntactically weakly valid expressions
@@ -1308,10 +842,10 @@ _QOI_ATOM_PATTERN = (
     + r"|(?:x)"
     + r"|(?:X)"
     + r"|(?:I)"
-    + r"".join(rf"|(?:{c})" for c in _qois.math.CONSTANTS)
-    + r"".join(rf"|(?:{c})" for c in _qois.math.FUNCTIONS)
-    + r"".join(rf"|(?:{c})" for c in _qois.amath.CONSTRUCTORS)
-    + r"".join(rf"|(?:{c})" for c in _qois.amath.FUNCTIONS)
+    + r"".join(rf"|(?:{c})" for c in MATH_CONSTANTS)
+    + r"".join(rf"|(?:{c})" for c in MATH_FUNCTIONS)
+    + r"".join(rf"|(?:{c})" for c in AMATH_CONSTRUCTORS)
+    + r"".join(rf"|(?:{c})" for c in AMATH_FUNCTIONS)
     + r"|(?:findiff)"
     + r")"
 )

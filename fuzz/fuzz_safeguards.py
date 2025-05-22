@@ -25,7 +25,9 @@ with atheris.instrument_imports():
         SafeguardsCodec,
     )
     from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
-    from numcodecs_safeguards.safeguards import _qois
+    from numcodecs_safeguards.safeguards._qois.amath import FUNCTIONS as AMATH_FUNCTIONS
+    from numcodecs_safeguards.safeguards._qois.math import CONSTANTS as MATH_CONSTANTS
+    from numcodecs_safeguards.safeguards._qois.math import FUNCTIONS as MATH_FUNCTIONS
     from numcodecs_safeguards.safeguards.abc import Safeguard
     from numcodecs_safeguards.safeguards.pointwise.qoi import PointwiseExpr
     from numcodecs_safeguards.safeguards.stencil import NeighbourhoodBoundaryAxis
@@ -105,7 +107,7 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
         return generate_parameter(data, ty, depth)
 
     if ty in (PointwiseExpr, StencilExpr):
-        ATOMS = ["x", int, float] + list(_qois.math.CONSTANTS)
+        ATOMS = ["x", int, float] + list(MATH_CONSTANTS)
         OPS = [
             "neg",
             "+",
@@ -113,11 +115,11 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
             "*",
             "/",
             "**",
-        ] + list(_qois.math.FUNCTIONS)
+        ] + list(MATH_FUNCTIONS)
 
         if ty is StencilExpr:
             ATOMS += ["X", "I"]
-            OPS += ["index", "findiff"] + list(_qois.amath.FUNCTIONS)
+            OPS += ["index", "findiff"] + list(AMATH_FUNCTIONS)
 
         atoms = []
         for _ in range(data.ConsumeIntInRange(2, 4)):
@@ -142,7 +144,7 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
                 atoms.append(f"(-{atom1})")
             elif op in ("log", "matmul"):
                 atoms.append(f"log({atom1},{atom2})")
-            elif op in tuple(_qois.math.FUNCTIONS) + tuple(_qois.amath.FUNCTIONS):
+            elif op in tuple(MATH_FUNCTIONS) + tuple(AMATH_FUNCTIONS):
                 atoms.append(f"{op}({atom1})")
             elif op == "index":
                 atoms.append(
