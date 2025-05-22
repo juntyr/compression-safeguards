@@ -28,10 +28,8 @@ with atheris.instrument_imports():
     from numcodecs_safeguards.safeguards import _qois
     from numcodecs_safeguards.safeguards.abc import Safeguard
     from numcodecs_safeguards.safeguards.pointwise.qoi import PointwiseExpr
-    from numcodecs_safeguards.safeguards.stencil.qoi import (
-        NeighbourhoodAxis,
-        StencilExpr,
-    )
+    from numcodecs_safeguards.safeguards.stencil import NeighbourhoodBoundaryAxis
+    from numcodecs_safeguards.safeguards.stencil.qoi import StencilExpr
 
 
 warnings.filterwarnings("error")
@@ -40,7 +38,7 @@ warnings.filterwarnings("error")
 class FuzzCodec(Codec):
     __slots__ = ("data", "decoded")
 
-    codec_id = "fuzz"
+    codec_id = "fuzz"  # type: ignore
 
     def __init__(self, data, decoded):
         self.data = data
@@ -89,10 +87,10 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
         if len(tys) == 2 and tys[0] is str and issubclass(tys[1], Enum):
             return list(tys[1])[data.ConsumeIntInRange(0, len(tys[1]) - 1)]
 
-        if len(tys) == 2 and tys[0] is dict and tys[1] is NeighbourhoodAxis:
+        if len(tys) == 2 and tys[0] is dict and tys[1] is NeighbourhoodBoundaryAxis:
             return {
                 p: generate_parameter(data, v.annotation, depth)
-                for p, v in signature(NeighbourhoodAxis).parameters.items()
+                for p, v in signature(NeighbourhoodBoundaryAxis).parameters.items()
             }
 
         if (
@@ -174,14 +172,14 @@ def generate_safeguard_config(data: atheris.FuzzedDataProvider, depth: int):
     }
 
 
-def check_one_input(data):
+def check_one_input(data) -> None:
     data = atheris.FuzzedDataProvider(data)
 
     safeguards = [
         generate_safeguard_config(data, 0) for _ in range(data.ConsumeIntInRange(0, 8))
     ]
 
-    dtype: np.ndtype = list(_SUPPORTED_DTYPES)[
+    dtype: np.dtype = list(_SUPPORTED_DTYPES)[
         data.ConsumeIntInRange(0, len(_SUPPORTED_DTYPES) - 1)
     ]
     sizea: int = data.ConsumeIntInRange(0, 20)

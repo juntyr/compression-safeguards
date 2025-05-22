@@ -209,17 +209,17 @@ class _AnyStencilSafeguard(_AnySafeguardBase, StencilSafeguard):
             if not isinstance(safeguard, StencilSafeguard):
                 continue
 
-            single_neighbourhood = safeguard.compute_neighbourhood_for_data_shape(
+            safeguard_neighbourhood = safeguard.compute_neighbourhood_for_data_shape(
                 data_shape
             )
 
-            for i, n in enumerate(single_neighbourhood):
+            for i, sn in enumerate(safeguard_neighbourhood):
                 ni = neighbourhood[i]
                 if ni is None:
-                    neighbourhood[i] = n
-                elif n is not None:
+                    neighbourhood[i] = sn
+                elif sn is not None:
                     neighbourhood[i] = NeighbourhoodAxis(
-                        max(ni.before, n.before), max(ni.after, n.after)
+                        max(ni.before, sn.before), max(ni.after, sn.after)
                     )
 
         return tuple(neighbourhood)
