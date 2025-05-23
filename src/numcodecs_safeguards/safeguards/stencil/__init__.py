@@ -2,7 +2,7 @@
 Implementations for the provided stencil safeguards.
 """
 
-__all__ = ["BoundaryCondition", "NeighbourhoodBoundaryAxis"]
+__all__ = ["BoundaryCondition", "NeighbourhoodAxis", "NeighbourhoodBoundaryAxis"]
 
 from enum import Enum, auto
 
