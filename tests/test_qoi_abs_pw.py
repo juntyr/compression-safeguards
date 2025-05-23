@@ -76,7 +76,7 @@ CHECKS = [
 
 
 def test_sandbox():
-    with pytest.raises(AssertionError, match="invalid qoi expression"):
+    with pytest.raises(AssertionError, match="invalid QoI expression"):
         # sandbox escape based on https://stackoverflow.com/q/35804961 and
         #  https://stackoverflow.com/a/35806044
         check_all_codecs(

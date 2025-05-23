@@ -51,7 +51,7 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
     decoded value is also NaN, but does not guarantee that it has the same
     bit pattern.
 
-    The qoi expression is written using the following EBNF grammar[^1] for
+    The QoI expression is written using the following EBNF grammar[^1] for
     `expr`:
 
     [^1]: You can visualise the EBNF grammar at <https://matthijsgroen.github.io/ebnf2railroad/try-yourself.html>.
@@ -179,8 +179,8 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
 
         self._x = sp.Symbol("x", real=True)
 
-        assert len(qoi.strip()) > 0, "qoi expression must not be empty"
-        assert _QOI_PATTERN.fullmatch(qoi) is not None, "invalid qoi expression"
+        assert len(qoi.strip()) > 0, "QoI expression must not be empty"
+        assert _QOI_PATTERN.fullmatch(qoi) is not None, "invalid QoI expression"
         try:
             qoi_expr = sp.parse_expr(
                 self._qoi,
@@ -203,7 +203,7 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
                 transformations=(sp.parsing.sympy_parser.auto_number,),
             )
             assert isinstance(qoi_expr, sp.Basic), (
-                "qoi expression must evaluate to a numeric expression"
+                "QoI expression must evaluate to a numeric expression"
             )
             # check if the expression is well-formed (e.g. no int's that cannot
             #  be printed) and if an error bound can be computed
@@ -213,11 +213,11 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
             )
         except Exception as err:
             raise AssertionError(
-                f"failed to parse qoi expression {qoi!r}: {err}"
+                f"failed to parse QoI expression {qoi!r}: {err}"
             ) from err
-        assert len(qoi_expr.free_symbols) > 0, "qoi expression must not be constant"
+        assert len(qoi_expr.free_symbols) > 0, "QoI expression must not be constant"
         assert not qoi_expr.has(sp.I), (
-            "qoi expression must not contain imaginary numbers"
+            "QoI expression must not contain imaginary numbers"
         )
 
         self._qoi_expr = qoi_expr

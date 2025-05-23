@@ -559,7 +559,7 @@ def ensure_bounded_derived_error(
     """
 
     # check if any derived expression exceeds the error bound
-    # this check matches the qoi safeguard's validity check
+    # this check matches the QoI safeguard's validity check
     def is_eb_exceeded(eb_x_guess):
         return ~np.where(
             _isfinite(exprv),

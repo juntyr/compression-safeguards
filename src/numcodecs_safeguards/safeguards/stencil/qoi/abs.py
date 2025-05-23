@@ -75,7 +75,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     If the safeguard is applied to data with an insufficient number of
     dimensions, it raises an exception. If the safeguard is applied to data
     with additional dimensions, it is indendently applied along these extra
-    axes. For instance, a 2d qoi is applied to independently to all 2d slices
+    axes. For instance, a 2d QoI is applied to independently to all 2d slices
     in a 3d data cube.
 
     If the data neighbourhood uses the
@@ -95,7 +95,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     of interest on the decoded data neighbourhood is also NaN, but does not
     guarantee that it has the same bit pattern.
 
-    The qoi expression is written using the following EBNF grammar[^1] for
+    The QoI expression is written using the following EBNF grammar[^1] for
     `expr`:
 
     [^1]: You can visualise the EBNF grammar at <https://matthijsgroen.github.io/ebnf2railroad/try-yourself.html>.
@@ -285,8 +285,8 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         X = self._X.as_explicit()
         X.__class__ = NumPyLikeArray
 
-        assert len(qoi.strip()) > 0, "qoi expression must not be empty"
-        assert _QOI_PATTERN.fullmatch(qoi) is not None, "invalid qoi expression"
+        assert len(qoi.strip()) > 0, "QoI expression must not be empty"
+        assert _QOI_PATTERN.fullmatch(qoi) is not None, "invalid QoI expression"
         try:
             qoi_expr = sp.parse_expr(
                 qoi,
@@ -317,7 +317,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                 transformations=(sp.parsing.sympy_parser.auto_number,),
             )
             assert isinstance(qoi_expr, sp.Basic), (
-                "qoi expression must evaluate to a numeric expression"
+                "QoI expression must evaluate to a numeric expression"
             )
             # check if the expression is well-formed (e.g. no int's that cannot
             #  be printed) and if an error bound can be computed
@@ -332,11 +332,11 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             )
         except Exception as err:
             raise AssertionError(
-                f"failed to parse qoi expression {qoi!r}: {err}"
+                f"failed to parse QoI expression {qoi!r}: {err}"
             ) from err
-        assert len(qoi_expr.free_symbols) > 0, "qoi expression must not be constant"
+        assert len(qoi_expr.free_symbols) > 0, "QoI expression must not be constant"
         assert not qoi_expr.has(sp.I), (
-            "qoi expression must not contain imaginary numbers"
+            "QoI expression must not contain imaginary numbers"
         )
 
         self._qoi = qoi
@@ -347,11 +347,11 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     ) -> tuple[None | NeighbourhoodAxis, ...]:
         """
         Compute the shape of the data neighbourhood for data of a given shape.
-        [`None`][None] is returned along dimensions for which the stencil qoi
+        [`None`][None] is returned along dimensions for which the stencil QoI
         safeguard does not need to look at adjacent data points.
 
         This method also checks that the data shape is compatible with the
-        stencil qoi safeguard.
+        stencil QoI safeguard.
 
         Parameters
         ----------
@@ -695,7 +695,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         assert np.all((eb_x_upper >= 0) & _isfinite(eb_x_upper))
 
         # compute how the data indices are distributed into windows
-        # i.e. for each qoi element, which data does it depend on
+        # i.e. for each QoI element, which data does it depend on
         indices_boundary = np.arange(data.size).reshape(data.shape)
         for axis in self._neighbourhood:
             indices_boundary = _pad_with_boundary(
@@ -714,7 +714,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         ).reshape((-1, np.prod(window)))
 
         # compute the reverse: for each data element, which windows is it in
-        # i.e. for each data element, which qoi elements does it contribute to
+        # i.e. for each data element, which QoI elements does it contribute to
         #      and thus which error bounds affect it
         reverse_indices_windows = np.full(
             (data.size, np.prod(window)), indices_windows.shape[0]
@@ -741,7 +741,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                     reverse_indices_windows[idx][reverse_indices_counter[idx]] = j
                     reverse_indices_counter[idx] += 1
 
-        # flatten the qoi error bounds and append an infinite value,
+        # flatten the QoI error bounds and append an infinite value,
         # which is indexed if an element did not contribute to the maximum
         # number of windows
         with np.errstate(invalid="ignore"):
