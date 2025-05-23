@@ -28,7 +28,12 @@ from ..._qois.eb import (
 )
 from ..._qois.math import CONSTANTS as MATH_CONSTANTS
 from ..._qois.math import FUNCTIONS as MATH_FUNCTIONS
-from ..._qois.re import QOI_FLOAT_LITERAL_PATTERN, QOI_INT_LITERAL_PATTERN
+from ..._qois.re import (
+    QOI_COMMENT_PATTERN,
+    QOI_FLOAT_LITERAL_PATTERN,
+    QOI_INT_LITERAL_PATTERN,
+    QOI_WHITESPACE_PATTERN,
+)
 from ..abc import PointwiseSafeguard, S, T
 from ..abs import _compute_safe_eb_diff_interval
 from . import PointwiseExpr
@@ -138,6 +143,9 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
     ;
     ```
 
+    The QoI expression can also contain whitespaces (space ` `, tab `\\t`,
+    newline `\\n`) and single-line inline comments starting with a hash `#`.
+
     The implementation of the absolute error bound on pointwise quantities of
     interest is inspired by:
 
@@ -174,16 +182,19 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
         assert eb_abs >= 0, "eb_abs must be non-negative"
         assert isinstance(eb_abs, int) or _isfinite(eb_abs), "eb_abs must be finite"
 
-        self._qoi = qoi
         self._eb_abs = eb_abs
 
         self._x = sp.Symbol("x", real=True)
 
-        assert len(qoi.strip()) > 0, "QoI expression must not be empty"
+        qoi_stripped = QOI_WHITESPACE_PATTERN.sub(
+            " ", QOI_COMMENT_PATTERN.sub(" ", qoi)
+        ).strip()
+
+        assert len(qoi_stripped) > 0, "QoI expression must not be empty"
         assert _QOI_PATTERN.fullmatch(qoi) is not None, "invalid QoI expression"
         try:
             qoi_expr = sp.parse_expr(
-                self._qoi,
+                qoi_stripped,
                 local_dict=dict(
                     # === data ===
                     # pointwise data
@@ -220,6 +231,7 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
             "QoI expression must not contain imaginary numbers"
         )
 
+        self._qoi = qoi
         self._qoi_expr = qoi_expr
 
     def evaluate_qoi(self, data: np.ndarray[S, T]) -> np.ndarray[S, F]:
@@ -501,8 +513,11 @@ def _compute_data_eb_for_qoi_eb(
 #  i.e. just enough that it's safe to eval afterwards
 _QOI_KWARG_PATTERN = (
     r"(?:"
-    r"(?:base[ \t]*=[ \t]*)"
-    r")"
+    + r"|".join(
+        rf"(?:{k}(?:{QOI_COMMENT_PATTERN.pattern}|(?:[ \t\n]))*=(?:{QOI_COMMENT_PATTERN.pattern}|(?:[ \t\n]))*)"
+        for k in ("base",)
+    )
+    + r")"
 )
 _QOI_ATOM_PATTERN = (
     r"(?:"
@@ -515,7 +530,7 @@ _QOI_ATOM_PATTERN = (
     + r"".join(rf"|(?:{f})" for f in MATH_FUNCTIONS)
     + r")"
 )
-_QOI_SEPARATOR_PATTERN = r"(?:[ \t\n\(\),\+\-\*/])"
+_QOI_SEPARATOR_PATTERN = rf"(?:{QOI_COMMENT_PATTERN.pattern}|(?:[ \t\n\(\),\+\-\*/]))"
 _QOI_PATTERN = re.compile(
     rf"{_QOI_SEPARATOR_PATTERN}*{_QOI_ATOM_PATTERN}(?:{_QOI_SEPARATOR_PATTERN}+{_QOI_KWARG_PATTERN}?{_QOI_ATOM_PATTERN})*{_QOI_SEPARATOR_PATTERN}*"
 )

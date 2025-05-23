@@ -91,11 +91,30 @@ def test_empty(check):
         check("")
     with pytest.raises(AssertionError, match="empty"):
         check("  \t   \n   ")
+    with pytest.raises(AssertionError, match="empty"):
+        check(" # just a comment ")
 
 
 def test_non_expression():
     with pytest.raises(AssertionError, match="numeric expression"):
         check_all_codecs(np.empty(0), "exp")
+
+
+def test_whitespace():
+    check_all_codecs(np.array([]), "  \n \t x   \t\n  ")
+    check_all_codecs(np.array([]), "  \n \t x \t \n  - \t \n 3  \t\n  ")
+    check_all_codecs(np.array([]), "x    -    3")
+    check_all_codecs(np.array([]), "sqrt   \n (x)")
+    check_all_codecs(np.array([]), "log ( x , base \t = \n 2 )")
+
+
+def test_comment():
+    check_all_codecs(np.array([]), "x # great variable")
+    check_all_codecs(np.array([]), "# great variable\nx")
+    check_all_codecs(np.array([]), "x # nothing 3+4 really matters 1/0")
+    check_all_codecs(
+        np.array([]), "log #1\n ( #2\n x #3\n , #4\n base #5\n = #6\n 2 #7\n )"
+    )
 
 
 @pytest.mark.parametrize("check", CHECKS)

@@ -36,7 +36,12 @@ from ..._qois.eb import (
 from ..._qois.findiff import create_findiff_for_neighbourhood
 from ..._qois.math import CONSTANTS as MATH_CONSTANTS
 from ..._qois.math import FUNCTIONS as MATH_FUNCTIONS
-from ..._qois.re import QOI_FLOAT_LITERAL_PATTERN, QOI_INT_LITERAL_PATTERN
+from ..._qois.re import (
+    QOI_COMMENT_PATTERN,
+    QOI_FLOAT_LITERAL_PATTERN,
+    QOI_INT_LITERAL_PATTERN,
+    QOI_WHITESPACE_PATTERN,
+)
 from ...pointwise.abs import _compute_safe_eb_diff_interval
 from .. import (
     BoundaryCondition,
@@ -221,8 +226,19 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
           , "axis", "=", int                 (* axis, relative to the neighbourhood *)
       , ")"
     ;
-
     ```
+
+    The QoI expression can also contain whitespaces (space ` `, tab `\\t`,
+    newline `\\n`) and single-line inline comments starting with a hash `#`.
+
+    The implementation of the absolute error bound on pointwise quantities of
+    interest is inspired by:
+
+    > Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
+    Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
+    Lossy Compression for Scientific Data. *Proceedings of the VLDB Endowment*.
+    16, 4 (December 2022), 697-710. Available from:
+    <https://doi.org/10.14778/3574245.3574255>.
 
     Parameters
     ----------
@@ -285,11 +301,15 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         X = self._X.as_explicit()
         X.__class__ = NumPyLikeArray
 
-        assert len(qoi.strip()) > 0, "QoI expression must not be empty"
+        qoi_stripped = QOI_WHITESPACE_PATTERN.sub(
+            " ", QOI_COMMENT_PATTERN.sub(" ", qoi)
+        ).strip()
+
+        assert len(qoi_stripped) > 0, "QoI expression must not be empty"
         assert _QOI_PATTERN.fullmatch(qoi) is not None, "invalid QoI expression"
         try:
             qoi_expr = sp.parse_expr(
-                qoi,
+                qoi_stripped,
                 local_dict=dict(
                     # === data ===
                     # data neighbourhood
@@ -897,13 +917,11 @@ def _compute_data_eb_for_stencil_qoi_eb(
 #  i.e. just enough that it's safe to eval afterwards
 _QOI_KWARG_PATTERN = (
     r"(?:"
-    r"(?:base[ \t]*=[ \t]*)"
-    r"|(?:order[ \t]*=[ \t]*)"
-    r"|(?:accuracy[ \t]*=[ \t]*)"
-    r"|(?:type[ \t]*=[ \t]*)"
-    r"|(?:dx[ \t]*=[ \t]*)"
-    r"|(?:axis[ \t]*=[ \t]*)"
-    r")"
+    + r"|".join(
+        rf"(?:{k}(?:{QOI_COMMENT_PATTERN.pattern}|(?:[ \t\n]))*=(?:{QOI_COMMENT_PATTERN.pattern}|(?:[ \t\n]))*)"
+        for k in ("base", "order", "accuracy", "type", "dx", "axis")
+    )
+    + r")"
 )
 _QOI_ATOM_PATTERN = (
     r"(?:"
@@ -921,7 +939,9 @@ _QOI_ATOM_PATTERN = (
     + r"|(?:findiff)"
     + r")"
 )
-_QOI_SEPARATOR_PATTERN = r"(?:[ \t\n\(\)\[\],:\+\-\*/])"
+_QOI_SEPARATOR_PATTERN = (
+    rf"(?:{QOI_COMMENT_PATTERN.pattern}|(?:[ \t\n\(\)\[\],:\+\-\*/]))"
+)
 _QOI_PATTERN = re.compile(
     rf"{_QOI_SEPARATOR_PATTERN}*{_QOI_ATOM_PATTERN}(?:{_QOI_SEPARATOR_PATTERN}+{_QOI_KWARG_PATTERN}?{_QOI_ATOM_PATTERN})*{_QOI_SEPARATOR_PATTERN}*"
 )
