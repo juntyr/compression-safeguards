@@ -21,12 +21,20 @@ def check_all_codecs(data: np.ndarray, qoi: str):
         for eb_abs in [10.0, 1.0, 0.1, 0.01, 0.0]:
             encode_decode(
                 data,
-                safeguards=[dict(kind="qoi_abs", qoi=qoi, eb_abs=eb_abs)],
+                safeguards=[dict(kind="qoi_abs_pw", qoi=qoi, eb_abs=eb_abs)],
             )
 
 
 def check_empty(qoi: str):
     check_all_codecs(np.empty(0), qoi)
+
+
+def check_unit(qoi: str):
+    check_all_codecs(np.linspace(-1.0, 1.0, 100), qoi)
+
+
+def check_circle(qoi: str):
+    check_all_codecs(np.linspace(-np.pi * 2, np.pi * 2, 100, dtype=np.int64), qoi)
 
 
 def check_arange(qoi: str):
@@ -59,10 +67,22 @@ def check_edge_cases(qoi: str):
 
 CHECKS = [
     check_empty,
+    check_unit,
+    check_circle,
     check_arange,
     check_linspace,
     check_edge_cases,
 ]
+
+
+def test_sandbox():
+    with pytest.raises(AssertionError, match="invalid QoI expression"):
+        # sandbox escape based on https://stackoverflow.com/q/35804961 and
+        #  https://stackoverflow.com/a/35806044
+        check_all_codecs(
+            np.empty(0),
+            "f\"{[c for c in ().__class__.__base__.__subclasses__() if c.__name__ == 'catch_warnings'][0]()._module.__builtins__['quit']()}\"",
+        )
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -71,6 +91,30 @@ def test_empty(check):
         check("")
     with pytest.raises(AssertionError, match="empty"):
         check("  \t   \n   ")
+    with pytest.raises(AssertionError, match="empty"):
+        check(" # just a comment ")
+
+
+def test_non_expression():
+    with pytest.raises(AssertionError, match="numeric expression"):
+        check_all_codecs(np.empty(0), "exp")
+
+
+def test_whitespace():
+    check_all_codecs(np.array([]), "  \n \t x   \t\n  ")
+    check_all_codecs(np.array([]), "  \n \t x \t \n  - \t \n 3  \t\n  ")
+    check_all_codecs(np.array([]), "x    -    3")
+    check_all_codecs(np.array([]), "sqrt   \n (x)")
+    check_all_codecs(np.array([]), "log ( x , base \t = \n 2 )")
+
+
+def test_comment():
+    check_all_codecs(np.array([]), "x # great variable")
+    check_all_codecs(np.array([]), "# great variable\nx")
+    check_all_codecs(np.array([]), "x # nothing 3+4 really matters 1/0")
+    check_all_codecs(
+        np.array([]), "log #1\n ( #2\n x #3\n , #4\n base #5\n = #6\n 2 #7\n )"
+    )
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -88,9 +132,9 @@ def test_constant(check):
 @pytest.mark.parametrize("check", CHECKS)
 def test_imaginary(check):
     with pytest.raises(AssertionError, match="imaginary"):
-        check_all_codecs(np.array([2], dtype=np.uint64), "(-log(-20417,ln(x)))")
+        check_all_codecs(np.array([2], dtype=np.uint64), "(-log(-20417, base=ln(x)))")
     with pytest.raises(AssertionError, match="imaginary"):
-        check("(-log(-20417,ln(x)))")
+        check("(-log(-20417, base=ln(x)))")
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -118,10 +162,10 @@ def test_exponential(check):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_logarithm(check):
-    check("log(x, 2)")
+    check("log(x, base=2)")
     check("ln(x)")
     check("ln(x + 1)")
-    check("log(2, x)")
+    check("log(2, base=x)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -154,6 +198,40 @@ def test_tanh(check):
 
 
 @pytest.mark.parametrize("check", CHECKS)
+def test_trigonometric(check):
+    check("sin(x)")
+    check("cos(x)")
+    check("tan(x)")
+    check("cot(x)")
+    check("sec(x)")
+    check("csc(x)")
+
+    check("asin(x)")
+    check("acos(x)")
+    check("atan(x)")
+    check("acot(x)")
+    check("asec(x)")
+    check("acsc(x)")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_hyperbolic(check):
+    check("sinh(x)")
+    check("cosh(x)")
+    check("tanh(x)")
+    check("coth(x)")
+    check("sech(x)")
+    check("csch(x)")
+
+    check("asinh(x)")
+    check("acosh(x)")
+    check("atanh(x)")
+    check("acoth(x)")
+    check("asech(x)")
+    check("acsch(x)")
+
+
+@pytest.mark.parametrize("check", CHECKS)
 def test_composed(check):
     check("2 / (ln(x) + sqrt(x))")
 
@@ -175,8 +253,10 @@ def test_fuzzer_found(check):
         np.array([[18312761160228738559]], dtype=np.uint64), "((pi**(x**(x+x)))**1)"
     )
     check_all_codecs(np.array([-1024.0]), "((pi**(x**(x+x)))**1)")
-
     check("((pi**(x**(x+x)))**1)")
+
+    check_all_codecs(np.array([], np.uint64), "(-((e/(22020**-37))**x))")
+    check("(-((e/(22020**-37))**x))")
 
 
 def test_lambdify_dtype():
@@ -184,13 +264,13 @@ def test_lambdify_dtype():
 
     import sympy as sp
 
-    from numcodecs_safeguards.safeguards.pointwise.qoi.abs import (
-        _compile_sympy_expr_to_numpy,
+    from numcodecs_safeguards.safeguards._qois.compile import (
+        sympy_expr_to_numpy,
     )
 
     x = sp.Symbol("x", real=True)
 
-    fn = _compile_sympy_expr_to_numpy([x], x + sp.pi + sp.E, np.dtype(np.float16))
+    fn = sympy_expr_to_numpy([x], x + sp.pi + sp.E, np.dtype(np.float16))
 
     assert (
         inspect.getsource(fn)

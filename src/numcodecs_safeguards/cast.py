@@ -292,7 +292,7 @@ def _nextafter(
     a: np.ndarray[S, T], b: int | float | np.ndarray[S, T]
 ) -> np.ndarray[S, T]:
     if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
-        return np.nextafter(a, b)
+        return np.nextafter(a, b)  # type: ignore
 
     b = np.array(b, dtype=a.dtype)  # type: ignore
 

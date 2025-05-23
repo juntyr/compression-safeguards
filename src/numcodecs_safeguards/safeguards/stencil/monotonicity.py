@@ -12,6 +12,7 @@ from numpy.lib.stride_tricks import sliding_window_view
 
 from ...cast import _isfinite, _isnan, from_total_order, to_total_order
 from ...intervals import Interval, IntervalUnion, Lower, Upper
+from . import BoundaryCondition, NeighbourhoodAxis, _pad_with_boundary
 from .abc import S, StencilSafeguard, T
 
 _STRICT = ((lt, gt, False, False),) * 2
@@ -80,8 +81,17 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     [`Monotonicity`][numcodecs_safeguards.safeguards.stencil.monotonicity.Monotonicity]:
     `strict`, `strict_with_consts`, `strict_to_weak`, `weak`.
 
-    Windows that are not monotonic or contain non-finite data are skipped. Axes
-    that have fewer elements than the window size are skipped as well.
+    Windows that are not monotonic or contain non-finite data are skipped.
+
+    If the provided `axis` index is out of range for some data shape, the
+    safeguard is not applied to that data.
+
+    If the
+    [valid][numcodecs_safeguards.safeguards.stencil.BoundaryCondition.valid]
+    `boundary` condition is used, axes that have fewer elements than
+    $(1 + window \cdot 2)$ are skipped. Using a different
+    [`BoundaryCondition`][numcodecs_safeguards.safeguards.stencil.BoundaryCondition]
+    ensures that the safeguard is always applied.
 
     Parameters
     ----------
@@ -91,15 +101,35 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     window : int
         Positive symmetric half-window size; the window has size
         $(1 + window \cdot 2)$.
+    boundary : str | BoundaryCondition
+        Boundary condition for evaluating the monotonicity near the data array
+        domain boundaries, e.g. by extending values.
+    constant_boundary : None | int | float
+        Optional constant value with which the data array domain is extended
+        for a constant boundary. The value must be safely convertible (without
+        over- or underflow or invalid values) to the data type.
+    axis : None | int
+        The axis along which the monotonicity is preserved. The default,
+        [`None`][None], is to preserve along all axes.
     """
 
-    __slots__ = "_window"
-    _window: int
+    __slots__ = ("_monotonicity", "_window", "_boundary", "_constant_boundary", "_axis")
     _monotonicity: Monotonicity
+    _window: int
+    _boundary: BoundaryCondition
+    _constant_boundary: None | int | float
+    _axis: None | int
 
     kind = "monotonicity"
 
-    def __init__(self, monotonicity: str | Monotonicity, window: int):
+    def __init__(
+        self,
+        monotonicity: str | Monotonicity,
+        window: int,
+        boundary: str | BoundaryCondition,
+        constant_boundary: None | int | float = None,
+        axis: None | int = None,
+    ):
         self._monotonicity = (
             monotonicity
             if isinstance(monotonicity, Monotonicity)
@@ -109,10 +139,65 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         assert window > 0, "window size must be positive"
         self._window = window
 
-    def check(self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]) -> bool:
+        self._boundary = (
+            boundary
+            if isinstance(boundary, BoundaryCondition)
+            else BoundaryCondition[boundary]
+        )
+        assert (self._boundary != BoundaryCondition.constant) == (
+            constant_boundary is None
+        ), (
+            "constant_boundary must be provided if and only if the constant boundary condition is used"
+        )
+        self._constant_boundary = constant_boundary
+
+        self._axis = axis
+
+    def compute_check_neighbourhood_for_data_shape(
+        self, data_shape: tuple[int, ...]
+    ) -> tuple[None | NeighbourhoodAxis, ...]:
         """
-        Check if monotonic sequences in the `data` array are preserved in the
-        `decoded` array.
+        Compute the shape of the data neighbourhood for data of a given shape.
+        [`None`][None] is returned along the dimensions where the monotonicity
+        safeguard is not applied.
+
+        Parameters
+        ----------
+        data_shape : tuple[int, ...]
+            The shape of the data.
+
+        Returns
+        -------
+        neighbourhood_shape : tuple[None | NeighbourhoodAxis, ...]
+            The shape of the data neighbourhood.
+        """
+
+        neighbourhood: list[None | NeighbourhoodAxis] = [None] * len(data_shape)
+
+        for axis, alen in enumerate(data_shape):
+            if (
+                self._axis is not None
+                and axis != self._axis
+                and axis != (len(data_shape) + self._axis)
+            ):
+                continue
+
+            if alen == 0:
+                continue
+
+            neighbourhood[axis] = NeighbourhoodAxis(
+                self._window,
+                self._window,
+            )
+
+        return tuple(neighbourhood)
+
+    def check_pointwise(
+        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Check which monotonic sequences centred on the points in the `data`
+        array are preserved in the `decoded` array.
 
         Parameters
         ----------
@@ -123,29 +208,66 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         Returns
         -------
-        ok : bool
-            `True` if the check succeeded.
+        ok : np.ndarray
+            Pointwise, `True` if the check succeeded for this element.
         """
+
+        ok = np.ones_like(data, dtype=np.bool)
 
         window = 1 + self._window * 2
 
         for axis, alen in enumerate(data.shape):
-            if alen < window:
+            if (
+                self._axis is not None
+                and axis != self._axis
+                and axis != (data.ndim + self._axis)
+            ):
                 continue
 
-            data_windows = sliding_window_view(data, window, axis=axis)
-            decoded_windows = sliding_window_view(decoded, window, axis=axis)
+            if self._boundary == BoundaryCondition.valid and alen < window:
+                continue
+
+            if alen == 0:
+                continue
+
+            data_boundary = _pad_with_boundary(
+                data,
+                self._boundary,
+                self._window,
+                self._window,
+                self._constant_boundary,
+                axis,
+            )
+            decoded_boundary = _pad_with_boundary(
+                decoded,
+                self._boundary,
+                self._window,
+                self._window,
+                self._constant_boundary,
+                axis,
+            )
+
+            data_windows = sliding_window_view(data_boundary, window, axis=axis)
+            decoded_windows = sliding_window_view(decoded_boundary, window, axis=axis)
 
             data_monotonic = self._monotonic_sign(data_windows, is_decoded=False)
             decoded_monotonic = self._monotonic_sign(decoded_windows, is_decoded=True)
 
             # for monotonic windows, check that the monotonicity matches
-            if np.any(
-                self._monotonic_sign_not_equal(data_monotonic, decoded_monotonic)
-            ):
-                return False
+            axis_ok = self._monotonic_sign_not_equal(data_monotonic, decoded_monotonic)
 
-        return True
+            if self._boundary == BoundaryCondition.valid:
+                s = tuple(
+                    [slice(None)] * axis
+                    + [slice(self._window, -self._window)]
+                    + [slice(None)] * (data.ndim - axis - 1)
+                )
+            else:
+                s = tuple([slice(None)] * data.ndim)
+
+            ok[s] &= ~axis_ok.reshape(ok[s].shape)
+
+        return ok  # type: ignore
 
     def compute_safe_intervals(
         self, data: np.ndarray[S, T]
@@ -177,24 +299,42 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         any_restriction = np.zeros_like(data, dtype=np.bool)
 
         for axis, alen in enumerate(data.shape):
-            if alen < window:
+            if (
+                self._axis is not None
+                and axis != self._axis
+                and axis != (data.ndim + self._axis)
+            ):
                 continue
 
-            data_windows = sliding_window_view(data, window, axis=axis)
+            if self._boundary == BoundaryCondition.valid and alen < window:
+                continue
+
+            if alen == 0:
+                continue
+
+            data_boundary = _pad_with_boundary(
+                data,
+                self._boundary,
+                self._window,
+                self._window,
+                self._constant_boundary,
+                axis,
+            )
+            data_windows = sliding_window_view(data_boundary, window, axis=axis)
             data_monotonic = self._monotonic_sign(data_windows, is_decoded=False)
 
-            # compute, per-element, if the element has a decreasing (lt),
+            # compute, pointwise, if the element has a decreasing (lt),
             #  increasing (gt), or equality (eq) constraint imposed upon it
             # for the lt and gt variants, compute both a mask for accesses to
             #  elements on the left and to elements on the right, since the
             #  elements at the left and right edge of the window cannot access
             #  one further element to the left / right, respectively
             elem_lt_left, elem_lt_right, elem_eq, elem_gt_left, elem_gt_right = (
-                np.zeros_like(data, dtype=np.bool),
-                np.zeros_like(data, dtype=np.bool),
-                np.zeros_like(data, dtype=np.bool),
-                np.zeros_like(data, dtype=np.bool),
-                np.zeros_like(data, dtype=np.bool),
+                np.zeros_like(data_boundary, dtype=np.bool),
+                np.zeros_like(data_boundary, dtype=np.bool),
+                np.zeros_like(data_boundary, dtype=np.bool),
+                np.zeros_like(data_boundary, dtype=np.bool),
+                np.zeros_like(data_boundary, dtype=np.bool),
             )
             for w in range(window):
                 # ensure that all members of the window receive their
@@ -202,7 +342,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 s = tuple(
                     [slice(None)] * axis
                     + [slice(w, None if (w + 1) == window else -window + w + 1)]
-                    + [slice(None)] * (len(data.shape) - axis - 1)
+                    + [slice(None)] * (data_boundary.ndim - axis - 1)
                 )
 
                 if w > 0:
@@ -217,12 +357,21 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 if w < (window - 1):
                     elem_gt_right[s] |= data_monotonic[..., 0] == +1
 
+            if self._boundary == BoundaryCondition.valid:
+                s = tuple([slice(None)] * data.ndim)
+            else:
+                s = tuple(
+                    [slice(None)] * axis
+                    + [slice(self._window, -self._window)]
+                    + [slice(None)] * (data_boundary.ndim - axis - 1)
+                )
+
             # if any element has an equality constraint, impose it and
             #  intersect with the overall valid interval
             if np.any(elem_eq):
-                any_restriction |= elem_eq
+                any_restriction |= elem_eq[s]
                 valid_eq = Interval.full_like(data)
-                Lower(data.flatten()) <= valid_eq[elem_eq.flatten()] <= Upper(
+                Lower(data.flatten()) <= valid_eq[elem_eq[s].flatten()] <= Upper(
                     data.flatten()
                 )
                 valid = valid.intersect(valid_eq)
@@ -234,25 +383,78 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             # nudge the lower bound up and upper bound down for strict
             #  monotonicity to ensure that the safe intervals don't overlap
             if np.any(elem_lt_left | elem_lt_right):
-                valid_lt = Interval.full_like(data)
+                valid_lt = Interval.full_like(data_boundary)
             if np.any(elem_lt_right):
-                any_restriction |= elem_lt_right
                 Lower(
                     from_total_order(
-                        to_total_order(np.roll(data, -1, axis=axis)) + nudge,
+                        to_total_order(np.roll(data_boundary, -1, axis=axis)) + nudge,
                         dtype=data.dtype,
                     ).flatten()
                 ) <= valid_lt[elem_lt_right.flatten()]
             if np.any(elem_lt_left):
-                any_restriction |= elem_lt_left
                 valid_lt[elem_lt_left.flatten()] <= Upper(
                     from_total_order(
-                        to_total_order(np.roll(data, +1, axis=axis)) - nudge,
+                        to_total_order(np.roll(data_boundary, +1, axis=axis)) - nudge,
                         dtype=data.dtype,
                     ).flatten()
                 )
             if np.any(elem_lt_left | elem_lt_right):
-                valid = valid.intersect(valid_lt)
+                # shape the interval bounds like the data for easier indexing
+                valid_lt_lower = valid_lt._lower.reshape(data_boundary.shape)
+                valid_lt_upper = valid_lt._upper.reshape(data_boundary.shape)
+
+                if self._boundary in (
+                    BoundaryCondition.reflect,
+                    BoundaryCondition.symmetric,
+                    BoundaryCondition.wrap,
+                ):
+                    # requirements inside the boundary need to be connected
+                    #  back to the original data elements
+                    boundary_indices = _pad_with_boundary(
+                        np.arange(alen),
+                        self._boundary,
+                        self._window,
+                        self._window,
+                        None,
+                        0,
+                    )
+                    for w in [ws for w in range(self._window) for ws in [w, -w - 1]]:
+                        s_boundary = tuple(
+                            [slice(None)] * axis
+                            + [w]
+                            + [slice(None)] * (data_boundary.ndim - axis - 1)
+                        )
+                        s_inner = tuple(
+                            [slice(None)] * axis
+                            + [boundary_indices[w] + self._window]
+                            + [slice(None)] * (data_boundary.ndim - axis - 1)
+                        )
+                        # map the boundary values for the requirement masks and
+                        #  interval back to the inner values
+                        elem_lt_left[s_inner] |= elem_lt_left[s_boundary]
+                        elem_lt_right[s_inner] |= elem_lt_right[s_boundary]
+                        valid_lt_lower[s_inner] = from_total_order(
+                            np.maximum(
+                                to_total_order(valid_lt_lower[s_inner]),
+                                to_total_order(valid_lt_lower[s_boundary]),
+                            ),
+                            dtype=data.dtype,
+                        )
+                        valid_lt_upper[s_inner] = from_total_order(
+                            np.minimum(
+                                to_total_order(valid_lt_upper[s_inner]),
+                                to_total_order(valid_lt_upper[s_boundary]),
+                            ),
+                            dtype=data.dtype,
+                        )
+
+                any_restriction |= elem_lt_left[s] | elem_lt_right[s]
+                valid = valid.intersect(
+                    Interval(
+                        _lower=valid_lt_lower[s].flatten(),
+                        _upper=valid_lt_upper[s].flatten(),
+                    )
+                )
 
             # if any element has an increasing constraint, impose it and
             #  intersect with the overall valid interval
@@ -261,25 +463,78 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             # nudge the lower bound up and upper bound down for strict
             #  monotonicity to ensure that the safe intervals don't overlap
             if np.any(elem_gt_left | elem_gt_right):
-                valid_gt = Interval.full_like(data)
+                valid_gt = Interval.full_like(data_boundary)
             if np.any(elem_gt_left):
-                any_restriction |= elem_gt_left
                 Lower(
                     from_total_order(
-                        to_total_order(np.roll(data, +1, axis=axis)) + nudge,
+                        to_total_order(np.roll(data_boundary, +1, axis=axis)) + nudge,
                         dtype=data.dtype,
                     ).flatten()
                 ) <= valid_gt[elem_gt_left.flatten()]
             if np.any(elem_gt_right):
-                any_restriction |= elem_gt_right
                 valid_gt[elem_gt_right.flatten()] <= Upper(
                     from_total_order(
-                        to_total_order(np.roll(data, -1, axis=axis)) - nudge,
+                        to_total_order(np.roll(data_boundary, -1, axis=axis)) - nudge,
                         dtype=data.dtype,
                     ).flatten()
                 )
             if np.any(elem_gt_left | elem_gt_right):
-                valid = valid.intersect(valid_gt)
+                # shape the interval bounds like the data for easier indexing
+                valid_gt_lower = valid_gt._lower.reshape(data_boundary.shape)
+                valid_gt_upper = valid_gt._upper.reshape(data_boundary.shape)
+
+                if self._boundary in (
+                    BoundaryCondition.reflect,
+                    BoundaryCondition.symmetric,
+                    BoundaryCondition.wrap,
+                ):
+                    # requirements inside the boundary need to be connected
+                    #  back to the original data elements
+                    boundary_indices = _pad_with_boundary(
+                        np.arange(alen),
+                        self._boundary,
+                        self._window,
+                        self._window,
+                        None,
+                        0,
+                    )
+                    for w in [ws for w in range(self._window) for ws in [w, -w - 1]]:
+                        s_boundary = tuple(
+                            [slice(None)] * axis
+                            + [w]
+                            + [slice(None)] * (data_boundary.ndim - axis - 1)
+                        )
+                        s_inner = tuple(
+                            [slice(None)] * axis
+                            + [boundary_indices[w] + self._window]
+                            + [slice(None)] * (data_boundary.ndim - axis - 1)
+                        )
+                        # map the boundary values for the requirement masks and
+                        #  interval back to the inner values
+                        elem_gt_left[s_inner] |= elem_gt_left[s_boundary]
+                        elem_gt_right[s_inner] |= elem_gt_right[s_boundary]
+                        valid_gt_lower[s_inner] = from_total_order(
+                            np.maximum(
+                                to_total_order(valid_gt_lower[s_inner]),
+                                to_total_order(valid_gt_lower[s_boundary]),
+                            ),
+                            dtype=data.dtype,
+                        )
+                        valid_gt_upper[s_inner] = from_total_order(
+                            np.minimum(
+                                to_total_order(valid_gt_upper[s_inner]),
+                                to_total_order(valid_gt_upper[s_boundary]),
+                            ),
+                            dtype=data.dtype,
+                        )
+
+                any_restriction |= elem_gt_left[s] | elem_gt_right[s]
+                valid = valid.intersect(
+                    Interval(
+                        _lower=valid_gt_lower[s].flatten(),
+                        _upper=valid_gt_upper[s].flatten(),
+                    )
+                )
 
         # produce conservative safe intervals by computing the midpoint between
         #  the data and the lower/upper bound
@@ -311,7 +566,16 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             valid._upper
         )
 
-        return filtered_valid.into_union()  # type: ignore
+        # special case for +0.0 and -0.0:
+        # - they compare equal but are ordered in binary
+        # - monotonicity interval can end up empty as [+0.0, -0.0]
+        # so explicitly add restricted zero values to the valid interval
+        zero_valid = Interval.empty_like(data)
+        Lower(data.flatten()) <= zero_valid[
+            (data.flatten() == 0) & any_restriction.flatten()
+        ] <= Upper(data.flatten())
+
+        return filtered_valid.union(zero_valid)
 
     def get_config(self) -> dict:
         """
@@ -323,11 +587,19 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             Configuration of the safeguard.
         """
 
-        return dict(
+        config = dict(
             kind=type(self).kind,
             monotonicity=self._monotonicity.name,
             window=self._window,
+            boundary=self._boundary.name,
+            constant_boundary=self._constant_boundary,
+            axis=self._axis,
         )
+
+        if self._constant_boundary is None:
+            del config["constant_boundary"]
+
+        return config
 
     def _monotonic_sign(
         self,

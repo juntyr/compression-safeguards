@@ -1,8 +1,10 @@
 from itertools import product
 
 import numpy as np
+import pytest
 
 from numcodecs_safeguards.cast import as_bits
+from numcodecs_safeguards.safeguards.stencil import BoundaryCondition
 from numcodecs_safeguards.safeguards.stencil.monotonicity import (
     Monotonicity,
     MonotonicityPreservingSafeguard,
@@ -18,29 +20,65 @@ from .codecs import (
 
 
 def check_all_codecs(data: np.ndarray):
-    for monotonicity, window in product(Monotonicity, range(1, 3 + 1)):
+    for monotonicity, window, boundary in product(
+        Monotonicity,
+        range(1, 3 + 1),
+        BoundaryCondition,
+    ):
         encode_decode_zero(
             data,
             safeguards=[
-                dict(kind="monotonicity", monotonicity=monotonicity, window=window)
+                dict(
+                    kind="monotonicity",
+                    monotonicity=monotonicity,
+                    window=window,
+                    boundary=boundary,
+                    constant_boundary=4.2
+                    if boundary == BoundaryCondition.constant
+                    else None,
+                )
             ],
         )
         encode_decode_neg(
             data,
             safeguards=[
-                dict(kind="monotonicity", monotonicity=monotonicity, window=window)
+                dict(
+                    kind="monotonicity",
+                    monotonicity=monotonicity,
+                    window=window,
+                    boundary=boundary,
+                    constant_boundary=4.2
+                    if boundary == BoundaryCondition.constant
+                    else None,
+                )
             ],
         )
         encode_decode_identity(
             data,
             safeguards=[
-                dict(kind="monotonicity", monotonicity=monotonicity, window=window)
+                dict(
+                    kind="monotonicity",
+                    monotonicity=monotonicity,
+                    window=window,
+                    boundary=boundary,
+                    constant_boundary=4.2
+                    if boundary == BoundaryCondition.constant
+                    else None,
+                )
             ],
         )
         encode_decode_noise(
             data,
             safeguards=[
-                dict(kind="monotonicity", monotonicity=monotonicity, window=window)
+                dict(
+                    kind="monotonicity",
+                    monotonicity=monotonicity,
+                    window=window,
+                    boundary=boundary,
+                    constant_boundary=4.2
+                    if boundary == BoundaryCondition.constant
+                    else None,
+                )
             ],
         )
 
@@ -138,7 +176,9 @@ def test_monotonicity():
 
     # test for all monotonicities
     for monotonicity, active_allowed in monotonicities.items():
-        safeguard = MonotonicityPreservingSafeguard(monotonicity, window=1)
+        safeguard = MonotonicityPreservingSafeguard(
+            monotonicity, window=1, boundary="valid"
+        )
 
         # test for all possible window combinations
         for data_window, decoded_window in product(windows, windows):
@@ -182,7 +222,34 @@ def test_fuzzer_sign_flip():
         data,
         decoded,
         safeguards=[
-            dict(kind="monotonicity", monotonicity="strict_to_weak", window=1),
+            dict(
+                kind="monotonicity",
+                monotonicity="strict_to_weak",
+                window=1,
+                boundary="valid",
+            ),
             dict(kind="sign"),
         ],
     )
+
+
+def test_fuzzer_padding_overflow():
+    data = np.array([[0.0]], dtype=np.float32)
+    decoded = np.array([[-9.444733e21]], dtype=np.float32)
+
+    with pytest.raises(ValueError, match="constant boundary has invalid value"):
+        encode_decode_mock(
+            data,
+            decoded,
+            safeguards=[
+                dict(
+                    kind="monotonicity",
+                    monotonicity="weak",
+                    window=108,
+                    boundary="constant",
+                    constant_boundary=-1.7976657042415566e308,
+                    axis=None,
+                ),
+                dict(kind="sign"),
+            ],
+        )

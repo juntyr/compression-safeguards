@@ -24,6 +24,8 @@ class PointwiseSafeguard(Safeguard, ABC):
     element, i.e. independent of other elements.
     """
 
+    __slots__ = ()
+
     @final
     def check(self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]) -> bool:
         """
@@ -63,7 +65,7 @@ class PointwiseSafeguard(Safeguard, ABC):
         Returns
         -------
         ok : np.ndarray
-            Per-element, `True` if the check succeeded for this element.
+            Pointwise, `True` if the check succeeded for this element.
         """
 
         pass

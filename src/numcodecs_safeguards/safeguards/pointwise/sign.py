@@ -45,7 +45,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         Returns
         -------
         ok : np.ndarray
-            Per-element, `True` if the check succeeded for this element.
+            Pointwise, `True` if the check succeeded for this element.
         """
 
         return self._sign(data) == self._sign(decoded)

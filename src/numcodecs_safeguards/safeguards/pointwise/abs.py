@@ -73,7 +73,7 @@ class AbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         Returns
         -------
         ok : np.ndarray
-            Per-element, `True` if the check succeeded for this element.
+            Pointwise, `True` if the check succeeded for this element.
         """
 
         # abs(data - decoded) <= self._eb_abs, but works for unsigned ints

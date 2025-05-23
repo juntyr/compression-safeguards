@@ -52,17 +52,15 @@ This package currently implements the following safeguards:
 
     It is guaranteed that the ratios between the original and the decoded values and their inverse ratios are less than or equal to the provided bound. The ratio error is defined to be infinite if the signs of the data and decoded data do not match. Since the provided error bound must be finite, this safeguard also guarantees that the sign of each decoded value matches the sign of each original value and that a decoded value is zero if and only if it is zero in the original data. The ratio error bound is sometimes also known as a decimal error bound if the ratio is expressed as the difference in orders of magnitude. This safeguard can also be used to guarantee a relative-like error bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bit pattern also satisfies the error bound.
 
-### Error Bounds on Finite Differences (~pointwise)
+### Error Bounds on derived Quantities of Interest (QoIs)
 
-- `findiff_abs` (absolute error bound for finite differences):
+- `qoi_abs_pw` (absolute error bound on quantities of interest):
 
-    The pointwise absolute error of the finite-difference-approximated derivative is guaranteed to be less than or equal to the provided bound. The safeguard supports three types of finite difference: `central`, `forward`, `backward`. The fininite difference is computed with respect to the provided uniform grid spacing. If the spacing is different along different axes, multiple safeguards along specific axes with different spacing can be combined. Infinite finite differences are preserved with the same bit pattern. NaN finite differences remain NaN though not necessarily with the same bit pattern.
+    The absolute error on a derived pointwise quantity of interest (QoI) is guaranteed to be less than or equal to the provided bound. The non-constant quantity of interest expression can contain the addition, multiplication, division, square root, exponentiation, logarithm, trigonometric, and hyperbolic operations over integer and floating point constants and the pointwise data value. Infinite quantities of interest are preserved with the same bit pattern. NaN quantities of interest remain NaN though not necessarily with the same bit pattern.
 
-### Error Bounds on derived Quantities of Interest (pointwise QoIs)
+- `qoi_abs_stencil` (absolute error bound on quantities of interest over a neighbourhood):
 
-- `qoi_abs` (absolute error bound on quantities of interest):
-
-    The pointwise absolute error on a derived quantity of interest (QoI) is guaranteed to be less than or equal to the provided bound. The non-constant quantity of interest expression can contain the addition, multiplication, division, square root, exponentiation and logarithm operations over integer and floating point constants and the pointwise data value. Infinite quantities of interest are preserved with the same bit pattern. NaN quantities of interest remain NaN though not necessarily with the same bit pattern.
+    The absolute error on a derived quantity of interest (QoI) over a neighbourhood of data points is guaranteed to be less than or equal to the provided bound. The non-constant quantity of interest expression can contain the addition, multiplication, division, square root, exponentiation, logarithm, trigonometric, hyperbolic, array sum, matrix transpose, matrix multiplication, and finite difference operations over integer and floating point constants and arrays and the data neighbourhood. If applied to data with more dimensions than the data neighbourhood of the QoI requires, the data neighbourhood is applied independently along these extra axes. If the data neighbourhood uses the `valid` boundary condition along an axis, only data neighbourhoods centred on data points that have sufficient points before and after are safeguarded. If the axis is smaller than required by the neighbourhood along this axis, the data is not safeguarded at all. Using a different boundary condition ensures that all data points are safeguarded. Infinite quantities of interest are preserved with the same bit pattern. NaN quantities of interest remain NaN though not necessarily with the same bit pattern.
 
 ### Pointwise properties
 
@@ -78,17 +76,18 @@ This package currently implements the following safeguards:
 
 - `monotonicity` (monotonicity-preserving):
 
-    Sequences that are monotonic in the input are guaranteed to be monotonic in the decompressed output. Monotonic sequences are detected using per-axis moving windows of constant size. Typically, the window size should be chosen to be large enough to ignore noise but small enough to capture details. Four levels of monotonicity can be enforced: `strict`, `strict_with_consts`, `strict_to_weak`, `weak`. Windows that are not monotonic or contain non-finite data are skipped. Axes that have fewer elements than the window size are skipped as well.
+    Sequences that are monotonic in the input are guaranteed to be monotonic in the decompressed output. Monotonic sequences are detected using per-axis moving windows of constant size. Typically, the window size should be chosen to be large enough to ignore noise but small enough to capture details. Four levels of monotonicity can be enforced: `strict`, `strict_with_consts`, `strict_to_weak`, `weak`. Windows that are not monotonic or contain non-finite data are skipped. If the `valid` boundary condition is used, axes that have fewer elements than
+    the window size are skipped as well.
 
-### Logical combinators (pointwise)
+### Logical combinators (~pointwise)
 
 - `all` (logical all / and):
 
-    For each element, all of the combined safeguards' guarantees are upheld. At the moment, only pointwise safeguards can be combined by this all-combinator.
+    For each element, all of the combined safeguards' guarantees are upheld. At the moment, only pointwise and stencil safeguards and combinations thereof can be combined by this all-combinator.
 
 - `any` (logical any / or):
 
-    For each element, at least one of the combined safeguards' guarantees is upheld. At the moment, only pointwise safeguards can be combined by this any-combinator.
+    For each element, at least one of the combined safeguards' guarantees is upheld. At the moment, only pointwise and stencil safeguards and combinations thereof can be combined by this any-combinator.
 
 ## Usage
 

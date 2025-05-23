@@ -1,6 +1,8 @@
 import atheris
 
 with atheris.instrument_imports():
+    from typing import Any
+
     import numcodecs as numcodecs
     import numpy as np
 
@@ -18,13 +20,13 @@ warnings.filterwarnings("error")
 
 def generate_interval_union(
     data: atheris.FuzzedDataProvider, n: int, imin: int, imax: int
-) -> tuple[IntervalUnion, set]:
+) -> tuple[IntervalUnion, set[int]]:
     n = data.ConsumeIntInRange(1, n)
 
     pivots = sorted(data.ConsumeIntInRange(imin, imax) for _ in range(n * 2))
 
     intervals = IntervalUnion.empty(np.dtype(int), 1, 1)
-    elems = set()
+    elems: set[int] = set()
 
     for i in range(n):
         low, high = pivots[i * 2], pivots[i * 2 + 1]
@@ -36,16 +38,16 @@ def generate_interval_union(
     return (intervals, elems)
 
 
-def check_one_input(data):
+def check_one_input(data) -> None:
     data = atheris.FuzzedDataProvider(data)
 
     n, imin, imax, m = 5, 0, 100, 10
 
-    info = []
+    info: list[Any] = []
 
     try:
         intervals = IntervalUnion.empty(np.dtype(int), 1, 1)
-        elems = set()
+        elems: set[int] = set()
 
         # generate #m interval unions with 1-#n intervals each
         #  and union/intersect them
@@ -70,21 +72,21 @@ def check_one_input(data):
 
         # compute low/high bounds from the elems to check that there are no
         #  adjacent intervals that should have been merged
-        i = None
+        el = None
         lows, highs = [], []
         for e in sorted(elems):
-            if i is None:
-                i = e
+            if el is None:
+                el = e
                 lows.append(e)
                 continue
-            if e == i + 1:
-                i = e
+            if e == el + 1:
+                el = e
                 continue
-            highs.append(i)
-            i = e
+            highs.append(el)
+            el = e
             lows.append(e)
-        if i is not None:
-            highs.append(i)
+        if el is not None:
+            highs.append(el)
 
         info.append(lows)
         info.append(highs)
@@ -93,7 +95,7 @@ def check_one_input(data):
         assert len(lows) == intervals._lower.shape[0]
         assert len(highs) == intervals._lower.shape[0]
 
-        check_elems = set()
+        check_elems: set[int] = set()
 
         for i in range(intervals._lower.shape[0]):
             low, high = intervals._lower[i, 0], intervals._upper[i, 0]

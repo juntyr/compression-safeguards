@@ -4,7 +4,7 @@ Implementation of the [`SafeguardsQuantizer`][numcodecs_safeguards.quantizer.Saf
 
 __all__ = ["SafeguardsQuantizer"]
 
-from collections.abc import Sequence
+from collections.abc import Collection
 from typing import TypeVar
 
 import numpy as np
@@ -29,7 +29,7 @@ class SafeguardsQuantizer:
 
     Parameters
     ----------
-    safeguards : Sequence[dict | Safeguard]
+    safeguards : Collection[dict | Safeguard]
         The safeguards that will be applied to the codec. They can either be
         passed as a safeguard configuration [`dict`][dict] or an already
         initialized
@@ -49,7 +49,7 @@ class SafeguardsQuantizer:
     def __init__(
         self,
         *,
-        safeguards: Sequence[dict | Safeguard],
+        safeguards: Collection[dict | Safeguard],
         _version: None | str = None,
     ):
         if _version is not None:
@@ -126,7 +126,7 @@ class SafeguardsQuantizer:
         partial_data : bool
             Whether the provided `data` and `prediction` only cover parts of
             the full data. While some safeguards can be checked and enforced
-            per-element, others should only be applied to the full data. When
+            pointwise, others should only be applied to the full data. When
             only partial data is provided, quantizing with any non-pointwise
             safeguards fails and raises an exception.
 

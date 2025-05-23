@@ -1,20 +1,16 @@
 """
-Quantity of interest (QoI) absolute error bound safeguard.
+Pointwise quantity of interest (QoI) absolute error bound safeguard.
 """
 
-__all__ = ["QuantityOfInterestAbsoluteErrorBoundSafeguard"]
+__all__ = ["PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard"]
 
-import functools
-from typing import Callable
+import re
 
 import numpy as np
 import sympy as sp
 
 from ....cast import (
     F,
-    _float128,
-    _float128_dtype,
-    _float128_precision,
     _isfinite,
     _isinf,
     _isnan,
@@ -25,20 +21,33 @@ from ....cast import (
     to_float,
 )
 from ....intervals import IntervalUnion
+from ..._qois.compile import sympy_expr_to_numpy as compile_sympy_expr_to_numpy
+from ..._qois.eb import (
+    compute_data_eb_for_stencil_qoi_eb_unchecked,
+    ensure_bounded_derived_error,
+)
+from ..._qois.math import CONSTANTS as MATH_CONSTANTS
+from ..._qois.math import FUNCTIONS as MATH_FUNCTIONS
+from ..._qois.re import (
+    QOI_COMMENT_PATTERN,
+    QOI_FLOAT_LITERAL_PATTERN,
+    QOI_INT_LITERAL_PATTERN,
+    QOI_WHITESPACE_PATTERN,
+)
 from ..abc import PointwiseSafeguard, S, T
 from ..abs import _compute_safe_eb_diff_interval
-from . import Expr
+from . import PointwiseExpr
 
 
-class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
+class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
     """
-    The `QuantityOfInterestAbsoluteErrorBoundSafeguard` guarantees that the
-    pointwise absolute error on a derived quantity of interest (QoI) is less
-    than or equal to the provided bound `eb_abs`.
+    The `PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard` guarantees
+    that the absolute error on a derived pointwise quantity of interest (QoI)
+    is less than or equal to the provided bound `eb_abs`.
 
     The quantity of interest is specified as a non-constant expression, in
-    string form, on the pointwise value `x`. For example, to bound the error on
-    the square of `x`, set `qoi=Expr("x**2")`.
+    string form, over the pointwise value `x`. For example, to bound the error
+    on the square of `x`, set `qoi="x**2"`.
 
     If the derived quantity of interest for an element evaluates to an infinite
     value, this safeguard guarantees that the quantity of interest on the
@@ -47,7 +56,10 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
     decoded value is also NaN, but does not guarantee that it has the same
     bit pattern.
 
-    The qoi expression is written using the following EBNF grammar for `expr`:
+    The QoI expression is written using the following EBNF grammar[^1] for
+    `expr`:
+
+    [^1]: You can visualise the EBNF grammar at <https://matthijsgroen.github.io/ebnf2railroad/try-yourself.html>.
 
     ```ebnf
     expr    =
@@ -63,8 +75,21 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
       | float
     ;
 
-    int     = ? integer literal ?;
-    float   = ? floating point literal ?;
+    int     =                             (* integer literal *)
+        [ sign ], digit, { digit }
+    ;
+    float   =                             (* floating point literal *)
+        [ sign ], digit, { digit }, ".", digit, { digit }, [
+            "e", [ sign ], digit, { digit }
+        ]
+    ;
+
+    sign    =
+        "+" | "-"
+    ;
+    digit   =
+        "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+    ;
 
     const   =
         "e"                               (* Euler's number *)
@@ -79,6 +104,30 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
       | "sqrt", "(", expr, ")"            (* square root *)
       | "ln", "(", expr, ")"              (* natural logarithm *)
       | "exp", "(", expr, ")"             (* exponential e^x *)
+      | "sin", "(", expr, ")"             (* sine sin(x) *)
+      | "cos", "(", expr, ")"             (* cosine cos(x) *)
+      | "tan", "(", expr, ")"             (* tangent tan(x) *)
+      | "cot", "(", expr, ")"             (* cotangent cot(x) *)
+      | "sec", "(", expr, ")"             (* secant sec(x) *)
+      | "csc", "(", expr, ")"             (* cosecant csc(x) *)
+      | "asin", "(", expr, ")"            (* inverse sine asin(x) *)
+      | "acos", "(", expr, ")"            (* inverse cosine acos(x) *)
+      | "atan", "(", expr, ")"            (* inverse tangent atan(x) *)
+      | "acot", "(", expr, ")"            (* inverse cotangent acot(x) *)
+      | "asec", "(", expr, ")"            (* inverse secant asec(x) *)
+      | "acsc", "(", expr, ")"            (* inverse cosecant acsc(x) *)
+      | "sinh", "(", expr, ")"            (* hyperbolic sine sinh(x) *)
+      | "cosh", "(", expr, ")"            (* hyperbolic cosine cosh(x) *)
+      | "tanh", "(", expr, ")"            (* hyperbolic tangent tanh(x) *)
+      | "coth", "(", expr, ")"            (* hyperbolic cotangent coth(x) *)
+      | "sech", "(", expr, ")"            (* hyperbolic secant sech(x) *)
+      | "csch", "(", expr, ")"            (* hyperbolic cosecant csch(x) *)
+      | "asinh", "(", expr, ")"           (* inverse hyperbolic sine asinh(x) *)
+      | "acosh", "(", expr, ")"           (* inverse hyperbolic cosine acosh(x) *)
+      | "atanh", "(", expr, ")"           (* inverse hyperbolic tangent atanh(x) *)
+      | "acoth", "(", expr, ")"           (* inverse hyperbolic cotangent acoth(x) *)
+      | "asech", "(", expr, ")"           (* inverse hyperbolic secant asech(x) *)
+      | "acsch", "(", expr, ")"           (* inverse hyperbolic cosecant acsch(x) *)
     ;
 
     binary  =
@@ -87,9 +136,15 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
       | expr, "*", expr                   (* multiplication *)
       | expr, "/", expr                   (* division *)
       | expr, "**", expr                  (* exponentiation *)
-      | "log", "(", expr, ",", expr, ")"  (* logarithm log(a, base) *)
+      | "log", "(",
+            expr, ","                     (* logarithm with explicit base *)
+          , "base", "=", expr,
+        ")"
     ;
     ```
+
+    The QoI expression can also contain whitespaces (space ` `, tab `\\t`,
+    newline `\\n`) and single-line inline comments starting with a hash `#`.
 
     The implementation of the absolute error bound on pointwise quantities of
     interest is inspired by:
@@ -102,9 +157,9 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
 
     Parameters
     ----------
-    qoi : Expr
+    qoi : PointwiseExpr
         The non-constant expression for computing the derived quantity of
-        interest for a pointwise value `x`.
+        interest over a pointwise value `x`.
     eb_abs : int | float
         The non-negative absolute error bound on the quantity of interest that
         is enforced by this safeguard.
@@ -116,42 +171,50 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         "_qoi_expr",
         "_x",
     )
-    _qoi: Expr
+    _qoi: PointwiseExpr
     _eb_abs: int | float
     _qoi_expr: sp.Basic
     _x: sp.Symbol
 
-    kind = "qoi_abs"
+    kind = "qoi_abs_pw"
 
-    def __init__(self, qoi: Expr, eb_abs: int | float):
+    def __init__(self, qoi: PointwiseExpr, eb_abs: int | float):
         assert eb_abs >= 0, "eb_abs must be non-negative"
         assert isinstance(eb_abs, int) or _isfinite(eb_abs), "eb_abs must be finite"
 
-        self._qoi = qoi
         self._eb_abs = eb_abs
 
         self._x = sp.Symbol("x", real=True)
 
-        assert len(qoi.strip()) > 0, "qoi expression must not be empty"
+        qoi_stripped = QOI_WHITESPACE_PATTERN.sub(
+            " ", QOI_COMMENT_PATTERN.sub(" ", qoi)
+        ).strip()
+
+        assert len(qoi_stripped) > 0, "QoI expression must not be empty"
+        assert _QOI_PATTERN.fullmatch(qoi) is not None, "invalid QoI expression"
         try:
             qoi_expr = sp.parse_expr(
-                self._qoi,
-                local_dict=dict(x=self._x),
+                qoi_stripped,
+                local_dict=dict(
+                    # === data ===
+                    # pointwise data
+                    x=self._x,
+                    # === constants ===
+                    **MATH_CONSTANTS,
+                    # === operators ===
+                    # poinwise math
+                    **MATH_FUNCTIONS,
+                ),
                 global_dict=dict(
                     # literals
                     Integer=sp.Integer,
                     Float=sp.Float,
                     Rational=sp.Rational,
-                    # constants
-                    pi=sp.pi,
-                    e=sp.E,
-                    # operators
-                    sqrt=sp.sqrt,
-                    exp=sp.exp,
-                    ln=sp.ln,
-                    log=sp.log,
                 ),
                 transformations=(sp.parsing.sympy_parser.auto_number,),
+            )
+            assert isinstance(qoi_expr, sp.Basic), (
+                "QoI expression must evaluate to a numeric expression"
             )
             # check if the expression is well-formed (e.g. no int's that cannot
             #  be printed) and if an error bound can be computed
@@ -161,14 +224,42 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             )
         except Exception as err:
             raise AssertionError(
-                f"failed to parse qoi expression {qoi!r}: {err}"
+                f"failed to parse QoI expression {qoi!r}: {err}"
             ) from err
-        assert len(qoi_expr.free_symbols) > 0, "qoi expression must not be constant"
+        assert len(qoi_expr.free_symbols) > 0, "QoI expression must not be constant"
         assert not qoi_expr.has(sp.I), (
-            "qoi expression must not contain imaginary numbers"
+            "QoI expression must not contain imaginary numbers"
         )
 
+        self._qoi = qoi
         self._qoi_expr = qoi_expr
+
+    def evaluate_qoi(self, data: np.ndarray[S, T]) -> np.ndarray[S, F]:
+        """
+        Evaluate the derived quantity of interest on the `data`.
+
+        If the `data` is of integer dtype, the quantity of interest is
+        evaluated in floating point with sufficient precision to represent all
+        integer values.
+
+        Parameters
+        ----------
+        data : np.ndarray[S, T]
+            Data for which the quantity of interest is evaluated.
+
+        Returns
+        -------
+        qoi : np.ndarray[S, F]
+            Evaluated quantity of interest, in floating point.
+        """
+
+        data_float: np.ndarray = to_float(data)
+
+        qoi_lambda = compile_sympy_expr_to_numpy(
+            [self._x], self._qoi_expr, data_float.dtype
+        )
+
+        return (qoi_lambda)(data_float)
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
@@ -188,12 +279,12 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         Returns
         -------
         ok : np.ndarray
-            Per-element, `True` if the check succeeded for this element.
+            Pointwise, `True` if the check succeeded for this element.
         """
 
         data_float: np.ndarray = to_float(data)
 
-        qoi_lambda = _compile_sympy_expr_to_numpy(
+        qoi_lambda = compile_sympy_expr_to_numpy(
             [self._x], self._qoi_expr, data_float.dtype
         )
 
@@ -249,7 +340,7 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             eb_abs: np.ndarray = to_finite_float(self._eb_abs, data_float.dtype)
         assert eb_abs >= 0
 
-        qoi_lambda = _compile_sympy_expr_to_numpy(
+        qoi_lambda = compile_sympy_expr_to_numpy(
             [self._x], self._qoi_expr, data_float.dtype
         )
 
@@ -335,10 +426,10 @@ class QuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
 def _compute_data_eb_for_qoi_eb(
     expr: sp.Basic,
     x: sp.Symbol,
-    xv: np.ndarray,
-    tauv_lower: np.ndarray,
-    tauv_upper: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
+    xv: np.ndarray[S, F],
+    tauv_lower: np.ndarray[S, F],
+    tauv_upper: np.ndarray[S, F],
+) -> tuple[np.ndarray[S, F], np.ndarray[S, F]]:
     """
     Translate an error bound on a derived quantity of interest (QoI) into an
     error bound on the input data.
@@ -372,22 +463,41 @@ def _compute_data_eb_for_qoi_eb(
     2022), 697-710. Available from: https://doi.org/10.14778/3574245.3574255.
     """
 
-    tl, tu = _compute_data_eb_for_qoi_eb_unchecked(expr, x, xv, tauv_lower, tauv_upper)
+    tl, tu = compute_data_eb_for_stencil_qoi_eb_unchecked(
+        expr,
+        xv,
+        tauv_lower,
+        tauv_upper,
+        check_is_x=lambda expr: expr == x,
+        evaluate_sympy_expr_to_numpy=lambda expr: compile_sympy_expr_to_numpy(
+            [x], expr, xv.dtype
+        )(xv),
+        compute_data_eb_for_stencil_qoi_eb=lambda expr,
+        xv,
+        tauv_lower,
+        tauv_upper: _compute_data_eb_for_qoi_eb(
+            expr,
+            x,
+            xv,
+            tauv_lower,
+            tauv_upper,
+        ),
+    )
 
-    exprl = _compile_sympy_expr_to_numpy([x], expr, xv.dtype)
+    exprl = compile_sympy_expr_to_numpy([x], expr, xv.dtype)
     exprv = (exprl)(xv)
 
     # handle rounding errors in the lower error bound computation
-    tl = _ensure_bounded_derived_error(
-        lambda tl: np.where(tl == 0, exprv, (exprl)(xv + tl)),
+    tl = ensure_bounded_derived_error(
+        lambda tl: np.where(tl == 0, exprv, (exprl)(xv + tl)),  # type: ignore
         exprv,
         xv,
         tl,
         tauv_lower,
         tauv_upper,
     )
-    tu = _ensure_bounded_derived_error(
-        lambda tu: np.where(tu == 0, exprv, (exprl)(xv + tu)),
+    tu = ensure_bounded_derived_error(
+        lambda tu: np.where(tu == 0, exprv, (exprl)(xv + tu)),  # type: ignore
         exprv,
         xv,
         tu,
@@ -398,468 +508,29 @@ def _compute_data_eb_for_qoi_eb(
     return tl, tu
 
 
-@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def _compute_data_eb_for_qoi_eb_unchecked(
-    expr: sp.Basic,
-    x: sp.Symbol,
-    xv: np.ndarray[S, F],
-    eb_expr_lower: np.ndarray[S, F],
-    eb_expr_upper: np.ndarray[S, F],
-) -> tuple[np.ndarray[S, F], np.ndarray[S, F]]:
-    """
-    Translate an error bound on a derived quantity of interest (QoI) into an
-    error bound on the input data.
-
-    This function does not check the returned error bound on the input data,
-    use `_compute_data_eb_for_qoi_eb` instead.
-
-    Parameters
-    ----------
-    expr : sp.Basic
-        Symbolic SymPy expression that defines the QoI.
-    x : sp.Symbol
-        Symbol for the pointwise input data.
-    xv : np.ndarray[S, F]
-        Actual values of the input data.
-    eb_expr_lower : np.ndarray[S, F]
-        Finite pointwise lower bound on the QoI error, must be negative or zero.
-    eb_expr_upper : np.ndarray[S, F]
-        Finite pointwise upper bound on the QoI error, must be positive or zero.
-
-    Returns
-    -------
-    eb_x_lower, eb_x_upper : tuple[np.ndarray[S, F], np.ndarray[S, F]]
-        Finite pointwise lower and upper error bound on the input data `x`.
-
-    Inspired by:
-
-    Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
-    Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
-    Lossy Compression for Scientific Data. Proc. VLDB Endow. 16, 4 (December
-    2022), 697-710. Available from: https://doi.org/10.14778/3574245.3574255.
-    """
-
-    assert len(expr.free_symbols) > 0, "constants have no error bounds"
-
-    zero = np.array(0, dtype=xv.dtype)
-
-    # x
-    if expr == x:
-        return (eb_expr_lower, eb_expr_upper)
-
-    # abs(...) is only used internally in exp(ln(abs(...)))
-    if expr.func is sp.Abs and len(expr.args) == 1:
-        # evaluate arg
-        (arg,) = expr.args
-        argv = _compile_sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
-        # flip the lower/upper error bound if the arg is negative
-        eql = np.where(argv < 0, -eb_expr_upper, eb_expr_lower)
-        equ = np.where(argv < 0, -eb_expr_lower, eb_expr_upper)
-        return _compute_data_eb_for_qoi_eb(arg, x, xv, eql, equ)
-
-    # ln(...)
-    # sympy automatically transforms log(..., base) into ln(...)/ln(base)
-    if expr.func is sp.log and len(expr.args) == 1:
-        # evaluate arg and ln(arg)
-        (arg,) = expr.args
-        argv = _compile_sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
-        exprv = np.log(argv)
-
-        # update the error bounds
-        eal = np.where(
-            (eb_expr_lower == 0),
-            zero,
-            np.exp(exprv + eb_expr_lower) - argv,
-        )
-        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
-
-        eau = np.where(
-            (eb_expr_upper == 0),
-            zero,
-            np.exp(exprv + eb_expr_upper) - argv,
-        )
-        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
-
-        # handle rounding errors in ln(e^(...)) early
-        eal = _ensure_bounded_derived_error(
-            lambda eal: np.log(argv + eal),
-            exprv,
-            argv,
-            eal,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eau = _ensure_bounded_derived_error(
-            lambda eau: np.log(argv + eau),
-            exprv,
-            argv,
-            eau,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eb_arg_lower, eb_arg_upper = eal, eau
-
-        # base case for ln(x)
-        if arg == x:
-            return eb_arg_lower, eb_arg_upper  # type: ignore
-        # composition using Lemma 3 from Jiao et al.
-        return _compute_data_eb_for_qoi_eb(arg, x, xv, eb_arg_lower, eb_arg_upper)
-
-    # e^(...)
-    if expr.func is sp.exp and len(expr.args) == 1:
-        # evaluate arg and e^arg
-        (arg,) = expr.args
-        argv = _compile_sympy_expr_to_numpy([x], arg, xv.dtype)(xv)
-        exprv = np.exp(argv)
-
-        # update the error bounds
-        # ensure that ln is not passed a negative argument
-        eal = np.where(
-            (eb_expr_lower == 0),
-            zero,
-            np.log(np.maximum(zero, exprv + eb_expr_lower)) - argv,
-        )
-        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
-
-        eau = np.where(
-            (eb_expr_upper == 0),
-            zero,
-            np.log(np.maximum(zero, exprv + eb_expr_upper)) - argv,
-        )
-        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
-
-        # handle rounding errors in e^(ln(...)) early
-        eal = _ensure_bounded_derived_error(
-            lambda eal: np.exp(argv + eal),
-            exprv,
-            argv,
-            eal,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eau = _ensure_bounded_derived_error(
-            lambda eau: np.exp(argv + eau),
-            exprv,
-            argv,
-            eau,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eb_arg_lower, eb_arg_upper = eal, eau
-
-        # base case for e^x
-        if arg == x:
-            return eb_arg_lower, eb_arg_upper  # type: ignore
-        # composition using Lemma 3 from Jiao et al.
-        return _compute_data_eb_for_qoi_eb(arg, x, xv, eb_arg_lower, eb_arg_upper)
-
-    # rewrite a ** b as e^(b*ln(abs(a)))
-    # this is mathematically incorrect for a <= 0 but works for deriving error bounds
-    if expr.is_Pow and len(expr.args) == 2:
-        a, b = expr.args
-        return _compute_data_eb_for_qoi_eb(
-            sp.exp(b * sp.ln(sp.Abs(a)), evaluate=False),
-            x,
-            xv,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-
-    # a_1 * e_1 + ... + a_n * e_n + c (weighted sum)
-    # using Corollary 2 and Lemma 4 from Jiao et al.
-    if expr.is_Add:
-        # find all non-constant terms
-        terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
-
-        factors = []
-        for i, term in enumerate(terms):
-            # extract the weighting factor of the term
-            if term.is_Mul:
-                factors.append(
-                    _compile_sympy_expr_to_numpy(
-                        [],
-                        sp.Mul(
-                            *[arg for arg in term.args if len(arg.free_symbols) == 0]  # type: ignore
-                        ),
-                        xv.dtype,
-                    )()
-                )
-                terms[i] = sp.Mul(
-                    *[arg for arg in term.args if len(arg.free_symbols) > 0]  # type: ignore
-                )
-            else:
-                factors.append(np.array(1))
-        total_abs_factor = np.sum(np.abs(factors))
-
-        etl: np.ndarray = _nan_to_zero(
-            to_finite_float(eb_expr_lower / total_abs_factor, xv.dtype)
-        )
-        etu: np.ndarray = _nan_to_zero(
-            to_finite_float(eb_expr_upper / total_abs_factor, xv.dtype)
-        )
-
-        # handle rounding errors in the total absolute factor early
-        etl = _ensure_bounded_derived_error(
-            lambda etl: etl * total_abs_factor,
-            np.zeros_like(xv),
-            None,
-            etl,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        etu = _ensure_bounded_derived_error(
-            lambda etu: etu * total_abs_factor,
-            np.zeros_like(xv),
-            None,
-            etu,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-
-        eb_x_lower, eb_x_upper = None, None
-        for term, factor in zip(terms, factors):
-            # recurse into the terms with a weighted error bound
-            exl, exu = _compute_data_eb_for_qoi_eb(
-                term,
-                x,
-                xv,
-                # flip the lower/upper error bound if the factor is negative
-                -etu if factor < 0 else etl,
-                -etl if factor < 0 else etu,
-            )
-            # combine the inner error bounds
-            if eb_x_lower is None:
-                eb_x_lower = exl
-            else:
-                eb_x_lower = np.maximum(eb_x_lower, exl)
-            if eb_x_upper is None:
-                eb_x_upper = exu
-            else:
-                eb_x_upper = np.minimum(eb_x_upper, exu)
-
-        return eb_x_lower, eb_x_upper  # type: ignore
-
-    # rewrite f * e_1 * ... * e_n (product) as f * e^(ln(abs(e_1) + ... + ln(abs(e_n)))
-    # this is mathematically incorrect if the product is non-positive,
-    #  but works for deriving error bounds
-    if expr.is_Mul:
-        # extract the constant factor and reduce tauv
-        factor = _compile_sympy_expr_to_numpy(
-            [],
-            sp.Mul(*[arg for arg in expr.args if len(arg.free_symbols) == 0]),  # type: ignore
-            xv.dtype,
-        )()
-
-        efl: np.ndarray = _nan_to_zero(
-            to_finite_float(eb_expr_lower / np.abs(factor), xv.dtype)
-        )
-        efu: np.ndarray = _nan_to_zero(
-            to_finite_float(eb_expr_upper / np.abs(factor), xv.dtype)
-        )
-
-        # handle rounding errors in the factor early
-        efl = _ensure_bounded_derived_error(
-            lambda efl: efl * np.abs(factor),
-            np.zeros_like(xv),
-            None,
-            efl,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        efu = _ensure_bounded_derived_error(
-            lambda efu: efu * np.abs(factor),
-            np.zeros_like(xv),
-            None,
-            efu,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-
-        # flip the lower/upper error bound if the factor is negative
-        eb_factor_lower = -efu if factor < 0 else efl
-        eb_factor_upper = -efl if factor < 0 else efu
-
-        # find all non-constant terms
-        terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
-
-        if len(terms) == 1:
-            return _compute_data_eb_for_qoi_eb(
-                terms[0], x, xv, eb_factor_lower, eb_factor_upper
-            )
-
-        return _compute_data_eb_for_qoi_eb(
-            sp.exp(sp.Add(*[sp.log(sp.Abs(term)) for term in terms]), evaluate=False),
-            x,
-            xv,
-            eb_factor_lower,
-            eb_factor_upper,
-        )
-
-    raise ValueError(f"unsupported expression kind {expr} (= {sp.srepr(expr)} =)")
-
-
-def _ensure_bounded_derived_error(
-    expr: Callable[[np.ndarray[S, F]], np.ndarray[S, F]],
-    exprv: np.ndarray[S, F],
-    xv: None | np.ndarray[S, F],
-    eb_x_guess: np.ndarray[S, F],
-    eb_expr_lower: np.ndarray[S, F],
-    eb_expr_upper: np.ndarray[S, F],
-) -> np.ndarray[S, F]:
-    """
-    Ensure that an error bound on an expression is met by an error bound on
-    the input data by nudging the provided guess.
-
-    Parameters
-    ----------
-    expr : Callable[[np.ndarray[S, F]], np.ndarray[S, F]]
-        Expression over which the error bound will be ensured.
-
-        The expression takes in the error bound guess and returns the value of
-        the expression for this error.
-    exprv : np.ndarray[S, F]
-        Evaluation of the expression for the zero-error case.
-    xv : None | np.ndarray[S, F]
-        Actual values of the input data, which are only used for better
-        refinement of the error bound guess.
-    eb_x_guess : np.ndarray[S, F]
-        Provided guess for the error bound on the initial data.
-    eb_expr_lower : np.ndarray[S, F]
-        Finite pointwise lower bound on the expression error, must be negative
-        or zero.
-    eb_expr_upper : np.ndarray[S, F]
-        Finite pointwise upper bound on the expression error, must be positive
-        or zero.
-
-    Returns
-    -------
-    eb_x : np.ndarray[S, F]
-        Finite pointwise error bound on the input data.
-    """
-
-    # check if any derived expression exceeds the error bound
-    # this check matches the qoi safeguard's validity check
-    is_eb_exceeded = lambda eb_x_guess: ~np.where(
-        _isfinite(exprv),
-        ((expr(eb_x_guess) - exprv) >= eb_expr_lower)
-        & ((expr(eb_x_guess) - exprv) <= eb_expr_upper),
-        np.where(
-            _isinf(exprv),
-            expr(eb_x_guess) == exprv,
-            _isnan(expr(eb_x_guess)),
-        ),
+# pattern of syntactically weakly valid expressions
+# we only check against forbidden tokens, not for semantic validity
+#  i.e. just enough that it's safe to eval afterwards
+_QOI_KWARG_PATTERN = (
+    r"(?:"
+    + r"|".join(
+        rf"(?:{k}(?:{QOI_COMMENT_PATTERN.pattern}|(?:[ \t\n]))*=(?:{QOI_COMMENT_PATTERN.pattern}|(?:[ \t\n]))*)"
+        for k in ("base",)
     )
-    eb_exceeded = is_eb_exceeded(eb_x_guess)
-
-    if not np.any(eb_exceeded):
-        return eb_x_guess
-
-    # first try to nudge the error bound itself
-    # we can nudge with nextafter since the expression values are floating
-    #  point
-    eb_x_guess = np.where(eb_exceeded, _nextafter(eb_x_guess, 0), eb_x_guess)  # type: ignore
-
-    # check again
-    eb_exceeded = is_eb_exceeded(eb_x_guess)
-
-    if not np.any(eb_exceeded):
-        return eb_x_guess
-
-    if xv is not None:
-        # second try to nudge it with respect to the data
-        eb_x_guess = np.where(
-            eb_exceeded, _nextafter(xv + eb_x_guess, xv) - xv, eb_x_guess
-        )  # type: ignore
-
-        # check again
-        eb_exceeded = is_eb_exceeded(eb_x_guess)
-
-        if not np.any(eb_exceeded):
-            return eb_x_guess
-
-    while True:
-        # finally fall back to repeatedly cutting it in half
-        eb_x_guess = np.where(eb_exceeded, eb_x_guess * 0.5, eb_x_guess)  # type: ignore
-
-        eb_exceeded = is_eb_exceeded(eb_x_guess)
-
-        if not np.any(eb_exceeded):
-            return eb_x_guess
-
-
-def _compile_sympy_expr_to_numpy(
-    symbols: list[sp.Symbol],
-    expr: sp.Basic,
-    dtype: np.dtype,
-) -> Callable[..., np.ndarray]:
-    """
-    Compile the SymPy expression `expr` over a list of `variables` into a
-    function that uses NumPy for numerical evaluation.
-
-    The function evaluates to a numpy array of the provided `dtype` if all
-    variable inputs are numpy arrays of the same `dtype`.
-    """
-
-    return sp.lambdify(
-        symbols,
-        expr,
-        modules=["numpy"]
-        + ([{_float128_dtype.name: _float128}] if dtype == _float128_dtype else []),
-        printer=_create_sympy_numpy_printer_class(dtype),
-        docstring_limit=0,
+    + r")"
+)
+_QOI_ATOM_PATTERN = (
+    r"(?:"
+    + r"".join(
+        rf"|(?:{l})"
+        for l in (QOI_INT_LITERAL_PATTERN, QOI_FLOAT_LITERAL_PATTERN)  # noqa: E741
     )
-
-
-@functools.cache
-def _create_sympy_numpy_printer_class(
-    dtype: np.dtype,
-) -> type[sp.printing.numpy.NumPyPrinter]:
-    """
-    Create a SymPy to NumPy printer class that outputs numerical values and
-    constants with the provided `dtype` and sufficient precision.
-    """
-
-    class NumPyDtypePrinter(sp.printing.numpy.NumPyPrinter):
-        # remove default printing of known constants
-        _kc = dict()
-
-        def __init__(self, settings=None):
-            self._dtype = dtype.name
-            if settings is None:
-                settings = dict()
-            if dtype == _float128_dtype:
-                settings["precision"] = _float128_precision * 2
-            else:
-                settings["precision"] = np.finfo(dtype).precision * 2
-            super().__init__(settings)
-
-        def _print_Integer(self, expr):
-            return str(expr.p)
-
-        def _print_Rational(self, expr):
-            return f"{self._dtype}({expr.p}) / {self._dtype}({expr.q})"
-
-        def _print_Float(self, expr):
-            # explicitly create the float from its string representation
-            #  e.g. 1.2 -> float16('1.2')
-            s = super()._print_Float(expr)
-            return f"{self._dtype}({s!r})"
-
-        def _print_Exp1(self, expr):
-            return self._print_NumberSymbol(expr)
-
-        def _print_Pi(self, expr):
-            return self._print_NumberSymbol(expr)
-
-        def _print_NaN(self, expr):
-            return f"{self._dtype}(nan)"
-
-        def _print_Infinity(self, expr):
-            return f"{self._dtype}(inf)"
-
-        def _print_ImaginaryUnit(self, expr):
-            raise ValueError(
-                "cannot evaluate an expression containing an imaginary number"
-            )
-
-    return NumPyDtypePrinter
+    + r"|(?:x)"
+    + r"".join(rf"|(?:{c})" for c in MATH_CONSTANTS)
+    + r"".join(rf"|(?:{f})" for f in MATH_FUNCTIONS)
+    + r")"
+)
+_QOI_SEPARATOR_PATTERN = rf"(?:{QOI_COMMENT_PATTERN.pattern}|(?:[ \t\n\(\),\+\-\*/]))"
+_QOI_PATTERN = re.compile(
+    rf"{_QOI_SEPARATOR_PATTERN}*{_QOI_ATOM_PATTERN}(?:{_QOI_SEPARATOR_PATTERN}+{_QOI_KWARG_PATTERN}?{_QOI_ATOM_PATTERN})*{_QOI_SEPARATOR_PATTERN}*"
+)

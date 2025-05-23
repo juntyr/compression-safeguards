@@ -1,0 +1,159 @@
+import numpy as np
+
+from numcodecs_safeguards.quantizer import SafeguardsQuantizer
+from numcodecs_safeguards.safeguards.pointwise.abc import PointwiseSafeguard
+from numcodecs_safeguards.safeguards.stencil.abc import StencilSafeguard
+
+from .codecs import (
+    encode_decode_identity,
+    encode_decode_neg,
+    encode_decode_noise,
+    encode_decode_zero,
+)
+
+
+def check_all_codecs(data: np.ndarray):
+    for combinator in ["any", "all"]:
+        decoded = encode_decode_zero(
+            data,
+            safeguards=[
+                dict(
+                    kind=combinator,
+                    safeguards=[
+                        dict(kind="ratio", eb_ratio=1.1),
+                        dict(kind="abs", eb_abs=0.1),
+                    ],
+                )
+            ],
+        )
+        np.testing.assert_allclose(decoded, data, rtol=0.1, atol=0.1)
+
+        decoded = encode_decode_neg(
+            data,
+            safeguards=[
+                dict(
+                    kind=combinator,
+                    safeguards=[
+                        dict(kind="ratio", eb_ratio=1.1),
+                        dict(kind="abs", eb_abs=0.1),
+                    ],
+                )
+            ],
+        )
+        np.testing.assert_allclose(decoded, data, rtol=0.1, atol=0.1)
+
+        decoded = encode_decode_identity(
+            data,
+            safeguards=[
+                dict(
+                    kind=combinator,
+                    safeguards=[
+                        dict(kind="ratio", eb_ratio=1.1),
+                        dict(kind="abs", eb_abs=0.1),
+                    ],
+                )
+            ],
+        )
+        np.testing.assert_allclose(decoded, data, rtol=0.0, atol=0.0)
+
+        decoded = encode_decode_noise(
+            data,
+            safeguards=[
+                dict(
+                    kind=combinator,
+                    safeguards=[
+                        dict(kind="ratio", eb_ratio=1.1),
+                        dict(kind="abs", eb_abs=0.1),
+                    ],
+                )
+            ],
+        )
+        np.testing.assert_allclose(decoded, data, rtol=0.1, atol=0.1)
+
+
+def test_empty():
+    check_all_codecs(np.empty(0))
+
+
+def test_arange():
+    check_all_codecs(np.arange(100, dtype=float))
+
+
+def test_linspace():
+    check_all_codecs(np.linspace(-1024, 1024, 2831))
+
+
+def test_edge_cases():
+    check_all_codecs(
+        np.array(
+            [
+                np.inf,
+                np.nan,
+                -np.inf,
+                -np.nan,
+                np.finfo(float).min,
+                np.finfo(float).max,
+                np.finfo(float).tiny,
+                -np.finfo(float).tiny,
+                -0.0,
+                +0.0,
+            ]
+        )
+    )
+
+
+def test_inheritance():
+    pointwise_config = dict(kind="abs", eb_abs=1)
+    stencil_config = dict(
+        kind="qoi_abs_stencil",
+        qoi="findiff(x, order=1, accuracy=1, type=1, dx=1, axis=0)",
+        neighbourhood=[
+            dict(
+                axis=0,
+                before=0,
+                after=1,
+                boundary="valid",
+            )
+        ],
+        eb_abs=1,
+    )
+
+    for combinator in ["any", "all"]:
+        quantizer = SafeguardsQuantizer(
+            safeguards=[
+                dict(
+                    kind=combinator,
+                    safeguards=[pointwise_config, pointwise_config],
+                )
+            ]
+        )
+        assert len(quantizer.safeguards) == 1
+        assert isinstance(quantizer.safeguards[0], PointwiseSafeguard)
+        assert not isinstance(quantizer.safeguards[0], StencilSafeguard)
+
+        quantizer = SafeguardsQuantizer(
+            safeguards=[
+                dict(
+                    kind=combinator,
+                    safeguards=[stencil_config, stencil_config],
+                ),
+            ]
+        )
+        assert len(quantizer.safeguards) == 1
+        assert not isinstance(quantizer.safeguards[0], PointwiseSafeguard)
+        assert isinstance(quantizer.safeguards[0], StencilSafeguard)
+
+        quantizer = SafeguardsQuantizer(
+            safeguards=[
+                dict(
+                    kind=combinator,
+                    safeguards=[
+                        pointwise_config,
+                        stencil_config,
+                    ],
+                ),
+            ]
+        )
+        assert len(quantizer.safeguards) == 1
+        assert not isinstance(quantizer.safeguards[0], PointwiseSafeguard)
+        assert isinstance(quantizer.safeguards[0], StencilSafeguard)

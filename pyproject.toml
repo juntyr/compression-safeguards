@@ -44,7 +44,7 @@ examples = [
     "netcdf4~=1.7.2",
     "matplotlib~=3.10.0",
 ]
-fuzz = ["atheris~=2.3"]
+fuzz = ["atheris~=2.3", "timeoutcontext~=1.2", "setuptools~=80.0"]
 test = ["pytest~=8.3"]
 typing = ["mypy~=1.14"]
 
@@ -60,7 +60,7 @@ where = ["src"]
 "numcodecs_safeguards" = ["py.typed"]
 
 [tool.ruff.lint]
-select = ["I"]
+select = ["E4", "E7", "E9", "F", "I"]
 
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]
@@ -75,3 +75,6 @@ module = [
     "varint.*",
 ]
 follow_untyped_imports = true
+
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/CITATION.cff", "/LICENSE", "/pyproject.toml", "/README.md"]

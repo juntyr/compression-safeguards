@@ -5,13 +5,14 @@ with atheris.instrument_imports():
     import numpy as np
 
 import sympy as sympy
+from timeoutcontext import timeout
 
 with atheris.instrument_imports():
     import sys
     import types
     import typing
     import warnings
-    from collections.abc import Sequence
+    from collections.abc import Collection, Sequence
     from enum import Enum
     from inspect import signature
 
@@ -24,15 +25,22 @@ with atheris.instrument_imports():
         SafeguardsCodec,
     )
     from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
+    from numcodecs_safeguards.safeguards._qois.amath import FUNCTIONS as AMATH_FUNCTIONS
+    from numcodecs_safeguards.safeguards._qois.math import CONSTANTS as MATH_CONSTANTS
+    from numcodecs_safeguards.safeguards._qois.math import FUNCTIONS as MATH_FUNCTIONS
     from numcodecs_safeguards.safeguards.abc import Safeguard
-    from numcodecs_safeguards.safeguards.pointwise.qoi import Expr
+    from numcodecs_safeguards.safeguards.pointwise.qoi import PointwiseExpr
+    from numcodecs_safeguards.safeguards.stencil import NeighbourhoodBoundaryAxis
+    from numcodecs_safeguards.safeguards.stencil.qoi import StencilExpr
 
 
 warnings.filterwarnings("error")
 
 
 class FuzzCodec(Codec):
-    codec_id = "fuzz"
+    __slots__ = ("data", "decoded")
+
+    codec_id = "fuzz"  # type: ignore
 
     def __init__(self, data, decoded):
         self.data = data
@@ -46,6 +54,13 @@ class FuzzCodec(Codec):
         assert out is not None
         out[:] = self.decoded
         return out
+
+    def get_config(self):
+        return dict(id=type(self).codec_id, data=self.data, decoded=self.decoded)
+
+    def __repr__(self):
+        config = {k: v for k, v in self.get_config().items() if k != "id"}
+        return f"{type(self).__name__}({', '.join(f'{k}={v!r}' for k, v in config.items())})"
 
 
 numcodecs.registry.register_codec(FuzzCodec)
@@ -61,7 +76,7 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
     if ty is bool:
         return data.ConsumeBool()
 
-    if typing.get_origin(ty) is Sequence:
+    if typing.get_origin(ty) in (Collection, Sequence):
         if len(typing.get_args(ty)) == 1:
             return [
                 generate_parameter(data, typing.get_args(ty)[0], depth)
@@ -74,16 +89,37 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
         if len(tys) == 2 and tys[0] is str and issubclass(tys[1], Enum):
             return list(tys[1])[data.ConsumeIntInRange(0, len(tys[1]) - 1)]
 
-        if len(tys) == 2 and tys[0] is dict and issubclass(tys[1], Safeguard):
+        if len(tys) == 2 and tys[0] is dict and tys[1] is NeighbourhoodBoundaryAxis:
+            return {
+                p: generate_parameter(data, v.annotation, depth)
+                for p, v in signature(NeighbourhoodBoundaryAxis).parameters.items()
+            }
+
+        if (
+            len(tys) > 1
+            and tys[0] is dict
+            and all(issubclass(t, Safeguard) for t in tys[1:])
+        ):
             return generate_safeguard_config(data, depth + 1)
 
         ty = tys[data.ConsumeIntInRange(0, len(tys) - 1)]
 
         return generate_parameter(data, ty, depth)
 
-    if ty is Expr:
-        ATOMS = ["x", int, float, "e", "pi"]
-        OPS = ["neg", "+", "-", "*", "/", "**", "log", "sqrt", "ln", "exp"]
+    if ty in (PointwiseExpr, StencilExpr):
+        ATOMS = ["x", int, float] + list(MATH_CONSTANTS)
+        OPS = [
+            "neg",
+            "+",
+            "-",
+            "*",
+            "/",
+            "**",
+        ] + list(MATH_FUNCTIONS)
+
+        if ty is StencilExpr:
+            ATOMS += ["X", "I"]
+            OPS += ["index", "findiff"] + list(AMATH_FUNCTIONS)
 
         atoms = []
         for _ in range(data.ConsumeIntInRange(2, 4)):
@@ -106,10 +142,18 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
             op = OPS[data.ConsumeIntInRange(0, len(OPS) - 1)]
             if op == "neg":
                 atoms.append(f"(-{atom1})")
-            elif op in ("sqrt", "ln", "exp"):
-                atoms.append(f"{op}({atom1})")
-            elif op == "log":
+            elif op in ("log", "matmul"):
                 atoms.append(f"log({atom1},{atom2})")
+            elif op in tuple(MATH_FUNCTIONS) + tuple(AMATH_FUNCTIONS):
+                atoms.append(f"{op}({atom1})")
+            elif op == "index":
+                atoms.append(
+                    f"{atom1}[{data.ConsumeIntInRange(0, 20)}, {data.ConsumeIntInRange(0, 20)}]"
+                )
+            elif op == "findiff":
+                atoms.append(
+                    f"findiff({atom1}, order={data.ConsumeIntInRange(0, 3)}, accuracy={data.ConsumeIntInRange(1, 4)}, type={data.ConsumeIntInRange(-1, 1)}, dx={data.ConsumeRegularFloat()}, axis={data.ConsumeIntInRange(0, 1)})"
+                )
             else:
                 atoms.append(f"({atom1}{op}{atom2})")
         [atom] = atoms
@@ -130,14 +174,14 @@ def generate_safeguard_config(data: atheris.FuzzedDataProvider, depth: int):
     }
 
 
-def check_one_input(data):
+def check_one_input(data) -> None:
     data = atheris.FuzzedDataProvider(data)
 
     safeguards = [
         generate_safeguard_config(data, 0) for _ in range(data.ConsumeIntInRange(0, 8))
     ]
 
-    dtype: np.ndtype = list(_SUPPORTED_DTYPES)[
+    dtype: np.dtype = list(_SUPPORTED_DTYPES)[
         data.ConsumeIntInRange(0, len(_SUPPORTED_DTYPES) - 1)
     ]
     sizea: int = data.ConsumeIntInRange(0, 20)
@@ -162,11 +206,12 @@ def check_one_input(data):
         decoded = decoded.reshape((sizea, sizeb))
 
     try:
-        safeguard = SafeguardsCodec(
-            codec=FuzzCodec(raw, decoded),
-            safeguards=safeguards,
-        )
-    except (AssertionError, Warning):
+        with timeout(1):
+            safeguard = SafeguardsCodec(
+                codec=FuzzCodec(raw, decoded),
+                safeguards=safeguards,
+            )
+    except (AssertionError, Warning, TimeoutError):
         return
 
     grepr = repr(safeguard)
@@ -182,6 +227,15 @@ def check_one_input(data):
         encoded = safeguard.encode(raw)
         safeguard.decode(encoded, out=np.empty_like(raw))
     except Exception as err:
+        if (
+            isinstance(err, IndexError)
+            and ("axis index" in str(err))
+            and ("out of bounds for array of shape" in str(err))
+        ) or (
+            isinstance(err, ValueError)
+            and ("constant boundary has invalid value" in str(err))
+        ):
+            return
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")
         raise err
 

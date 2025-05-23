@@ -2,8 +2,8 @@
 Implementations for the provided pointwise quantity of interest (QoI) safeguards.
 """
 
-__all__ = ["Expr"]
+__all__ = ["PointwiseExpr"]
 
 from typing import NewType
 
-Expr = NewType("Expr", str)
+PointwiseExpr = NewType("PointwiseExpr", str)
