@@ -200,7 +200,7 @@ class _AnyStencilSafeguard(_AnySafeguardBase, StencilSafeguard):
             )
         self._safeguards = safeguards
 
-    def compute_neighbourhood_for_data_shape(
+    def compute_check_neighbourhood_for_data_shape(
         self, data_shape: tuple[int, ...]
     ) -> tuple[None | NeighbourhoodAxis, ...]:
         neighbourhood: list[None | NeighbourhoodAxis] = [None] * len(data_shape)
@@ -209,8 +209,8 @@ class _AnyStencilSafeguard(_AnySafeguardBase, StencilSafeguard):
             if not isinstance(safeguard, StencilSafeguard):
                 continue
 
-            safeguard_neighbourhood = safeguard.compute_neighbourhood_for_data_shape(
-                data_shape
+            safeguard_neighbourhood = (
+                safeguard.compute_check_neighbourhood_for_data_shape(data_shape)
             )
 
             for i, sn in enumerate(safeguard_neighbourhood):

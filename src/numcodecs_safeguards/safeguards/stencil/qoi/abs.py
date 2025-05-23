@@ -36,6 +36,7 @@ from ..._qois.eb import (
 from ..._qois.findiff import create_findiff_for_neighbourhood
 from ..._qois.math import CONSTANTS as MATH_CONSTANTS
 from ..._qois.math import FUNCTIONS as MATH_FUNCTIONS
+from ..._qois.re import QOI_FLOAT_LITERAL_PATTERN, QOI_INT_LITERAL_PATTERN
 from ...pointwise.abs import _compute_safe_eb_diff_interval
 from .. import (
     BoundaryCondition,
@@ -58,7 +59,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     `eb_abs`.
 
     The quantity of interest is specified as a non-constant expression, in
-    string form, on the neighbourhood tensor `X` that is centred on the
+    string form, over the neighbourhood tensor `X` that is centred on the
     pointwise value `x`. For example, to bound the error on the four-neighbour
     box mean in a 3x3 neighbourhood (where `x = X[I]`), set
     `qoi="(X[I+A[-1,0]]+X[I+A[+1,0]]+X[I+A[0,-1]]+X[I+A[0,+1]])/4"`.
@@ -66,14 +67,33 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     `x` using the index array `I`.
 
     The stencil QoI safeguard can also be used to bound the pointwise absolute
-    error of the finite-difference-approximated derivative over the data.
+    error of the finite-difference-approximated derivative over the data by
+    using the `findiff` function in the `qoi` expression.
 
-    If the derived quantity of interest for an element evaluates to an infinite
-    value, this safeguard guarantees that the quantity of interest on the
-    decoded value produces the exact same infinite value. For a NaN quantity of
-    interest, this safeguard guarantees that the quantity of interest on the
-    decoded value is also NaN, but does not guarantee that it has the same
-    bit pattern.
+    The shape of the data neighbourhood is specified as an ordered list of
+    unique data axes and boundary conditions that are applied to these axes.
+    If the safeguard is applied to data with an insufficient number of
+    dimensions, it raises an exception. If the safeguard is applied to data
+    with additional dimensions, it is indendently applied along these extra
+    axes. For instance, a 2d qoi is applied to independently to all 2d slices
+    in a 3d data cube.
+
+    If the data neighbourhood uses the
+    [valid][numcodecs_safeguards.safeguards.stencil.BoundaryCondition.valid]
+    boundary condition along an axis, the safeguard is only applied to data
+    neighbourhoods centred on data points that have sufficient points before
+    and after to satisfy the neighbourhood shape, i.e. it is not applied to
+    all data points. If the axis is smaller than required by the neighbourhood
+    along this axis, the safeguard is not applied. Using a different
+    [`BoundaryCondition`][numcodecs_safeguards.safeguards.stencil.BoundaryCondition]
+    ensures that the safeguard is always applied to all data points.
+
+    If the derived quantity of interest for a data neighbourhood evaluates to
+    an infinite value, this safeguard guarantees that the quantity of interest
+    on the decoded data neighbourhood produces the exact same infinite value.
+    For a NaN quantity of interest, this safeguard guarantees that the quantity
+    of interest on the decoded data neighbourhood is also NaN, but does not
+    guarantee that it has the same bit pattern.
 
     The qoi expression is written using the following EBNF grammar[^1] for
     `expr`:
@@ -94,6 +114,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     literal =
         int
       | float
+      | array
     ;
 
     int     =                             (* integer literal *)
@@ -112,6 +133,12 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
     ;
 
+    array   =
+        "A", "[", [
+            expr, { ",", expr }, [","]    (* n-dimensional array *)
+        ], "]"
+    ;
+
     const   =
         "e"                               (* Euler's number *)
       | "pi"                              (* pi *)
@@ -120,12 +147,6 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     var     =
         "x"                               (* pointwise data value *)
       | "X"                               (* data neighbourhood *)
-    ;
-
-    array   =
-        "A", "[", [
-            expr, { ",", expr }, [","]    (* n-dimensional array *)
-        ], "]"
     ;
 
     unary   =
@@ -205,13 +226,17 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
     Parameters
     ----------
-    qoi : Expr
+    qoi : StencilExpr
         The non-constant expression for computing the derived quantity of
-        interest for a neighbourhood tensor `X`.
-    neighbourhood : Sequence[dict | NeighbourhoodAxis]
+        interest over a neighbourhood tensor `X`.
+    neighbourhood : Sequence[dict | NeighbourhoodBoundaryAxis]
         The non-empty axes of the data neighbourhood over which the quantity of
         interest is computed. The neighbourhood window is applied independently
         over any additional axes in the data.
+
+        The per-axis boundary conditions are applied to the data in their order
+        in the neighbourhood, i.e. earlier boundary extensions can influence
+        later ones.
     eb_abs : int | float
         The non-negative absolute error bound on the quantity of interest that
         is enforced by this safeguard.
@@ -253,11 +278,8 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         assert isinstance(eb_abs, int) or _isfinite(eb_abs), "eb_abs must be finite"
         self._eb_abs = eb_abs
 
-        shapel, Il = [], []  # noqa: E741
-        for axis in self._neighbourhood:
-            shapel.append(axis.before + 1 + axis.after)
-            Il.append(axis.before)
-        shape, I = tuple(shapel), tuple(Il)  # noqa: E741
+        shape = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
+        I = tuple(axis.before for axis in self._neighbourhood)  # noqa: E741
 
         self._X = sp.tensor.array.expressions.ArraySymbol("X", shape)
         X = self._X.as_explicit()
@@ -320,7 +342,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         self._qoi = qoi
         self._qoi_expr = qoi_expr
 
-    def compute_neighbourhood_for_data_shape(
+    def compute_check_neighbourhood_for_data_shape(
         self, data_shape: tuple[int, ...]
     ) -> tuple[None | NeighbourhoodAxis, ...]:
         """
@@ -385,18 +407,8 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        all_axes = []
-        for axis in self._neighbourhood:
-            if (axis.axis >= data.ndim) or (axis.axis < -data.ndim):
-                raise IndexError(
-                    f"axis index {axis.axis} is out of bounds for array of shape {data.shape}"
-                )
-            naxis = data.ndim - axis.axis if axis.axis < 0 else axis.axis
-            if naxis in all_axes:
-                raise IndexError(
-                    f"duplicate axis index {axis.axis}, normalised to {naxis}, for array of shape {data.shape}"
-                )
-            all_axes.append(naxis)
+        # check that the data shape is compatible with the neighbourhood shape
+        self.compute_check_neighbourhood_for_data_shape(data.shape)
 
         window = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
 
@@ -504,18 +516,8 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             Union of intervals in which the absolute error bound is upheld.
         """
 
-        all_axes = []
-        for axis in self._neighbourhood:
-            if (axis.axis >= data.ndim) or (axis.axis < -data.ndim):
-                raise IndexError(
-                    f"axis index {axis.axis} is out of bounds for array of shape {data.shape}"
-                )
-            naxis = data.ndim - axis.axis if axis.axis < 0 else axis.axis
-            if naxis in all_axes:
-                raise IndexError(
-                    f"duplicate axis index {axis.axis}, normalised to {naxis}, for array of shape {data.shape}"
-                )
-            all_axes.append(naxis)
+        # check that the data shape is compatible with the neighbourhood shape
+        self.compute_check_neighbourhood_for_data_shape(data.shape)
 
         window = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
 
@@ -617,6 +619,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                 self._qoi_expr,
                 self._X,
                 data_windows_float,
+                # not all data points are (valid) data neighbourhood centres
                 data_float[tuple(s)],
                 eb_qoi_lower,
                 eb_qoi_upper,
@@ -837,15 +840,17 @@ _QOI_KWARG_PATTERN = (
 )
 _QOI_ATOM_PATTERN = (
     r"(?:"
-    + r"(?:[+-]?[0-9]+)"
-    + r"|(?:[+-]?[0-9]+\.[0-9]+(?:e[+-]?[0-9]+)?)"
+    + r"".join(
+        rf"|(?:{l})"
+        for l in (QOI_INT_LITERAL_PATTERN, QOI_FLOAT_LITERAL_PATTERN)  # noqa: E741
+    )
     + r"|(?:x)"
     + r"|(?:X)"
     + r"|(?:I)"
     + r"".join(rf"|(?:{c})" for c in MATH_CONSTANTS)
-    + r"".join(rf"|(?:{c})" for c in MATH_FUNCTIONS)
+    + r"".join(rf"|(?:{f})" for f in MATH_FUNCTIONS)
     + r"".join(rf"|(?:{c})" for c in AMATH_CONSTRUCTORS)
-    + r"".join(rf"|(?:{c})" for c in AMATH_FUNCTIONS)
+    + r"".join(rf"|(?:{f})" for f in AMATH_FUNCTIONS)
     + r"|(?:findiff)"
     + r")"
 )

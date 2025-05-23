@@ -28,6 +28,7 @@ from ..._qois.eb import (
 )
 from ..._qois.math import CONSTANTS as MATH_CONSTANTS
 from ..._qois.math import FUNCTIONS as MATH_FUNCTIONS
+from ..._qois.re import QOI_FLOAT_LITERAL_PATTERN, QOI_INT_LITERAL_PATTERN
 from ..abc import PointwiseSafeguard, S, T
 from ..abs import _compute_safe_eb_diff_interval
 from . import PointwiseExpr
@@ -40,8 +41,8 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
     is less than or equal to the provided bound `eb_abs`.
 
     The quantity of interest is specified as a non-constant expression, in
-    string form, on the pointwise value `x`. For example, to bound the error on
-    the square of `x`, set `qoi="x**2"`.
+    string form, over the pointwise value `x`. For example, to bound the error
+    on the square of `x`, set `qoi="x**2"`.
 
     If the derived quantity of interest for an element evaluates to an infinite
     value, this safeguard guarantees that the quantity of interest on the
@@ -148,9 +149,9 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
 
     Parameters
     ----------
-    qoi : Expr
+    qoi : PointwiseExpr
         The non-constant expression for computing the derived quantity of
-        interest for a pointwise value `x`.
+        interest over a pointwise value `x`.
     eb_abs : int | float
         The non-negative absolute error bound on the quantity of interest that
         is enforced by this safeguard.
@@ -478,11 +479,13 @@ _QOI_KWARG_PATTERN = (
 )
 _QOI_ATOM_PATTERN = (
     r"(?:"
-    + r"(?:[+-]?[0-9]+)"
-    + r"|(?:[+-]?[0-9]+\.[0-9]+(?:e[+-]?[0-9]+)?)"
+    + r"".join(
+        rf"|(?:{l})"
+        for l in (QOI_INT_LITERAL_PATTERN, QOI_FLOAT_LITERAL_PATTERN)  # noqa: E741
+    )
     + r"|(?:x)"
     + r"".join(rf"|(?:{c})" for c in MATH_CONSTANTS)
-    + r"".join(rf"|(?:{c})" for c in MATH_FUNCTIONS)
+    + r"".join(rf"|(?:{f})" for f in MATH_FUNCTIONS)
     + r")"
 )
 _QOI_SEPARATOR_PATTERN = r"(?:[ \t\n\(\),\+\-\*/])"

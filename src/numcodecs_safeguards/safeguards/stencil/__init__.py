@@ -13,7 +13,7 @@ from typing_extensions import Self  # MSPV 3.11
 class BoundaryCondition(Enum):
     """
     Different types of boundary conditions that can be applied to the data
-    domain boundaries for
+    array domain boundaries for
     [`StencilSafeguard`][numcodecs_safeguards.safeguards.stencil.abc.StencilSafeguard]s.
 
     Since stencil safeguards operate over small neighbourhoods of data points,
@@ -136,11 +136,12 @@ class NeighbourhoodBoundaryAxis:
         two next values.
     boundary : str | BoundaryCondition
         The boundary condition that is applied to this axis near the data
-        domain boundary to fill the data neighbourhood, e.g. by extending
+        array domain boundary to fill the data neighbourhood, e.g. by extending
         values.
     constant_boundary : None | int | float
-        Optional constant value with which the data domain is extended for a
-        constant boundary.
+        Optional constant value with which the data array domain is extended
+        for a constant boundary. The value must be safely convertable (without
+        over- or underflow or invalid values) to the data type.
     """
 
     __slots__ = ("_axis", "_shape", "_boundary", "_constant_boundary")
@@ -206,7 +207,7 @@ class NeighbourhoodBoundaryAxis:
     def boundary(self) -> BoundaryCondition:
         """
         The boundary condition that is applied to this axis near the data
-        domain boundary to fill the data neighbourhood, e.g. by extending
+        array domain boundary to fill the data neighbourhood, e.g. by extending
         values.
         """
         return self._boundary
@@ -214,8 +215,8 @@ class NeighbourhoodBoundaryAxis:
     @property
     def constant_boundary(self) -> None | int | float:
         """
-        Optional constant value with which the data domain is extended for a
-        constant boundary.
+        Optional constant value with which the data array domain is extended
+        for a constant boundary.
         """
         return self._constant_boundary
 

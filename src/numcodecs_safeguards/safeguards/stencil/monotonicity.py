@@ -93,11 +93,12 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         Positive symmetric half-window size; the window has size
         $(1 + window \cdot 2)$.
     boundary : str | BoundaryCondition
-        Boundary condition for evaluating the monotonicity near the data domain
-        boundaries, e.g. by extending values.
+        Boundary condition for evaluating the monotonicity near the data array
+        domain boundaries, e.g. by extending values.
     constant_boundary : None | int | float
-        Optional constant value with which the data domain is extended for a
-        constant boundary.
+        Optional constant value with which the data array domain is extended
+        for a constant boundary. The value must be safely convertable (without
+        over- or underflow or invalid values) to the data type.
     axis : None | int
         The axis along which the monotonicity is preserved. The default,
         [`None`][None], is to preserve along all axes.
@@ -143,7 +144,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         self._axis = axis
 
-    def compute_neighbourhood_for_data_shape(
+    def compute_check_neighbourhood_for_data_shape(
         self, data_shape: tuple[int, ...]
     ) -> tuple[None | NeighbourhoodAxis, ...]:
         """

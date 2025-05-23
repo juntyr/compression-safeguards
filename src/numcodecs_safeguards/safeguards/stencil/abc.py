@@ -29,7 +29,7 @@ class StencilSafeguard(Safeguard, ABC):
     __slots__ = ()
 
     @abstractmethod
-    def compute_neighbourhood_for_data_shape(
+    def compute_check_neighbourhood_for_data_shape(
         self, data_shape: tuple[int, ...]
     ) -> tuple[None | NeighbourhoodAxis, ...]:
         """
