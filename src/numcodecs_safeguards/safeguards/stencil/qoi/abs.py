@@ -368,9 +368,6 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
         neighbourhood: list[None | NeighbourhoodAxis] = [None] * len(data_shape)
 
-        if np.prod(data_shape) == 0:
-            return tuple(neighbourhood)
-
         all_axes = []
         for axis in self._neighbourhood:
             if (axis.axis >= len(data_shape)) or (axis.axis < -len(data_shape)):
@@ -385,6 +382,9 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             all_axes.append(naxis)
 
             neighbourhood[naxis] = axis.shape
+
+        if np.prod(data_shape) == 0:
+            return (None,) * len(data_shape)
 
         return tuple(neighbourhood)
 

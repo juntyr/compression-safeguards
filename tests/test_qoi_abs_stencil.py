@@ -590,3 +590,31 @@ def test_fuzzer_findiff_fraction_float_overflow():
                 dict(kind="sign"),
             ],
         )
+
+
+def test_fuzzer_tuple_index_out_of_range():
+    data = np.array([], dtype=np.int32)
+    decoded = np.array([], dtype=np.int32)
+
+    with pytest.raises(
+        IndexError, match=r"axis index -65 is out of bounds for array of shape \(0,\)"
+    ):
+        encode_decode_mock(
+            data,
+            decoded,
+            safeguards=[
+                dict(
+                    kind="qoi_abs_stencil",
+                    qoi="(-(-x))",
+                    neighbourhood=[
+                        dict(
+                            axis=-65,
+                            before=0,
+                            after=0,
+                            boundary="valid",
+                        )
+                    ],
+                    eb_abs=0,
+                ),
+            ],
+        )
