@@ -9,7 +9,6 @@ from collections.abc import Sequence
 from typing import TypeVar
 
 import numpy as np
-import numpy.ma as ma
 import sympy as sp
 import sympy.tensor.array.expressions  # noqa: F401
 from numpy.lib.stride_tricks import sliding_window_view
@@ -22,7 +21,6 @@ from ....cast import (
     _nan_to_zero,
     _nextafter,
     as_bits,
-    from_float,
     to_finite_float,
     to_float,
 )
@@ -397,20 +395,18 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         boundary condition is used along any axis.
 
         If the `data` is of integer dtype, the quantity of interest is
-        internally evaluated in floating point with sufficient precision to
-        represent all integer values. Before returning, the qoi values are cast
-        back to integers, where infinite qoi values are mapped to the minimum /
-        maximum integer value, and NaN qoi values are masked.
+        evaluated in floating point with sufficient precision to represent all
+        integer values.
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, T]
             Data for which the quantity of interest is evaluated.
 
         Returns
         -------
-        qoi : np.ndarray
-            Evaluated quantity of interest.
+        qoi : np.ndarray[tuple[int, ...], F]
+            Evaluated quantity of interest, in floating point.
         """
 
         # check that the data shape is compatible with the neighbourhood shape
@@ -455,19 +451,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             [self._X], self._qoi_expr, data_windows_float.dtype
         )
 
-        qoi_data_float = (qoi_lambda)(data_windows_float)
-
-        qoi_data = from_float(qoi_data_float, data.dtype)
-
-        if np.issubdtype(data.dtype, np.floating):
-            return qoi_data
-
-        mask = _isnan(qoi_data_float)
-
-        if not np.any(mask):
-            return qoi_data
-
-        return ma.array(qoi_data, mask=mask, hard_mask=True)
+        return (qoi_lambda)(data_windows_float)
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
@@ -543,20 +527,8 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             [self._X], self._qoi_expr, data_windows_float.dtype
         )
 
-        qoi_data_float = (qoi_lambda)(data_windows_float)
-        qoi_decoded_float = (qoi_lambda)(decoded_windows_float)
-
-        # convert the qois back to data dtype and then back to floats
-        # this ensures we compare with the precision of the original dtype
-        # but also comparing in extended floating point is easier
-        qoi_data_orig = from_float(qoi_data_float, data.dtype)
-        qoi_decoded_orig = from_float(qoi_decoded_float, decoded.dtype)
-        qoi_data = np.where(
-            _isfinite(qoi_data_float), to_float(qoi_data_orig), qoi_data_float
-        )
-        qoi_decoded = np.where(
-            _isfinite(qoi_decoded_float), to_float(qoi_decoded_orig), qoi_decoded_float
-        )
+        qoi_data = (qoi_lambda)(data_windows_float)
+        qoi_decoded = (qoi_lambda)(decoded_windows_float)
 
         absolute_bound = (
             np.where(
