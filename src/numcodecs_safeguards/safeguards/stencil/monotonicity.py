@@ -399,10 +399,9 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                     ).flatten()
                 )
             if np.any(elem_lt_left | elem_lt_right):
-                # temporarily shape the interval bounds like the data
-                #  for easier indexing
-                valid_lt._lower = valid_lt._lower.reshape(data_boundary.shape)
-                valid_lt._upper = valid_lt._upper.reshape(data_boundary.shape)
+                # shape the interval bounds like the data for easier indexing
+                valid_lt_lower = valid_lt._lower.reshape(data_boundary.shape)
+                valid_lt_upper = valid_lt._upper.reshape(data_boundary.shape)
 
                 if self._boundary in (
                     BoundaryCondition.reflect,
@@ -434,17 +433,17 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                         #  interval back to the inner values
                         elem_lt_left[s_inner] |= elem_lt_left[s_boundary]
                         elem_lt_right[s_inner] |= elem_lt_right[s_boundary]
-                        valid_lt._lower[s_inner] = from_total_order(
+                        valid_lt_lower[s_inner] = from_total_order(
                             np.maximum(
-                                to_total_order(valid_lt._lower[s_inner]),
-                                to_total_order(valid_lt._lower[s_boundary]),
+                                to_total_order(valid_lt_lower[s_inner]),
+                                to_total_order(valid_lt_lower[s_boundary]),
                             ),
                             dtype=data.dtype,
                         )
-                        valid_lt._upper[s_inner] = from_total_order(
+                        valid_lt_upper[s_inner] = from_total_order(
                             np.minimum(
-                                to_total_order(valid_lt._upper[s_inner]),
-                                to_total_order(valid_lt._upper[s_boundary]),
+                                to_total_order(valid_lt_upper[s_inner]),
+                                to_total_order(valid_lt_upper[s_boundary]),
                             ),
                             dtype=data.dtype,
                         )
@@ -452,8 +451,8 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 any_restriction |= elem_lt_left[s] | elem_lt_right[s]
                 valid = valid.intersect(
                     Interval(
-                        _lower=valid_lt._lower[s].flatten(),
-                        _upper=valid_lt._upper[s].flatten(),
+                        _lower=valid_lt_lower[s].flatten(),
+                        _upper=valid_lt_upper[s].flatten(),
                     )
                 )
 
@@ -480,10 +479,9 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                     ).flatten()
                 )
             if np.any(elem_gt_left | elem_gt_right):
-                # temporarily shape the interval bounds like the data
-                #  for easier indexing
-                valid_gt._lower = valid_gt._lower.reshape(data_boundary.shape)
-                valid_gt._upper = valid_gt._upper.reshape(data_boundary.shape)
+                # shape the interval bounds like the data for easier indexing
+                valid_gt_lower = valid_gt._lower.reshape(data_boundary.shape)
+                valid_gt_upper = valid_gt._upper.reshape(data_boundary.shape)
 
                 if self._boundary in (
                     BoundaryCondition.reflect,
@@ -515,17 +513,17 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                         #  interval back to the inner values
                         elem_gt_left[s_inner] |= elem_gt_left[s_boundary]
                         elem_gt_right[s_inner] |= elem_gt_right[s_boundary]
-                        valid_gt._lower[s_inner] = from_total_order(
+                        valid_gt_lower[s_inner] = from_total_order(
                             np.maximum(
-                                to_total_order(valid_gt._lower[s_inner]),
-                                to_total_order(valid_gt._lower[s_boundary]),
+                                to_total_order(valid_gt_lower[s_inner]),
+                                to_total_order(valid_gt_lower[s_boundary]),
                             ),
                             dtype=data.dtype,
                         )
-                        valid_gt._upper[s_inner] = from_total_order(
+                        valid_gt_upper[s_inner] = from_total_order(
                             np.minimum(
-                                to_total_order(valid_gt._upper[s_inner]),
-                                to_total_order(valid_gt._upper[s_boundary]),
+                                to_total_order(valid_gt_upper[s_inner]),
+                                to_total_order(valid_gt_upper[s_boundary]),
                             ),
                             dtype=data.dtype,
                         )
@@ -533,8 +531,8 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 any_restriction |= elem_gt_left[s] | elem_gt_right[s]
                 valid = valid.intersect(
                     Interval(
-                        _lower=valid_gt._lower[s].flatten(),
-                        _upper=valid_gt._upper[s].flatten(),
+                        _lower=valid_gt_lower[s].flatten(),
+                        _upper=valid_gt_upper[s].flatten(),
                     )
                 )
 
