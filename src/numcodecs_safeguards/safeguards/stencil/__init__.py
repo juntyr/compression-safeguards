@@ -140,7 +140,7 @@ class NeighbourhoodBoundaryAxis:
         values.
     constant_boundary : None | int | float
         Optional constant value with which the data array domain is extended
-        for a constant boundary. The value must be safely convertable (without
+        for a constant boundary. The value must be safely convertible (without
         over- or underflow or invalid values) to the data type.
     """
 
