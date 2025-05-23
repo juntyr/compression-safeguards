@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from typing import TypeVar
 
 import numpy as np
+import numpy.ma as ma
 import sympy as sp
 import sympy.tensor.array.expressions  # noqa: F401
 from numpy.lib.stride_tricks import sliding_window_view
@@ -21,6 +22,7 @@ from ....cast import (
     _nan_to_zero,
     _nextafter,
     as_bits,
+    from_float,
     to_finite_float,
     to_float,
 )
@@ -386,6 +388,87 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
         return tuple(neighbourhood)
 
+    def evaluate_qoi(self, data: np.ndarray[S, T]) -> np.ndarray[tuple[int, ...], T]:
+        """
+        Evaluate the derived quantity of interest on the `data`.
+
+        The quantity of interest may have a different shape if the
+        [valid][numcodecs_safeguards.safeguards.stencil.BoundaryCondition.valid]
+        boundary condition is used along any axis.
+
+        If the `data` is of integer dtype, the quantity of interest is
+        internally evaluated in floating point with sufficient precision to
+        represent all integer values. Before returning, the qoi values are cast
+        back to integers, where infinite qoi values are mapped to the minimum /
+        maximum integer value, and NaN qoi values are masked.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data for which the quantity of interest is evaluated.
+
+        Returns
+        -------
+        qoi : np.ndarray
+            Evaluated quantity of interest.
+        """
+
+        # check that the data shape is compatible with the neighbourhood shape
+        self.compute_check_neighbourhood_for_data_shape(data.shape)
+
+        empty_shape = list(data.shape)
+
+        # if the neighbourhood is empty, e.g. because we in valid mode and the
+        #  neighbourhood shape exceeds the data shape, return empty
+        for axis in self._neighbourhood:
+            if axis.boundary == BoundaryCondition.valid:
+                empty_shape[axis.axis] = max(
+                    0, empty_shape[axis.axis] - axis.before - axis.after
+                )
+
+        if any(s == 0 for s in empty_shape):
+            return np.zeros(empty_shape, dtype=data.dtype)
+
+        data_boundary = data
+        for axis in self._neighbourhood:
+            data_boundary = _pad_with_boundary(
+                data_boundary,
+                axis.boundary,
+                axis.before,
+                axis.after,
+                axis.constant_boundary,
+                axis.axis,
+            )
+
+        window = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
+
+        data_windows_float: np.ndarray = to_float(
+            sliding_window_view(
+                data_boundary,
+                window,
+                axis=tuple(axis.axis for axis in self._neighbourhood),
+                writeable=False,
+            )  # type: ignore
+        )
+
+        qoi_lambda = compile_sympy_expr_to_numpy(
+            [self._X], self._qoi_expr, data_windows_float.dtype
+        )
+
+        qoi_data_float = (qoi_lambda)(data_windows_float)
+
+        qoi_data = from_float(qoi_data_float, data.dtype)
+
+        if np.issubdtype(data.dtype, np.floating):
+            return qoi_data
+
+        mask = _isnan(qoi_data_float)
+
+        if not np.any(mask):
+            return qoi_data
+
+        return ma.array(qoi_data, mask=mask, hard_mask=True)
+
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
         self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
@@ -460,8 +543,20 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             [self._X], self._qoi_expr, data_windows_float.dtype
         )
 
-        qoi_data = (qoi_lambda)(data_windows_float)
-        qoi_decoded = (qoi_lambda)(decoded_windows_float)
+        qoi_data_float = (qoi_lambda)(data_windows_float)
+        qoi_decoded_float = (qoi_lambda)(decoded_windows_float)
+
+        # convert the qois back to data dtype and then back to floats
+        # this ensures we compare with the precision of the original dtype
+        # but also comparing in extended floating point is easier
+        qoi_data_orig = from_float(qoi_data_float, data.dtype)
+        qoi_decoded_orig = from_float(qoi_decoded_float, decoded.dtype)
+        qoi_data = np.where(
+            _isfinite(qoi_data_float), to_float(qoi_data_orig), qoi_data_float
+        )
+        qoi_decoded = np.where(
+            _isfinite(qoi_decoded_float), to_float(qoi_decoded_orig), qoi_decoded_float
+        )
 
         absolute_bound = (
             np.where(

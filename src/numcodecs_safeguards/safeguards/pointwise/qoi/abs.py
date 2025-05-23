@@ -7,6 +7,7 @@ __all__ = ["PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard"]
 import re
 
 import numpy as np
+import numpy.ma as ma
 import sympy as sp
 
 from ....cast import (
@@ -17,6 +18,7 @@ from ....cast import (
     _nan_to_zero,
     _nextafter,
     as_bits,
+    from_float,
     to_finite_float,
     to_float,
 )
@@ -222,6 +224,47 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
 
         self._qoi_expr = qoi_expr
 
+    def evaluate_qoi(self, data: np.ndarray[S, T]) -> np.ndarray[S, T]:
+        """
+        Evaluate the derived quantity of interest on the `data`.
+
+        If the `data` is of integer dtype, the quantity of interest is
+        internally evaluated in floating point with sufficient precision to
+        represent all integer values. Before returning, the qoi values are cast
+        back to integers, where infinite qoi values are mapped to the minimum /
+        maximum integer value, and NaN qoi values are masked.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data for which the quantity of interest is evaluated.
+
+        Returns
+        -------
+        qoi : np.ndarray
+            Evaluated quantity of interest.
+        """
+
+        data_float: np.ndarray = to_float(data)
+
+        qoi_lambda = compile_sympy_expr_to_numpy(
+            [self._x], self._qoi_expr, data_float.dtype
+        )
+
+        qoi_data_float = (qoi_lambda)(data_float)
+
+        qoi_data = from_float(qoi_data_float, data.dtype)
+
+        if np.issubdtype(data.dtype, np.floating):
+            return qoi_data
+
+        mask = _isnan(qoi_data_float)
+
+        if not np.any(mask):
+            return qoi_data
+
+        return ma.array(qoi_data, mask=mask, hard_mask=True)
+
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
         self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
@@ -249,8 +292,20 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
             [self._x], self._qoi_expr, data_float.dtype
         )
 
-        qoi_data = (qoi_lambda)(data_float)
-        qoi_decoded = (qoi_lambda)(to_float(decoded))
+        qoi_data_float = (qoi_lambda)(data_float)
+        qoi_decoded_float = (qoi_lambda)(to_float(decoded))
+
+        # convert the qois back to data dtype and then back to floats
+        # this ensures we compare with the precision of the original dtype
+        # but also comparing in extended floating point is easier
+        qoi_data_orig = from_float(qoi_data_float, data.dtype)
+        qoi_decoded_orig = from_float(qoi_decoded_float, decoded.dtype)
+        qoi_data = np.where(
+            _isfinite(qoi_data_float), to_float(qoi_data_orig), qoi_data_float
+        )
+        qoi_decoded = np.where(
+            _isfinite(qoi_decoded_float), to_float(qoi_decoded_orig), qoi_decoded_float
+        )
 
         absolute_bound = (
             np.where(
