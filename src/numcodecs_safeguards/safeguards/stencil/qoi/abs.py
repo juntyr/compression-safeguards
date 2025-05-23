@@ -392,7 +392,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                 raise IndexError(
                     f"axis index {axis.axis} is out of bounds for array of shape {data_shape}"
                 )
-            naxis = len(data_shape) - axis.axis if axis.axis < 0 else axis.axis
+            naxis = axis.axis if axis.axis >= 0 else len(data_shape) + axis.axis
             if naxis in all_axes:
                 raise IndexError(
                     f"duplicate axis index {axis.axis}, normalised to {naxis}, for array of shape {data_shape}"

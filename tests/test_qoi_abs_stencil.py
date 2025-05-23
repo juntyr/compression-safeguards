@@ -639,3 +639,28 @@ def test_fuzzer_tuple_index_out_of_range():
                 ),
             ],
         )
+
+
+def test_fuzzer_list_assignment_out_of_range():
+    data = np.array([], dtype=np.uint8)
+    decoded = np.array([], dtype=np.uint8)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(
+                kind="qoi_abs_stencil",
+                qoi="acsc((x-e))",
+                neighbourhood=[
+                    dict(
+                        axis=-1,
+                        before=93,
+                        after=0,
+                        boundary="valid",
+                    )
+                ],
+                eb_abs=0,
+            ),
+        ],
+    )
