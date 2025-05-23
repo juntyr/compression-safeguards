@@ -81,8 +81,17 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     [`Monotonicity`][numcodecs_safeguards.safeguards.stencil.monotonicity.Monotonicity]:
     `strict`, `strict_with_consts`, `strict_to_weak`, `weak`.
 
-    Windows that are not monotonic or contain non-finite data are skipped. Axes
-    that have fewer elements than the window size are skipped as well.
+    Windows that are not monotonic or contain non-finite data are skipped.
+
+    If the provided `axis` index is out of range for some data shape, the
+    safeguard is not applied to that data.
+
+    If the
+    [valid][numcodecs_safeguards.safeguards.stencil.BoundaryCondition.valid]
+    `boundary` condition is used, axes that have fewer elements than
+    $(1 + window \cdot 2)$ are skipped. Using a different
+    [`BoundaryCondition`][numcodecs_safeguards.safeguards.stencil.BoundaryCondition]
+    ensures that the safeguard is always applied.
 
     Parameters
     ----------
@@ -149,11 +158,8 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     ) -> tuple[None | NeighbourhoodAxis, ...]:
         """
         Compute the shape of the data neighbourhood for data of a given shape.
-        [`None`][None] is returned along dimensions for which there is no data
-        neighbourhood.
-
-        This method also checks that the data shape is compatible with this
-        stencil safeguard.
+        [`None`][None] is returned along the dimensions where the monotonicity
+        safeguard is not applied.
 
         Parameters
         ----------

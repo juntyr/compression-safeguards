@@ -34,8 +34,8 @@ class StencilSafeguard(Safeguard, ABC):
     ) -> tuple[None | NeighbourhoodAxis, ...]:
         """
         Compute the shape of the data neighbourhood for data of a given shape.
-        [`None`][None] is returned along dimensions for which there is no data
-        neighbourhood.
+        [`None`][None] is returned along dimensions for which the stencil
+        safeguard does not need to look at adjacent data points.
 
         This method also checks that the data shape is compatible with this
         stencil safeguard.

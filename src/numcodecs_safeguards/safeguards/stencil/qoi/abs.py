@@ -230,7 +230,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         The non-constant expression for computing the derived quantity of
         interest over a neighbourhood tensor `X`.
     neighbourhood : Sequence[dict | NeighbourhoodBoundaryAxis]
-        The non-empty axes of the data neighbourhood over which the quantity of
+        The non-empty axes of the data neighbourhood for which the quantity of
         interest is computed. The neighbourhood window is applied independently
         over any additional axes in the data.
 
@@ -347,11 +347,11 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     ) -> tuple[None | NeighbourhoodAxis, ...]:
         """
         Compute the shape of the data neighbourhood for data of a given shape.
-        [`None`][None] is returned along dimensions for which there is no data
-        neighbourhood.
+        [`None`][None] is returned along dimensions for which the stencil qoi
+        safeguard does not need to look at adjacent data points.
 
-        This method also checks that the data shape is compatible with this
-        stencil safeguard.
+        This method also checks that the data shape is compatible with the
+        stencil qoi safeguard.
 
         Parameters
         ----------
