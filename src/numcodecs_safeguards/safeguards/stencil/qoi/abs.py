@@ -406,7 +406,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
         return tuple(neighbourhood)
 
-    def evaluate_qoi(self, data: np.ndarray[S, T]) -> np.ndarray[tuple[int, ...], T]:
+    def evaluate_qoi(self, data: np.ndarray[S, T]) -> np.ndarray[tuple[int, ...], F]:
         """
         Evaluate the derived quantity of interest on the `data`.
 
@@ -443,7 +443,8 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                 )
 
         if any(s == 0 for s in empty_shape):
-            return np.zeros(empty_shape, dtype=data.dtype)
+            float_dtype: np.dtype = to_float(np.array([0, 1], dtype=data.dtype)).dtype
+            return np.zeros(empty_shape, dtype=float_dtype)  # type: ignore
 
         data_boundary = data
         for axis in self._neighbourhood:
