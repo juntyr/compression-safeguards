@@ -8,6 +8,7 @@ from enum import Enum
 
 from .combinators.all import AllSafeguards
 from .combinators.any import AnySafeguard
+from .combinators.safe import AlwaysSafeguard
 from .pointwise.abs import AbsoluteErrorBoundSafeguard
 from .pointwise.qoi.abs import PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard
 from .pointwise.ratio import RatioErrorBoundSafeguard
@@ -26,6 +27,10 @@ class Safeguards(Enum):
     # exact values
     zero = ZeroIsZeroSafeguard
     """Enforce that zero (or another constant) is exactly preserved."""
+
+    # sign
+    sign = SignPreservingSafeguard
+    """Enforce that the sign (-1, 0, +1) of each element is preserved."""
 
     # error bounds
     abs = AbsoluteErrorBoundSafeguard
@@ -48,14 +53,12 @@ class Safeguards(Enum):
     monotonicity = MonotonicityPreservingSafeguard
     """Enforce that monotonic sequences remain monotonic."""
 
-    # sign
-    sign = SignPreservingSafeguard
-    """Enforce that the sign (-1, 0, +1) of each element is preserved."""
-
-    # logical and combinator
+    # logical combinators
     all = AllSafeguards
     """Enforce that all of the inner safeguards' guarantees are met."""
 
-    # logical or combinator
     any = AnySafeguard
     """Enforce that any one of the inner safeguards' guarantees are met."""
+
+    safe = AlwaysSafeguard
+    """All elements are always safe."""

@@ -89,6 +89,10 @@ This package currently implements the following safeguards:
 
     For each element, at least one of the combined safeguards' guarantees is upheld. At the moment, only pointwise and stencil safeguards and combinations thereof can be combined by this any-combinator.
 
+- `safe` (logical truth):
+
+    All elements always meet their guarantees and are thus always safe. This truth-combinator can be used, with care, with other logical combinators.
+
 ## Usage
 
 The `SafeguardsCodec` adapter provided by this package can wrap any existing [`Codec`] [^2] implementing the [`numcodecs`] API [^3] that encodes a buffer (e.g. an ndarray or bytes) to bytes. It is desirable to perform lossless compression after applying the safeguards (rather than before).
