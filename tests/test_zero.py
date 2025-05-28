@@ -1,5 +1,4 @@
 import numpy as np
-
 from numcodecs_safeguards.cast import as_bits
 
 from .codecs import (

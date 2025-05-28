@@ -1,5 +1,4 @@
 import numpy as np
-
 from numcodecs_safeguards.quantizer import SafeguardsQuantizer
 from numcodecs_safeguards.safeguards.pointwise.abc import PointwiseSafeguard
 from numcodecs_safeguards.safeguards.stencil.abc import StencilSafeguard

@@ -1,4 +1,4 @@
-site_name: numcodecs-safeguards
+site_name: compression-safeguards
 
 strict: true
 
@@ -38,9 +38,11 @@ plugins:
   - autorefs
   - mkdocstrings-python-generator:
       source_dirs:
-        - nav_heading: [Documentation]
+        - nav_heading: [API Reference]
           base: src
           ignore: ["_qois"]
+        - nav_heading: [API Reference]
+          base: packages/numcodecs-safeguards/src
   - mkdocstrings:
       enable_inventory: true
       handlers:
@@ -71,3 +73,4 @@ plugins:
 
 watch:
   - src
+  - packages

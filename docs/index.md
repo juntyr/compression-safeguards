@@ -1,6 +1,6 @@
 # Fearless lossy compression with `numcodecs-safeguards`
 
-Lossy compression [^1] can be *scary* as valuable information or features of the data may be lost. This package provides several [`Safeguards`][numcodecs_safeguards.Safeguards] to express *your* requirements for lossy compression to be safe to use and to *guarantee* that they are upheld by lossy compression. By using safeguards to ensure your safety requirements, lossy compression can be applied safely and *without fear*.
+Lossy compression [^1] can be *scary* as valuable information or features of the data may be lost. This package provides several [`Safeguards`][compression_safeguards.Safeguards] to express *your* requirements for lossy compression to be safe to use and to *guarantee* that they are upheld by lossy compression. By using safeguards to ensure your safety requirements, lossy compression can be applied safely and *without fear*.
 
 [^1]: Lossy compression methods reduce data size by only storing an approximation of the data. In contrast to lossless compression methods, lossy compression loses information about the data, e.g. by reducing its resolution (only store every $n$th element) precision (only store $n$ digits after the decimal point), smoothing, etc. Therefore, lossy compression methods provide a tradeoff between size reduction and quality preservation.
 
@@ -14,7 +14,7 @@ By using the [`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec] adapter, 
 
 ## (b) Safeguards for developers of lossy compressors
 
-Safeguards can fill the role of a quantizer, which is part of many (predictive) (error-bounded) compressors. If you currently use e.g. a linear quantizer module in your compressor to provide an absolute error bound, you could replace it with the [`SafeguardsQuantizer`][numcodecs_safeguards.quantizer.SafeguardsQuantizer], which provides a larger selection of safeguards that your compressor can then guarantee.
+Safeguards can fill the role of a quantizer, which is part of many (predictive) (error-bounded) compressors. If you currently use e.g. a linear quantizer module in your compressor to provide an absolute error bound, you could replace it with the [`SafeguardsQuantizer`][compression_safeguards.quantizer.SafeguardsQuantizer], which provides a larger selection of safeguards that your compressor can then guarantee.
 
 ## Design and Guarantees
 
@@ -35,59 +35,59 @@ If applied to
 
 ## Provided safeguards
 
-This package currently implements the following [safeguards][numcodecs_safeguards.Safeguards]:
+This package currently implements the following [safeguards][compression_safeguards.Safeguards]:
 
 ### Error Bounds (pointwise)
 
-- [`abs`][numcodecs_safeguards.safeguards.pointwise.abs.AbsoluteErrorBoundSafeguard] (absolute error bound):
+- [`abs`][compression_safeguards.safeguards.pointwise.abs.AbsoluteErrorBoundSafeguard] (absolute error bound):
 
     The pointwise absolute error is guaranteed to be less than or equal to the provided bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bit pattern also satisfies the error bound.
 
-- [`rel`][numcodecs_safeguards.safeguards.pointwise.rel.RelativeErrorBoundSafeguard] (relative error bound):
+- [`rel`][compression_safeguards.safeguards.pointwise.rel.RelativeErrorBoundSafeguard] (relative error bound):
 
     The pointwise relative error is guaranteed to be less than or equal to the provided bound. Zero values are preserved with the same bit pattern. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bit pattern also satisfies the error bound.
 
-- [`ratio`][numcodecs_safeguards.safeguards.pointwise.ratio.RatioErrorBoundSafeguard] (ratio [decimal] error bound):
+- [`ratio`][compression_safeguards.safeguards.pointwise.ratio.RatioErrorBoundSafeguard] (ratio [decimal] error bound):
 
     It is guaranteed that the ratios between the original and the decoded values and their inverse ratios are less than or equal to the provided bound. The ratio error is defined to be infinite if the signs of the data and decoded data do not match. Since the provided error bound must be finite, this safeguard also guarantees that the sign of each decoded value matches the sign of each original value and that a decoded value is zero if and only if it is zero in the original data. The ratio error bound is sometimes also known as a decimal error bound if the ratio is expressed as the difference in orders of magnitude. This safeguard can also be used to guarantee a relative-like error bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bit pattern also satisfies the error bound.
 
 ### Error Bounds on derived Quantities of Interest (QoIs)
 
-- [`qoi_abs_pw`][numcodecs_safeguards.safeguards.pointwise.qoi.abs.PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard] (absolute error bound on pointwise quantities of interest):
+- [`qoi_abs_pw`][compression_safeguards.safeguards.pointwise.qoi.abs.PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard] (absolute error bound on pointwise quantities of interest):
 
     The absolute error on a derived pointwise quantity of interest (QoI) is guaranteed to be less than or equal to the provided bound. The non-constant quantity of interest expression can contain the addition, multiplication, division, square root, exponentiation, logarithm, trigonometric, and hyperbolic operations over integer and floating point constants and the pointwise data value. Infinite quantities of interest are preserved with the same bit pattern. NaN quantities of interest remain NaN though not necessarily with the same bit pattern.
 
-- [`qoi_abs_stencil`][numcodecs_safeguards.safeguards.stencil.qoi.abs.StencilQuantityOfInterestAbsoluteErrorBoundSafeguard] (absolute error bound on quantities of interest over a neighbourhood):
+- [`qoi_abs_stencil`][compression_safeguards.safeguards.stencil.qoi.abs.StencilQuantityOfInterestAbsoluteErrorBoundSafeguard] (absolute error bound on quantities of interest over a neighbourhood):
 
-    The absolute error on a derived quantity of interest (QoI) over a neighbourhood of data points is guaranteed to be less than or equal to the provided bound. The non-constant quantity of interest expression can contain the addition, multiplication, division, square root, exponentiation, logarithm, trigonometric, hyperbolic, array sum, matrix transpose, matrix multiplication, and finite difference operations over integer and floating point constants and arrays and the data neighbourhood. If applied to data with more dimensions than the data neighbourhood of the QoI requires, the data neighbourhood is applied independently along these extra axes. If the data neighbourhood uses the [valid][numcodecs_safeguards.safeguards.stencil.BoundaryCondition.valid] boundary condition along an axis, only data neighbourhoods centred on data points that have sufficient points before and after are safeguarded. If the axis is smaller than required by the neighbourhood along this axis, the data is not safeguarded at all. Using a different [`BoundaryCondition`][numcodecs_safeguards.safeguards.stencil.BoundaryCondition] ensures that all data points are safeguarded. Infinite quantities of interest are preserved with the same bit pattern. NaN quantities of interest remain NaN though not necessarily with the same bit pattern.
+    The absolute error on a derived quantity of interest (QoI) over a neighbourhood of data points is guaranteed to be less than or equal to the provided bound. The non-constant quantity of interest expression can contain the addition, multiplication, division, square root, exponentiation, logarithm, trigonometric, hyperbolic, array sum, matrix transpose, matrix multiplication, and finite difference operations over integer and floating point constants and arrays and the data neighbourhood. If applied to data with more dimensions than the data neighbourhood of the QoI requires, the data neighbourhood is applied independently along these extra axes. If the data neighbourhood uses the [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid] boundary condition along an axis, only data neighbourhoods centred on data points that have sufficient points before and after are safeguarded. If the axis is smaller than required by the neighbourhood along this axis, the data is not safeguarded at all. Using a different [`BoundaryCondition`][compression_safeguards.safeguards.stencil.BoundaryCondition] ensures that all data points are safeguarded. Infinite quantities of interest are preserved with the same bit pattern. NaN quantities of interest remain NaN though not necessarily with the same bit pattern.
 
 ### Pointwise properties
 
-- [`zero`][numcodecs_safeguards.safeguards.pointwise.zero.ZeroIsZeroSafeguard] (zero/constant preserving):
+- [`zero`][compression_safeguards.safeguards.pointwise.zero.ZeroIsZeroSafeguard] (zero/constant preserving):
 
     Values that are zero in the input are guaranteed to also be *exactly* zero in the decompressed output. This safeguard can also be used to enforce that another constant value is bitwise preserved, e.g. a missing value constant or a semantic "zero" value that is represented as a non-zero number. Beware that +0.0 and -0.0 are semantically equivalent in floating point but have different bitwise patterns. If you want to preserve both, you need to use two safeguards, one configured for each zero.
 
-- [`sign`][numcodecs_safeguards.safeguards.pointwise.sign.SignPreservingSafeguard] (sign-preserving):
+- [`sign`][compression_safeguards.safeguards.pointwise.sign.SignPreservingSafeguard] (sign-preserving):
 
     Values are guaranteed to have the same sign (-1, 0, +1) in the decompressed output as they have in the input data. The sign for NaNs is derived from their sign bit, e.g. sign(-NaN) = -1. Sign-preservation should be combined with e.g. an error bound, as it by itself accepts *any* value with the same sign.
 
 ### Relationships between neighboring elements
 
-- [`monotonicity`][numcodecs_safeguards.safeguards.stencil.monotonicity.MonotonicityPreservingSafeguard] (monotonicity-preserving):
+- [`monotonicity`][compression_safeguards.safeguards.stencil.monotonicity.MonotonicityPreservingSafeguard] (monotonicity-preserving):
 
-    Sequences that are monotonic in the input are guaranteed to be monotonic in the decompressed output. Monotonic sequences are detected using per-axis moving windows of constant size. Typically, the window size should be chosen to be large enough to ignore noise but small enough to capture details. Four levels of [monotonicity][numcodecs_safeguards.safeguards.stencil.monotonicity.Monotonicity] can be enforced: `strict`, `strict_with_consts`, `strict_to_weak`, `weak`. Windows that are not monotonic or contain non-finite data are skipped. If the [valid][numcodecs_safeguards.safeguards.stencil.BoundaryCondition.valid] boundary condition is used, axes that have fewer elements than the window size are skipped as well.
+    Sequences that are monotonic in the input are guaranteed to be monotonic in the decompressed output. Monotonic sequences are detected using per-axis moving windows of constant size. Typically, the window size should be chosen to be large enough to ignore noise but small enough to capture details. Four levels of [monotonicity][compression_safeguards.safeguards.stencil.monotonicity.Monotonicity] can be enforced: `strict`, `strict_with_consts`, `strict_to_weak`, `weak`. Windows that are not monotonic or contain non-finite data are skipped. If the [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid] boundary condition is used, axes that have fewer elements than the window size are skipped as well.
 
 ### Logical combinators (~pointwise)
 
-- [`all`][numcodecs_safeguards.safeguards.combinators.all.AllSafeguards] (logical all / and):
+- [`all`][compression_safeguards.safeguards.combinators.all.AllSafeguards] (logical all / and):
 
     For each element, all of the combined safeguards' guarantees are upheld. At the moment, only pointwise and stencil safeguards and combinations thereof can be combined by this all-combinator.
 
-- [`any`][numcodecs_safeguards.safeguards.combinators.any.AnySafeguard] (logical any / or):
+- [`any`][compression_safeguards.safeguards.combinators.any.AnySafeguard] (logical any / or):
 
     For each element, at least one of the combined safeguards' guarantees is upheld. At the moment, only pointwise and stencil safeguards and combinations thereof can be combined by this any-combinator.
 
-- [`safe`][numcodecs_safeguards.safeguards.combinators.safe.AlwaysSafeguard] (logical truth):
+- [`safe`][compression_safeguards.safeguards.combinators.safe.AlwaysSafeguard] (logical truth):
 
     All elements always meet their guarantees and are thus always safe. This truth-combinator can be used, with care, with other logical combinators.
 
@@ -98,7 +98,8 @@ The [`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec] adapter provided b
 You can wrap an existing codec with e.g. an absolute error bound of $eb_{abs} = 0.1$  as follows:
 
 ```python
-from numcodecs_safeguards import Safeguards, SafeguardsCodec
+from compression_safeguards import Safeguards
+from numcodecs_safeguards import SafeguardsCodec
 
 SafeguardsCodec(codec=codec, safeguards=[Safeguards.abs.value(eb_abs=0.1)])
 ```
@@ -154,6 +155,6 @@ Please also refer to the [CITATION.cff](https://github.com/juntyr/numcodecs-safe
 
 ## Funding
 
-The `numcodecs-safeguards` package has been developed as part of [ESiWACE3](https://www.esiwace.eu), the third phase of the Centre of Excellence in Simulation of Weather and Climate in Europe.
+The `compression-safeguards` and `numcodecs-safeguards` packages have been developed as part of [ESiWACE3](https://www.esiwace.eu), the third phase of the Centre of Excellence in Simulation of Weather and Climate in Europe.
 
 Funded by the European Union. This work has received funding from the European High Performance Computing Joint Undertaking (JU) under grant agreement No 101093054.

@@ -13,14 +13,14 @@ import numcodecs.compat
 import numcodecs.registry
 import numpy as np
 import varint
+from compression_safeguards.cast import as_bits
+from compression_safeguards.quantizer import _SUPPORTED_DTYPES, SafeguardsQuantizer
+from compression_safeguards.safeguards.abc import Safeguard
 from numcodecs.abc import Codec
 from numcodecs_combinators.abc import CodecCombinatorMixin
 from typing_extensions import Buffer  # MSPV 3.12
 
-from .cast import as_bits
 from .lossless import Lossless
-from .quantizer import _SUPPORTED_DTYPES, SafeguardsQuantizer
-from .safeguards.abc import Safeguard
 
 
 class SafeguardsCodec(Codec, CodecCombinatorMixin):
@@ -50,10 +50,10 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         The safeguards that will be applied to the codec. They can either be
         passed as a safeguard configuration [`dict`][dict] or an already
         initialized
-        [`Safeguard`][numcodecs_safeguards.safeguards.abc.Safeguard].
+        [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard].
 
         Please refer to
-        [`Safeguards`][numcodecs_safeguards.safeguards.Safeguards]
+        [`Safeguards`][compression_safeguards.safeguards.Safeguards]
         for an enumeration of all supported safeguards.
     lossless : None | dict | Lossless, optional
         The lossless encoding that is applied after the codec and the

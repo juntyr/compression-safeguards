@@ -73,7 +73,7 @@ def to_finite_float(
     to guarantee that it is finite.
 
     The dtype `F` should come from a prior use of the
-    [`to_float`][numcodecs_safeguards.cast.to_float] helper function.
+    [`to_float`][compression_safeguards.cast.to_float] helper function.
 
     Parameters
     ----------
@@ -107,7 +107,7 @@ def to_finite_float(
 def from_float(x: np.ndarray[S, F], dtype: T) -> np.ndarray[S, T]:
     """
     Reverses the conversion of the array `x`, using the
-    [`to_float`][numcodecs_safeguards.cast.to_float], back to the original
+    [`to_float`][compression_safeguards.cast.to_float], back to the original
     `dtype`.
 
     If the original `dtype` was integer, the rounding conversion is lossy.
@@ -383,7 +383,7 @@ except (AttributeError, AssertionError):
         _float128_precision = 33
     except ImportError:
         raise TypeError("""
-numcodecs_safeguards requires float128 support:
+compression_safeguards requires float128 support:
 - numpy.float128 either does not exist is does not offer true 128 bit precision
 - numpy_quaddtype is not installed
 """) from None

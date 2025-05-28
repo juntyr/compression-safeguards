@@ -2,7 +2,6 @@ from itertools import product
 
 import numpy as np
 import pytest
-
 from numcodecs_safeguards.cast import as_bits
 from numcodecs_safeguards.safeguards.stencil import BoundaryCondition
 from numcodecs_safeguards.safeguards.stencil.monotonicity import (

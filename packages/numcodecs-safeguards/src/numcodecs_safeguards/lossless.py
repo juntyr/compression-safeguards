@@ -1,5 +1,5 @@
 """
-Helper classes for lossless encoding for the codec and quantizer with safeguards.
+Helper classes for lossless encoding for the codec with safeguards.
 """
 
 __all__ = ["Lossless"]
@@ -11,13 +11,12 @@ import numcodecs.compat
 import numcodecs.registry
 import numpy as np
 import varint
+from compression_safeguards.cast import as_bits
 from dahuffman import HuffmanCodec as DaHuffmanCodec
 from dahuffman.huffmancodec import _EOF
 from numcodecs.abc import Codec
 from numcodecs_combinators.stack import CodecStack
 from typing_extensions import Buffer  # MSPV 3.12
-
-from .cast import as_bits
 
 
 class HuffmanCodec(Codec):

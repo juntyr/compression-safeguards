@@ -100,7 +100,8 @@ The `SafeguardsCodec` adapter provided by this package can wrap any existing [`C
 You can wrap an existing codec with e.g. an absolute error bound of $eb_{abs} = 0.1$  as follows:
 
 ```python
-from numcodecs_safeguards import Safeguards, SafeguardsCodec
+from compression_safeguards import Safeguards
+from numcodecs_safeguards import SafeguardsCodec
 
 SafeguardsCodec(codec=codec, safeguards=[Safeguards.abs.value(eb_abs=0.1)])
 ```
@@ -166,6 +167,6 @@ Licensed under the Mozilla Public License, Version 2.0 ([LICENSE](LICENSE) or ht
 
 ## Funding
 
-The `numcodecs-safeguards` package has been developed as part of [ESiWACE3](https://www.esiwace.eu), the third phase of the Centre of Excellence in Simulation of Weather and Climate in Europe.
+The `compression-safeguards` and `numcodecs-safeguards` packages have been developed as part of [ESiWACE3](https://www.esiwace.eu), the third phase of the Centre of Excellence in Simulation of Weather and Climate in Europe.
 
 Funded by the European Union. This work has received funding from the European High Performance Computing Joint Undertaking (JU) under grant agreement No 101093054.

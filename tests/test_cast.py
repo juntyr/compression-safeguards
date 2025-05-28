@@ -1,5 +1,4 @@
 import numpy as np
-
 from numcodecs_safeguards.cast import (
     _float128,
     _float128_eps,

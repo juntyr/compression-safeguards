@@ -1,6 +1,5 @@
 import numpy as np
 from numcodecs.abc import Codec
-
 from numcodecs_safeguards import SafeguardsCodec
 
 

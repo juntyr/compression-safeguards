@@ -19,7 +19,6 @@ with atheris.instrument_imports():
     import numcodecs.registry
     import numpy as np
     from numcodecs.abc import Codec
-
     from numcodecs_safeguards import (
         Safeguards,
         SafeguardsCodec,

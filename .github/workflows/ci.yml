@@ -59,8 +59,8 @@ jobs:
       - name: Setup Python
         run: uv python install
 
-      - name: Install numcodecs-safeguards
-        run: uv sync --only-group test && uv pip install .
+      - name: Setup the venv and install the safeguards
+        run: uv sync --all-packages --only-group test
 
       - name: Install numpy-quaddtype
         run: uv pip install -i https://test.pypi.org/simple/ numpy-quaddtype~=0.0.7
@@ -81,11 +81,14 @@ jobs:
       - name: Setup Python
         run: uv python install
 
-      - name: Install numcodecs-safeguards
-        run: uv sync --only-group typing && uv pip install .
+      - name: Setup the venv and install the safeguards
+        run: uv sync --all-packages --only-group typing
 
       - name: Install numpy-quaddtype
         run: uv pip install -i https://test.pypi.org/simple/ numpy-quaddtype~=0.0.7
+
+      - name: Typecheck compression-safeguards
+        run: uv run mypy -p compression_safeguards
 
       - name: Typecheck numcodecs-safeguards
         run: uv run mypy -p numcodecs_safeguards
@@ -106,8 +109,8 @@ jobs:
       - name: Setup Python
         run: uv python install
 
-      - name: Install numcodecs-safeguards
-        run: uv sync --only-group fuzz && uv pip install .
+      - name: Setup the venv and install the safeguards
+        run: uv sync --all-packages --only-group fuzz
 
       - name: Install numpy-quaddtype
         run: uv pip install -i https://test.pypi.org/simple/ numpy-quaddtype~=0.0.7

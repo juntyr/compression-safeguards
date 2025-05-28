@@ -24,7 +24,7 @@ _WEAK = ((le, ge, False, True), (le, ge, True, True))
 class Monotonicity(Enum):
     """
     Different levels of monotonicity that can be enforced by the
-    [`MonotonicityPreservingSafeguard`][numcodecs_safeguards.safeguards.stencil.monotonicity.MonotonicityPreservingSafeguard].
+    [`MonotonicityPreservingSafeguard`][compression_safeguards.safeguards.stencil.monotonicity.MonotonicityPreservingSafeguard].
     """
 
     strict = _STRICT
@@ -78,7 +78,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     small enough to capture details.
 
     The safeguard supports enforcing four levels of
-    [`Monotonicity`][numcodecs_safeguards.safeguards.stencil.monotonicity.Monotonicity]:
+    [`Monotonicity`][compression_safeguards.safeguards.stencil.monotonicity.Monotonicity]:
     `strict`, `strict_with_consts`, `strict_to_weak`, `weak`.
 
     Windows that are not monotonic or contain non-finite data are skipped.
@@ -87,10 +87,10 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     safeguard is not applied to that data.
 
     If the
-    [valid][numcodecs_safeguards.safeguards.stencil.BoundaryCondition.valid]
+    [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
     `boundary` condition is used, axes that have fewer elements than
     $(1 + window \cdot 2)$ are skipped. Using a different
-    [`BoundaryCondition`][numcodecs_safeguards.safeguards.stencil.BoundaryCondition]
+    [`BoundaryCondition`][compression_safeguards.safeguards.stencil.BoundaryCondition]
     ensures that the safeguard is always applied.
 
     Parameters

@@ -2,7 +2,6 @@ from itertools import cycle, permutations, product
 
 import numpy as np
 import pytest
-
 from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
 from numcodecs_safeguards.safeguards.stencil import BoundaryCondition
 

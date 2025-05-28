@@ -84,13 +84,13 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     in a 3d data cube.
 
     If the data neighbourhood uses the
-    [valid][numcodecs_safeguards.safeguards.stencil.BoundaryCondition.valid]
+    [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
     boundary condition along an axis, the safeguard is only applied to data
     neighbourhoods centred on data points that have sufficient points before
     and after to satisfy the neighbourhood shape, i.e. it is not applied to
     all data points. If the axis is smaller than required by the neighbourhood
     along this axis, the safeguard is not applied. Using a different
-    [`BoundaryCondition`][numcodecs_safeguards.safeguards.stencil.BoundaryCondition]
+    [`BoundaryCondition`][compression_safeguards.safeguards.stencil.BoundaryCondition]
     ensures that the safeguard is always applied to all data points.
 
     If the derived quantity of interest for a data neighbourhood evaluates to
@@ -411,7 +411,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         Evaluate the derived quantity of interest on the `data`.
 
         The quantity of interest may have a different shape if the
-        [valid][numcodecs_safeguards.safeguards.stencil.BoundaryCondition.valid]
+        [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
         boundary condition is used along any axis.
 
         If the `data` is of integer dtype, the quantity of interest is

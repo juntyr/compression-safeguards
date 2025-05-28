@@ -1,5 +1,5 @@
 """
-Implementation of the [`SafeguardsQuantizer`][numcodecs_safeguards.quantizer.SafeguardsQuantizer], which quantizes the correction needed to satisfy a set of safeguards.
+Implementation of the [`SafeguardsQuantizer`][compression_safeguards.quantizer.SafeguardsQuantizer], which quantizes the correction needed to satisfy a set of safeguards.
 """
 
 __all__ = ["SafeguardsQuantizer"]
@@ -33,10 +33,10 @@ class SafeguardsQuantizer:
         The safeguards that will be applied to the codec. They can either be
         passed as a safeguard configuration [`dict`][dict] or an already
         initialized
-        [`Safeguard`][numcodecs_safeguards.safeguards.abc.Safeguard].
+        [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard].
 
         Please refer to
-        [`Safeguards`][numcodecs_safeguards.safeguards.Safeguards]
+        [`Safeguards`][compression_safeguards.safeguards.Safeguards]
         for an enumeration of all supported safeguards.
     _version : ...
         The quantizer's version. Do not provide this parameter explicitly.
@@ -97,11 +97,11 @@ class SafeguardsQuantizer:
     def version(self) -> str:
         """
         The version of the format of the correction computed by the
-        [`quantize`][numcodecs_safeguards.quantizer.SafeguardsQuantizer.quantize]
+        [`quantize`][compression_safeguards.quantizer.SafeguardsQuantizer.quantize]
         method.
 
         The quantizer can only
-        [`recover`][numcodecs_safeguards.quantizer.SafeguardsQuantizer.recover]
+        [`recover`][compression_safeguards.quantizer.SafeguardsQuantizer.recover]
         quantized corrections with the matching version.
         """
 
