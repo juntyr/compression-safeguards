@@ -2,8 +2,9 @@ from itertools import cycle, permutations, product
 
 import numpy as np
 import pytest
-from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
-from numcodecs_safeguards.safeguards.stencil import BoundaryCondition
+
+from compression_safeguards.quantizer import _SUPPORTED_DTYPES
+from compression_safeguards.safeguards.stencil import BoundaryCondition
 
 from .codecs import (
     encode_decode_identity,
@@ -215,7 +216,7 @@ def test_mean():
 
 
 def test_findiff():
-    from numcodecs_safeguards.safeguards.stencil.qoi.abs import (
+    from compression_safeguards.safeguards.stencil.qoi.abs import (
         StencilQuantityOfInterestAbsoluteErrorBoundSafeguard,
     )
 
@@ -323,7 +324,7 @@ def test_findiff():
 
 
 def test_matmul():
-    from numcodecs_safeguards.safeguards.stencil.qoi.abs import (
+    from compression_safeguards.safeguards.stencil.qoi.abs import (
         StencilQuantityOfInterestAbsoluteErrorBoundSafeguard,
     )
 
@@ -350,7 +351,7 @@ def test_matmul():
 
 
 def test_indexing():
-    from numcodecs_safeguards.safeguards.stencil.qoi.abs import (
+    from compression_safeguards.safeguards.stencil.qoi.abs import (
         StencilQuantityOfInterestAbsoluteErrorBoundSafeguard,
     )
 
@@ -408,8 +409,8 @@ def test_indexing():
 def test_lambdify_indexing():
     import inspect
 
-    from numcodecs_safeguards.safeguards._qois.compile import sympy_expr_to_numpy
-    from numcodecs_safeguards.safeguards.stencil.qoi.abs import (
+    from compression_safeguards.safeguards._qois.compile import sympy_expr_to_numpy
+    from compression_safeguards.safeguards.stencil.qoi.abs import (
         StencilQuantityOfInterestAbsoluteErrorBoundSafeguard,
     )
 

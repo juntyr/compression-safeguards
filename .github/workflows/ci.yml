@@ -95,7 +95,7 @@ jobs:
         run: uv run mypy -p compression_safeguards
 
       - name: Typecheck numcodecs-safeguards
-        run: uv run mypy -p numcodecs_safeguards
+        run: cd packages/numcodecs-safeguards && uv run mypy -p numcodecs_safeguards
 
   fuzz:
     name: Fuzz

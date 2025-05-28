@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
-from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
+
+from compression_safeguards.quantizer import _SUPPORTED_DTYPES
 
 from .codecs import (
     encode_decode_identity,
@@ -262,7 +263,8 @@ def test_lambdify_dtype():
     import inspect
 
     import sympy as sp
-    from numcodecs_safeguards.safeguards._qois.compile import (
+
+    from compression_safeguards.safeguards._qois.compile import (
         sympy_expr_to_numpy,
     )
 

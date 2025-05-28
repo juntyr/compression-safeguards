@@ -1,7 +1,8 @@
 import numpy as np
-from numcodecs_safeguards.quantizer import SafeguardsQuantizer
-from numcodecs_safeguards.safeguards.pointwise.abc import PointwiseSafeguard
-from numcodecs_safeguards.safeguards.stencil.abc import StencilSafeguard
+
+from compression_safeguards.quantizer import SafeguardsQuantizer
+from compression_safeguards.safeguards.pointwise.abc import PointwiseSafeguard
+from compression_safeguards.safeguards.stencil.abc import StencilSafeguard
 
 from .codecs import (
     encode_decode_identity,

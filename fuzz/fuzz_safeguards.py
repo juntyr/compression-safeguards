@@ -19,18 +19,19 @@ with atheris.instrument_imports():
     import numcodecs.registry
     import numpy as np
     from numcodecs.abc import Codec
-    from numcodecs_safeguards import (
-        Safeguards,
-        SafeguardsCodec,
+    from numcodecs_safeguards import SafeguardsCodec
+
+    from compression_safeguards import Safeguards
+    from compression_safeguards.quantizer import _SUPPORTED_DTYPES
+    from compression_safeguards.safeguards._qois.amath import (
+        FUNCTIONS as AMATH_FUNCTIONS,
     )
-    from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
-    from numcodecs_safeguards.safeguards._qois.amath import FUNCTIONS as AMATH_FUNCTIONS
-    from numcodecs_safeguards.safeguards._qois.math import CONSTANTS as MATH_CONSTANTS
-    from numcodecs_safeguards.safeguards._qois.math import FUNCTIONS as MATH_FUNCTIONS
-    from numcodecs_safeguards.safeguards.abc import Safeguard
-    from numcodecs_safeguards.safeguards.pointwise.qoi import PointwiseExpr
-    from numcodecs_safeguards.safeguards.stencil import NeighbourhoodBoundaryAxis
-    from numcodecs_safeguards.safeguards.stencil.qoi import StencilExpr
+    from compression_safeguards.safeguards._qois.math import CONSTANTS as MATH_CONSTANTS
+    from compression_safeguards.safeguards._qois.math import FUNCTIONS as MATH_FUNCTIONS
+    from compression_safeguards.safeguards.abc import Safeguard
+    from compression_safeguards.safeguards.pointwise.qoi import PointwiseExpr
+    from compression_safeguards.safeguards.stencil import NeighbourhoodBoundaryAxis
+    from compression_safeguards.safeguards.stencil.qoi import StencilExpr
 
 
 warnings.filterwarnings("error")

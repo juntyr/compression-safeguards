@@ -1,5 +1,6 @@
 import numpy as np
-from numcodecs_safeguards.cast import (
+
+from compression_safeguards.cast import (
     _float128,
     _float128_eps,
     _float128_max,

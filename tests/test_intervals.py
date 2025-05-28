@@ -1,6 +1,7 @@
 import numpy as np
-from numcodecs_safeguards.cast import as_bits
-from numcodecs_safeguards.intervals import (
+
+from compression_safeguards.cast import as_bits
+from compression_safeguards.intervals import (
     Interval,
     IntervalUnion,
     Lower,
@@ -8,9 +9,9 @@ from numcodecs_safeguards.intervals import (
     _maximum,
     _minimum,
 )
-from numcodecs_safeguards.safeguards.pointwise.abs import AbsoluteErrorBoundSafeguard
-from numcodecs_safeguards.safeguards.pointwise.sign import SignPreservingSafeguard
-from numcodecs_safeguards.safeguards.pointwise.zero import ZeroIsZeroSafeguard
+from compression_safeguards.safeguards.pointwise.abs import AbsoluteErrorBoundSafeguard
+from compression_safeguards.safeguards.pointwise.sign import SignPreservingSafeguard
+from compression_safeguards.safeguards.pointwise.zero import ZeroIsZeroSafeguard
 
 
 def test_sign():

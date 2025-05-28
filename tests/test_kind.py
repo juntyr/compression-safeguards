@@ -1,4 +1,4 @@
-from numcodecs_safeguards import Safeguards
+from compression_safeguards import Safeguards
 
 
 def test_safeguard_kinds():

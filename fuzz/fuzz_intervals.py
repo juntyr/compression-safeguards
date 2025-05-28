@@ -3,7 +3,6 @@ import atheris
 with atheris.instrument_imports():
     from typing import Any
 
-    import numcodecs as numcodecs
     import numpy as np
 
 import sympy as sympy
@@ -12,7 +11,7 @@ with atheris.instrument_imports():
     import sys
     import warnings
 
-    from numcodecs_safeguards.intervals import Interval, IntervalUnion, Lower, Upper
+    from compression_safeguards.intervals import Interval, IntervalUnion, Lower, Upper
 
 
 warnings.filterwarnings("error")
