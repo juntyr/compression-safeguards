@@ -62,7 +62,7 @@ jobs:
       - name: Install the safeguards
         run: |
           uv pip install .
-          uv pip install packages/numcodecs_safeguards
+          uv pip install packages/numcodecs-safeguards
 
       - name: Install numpy-quaddtype
         run: uv pip install -i https://test.pypi.org/simple/ numpy-quaddtype~=0.0.7
@@ -86,7 +86,7 @@ jobs:
       - name: Install the safeguards
         run: |
           uv pip install .
-          uv pip install packages/numcodecs_safeguards
+          uv pip install packages/numcodecs-safeguards
 
       - name: Install numpy-quaddtype
         run: uv pip install -i https://test.pypi.org/simple/ numpy-quaddtype~=0.0.7
@@ -116,7 +116,7 @@ jobs:
       - name: Install the safeguards
         run: |
           uv pip install .
-          uv pip install packages/numcodecs_safeguards
+          uv pip install packages/numcodecs-safeguards
 
       - name: Install numpy-quaddtype
         run: uv pip install -i https://test.pypi.org/simple/ numpy-quaddtype~=0.0.7
