@@ -56,13 +56,8 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
-      - name: Setup the Python venv
-        run: uv sync --all-packages --only-group test
-
-      - name: Install the safeguards
-        run: |
-          uv pip install .
-          uv pip install packages/numcodecs-safeguards
+      - name: Setup the Python venv with the safeguards
+        run: uv sync --all-packages --group test
 
       - name: Install numpy-quaddtype
         run: uv pip install -i https://test.pypi.org/simple/ numpy-quaddtype~=0.0.7
@@ -80,13 +75,8 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
-      - name: Setup the Python venv
-        run: uv sync --all-packages --only-group typing
-
-      - name: Install the safeguards
-        run: |
-          uv pip install .
-          uv pip install packages/numcodecs-safeguards
+      - name: Setup the Python venv with the safeguards
+        run: uv sync --all-packages --group typing
 
       - name: Install numpy-quaddtype
         run: uv pip install -i https://test.pypi.org/simple/ numpy-quaddtype~=0.0.7
@@ -110,13 +100,8 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
-      - name: Setup the Python venv
-        run: uv sync --all-packages --only-group fuzz
-
-      - name: Install the safeguards
-        run: |
-          uv pip install .
-          uv pip install packages/numcodecs-safeguards
+      - name: Setup the Python venv with the safeguards
+        run: uv sync --all-packages --group fuzz
 
       - name: Install numpy-quaddtype
         run: uv pip install -i https://test.pypi.org/simple/ numpy-quaddtype~=0.0.7
