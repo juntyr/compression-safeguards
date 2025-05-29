@@ -47,6 +47,7 @@ class HuffmanCodec(Codec):
             (k, e) for k, e in huffman.get_code_table().items() if k != _EOF
         ]
         message.append(varint.encode(len(table_no_eof)))
+        # FIXME: what about endianness
         message.append(np.array([k for k, _ in table_no_eof]).tobytes())
         for k, (bitsize, value) in table_no_eof:
             message.append(varint.encode(bitsize))
