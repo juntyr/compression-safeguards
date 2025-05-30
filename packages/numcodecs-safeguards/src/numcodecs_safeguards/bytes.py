@@ -51,7 +51,9 @@ class BytesCodec(Codec):
 
         # FIXME: what about endianness
         decoded = np.frombuffer(
-            b_io.read(np.prod(shape) * dtype.itemsize), dtype=dtype, count=np.prod(shape)
+            b_io.read(np.prod(shape) * dtype.itemsize),
+            dtype=dtype,
+            count=np.prod(shape),
         )
 
         return numcodecs.compat.ndarray_copy(decoded, out)  # type: ignore

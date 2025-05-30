@@ -1,13 +1,14 @@
 """
-Implementation of the [`SafeguardsQuantizer`][compression_safeguards.quantizer.SafeguardsQuantizer], which quantizes the correction needed to satisfy a set of safeguards.
+Implementation of the [`SafeguardsCollection`][compression_safeguards.collection.SafeguardsCollection], which computes the correction needed to satisfy a set of safeguards.
 """
 
-__all__ = ["SafeguardsQuantizer"]
+__all__ = ["SafeguardsCollection"]
 
 from collections.abc import Collection
 from typing import TypeVar
 
 import numpy as np
+from typing_extensions import Self
 
 from .cast import as_bits
 from .safeguards import Safeguards
@@ -23,23 +24,22 @@ S = TypeVar("S", bound=tuple[int, ...])
 """ Any array shape. """
 
 
-class SafeguardsQuantizer:
+class SafeguardsCollection:
     """
-    A quantizer which computes the correction needed to satisfy a set of `safeguards`.
+    Instantiated collection of safeguards.
 
     Parameters
     ----------
     safeguards : Collection[dict | Safeguard]
-        The safeguards that will be applied to the codec. They can either be
-        passed as a safeguard configuration [`dict`][dict] or an already
-        initialized
+        The safeguards that will be applied. They can either be passed as a
+        safeguard configuration [`dict`][dict] or an already initialized
         [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard].
 
         Please refer to
         [`Safeguards`][compression_safeguards.safeguards.Safeguards]
         for an enumeration of all supported safeguards.
     _version : ...
-        The quantizer's version. Do not provide this parameter explicitly.
+        The safeguards' version. Do not provide this parameter explicitly.
     """
 
     __slots__ = ("_pointwise_safeguards", "_stencil_safeguards")
@@ -85,10 +85,9 @@ class SafeguardsQuantizer:
         )
 
     @property
-    def safeguards(self) -> tuple[Safeguard, ...]:
+    def safeguards(self) -> Collection[Safeguard]:
         """
-        The set of safeguards that this quantizer has been configured to
-        uphold.
+        The collection of safeguards.
         """
 
         return self._pointwise_safeguards + self._stencil_safeguards
@@ -97,25 +96,26 @@ class SafeguardsQuantizer:
     def version(self) -> str:
         """
         The version of the format of the correction computed by the
-        [`quantize`][compression_safeguards.quantizer.SafeguardsQuantizer.quantize]
+        [`compute_correction`][compression_safeguards.collection.SafeguardsCollection.compute_correction]
         method.
 
-        The quantizer can only
-        [`recover`][compression_safeguards.quantizer.SafeguardsQuantizer.recover]
-        quantized corrections with the matching version.
+        The safeguards can only
+        [`apply_correction`][compression_safeguards.collection.SafeguardsCollection.apply_correction]s
+        with the matching version.
         """
 
         return _FORMAT_VERSION
 
-    def quantize(
+    def compute_correction(
         self,
         data: np.ndarray[S, T],
         prediction: np.ndarray[S, T],
-        *,
-        partial_data: bool = True,
-    ) -> np.ndarray[S, C]:
+    ):
         """
-        Quantize the correction required to make the `prediction` array satisfy the safeguards relative to the `data` array.
+        Compute the correction required to make the `prediction` array satisfy the safeguards relative to the `data` array.
+
+        The `data` array must contain the complete data, i.e. not just a chunk
+        of data, so that non-pointwise safeguards are correctly applied.
 
         Parameters
         ----------
@@ -123,12 +123,6 @@ class SafeguardsQuantizer:
             The data array, relative to which the safeguards are enforced.
         prediction : np.ndarray[S, T]
             The prediction array for which the correction is computed.
-        partial_data : bool
-            Whether the provided `data` and `prediction` only cover parts of
-            the full data. While some safeguards can be checked and enforced
-            pointwise, others should only be applied to the full data. When
-            only partial data is provided, quantizing with any non-pointwise
-            safeguards fails and raises an exception.
 
         Returns
         -------
@@ -140,10 +134,8 @@ class SafeguardsQuantizer:
             f"can only quantize arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
         )
 
-        assert (not partial_data) or len(self._stencil_safeguards) == 0, (
-            "quantizing partial data with non-pointwise safeguards "
-            + f"{self._stencil_safeguards!r} is not supported"
-        )
+        assert data.dtype == prediction.dtype
+        assert data.shape == prediction.shape
 
         all_ok = True
         for safeguard in self.safeguards:
@@ -180,18 +172,18 @@ class SafeguardsQuantizer:
 
         return prediction_bits - correction_bits
 
-    def recover(
-        self, prediction: np.ndarray[S, T], quantized: np.ndarray[S, C]
+    def apply_correction(
+        self, prediction: np.ndarray[S, T], correction: np.ndarray[S, C]
     ) -> np.ndarray[S, T]:
         """
-        Recover the corrected array from the `prediction` and its quantized `correction`.
+        Apply the `correction` to the `prediction` to satisfy the safeguards for which the `correction` was computed.
 
         Parameters
         ----------
         prediction : np.ndarray[S, T]
             The prediction array for which the correction has been computed.
-        quantized : quantized: np.ndarray[S, C]
-            The quantized correction array.
+        correction : np.ndarray[S, C]
+            The correction array.
 
         Returns
         -------
@@ -200,26 +192,44 @@ class SafeguardsQuantizer:
         """
 
         prediction_bits = as_bits(prediction)
-        quantized_bits = as_bits(quantized)
+        correction_bits = as_bits(correction)
 
-        recovered = prediction_bits - quantized_bits
+        corrected = prediction_bits - correction_bits
 
-        return recovered.view(prediction.dtype)
+        return corrected.view(prediction.dtype)
 
     def get_config(self) -> dict:
         """
-        Returns the configuration of the quantizer with safeguards.
+        Returns the configuration of the safeguards.
 
         Returns
         -------
         config : dict
-            Configuration of the quantizer with safeguards.
+            Configuration of the safeguards.
         """
 
         return dict(
             _version=self.version,
             safeguards=[safeguard.get_config() for safeguard in self.safeguards],
         )
+
+    @classmethod
+    def from_config(cls, config: dict) -> Self:
+        """
+        Instantiate the safeguards from a configuration [`dict`][dict].
+
+        Parameters
+        ----------
+        config : dict
+            Configuration of the safeguards.
+
+        Returns
+        -------
+        safeguards : Self
+            Instantiated safeguards.
+        """
+
+        return cls(**config)
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(safeguards={list(self.safeguards)!r})"
@@ -228,15 +238,15 @@ class SafeguardsQuantizer:
 _FORMAT_VERSION: str = "0.1.x"
 
 
-_SUPPORTED_DTYPES: set[np.dtype] = {
-    np.dtype("int8"),
-    np.dtype("int16"),
-    np.dtype("int32"),
-    np.dtype("int64"),
-    np.dtype("uint8"),
-    np.dtype("uint16"),
-    np.dtype("uint32"),
-    np.dtype("uint64"),
-    np.dtype("float32"),
-    np.dtype("float64"),
+_SUPPORTED_DTYPES: frozenset[np.dtype] = {
+    np.dtype(np.int8),
+    np.dtype(np.int16),
+    np.dtype(np.int32),
+    np.dtype(np.int64),
+    np.dtype(np.uint8),
+    np.dtype(np.uint16),
+    np.dtype(np.uint32),
+    np.dtype(np.uint64),
+    np.dtype(np.float32),
+    np.dtype(np.float64),
 }

@@ -14,7 +14,7 @@ By using the `SafeguardsCodec` adapter, badly behaving lossy compressors become 
 
 ## (b) Safeguards for developers of lossy compressors
 
-Safeguards can fill the role of a quantizer, which is part of many (predictive) (error-bounded) compressors. If you currently use e.g. a linear quantizer module in your compressor to provide an absolute error bound, you could replace it with the `SafeguardsQuantizer`, which provides a larger selection of safeguards that your compressor can then guarantee.
+Safeguards can also fill the role of a quantizer, which is part of many (predictive) (error-bounded) compressors. If you currently use e.g. a linear quantizer module in your compressor to provide an absolute error bound, you could instead quantize to safeguards'-computed correction and thus offer a larger selection of safeguards that your compressor can then guarantee. Note, however, that only pointwise safeguards can be used when quantizing data elements one-by-one.
 
 
 ## Design and Guarantees

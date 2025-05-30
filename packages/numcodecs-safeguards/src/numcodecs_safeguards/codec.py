@@ -14,7 +14,7 @@ import numcodecs.registry
 import numpy as np
 import varint
 from compression_safeguards.cast import as_bits
-from compression_safeguards.quantizer import _SUPPORTED_DTYPES, SafeguardsQuantizer
+from compression_safeguards.collection import _SUPPORTED_DTYPES, SafeguardsCollection
 from compression_safeguards.safeguards.abc import Safeguard
 from numcodecs.abc import Codec
 from numcodecs_combinators.abc import CodecCombinatorMixin
@@ -73,12 +73,12 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
     __slots__ = (
         "_codec",
-        "_quantizer",
+        "_safeguards",
         "_lossless_for_codec",
         "_lossless_for_safeguards",
     )
     _codec: None | Codec
-    _quantizer: SafeguardsQuantizer
+    _safeguards: SafeguardsCollection
     _lossless_for_codec: None | Codec
     _lossless_for_safeguards: Codec
 
@@ -92,7 +92,9 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         lossless: None | dict | Lossless = None,
         _version: None | str = None,
     ):
-        self._quantizer = SafeguardsQuantizer(safeguards=safeguards, _version=_version)
+        self._safeguards = SafeguardsCollection(
+            safeguards=safeguards, _version=_version
+        )
 
         self._codec = (
             codec
@@ -172,17 +174,15 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         assert decoded.dtype == data.dtype, "codec must roundtrip dtype"
         assert decoded.shape == data.shape, "codec must roundtrip shape"
 
-        # the codec's always quantize the full data ... at least chunking is
-        #  not our concern
-        quantized: np.ndarray = self._quantizer.quantize(
-            data, decoded, partial_data=False
-        )
+        # the codec always compresses the complete data ... at least chunking
+        #  is not our concern
+        correction: np.ndarray = self._safeguards.compute_correction(data, decoded)
 
-        if np.all(quantized == 0):
+        if np.all(correction == 0):
             correction_bytes = b""
         else:
             correction_bytes = numcodecs.compat.ensure_bytes(
-                self._lossless_for_safeguards.encode(quantized)
+                self._lossless_for_safeguards.encode(correction)
             )
 
         correction_len = varint.encode(len(correction_bytes))
@@ -221,10 +221,10 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         if correction_len > 0:
             encoded = buf_bytes[buf_io.tell() : -correction_len]
-            correction = buf_bytes[-correction_len:]
+            correction_bytes = buf_bytes[-correction_len:]
         else:
             encoded = buf_bytes[buf_io.tell() :]
-            correction = b""
+            correction_bytes = b""
 
         if self._codec is None:
             assert encoded == b"", "can only decode empty message without a codec"
@@ -240,15 +240,15 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             )
 
         if correction_len > 0:
-            quantized = (
+            correction = (
                 numcodecs.compat.ensure_ndarray(
-                    self._lossless_for_safeguards.decode(correction)
+                    self._lossless_for_safeguards.decode(correction_bytes)
                 )
                 .view(as_bits(decoded).dtype)
                 .reshape(decoded.shape)
             )
 
-            corrected = self._quantizer.recover(decoded, quantized)
+            corrected = self._safeguards.apply_correction(decoded, correction)
         else:
             corrected = decoded
 
@@ -271,7 +271,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             id=type(self).codec_id,
             codec=None if self._codec is None else self._codec.get_config(),
             safeguards=[
-                safeguard.get_config() for safeguard in self._quantizer.safeguards
+                safeguard.get_config() for safeguard in self._safeguards.safeguards
             ],
             lossless=dict(
                 for_codec=None
@@ -279,11 +279,11 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 else self._lossless_for_codec.get_config(),
                 for_safeguards=self._lossless_for_safeguards.get_config(),
             ),
-            _version=self._quantizer.version,
+            _version=self._safeguards.version,
         )
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(codec={self._codec!r}, safeguards={list(self._quantizer.safeguards)!r}, lossless={Lossless(for_codec=self._lossless_for_codec, for_safeguards=self._lossless_for_safeguards)!r})"
+        return f"{type(self).__name__}(codec={self._codec!r}, safeguards={list(self._safeguards.safeguards)!r}, lossless={Lossless(for_codec=self._lossless_for_codec, for_safeguards=self._lossless_for_safeguards)!r})"
 
     def map(self, mapper: Callable[[Codec], Codec]) -> "SafeguardsCodec":
         """
@@ -318,14 +318,14 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         return SafeguardsCodec(
             codec=None if self._codec is None else mapper(self._codec),
-            safeguards=self._quantizer.safeguards,
+            safeguards=self._safeguards.safeguards,
             lossless=Lossless(
                 for_codec=None
                 if self._lossless_for_codec is None
                 else mapper(self._lossless_for_codec),
                 for_safeguards=mapper(self._lossless_for_safeguards),
             ),
-            _version=self._quantizer.version,
+            _version=self._safeguards.version,
         )
 
 

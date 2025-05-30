@@ -3,7 +3,7 @@ from itertools import cycle, permutations, product
 import numpy as np
 import pytest
 
-from compression_safeguards.quantizer import _SUPPORTED_DTYPES
+from compression_safeguards.collection import _SUPPORTED_DTYPES
 from compression_safeguards.safeguards.stencil import BoundaryCondition
 
 from .codecs import (

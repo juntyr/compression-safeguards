@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from compression_safeguards.quantizer import _SUPPORTED_DTYPES
+from compression_safeguards.collection import _SUPPORTED_DTYPES
 
 from .codecs import (
     encode_decode_identity,

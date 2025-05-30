@@ -22,7 +22,7 @@ with atheris.instrument_imports():
     from numcodecs_safeguards import SafeguardsCodec
 
     from compression_safeguards import Safeguards
-    from compression_safeguards.quantizer import _SUPPORTED_DTYPES
+    from compression_safeguards.collection import _SUPPORTED_DTYPES
     from compression_safeguards.safeguards._qois.amath import (
         FUNCTIONS as AMATH_FUNCTIONS,
     )
