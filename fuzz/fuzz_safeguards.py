@@ -2,6 +2,7 @@ import atheris
 
 with atheris.instrument_imports():
     import numcodecs
+    import numcodecs.compat
     import numpy as np
 
 import sympy as sympy
@@ -50,9 +51,7 @@ class FuzzCodec(Codec):
 
     def decode(self, buf, out=None):
         assert len(buf) == 0
-        assert out is not None
-        out[:] = self.decoded
-        return out
+        return numcodecs.compat.ndarray_copy(np.copy(self.decoded), out)
 
     def get_config(self):
         return dict(id=type(self).codec_id, data=self.data, decoded=self.decoded)

@@ -11,7 +11,6 @@ from .codecs import (
     encode_decode_mock,
     encode_decode_neg,
     encode_decode_noise,
-    encode_decode_none,
     encode_decode_zero,
 )
 
@@ -528,7 +527,7 @@ def test_fuzzer_findiff_fraction_compare():
     data = np.array([1978047305655558])
 
     for boundary in BoundaryCondition:
-        encode_decode_none(
+        encode_decode_zero(
             data,
             safeguards=[
                 dict(kind="zero", zero=7),
