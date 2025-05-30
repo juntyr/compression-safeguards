@@ -12,15 +12,14 @@ dependencies = [
     "compression-safeguards==0.0.1",
     "numcodecs>=0.13.0,<0.17",
     "numcodecs-combinators~=0.2.3",
+    "numcodecs-huffman~=0.1.0",
     "numpy~=2.0",
     "varint~=1.0",
     "typing-extensions~=4.6",
-    "dahuffman~=0.4.0",
 ]
 
 [project.entry-points."numcodecs.codecs"]
 "safeguards" = "numcodecs_safeguards.codec:SafeguardsCodec"
-"safeguards.lossless.huffman" = "numcodecs_safeguards.lossless:HuffmanCodec"
 "safeguards.lossless.delta_huffman" = "numcodecs_safeguards.lossless:DeltaHuffmanCodec"
 
 [tool.setuptools.packages.find]
@@ -38,7 +37,6 @@ xfail_strict = true
 
 [[tool.mypy.overrides]]
 module = [
-    "dahuffman.*",
     "numcodecs.*",
     "varint.*",
 ]
