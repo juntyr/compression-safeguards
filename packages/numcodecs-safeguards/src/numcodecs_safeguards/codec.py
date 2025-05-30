@@ -52,7 +52,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         It is also possible to use *only* the safeguards to encode the data by
         passing [`numcodecs_zero.ZeroCodec()`][numcodecs_zero.ZeroCodec] or
-        `dict(kind="zero")` to `codec`. The zero codec only encodes the data
+        `dict(id="zero")` to `codec`. The zero codec only encodes the data
         type and shape, not the data values themselves, and decodes to all-
         zeros, forcing the safeguards to correct (almost) all values.
     safeguards : Collection[dict | Safeguard]

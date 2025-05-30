@@ -249,7 +249,7 @@ def check_one_input(data) -> None:
 
     # test using the safeguards with the zero codec
     safeguard = SafeguardsCodec(
-        codec=dict(kind="zero"),
+        codec=dict(id="zero"),
         safeguards=safeguards,
     )
 
