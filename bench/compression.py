@@ -91,7 +91,7 @@ def gen_single_codec(codec: Codec) -> Callable[[Generator[float]], Generator[Cod
 
 def gen_benchmark(
     data: Generator[tuple[str, np.ndarray], None, None],
-    codec_gens: list[Callable[[Generator[float]], Generator[Codec]], None, None],
+    codec_gens: list[Callable[[Generator[float]], Generator[Codec]]],
 ) -> Generator[tuple[str, Codec, float | Exception], None, None]:
     # from matplotlib import pyplot as plt
 
