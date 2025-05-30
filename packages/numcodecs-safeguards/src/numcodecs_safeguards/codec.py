@@ -14,7 +14,7 @@ import numcodecs.registry
 import numpy as np
 import varint
 from compression_safeguards.cast import as_bits
-from compression_safeguards.collection import _SUPPORTED_DTYPES, SafeguardsCollection
+from compression_safeguards.collection import SafeguardsCollection
 from compression_safeguards.safeguards.abc import Safeguard
 from numcodecs.abc import Codec
 from numcodecs_combinators.abc import CodecCombinatorMixin
@@ -142,8 +142,8 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         data = numcodecs.compat.ensure_ndarray(buf)
 
-        assert data.dtype in _SUPPORTED_DTYPES, (
-            f"can only encode arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
+        assert data.dtype in SafeguardsCollection.supported_dtypes(), (
+            f"can only encode arrays of dtype {', '.join(d.str for d in SafeguardsCollection.supported_dtypes())}"
         )
 
         if self._codec is None:

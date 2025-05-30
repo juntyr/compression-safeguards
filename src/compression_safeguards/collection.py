@@ -99,6 +99,14 @@ class SafeguardsCollection:
 
         return _FORMAT_VERSION
 
+    @staticmethod
+    def supported_dtypes() -> frozenset[np.dtype]:
+        """
+        The set of numpy [`dtype`][numpy.dtype]s that the safeguards support.
+        """
+
+        return _SUPPORTED_DTYPES
+
     def compute_correction(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -124,7 +132,7 @@ class SafeguardsCollection:
         """
 
         assert data.dtype in _SUPPORTED_DTYPES, (
-            f"can only quantize arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
+            f"can only safeguard arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
         )
 
         assert data.dtype == prediction.dtype

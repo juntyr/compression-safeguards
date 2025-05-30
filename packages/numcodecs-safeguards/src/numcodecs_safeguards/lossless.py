@@ -141,7 +141,7 @@ class Lossless:
     """
     Configuration for the lossless encoding used by the
     [`SafeguardsCodec`][numcodecs_safeguards.codec.SafeguardsCodec] to encode
-    the wrapped codec's encoded data and any safeguards-quantized corrections.
+    the wrapped codec's encoded data and any safeguards-computed corrections.
     """
 
     for_codec: None | dict | Codec = None
@@ -155,7 +155,7 @@ class Lossless:
         default_factory=_default_lossless_for_safeguards,
     )
     """
-    Lossless codec (configuration) that is applied to the safeguard-quantized
+    Lossless codec (configuration) that is applied to the safeguard-computed
     corrections.
     
     The default is considered an implementation detail.

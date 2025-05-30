@@ -3,7 +3,7 @@ from itertools import cycle, permutations, product
 import numpy as np
 import pytest
 
-from compression_safeguards.collection import _SUPPORTED_DTYPES
+from compression_safeguards import SafeguardsCollection
 from compression_safeguards.safeguards.stencil import BoundaryCondition
 
 from .codecs import (
@@ -431,7 +431,9 @@ def test_lambdify_indexing():
     )
 
 
-@pytest.mark.parametrize("dtype", sorted(d.name for d in _SUPPORTED_DTYPES))
+@pytest.mark.parametrize(
+    "dtype", sorted(d.name for d in SafeguardsCollection.supported_dtypes())
+)
 def test_dtypes(dtype):
     check_all_codecs(np.array([[1]], dtype=dtype), "x/sqrt(pi)", [(0, 0)])
 
