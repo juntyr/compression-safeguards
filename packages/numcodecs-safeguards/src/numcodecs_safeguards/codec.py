@@ -36,16 +36,28 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         [`numcodecs.registry.get_codec(config)`][numcodecs.registry.get_codec],
         or an already initialized [`Codec`][numcodecs.abc.Codec].
 
-        The codec must encode to a 1D buffer of bytes. It is desirable to
-        perform lossless compression after applying the safeguards (rather than
-        before), e.g. by customising the
+        It is desirable to perform lossless compression after applying the
+        safeguards (rather than before), e.g. by customising the
         [`Lossless.for_codec`][numcodecs_safeguards.lossless.Lossless.for_codec]
         field of the `lossless` parameter.
 
+        The `codec` combined with its `lossless` encoding must encode to a 1D
+        buffer of bytes. It is also recommended that the `codec` can
+        [`decode`][numcodecs.abc.Codec.decode]
+        without receiving the output data type and shape via the `out`
+        parameter. If the `codec` does not fulfil these requirements, it can be
+        wrapped inside the
+        [`numcodecs_combinators.framed.FramedCodecStack`][numcodecs_combinators.framed.FramedCodecStack]
+        combinator.
+
         If [`None`][None], *only* the safeguards are used to encode the data.
+        In this case, the [`Lossless.for_codec`][numcodecs_safeguards.lossless.Lossless.for_codec]
+        field of the `lossless` parameter should be set to
+        [`numcodecs_combinators.framed.FramedCodecStack()`][numcodecs_combinators.framed.FramedCodecStack].
+
         Note that using a codec likely provides a better compression ratio. If
-        no safeguards are provided, the encoded data can be decoded to *any*
-        output.
+        no codec and no safeguards are provided, the encoded data can be
+        decoded to *any* output.
     safeguards : Collection[dict | Safeguard]
         The safeguards that will be applied to the codec. They can either be
         passed as a safeguard configuration [`dict`][dict] or an already
@@ -67,6 +79,8 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
           specifies the lossless encoding that is applied to the encoded
           correction that the safeguards produce. By default, Huffman encoding
           followed by Zstandard is applied.
+
+        The lossless encoding must encode to a 1D buffer of bytes.
     _version : ...
         The codecs's version. Do not provide this parameter explicitly.
     """
@@ -124,6 +138,16 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             else numcodecs.registry.get_codec(lossless.for_safeguards)
         )
 
+        if self._codec is None and self._lossless_for_codec is None:
+            raise ValueError(
+                "SafeguardsCodec with no codec and no lossless encoding for "
+                "the codec may fail to decode if the output data type and "
+                "shape is unknown\n\n"
+                "Hint: use the "
+                "`numcodecs_combinators.framed.FramedCodecStack()` codec for "
+                "the lossless encoding for the codec"
+            )
+
     def encode(self, buf: Buffer) -> Buffer:
         """Encode the data in `buf`.
 
@@ -147,29 +171,35 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         )
 
         if self._codec is None:
-            encoded_bytes = b""
+            encoded = numcodecs.compat.ensure_ndarray(b"")
             decoded = np.zeros_like(data)
         else:
             encoded = self._codec.encode(np.copy(data))
             encoded = numcodecs.compat.ensure_ndarray(encoded)
 
-            assert encoded.dtype == np.dtype("uint8"), "codec must encode to bytes"
-            assert encoded.ndim <= 1, "codec must encode to 1D bytes"
-            encoded_bytes = numcodecs.compat.ensure_bytes(encoded)
-
-            decoded = np.empty_like(data)
-            decoded = self._codec.decode(
-                np.frombuffer(
-                    np.copy(encoded_bytes), dtype="uint8", count=len(encoded_bytes)
-                ),
-                out=decoded,
-            )
+            # check that decoding with `out=None` works
+            try:
+                decoded = self._codec.decode(np.copy(encoded), out=None)
+            except Exception as err:
+                raise ValueError(
+                    "decoding with `out=None` failed\n\n"
+                    "consider using wrapping the codec in the "
+                    "`numcodecs_combinators.framed.FramedCodecStack(codec)` "
+                    "combinator if the codec requires knowing the output data "
+                    "type and shape for decoding"
+                ) from err
             decoded = numcodecs.compat.ensure_ndarray(decoded)
 
-            if self._lossless_for_codec is not None:
-                encoded_bytes = numcodecs.compat.ensure_bytes(
-                    self._lossless_for_codec.encode(encoded_bytes)
-                )
+        if self._lossless_for_codec is not None:
+            encoded_bytes = numcodecs.compat.ensure_bytes(
+                self._lossless_for_codec.encode(encoded)
+            )
+
+        assert encoded.dtype == np.dtype("uint8"), (
+            "codec and lossless must encode to bytes"
+        )
+        assert encoded.ndim <= 1, "codec and lossless must encode to 1D bytes"
+        encoded_bytes = numcodecs.compat.ensure_bytes(encoded)
 
         assert decoded.dtype == data.dtype, "codec must roundtrip dtype"
         assert decoded.shape == data.shape, "codec must roundtrip shape"
@@ -207,8 +237,6 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             Decoded data. May be any object supporting the new-style
             buffer protocol.
         """
-
-        assert out is not None, "can only decode into known dtype and shape"
 
         buf_array = numcodecs.compat.ensure_ndarray(buf)
         assert buf_array.dtype == np.dtype("uint8"), "codec must decode from bytes"
