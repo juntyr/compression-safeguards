@@ -247,9 +247,9 @@ def check_one_input(data) -> None:
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")
         raise err
 
-    # test using the safeguards without a codec
+    # test using the safeguards with the zero codec
     safeguard = SafeguardsCodec(
-        codec=None,
+        codec=dict(kind="zero"),
         safeguards=safeguards,
     )
 

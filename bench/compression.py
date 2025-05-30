@@ -506,7 +506,8 @@ if __name__ == "__main__":
             gen_single_codec(Zstd(level=3)),
             gen_codecs_with_eb_abs(
                 lambda eb_abs: SafeguardsCodec(
-                    codec=None, safeguards=[dict(kind="abs", eb_abs=eb_abs)]
+                    codec=dict(kind="zero"),
+                    safeguards=[dict(kind="abs", eb_abs=eb_abs)],
                 )
             ),
             # gen_codecs_with_eb_abs(

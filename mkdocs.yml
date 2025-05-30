@@ -70,6 +70,7 @@ plugins:
             - https://numpy.org/doc/2.2/objects.inv
             - https://numcodecs.readthedocs.io/en/v0.15.0/objects.inv
             - https://numcodecs-combinators.readthedocs.io/en/v0.2.7/objects.inv
+            - https://numcodecs-zero.readthedocs.io/en/v0.1.0/objects.inv
 
 watch:
   - src

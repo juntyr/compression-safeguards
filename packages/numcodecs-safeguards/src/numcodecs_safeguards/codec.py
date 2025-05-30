@@ -30,7 +30,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
     Parameters
     ----------
-    codec : None | dict | Codec
+    codec : dict | Codec
         The codec to wrap with safeguards. It can either be passed as a codec
         configuration [`dict`][dict], which is passed to
         [`numcodecs.registry.get_codec(config)`][numcodecs.registry.get_codec],
@@ -50,14 +50,11 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         [`numcodecs_combinators.framed.FramedCodecStack`][numcodecs_combinators.framed.FramedCodecStack]
         combinator.
 
-        If [`None`][None], *only* the safeguards are used to encode the data.
-        In this case, the [`Lossless.for_codec`][numcodecs_safeguards.lossless.Lossless.for_codec]
-        field of the `lossless` parameter should be set to
-        [`numcodecs_combinators.framed.FramedCodecStack()`][numcodecs_combinators.framed.FramedCodecStack].
-
-        Note that using a codec likely provides a better compression ratio. If
-        no codec and no safeguards are provided, the encoded data can be
-        decoded to *any* output.
+        It is also possible to use *only* the safeguards to encode the data by
+        passing [`numcodecs_zero.ZeroCodec()`][numcodecs_zero.ZeroCodec] or
+        `dict(kind="zero")` to `codec`. The zero codec only encodes the data
+        type and shape, not the data values themselves, and decodes to all-
+        zeros, forcing the safeguards to correct (almost) all values.
     safeguards : Collection[dict | Safeguard]
         The safeguards that will be applied to the codec. They can either be
         passed as a safeguard configuration [`dict`][dict] or an already
@@ -91,7 +88,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         "_lossless_for_codec",
         "_lossless_for_safeguards",
     )
-    _codec: None | Codec
+    _codec: Codec
     _safeguards: SafeguardsCollection
     _lossless_for_codec: None | Codec
     _lossless_for_safeguards: Codec
@@ -101,7 +98,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
     def __init__(
         self,
         *,
-        codec: None | dict | Codec,
+        codec: dict | Codec,
         safeguards: Collection[dict | Safeguard],
         lossless: None | dict | Lossless = None,
         _version: None | str = None,
@@ -111,11 +108,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         )
 
         self._codec = (
-            codec
-            if isinstance(codec, Codec)
-            else numcodecs.registry.get_codec(codec)
-            if codec is not None
-            else None
+            codec if isinstance(codec, Codec) else numcodecs.registry.get_codec(codec)
         )
 
         lossless = (
@@ -137,16 +130,6 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             if isinstance(lossless.for_safeguards, Codec)
             else numcodecs.registry.get_codec(lossless.for_safeguards)
         )
-
-        if self._codec is None and self._lossless_for_codec is None:
-            raise ValueError(
-                "SafeguardsCodec with no codec and no lossless encoding for "
-                "the codec may fail to decode if the output data type and "
-                "shape is unknown\n\n"
-                "Hint: use the "
-                "`numcodecs_combinators.framed.FramedCodecStack()` codec for "
-                "the lossless encoding for the codec"
-            )
 
     def encode(self, buf: Buffer) -> Buffer:
         """Encode the data in `buf`.
@@ -170,25 +153,21 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             f"can only encode arrays of dtype {', '.join(d.str for d in SafeguardsCollection.supported_dtypes())}"
         )
 
-        if self._codec is None:
-            encoded = numcodecs.compat.ensure_ndarray(b"")
-            decoded = np.zeros_like(data)
-        else:
-            encoded = self._codec.encode(np.copy(data))
-            encoded = numcodecs.compat.ensure_ndarray(encoded)
+        encoded = self._codec.encode(np.copy(data))
+        encoded = numcodecs.compat.ensure_ndarray(encoded)
 
-            # check that decoding with `out=None` works
-            try:
-                decoded = self._codec.decode(np.copy(encoded), out=None)
-            except Exception as err:
-                raise ValueError(
-                    "decoding with `out=None` failed\n\n"
-                    "consider using wrapping the codec in the "
-                    "`numcodecs_combinators.framed.FramedCodecStack(codec)` "
-                    "combinator if the codec requires knowing the output data "
-                    "type and shape for decoding"
-                ) from err
-            decoded = numcodecs.compat.ensure_ndarray(decoded)
+        # check that decoding with `out=None` works
+        try:
+            decoded = self._codec.decode(np.copy(encoded), out=None)
+        except Exception as err:
+            raise ValueError(
+                "decoding with `out=None` failed\n\n"
+                "consider using wrapping the codec in the "
+                "`numcodecs_combinators.framed.FramedCodecStack(codec)` "
+                "combinator if the codec requires knowing the output data "
+                "type and shape for decoding"
+            ) from err
+        decoded = numcodecs.compat.ensure_ndarray(decoded)
 
         if self._lossless_for_codec is not None:
             encoded_bytes = numcodecs.compat.ensure_bytes(
@@ -254,18 +233,14 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             encoded = buf_bytes[buf_io.tell() :]
             correction_bytes = b""
 
-        if self._codec is None:
-            assert encoded == b"", "can only decode empty message without a codec"
-            decoded = np.zeros_like(out)
-        else:
-            if self._lossless_for_codec is not None:
-                encoded = numcodecs.compat.ensure_bytes(
-                    self._lossless_for_codec.decode(encoded)
-                )
-
-            decoded = self._codec.decode(
-                np.frombuffer(encoded, dtype="uint8", count=len(encoded)), out=out
+        if self._lossless_for_codec is not None:
+            encoded = numcodecs.compat.ensure_bytes(
+                self._lossless_for_codec.decode(encoded)
             )
+
+        decoded = self._codec.decode(
+            np.frombuffer(encoded, dtype="uint8", count=len(encoded)), out=out
+        )
 
         if correction_len > 0:
             correction = (
@@ -297,7 +272,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         return dict(
             id=type(self).codec_id,
-            codec=None if self._codec is None else self._codec.get_config(),
+            codec=self._codec.get_config(),
             safeguards=[
                 safeguard.get_config() for safeguard in self._safeguards.safeguards
             ],
@@ -345,7 +320,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         """
 
         return SafeguardsCodec(
-            codec=None if self._codec is None else mapper(self._codec),
+            codec=mapper(self._codec),
             safeguards=self._safeguards.safeguards,
             lossless=Lossless(
                 for_codec=None
