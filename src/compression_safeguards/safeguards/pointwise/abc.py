@@ -5,15 +5,13 @@ Abstract base class for the pointwise safeguards.
 __all__ = ["PointwiseSafeguard"]
 
 from abc import ABC, abstractmethod
-from typing import Any, TypeVar, final
+from typing import Any, final
 
 import numpy as np
 
 from ...intervals import IntervalUnion
+from ...typing import S, T
 from ..abc import Safeguard
-
-T = TypeVar("T", bound=np.dtype)
-S = TypeVar("S", bound=tuple[int, ...])
 
 
 class PointwiseSafeguard(Safeguard, ABC):
@@ -27,7 +25,9 @@ class PointwiseSafeguard(Safeguard, ABC):
     __slots__ = ()
 
     @final
-    def check(self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]) -> bool:
+    def check(
+        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+    ) -> bool:
         """
         Check if the `decoded` array upholds the property enforced by this
         safeguard.
@@ -49,7 +49,7 @@ class PointwiseSafeguard(Safeguard, ABC):
 
     @abstractmethod
     def check_pointwise(
-        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `decoded` array uphold the property
@@ -72,7 +72,7 @@ class PointwiseSafeguard(Safeguard, ABC):
 
     @abstractmethod
     def compute_safe_intervals(
-        self, data: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]]
     ) -> IntervalUnion[T, Any, Any]:
         """
         Compute the intervals in which the safeguard's guarantees with respect

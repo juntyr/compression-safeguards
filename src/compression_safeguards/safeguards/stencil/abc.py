@@ -5,16 +5,14 @@ Abstract base class for the stencil safeguards.
 __all__ = ["StencilSafeguard"]
 
 from abc import ABC, abstractmethod
-from typing import Any, TypeVar, final
+from typing import Any, final
 
 import numpy as np
 
 from ...intervals import IntervalUnion
+from ...typing import S, T
 from ..abc import Safeguard
 from . import NeighbourhoodAxis
-
-T = TypeVar("T", bound=np.dtype)
-S = TypeVar("S", bound=tuple[int, ...])
 
 
 class StencilSafeguard(Safeguard, ABC):
@@ -54,7 +52,9 @@ class StencilSafeguard(Safeguard, ABC):
         pass
 
     @final
-    def check(self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]) -> bool:
+    def check(
+        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+    ) -> bool:
         """
         Check if the `decoded` array upholds the property enforced by this
         safeguard.
@@ -76,7 +76,7 @@ class StencilSafeguard(Safeguard, ABC):
 
     @abstractmethod
     def check_pointwise(
-        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `decoded` array uphold the neighbourhood
@@ -99,7 +99,7 @@ class StencilSafeguard(Safeguard, ABC):
 
     @abstractmethod
     def compute_safe_intervals(
-        self, data: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]]
     ) -> IntervalUnion[T, Any, Any]:
         """
         Compute the intervals in which the safeguard's guarantees with respect

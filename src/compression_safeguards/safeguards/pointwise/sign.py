@@ -7,7 +7,8 @@ __all__ = ["SignPreservingSafeguard"]
 import numpy as np
 
 from ...intervals import Interval, IntervalUnion, Lower, Maximum, Minimum, Upper
-from .abc import PointwiseSafeguard, S, T
+from ...typing import S, T
+from .abc import PointwiseSafeguard
 
 
 class SignPreservingSafeguard(PointwiseSafeguard):
@@ -29,7 +30,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         pass
 
     def check_pointwise(
-        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check for which elements in the `decoded` array the signs match the
@@ -51,7 +52,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         return self._sign(data) == self._sign(decoded)
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]]
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the `data`'s sign is preserved.
@@ -94,7 +95,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
 
         return dict(kind=type(self).kind)
 
-    def _sign(self, x: np.ndarray[S, T]) -> np.ndarray[S, np.dtype[np.int_]]:
+    def _sign(self, x: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[np.int_]]:
         zero = np.array(0, dtype=x.dtype)
 
         # if >0: (true) * (1 - 0*2) = 1
@@ -103,13 +104,13 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         return (x != zero) * (1 - np.signbit(x) * 2)
 
     def _tiny_like(
-        self, a: np.ndarray[S, T]
-    ) -> tuple[np.ndarray[tuple[()], T], np.ndarray[tuple[()], T]]:
+        self, a: np.ndarray[S, np.dtype[T]]
+    ) -> tuple[np.ndarray[tuple[()], np.dtype[T]], np.ndarray[tuple[()], np.dtype[T]]]:
         if np.issubdtype(a.dtype, np.integer):
             tiny = np.array(1, dtype=a.dtype)
             neg_tiny = np.array(-tiny)
         else:
-            info = np.finfo(a.dtype)
+            info = np.finfo(a.dtype)  # type: ignore
             tiny = np.array(info.smallest_subnormal)
             neg_tiny = np.array(-info.smallest_subnormal)
 

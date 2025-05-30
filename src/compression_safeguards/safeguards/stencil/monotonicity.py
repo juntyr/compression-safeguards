@@ -12,8 +12,9 @@ from numpy.lib.stride_tricks import sliding_window_view
 
 from ...cast import _isfinite, _isnan, from_total_order, to_total_order
 from ...intervals import Interval, IntervalUnion, Lower, Upper
+from ...typing import S, T
 from . import BoundaryCondition, NeighbourhoodAxis, _pad_with_boundary
-from .abc import S, StencilSafeguard, T
+from .abc import StencilSafeguard
 
 _STRICT = ((lt, gt, False, False),) * 2
 _STRICT_WITH_CONSTS = ((lt, gt, True, False),) * 2
@@ -193,7 +194,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         return tuple(neighbourhood)
 
     def check_pointwise(
-        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which monotonic sequences centred on the points in the `data`
@@ -270,7 +271,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         return ok  # type: ignore
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]]
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the monotonicity of the `data` is

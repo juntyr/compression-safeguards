@@ -1,11 +1,10 @@
-from typing import Callable, TypeVar
+from typing import Callable
 
 import numpy as np
 import sympy as sp
 import sympy.tensor.array.expressions  # noqa: F401
 
 from ...cast import (
-    F,
     _isfinite,
     _isinf,
     _isnan,
@@ -13,17 +12,16 @@ from ...cast import (
     _nextafter,
     to_finite_float,
 )
+from ...typing import F, S
 from .array import NumPyLikeArray
-
-S = TypeVar("S", bound=tuple[int, ...])
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 def compute_data_eb_for_stencil_qoi_eb_unchecked(
     expr: sp.Basic,
-    xv: np.ndarray[S, F],
-    eb_expr_lower: np.ndarray[S, F],
-    eb_expr_upper: np.ndarray[S, F],
+    xv: np.ndarray[S, np.dtype[F]],
+    eb_expr_lower: np.ndarray[S, np.dtype[F]],
+    eb_expr_upper: np.ndarray[S, np.dtype[F]],
     check_is_x: Callable[[sp.Basic], bool],
     evaluate_sympy_expr_to_numpy: Callable[[sp.Basic], np.ndarray],
     compute_data_eb_for_stencil_qoi_eb: Callable[
@@ -31,15 +29,15 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
             # expr
             sp.Basic,
             # xv
-            np.ndarray[S, F],
+            np.ndarray[S, np.dtype[F]],
             # eb_expr_lower
-            np.ndarray[S, F],
+            np.ndarray[S, np.dtype[F]],
             # eb_expr_upper
-            np.ndarray[S, F],
+            np.ndarray[S, np.dtype[F]],
         ],
-        tuple[np.ndarray[S, F], np.ndarray[S, F]],
+        tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]],
     ],
-) -> tuple[np.ndarray[S, F], np.ndarray[S, F]]:
+) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
     """
     Translate an error bound on a derived quantity of interest (QoI) into an
     error bound on the input data.
@@ -51,11 +49,11 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
     ----------
     expr : sp.Basic
         Symbolic SymPy expression that defines the QoI.
-    xv : np.ndarray[S, F]
+    xv : np.ndarray[S, np.dtype[F]]
         Actual values of the input data.
-    eb_expr_lower : np.ndarray[S, F]
+    eb_expr_lower : np.ndarray[S, np.dtype[F]]
         Finite pointwise lower bound on the QoI error, must be negative or zero.
-    eb_expr_upper : np.ndarray[S, F]
+    eb_expr_upper : np.ndarray[S, np.dtype[F]]
         Finite pointwise upper bound on the QoI error, must be positive or zero.
     check_is_x : Callable[[sp.Basic], bool]
         Check if an expression is equal to `x` the data symbol.
@@ -66,19 +64,19 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
             # expr
             sp.Basic,
             # xv
-            np.ndarray[S, F],
+            np.ndarray[S, np.dtype[F]],
             # eb_expr_lower
-            np.ndarray[S, F],
+            np.ndarray[S, np.dtype[F]],
             # eb_expr_upper
-            np.ndarray[S, F],
+            np.ndarray[S, np.dtype[F]],
         ],
-        tuple[np.ndarray[S, F], np.ndarray[S, F]],
+        tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]],
     ]
         Callback for the outer checked version of this function.
 
     Returns
     -------
-    eb_x_lower, eb_x_upper : tuple[np.ndarray[S, F], np.ndarray[S, F]]
+    eb_x_lower, eb_x_upper : tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]
         Finite pointwise lower and upper error bound on the input data `x`.
 
     Inspired by:
@@ -520,41 +518,41 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
 
 
 def ensure_bounded_derived_error(
-    expr: Callable[[np.ndarray[S, F]], np.ndarray[S, F]],
-    exprv: np.ndarray[S, F],
-    xv: None | np.ndarray[S, F],
-    eb_x_guess: np.ndarray[S, F],
-    eb_expr_lower: np.ndarray[S, F],
-    eb_expr_upper: np.ndarray[S, F],
-) -> np.ndarray[S, F]:
+    expr: Callable[[np.ndarray[S, np.dtype[F]]], np.ndarray[S, np.dtype[F]]],
+    exprv: np.ndarray[S, np.dtype[F]],
+    xv: None | np.ndarray[S, np.dtype[F]],
+    eb_x_guess: np.ndarray[S, np.dtype[F]],
+    eb_expr_lower: np.ndarray[S, np.dtype[F]],
+    eb_expr_upper: np.ndarray[S, np.dtype[F]],
+) -> np.ndarray[S, np.dtype[F]]:
     """
     Ensure that an error bound on an expression is met by an error bound on
     the input data by nudging the provided guess.
 
     Parameters
     ----------
-    expr : Callable[[np.ndarray[S, F]], np.ndarray[S, F]]
+    expr : Callable[[np.ndarray[S, np.dtype[F]]], np.ndarray[S, np.dtype[F]]]
         Expression over which the error bound will be ensured.
 
         The expression takes in the error bound guess and returns the value of
         the expression for this error.
-    exprv : np.ndarray[S, F]
+    exprv : np.ndarray[S, np.dtype[F]]
         Evaluation of the expression for the zero-error case.
-    xv : None | np.ndarray[S, F]
+    xv : None | np.ndarray[S, np.dtype[F]]
         Actual values of the input data, which are only used for better
         refinement of the error bound guess.
-    eb_x_guess : np.ndarray[S, F]
+    eb_x_guess : np.ndarray[S, np.dtype[F]]
         Provided guess for the error bound on the initial data.
-    eb_expr_lower : np.ndarray[S, F]
+    eb_expr_lower : np.ndarray[S, np.dtype[F]]
         Finite pointwise lower bound on the expression error, must be negative
         or zero.
-    eb_expr_upper : np.ndarray[S, F]
+    eb_expr_upper : np.ndarray[S, np.dtype[F]]
         Finite pointwise upper bound on the expression error, must be positive
         or zero.
 
     Returns
     -------
-    eb_x : np.ndarray[S, F]
+    eb_x : np.ndarray[S, np.dtype[F]]
         Finite pointwise error bound on the input data.
     """
 

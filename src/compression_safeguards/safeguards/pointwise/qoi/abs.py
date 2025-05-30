@@ -10,7 +10,6 @@ import numpy as np
 import sympy as sp
 
 from ....cast import (
-    F,
     _isfinite,
     _isinf,
     _isnan,
@@ -21,6 +20,7 @@ from ....cast import (
     to_float,
 )
 from ....intervals import IntervalUnion
+from ....typing import F, S, T
 from ..._qois.compile import sympy_expr_to_numpy as compile_sympy_expr_to_numpy
 from ..._qois.eb import (
     compute_data_eb_for_stencil_qoi_eb_unchecked,
@@ -34,7 +34,7 @@ from ..._qois.re import (
     QOI_INT_LITERAL_PATTERN,
     QOI_WHITESPACE_PATTERN,
 )
-from ..abc import PointwiseSafeguard, S, T
+from ..abc import PointwiseSafeguard
 from ..abs import _compute_safe_eb_diff_interval
 from . import PointwiseExpr
 
@@ -234,7 +234,9 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
         self._qoi = qoi
         self._qoi_expr = qoi_expr
 
-    def evaluate_qoi(self, data: np.ndarray[S, T]) -> np.ndarray[S, F]:
+    def evaluate_qoi(
+        self, data: np.ndarray[S, np.dtype[T]]
+    ) -> np.ndarray[S, np.dtype[F]]:
         """
         Evaluate the derived quantity of interest on the `data`.
 
@@ -244,12 +246,12 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
 
         Parameters
         ----------
-        data : np.ndarray[S, T]
+        data : np.ndarray[S, np.dtype[T]]
             Data for which the quantity of interest is evaluated.
 
         Returns
         -------
-        qoi : np.ndarray[S, F]
+        qoi : np.ndarray[S, np.dtype[F]]
             Evaluated quantity of interest, in floating point.
         """
 
@@ -263,7 +265,7 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
-        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `decoded` array satisfy the absolute error
@@ -315,7 +317,7 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
         return ok  # type: ignore
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]]
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the absolute error bound is upheld with
@@ -426,10 +428,10 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
 def _compute_data_eb_for_qoi_eb(
     expr: sp.Basic,
     x: sp.Symbol,
-    xv: np.ndarray[S, F],
-    tauv_lower: np.ndarray[S, F],
-    tauv_upper: np.ndarray[S, F],
-) -> tuple[np.ndarray[S, F], np.ndarray[S, F]]:
+    xv: np.ndarray[S, np.dtype[F]],
+    tauv_lower: np.ndarray[S, np.dtype[F]],
+    tauv_upper: np.ndarray[S, np.dtype[F]],
+) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
     """
     Translate an error bound on a derived quantity of interest (QoI) into an
     error bound on the input data.
@@ -443,16 +445,16 @@ def _compute_data_eb_for_qoi_eb(
         Symbolic SymPy expression that defines the QoI.
     x : sp.Symbol
         Symbol for the pointwise input data.
-    xv : np.ndarray[S, F]
+    xv : np.ndarray[S, np.dtype[F]]
         Actual values of the input data.
-    eb_expr_lower : np.ndarray[S, F]
+    eb_expr_lower : np.ndarray[S, np.dtype[F]]
         Finite pointwise lower bound on the QoI error, must be negative or zero.
-    eb_expr_upper : np.ndarray[S, F]
+    eb_expr_upper : np.ndarray[S, np.dtype[F]]
         Finite pointwise upper bound on the QoI error, must be positive or zero.
 
     Returns
     -------
-    eb_x_lower, eb_x_upper : tuple[np.ndarray[S, F], np.ndarray[S, F]]
+    eb_x_lower, eb_x_upper : tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]
         Finite pointwise lower and upper error bound on the input data `x`.
 
     Inspired by:

@@ -7,7 +7,6 @@ __all__ = ["AbsoluteErrorBoundSafeguard"]
 import numpy as np
 
 from ...cast import (
-    F,
     _isfinite,
     _isinf,
     _isnan,
@@ -19,7 +18,8 @@ from ...cast import (
     to_total_order,
 )
 from ...intervals import Interval, IntervalUnion, Lower, Upper
-from .abc import PointwiseSafeguard, S, T
+from ...typing import F, S, T
+from .abc import PointwiseSafeguard
 
 
 class AbsoluteErrorBoundSafeguard(PointwiseSafeguard):
@@ -57,7 +57,7 @@ class AbsoluteErrorBoundSafeguard(PointwiseSafeguard):
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
-        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `decoded` array satisfy the absolute error
@@ -102,7 +102,7 @@ class AbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         return ok  # type: ignore
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]]
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the absolute error bound is upheld with
@@ -147,16 +147,16 @@ class AbsoluteErrorBoundSafeguard(PointwiseSafeguard):
 
 
 def _compute_safe_eb_diff_interval(
-    data: np.ndarray[S, T],
-    data_float: np.ndarray[S, F],
-    eb_lower: np.ndarray[S | tuple[()], F],
-    eb_upper: np.ndarray[S | tuple[()], F],
+    data: np.ndarray[S, np.dtype[T]],
+    data_float: np.ndarray[S, np.dtype[F]],
+    eb_lower: np.ndarray[S | tuple[()], np.dtype[F]],
+    eb_upper: np.ndarray[S | tuple[()], np.dtype[F]],
     equal_nan: bool,
 ) -> Interval[T, int]:
-    dataf: np.ndarray[tuple[int], T] = data.flatten()
-    dataf_float: np.ndarray[tuple[int], F] = data_float.flatten()
-    eb_lowerf: np.ndarray[tuple[int], F] = np.array(eb_lower).flatten()  # type: ignore
-    eb_upperf: np.ndarray[tuple[int], F] = np.array(eb_upper).flatten()  # type: ignore
+    dataf: np.ndarray[tuple[int], np.dtype[T]] = data.flatten()
+    dataf_float: np.ndarray[tuple[int], np.dtype[F]] = data_float.flatten()
+    eb_lowerf: np.ndarray[tuple[int], np.dtype[F]] = np.array(eb_lower).flatten()  # type: ignore
+    eb_upperf: np.ndarray[tuple[int], np.dtype[F]] = np.array(eb_upper).flatten()  # type: ignore
 
     assert np.all(_isfinite(eb_lowerf) & (eb_lowerf <= 0))
     assert np.all(_isfinite(eb_upperf) & (eb_upperf >= 0))

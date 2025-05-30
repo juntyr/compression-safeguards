@@ -8,7 +8,8 @@ import numpy as np
 
 from ...cast import as_bits
 from ...intervals import Interval, IntervalUnion, Lower, Upper
-from .abc import PointwiseSafeguard, S, T
+from ...typing import S, T
+from .abc import PointwiseSafeguard
 
 
 class ZeroIsZeroSafeguard(PointwiseSafeguard):
@@ -39,7 +40,7 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
         self._zero = zero
 
     def check_pointwise(
-        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements are either
@@ -64,7 +65,7 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
         return (as_bits(data) != zero_bits) | (as_bits(decoded) == zero_bits)
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]]
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the zero-is-zero guarantee is upheld with
@@ -103,7 +104,7 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
 
         return dict(kind=type(self).kind, zero=self._zero)
 
-    def _zero_like(self, dtype: T) -> np.ndarray[tuple[()], T]:
+    def _zero_like(self, dtype: np.dtype[T]) -> np.ndarray[tuple[()], np.dtype[T]]:
         zero = np.array(self._zero)
         if zero.dtype != dtype:
             with np.errstate(

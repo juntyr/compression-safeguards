@@ -10,8 +10,9 @@ from collections.abc import Collection
 import numpy as np
 
 from ...intervals import IntervalUnion
+from ...typing import S, T
 from ..abc import Safeguard
-from ..pointwise.abc import PointwiseSafeguard, S, T
+from ..pointwise.abc import PointwiseSafeguard
 from ..stencil import NeighbourhoodAxis
 from ..stencil.abc import StencilSafeguard
 
@@ -80,7 +81,7 @@ class AnySafeguard(Safeguard):
         ...
 
     def check_pointwise(  # type: ignore
-        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check for which elements at least one of the combined safeguards
@@ -102,7 +103,7 @@ class AnySafeguard(Safeguard):
         ...
 
     def compute_safe_intervals(  # type: ignore
-        self, data: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]]
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the union of the safe intervals of the combined safeguards,
@@ -144,7 +145,7 @@ class _AnySafeguardBase(ABC):
         return self._safeguards  # type: ignore
 
     def check_pointwise(
-        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         front, *tail = self.safeguards
 
@@ -156,7 +157,7 @@ class _AnySafeguardBase(ABC):
         return ok
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]]
     ) -> IntervalUnion[T, int, int]:
         front, *tail = self.safeguards
 

@@ -5,7 +5,6 @@ Implementation of the [`SafeguardsCollection`][compression_safeguards.collection
 __all__ = ["SafeguardsCollection"]
 
 from collections.abc import Collection
-from typing import TypeVar
 
 import numpy as np
 from typing_extensions import Self
@@ -15,13 +14,7 @@ from .safeguards import Safeguards
 from .safeguards.abc import Safeguard
 from .safeguards.pointwise.abc import PointwiseSafeguard
 from .safeguards.stencil.abc import StencilSafeguard
-
-T = TypeVar("T", bound=np.dtype)
-""" Any numpy [`dtype`][numpy.dtype] type variable. """
-C = TypeVar("C", bound=np.dtype)
-""" The numpy [`dtype`][numpy.dtype] type variable for corrections. """
-S = TypeVar("S", bound=tuple[int, ...])
-""" Any array shape. """
+from .typing import C, S, T
 
 
 class SafeguardsCollection:
@@ -108,9 +101,9 @@ class SafeguardsCollection:
 
     def compute_correction(
         self,
-        data: np.ndarray[S, T],
-        prediction: np.ndarray[S, T],
-    ):
+        data: np.ndarray[S, np.dtype[T]],
+        prediction: np.ndarray[S, np.dtype[T]],
+    ) -> np.ndarray[S, np.dtype[C]]:
         """
         Compute the correction required to make the `prediction` array satisfy the safeguards relative to the `data` array.
 
@@ -119,14 +112,14 @@ class SafeguardsCollection:
 
         Parameters
         ----------
-        data : np.ndarray[S, T]
+        data : np.ndarray[S, np.dtype[T]]
             The data array, relative to which the safeguards are enforced.
-        prediction : np.ndarray[S, T]
+        prediction : np.ndarray[S, np.dtype[T]]
             The prediction array for which the correction is computed.
 
         Returns
         -------
-        correction : np.ndarray[S, C]
+        correction : np.ndarray[S, np.dtype[C]]
             The correction array.
         """
 
@@ -173,23 +166,27 @@ class SafeguardsCollection:
         return prediction_bits - correction_bits
 
     def apply_correction(
-        self, prediction: np.ndarray[S, T], correction: np.ndarray[S, C]
-    ) -> np.ndarray[S, T]:
+        self,
+        prediction: np.ndarray[S, np.dtype[T]],
+        correction: np.ndarray[S, np.dtype[C]],
+    ) -> np.ndarray[S, np.dtype[T]]:
         """
         Apply the `correction` to the `prediction` to satisfy the safeguards for which the `correction` was computed.
 
         Parameters
         ----------
-        prediction : np.ndarray[S, T]
+        prediction : np.ndarray[S, np.dtype[T]]
             The prediction array for which the correction has been computed.
-        correction : np.ndarray[S, C]
+        correction : np.ndarray[S, np.dtype[C]]
             The correction array.
 
         Returns
         -------
-        corrected : np.ndarray[T, C]
+        corrected : np.ndarray[S, np.dtype[T]]
             The corrected array, which satisfies the safeguards.
         """
+
+        assert correction.shape == prediction.shape
 
         prediction_bits = as_bits(prediction)
         correction_bits = as_bits(correction)
@@ -238,15 +235,17 @@ class SafeguardsCollection:
 _FORMAT_VERSION: str = "0.1.x"
 
 
-_SUPPORTED_DTYPES: frozenset[np.dtype] = {
-    np.dtype(np.int8),
-    np.dtype(np.int16),
-    np.dtype(np.int32),
-    np.dtype(np.int64),
-    np.dtype(np.uint8),
-    np.dtype(np.uint16),
-    np.dtype(np.uint32),
-    np.dtype(np.uint64),
-    np.dtype(np.float32),
-    np.dtype(np.float64),
-}
+_SUPPORTED_DTYPES: frozenset[np.dtype] = frozenset(
+    {
+        np.dtype(np.int8),
+        np.dtype(np.int16),
+        np.dtype(np.int32),
+        np.dtype(np.int64),
+        np.dtype(np.uint8),
+        np.dtype(np.uint16),
+        np.dtype(np.uint32),
+        np.dtype(np.uint64),
+        np.dtype(np.float32),
+        np.dtype(np.float64),
+    }
+)

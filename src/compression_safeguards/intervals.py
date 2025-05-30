@@ -18,17 +18,16 @@ from .cast import (
     from_total_order,
     to_total_order,
 )
+from .typing import S, T
 
-T = TypeVar("T", bound=np.dtype)
 N = TypeVar("N", bound=int)
 U = TypeVar("U", bound=int)
 V = TypeVar("V", bound=int)
-S = TypeVar("S", bound=tuple[int, ...])
 
 
 class Interval(Generic[T, N]):
     """
-    Single interval over a `N`-sized [`ndarray`][numpy.ndarray] of dtype `T`.
+    Single interval over a `N`-sized [`ndarray`][numpy.ndarray] of data type `T`.
 
     ## Construction
 
@@ -83,20 +82,20 @@ class Interval(Generic[T, N]):
     """
 
     __slots__ = ("_lower", "_upper")
-    _lower: np.ndarray[tuple[N], T]
-    _upper: np.ndarray[tuple[N], T]
+    _lower: np.ndarray[tuple[N], np.dtype[T]]
+    _upper: np.ndarray[tuple[N], np.dtype[T]]
 
     def __init__(
         self,
         *,
-        _lower: np.ndarray[tuple[N], T],
-        _upper: np.ndarray[tuple[N], T],
+        _lower: np.ndarray[tuple[N], np.dtype[T]],
+        _upper: np.ndarray[tuple[N], np.dtype[T]],
     ) -> None:
         self._lower = _lower
         self._upper = _upper
 
     @staticmethod
-    def empty(dtype: T, n: N) -> "Interval[T, N]":
+    def empty(dtype: np.dtype[T], n: N) -> "Interval[T, N]":
         """
         Create an empty interval that contains no values.
 
@@ -120,7 +119,7 @@ class Interval(Generic[T, N]):
         )
 
     @staticmethod
-    def empty_like(a: np.ndarray[tuple[int, ...], T]) -> "Interval[T, int]":
+    def empty_like(a: np.ndarray[tuple[int, ...], np.dtype[T]]) -> "Interval[T, int]":
         """
         Create an empty interval that contains no values and has the same dtype and size as `a`.
 
@@ -138,7 +137,7 @@ class Interval(Generic[T, N]):
         return Interval.empty(a.dtype, a.size)
 
     @staticmethod
-    def full(dtype: T, n: N) -> "Interval[T, N]":
+    def full(dtype: np.dtype[T], n: N) -> "Interval[T, N]":
         """
         Create a full interval that contains all possible values of `dtype`.
 
@@ -161,7 +160,7 @@ class Interval(Generic[T, N]):
         )
 
     @staticmethod
-    def full_like(a: np.ndarray[tuple[int, ...], T]) -> "Interval[T, int]":
+    def full_like(a: np.ndarray[tuple[int, ...], np.dtype[T]]) -> "Interval[T, int]":
         """
         Create a full interval that contains all possible values and has the same dtype and size as `a`.
 
@@ -181,7 +180,7 @@ class Interval(Generic[T, N]):
     def __getitem__(self, key) -> "IndexedInterval[T, N]":
         return IndexedInterval(_lower=self._lower, _upper=self._upper, _index=key)
 
-    def preserve_inf(self, a: np.ndarray[tuple[N], T]) -> Self:
+    def preserve_inf(self, a: np.ndarray[tuple[N], np.dtype[T]]) -> Self:
         """
         Preserve all infinite values in `a` exactly.
 
@@ -213,7 +212,9 @@ class Interval(Generic[T, N]):
 
         return self
 
-    def preserve_nan(self, a: np.ndarray[tuple[N], T], *, equal_nan: bool) -> Self:
+    def preserve_nan(
+        self, a: np.ndarray[tuple[N], np.dtype[T]], *, equal_nan: bool
+    ) -> Self:
         """
         Preserve all NaN values in `a`.
 
@@ -265,7 +266,7 @@ class Interval(Generic[T, N]):
 
         return self
 
-    def preserve_finite(self, a: np.ndarray[tuple[N], T]) -> Self:
+    def preserve_finite(self, a: np.ndarray[tuple[N], np.dtype[T]]) -> Self:
         """
         Preserve all finite values in `a` as finite values.
 
@@ -372,15 +373,15 @@ class Interval(Generic[T, N]):
 
 class IndexedInterval(Generic[T, N]):
     __slots__ = ("_lower", "_upper", "_index")
-    _lower: np.ndarray[tuple[N], T]
-    _upper: np.ndarray[tuple[N], T]
+    _lower: np.ndarray[tuple[N], np.dtype[T]]
+    _upper: np.ndarray[tuple[N], np.dtype[T]]
     _index: Any
 
     def __init__(
         self,
         *,
-        _lower: np.ndarray[tuple[N], T],
-        _upper: np.ndarray[tuple[N], T],
+        _lower: np.ndarray[tuple[N], np.dtype[T]],
+        _upper: np.ndarray[tuple[N], np.dtype[T]],
         _index: Any,
     ) -> None:
         self._lower = _lower
@@ -534,7 +535,7 @@ class Upper:
 
 class IntervalUnion(Generic[T, N, U]):
     """
-    Union of `U` intervals, each over a `N`-sized [`ndarray`][numpy.ndarray] of dtype `T`.
+    Union of `U` intervals, each over a `N`-sized [`ndarray`][numpy.ndarray] of data type `T`.
     """
 
     __slots__ = ("_lower", "_upper")
@@ -543,20 +544,20 @@ class IntervalUnion(Generic[T, N, U]):
     # - no non-empty intervals come after empty intervals
     # - no intervals intersect within the union
     # - no intervals can be adjacent within the union, e.g. [1..3] and [4..5]
-    _lower: np.ndarray[tuple[U, N], T]
-    _upper: np.ndarray[tuple[U, N], T]
+    _lower: np.ndarray[tuple[U, N], np.dtype[T]]
+    _upper: np.ndarray[tuple[U, N], np.dtype[T]]
 
     def __init__(
         self,
         *,
-        _lower: np.ndarray[tuple[U, N], T],
-        _upper: np.ndarray[tuple[U, N], T],
+        _lower: np.ndarray[tuple[U, N], np.dtype[T]],
+        _upper: np.ndarray[tuple[U, N], np.dtype[T]],
     ) -> None:
         self._lower = _lower
         self._upper = _upper
 
     @staticmethod
-    def empty(dtype: T, n: N, u: U) -> "IntervalUnion[T, N, U]":
+    def empty(dtype: np.dtype[T], n: N, u: U) -> "IntervalUnion[T, N, U]":
         """
         Create an empty interval union that contains no values.
 
@@ -772,13 +773,15 @@ class IntervalUnion(Generic[T, N, U]):
 
         return IntervalUnion(_lower=out._lower[:uv], _upper=out._upper[:uv])  # type: ignore
 
-    def contains(self, other: np.ndarray[S, T]) -> np.ndarray[S, np.dtype[np.bool]]:
+    def contains(
+        self, other: np.ndarray[S, np.dtype[T]]
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check if this interval union contains the elements of the `other` array.
 
         Parameters
         ----------
-        other : np.ndarray[S, T]
+        other : np.ndarray[S, np.dtype[T]]
             The array whose elements' membership in interval union should be
             checked
 
@@ -800,7 +803,9 @@ class IntervalUnion(Generic[T, N, U]):
 
         return is_contained.reshape(other.shape)  # type: ignore
 
-    def _pick_simple(self, prediction: np.ndarray[S, T]) -> np.ndarray[S, T]:
+    def _pick_simple(
+        self, prediction: np.ndarray[S, np.dtype[T]]
+    ) -> np.ndarray[S, np.dtype[T]]:
         # simple pick:
         #  1. if prediction is in the interval, use it
         #  2. otherwise pick the lower bound of the first interval
@@ -809,7 +814,9 @@ class IntervalUnion(Generic[T, N, U]):
 
         return pick
 
-    def _pick_more_zeros(self, prediction: np.ndarray[S, T]) -> np.ndarray[S, T]:
+    def _pick_more_zeros(
+        self, prediction: np.ndarray[S, np.dtype[T]]
+    ) -> np.ndarray[S, np.dtype[T]]:
         if prediction.size == 0:
             return prediction
 
@@ -903,7 +910,9 @@ class IntervalUnion(Generic[T, N, U]):
 
         return pick.reshape(prediction.shape)
 
-    def pick(self, prediction: np.ndarray[S, T]) -> np.ndarray[S, T]:
+    def pick(
+        self, prediction: np.ndarray[S, np.dtype[T]]
+    ) -> np.ndarray[S, np.dtype[T]]:
         """
         Pick a member of the interval union that minimises the cost of correcting the prediction to be a member of the interval union.
 
@@ -912,12 +921,12 @@ class IntervalUnion(Generic[T, N, U]):
 
         Parameters
         ----------
-        prediction : np.ndarray[S, T]
+        prediction : np.ndarray[S, np.dtype[T]]
             A prediction for a member of the interval union
 
         Returns
         -------
-        member : np.ndarray[S, T]
+        member : np.ndarray[S, np.dtype[T]]
             A member of the interval union
         """
 

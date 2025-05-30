@@ -14,7 +14,6 @@ import sympy.tensor.array.expressions  # noqa: F401
 from numpy.lib.stride_tricks import sliding_window_view
 
 from ....cast import (
-    F,
     _isfinite,
     _isinf,
     _isnan,
@@ -25,6 +24,7 @@ from ....cast import (
     to_float,
 )
 from ....intervals import Interval, IntervalUnion
+from ....typing import F, S, T
 from ..._qois.amath import CONSTRUCTORS as AMATH_CONSTRUCTORS
 from ..._qois.amath import FUNCTIONS as AMATH_FUNCTIONS
 from ..._qois.array import NumPyLikeArray
@@ -49,7 +49,7 @@ from .. import (
     NeighbourhoodBoundaryAxis,
     _pad_with_boundary,
 )
-from ..abc import S, StencilSafeguard, T
+from ..abc import StencilSafeguard
 from . import StencilExpr
 
 Qs = TypeVar("Qs", bound=tuple[int, ...])
@@ -406,7 +406,9 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
         return tuple(neighbourhood)
 
-    def evaluate_qoi(self, data: np.ndarray[S, T]) -> np.ndarray[tuple[int, ...], F]:
+    def evaluate_qoi(
+        self, data: np.ndarray[S, np.dtype[T]]
+    ) -> np.ndarray[tuple[int, ...], np.dtype[F]]:
         """
         Evaluate the derived quantity of interest on the `data`.
 
@@ -420,12 +422,12 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
         Parameters
         ----------
-        data : np.ndarray[S, T]
+        data : np.ndarray[S, np.dtype[T]]
             Data for which the quantity of interest is evaluated.
 
         Returns
         -------
-        qoi : np.ndarray[tuple[int, ...], F]
+        qoi : np.ndarray[tuple[int, ...], np.dtype[F]]
             Evaluated quantity of interest, in floating point.
         """
 
@@ -476,7 +478,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
-        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `decoded` array satisfy the absolute error
@@ -587,7 +589,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         return ok  # type: ignore
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]]
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the absolute error bound is upheld with
@@ -811,11 +813,13 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 def _compute_data_eb_for_stencil_qoi_eb(
     expr: sp.Basic,
     X: sp.tensor.array.expressions.ArraySymbol,
-    XvN: np.ndarray[tuple[int, ...], F],  # np.ndarray[tuple[*Qs, *Ns], F],
-    Xv: np.ndarray[Qs, F],
-    tauv_lower: np.ndarray[Qs, F],
-    tauv_upper: np.ndarray[Qs, F],
-) -> tuple[np.ndarray[Qs, F], np.ndarray[Qs, F]]:
+    XvN: np.ndarray[
+        tuple[int, ...], np.dtype[F]
+    ],  # np.ndarray[tuple[*Qs, *Ns], np.dtype[F]],
+    Xv: np.ndarray[Qs, np.dtype[F]],
+    tauv_lower: np.ndarray[Qs, np.dtype[F]],
+    tauv_upper: np.ndarray[Qs, np.dtype[F]],
+) -> tuple[np.ndarray[Qs, np.dtype[F]], np.ndarray[Qs, np.dtype[F]]]:
     """
     Translate an error bound on a derived quantity of interest (QoI) into an
     error bound on the input data.
@@ -829,18 +833,18 @@ def _compute_data_eb_for_stencil_qoi_eb(
         Symbolic SymPy expression that defines the QoI.
     X : sp.tensor.array.expressions.ArraySymbol
         Symbol for the input data neighbourhood.
-    XvN : np.ndarray[tuple[*Qs, *Ns], F]
+    XvN : np.ndarray[tuple[*Qs, *Ns], np.dtype[F]]
         Actual values of the input data, with the neighbourhood on the last axes.
-    Xv : np.ndarray[Qs, F]
+    Xv : np.ndarray[Qs, np.dtype[F]]
         Actual values of the input data.
-    eb_expr_lower : np.ndarray[Qs, F]
+    eb_expr_lower : np.ndarray[Qs, np.dtype[F]]
         Finite pointwise lower bound on the QoI error, must be negative or zero.
-    eb_expr_upper : np.ndarray[Qs, F]
+    eb_expr_upper : np.ndarray[Qs, np.dtype[F]]
         Finite pointwise upper bound on the QoI error, must be positive or zero.
 
     Returns
     -------
-    eb_x_lower, eb_x_upper : tuple[np.ndarray[Qs, F], np.ndarray[Qs, F]]
+    eb_x_lower, eb_x_upper : tuple[np.ndarray[Qs, np.dtype[F]], np.ndarray[Qs, np.dtype[F]]]
         Finite pointwise lower and upper error bound on the input data `x`.
 
     Inspired by:

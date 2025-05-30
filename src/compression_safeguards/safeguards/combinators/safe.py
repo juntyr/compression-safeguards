@@ -7,7 +7,8 @@ __all__ = ["AlwaysSafeguard"]
 import numpy as np
 
 from ...intervals import Interval, IntervalUnion
-from ..pointwise.abc import PointwiseSafeguard, S, T
+from ...typing import S, T
+from ..pointwise.abc import PointwiseSafeguard
 
 
 class AlwaysSafeguard(PointwiseSafeguard):
@@ -26,7 +27,7 @@ class AlwaysSafeguard(PointwiseSafeguard):
         pass
 
     def check_pointwise(
-        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         All elements are safe and thus always succeed the check.
@@ -47,7 +48,7 @@ class AlwaysSafeguard(PointwiseSafeguard):
         return np.ones_like(data, dtype=np.bool)  # type: ignore
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]]
     ) -> IntervalUnion[T, int, int]:
         """
         Since all values are always safe, the safe intervals for each element

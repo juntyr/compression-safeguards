@@ -11,21 +11,14 @@ __all__ = [
     "from_total_order",
 ]
 
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable
 
 import numpy as np
 
-T = TypeVar("T", bound=np.dtype)
-""" Any numpy [`dtype`][numpy.dtype] type variable. """
-F = TypeVar("F", bound=np.dtype)
-""" Any numpy [`floating`][numpy.floating] dtype type variable. """
-U = TypeVar("U", bound=np.dtype)
-""" Any numpy [`unsigned`][numpy.unsigned] dtype type variable. """
-S = TypeVar("S", bound=tuple[int, ...])
-""" Any array shape. """
+from .typing import F, S, T, U
 
 
-def to_float(x: np.ndarray[S, T]) -> np.ndarray[S, F]:
+def to_float(x: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[F]]:
     """
     Losslessly convert the array `x` to floating point.
 
@@ -34,12 +27,12 @@ def to_float(x: np.ndarray[S, T]) -> np.ndarray[S, F]:
 
     Parameters
     ----------
-    x : np.ndarray[S, T]
+    x : np.ndarray[S, np.dtype[T]]
         The array to convert.
 
     Returns
     -------
-    converted : np.ndarray[S, F]
+    converted : np.ndarray[S, np.dtype[F]]
         The converted array with a floating dtype.
     """
 
@@ -61,18 +54,19 @@ def to_float(x: np.ndarray[S, T]) -> np.ndarray[S, F]:
 
 
 def to_finite_float(
-    x: int | float | np.ndarray[S, T],
-    dtype: F,
+    x: int | float | np.ndarray[S, np.dtype[T]],
+    dtype: np.dtype[F],
     *,
-    map: None | Callable[[np.ndarray[S, F]], np.ndarray[S, F]] = None,
-) -> np.ndarray[S, F]:
+    map: None
+    | Callable[[np.ndarray[S, np.dtype[F]]], np.ndarray[S, np.dtype[F]]] = None,
+) -> np.ndarray[S, np.dtype[F]]:
     """
-    Convert `x` to the floating-point dtype `F` and apply an optional `map`ping function.
+    Convert `x` to the floating-point data type `F` and apply an optional `map`ping function.
 
     The result is clamped between the minimum and maximum floating point values
     to guarantee that it is finite.
 
-    The dtype `F` should come from a prior use of the
+    The floating-point `dtype` should come from a prior use of the
     [`to_float`][compression_safeguards.cast.to_float] helper function.
 
     Parameters
@@ -86,11 +80,11 @@ def to_finite_float(
 
     Returns
     -------
-    converted : np.ndarray[tuple[int, ...], F]
+    converted : np.ndarray[tuple[int, ...], np.dtype[F]]
         The converted value or array with `dtype`.
     """
 
-    xf: np.ndarray[S, F] = np.array(x).astype(dtype)  # type: ignore
+    xf: np.ndarray[S, np.dtype[F]] = np.array(x).astype(dtype)  # type: ignore
 
     if map is not None:
         xf = np.array(map(xf)).astype(dtype)  # type: ignore
@@ -104,7 +98,9 @@ def to_finite_float(
     return np.where(_isnan(xf), xf, np.maximum(minv, np.minimum(xf, maxv)))  # type: ignore
 
 
-def from_float(x: np.ndarray[S, F], dtype: T) -> np.ndarray[S, T]:
+def from_float(
+    x: np.ndarray[S, np.dtype[F]], dtype: np.dtype[T]
+) -> np.ndarray[S, np.dtype[T]]:
     """
     Reverses the conversion of the array `x`, using the
     [`to_float`][compression_safeguards.cast.to_float], back to the original
@@ -115,41 +111,43 @@ def from_float(x: np.ndarray[S, F], dtype: T) -> np.ndarray[S, T]:
 
     Parameters
     ----------
-    x : np.ndarray[S, F]
+    x : np.ndarray[S, np.dtype[F]]
         The array to re-convert.
     dtype : np.dtype
         The original dtype.
 
     Returns
     -------
-    converted : np.ndarray[S, T]
+    converted : np.ndarray[S, np.dtype[T]]
         The re-converted array with the original `dtype`.
     """
 
     if x.dtype == dtype:
         return x  # type: ignore
 
-    info = np.iinfo(dtype)
+    info = np.iinfo(dtype)  # type: ignore
     imin, imax = np.array(info.min, dtype=dtype), np.array(info.max, dtype=dtype)
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         return np.where(x < imin, imin, np.where(x <= imax, x.astype(dtype), imax))  # type: ignore
 
 
-def as_bits(a: np.ndarray[S, T], *, kind: str = "u") -> np.ndarray[S, Any]:
+def as_bits(
+    a: np.ndarray[S, np.dtype[T]], *, kind: str = "u"
+) -> np.ndarray[S, np.dtype[Any]]:
     """
     Reinterprets the array `a` to its binary representation.
 
     Parameters
     ----------
-    a : np.ndarray[S, T]
+    a : np.ndarray[S, np.dtype[T]]
         The array to reinterpret as binary.
     kind : str, optional
         The kind of binary dtype, e.g. `"u"` or `"i"`.
 
     Returns
     -------
-    binary : np.ndarray[S, Any]
+    binary : np.ndarray[S, np.dtype[Any]]
         The binary representation of the array `a`.
     """
 
@@ -162,7 +160,7 @@ def as_bits(a: np.ndarray[S, T], *, kind: str = "u") -> np.ndarray[S, Any]:
     )  # type: ignore
 
 
-def to_total_order(a: np.ndarray[S, T]) -> np.ndarray[S, U]:
+def to_total_order(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[U]]:
     """
     Reinterprets the array `a` to its total-order unsigned binary
     representation.
@@ -176,12 +174,12 @@ def to_total_order(a: np.ndarray[S, T]) -> np.ndarray[S, U]:
 
     Parameters
     ----------
-    a : np.ndarray[S, T]
+    a : np.ndarray[S, np.dtype[T]]
         The array to reinterpret to its total-order.
 
     Returns
     -------
-    ordered : np.ndarray[S, U]
+    ordered : np.ndarray[S, np.dtype[U]]
         The total-order unsigned binary representation of the array `a`.
     """
 
@@ -191,7 +189,8 @@ def to_total_order(a: np.ndarray[S, T]) -> np.ndarray[S, U]:
     utype = a.dtype.str.replace("i", "u").replace("f", "u")
 
     if np.issubdtype(a.dtype, np.signedinteger):
-        return a.view(utype) + np.array(np.iinfo(a.dtype).max, dtype=utype) + 1
+        shift = np.iinfo(a.dtype).max  # type: ignore
+        return a.view(utype) + np.array(shift, dtype=utype) + 1
 
     if not np.issubdtype(a.dtype, np.floating):
         raise TypeError(f"unsupported interval type {a.dtype}")
@@ -206,7 +205,9 @@ def to_total_order(a: np.ndarray[S, T]) -> np.ndarray[S, U]:
     return a.view(dtype=utype) ^ mask
 
 
-def from_total_order(a: np.ndarray[S, U], dtype: T) -> np.ndarray[S, T]:
+def from_total_order(
+    a: np.ndarray[S, np.dtype[U]], dtype: np.dtype[T]
+) -> np.ndarray[S, np.dtype[T]]:
     """
     Reverses the reinterpretation of the array `a` back from total-order
     unsigned binary to the provided `dtype`.
@@ -216,12 +217,12 @@ def from_total_order(a: np.ndarray[S, U], dtype: T) -> np.ndarray[S, T]:
 
     Parameters
     ----------
-    a : np.ndarray[S, U]
+    a : np.ndarray[S, np.dtype[U]]
         The array to reverse-reinterpret back from its total-order.
 
     Returns
     -------
-    array : np.ndarray[S, T]
+    array : np.ndarray[S, np.dtype[T]]
         The array with its original `dtype`.
     """
 
@@ -231,7 +232,8 @@ def from_total_order(a: np.ndarray[S, U], dtype: T) -> np.ndarray[S, T]:
         return a  # type: ignore
 
     if np.issubdtype(dtype, np.signedinteger):
-        return a.view(dtype) + np.iinfo(dtype).max + 1  # type: ignore
+        shift = np.iinfo(dtype).max  # type: ignore
+        return a.view(dtype) + shift + 1
 
     if not np.issubdtype(dtype, np.floating):
         raise TypeError(f"unsupported interval type {dtype}")
@@ -250,7 +252,7 @@ def from_total_order(a: np.ndarray[S, U], dtype: T) -> np.ndarray[S, T]:
 # wrapper around np.isnan that also works for numpy_quaddtype
 @np.errstate(invalid="ignore")
 def _isnan(
-    a: int | float | np.ndarray[S, T],
+    a: int | float | np.ndarray[S, np.dtype[T]],
 ) -> bool | np.ndarray[S, np.dtype[np.bool]]:
     if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
         return np.isnan(a)  # type: ignore
@@ -260,7 +262,7 @@ def _isnan(
 # wrapper around np.isinf that also works for numpy_quaddtype
 @np.errstate(invalid="ignore")
 def _isinf(
-    a: int | float | np.ndarray[S, T],
+    a: int | float | np.ndarray[S, np.dtype[T]],
 ) -> bool | np.ndarray[S, np.dtype[np.bool]]:
     if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
         return np.isinf(a)  # type: ignore
@@ -270,7 +272,7 @@ def _isinf(
 # wrapper around np.isfinite that also works for numpy_quaddtype
 @np.errstate(invalid="ignore")
 def _isfinite(
-    a: int | float | np.ndarray[S, T],
+    a: int | float | np.ndarray[S, np.dtype[T]],
 ) -> bool | np.ndarray[S, np.dtype[np.bool]]:
     if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
         return np.isfinite(a)  # type: ignore
@@ -279,7 +281,7 @@ def _isfinite(
 
 # wrapper around np.nan_to_num that also works for numpy_quaddtype
 @np.errstate(invalid="ignore")
-def _nan_to_zero(a: np.ndarray[S, T]) -> np.ndarray[S, T]:
+def _nan_to_zero(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
     if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
         return np.nan_to_num(a, nan=0, posinf=np.inf, neginf=-np.inf)  # type: ignore
     return np.where(_isnan(a), _float128(0), a)  # type: ignore
@@ -289,8 +291,8 @@ def _nan_to_zero(a: np.ndarray[S, T]) -> np.ndarray[S, T]:
 # Implementation is variant 2 from https://stackoverflow.com/a/70512834
 @np.errstate(invalid="ignore")
 def _nextafter(
-    a: np.ndarray[S, T], b: int | float | np.ndarray[S, T]
-) -> np.ndarray[S, T]:
+    a: np.ndarray[S, np.dtype[T]], b: int | float | np.ndarray[S, np.dtype[T]]
+) -> np.ndarray[S, np.dtype[T]]:
     if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
         return np.nextafter(a, b)  # type: ignore
 

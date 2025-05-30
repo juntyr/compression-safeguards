@@ -7,7 +7,6 @@ __all__ = ["RatioErrorBoundSafeguard"]
 import numpy as np
 
 from ...cast import (
-    F,
     _isfinite,
     _isinf,
     _isnan,
@@ -19,7 +18,8 @@ from ...cast import (
     to_total_order,
 )
 from ...intervals import Interval, IntervalUnion, Lower, Upper
-from .abc import PointwiseSafeguard, S, T
+from ...typing import F, S, T
+from .abc import PointwiseSafeguard
 
 
 class RatioErrorBoundSafeguard(PointwiseSafeguard):
@@ -84,7 +84,7 @@ class RatioErrorBoundSafeguard(PointwiseSafeguard):
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
-        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `decoded` array satisfy the ratio error
@@ -141,7 +141,7 @@ class RatioErrorBoundSafeguard(PointwiseSafeguard):
         return ok  # type: ignore
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]]
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the ratio error bound is upheld with
@@ -188,13 +188,13 @@ class RatioErrorBoundSafeguard(PointwiseSafeguard):
 
 
 def _compute_safe_eb_ratio_interval(
-    data: np.ndarray[S, T],
-    data_float: np.ndarray[S, F],
-    eb_ratio: np.ndarray[tuple[()], F],
+    data: np.ndarray[S, np.dtype[T]],
+    data_float: np.ndarray[S, np.dtype[F]],
+    eb_ratio: np.ndarray[tuple[()], np.dtype[F]],
     equal_nan: bool,
 ) -> Interval[T, int]:
-    dataf: np.ndarray[tuple[int], T] = data.flatten()
-    dataf_float: np.ndarray[tuple[int], F] = data_float.flatten()
+    dataf: np.ndarray[tuple[int], np.dtype[T]] = data.flatten()
+    dataf_float: np.ndarray[tuple[int], np.dtype[F]] = data_float.flatten()
 
     valid = (
         Interval.empty_like(dataf)

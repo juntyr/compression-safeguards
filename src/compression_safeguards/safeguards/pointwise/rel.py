@@ -16,7 +16,8 @@ from ...cast import (
     to_float,
 )
 from ...intervals import IntervalUnion, Lower, Upper
-from .abc import PointwiseSafeguard, S, T
+from ...typing import S, T
+from .abc import PointwiseSafeguard
 from .abs import _compute_safe_eb_diff_interval
 
 
@@ -63,7 +64,7 @@ class RelativeErrorBoundSafeguard(PointwiseSafeguard):
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
-        self, data: np.ndarray[S, T], decoded: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `decoded` array satisfy the relative error
@@ -115,7 +116,7 @@ class RelativeErrorBoundSafeguard(PointwiseSafeguard):
         return ok  # type: ignore
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, T]
+        self, data: np.ndarray[S, np.dtype[T]]
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the relative error bound is upheld with
