@@ -812,7 +812,7 @@ class IntervalUnion(Generic[T, N, U]):
         pick = self._lower[0].reshape(prediction.shape).copy()
         pick = np.where(self.contains(prediction), prediction, pick)
 
-        return pick
+        return pick  # type: ignore
 
     def _pick_more_zeros(
         self, prediction: np.ndarray[S, np.dtype[T]]
@@ -908,7 +908,7 @@ class IntervalUnion(Generic[T, N, U]):
         )
         assert np.all(self.contains(pick))
 
-        return pick.reshape(prediction.shape)
+        return pick.reshape(prediction.shape)  # type: ignore
 
     def pick(
         self, prediction: np.ndarray[S, np.dtype[T]]
