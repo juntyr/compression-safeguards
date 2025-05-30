@@ -36,7 +36,7 @@ class NoiseCodec(Codec):
     codec_id = "noise"  # type: ignore
 
     def encode(self, buf):
-        return np.array(buf) + np.random.normal(scale=0.1, size=buf.shape)
+        return buf + np.random.normal(scale=0.1, size=buf.shape).astype(buf.dtype)
 
     def decode(self, buf, out=None):
         return numcodecs.compat.ndarray_copy(buf, out)
