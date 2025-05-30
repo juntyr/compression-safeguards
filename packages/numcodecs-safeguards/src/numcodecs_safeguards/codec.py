@@ -131,8 +131,26 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             else numcodecs.registry.get_codec(lossless.for_safeguards)
         )
 
-    def encode(self, buf: Buffer) -> Buffer:
+    def encode(self, buf: Buffer) -> bytes:
         """Encode the data in `buf`.
+
+        The encoded data is defined by the following *stable* format:
+
+        ```
+        ULEB128(len(correction_bytes)), encoded_bytes, correction_bytes
+        ```
+
+        where
+
+        - `ULEB128` refers to the unsigned LEB128 (little endian base 128)
+          variable length encoding for unsigned integers
+        - `encoded_bytes` refers to the codec- and lossless-encoded bytes of
+          the data in `buf`
+        - `correction_bytes` refers to the lossless-encoded safeguards
+          correction
+
+        If no correction is required, `correction_bytes` is empty and there is
+        only a single-byte overhead from using the safeguards.
 
         Parameters
         ----------
@@ -142,9 +160,8 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         Returns
         -------
-        enc : Buffer
-            Encoded data. May be any object supporting the new-style buffer
-            protocol.
+        enc : bytes
+            Encoded data as a bytestring.
         """
 
         data = numcodecs.compat.ensure_ndarray(buf)
@@ -204,8 +221,8 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         Parameters
         ----------
         buf : Buffer
-            Encoded data. May be any object supporting the new-style buffer
-            protocol.
+            Encoded data. Must be an object representing a bytestring, e.g.
+            [`bytes`][bytes] or a 1D array of [`np.uint8`][numpy.uint8]s etc.
         out : None | Buffer
             Writeable buffer to store decoded data. N.B. if provided, this buffer must
             be exactly the right size to store the decoded data.
