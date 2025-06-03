@@ -39,7 +39,7 @@ class BinaryDeltaCodec(Codec):
 
         a_bits = np.cumsum(a_bits_delta, dtype=a_bits_delta.dtype)
 
-        a = a_bits.view(a_delta.dtype, a_delta.shape)
+        a = a_bits.view(a_delta.dtype).reshape(a_delta.shape)
 
         return numcodecs.compat.ndarray_copy(a, out)  # type: ignore
 
