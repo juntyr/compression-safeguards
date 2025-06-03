@@ -11,54 +11,48 @@ import numcodecs.registry
 import numpy as np
 from compression_safeguards.cast import as_bits
 from numcodecs.abc import Codec
+from numcodecs_combinators.best import PickBestCodec
 from numcodecs_combinators.stack import CodecStack
 from numcodecs_huffman import HuffmanCodec
 from typing_extensions import Buffer  # MSPV 3.12
 
 
-class DeltaHuffmanCodec(HuffmanCodec):
+class BinaryDeltaCodec(Codec):
     __slots__ = ()
 
-    codec_id: str = "safeguards.lossless.delta_huffman"  # type: ignore
+    codec_id: str = "safeguards.lossless.binary_delta"  # type: ignore
 
-    def encode(self, buf: Buffer) -> bytes:
+    def encode(self, buf: Buffer) -> Buffer:
         a = numcodecs.compat.ensure_ndarray(buf)
-        dtype, shape = a.dtype, a.shape
-        a = as_bits(a.flatten())
+        a_bits = as_bits(a.flatten())
 
-        a_delta = a.copy()
-        a_delta[1:] = np.diff(a_delta)
+        a_bits_delta = a_bits.copy()
+        a_bits_delta[1:] = np.diff(a_bits)
 
-        encoded: bytes = super().encode(a.view(dtype).reshape(shape))
-        encoded_delta: bytes = super().encode(a_delta.view(dtype).reshape(shape))
+        a_delta = a_bits_delta.view(a.dtype).reshape(a.shape)
 
-        if len(encoded_delta) < len(encoded):
-            return bytes([1]) + encoded_delta
-
-        return bytes([0]) + encoded
+        return a_delta
 
     def decode(self, buf: Buffer, out: None | Buffer = None) -> Buffer:
-        b = numcodecs.compat.ensure_bytes(buf)
+        a_delta = numcodecs.compat.ensure_ndarray(buf)
+        a_bits_delta = as_bits(a_delta.flatten())
 
-        marker, b = b[0], b[1:]
+        a_bits = np.cumsum(a_bits_delta, dtype=a_bits_delta.dtype)
 
-        decoded = numcodecs.compat.ensure_ndarray(super().decode(b, out=out))
+        a = a_bits.view(a_delta.dtype, a_delta.shape)
 
-        if marker != 0:
-            shape, dtype = decoded.shape, decoded.dtype
-            decoded = as_bits(decoded).flatten()
-            decoded = np.cumsum(decoded, dtype=decoded.dtype)
-            decoded = decoded.view(dtype).reshape(shape)
-
-        return numcodecs.compat.ndarray_copy(decoded, out)  # type: ignore
+        return numcodecs.compat.ndarray_copy(a, out)  # type: ignore
 
 
-numcodecs.registry.register_codec(DeltaHuffmanCodec)
+numcodecs.registry.register_codec(BinaryDeltaCodec)
 
 
 def _default_lossless_for_safeguards():
     return CodecStack(
-        DeltaHuffmanCodec(),
+        PickBestCodec(
+            HuffmanCodec(),
+            CodecStack(BinaryDeltaCodec(), HuffmanCodec()),
+        ),
         numcodecs.zstd.Zstd(level=3),
     )
 

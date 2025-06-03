@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 dependencies = [
     "compression-safeguards==0.0.1",
     "numcodecs>=0.13.0,<0.17",
-    "numcodecs-combinators~=0.2.7",
+    "numcodecs-combinators~=0.2.8",
     "numcodecs-huffman~=0.1.0",
     "numcodecs-zero~=0.1.0",
     "numpy~=2.0",
@@ -21,7 +21,7 @@ dependencies = [
 
 [project.entry-points."numcodecs.codecs"]
 "safeguards" = "numcodecs_safeguards.codec:SafeguardsCodec"
-"safeguards.lossless.delta_huffman" = "numcodecs_safeguards.lossless:DeltaHuffmanCodec"
+"safeguards.lossless.binary_delta" = "numcodecs_safeguards.lossless:BinaryDeltaCodec"
 
 [tool.setuptools.packages.find]
 where = ["src"]
