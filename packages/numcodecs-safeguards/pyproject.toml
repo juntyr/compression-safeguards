@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.entry-points."numcodecs.codecs"]
-"safeguards" = "numcodecs_safeguards.codec:SafeguardsCodec"
+"safeguards" = "numcodecs_safeguards:SafeguardsCodec"
 "safeguards.lossless.binary_delta" = "numcodecs_safeguards.lossless:BinaryDeltaCodec"
 
 [tool.setuptools.packages.find]

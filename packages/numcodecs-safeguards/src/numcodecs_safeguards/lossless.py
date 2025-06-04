@@ -61,8 +61,8 @@ def _default_lossless_for_safeguards():
 class Lossless:
     """
     Configuration for the lossless encoding used by the
-    [`SafeguardsCodec`][numcodecs_safeguards.codec.SafeguardsCodec] to encode
-    the wrapped codec's encoded data and any safeguards-computed corrections.
+    [`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec] to encode the
+    wrapped codec's encoded data and any safeguards-computed corrections.
     """
 
     for_codec: None | dict | Codec = None

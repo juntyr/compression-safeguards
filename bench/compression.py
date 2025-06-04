@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from numcodecs.abc import Codec
-from numcodecs_safeguards.codec import SafeguardsCodec
+from numcodecs_safeguards import SafeguardsCodec
 from numcodecs_safeguards.lossless import Lossless
 from numcodecs_wasm_sz3 import Sz3
 from numcodecs_wasm_zfp import Zfp

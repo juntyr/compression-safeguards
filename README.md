@@ -129,7 +129,7 @@ numcodecs.registry.get_codec(dict(
 ))
 ```
 
-Please refer to the [API documentation](https://juntyr.github.io/numcodecs-safeguards/_ref/numcodecs_safeguards/codec/#numcodecs_safeguards.codec.SafeguardsCodec) for further information.
+Please refer to the [API documentation](https://juntyr.github.io/numcodecs-safeguards/_ref/numcodecs_safeguards/#numcodecs_safeguards.SafeguardsCodec) for further information.
 
 [^2]: If you want to wrap a sequence or stack of codecs, you can use the [`CodecStack`] combinator from the [`numcodecs-combinators`] package.
 [^3]: The method implemented in this package is not specific to the [`numcodecs`] API. Please reach out if you'd like to help bring the safeguards to a different compression API or language.
