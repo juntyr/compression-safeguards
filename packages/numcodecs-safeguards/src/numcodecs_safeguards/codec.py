@@ -189,7 +189,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
             # MSPV 3.11
             if getattr(err, "add_note", None) is not None:
-                err.add_note(message)
+                err.add_note(message)  # type: ignore
                 raise err
             else:
                 raise ValueError(message) from err
@@ -217,7 +217,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
             # MSPV 3.11
             if getattr(err, "add_note", None) is not None:
-                err.add_note(message)
+                err.add_note(message)  # type: ignore
                 raise err
             else:
                 raise ValueError(message) from err

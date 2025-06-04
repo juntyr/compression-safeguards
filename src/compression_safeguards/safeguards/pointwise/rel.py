@@ -154,7 +154,7 @@ class RelativeErrorBoundSafeguard(PointwiseSafeguard):
         dataf = data.flatten()
         Lower(dataf) <= valid[dataf == 0] <= Upper(dataf)
 
-        return valid.into_union()  # type: ignore
+        return valid.into_union()
 
     def get_config(self) -> dict:
         """

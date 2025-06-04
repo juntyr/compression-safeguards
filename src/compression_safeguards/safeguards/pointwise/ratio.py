@@ -168,7 +168,7 @@ class RatioErrorBoundSafeguard(PointwiseSafeguard):
 
         return _compute_safe_eb_ratio_interval(
             data, data_float, eb_ratio, equal_nan=self._equal_nan
-        ).into_union()  # type: ignore
+        ).into_union()
 
     def get_config(self) -> dict:
         """

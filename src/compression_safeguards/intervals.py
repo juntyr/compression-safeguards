@@ -2,7 +2,18 @@
 Types and helpers to construct safe intervals for the safeguards.
 """
 
-__all__ = ["Interval", "IntervalUnion", "Minimum", "Maximum", "Lower", "Upper"]
+__all__ = [
+    "Interval",
+    "IntervalUnion",
+    "Minimum",
+    "Maximum",
+    "Lower",
+    "Upper",
+    "N",
+    "Ni",
+    "U",
+    "Ui",
+]
 
 from typing import Any, Generic, Literal, TypeVar
 
@@ -20,9 +31,17 @@ from .cast import (
 )
 from .typing import S, T
 
-N = TypeVar("N", bound=int)
-U = TypeVar("U", bound=int)
-V = TypeVar("V", bound=int)
+N = TypeVar("N", bound=int, covariant=True)
+""" The number of elements in the interval (covariant). """
+
+Ni = TypeVar("Ni", bound=int)
+""" The number of elements in the interval (invariant). """
+
+U = TypeVar("U", bound=int, covariant=True)
+""" The maximum number of intervals in an interval union (covariant). """
+
+Ui = TypeVar("Ui", bound=int)
+""" The maximum number of intervals in an interval union (invariant). """
 
 
 class Interval(Generic[T, N]):
@@ -95,20 +114,20 @@ class Interval(Generic[T, N]):
         self._upper = _upper
 
     @staticmethod
-    def empty(dtype: np.dtype[T], n: N) -> "Interval[T, N]":
+    def empty(dtype: np.dtype[T], n: Ni) -> "Interval[T, Ni]":
         """
         Create an empty interval that contains no values.
 
         Parameters
         ----------
-        dtype : np.dtype
+        dtype : np.dtype[T]
             The dtype of the interval
-        n : int
+        n : Ni
             The size of the interval
 
         Returns
         -------
-        empty : Interval[dtype, n]
+        empty : Interval[T, Ni]
             The empty interval
         """
 
@@ -125,32 +144,32 @@ class Interval(Generic[T, N]):
 
         Parameters
         ----------
-        a : np.ndarray
+        a : np.ndarray[tuple[int, ...], np.dtype[T]]
             An array whose dtype and size the interval gets.
 
         Returns
         -------
-        empty : Interval[a.dtype, a.size]
+        empty : Interval[T, int]
             The empty interval
         """
 
         return Interval.empty(a.dtype, a.size)
 
     @staticmethod
-    def full(dtype: np.dtype[T], n: N) -> "Interval[T, N]":
+    def full(dtype: np.dtype[T], n: Ni) -> "Interval[T, Ni]":
         """
         Create a full interval that contains all possible values of `dtype`.
 
         Parameters
         ----------
-        dtype : np.dtype
+        dtype : np.dtype[T]
             The dtype of the interval
-        n : int
+        n : Ni
             The size of the interval
 
         Returns
         -------
-        full : Interval[dtype, n]
+        full : Interval[T, Ni]
             The full interval
         """
 
@@ -166,12 +185,12 @@ class Interval(Generic[T, N]):
 
         Parameters
         ----------
-        a : np.ndarray
+        a : np.ndarray[tuple[int, ...], np.dtype[T]]
             An array whose dtype and size the interval gets
 
         Returns
         -------
-        full : Interval[a.dtype, a.size]
+        full : Interval[T, int]
             The full interval
         """
 
@@ -195,7 +214,7 @@ class Interval(Generic[T, N]):
 
         Parameters
         ----------
-        a : np.ndarray
+        a : np.ndarray[tuple[N], np.dtype[T]]
             The arrays whose infinite values this interval should preserve
 
         Returns
@@ -225,8 +244,11 @@ class Interval(Generic[T, N]):
 
         Parameters
         ----------
-        a : np.ndarray
+        a : np.ndarray[tuple[N], np.dtype[T]]
             The arrays whose NaN values this interval should preserve
+        equal_nan : bool
+            Whether any NaN values matches another NaN value or if NaN values
+            should be preserved exactly
 
         Returns
         -------
@@ -275,7 +297,7 @@ class Interval(Generic[T, N]):
 
         Parameters
         ----------
-        a : np.ndarray
+        a : np.ndarray[tuple[N], np.dtype[T]]
             The arrays whose non-finite values this interval should preserve as
             non-finite.
 
@@ -302,12 +324,12 @@ class Interval(Generic[T, N]):
 
         Parameters
         ----------
-        other : Self
+        other : Interval[T, N]
             The other interval to intersect with
 
         Returns
         -------
-        intersection : Self
+        intersection : Interval[T, N]
             The intersection of `self` and `other`
         """
 
@@ -557,22 +579,22 @@ class IntervalUnion(Generic[T, N, U]):
         self._upper = _upper
 
     @staticmethod
-    def empty(dtype: np.dtype[T], n: N, u: U) -> "IntervalUnion[T, N, U]":
+    def empty(dtype: np.dtype[T], n: Ni, u: Ui) -> "IntervalUnion[T, Ni, Ui]":
         """
         Create an empty interval union that contains no values.
 
         Parameters
         ----------
-        dtype : np.dtype
+        dtype : np.dtype[T]
             The dtype of the intervals
-        n : int
+        n : Ni
             The size of the intervals
-        u : int
+        u : Ui
             The number of intervals in the union
 
         Returns
         -------
-        empty : IntervalUnion[dtype, n, u]
+        empty : IntervalUnion[T, Ni, Ui]
             The empty interval union
         """
 
@@ -581,18 +603,20 @@ class IntervalUnion(Generic[T, N, U]):
             _upper=np.full((u, n), _minimum(dtype), dtype=dtype),
         )
 
-    def intersect(self, other: "IntervalUnion[T, N, V]") -> "IntervalUnion[T, N, int]":
+    def intersect(
+        self, other: "IntervalUnion[T, N, int]"
+    ) -> "IntervalUnion[T, N, int]":
         """
         Computes the intersection with the `other` interval union.
 
         Parameters
         ----------
-        other : Self
+        other : IntervalUnion[T, N, int]
             The other interval union to intersect with
 
         Returns
         -------
-        intersection : IntervalUnion[T, N, ..]
+        intersection : IntervalUnion[T, N, int]
             The intersection of `self` and `other`
         """
 
@@ -601,7 +625,7 @@ class IntervalUnion(Generic[T, N, U]):
         if n == 0:
             return IntervalUnion.empty(self._lower.dtype, n, 0)
 
-        uv: int = u + v - 1  # type: ignore
+        uv: int = u + v - 1
         out: IntervalUnion[T, N, int] = IntervalUnion.empty(
             self._lower.dtype,
             n,
@@ -638,19 +662,19 @@ class IntervalUnion(Generic[T, N, U]):
         return IntervalUnion(_lower=out._lower[:uv], _upper=out._upper[:uv])  # type: ignore
 
     def union(
-        self, other: "Interval[T, N] | IntervalUnion[T, N, V]"
+        self, other: "Interval[T, N] | IntervalUnion[T, N, int]"
     ) -> "IntervalUnion[T, N, int]":
         """
         Computes the union with the `other` interval (union).
 
         Parameters
         ----------
-        other : Interval[T, N] | IntervalUnion[T, N, V]
+        other : Interval[T, N] | IntervalUnion[T, N, int]
             The other interval (union) to union with
 
         Returns
         -------
-        union : IntervalUnion[T, N, ..]
+        union : IntervalUnion[T, N, int]
             The union of `self` and `other`
         """
 
@@ -662,12 +686,12 @@ class IntervalUnion(Generic[T, N, U]):
             return IntervalUnion.empty(self._lower.dtype, n, 0)
 
         if u == 0:
-            return otheru  # type: ignore
+            return otheru
 
         if v == 0:
-            return self  # type: ignore
+            return self
 
-        uv: int = u + v  # type: ignore
+        uv: int = u + v
         out: IntervalUnion[T, N, int] = IntervalUnion.empty(
             self._lower.dtype,
             n,
@@ -787,7 +811,7 @@ class IntervalUnion(Generic[T, N, U]):
 
         Returns
         -------
-        contains : np.ndarray[S, bool]
+        contains : np.ndarray[S, np.dtype[np.bool]]
             The pointwise result of the contains check
         """
 
@@ -908,7 +932,7 @@ class IntervalUnion(Generic[T, N, U]):
         )
         assert np.all(self.contains(pick))
 
-        return pick.reshape(prediction.shape)  # type: ignore
+        return pick.reshape(prediction.shape)
 
     def pick(
         self, prediction: np.ndarray[S, np.dtype[T]]

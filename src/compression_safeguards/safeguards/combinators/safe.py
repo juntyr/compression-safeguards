@@ -66,9 +66,9 @@ class AlwaysSafeguard(PointwiseSafeguard):
             always safe.
         """
 
-        return Interval.full_like(data).into_union()  # type: ignore
+        return Interval.full_like(data).into_union()
 
-    def get_config(self) -> dict:  # type: ignore
+    def get_config(self) -> dict:
         """
         Returns the configuration of the safeguard.
 

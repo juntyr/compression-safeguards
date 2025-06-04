@@ -81,7 +81,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         Minimum <= valid[sign == -1] <= Upper(neg_tiny)
         Lower(tiny) <= valid[sign == +1] <= Maximum
 
-        return valid.into_union()  # type: ignore
+        return valid.into_union()
 
     def get_config(self) -> dict:
         """

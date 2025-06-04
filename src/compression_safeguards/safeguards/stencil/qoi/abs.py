@@ -445,8 +445,10 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
                 )
 
         if any(s == 0 for s in empty_shape):
-            float_dtype: np.dtype = to_float(np.array([0, 1], dtype=data.dtype)).dtype
-            return np.zeros(empty_shape, dtype=float_dtype)  # type: ignore
+            float_dtype: np.dtype[F] = to_float(
+                np.array([0, 1], dtype=data.dtype)
+            ).dtype
+            return np.zeros(empty_shape, dtype=float_dtype)
 
         data_boundary = data
         for axis in self._neighbourhood:
@@ -615,9 +617,9 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         #  neighbourhood shape exceeds the data shape, allow all values
         for axis, w in zip(self._neighbourhood, window):
             if data.shape[axis.axis] < w and axis.boundary == BoundaryCondition.valid:
-                return Interval.full_like(data).into_union()  # type: ignore
+                return Interval.full_like(data).into_union()
         if data.size == 0:
-            return Interval.full_like(data).into_union()  # type: ignore
+            return Interval.full_like(data).into_union()
 
         data_boundary = data
         for axis in self._neighbourhood:
@@ -789,7 +791,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             eb_x_orig_lower,
             eb_x_orig_upper,
             equal_nan=True,
-        ).into_union()  # type: ignore
+        ).into_union()
 
     def get_config(self) -> dict:
         """

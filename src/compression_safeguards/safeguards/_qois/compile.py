@@ -63,7 +63,7 @@ def _create_sympy_numpy_printer_class(
         __slots__ = ("_dtype",)
 
         # remove default printing of known constants
-        _kc = dict()
+        _kc: dict = dict()
 
         def __init__(self, settings=None):
             self._dtype = dtype.name

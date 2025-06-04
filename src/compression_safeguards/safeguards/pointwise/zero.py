@@ -90,7 +90,7 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
         # preserve zero values exactly, do not constrain other values
         Lower(zero) <= valid[as_bits(dataf) == as_bits(zero)] <= Upper(zero)
 
-        return valid.into_union()  # type: ignore
+        return valid.into_union()
 
     def get_config(self) -> dict:
         """

@@ -84,10 +84,10 @@ def to_finite_float(
         The converted value or array with `dtype`.
     """
 
-    xf: np.ndarray[S, np.dtype[F]] = np.array(x).astype(dtype)  # type: ignore
+    xf: np.ndarray[S, np.dtype[F]] = np.array(x).astype(dtype)
 
     if map is not None:
-        xf = np.array(map(xf)).astype(dtype)  # type: ignore
+        xf = np.array(map(xf)).astype(dtype)
 
     if np.dtype(dtype) == _float128_dtype:
         minv, maxv = _float128_min, _float128_max
@@ -291,12 +291,12 @@ def _nan_to_zero(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
 # Implementation is variant 2 from https://stackoverflow.com/a/70512834
 @np.errstate(invalid="ignore")
 def _nextafter(
-    a: np.ndarray[S, np.dtype[T]], b: int | float | np.ndarray[S, np.dtype[T]]
-) -> np.ndarray[S, np.dtype[T]]:
+    a: np.ndarray[S, np.dtype[F]], b: int | float | np.ndarray[S, np.dtype[F]]
+) -> np.ndarray[S, np.dtype[F]]:
     if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
         return np.nextafter(a, b)  # type: ignore
 
-    b = np.array(b, dtype=a.dtype)  # type: ignore
+    b = np.array(b, dtype=a.dtype)
 
     _float128_neg_zero = -_float128(0)
 
@@ -381,7 +381,7 @@ except (AttributeError, AssertionError):
         _float128_eps = numpy_quaddtype.epsilon
         _float128_smallest_normal = numpy_quaddtype.min_value
         # taken from https://sleef.org/quad.xhtml
-        _float128_smallest_subnormal = _float128(2) ** (-16494)  # type: ignore
+        _float128_smallest_subnormal = _float128(2) ** (-16494)
         _float128_precision = 33
     except ImportError:
         raise TypeError("""

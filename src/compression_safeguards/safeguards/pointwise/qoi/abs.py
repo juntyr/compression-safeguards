@@ -409,7 +409,7 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
             eb_x_lower,
             eb_x_upper,
             equal_nan=True,
-        ).into_union()  # type: ignore
+        ).into_union()
 
     def get_config(self) -> dict:
         """
