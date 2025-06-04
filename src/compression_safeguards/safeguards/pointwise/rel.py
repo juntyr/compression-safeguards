@@ -6,7 +6,7 @@ __all__ = ["RelativeErrorBoundSafeguard"]
 
 import numpy as np
 
-from ...cast import (
+from ...utils.cast import (
     _isfinite,
     _isinf,
     _isnan,
@@ -15,8 +15,8 @@ from ...cast import (
     to_finite_float,
     to_float,
 )
-from ...intervals import IntervalUnion, Lower, Upper
-from ...typing import S, T
+from ...utils.intervals import IntervalUnion, Lower, Upper
+from ...utils.typing import S, T
 from .abc import PointwiseSafeguard
 from .abs import _compute_safe_eb_diff_interval
 

@@ -52,11 +52,13 @@ class Interval(Generic[T, N]):
 
     An interval should only be constructed using
 
-    - [`Interval.empty`][compression_safeguards.intervals.Interval.empty] or
-      [`Interval.empty_like`][compression_safeguards.intervals.Interval.empty_like]
+    - [`Interval.empty`][compression_safeguards.utils.intervals.Interval.empty]
+      or
+      [`Interval.empty_like`][compression_safeguards.utils.intervals.Interval.empty_like]
       for an empty interval that contains no values
-    - [`Interval.full`][compression_safeguards.intervals.Interval.full] or
-      [`Interval.full_like`][compression_safeguards.intervals.Interval.full_like]
+    - [`Interval.full`][compression_safeguards.utils.intervals.Interval.full]
+      or
+      [`Interval.full_like`][compression_safeguards.utils.intervals.Interval.full_like]
       for a full interval that contains all possible values
 
     ## Overriding lower and upper bounds
@@ -85,19 +87,21 @@ class Interval(Generic[T, N]):
 
     The following common lower and upper bounds are provided for ease of use:
 
-    - [`Interval.preserve_inf`][compression_safeguards.intervals.Interval.preserve_inf]
-    - [`Interval.preserve_nan`][compression_safeguards.intervals.Interval.preserve_nan]
-    - [`Interval.preserve_finite`][compression_safeguards.intervals.Interval.preserve_finite]
+    - [`Interval.preserve_inf`][compression_safeguards.utils.intervals.Interval.preserve_inf]
+    - [`Interval.preserve_nan`][compression_safeguards.utils.intervals.Interval.preserve_nan]
+    - [`Interval.preserve_finite`][compression_safeguards.utils.intervals.Interval.preserve_finite]
 
     ## Interval operations
 
     Two intervals can be
 
-    - intersected using [`Interval.intersect`][compression_safeguards.intervals.Interval.intersect]
-    - unioned using [`Interval.union`][compression_safeguards.intervals.Interval.union]
+    - intersected using
+      [`Interval.intersect`][compression_safeguards.utils.intervals.Interval.intersect]
+    - unioned using
+      [`Interval.union`][compression_safeguards.utils.intervals.Interval.union]
 
     or converted into a single-member union of intervals using
-    [`Interval.into_union`][compression_safeguards.intervals.Interval.into_union].
+    [`Interval.into_union`][compression_safeguards.utils.intervals.Interval.into_union].
     """
 
     __slots__ = ("_lower", "_upper")
@@ -469,7 +473,7 @@ Maximum = _Maximum()
 
 class Lower:
     """
-    Array wrapper to override an [`Interval`][compression_safeguards.intervals.Interval]'s lower bound using comparison syntax.
+    Array wrapper to override an [`Interval`][compression_safeguards.utils.intervals.Interval]'s lower bound using comparison syntax.
 
     ```python
     Lower(lower_bound) <= interval
@@ -513,7 +517,7 @@ class Lower:
 
 class Upper:
     """
-    Array wrapper to override an [`Interval`][compression_safeguards.intervals.Interval]'s upper bound using comparison syntax.
+    Array wrapper to override an [`Interval`][compression_safeguards.utils.intervals.Interval]'s upper bound using comparison syntax.
 
     ```python
     interval <= Upper(upper_bound)

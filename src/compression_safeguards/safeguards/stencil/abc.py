@@ -9,8 +9,8 @@ from typing import Any, final
 
 import numpy as np
 
-from ...intervals import IntervalUnion
-from ...typing import S, T
+from ...utils.intervals import IntervalUnion
+from ...utils.typing import S, T
 from ..abc import Safeguard
 from . import NeighbourhoodAxis
 

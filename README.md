@@ -1,6 +1,6 @@
 # Fearless lossy compression with `numcodecs-safeguards`
 
-Lossy compression [^1] can be *scary* as valuable information or features of the data may be lost. This package provides several `Safeguards` to express *your* requirements for lossy compression to be safe to use and to *guarantee* that they are upheld by lossy compression. By using safeguards to ensure your safety requirements, lossy compression can be applied safely and *without fear*.
+Lossy compression [^1] can be *scary* as valuable information or features of the data may be lost. This package provides several `SafeguardKind`s to express *your* requirements for lossy compression to be safe to use and to *guarantee* that they are upheld by lossy compression. By using safeguards to ensure your safety requirements, lossy compression can be applied safely and *without fear*.
 
 [^1]: Lossy compression methods reduce data size by only storing an approximation of the data. In contrast to lossless compression methods, lossy compression loses information about the data, e.g. by reducing its resolution (only store every $n$th element) precision (only store $n$ digits after the decimal point), smoothing, etc. Therefore, lossy compression methods provide a tradeoff between size reduction and quality preservation.
 
@@ -14,7 +14,7 @@ By using the `SafeguardsCodec` adapter, badly behaving lossy compressors become 
 
 ## (b) Safeguards for developers of lossy compressors
 
-Safeguards can also fill the role of a quantizer, which is part of many (predictive) (error-bounded) compressors. If you currently use e.g. a linear quantizer module in your compressor to provide an absolute error bound, you could instead quantize to safeguards'-computed correction and thus offer a larger selection of safeguards that your compressor can then guarantee. Note, however, that only pointwise safeguards can be used when quantizing data elements one-by-one.
+Safeguards can also fill the role of a quantizer, which is part of many (predictive) (error-bounded) compressors. If you currently use e.g. a linear quantizer module in your compressor to provide an absolute error bound, you could instead adapt the `Safeguards`, quantize to their computed correction values, and thereby offer a larger selection of safety requirements that your compressor can then guarantee. Note, however, that only pointwise safeguards can be used when quantizing data elements one-by-one.
 
 
 ## Design and Guarantees
@@ -100,10 +100,10 @@ The `SafeguardsCodec` adapter provided by this package can wrap any existing [`C
 You can wrap an existing codec with e.g. an absolute error bound of $eb_{abs} = 0.1$  as follows:
 
 ```python
-from compression_safeguards import Safeguards
+from compression_safeguards import SafeguardKind
 from numcodecs_safeguards import SafeguardsCodec
 
-SafeguardsCodec(codec=codec, safeguards=[Safeguards.abs.value(eb_abs=0.1)])
+SafeguardsCodec(codec=codec, safeguards=[SafeguardKind.abs.value(eb_abs=0.1)])
 ```
 
 You can also provide just the configuration for the codec or any of the safeguards:

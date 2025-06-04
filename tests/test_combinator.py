@@ -1,6 +1,6 @@
 import numpy as np
 
-from compression_safeguards.collection import SafeguardsCollection
+from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.pointwise.abc import PointwiseSafeguard
 from compression_safeguards.safeguards.stencil.abc import StencilSafeguard
 
@@ -119,7 +119,7 @@ def test_inheritance():
     )
 
     for combinator in ["any", "all"]:
-        safeguards = SafeguardsCollection(
+        safeguards = Safeguards(
             safeguards=[
                 dict(
                     kind=combinator,
@@ -131,7 +131,7 @@ def test_inheritance():
         assert isinstance(safeguards.safeguards[0], PointwiseSafeguard)
         assert not isinstance(safeguards.safeguards[0], StencilSafeguard)
 
-        safeguards = SafeguardsCollection(
+        safeguards = Safeguards(
             safeguards=[
                 dict(
                     kind=combinator,
@@ -143,7 +143,7 @@ def test_inheritance():
         assert not isinstance(safeguards.safeguards[0], PointwiseSafeguard)
         assert isinstance(safeguards.safeguards[0], StencilSafeguard)
 
-        safeguards = SafeguardsCollection(
+        safeguards = Safeguards(
             safeguards=[
                 dict(
                     kind=combinator,

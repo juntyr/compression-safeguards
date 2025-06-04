@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 import numcodecs.compat
 import numcodecs.registry
 import numpy as np
-from compression_safeguards.cast import as_bits
+from compression_safeguards.utils.cast import as_bits
 from numcodecs.abc import Codec
 from numcodecs_combinators.best import PickBestCodec
 from numcodecs_combinators.stack import CodecStack

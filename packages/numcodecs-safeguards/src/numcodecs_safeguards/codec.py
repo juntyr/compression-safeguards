@@ -13,9 +13,9 @@ import numcodecs.compat
 import numcodecs.registry
 import numpy as np
 import varint
-from compression_safeguards.cast import as_bits
-from compression_safeguards.collection import SafeguardsCollection
+from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.abc import Safeguard
+from compression_safeguards.utils.cast import as_bits
 from numcodecs.abc import Codec
 from numcodecs_combinators.abc import CodecCombinatorMixin
 from typing_extensions import Buffer  # MSPV 3.12
@@ -61,8 +61,8 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         initialized
         [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard].
 
-        Please refer to
-        [`Safeguards`][compression_safeguards.safeguards.Safeguards]
+        Please refer to the
+        [`SafeguardKind`][compression_safeguards.safeguards.SafeguardKind]
         for an enumeration of all supported safeguards.
     lossless : None | dict | Lossless, optional
         The lossless encoding that is applied after the codec and the
@@ -89,7 +89,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         "_lossless_for_safeguards",
     )
     _codec: Codec
-    _safeguards: SafeguardsCollection
+    _safeguards: Safeguards
     _lossless_for_codec: None | Codec
     _lossless_for_safeguards: Codec
 
@@ -103,9 +103,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         lossless: None | dict | Lossless = None,
         _version: None | str = None,
     ):
-        self._safeguards = SafeguardsCollection(
-            safeguards=safeguards, _version=_version
-        )
+        self._safeguards = Safeguards(safeguards=safeguards, _version=_version)
 
         self._codec = (
             codec if isinstance(codec, Codec) else numcodecs.registry.get_codec(codec)
@@ -168,8 +166,8 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         data = numcodecs.compat.ensure_ndarray(buf)
 
-        assert data.dtype in SafeguardsCollection.supported_dtypes(), (
-            f"can only encode arrays of dtype {', '.join(d.str for d in SafeguardsCollection.supported_dtypes())}"
+        assert data.dtype in Safeguards.supported_dtypes(), (
+            f"can only encode arrays of dtype {', '.join(d.str for d in Safeguards.supported_dtypes())}"
         )
 
         encoded = self._codec.encode(np.copy(data))

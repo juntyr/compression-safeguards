@@ -11,7 +11,12 @@ with atheris.instrument_imports():
     import sys
     import warnings
 
-    from compression_safeguards.intervals import Interval, IntervalUnion, Lower, Upper
+    from compression_safeguards.utils.intervals import (
+        Interval,
+        IntervalUnion,
+        Lower,
+        Upper,
+    )
 
 
 warnings.filterwarnings("error")

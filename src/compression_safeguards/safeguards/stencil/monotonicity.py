@@ -10,9 +10,9 @@ from operator import ge, gt, le, lt
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
-from ...cast import _isfinite, _isnan, from_total_order, to_total_order
-from ...intervals import Interval, IntervalUnion, Lower, Upper
-from ...typing import S, T
+from ...utils.cast import _isfinite, _isnan, from_total_order, to_total_order
+from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
+from ...utils.typing import S, T
 from . import BoundaryCondition, NeighbourhoodAxis, _pad_with_boundary
 from .abc import StencilSafeguard
 

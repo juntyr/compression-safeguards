@@ -5,7 +5,7 @@ import numpy as np
 import sympy as sp
 import sympy.tensor.array.expressions  # noqa: F401
 
-from ...cast import _float128, _float128_dtype, _float128_precision
+from ...utils.cast import _float128, _float128_dtype, _float128_precision
 
 
 def sympy_expr_to_numpy(

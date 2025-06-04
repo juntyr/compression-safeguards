@@ -3,7 +3,7 @@ from enum import Enum, auto
 import sympy as sp
 import sympy.tensor.array.expressions  # noqa: F401
 
-from ...cast import _isfinite
+from ...utils.cast import _isfinite
 
 
 def create_findiff_for_neighbourhood(

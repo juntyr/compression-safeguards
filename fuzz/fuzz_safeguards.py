@@ -22,7 +22,7 @@ with atheris.instrument_imports():
     from numcodecs.abc import Codec
     from numcodecs_safeguards import SafeguardsCodec
 
-    from compression_safeguards import Safeguards, SafeguardsCollection
+    from compression_safeguards import SafeguardKind, Safeguards
     from compression_safeguards.safeguards._qois.amath import (
         FUNCTIONS as AMATH_FUNCTIONS,
     )
@@ -161,7 +161,7 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
 
 
 def generate_safeguard_config(data: atheris.FuzzedDataProvider, depth: int):
-    kind = list(Safeguards)[data.ConsumeIntInRange(0, len(Safeguards) - 1)]
+    kind = list(SafeguardKind)[data.ConsumeIntInRange(0, len(SafeguardKind) - 1)]
 
     return {
         "kind": kind.name,
@@ -179,8 +179,8 @@ def check_one_input(data) -> None:
         generate_safeguard_config(data, 0) for _ in range(data.ConsumeIntInRange(0, 8))
     ]
 
-    dtype: np.dtype = list(SafeguardsCollection.supported_dtypes())[
-        data.ConsumeIntInRange(0, len(SafeguardsCollection.supported_dtypes()) - 1)
+    dtype: np.dtype = list(Safeguards.supported_dtypes())[
+        data.ConsumeIntInRange(0, len(Safeguards.supported_dtypes()) - 1)
     ]
     sizea: int = data.ConsumeIntInRange(0, 20)
     sizeb: int = data.ConsumeIntInRange(0, 20 // max(1, sizea))

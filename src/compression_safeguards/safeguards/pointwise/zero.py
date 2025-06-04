@@ -6,9 +6,9 @@ __all__ = ["ZeroIsZeroSafeguard"]
 
 import numpy as np
 
-from ...cast import as_bits
-from ...intervals import Interval, IntervalUnion, Lower, Upper
-from ...typing import S, T
+from ...utils.cast import as_bits
+from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
+from ...utils.typing import S, T
 from .abc import PointwiseSafeguard
 
 

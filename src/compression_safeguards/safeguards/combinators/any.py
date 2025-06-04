@@ -9,8 +9,8 @@ from collections.abc import Collection
 
 import numpy as np
 
-from ...intervals import IntervalUnion
-from ...typing import S, T
+from ...utils.intervals import IntervalUnion
+from ...utils.typing import S, T
 from ..abc import Safeguard
 from ..pointwise.abc import PointwiseSafeguard
 from ..stencil import NeighbourhoodAxis
@@ -48,14 +48,14 @@ class AnySafeguard(Safeguard):
     def __new__(  # type: ignore
         cls, *, safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard]
     ) -> "_AnyPointwiseSafeguard | _AnyStencilSafeguard":
-        from ... import Safeguards
+        from ... import SafeguardKind
 
         assert len(safeguards) > 1, "can only combine over at least one safeguard"
 
         safeguards_ = tuple(
             safeguard
             if isinstance(safeguard, (PointwiseSafeguard, StencilSafeguard))
-            else Safeguards[safeguard["kind"]].value(
+            else SafeguardKind[safeguard["kind"]].value(
                 **{p: v for p, v in safeguard.items() if p != "kind"}
             )
             for safeguard in safeguards

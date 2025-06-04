@@ -67,7 +67,7 @@ def to_finite_float(
     to guarantee that it is finite.
 
     The floating-point `dtype` should come from a prior use of the
-    [`to_float`][compression_safeguards.cast.to_float] helper function.
+    [`to_float`][compression_safeguards.utils.cast.to_float] helper function.
 
     Parameters
     ----------
@@ -103,8 +103,8 @@ def from_float(
 ) -> np.ndarray[S, np.dtype[T]]:
     """
     Reverses the conversion of the array `x`, using the
-    [`to_float`][compression_safeguards.cast.to_float], back to the original
-    `dtype`.
+    [`to_float`][compression_safeguards.utils.cast.to_float], back to the
+    original `dtype`.
 
     If the original `dtype` was integer, the rounding conversion is lossy.
     Infinite values are clamped to the minimum/maximum integer values.

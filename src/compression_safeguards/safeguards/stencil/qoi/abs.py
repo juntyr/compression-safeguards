@@ -13,7 +13,7 @@ import sympy as sp
 import sympy.tensor.array.expressions  # noqa: F401
 from numpy.lib.stride_tricks import sliding_window_view
 
-from ....cast import (
+from ....utils.cast import (
     _isfinite,
     _isinf,
     _isnan,
@@ -23,8 +23,8 @@ from ....cast import (
     to_finite_float,
     to_float,
 )
-from ....intervals import Interval, IntervalUnion
-from ....typing import F, S, T
+from ....utils.intervals import Interval, IntervalUnion
+from ....utils.typing import F, S, T
 from ..._qois.amath import CONSTRUCTORS as AMATH_CONSTRUCTORS
 from ..._qois.amath import FUNCTIONS as AMATH_FUNCTIONS
 from ..._qois.array import NumPyLikeArray

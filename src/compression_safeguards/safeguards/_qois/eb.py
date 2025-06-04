@@ -4,7 +4,7 @@ import numpy as np
 import sympy as sp
 import sympy.tensor.array.expressions  # noqa: F401
 
-from ...cast import (
+from ...utils.cast import (
     _isfinite,
     _isinf,
     _isnan,
@@ -12,7 +12,7 @@ from ...cast import (
     _nextafter,
     to_finite_float,
 )
-from ...typing import F, S
+from ...utils.typing import F, S
 from .array import NumPyLikeArray
 
 

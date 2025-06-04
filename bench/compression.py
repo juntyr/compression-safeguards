@@ -17,9 +17,9 @@ from numcodecs_wasm_zfp import Zfp
 from numcodecs_wasm_zstd import Zstd
 from tqdm import tqdm
 
-from compression_safeguards.cast import as_bits
-from compression_safeguards.collection import SafeguardsCollection
+from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.pointwise.abs import AbsoluteErrorBoundSafeguard
+from compression_safeguards.utils.cast import as_bits
 
 
 def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
@@ -152,10 +152,10 @@ class MyLinearQuantizer(MyQuantizer):
 
 class MySafeguardsQuantizer(MyQuantizer):
     __slots__ = ("_safeguards",)
-    _safeguards: SafeguardsCollection
+    _safeguards: Safeguards
 
     def __init__(self, eb_abs):
-        self._safeguards = SafeguardsCollection(
+        self._safeguards = Safeguards(
             safeguards=[AbsoluteErrorBoundSafeguard(eb_abs=eb_abs)]
         )
 

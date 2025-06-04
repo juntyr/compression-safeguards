@@ -9,7 +9,7 @@ import re
 import numpy as np
 import sympy as sp
 
-from ....cast import (
+from ....utils.cast import (
     _isfinite,
     _isinf,
     _isnan,
@@ -19,8 +19,8 @@ from ....cast import (
     to_finite_float,
     to_float,
 )
-from ....intervals import IntervalUnion
-from ....typing import F, S, T
+from ....utils.intervals import IntervalUnion
+from ....utils.typing import F, S, T
 from ..._qois.compile import sympy_expr_to_numpy as compile_sympy_expr_to_numpy
 from ..._qois.eb import (
     compute_data_eb_for_stencil_qoi_eb_unchecked,

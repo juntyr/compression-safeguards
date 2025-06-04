@@ -1,6 +1,6 @@
 import numpy as np
 
-from compression_safeguards.cast import as_bits
+from compression_safeguards.utils.cast import as_bits
 
 from .codecs import (
     encode_decode_identity,

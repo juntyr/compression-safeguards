@@ -6,7 +6,7 @@ __all__ = ["RatioErrorBoundSafeguard"]
 
 import numpy as np
 
-from ...cast import (
+from ...utils.cast import (
     _isfinite,
     _isinf,
     _isnan,
@@ -17,8 +17,8 @@ from ...cast import (
     to_float,
     to_total_order,
 )
-from ...intervals import Interval, IntervalUnion, Lower, Upper
-from ...typing import F, S, T
+from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
+from ...utils.typing import F, S, T
 from .abc import PointwiseSafeguard
 
 

@@ -1,25 +1,25 @@
 """
-Implementation of the [`SafeguardsCollection`][compression_safeguards.collection.SafeguardsCollection], which computes the correction needed to satisfy a set of safeguards.
+Implementation of the [`Safeguards`][compression_safeguards.api.Safeguards], which compute the correction needed to satisfy a set of [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard]s.
 """
 
-__all__ = ["SafeguardsCollection"]
+__all__ = ["Safeguards"]
 
 from collections.abc import Collection
 
 import numpy as np
 from typing_extensions import Self
 
-from .cast import as_bits
-from .safeguards import Safeguards
+from .safeguards import SafeguardKind
 from .safeguards.abc import Safeguard
 from .safeguards.pointwise.abc import PointwiseSafeguard
 from .safeguards.stencil.abc import StencilSafeguard
-from .typing import C, S, T
+from .utils.cast import as_bits
+from .utils.typing import C, S, T
 
 
-class SafeguardsCollection:
+class Safeguards:
     """
-    Instantiated collection of safeguards.
+    Collection of [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard]s.
 
     Parameters
     ----------
@@ -28,8 +28,8 @@ class SafeguardsCollection:
         safeguard configuration [`dict`][dict] or an already initialized
         [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard].
 
-        Please refer to
-        [`Safeguards`][compression_safeguards.safeguards.Safeguards]
+        Please refer to the
+        [`SafeguardKind`][compression_safeguards.safeguards.SafeguardKind]
         for an enumeration of all supported safeguards.
     _version : ...
         The safeguards' version. Do not provide this parameter explicitly.
@@ -51,7 +51,7 @@ class SafeguardsCollection:
         safeguards = [
             safeguard
             if isinstance(safeguard, Safeguard)
-            else Safeguards[safeguard["kind"]].value(
+            else SafeguardKind[safeguard["kind"]].value(
                 **{p: v for p, v in safeguard.items() if p != "kind"}
             )
             for safeguard in safeguards
@@ -89,11 +89,11 @@ class SafeguardsCollection:
     def version(self) -> str:
         """
         The version of the format of the correction computed by the
-        [`compute_correction`][compression_safeguards.collection.SafeguardsCollection.compute_correction]
+        [`compute_correction`][compression_safeguards.api.Safeguards.compute_correction]
         method.
 
         The safeguards can only
-        [`apply_correction`][compression_safeguards.collection.SafeguardsCollection.apply_correction]s
+        [`apply_correction`][compression_safeguards.api.Safeguards.apply_correction]s
         with the matching version.
         """
 
@@ -231,7 +231,7 @@ class SafeguardsCollection:
         Returns
         -------
         safeguards : Self
-            Instantiated safeguards.
+            Collection of safeguards.
         """
 
         return cls(**config)

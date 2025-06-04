@@ -1,8 +1,8 @@
 """
-Implementations for the provided safeguards.
+Implementations for the provided [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard]s.
 """
 
-__all__ = ["Safeguards"]
+__all__ = ["SafeguardKind"]
 
 from enum import Enum
 
@@ -19,7 +19,7 @@ from .stencil.monotonicity import MonotonicityPreservingSafeguard
 from .stencil.qoi.abs import StencilQuantityOfInterestAbsoluteErrorBoundSafeguard
 
 
-class Safeguards(Enum):
+class SafeguardKind(Enum):
     """
     Enumeration of all supported safeguards:
     """

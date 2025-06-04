@@ -1,5 +1,5 @@
 """
-Implementations for the provided stencil safeguards.
+Implementations for the provided [`StencilSafeguard`][compression_safeguards.safeguards.stencil.abc.StencilSafeguard]s.
 """
 
 __all__ = ["BoundaryCondition", "NeighbourhoodAxis", "NeighbourhoodBoundaryAxis"]

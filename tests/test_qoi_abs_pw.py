@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from compression_safeguards import SafeguardsCollection
+from compression_safeguards import Safeguards
 
 from .codecs import (
     encode_decode_identity,
@@ -239,9 +239,7 @@ def test_composed(check):
     check("exp(ln(x)+x)")
 
 
-@pytest.mark.parametrize(
-    "dtype", sorted(d.name for d in SafeguardsCollection.supported_dtypes())
-)
+@pytest.mark.parametrize("dtype", sorted(d.name for d in Safeguards.supported_dtypes()))
 def test_dtypes(dtype):
     check_all_codecs(np.array([[1]], dtype=dtype), "x/sqrt(pi)")
 

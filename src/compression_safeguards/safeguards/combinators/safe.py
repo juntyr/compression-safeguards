@@ -6,8 +6,8 @@ __all__ = ["AlwaysSafeguard"]
 
 import numpy as np
 
-from ...intervals import Interval, IntervalUnion
-from ...typing import S, T
+from ...utils.intervals import Interval, IntervalUnion
+from ...utils.typing import S, T
 from ..pointwise.abc import PointwiseSafeguard
 
 
