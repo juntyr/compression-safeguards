@@ -142,12 +142,14 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         where
 
-        - `ULEB128` refers to the unsigned LEB128 (little endian base 128)
-          variable length encoding for unsigned integers
-        - `encoded_bytes` refers to the codec- and lossless-encoded bytes of
-          the data in `buf`
-        - `correction_bytes` refers to the lossless-encoded safeguards
-          correction
+        - `ULEB128` refers to the
+          [unsigned LEB128](https://en.wikipedia.org/wiki/LEB128#Unsigned_LEB128)
+          (little endian base 128) variable length encoding for unsigned
+          integers
+        - `encoded_bytes` refers to the encoded bytes produced by the codec and
+          its optional lossless encoding
+        - `correction_bytes` refers to the encoded correction bytes produced by
+          the safeguards and their lossless encoding
 
         If no correction is required, `correction_bytes` is empty and there is
         only a single-byte overhead from using the safeguards.
@@ -177,28 +179,48 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         try:
             decoded = self._codec.decode(np.copy(encoded), out=None)
         except Exception as err:
-            raise ValueError(
+            message = (
                 "decoding with `out=None` failed\n\n"
                 "consider using wrapping the codec in the "
                 "`numcodecs_combinators.framed.FramedCodecStack(codec)` "
                 "combinator if the codec requires knowing the output data "
                 "type and shape for decoding"
-            ) from err
+            )
+
+            # MSPV 3.11
+            if getattr(err, "add_note", None) is not None:
+                err.add_note(message)
+                raise err
+            else:
+                raise ValueError(message) from err
         decoded = numcodecs.compat.ensure_ndarray(decoded)
 
         if self._lossless_for_codec is not None:
-            encoded_bytes = numcodecs.compat.ensure_bytes(
-                self._lossless_for_codec.encode(encoded)
+            encoded = self._lossless_for_codec.encode(encoded)
+
+        try:
+            assert encoded.dtype == np.dtype("uint8"), (
+                "codec and lossless must encode to bytes"
+            )
+            assert encoded.ndim <= 1, "codec and lossless must encode to 1D bytes"
+            encoded_bytes = numcodecs.compat.ensure_bytes(encoded)
+
+            assert decoded.dtype == data.dtype, "codec must roundtrip dtype"
+            assert decoded.shape == data.shape, "codec must roundtrip shape"
+        except Exception as err:
+            message = (
+                "consider using wrapping the codec in the "
+                "`numcodecs_combinators.framed.FramedCodecStack(codec)` "
+                "combinator to encode to bytes and preserve the data dtype and"
+                "shape"
             )
 
-        assert encoded.dtype == np.dtype("uint8"), (
-            "codec and lossless must encode to bytes"
-        )
-        assert encoded.ndim <= 1, "codec and lossless must encode to 1D bytes"
-        encoded_bytes = numcodecs.compat.ensure_bytes(encoded)
-
-        assert decoded.dtype == data.dtype, "codec must roundtrip dtype"
-        assert decoded.shape == data.shape, "codec must roundtrip shape"
+            # MSPV 3.11
+            if getattr(err, "add_note", None) is not None:
+                err.add_note(message)
+                raise err
+            else:
+                raise ValueError(message) from err
 
         # the codec always compresses the complete data ... at least chunking
         #  is not our concern
