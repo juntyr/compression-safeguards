@@ -22,7 +22,7 @@ bench = [
     "numcodecs-wasm-sz3~=0.6.0",
     "numcodecs-wasm-zfp~=0.5.1",
     "numcodecs-wasm-zstd~=0.3.0",
-    "xarray~=2025.1",
+    "xarray~=2025.4",
     "netcdf4~=1.7.2",
     "tqdm~=4.0",
     "matplotlib~=3.10.0",
@@ -30,7 +30,7 @@ bench = [
 ]
 dev = ["ruff~=0.9"]
 examples = [
-    "cdsapi~=0.7.5",
+    "cdsapi~=0.7.6",
     "jupyterlab",
     "numcodecs-wasm~=0.1.6",
     "numcodecs-wasm-sz3~=0.6.0",

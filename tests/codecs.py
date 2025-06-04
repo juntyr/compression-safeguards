@@ -81,6 +81,15 @@ def encode_decode_identity(data: np.ndarray, **kwargs) -> np.ndarray:
     codec = SafeguardsCodec(codec=FramedCodecStack(IdentityCodec()), **kwargs)
 
     encoded = codec.encode(data)
+    assert isinstance(encoded, bytes)
+
+    just_data = FramedCodecStack(IdentityCodec()).encode(data)
+    assert isinstance(just_data, bytes)
+
+    # Ensure that codecs that already satisfy the properties only have a
+    #  single-byte overhead
+    assert len(encoded) == (1 + len(just_data))
+
     decoded = codec.decode(encoded)
 
     return decoded
