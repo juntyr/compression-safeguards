@@ -1,4 +1,4 @@
-"""
+r"""
 # Fearless lossy compression with `numcodecs-safeguards`
 
 Lossy compression can be *scary* as valuable information or features of the
@@ -22,12 +22,14 @@ data, if necessary. If no correction is needed, the `SafeguardsCodec` only has
 a one-byte overhead for the compressed data and a computational overhead at
 compression time.
 
-By using the [`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec] adapter,
-badly behaving lossy codecs become safe to use, at the cost of potentially
-less efficient compression, and lossy compression can be applied *without
-fear*.
+By using the `SafeguardsCodec` adapter, badly behaving lossy codecs become safe
+to use, at the cost of potentially less efficient compression, and lossy
+compression can be applied *without fear*.
 
 ## Example
+
+You can wrap an existing codec with e.g. a relative error bound of
+$eb_{rel} = 1\%$ and preserve data signs as follows:
 
 ```py
 import numpy as np
@@ -42,7 +44,7 @@ lossy_codec = FixedScaleOffset(
 
 # wrap the codec in the `SafeguardsCodec` and specify the safeguards to apply
 sg_codec = SafeguardsCodec(codec=lossy_codec, safeguards=[
-    # guarantee a relative error of 1%:
+    # guarantee a relative error bound of 1%:
     #   |x - x'| <= |x| * 0.01
     dict(kind="rel", eb_rel=0.01),
     # guarantee that the sign is preserved:
