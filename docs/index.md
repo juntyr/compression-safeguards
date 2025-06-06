@@ -106,6 +106,7 @@ You may also need to install the `numpy-quaddtype` dependency from the PyPi test
 <!--
 ```sh
 pip install numpy
+```
 -->
 <!--pytest-codeblocks:cont-->
 ```sh
