@@ -2,6 +2,7 @@ import atheris
 
 with atheris.instrument_imports():
     import numcodecs
+    import numcodecs.compat
     import numpy as np
 
 import sympy as sympy
@@ -19,19 +20,18 @@ with atheris.instrument_imports():
     import numcodecs.registry
     import numpy as np
     from numcodecs.abc import Codec
+    from numcodecs_safeguards import SafeguardsCodec
 
-    from numcodecs_safeguards import (
-        Safeguards,
-        SafeguardsCodec,
+    from compression_safeguards import SafeguardKind, Safeguards
+    from compression_safeguards.safeguards._qois.amath import (
+        FUNCTIONS as AMATH_FUNCTIONS,
     )
-    from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
-    from numcodecs_safeguards.safeguards._qois.amath import FUNCTIONS as AMATH_FUNCTIONS
-    from numcodecs_safeguards.safeguards._qois.math import CONSTANTS as MATH_CONSTANTS
-    from numcodecs_safeguards.safeguards._qois.math import FUNCTIONS as MATH_FUNCTIONS
-    from numcodecs_safeguards.safeguards.abc import Safeguard
-    from numcodecs_safeguards.safeguards.pointwise.qoi import PointwiseExpr
-    from numcodecs_safeguards.safeguards.stencil import NeighbourhoodBoundaryAxis
-    from numcodecs_safeguards.safeguards.stencil.qoi import StencilExpr
+    from compression_safeguards.safeguards._qois.math import CONSTANTS as MATH_CONSTANTS
+    from compression_safeguards.safeguards._qois.math import FUNCTIONS as MATH_FUNCTIONS
+    from compression_safeguards.safeguards.abc import Safeguard
+    from compression_safeguards.safeguards.pointwise.qoi import PointwiseExpr
+    from compression_safeguards.safeguards.stencil import NeighbourhoodBoundaryAxis
+    from compression_safeguards.safeguards.stencil.qoi import StencilExpr
 
 
 warnings.filterwarnings("error")
@@ -51,9 +51,7 @@ class FuzzCodec(Codec):
 
     def decode(self, buf, out=None):
         assert len(buf) == 0
-        assert out is not None
-        out[:] = self.decoded
-        return out
+        return numcodecs.compat.ndarray_copy(np.copy(self.decoded), out)
 
     def get_config(self):
         return dict(id=type(self).codec_id, data=self.data, decoded=self.decoded)
@@ -163,7 +161,7 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
 
 
 def generate_safeguard_config(data: atheris.FuzzedDataProvider, depth: int):
-    kind = list(Safeguards)[data.ConsumeIntInRange(0, len(Safeguards) - 1)]
+    kind = list(SafeguardKind)[data.ConsumeIntInRange(0, len(SafeguardKind) - 1)]
 
     return {
         "kind": kind.name,
@@ -181,8 +179,8 @@ def check_one_input(data) -> None:
         generate_safeguard_config(data, 0) for _ in range(data.ConsumeIntInRange(0, 8))
     ]
 
-    dtype: np.dtype = list(_SUPPORTED_DTYPES)[
-        data.ConsumeIntInRange(0, len(_SUPPORTED_DTYPES) - 1)
+    dtype: np.dtype = list(Safeguards.supported_dtypes())[
+        data.ConsumeIntInRange(0, len(Safeguards.supported_dtypes()) - 1)
     ]
     sizea: int = data.ConsumeIntInRange(0, 20)
     sizeb: int = data.ConsumeIntInRange(0, 20 // max(1, sizea))
@@ -248,9 +246,9 @@ def check_one_input(data) -> None:
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")
         raise err
 
-    # test using the safeguards without a codec
+    # test using the safeguards with the zero codec
     safeguard = SafeguardsCodec(
-        codec=None,
+        codec=dict(id="zero"),
         safeguards=safeguards,
     )
 

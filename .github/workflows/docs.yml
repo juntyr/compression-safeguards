@@ -21,11 +21,11 @@ jobs:
       - name: Setup Python
         run: uv python install
 
-      - name: Install mkdocs dependencies
-        run: uv venv && uv pip install -r docs/requirements.txt
+      - name: Setup the Python venv with the safeguards
+        run: uv sync --all-packages
 
-      - name: Install numcodecs-safeguards
-        run: uv pip install .
+      - name: Install mkdocs dependencies
+        run: uv pip install -r docs/requirements.txt
 
       - name: Build the documentation
         run: uv run mkdocs build

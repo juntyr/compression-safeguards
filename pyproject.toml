@@ -3,19 +3,15 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "numcodecs-safeguards"
+name = "compression-safeguards"
 version = "0.0.1"
 description = "Fearless lossy compression using safeguards"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "numcodecs>=0.13.0,<0.17",
-    "numcodecs-combinators~=0.2.3",
     "numpy~=2.0",
-    # "numpy-quaddtype~=0.0.7", # pip install -i https://test.pypi.org/simple/ numpy-quaddtype~=0.0.7
-    "varint~=1.0",
+    "numpy-quaddtype~=0.0.7; sys_platform != 'emscripten'", # pip install -i https://test.pypi.org/simple/ numpy-quaddtype~=0.0.7
     "typing-extensions~=4.6",
-    "dahuffman~=0.4.0",
     "sympy~=1.14.0",
 ]
 
@@ -26,7 +22,7 @@ bench = [
     "numcodecs-wasm-sz3~=0.6.0",
     "numcodecs-wasm-zfp~=0.5.1",
     "numcodecs-wasm-zstd~=0.3.0",
-    "xarray~=2025.1",
+    "xarray~=2025.4",
     "netcdf4~=1.7.2",
     "tqdm~=4.0",
     "matplotlib~=3.10.0",
@@ -34,7 +30,7 @@ bench = [
 ]
 dev = ["ruff~=0.9"]
 examples = [
-    "cdsapi~=0.7.5",
+    "cdsapi~=0.7.6",
     "jupyterlab",
     "numcodecs-wasm~=0.1.6",
     "numcodecs-wasm-sz3~=0.6.0",
@@ -46,18 +42,14 @@ examples = [
 ]
 fuzz = ["atheris~=2.3", "timeoutcontext~=1.2", "setuptools~=80.0"]
 test = ["pytest~=8.3"]
+doctest = ["griffe2md~=1.1", "pytest~=8.3", "pytest-codeblocks~=0.17.0"]
 typing = ["mypy~=1.14"]
-
-[project.entry-points."numcodecs.codecs"]
-"safeguards" = "numcodecs_safeguards.codec:SafeguardsCodec"
-"safeguards.lossless.huffman" = "numcodecs_safeguards.lossless:HuffmanCodec"
-"safeguards.lossless.delta_huffman" = "numcodecs_safeguards.lossless:DeltaHuffmanCodec"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-"numcodecs_safeguards" = ["py.typed"]
+"compression_safeguards" = ["py.typed"]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I"]
@@ -67,14 +59,25 @@ addopts = ["--import-mode=importlib"]
 xfail_strict = true
 
 [[tool.mypy.overrides]]
-module = [
-    "dahuffman.*",
-    "numcodecs.*",
-    "numpy_quaddtype.*",
-    "sympy.*",
-    "varint.*",
-]
+module = ["numpy_quaddtype.*", "sympy.*"]
 follow_untyped_imports = true
 
 [tool.hatch.build.targets.sdist]
 include = ["/src", "/CITATION.cff", "/LICENSE", "/pyproject.toml", "/README.md"]
+
+[tool.uv.workspace]
+members = ["packages/numcodecs-safeguards"]
+
+[tool.uv.sources]
+# numpy requires an explicit index since numpy-quaddtype depends on it
+numpy = { index = "pypi" }
+# numpy-quaddtype is only published on the Test PyPi index so far
+numpy-quaddtype = { index = "testpypi" }
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple/"
+
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"

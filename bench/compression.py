@@ -10,16 +10,16 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from numcodecs.abc import Codec
+from numcodecs_safeguards import SafeguardsCodec
+from numcodecs_safeguards.lossless import Lossless
 from numcodecs_wasm_sz3 import Sz3
 from numcodecs_wasm_zfp import Zfp
 from numcodecs_wasm_zstd import Zstd
 from tqdm import tqdm
 
-from numcodecs_safeguards.cast import as_bits
-from numcodecs_safeguards.codec import SafeguardsCodec
-from numcodecs_safeguards.lossless import Lossless
-from numcodecs_safeguards.quantizer import SafeguardsQuantizer
-from numcodecs_safeguards.safeguards.pointwise.abs import AbsoluteErrorBoundSafeguard
+from compression_safeguards.api import Safeguards
+from compression_safeguards.safeguards.pointwise.abs import AbsoluteErrorBoundSafeguard
+from compression_safeguards.utils.cast import as_bits
 
 
 def gen_data() -> Generator[tuple[str, np.ndarray], None, None]:
@@ -91,7 +91,7 @@ def gen_single_codec(codec: Codec) -> Callable[[Generator[float]], Generator[Cod
 
 def gen_benchmark(
     data: Generator[tuple[str, np.ndarray], None, None],
-    codec_gens: list[Callable[[Generator[float]], Generator[Codec]], None, None],
+    codec_gens: list[Callable[[Generator[float]], Generator[Codec]]],
 ) -> Generator[tuple[str, Codec, float | Exception], None, None]:
     # from matplotlib import pyplot as plt
 
@@ -151,10 +151,11 @@ class MyLinearQuantizer(MyQuantizer):
 
 
 class MySafeguardsQuantizer(MyQuantizer):
-    __slots__ = ("_quantizer",)
+    __slots__ = ("_safeguards",)
+    _safeguards: Safeguards
 
     def __init__(self, eb_abs):
-        self._quantizer = SafeguardsQuantizer(
+        self._safeguards = Safeguards(
             safeguards=[AbsoluteErrorBoundSafeguard(eb_abs=eb_abs)]
         )
 
@@ -162,13 +163,15 @@ class MySafeguardsQuantizer(MyQuantizer):
         return np.dtype(dtype.str.replace("f", "u").replace("i", "u"))
 
     def encode(self, x, predict):
-        return self._quantizer.quantize(np.array(x), np.array(predict))[()]
+        return self._safeguards.compute_correction(np.array(x), np.array(predict))[()]
 
     def decode(self, e, predict):
-        return self._quantizer.recover(np.array(predict), np.array(e))[()]
+        return self._safeguards.apply_correction(np.array(predict), np.array(e))[()]
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(safeguards={list(self._quantizer.safeguards)!r})"
+        return (
+            f"{type(self).__name__}(safeguards={list(self._safeguards.safeguards)!r})"
+        )
 
 
 class LorenzoPredictor(Codec):
@@ -503,7 +506,8 @@ if __name__ == "__main__":
             gen_single_codec(Zstd(level=3)),
             gen_codecs_with_eb_abs(
                 lambda eb_abs: SafeguardsCodec(
-                    codec=None, safeguards=[dict(kind="abs", eb_abs=eb_abs)]
+                    codec=dict(id="zero"),
+                    safeguards=[dict(kind="abs", eb_abs=eb_abs)],
                 )
             ),
             # gen_codecs_with_eb_abs(

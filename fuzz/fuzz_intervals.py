@@ -3,7 +3,6 @@ import atheris
 with atheris.instrument_imports():
     from typing import Any
 
-    import numcodecs as numcodecs
     import numpy as np
 
 import sympy as sympy
@@ -12,7 +11,12 @@ with atheris.instrument_imports():
     import sys
     import warnings
 
-    from numcodecs_safeguards.intervals import Interval, IntervalUnion, Lower, Upper
+    from compression_safeguards.utils.intervals import (
+        Interval,
+        IntervalUnion,
+        Lower,
+        Upper,
+    )
 
 
 warnings.filterwarnings("error")
@@ -25,12 +29,12 @@ def generate_interval_union(
 
     pivots = sorted(data.ConsumeIntInRange(imin, imax) for _ in range(n * 2))
 
-    intervals = IntervalUnion.empty(np.dtype(int), 1, 1)
+    intervals = IntervalUnion.empty(np.dtype(np.int_), 1, 1)
     elems: set[int] = set()
 
     for i in range(n):
         low, high = pivots[i * 2], pivots[i * 2 + 1]
-        interval = Interval.empty(np.dtype(int), 1)
+        interval = Interval.empty(np.dtype(np.int_), 1)
         Lower(np.array(low)) <= interval[:] <= Upper(np.array(high))
         intervals = intervals.union(interval.into_union())
         elems = elems.union(range(low, high + 1))
@@ -46,7 +50,7 @@ def check_one_input(data) -> None:
     info: list[Any] = []
 
     try:
-        intervals = IntervalUnion.empty(np.dtype(int), 1, 1)
+        intervals = IntervalUnion.empty(np.dtype(np.int_), 1, 1)
         elems: set[int] = set()
 
         # generate #m interval unions with 1-#n intervals each

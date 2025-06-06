@@ -1,4 +1,4 @@
-site_name: numcodecs-safeguards
+site_name: compression-safeguards
 
 strict: true
 
@@ -27,8 +27,10 @@ theme:
 nav:
   - Home: index.md
   - Links:
-      - GitHub: https://github.com/juntyr/numcodecs-safeguards
-      - PyPI: https://pypi.org/project/numcodecs-safeguards/
+      - GitHub: https://github.com/juntyr/compression-safeguards
+      - PyPI:
+        - compression-safeguards: https://pypi.org/project/compression-safeguards/
+        - numcodecs-safeguards: https://pypi.org/project/numcodecs-safeguards/
 
 plugins:
   - exclude:
@@ -38,9 +40,11 @@ plugins:
   - autorefs
   - mkdocstrings-python-generator:
       source_dirs:
-        - nav_heading: [Documentation]
+        - nav_heading: [API Reference]
           base: src
           ignore: ["_qois"]
+        - nav_heading: [API Reference]
+          base: packages/numcodecs-safeguards/src
   - mkdocstrings:
       enable_inventory: true
       handlers:
@@ -67,7 +71,9 @@ plugins:
             - https://docs.python.org/3.12/objects.inv
             - https://numpy.org/doc/2.2/objects.inv
             - https://numcodecs.readthedocs.io/en/v0.15.0/objects.inv
-            - https://numcodecs-combinators.readthedocs.io/en/v0.2.3/objects.inv
+            - https://numcodecs-combinators.readthedocs.io/en/v0.2.7/objects.inv
+            - https://numcodecs-zero.readthedocs.io/en/v0.1.0/objects.inv
 
 watch:
   - src
+  - packages

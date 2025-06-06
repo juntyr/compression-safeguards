@@ -1,6 +1,6 @@
 import numpy as np
 
-from numcodecs_safeguards.safeguards.pointwise.sign import SignPreservingSafeguard
+from compression_safeguards.safeguards.pointwise.sign import SignPreservingSafeguard
 
 from .codecs import (
     encode_decode_identity,

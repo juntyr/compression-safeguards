@@ -1,0 +1,259 @@
+"""
+Implementation of the [`Safeguards`][compression_safeguards.api.Safeguards], which compute the correction needed to satisfy a set of [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard]s.
+"""
+
+__all__ = ["Safeguards"]
+
+from collections.abc import Collection
+
+import numpy as np
+from typing_extensions import Self
+
+from .safeguards import SafeguardKind
+from .safeguards.abc import Safeguard
+from .safeguards.pointwise.abc import PointwiseSafeguard
+from .safeguards.stencil.abc import StencilSafeguard
+from .utils.cast import as_bits
+from .utils.typing import C, S, T
+
+
+class Safeguards:
+    """
+    Collection of [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard]s.
+
+    Parameters
+    ----------
+    safeguards : Collection[dict | Safeguard]
+        The safeguards that will be applied. They can either be passed as a
+        safeguard configuration [`dict`][dict] or an already initialized
+        [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard].
+
+        Please refer to the
+        [`SafeguardKind`][compression_safeguards.safeguards.SafeguardKind]
+        for an enumeration of all supported safeguards.
+    _version : ...
+        The safeguards' version. Do not provide this parameter explicitly.
+    """
+
+    __slots__ = ("_pointwise_safeguards", "_stencil_safeguards")
+    _pointwise_safeguards: tuple[PointwiseSafeguard, ...]
+    _stencil_safeguards: tuple[StencilSafeguard, ...]
+
+    def __init__(
+        self,
+        *,
+        safeguards: Collection[dict | Safeguard],
+        _version: None | str = None,
+    ):
+        if _version is not None:
+            assert _version == _FORMAT_VERSION
+
+        safeguards = [
+            safeguard
+            if isinstance(safeguard, Safeguard)
+            else SafeguardKind[safeguard["kind"]].value(
+                **{p: v for p, v in safeguard.items() if p != "kind"}
+            )
+            for safeguard in safeguards
+        ]
+
+        self._pointwise_safeguards = tuple(
+            safeguard
+            for safeguard in safeguards
+            if isinstance(safeguard, PointwiseSafeguard)
+        )
+        self._stencil_safeguards = tuple(
+            safeguard
+            for safeguard in safeguards
+            if isinstance(safeguard, StencilSafeguard)
+        )
+        unsupported_safeguards = [
+            safeguard
+            for safeguard in safeguards
+            if not isinstance(safeguard, (PointwiseSafeguard, StencilSafeguard))
+        ]
+
+        assert len(unsupported_safeguards) == 0, (
+            f"unsupported safeguards {unsupported_safeguards!r}"
+        )
+
+    @property
+    def safeguards(self) -> Collection[Safeguard]:
+        """
+        The collection of safeguards.
+        """
+
+        return self._pointwise_safeguards + self._stencil_safeguards
+
+    @property
+    def version(self) -> str:
+        """
+        The version of the format of the correction computed by the
+        [`compute_correction`][compression_safeguards.api.Safeguards.compute_correction]
+        method.
+
+        The safeguards can only
+        [`apply_correction`][compression_safeguards.api.Safeguards.apply_correction]s
+        with the matching version.
+        """
+
+        return _FORMAT_VERSION
+
+    @staticmethod
+    def supported_dtypes() -> frozenset[np.dtype]:
+        """
+        The set of numpy [`dtype`][numpy.dtype]s that the safeguards support.
+        """
+
+        return _SUPPORTED_DTYPES
+
+    def compute_correction(
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        prediction: np.ndarray[S, np.dtype[T]],
+    ) -> np.ndarray[S, np.dtype[C]]:
+        """
+        Compute the correction required to make the `prediction` array satisfy the safeguards relative to the `data` array.
+
+        The `data` array must contain the complete data, i.e. not just a chunk
+        of data, so that non-pointwise safeguards are correctly applied.
+
+        Parameters
+        ----------
+        data : np.ndarray[S, np.dtype[T]]
+            The data array, relative to which the safeguards are enforced.
+        prediction : np.ndarray[S, np.dtype[T]]
+            The prediction array for which the correction is computed.
+
+        Returns
+        -------
+        correction : np.ndarray[S, np.dtype[C]]
+            The correction array.
+        """
+
+        assert data.dtype in _SUPPORTED_DTYPES, (
+            f"can only safeguard arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
+        )
+
+        assert data.dtype == prediction.dtype
+        assert data.shape == prediction.shape
+
+        all_ok = True
+        for safeguard in self.safeguards:
+            if not safeguard.check(data, prediction):
+                all_ok = False
+                break
+
+        if all_ok:
+            return np.zeros_like(as_bits(data))
+
+        all_intervals = []
+        for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
+            intervals = safeguard.compute_safe_intervals(data)
+            assert np.all(intervals.contains(data)), (
+                f"pointwise safeguard {safeguard!r}'s intervals must contain the original data"
+            )
+            all_intervals.append(intervals)
+
+        combined_intervals = all_intervals[0]
+        for intervals in all_intervals[1:]:
+            combined_intervals = combined_intervals.intersect(intervals)
+        correction = combined_intervals.pick(prediction)
+
+        for safeguard, intervals in zip(self.safeguards, all_intervals):
+            assert np.all(intervals.contains(correction)), (
+                f"{safeguard!r} interval does not contain the correction {correction!r}"
+            )
+            assert safeguard.check(data, correction), (
+                f"{safeguard!r} check fails after correction {correction!r} on data {data!r}"
+            )
+
+        prediction_bits = as_bits(prediction)
+        correction_bits = as_bits(correction)
+
+        return prediction_bits - correction_bits
+
+    def apply_correction(
+        self,
+        prediction: np.ndarray[S, np.dtype[T]],
+        correction: np.ndarray[S, np.dtype[C]],
+    ) -> np.ndarray[S, np.dtype[T]]:
+        """
+        Apply the `correction` to the `prediction` to satisfy the safeguards for which the `correction` was computed.
+
+        Parameters
+        ----------
+        prediction : np.ndarray[S, np.dtype[T]]
+            The prediction array for which the correction has been computed.
+        correction : np.ndarray[S, np.dtype[C]]
+            The correction array.
+
+        Returns
+        -------
+        corrected : np.ndarray[S, np.dtype[T]]
+            The corrected array, which satisfies the safeguards.
+        """
+
+        assert correction.shape == prediction.shape
+
+        prediction_bits = as_bits(prediction)
+        correction_bits = as_bits(correction)
+
+        corrected = prediction_bits - correction_bits
+
+        return corrected.view(prediction.dtype)
+
+    def get_config(self) -> dict:
+        """
+        Returns the configuration of the safeguards.
+
+        Returns
+        -------
+        config : dict
+            Configuration of the safeguards.
+        """
+
+        return dict(
+            _version=self.version,
+            safeguards=[safeguard.get_config() for safeguard in self.safeguards],
+        )
+
+    @classmethod
+    def from_config(cls, config: dict) -> Self:
+        """
+        Instantiate the safeguards from a configuration [`dict`][dict].
+
+        Parameters
+        ----------
+        config : dict
+            Configuration of the safeguards.
+
+        Returns
+        -------
+        safeguards : Self
+            Collection of safeguards.
+        """
+
+        return cls(**config)
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(safeguards={list(self.safeguards)!r})"
+
+
+_FORMAT_VERSION: str = "0.1.x"
+
+
+_SUPPORTED_DTYPES: frozenset[np.dtype] = frozenset(
+    {
+        np.dtype(np.int8),
+        np.dtype(np.int16),
+        np.dtype(np.int32),
+        np.dtype(np.int64),
+        np.dtype(np.uint8),
+        np.dtype(np.uint16),
+        np.dtype(np.uint32),
+        np.dtype(np.uint64),
+        np.dtype(np.float32),
+        np.dtype(np.float64),
+    }
+)

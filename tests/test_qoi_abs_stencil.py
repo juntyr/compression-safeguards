@@ -3,15 +3,14 @@ from itertools import cycle, permutations, product
 import numpy as np
 import pytest
 
-from numcodecs_safeguards.quantizer import _SUPPORTED_DTYPES
-from numcodecs_safeguards.safeguards.stencil import BoundaryCondition
+from compression_safeguards import Safeguards
+from compression_safeguards.safeguards.stencil import BoundaryCondition
 
 from .codecs import (
     encode_decode_identity,
     encode_decode_mock,
     encode_decode_neg,
     encode_decode_noise,
-    encode_decode_none,
     encode_decode_zero,
 )
 
@@ -216,7 +215,7 @@ def test_mean():
 
 
 def test_findiff():
-    from numcodecs_safeguards.safeguards.stencil.qoi.abs import (
+    from compression_safeguards.safeguards.stencil.qoi.abs import (
         StencilQuantityOfInterestAbsoluteErrorBoundSafeguard,
     )
 
@@ -324,7 +323,7 @@ def test_findiff():
 
 
 def test_matmul():
-    from numcodecs_safeguards.safeguards.stencil.qoi.abs import (
+    from compression_safeguards.safeguards.stencil.qoi.abs import (
         StencilQuantityOfInterestAbsoluteErrorBoundSafeguard,
     )
 
@@ -351,7 +350,7 @@ def test_matmul():
 
 
 def test_indexing():
-    from numcodecs_safeguards.safeguards.stencil.qoi.abs import (
+    from compression_safeguards.safeguards.stencil.qoi.abs import (
         StencilQuantityOfInterestAbsoluteErrorBoundSafeguard,
     )
 
@@ -409,8 +408,8 @@ def test_indexing():
 def test_lambdify_indexing():
     import inspect
 
-    from numcodecs_safeguards.safeguards._qois.compile import sympy_expr_to_numpy
-    from numcodecs_safeguards.safeguards.stencil.qoi.abs import (
+    from compression_safeguards.safeguards._qois.compile import sympy_expr_to_numpy
+    from compression_safeguards.safeguards.stencil.qoi.abs import (
         StencilQuantityOfInterestAbsoluteErrorBoundSafeguard,
     )
 
@@ -431,7 +430,7 @@ def test_lambdify_indexing():
     )
 
 
-@pytest.mark.parametrize("dtype", sorted(d.name for d in _SUPPORTED_DTYPES))
+@pytest.mark.parametrize("dtype", sorted(d.name for d in Safeguards.supported_dtypes()))
 def test_dtypes(dtype):
     check_all_codecs(np.array([[1]], dtype=dtype), "x/sqrt(pi)", [(0, 0)])
 
@@ -526,7 +525,7 @@ def test_fuzzer_findiff_fraction_compare():
     data = np.array([1978047305655558])
 
     for boundary in BoundaryCondition:
-        encode_decode_none(
+        encode_decode_zero(
             data,
             safeguards=[
                 dict(kind="zero", zero=7),

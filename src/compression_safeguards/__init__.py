@@ -1,0 +1,174 @@
+"""
+# Fearless lossy compression with `compression-safeguards`
+
+Lossy compression can be *scary* as valuable information or features of the
+data may be lost.
+
+By using safeguards to **guarantee** your safety requirements, lossy
+compression can be applied safely and *without fear*.
+
+## Overview
+
+This package provides several
+[`Safeguard`][compression_safeguards.safeguards.abc.Safeguard]s (refer to the
+[`SafeguardKind`][compression_safeguards.SafeguardKind] for an enumeration)
+with which you can express *your* requirements for lossy compression to be safe
+to use.
+
+The safeguards are then combined in the
+[`Safeguards`][compression_safeguards.Safeguards], which can be used to compute
+and apply the required correction to lossy-compressed data so that it satisfies
+your safety guarantees.
+
+This package provides the implementations of the safeguards and the low-level
+`Safeguards` API. Please also refer to the following integrations of the
+safeguards with popular compression APIs:
+
+- [`numcodecs-safeguards`][numcodecs_safeguards]: provides the
+  [`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec] meta-compressor that
+  conveniently applies safeguards to any compressor using the
+  [`numcodecs.abc.Codec`][numcodecs.abc.Codec] API.
+
+## Examples
+
+In the following examples, we assume that there is *some* compressor that can
+`compress` and `decompress` n-dimensional `data` using functions of that name.
+
+### Basic Usage
+
+You can guarantee an absolute error bound of $eb_{abs} = 0.1$  as follows:
+
+<!--
+```py
+import numpy as np
+def compress(data):
+    return data
+def decompress(data):
+    return np.zeros_like(data)
+```
+-->
+<!--pytest-codeblocks:cont-->
+```py
+import numpy as np
+from compression_safeguards import Safeguards
+
+# create the `Safeguards`
+sg = Safeguards(safeguards=[
+    # guarantee an absolute error bound of 0.1:
+    #   |x - x'| <= 0.1
+    dict(kind="abs", eb_abs=0.1),
+])
+
+# generate some random data to compress
+data = np.random.normal(size=(10, 10, 10))
+
+## compression
+
+# compress and decompress the data using *some* compressor
+compressed = compress(data)
+decompressed = decompress(compressed)
+
+# compute the correction that the safeguards would need to apply to
+# guarantee the selected safety requirements
+correction = sg.compute_correction(data, decompressed)
+
+# now the compressed data and correction can be stored somewhere
+# ...
+# and loaded again to decompress
+
+## decompression
+decompressed = decompress(compressed)
+decompressed = sg.apply_correction(decompressed, correction)
+
+# the safeguard properties are now guaranteed to hold
+assert np.all(np.abs(data - decompressed) <= 0.1)
+```
+
+### Instantiating the safeguards
+
+The safeguards can be instantiated from JSON-like configuration:
+
+```py
+from compression_safeguards import Safeguards
+
+sg = Safeguards(safeguards=[
+    dict(kind="abs", eb_abs=0.1),
+])
+```
+
+or by using the [`SafeguardKind`][compression_safeguards.SafeguardKind]:
+
+```py
+from compression_safeguards import Safeguards, SafeguardKind
+
+sg = Safeguards(safeguards=[
+    SafeguardKind.abs.value(eb_abs=0.1),
+])
+```
+
+These two methods can be freely combined.
+
+The entire safeguards can also be turned into a JSON configuration and
+recreated from such configuration:
+
+```py
+from compression_safeguards import Safeguards
+
+sg = Safeguards(safeguards=[
+    dict(kind="abs", eb_abs=0.1),
+])
+config = sg.get_config()
+
+sg = Safeguards.from_config(config)
+assert sg.get_config() == config
+```
+
+### Combining several safeguards
+
+All of the provided safeguards can be freely combined and are guaranteed to
+work together.
+
+Providing several safeguards means that *all* the specified
+safety requirements must be upheld:
+
+```py
+from compression_safeguards import Safeguards
+
+sg = Safeguards(safeguards=[
+    # guarantee an absolute error bound
+    dict(kind="abs", eb_abs=0.1),
+    # and that the data sign is preserved
+    dict(kind="sign"),
+])
+```
+
+This package also provides several combinators that can be used to express
+pointwise logical combinations of safeguards:
+
+```py
+from compression_safeguards import Safeguards
+
+sg = Safeguards(safeguards=[
+    # guarantee that, for each element, *both* an absolute error bound of 0.1
+    # *and* a relative error bound of 1% are upheld
+    dict(kind="all", safeguards=[
+        dict(kind="abs", eb_abs=0.1),
+        dict(kind="rel", eb_rel=0.01),
+    ]),
+])
+
+sg = Safeguards(safeguards=[
+    # guarantee that, for each element, an absolute error bound of 0.1
+    # *or* a relative error bound of 1% are upheld
+    dict(kind="any", safeguards=[
+        dict(kind="abs", eb_abs=0.1),
+        dict(kind="rel", eb_rel=0.01),
+    ]),
+])
+```
+"""
+
+__all__ = ["Safeguards", "SafeguardKind"]
+
+from .api import Safeguards
+from .safeguards import SafeguardKind

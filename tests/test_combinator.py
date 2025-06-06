@@ -1,8 +1,8 @@
 import numpy as np
 
-from numcodecs_safeguards.quantizer import SafeguardsQuantizer
-from numcodecs_safeguards.safeguards.pointwise.abc import PointwiseSafeguard
-from numcodecs_safeguards.safeguards.stencil.abc import StencilSafeguard
+from compression_safeguards.api import Safeguards
+from compression_safeguards.safeguards.pointwise.abc import PointwiseSafeguard
+from compression_safeguards.safeguards.stencil.abc import StencilSafeguard
 
 from .codecs import (
     encode_decode_identity,
@@ -119,7 +119,7 @@ def test_inheritance():
     )
 
     for combinator in ["any", "all"]:
-        quantizer = SafeguardsQuantizer(
+        safeguards = Safeguards(
             safeguards=[
                 dict(
                     kind=combinator,
@@ -127,11 +127,11 @@ def test_inheritance():
                 )
             ]
         )
-        assert len(quantizer.safeguards) == 1
-        assert isinstance(quantizer.safeguards[0], PointwiseSafeguard)
-        assert not isinstance(quantizer.safeguards[0], StencilSafeguard)
+        assert len(safeguards.safeguards) == 1
+        assert isinstance(safeguards.safeguards[0], PointwiseSafeguard)
+        assert not isinstance(safeguards.safeguards[0], StencilSafeguard)
 
-        quantizer = SafeguardsQuantizer(
+        safeguards = Safeguards(
             safeguards=[
                 dict(
                     kind=combinator,
@@ -139,11 +139,11 @@ def test_inheritance():
                 ),
             ]
         )
-        assert len(quantizer.safeguards) == 1
-        assert not isinstance(quantizer.safeguards[0], PointwiseSafeguard)
-        assert isinstance(quantizer.safeguards[0], StencilSafeguard)
+        assert len(safeguards.safeguards) == 1
+        assert not isinstance(safeguards.safeguards[0], PointwiseSafeguard)
+        assert isinstance(safeguards.safeguards[0], StencilSafeguard)
 
-        quantizer = SafeguardsQuantizer(
+        safeguards = Safeguards(
             safeguards=[
                 dict(
                     kind=combinator,
@@ -154,6 +154,6 @@ def test_inheritance():
                 ),
             ]
         )
-        assert len(quantizer.safeguards) == 1
-        assert not isinstance(quantizer.safeguards[0], PointwiseSafeguard)
-        assert isinstance(quantizer.safeguards[0], StencilSafeguard)
+        assert len(safeguards.safeguards) == 1
+        assert not isinstance(safeguards.safeguards[0], PointwiseSafeguard)
+        assert isinstance(safeguards.safeguards[0], StencilSafeguard)
