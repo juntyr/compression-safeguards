@@ -165,3 +165,6 @@ jobs:
           uv run griffe2md src/compression_safeguards/ -o docs/compression_safeguards.md
           uv run griffe2md packages/numcodecs-safeguards/src/numcodecs_safeguards/ -o docs/numcodecs_safeguards.md
           find docs -type f -name "*.md" | xargs sed -i -e 's/```py/```python/g'
+
+      - name: Run doctests
+        run: pytest -v -W error --codeblocks docs/
