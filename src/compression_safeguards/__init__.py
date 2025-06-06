@@ -4,8 +4,8 @@
 Lossy compression can be *scary* as valuable information or features of the
 data may be lost.
 
-By using safeguards to guarantee your safety requirements, lossy compression can
-be applied safely and *without fear*.
+By using safeguards to **guarantee** your safety requirements, lossy
+compression can be applied safely and *without fear*.
 
 ## Overview
 
@@ -24,7 +24,7 @@ This package provides the implementations of the safeguards and the low-level
 `Safeguards` API. Please also refer to the following integrations of the
 safeguards with popular compression APIs:
 
-- [`numcodecs_safeguards`][numcodecs_safeguards]: provides the
+- [`numcodecs-safeguards`][numcodecs_safeguards]: provides the
   [`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec] meta-compressor that
   conveniently applies safeguards to any compressor using the
   [`numcodecs.abc.Codec`][numcodecs.abc.Codec] API.

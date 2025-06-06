@@ -27,8 +27,10 @@ theme:
 nav:
   - Home: index.md
   - Links:
-      - GitHub: https://github.com/juntyr/numcodecs-safeguards
-      - PyPI: https://pypi.org/project/numcodecs-safeguards/
+      - GitHub: https://github.com/juntyr/compression-safeguards
+      - PyPI:
+        - compression-safeguards: https://pypi.org/project/compression-safeguards/
+        - numcodecs-safeguards: https://pypi.org/project/numcodecs-safeguards/
 
 plugins:
   - exclude:

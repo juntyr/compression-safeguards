@@ -4,9 +4,9 @@ r"""
 Lossy compression can be *scary* as valuable information or features of the
 data may be lost.
 
-By using [`Safeguards`][compression_safeguards.Safeguards] to guarantee your
-safety requirements, lossy compression can be applied safely and *without
-fear*.
+By using [`Safeguards`][compression_safeguards.Safeguards] to **guarantee**
+your safety requirements, lossy compression can be applied safely and
+*without fear*.
 
 ## Overview
 
@@ -102,7 +102,10 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         The codec to wrap with safeguards. It can either be passed as a codec
         configuration [`dict`][dict], which is passed to
         [`numcodecs.registry.get_codec(config)`][numcodecs.registry.get_codec],
-        or an already initialized [`Codec`][numcodecs.abc.Codec].
+        or an already initialized [`Codec`][numcodecs.abc.Codec]. If you want to
+        wrap a sequence or stack of codecs, you can use the
+        [`numcodecs_combinators.stack.CodecStack`][numcodecs_combinators.stack.CodecStack]
+        combinator.
 
         It is desirable to perform lossless compression after applying the
         safeguards (rather than before), e.g. by customising the
