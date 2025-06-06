@@ -167,4 +167,4 @@ jobs:
           find docs -type f -name "*.md" | xargs sed -i -e 's/```py/```python/g'
 
       - name: Run doctests
-        run: pytest -v -W error --codeblocks docs/
+        run: uv run pytest -v -W error --codeblocks docs/
