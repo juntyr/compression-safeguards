@@ -64,7 +64,7 @@ assert np.all(np.sign(data) == np.sign(decoded))
 
 Please refer to the
 [`compression_safeguards.SafeguardKind`][compression_safeguards.SafeguardKind]
-for an enumation of all supported safeguards.
+for an enumeration of all supported safeguards.
 """
 
 __all__ = ["SafeguardsCodec"]
