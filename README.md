@@ -115,23 +115,52 @@ SafeguardsCodec(codec=codec, safeguards=[SafeguardKind.abs.value(eb_abs=0.1)])
 
 You can also provide just the configuration for the codec or any of the safeguards:
 
-```python
+<!--
+```py
+import numcodecs
+class MyCodec(numcodecs.abc.Codec):
+    codec_id = "my-codec"
+    def encode(self, buf):
+        return buf
+    def decode(self, buf, out=None):
+        return numcodecs.compat.ndarray_copy(buf, out)
+numcodecs.registry.register_codec(MyCodec)
+```
+-->
+<!--pytest-codeblocks:cont-->
+```py
 from numcodecs_safeguards import SafeguardsCodec
 
 SafeguardsCodec(
-    codec=dict(id="my-codec", ...),
+    codec=dict(
+        id="my-codec",
+        # ...
+    ),
     safeguards=[dict(kind="abs", eb_abs=0.1)],
 )
 ```
 
 Finally, you can also use `numcodecs.registry.get_codec(config)` to instantiate the codec with safeguards from one combined configuration:
 
-```python
+<!--
+```py
+import numcodecs
+class MyCodec(numcodecs.abc.Codec):
+    codec_id = "my-codec"
+    def encode(self, buf):
+        return buf
+    def decode(self, buf, out=None):
+        return numcodecs.compat.ndarray_copy(buf, out)
+numcodecs.registry.register_codec(MyCodec)
+```
+-->
+<!--pytest-codeblocks:cont-->
+```py
 import numcodecs
 
 numcodecs.registry.get_codec(dict(
     id="safeguards",
-    codec=dict(id="my-codec", ...),
+    codec=dict(id="my-codec"),
     safeguards=[dict(kind="abs", eb_abs=0.1)],
 ))
 ```

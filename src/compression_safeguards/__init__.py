@@ -102,7 +102,7 @@ or by using the [`SafeguardKind`][compression_safeguards.SafeguardKind]:
 from compression_safeguards import Safeguards, SafeguardKind
 
 sg = Safeguards(safeguards=[
-    SafeguardKind.abs(eb_abs=0.1),
+    SafeguardKind.abs.value(eb_abs=0.1),
 ])
 ```
 
