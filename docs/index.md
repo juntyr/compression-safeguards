@@ -97,7 +97,7 @@ The [`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec] adapter provided b
 
 You can wrap an existing codec with e.g. an absolute error bound of $eb_{abs} = 0.1$  as follows:
 
-```python
+```py
 from compression_safeguards import SafeguardKind
 from numcodecs_safeguards import SafeguardsCodec
 

@@ -42,6 +42,7 @@ examples = [
 ]
 fuzz = ["atheris~=2.3", "timeoutcontext~=1.2", "setuptools~=80.0"]
 test = ["pytest~=8.3"]
+doctest = ["griffe2md~=1.1", "pytest~=8.3", "pytest-codeblocks~=0.17.0"]
 typing = ["mypy~=1.14"]
 
 [tool.setuptools.packages.find]
@@ -58,19 +59,14 @@ addopts = ["--import-mode=importlib"]
 xfail_strict = true
 
 [[tool.mypy.overrides]]
-module = [
-    "numpy_quaddtype.*",
-    "sympy.*",
-]
+module = ["numpy_quaddtype.*", "sympy.*"]
 follow_untyped_imports = true
 
 [tool.hatch.build.targets.sdist]
 include = ["/src", "/CITATION.cff", "/LICENSE", "/pyproject.toml", "/README.md"]
 
 [tool.uv.workspace]
-members = [
-    "packages/numcodecs-safeguards",
-]
+members = ["packages/numcodecs-safeguards"]
 
 [tool.uv.sources]
 # numpy requires an explicit index since numpy-quaddtype depends on it

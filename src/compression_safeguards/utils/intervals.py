@@ -65,20 +65,20 @@ class Interval(Generic[T, N]):
 
     The lower and upper bounds of the interval can be set as follows:
 
-    ```py
+    ```python
     Lower(lower_data) <= interval <= Upper(upper_data)
     ```
 
     They can also be set to the smallest and largest possible values using:
 
-    ```py
+    ```python
     Minimum <= interval <= Maximum
     ```
 
     If only the interval bounds for some array members should be updated, only
     the interval itself needs to be indexed:
 
-    ```py
+    ```python
     # bound infinite values to be exactly themselves
     Lower(data) <= interval[np.isinf(data)] <= Upper(data)
     ```

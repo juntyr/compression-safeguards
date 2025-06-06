@@ -8,21 +8,63 @@ By using [`Safeguards`][compression_safeguards.Safeguards] to guarantee your
 safety requirements, lossy compression can be applied safely and *without
 fear*.
 
-## Safeguards for users of lossy compression
+## Overview
 
 This package provides the
-[`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec] adapter that can be
-wrapped around *any* existing (lossy)
+[`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec] adapter /
+meta-compressor that can be wrapped around *any* existing (lossy)
 [`numcodecs.abc.Codec`][numcodecs.abc.Codec] to *guarantee* that certain
-properties about the data are upheld.
+properties of the original data are preserved by compression.
 
-Note that the wrapped codec is treated as a blackbox and the decompressed data
-is postprocessed to re-establish the properties, if necessary.
+The `SafeguardsCodec` treats the wrapped inner codec as a blackbox. To
+guarantee the user's safety requirements, it post-processes the decompressed
+data, if necessary. If no correction is needed, the `SafeguardsCodec` only has
+a one-byte overhead for the compressed data and a computational overhead at
+compression time.
 
 By using the [`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec] adapter,
 badly behaving lossy codecs become safe to use, at the cost of potentially
 less efficient compression, and lossy compression can be applied *without
 fear*.
+
+## Example
+
+```py
+import numpy as np
+from numcodecs.fixedscaleoffset import FixedScaleOffset
+from numcodecs_safeguards import SafeguardsCodec
+
+# use any numcodecs-compatible codec
+# here we quantize data >= -10 with one decimal digit
+lossy_codec = FixedScaleOffset(
+    offset=-10, scale=10, dtype="float64", astype="uint8",
+)
+
+# wrap the codec in the `SafeguardsCodec` and specify the safeguards to apply
+sg_codec = SafeguardsCodec(codec=lossy_codec, safeguards=[
+    # guarantee a relative error of 1%:
+    #   |x - x'| <= |x| * 0.01
+    dict(kind="rel", eb_rel=0.01),
+    # guarantee that the sign is preserved:
+    #   sign(x) = sign(x')
+    dict(kind="sign"),
+])
+
+# some n-dimensional data
+data = np.linspace(-10, 10, 21)
+
+# encode and decode the data
+encoded = sg_codec.encode(data)
+decoded = sg_codec.decode(encoded)
+
+# the safeguard properties are guaranteed to hold
+assert np.all(np.abs(data - decoded) <= np.abs(data) * 0.01)
+assert np.all(np.sign(data) == np.sign(decoded))
+```
+
+Please refer to the
+[`compression_safeguards.SafeguardKind`][compression_safeguards.SafeguardKind]
+for an enumation of all supported safeguards.
 """
 
 __all__ = ["SafeguardsCodec"]

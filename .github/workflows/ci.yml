@@ -28,11 +28,11 @@ jobs:
     name: Spellcheck
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout the Repository
-      uses: actions/checkout@v4
+      - name: Checkout the Repository
+        uses: actions/checkout@v4
 
-    - name: Spellcheck repo
-      uses: crate-ci/typos@v1.32.0
+      - name: Spellcheck repo
+        uses: crate-ci/typos@v1.32.0
 
   fmt:
     name: Formatting
@@ -126,3 +126,42 @@ jobs:
         with:
           path: ./corpus
           key: fuzzer-corpus
+
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the Repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Setup the Python venv with the safeguards
+        run: uv sync --all-packages
+
+      - name: Install mkdocs dependencies
+        run: uv pip install -r docs/requirements.txt
+
+      - name: Check docs build
+        run: uv run mkdocs build
+
+  doctest:
+    name: Doctest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the Repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Setup the Python venv with the safeguards
+        run: uv sync --all-packages --group doctest
+
+      - name: Compile all docs
+        run: |
+          cp README.md docs/
+          uv run griffe2md src/compression_safeguards/ -o docs/compression_safeguards.md
+          uv run griffe2md packages/numcodecs-safeguards/src/numcodecs_safeguards/ -o docs/numcodecs_safeguards.md
+          find docs -type f -name "*.md" | xargs sed -i '' -e 's/```py/```python/g'
