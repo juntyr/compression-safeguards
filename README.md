@@ -97,18 +97,25 @@ This package currently implements the following safeguards:
 
 The `compression-safeguards` package can be installed from PyPi using pip:
 
+<!--pytest.mark.skip-->
 ```sh
 pip install compression-safeguards
 ```
 
 You may also need to install the `numpy-quaddtype` dependency from the PyPi test index:
 
+<!--
+```sh
+pip install numpy
+-->
+<!--pytest-codeblocks:cont-->
 ```sh
 pip install -i https://test.pypi.org/simple/ numpy-quaddtype~=0.0.7
 ```
 
 The integrations can be installed similarly:
 
+<!--pytest.mark.skip-->
 ```sh
 pip install numcodecs-safeguards
 ```
