@@ -4,8 +4,7 @@ Implementation of the [`Safeguards`][compression_safeguards.api.Safeguards], whi
 
 __all__ = ["Safeguards"]
 
-from collections.abc import Collection, Mapping, Set
-from typing import Any
+from collections.abc import Collection, Set
 
 import numpy as np
 from typing_extensions import Self
@@ -14,6 +13,7 @@ from .safeguards import SafeguardKind
 from .safeguards.abc import Safeguard
 from .safeguards.pointwise.abc import PointwiseSafeguard
 from .safeguards.stencil.abc import StencilSafeguard
+from .utils.binding import LateBound, Parameter
 from .utils.cast import as_bits
 from .utils.typing import C, S, T
 
@@ -87,8 +87,8 @@ class Safeguards:
         return self._pointwise_safeguards + self._stencil_safeguards
 
     @property
-    def late_bound(self) -> Set[str]:
-        return frozenset(*[b for s in self.safeguards for b in s.late_bound])
+    def late_bound(self) -> Set[Parameter]:
+        return frozenset([b for s in self.safeguards for b in s.late_bound])
 
     @property
     def version(self) -> str:
@@ -117,7 +117,7 @@ class Safeguards:
         data: np.ndarray[S, np.dtype[T]],
         prediction: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
+        late_bound: LateBound,
     ) -> np.ndarray[S, np.dtype[C]]:
         """
         Compute the correction required to make the `prediction` array satisfy the safeguards relative to the `data` array.

@@ -4,11 +4,9 @@ Always safe (logical truth) combinator safeguard.
 
 __all__ = ["AlwaysSafeguard"]
 
-from collections.abc import Mapping
-from typing import Any
-
 import numpy as np
 
+from ...utils.binding import LateBound
 from ...utils.intervals import Interval, IntervalUnion
 from ...utils.typing import S, T
 from ..pointwise.abc import PointwiseSafeguard
@@ -34,7 +32,7 @@ class AlwaysSafeguard(PointwiseSafeguard):
         data: np.ndarray[S, np.dtype[T]],
         decoded: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
+        late_bound: LateBound,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         All elements are safe and thus always succeed the check.
@@ -58,7 +56,7 @@ class AlwaysSafeguard(PointwiseSafeguard):
         self,
         data: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
+        late_bound: LateBound,
     ) -> IntervalUnion[T, int, int]:
         """
         Since all values are always safe, the safe intervals for each element

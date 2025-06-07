@@ -5,11 +5,11 @@ Logical all (and) combinator safeguard.
 __all__ = ["AllSafeguards"]
 
 from abc import ABC
-from collections.abc import Collection, Mapping
-from typing import Any
+from collections.abc import Collection
 
 import numpy as np
 
+from ...utils.binding import LateBound
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import S, T
 from ..abc import Safeguard
@@ -86,7 +86,7 @@ class AllSafeguards(Safeguard):
         data: np.ndarray[S, np.dtype[T]],
         decoded: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
+        late_bound: LateBound,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check for which elements all of the combined safeguards succeed the
@@ -111,7 +111,7 @@ class AllSafeguards(Safeguard):
         self,
         data: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
+        late_bound: LateBound,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intersection of the safe intervals of the combined
@@ -157,7 +157,7 @@ class _AllSafeguardsBase(ABC):
         data: np.ndarray[S, np.dtype[T]],
         decoded: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
+        late_bound: LateBound,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         front, *tail = self.safeguards
 
@@ -172,7 +172,7 @@ class _AllSafeguardsBase(ABC):
         self,
         data: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
+        late_bound: LateBound,
     ) -> IntervalUnion[T, int, int]:
         front, *tail = self.safeguards
 

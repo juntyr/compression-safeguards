@@ -5,12 +5,11 @@ Pointwise quantity of interest (QoI) absolute error bound safeguard.
 __all__ = ["PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard"]
 
 import re
-from collections.abc import Mapping
-from typing import Any
 
 import numpy as np
 import sympy as sp
 
+from ....utils.binding import LateBound
 from ....utils.cast import (
     _isfinite,
     _isinf,
@@ -271,7 +270,7 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
         data: np.ndarray[S, np.dtype[T]],
         decoded: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
+        late_bound: LateBound,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `decoded` array satisfy the absolute error
@@ -326,7 +325,7 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
         self,
         data: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
+        late_bound: LateBound,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the absolute error bound is upheld with

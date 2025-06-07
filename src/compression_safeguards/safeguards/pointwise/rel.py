@@ -4,11 +4,9 @@ Relative error bound safeguard.
 
 __all__ = ["RelativeErrorBoundSafeguard"]
 
-from collections.abc import Mapping
-from typing import Any
-
 import numpy as np
 
+from ...utils.binding import LateBound
 from ...utils.cast import (
     _isfinite,
     _isinf,
@@ -71,7 +69,7 @@ class RelativeErrorBoundSafeguard(PointwiseSafeguard):
         data: np.ndarray[S, np.dtype[T]],
         decoded: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
+        late_bound: LateBound,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `decoded` array satisfy the relative error
@@ -126,7 +124,7 @@ class RelativeErrorBoundSafeguard(PointwiseSafeguard):
         self,
         data: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
+        late_bound: LateBound,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the relative error bound is upheld with

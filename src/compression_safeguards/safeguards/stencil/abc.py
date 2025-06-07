@@ -5,11 +5,11 @@ Abstract base class for the stencil safeguards.
 __all__ = ["StencilSafeguard"]
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
-from typing import Any, final
+from typing import final
 
 import numpy as np
 
+from ...utils.binding import LateBound
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import S, T
 from ..abc import Safeguard
@@ -58,7 +58,7 @@ class StencilSafeguard(Safeguard, ABC):
         data: np.ndarray[S, np.dtype[T]],
         decoded: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
+        late_bound: LateBound,
     ) -> bool:
         """
         Check if the `decoded` array upholds the property enforced by this
@@ -85,7 +85,7 @@ class StencilSafeguard(Safeguard, ABC):
         data: np.ndarray[S, np.dtype[T]],
         decoded: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
+        late_bound: LateBound,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `decoded` array uphold the neighbourhood
@@ -111,8 +111,8 @@ class StencilSafeguard(Safeguard, ABC):
         self,
         data: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
-    ) -> IntervalUnion[T, Any, Any]:
+        late_bound: LateBound,
+    ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the safeguard's guarantees with respect
         to the `data` are upheld.
@@ -122,12 +122,12 @@ class StencilSafeguard(Safeguard, ABC):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data for which the safe intervals should be computed.
 
         Returns
         -------
-        intervals : IntervalUnion
+        intervals : IntervalUnion[T, int, int]
             Union of intervals in which the safeguard's guarantees are upheld.
         """
 

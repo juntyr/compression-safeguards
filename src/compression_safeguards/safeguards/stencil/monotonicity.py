@@ -4,14 +4,13 @@ Monotonicity-preserving safeguard.
 
 __all__ = ["Monotonicity", "MonotonicityPreservingSafeguard"]
 
-from collections.abc import Mapping
 from enum import Enum
 from operator import ge, gt, le, lt
-from typing import Any
 
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
+from ...utils.binding import LateBound
 from ...utils.cast import _isfinite, _isnan, from_total_order, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import S, T
@@ -200,7 +199,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         data: np.ndarray[S, np.dtype[T]],
         decoded: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
+        late_bound: LateBound,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which monotonic sequences centred on the points in the `data`
@@ -280,7 +279,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         self,
         data: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
+        late_bound: LateBound,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the monotonicity of the `data` is

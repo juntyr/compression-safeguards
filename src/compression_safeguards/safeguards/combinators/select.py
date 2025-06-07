@@ -5,11 +5,11 @@ Logical selector (switch case) combinator safeguard.
 __all__ = ["SelectSafeguard"]
 
 from abc import ABC
-from collections.abc import Collection, Mapping, Set
-from typing import Any
+from collections.abc import Collection, Set
 
 import numpy as np
 
+from ...utils.binding import LateBound, Parameter
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import S, T
 from ..abc import Safeguard
@@ -52,7 +52,7 @@ class SelectSafeguard(Safeguard):
     def __init__(
         self,
         *,
-        selector: str,
+        selector: Parameter,
         safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard],
     ):
         pass
@@ -60,7 +60,7 @@ class SelectSafeguard(Safeguard):
     def __new__(  # type: ignore
         cls,
         *,
-        selector: str,
+        selector: Parameter,
         safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard],
     ) -> "_SelectPointwiseSafeguard | _SelectStencilSafeguard":
         from ... import SafeguardKind
@@ -122,7 +122,7 @@ class SelectSafeguard(Safeguard):
         data: np.ndarray[S, np.dtype[T]],
         decoded: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
+        late_bound: LateBound,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check for which elements the selected safeguard succeed the check.
@@ -146,7 +146,7 @@ class SelectSafeguard(Safeguard):
         self,
         data: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
+        late_bound: LateBound,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the safe intervals for the selected safeguard.
@@ -183,7 +183,7 @@ class _SelectSafeguardBase(ABC):
     kind = "select"
 
     @property
-    def selector(self) -> str:
+    def selector(self) -> Parameter:
         return self._selector  # type: ignore
 
     @property
@@ -191,9 +191,9 @@ class _SelectSafeguardBase(ABC):
         return self._safeguards  # type: ignore
 
     @property
-    def late_bound(self) -> Set[str]:
+    def late_bound(self) -> Set[Parameter]:
         return frozenset(
-            self.selector, *[b for s in self.safeguards for b in s.late_bound]
+            [self.selector] + [b for s in self.safeguards for b in s.late_bound]
         )
 
     def check_pointwise(
@@ -201,32 +201,28 @@ class _SelectSafeguardBase(ABC):
         data: np.ndarray[S, np.dtype[T]],
         decoded: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
+        late_bound: LateBound,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
-        assert self.selector in late_bound, (
-            f"late_bound missing binding for {self.selector}"
+        selector = late_bound.resolve_ndarray(
+            self.selector, data.shape, np.dtype(np.int_)
         )
-        selector = late_bound[self.selector]
-        selector = np.broadcast_to(selector, data.shape)
 
         oks = [
             safeguard.check_pointwise(data, decoded, late_bound=late_bound)
             for safeguard in self.safeguards
         ]
 
-        return np.choose(selector, oks)
+        return np.choose(selector, oks)  # type: ignore
 
     def compute_safe_intervals(
         self,
         data: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Any],
+        late_bound: LateBound,
     ) -> IntervalUnion[T, int, int]:
-        assert self.selector in late_bound, (
-            f"late_bound missing binding for {self.selector}"
+        selector = late_bound.resolve_ndarray(
+            self.selector, data.shape, np.dtype(np.int_)
         )
-        selector = late_bound[self.selector]
-        selector = np.broadcast_to(selector, data.shape)
 
         valids = [
             safeguard.compute_safe_intervals(data, late_bound=late_bound)
@@ -281,11 +277,10 @@ class _SelectPointwiseSafeguard(_SelectSafeguardBase, PointwiseSafeguard):
         "_selector",
         "_safeguards",
     )
-    _selector: str
+    _selector: Parameter
     _safeguards: tuple[PointwiseSafeguard, ...]
 
-    def __init__(self, selector: str, *safeguards: PointwiseSafeguard):
-        assert selector.isidentifier(), "selector must be a valid indentifier"
+    def __init__(self, selector: Parameter, *safeguards: PointwiseSafeguard):
         self._selector = selector
 
         for safeguard in safeguards:
@@ -300,13 +295,12 @@ class _SelectStencilSafeguard(_SelectSafeguardBase, StencilSafeguard):
         "_selector",
         "_safeguards",
     )
-    _selector: str
+    _selector: Parameter
     _safeguards: tuple[PointwiseSafeguard | StencilSafeguard, ...]
 
     def __init__(
-        self, selector: str, *safeguards: PointwiseSafeguard | StencilSafeguard
+        self, selector: Parameter, *safeguards: PointwiseSafeguard | StencilSafeguard
     ):
-        assert selector.isidentifier(), "selector must be a valid indentifier"
         self._selector = selector
 
         for safeguard in safeguards:
