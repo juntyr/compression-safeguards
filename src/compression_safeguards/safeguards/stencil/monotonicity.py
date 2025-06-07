@@ -4,8 +4,10 @@ Monotonicity-preserving safeguard.
 
 __all__ = ["Monotonicity", "MonotonicityPreservingSafeguard"]
 
+from collections.abc import Mapping
 from enum import Enum
 from operator import ge, gt, le, lt
+from typing import Any
 
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
@@ -194,7 +196,11 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         return tuple(neighbourhood)
 
     def check_pointwise(
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Mapping[str, Any],
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which monotonic sequences centred on the points in the `data`
@@ -271,7 +277,10 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         return ok  # type: ignore
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Mapping[str, Any],
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the monotonicity of the `data` is

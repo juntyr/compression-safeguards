@@ -4,6 +4,9 @@ Relative error bound safeguard.
 
 __all__ = ["RelativeErrorBoundSafeguard"]
 
+from collections.abc import Mapping
+from typing import Any
+
 import numpy as np
 
 from ...utils.cast import (
@@ -64,7 +67,11 @@ class RelativeErrorBoundSafeguard(PointwiseSafeguard):
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Mapping[str, Any],
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `decoded` array satisfy the relative error
@@ -116,7 +123,10 @@ class RelativeErrorBoundSafeguard(PointwiseSafeguard):
         return ok  # type: ignore
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Mapping[str, Any],
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the relative error bound is upheld with

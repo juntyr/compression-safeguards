@@ -54,7 +54,10 @@ class StencilSafeguard(Safeguard, ABC):
 
     @final
     def check(
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]], *,
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
         late_bound: Mapping[str, Any],
     ) -> bool:
         """
@@ -78,7 +81,10 @@ class StencilSafeguard(Safeguard, ABC):
 
     @abstractmethod
     def check_pointwise(
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]], *,
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
         late_bound: Mapping[str, Any],
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
@@ -102,7 +108,9 @@ class StencilSafeguard(Safeguard, ABC):
 
     @abstractmethod
     def compute_safe_intervals(
-        self, data: np.ndarray[S, np.dtype[T]], *,
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
         late_bound: Mapping[str, Any],
     ) -> IntervalUnion[T, Any, Any]:
         """

@@ -4,6 +4,9 @@ Sign-preserving safeguard.
 
 __all__ = ["SignPreservingSafeguard"]
 
+from collections.abc import Mapping
+from typing import Any
+
 import numpy as np
 
 from ...utils.intervals import Interval, IntervalUnion, Lower, Maximum, Minimum, Upper
@@ -30,7 +33,11 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         pass
 
     def check_pointwise(
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Mapping[str, Any],
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check for which elements in the `decoded` array the signs match the
@@ -52,7 +59,10 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         return self._sign(data) == self._sign(decoded)
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Mapping[str, Any],
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the `data`'s sign is preserved.

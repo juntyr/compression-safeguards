@@ -1,11 +1,11 @@
 """
-Logical all (and) combinator safeguard.
+Logical selector (switch case) combinator safeguard.
 """
 
 __all__ = ["SelectSafeguard"]
 
 from abc import ABC
-from collections.abc import Collection, Set, Mapping
+from collections.abc import Collection, Mapping, Set
 from typing import Any
 
 import numpy as np
@@ -20,15 +20,23 @@ from ..stencil.abc import StencilSafeguard
 
 class SelectSafeguard(Safeguard):
     """
-    The `AllSafeguards` guarantees that, for each element, all of the combined
-    safeguards' guarantees are upheld.
+    The `SelectSafeguard` guarantees that, for each element, the guarantees of
+    the pointwise selected safeguard are upheld. This combinator allows
+    selecting between several safeguards with per-element granularity.
+
+    This combinator can be used to describe simple regions of interest where
+    different safeguards, e.g. with different error bounds, are applied to
+    different parts of the data.
 
     At the moment, only pointwise and stencil safeguards and combinations
-    thereof can be combined by this all-combinator. The combinator is a
+    thereof can be combined by this select-combinator. The combinator is a
     pointwise or a stencil safeguard, depending on the safeguards it combines.
 
     Parameters
     ----------
+    selector : str
+        Identifier for the late-bound parameter that is used to select between
+        the `safeguards`.
     safeguards : Collection[dict | PointwiseSafeguard | StencilSafeguard]
         At least one safeguard configuration [`dict`][dict]s or already
         initialized
@@ -42,12 +50,18 @@ class SelectSafeguard(Safeguard):
     kind = "select"
 
     def __init__(
-        self, *, selector: str, safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard]
+        self,
+        *,
+        selector: str,
+        safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard],
     ):
         pass
 
     def __new__(  # type: ignore
-        cls, *, selector: str, safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard]
+        cls,
+        *,
+        selector: str,
+        safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard],
     ) -> "_SelectPointwiseSafeguard | _SelectStencilSafeguard":
         from ... import SafeguardKind
 
@@ -68,12 +82,15 @@ class SelectSafeguard(Safeguard):
             )
 
         if all(isinstance(safeguard, PointwiseSafeguard) for safeguard in safeguards_):
-            return _SelectPointwiseSafeguard(*safeguards_)  # type: ignore
+            return _SelectPointwiseSafeguard(selector, *safeguards_)  # type: ignore
         else:
-            return _SelectStencilSafeguard(*safeguards_)
-    
+            return _SelectStencilSafeguard(selector, *safeguards_)
+
     @property
     def selector(self) -> str:  # type: ignore
+        """
+        The identifier for the late-bound selector parameter.
+        """
         ...
 
     @property
@@ -87,15 +104,28 @@ class SelectSafeguard(Safeguard):
 
     @property
     def late_bound(self) -> Set[str]:  # type: ignore
+        """
+        The set of the identifiers of the late-bound parameters that this
+        safeguard has.
+
+        Late-bound parameters are only bound when checking and applying the
+        safeguard, in contrast to the normal early-bound parameters that are
+        configured during safeguard initialisation.
+
+        Late-bound parameters can be used for parameters that depend on the
+        specific data that is to be safeguarded.
+        """
         ...
 
     def check_pointwise(  # type: ignore
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]], *,
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
         late_bound: Mapping[str, Any],
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check for which elements all of the combined safeguards succeed the
-        check.
+        Check for which elements the selected safeguard succeed the check.
 
         Parameters
         ----------
@@ -113,12 +143,13 @@ class SelectSafeguard(Safeguard):
         ...
 
     def compute_safe_intervals(  # type: ignore
-        self, data: np.ndarray[S, np.dtype[T]], *,
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
         late_bound: Mapping[str, Any],
     ) -> IntervalUnion[T, int, int]:
         """
-        Compute the intersection of the safe intervals of the combined
-        safeguards, i.e. where all of them are safe.
+        Compute the safe intervals for the selected safeguard.
 
         Parameters
         ----------
@@ -128,7 +159,7 @@ class SelectSafeguard(Safeguard):
         Returns
         -------
         intervals : IntervalUnion
-            Intersection of safe intervals.
+            The safe intervals.
         """
 
         ...
@@ -161,59 +192,79 @@ class _SelectSafeguardBase(ABC):
 
     @property
     def late_bound(self) -> Set[str]:
-        return frozenset(self.selector, **[b for s in self.safeguards for b in s.late_bound])
+        return frozenset(
+            self.selector, *[b for s in self.safeguards for b in s.late_bound]
+        )
 
     def check_pointwise(
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]], *,
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
         late_bound: Mapping[str, Any],
     ) -> np.ndarray[S, np.dtype[np.bool]]:
-        assert self.selector in late_bound, f"late_bound missing binding for {self.selector}"
+        assert self.selector in late_bound, (
+            f"late_bound missing binding for {self.selector}"
+        )
         selector = late_bound[self.selector]
         selector = np.broadcast_to(selector, data.shape)
 
-        ok = np.zeros_like(data, dtype=np.bool)
+        oks = [
+            safeguard.check_pointwise(data, decoded, late_bound=late_bound)
+            for safeguard in self.safeguards
+        ]
 
-        for i, safeguard in enumerate(self.safeguards):
-            if not np.any(selector == i):
-                continue
-
-        front, *tail = self.safeguards
-
-        ok = front.check_pointwise(data, decoded)
-
-        for safeguard in tail:
-            ok &= safeguard.check_pointwise(data, decoded)
-
-        return ok
+        return np.choose(selector, oks)
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, np.dtype[T]], *,
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
         late_bound: Mapping[str, Any],
     ) -> IntervalUnion[T, int, int]:
-        assert self.selector in late_bound, f"late_bound missing binding for {self.selector}"
+        assert self.selector in late_bound, (
+            f"late_bound missing binding for {self.selector}"
+        )
         selector = late_bound[self.selector]
+        selector = np.broadcast_to(selector, data.shape)
 
-        front, *tail = self.safeguards
+        valids = [
+            safeguard.compute_safe_intervals(data, late_bound=late_bound)
+            for safeguard in self.safeguards
+        ]
 
-        valid = front.compute_safe_intervals(data)
+        umax = max(valid.u for valid in valids)
 
-        for safeguard in tail:
-            valid = valid.intersect(safeguard.compute_safe_intervals(data))
+        for i, v in enumerate(valids):
+            vnew = IntervalUnion.empty(data.dtype, data.size, umax)
+            vnew._lower[: v.u] = v._lower
+            vnew._upper[: v.u] = v._upper
+            valids[i] = vnew
+
+        valid: IntervalUnion[T, int, int] = IntervalUnion.empty(
+            data.dtype, data.size, umax
+        )
+        valid._lower = np.choose(selector, [v._lower for v in valids])
+        valid._upper = np.choose(selector, [v._upper for v in valids])
 
         return valid
 
     def get_config(self) -> dict:
         return dict(
             kind=type(self).kind,
+            selector=self.selector,
             safeguards=[safeguard.get_config() for safeguard in self.safeguards],
         )
 
     def __repr__(self) -> str:
-        return f"{SelectSafeguard.__name__}(safeguards={list(self.safeguards)!r})"
+        return f"{SelectSafeguard.__name__}(selector={self.selector!r}, safeguards={list(self.safeguards)!r})"
 
 
 class _SelectPointwiseSafeguard(_SelectSafeguardBase, PointwiseSafeguard):
-    __slots__ = ("_selector", "_safeguards",)
+    __slots__ = (
+        "_selector",
+        "_safeguards",
+    )
     _selector: str
     _safeguards: tuple[PointwiseSafeguard, ...]
 
@@ -229,11 +280,16 @@ class _SelectPointwiseSafeguard(_SelectSafeguardBase, PointwiseSafeguard):
 
 
 class _SelectStencilSafeguard(_SelectSafeguardBase, StencilSafeguard):
-    __slots__ = ("_selector", "_safeguards",)
+    __slots__ = (
+        "_selector",
+        "_safeguards",
+    )
     _selector: str
     _safeguards: tuple[PointwiseSafeguard | StencilSafeguard, ...]
 
-    def __init__(self, selector: str, *safeguards: PointwiseSafeguard | StencilSafeguard):
+    def __init__(
+        self, selector: str, *safeguards: PointwiseSafeguard | StencilSafeguard
+    ):
         assert selector.isidentifier(), "selector must be a valid indentifier"
         self._selector = selector
 

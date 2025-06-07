@@ -175,6 +175,9 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         _version: None | str = None,
     ):
         self._safeguards = Safeguards(safeguards=safeguards, _version=_version)
+        assert len(self._safeguards.late_bound) == 0, (
+            "SafeguardsCodec does not (yet) support late-bound parameters"
+        )
 
         self._codec = (
             codec if isinstance(codec, Codec) else numcodecs.registry.get_codec(codec)
@@ -293,7 +296,9 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         # the codec always compresses the complete data ... at least chunking
         #  is not our concern
-        correction: np.ndarray = self._safeguards.compute_correction(data, decoded)
+        correction: np.ndarray = self._safeguards.compute_correction(
+            data, decoded, late_bound={}
+        )
 
         if np.all(correction == 0):
             correction_bytes = b""

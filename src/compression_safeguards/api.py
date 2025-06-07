@@ -4,7 +4,8 @@ Implementation of the [`Safeguards`][compression_safeguards.api.Safeguards], whi
 
 __all__ = ["Safeguards"]
 
-from collections.abc import Collection
+from collections.abc import Collection, Mapping, Set
+from typing import Any
 
 import numpy as np
 from typing_extensions import Self
@@ -86,6 +87,10 @@ class Safeguards:
         return self._pointwise_safeguards + self._stencil_safeguards
 
     @property
+    def late_bound(self) -> Set[str]:
+        return frozenset(*[b for s in self.safeguards for b in s.late_bound])
+
+    @property
     def version(self) -> str:
         """
         The version of the format of the correction computed by the
@@ -111,6 +116,8 @@ class Safeguards:
         self,
         data: np.ndarray[S, np.dtype[T]],
         prediction: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Mapping[str, Any],
     ) -> np.ndarray[S, np.dtype[C]]:
         """
         Compute the correction required to make the `prediction` array satisfy the safeguards relative to the `data` array.
@@ -138,9 +145,15 @@ class Safeguards:
         assert data.dtype == prediction.dtype
         assert data.shape == prediction.shape
 
+        late_bound_reqs = self.late_bound
+        late_bound_keys = frozenset(late_bound.keys())
+        assert late_bound_reqs == late_bound_keys, (
+            f"late_bound is missing bindings for {late_bound_reqs - late_bound_keys} and has extraneous {late_bound_keys - late_bound_reqs}"
+        )
+
         all_ok = True
         for safeguard in self.safeguards:
-            if not safeguard.check(data, prediction):
+            if not safeguard.check(data, prediction, late_bound=late_bound):
                 all_ok = False
                 break
 
@@ -149,7 +162,7 @@ class Safeguards:
 
         all_intervals = []
         for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
-            intervals = safeguard.compute_safe_intervals(data)
+            intervals = safeguard.compute_safe_intervals(data, late_bound=late_bound)
             assert np.all(intervals.contains(data)), (
                 f"pointwise safeguard {safeguard!r}'s intervals must contain the original data"
             )
@@ -164,7 +177,7 @@ class Safeguards:
             assert np.all(intervals.contains(correction)), (
                 f"{safeguard!r} interval does not contain the correction {correction!r}"
             )
-            assert safeguard.check(data, correction), (
+            assert safeguard.check(data, correction, late_bound=late_bound), (
                 f"{safeguard!r} check fails after correction {correction!r} on data {data!r}"
             )
 

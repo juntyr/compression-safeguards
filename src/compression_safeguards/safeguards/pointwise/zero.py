@@ -4,6 +4,9 @@ Zero-is-zero safeguard.
 
 __all__ = ["ZeroIsZeroSafeguard"]
 
+from collections.abc import Mapping
+from typing import Any
+
 import numpy as np
 
 from ...utils.cast import as_bits
@@ -40,7 +43,11 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
         self._zero = zero
 
     def check_pointwise(
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Mapping[str, Any],
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements are either
@@ -65,7 +72,10 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
         return (as_bits(data) != zero_bits) | (as_bits(decoded) == zero_bits)
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Mapping[str, Any],
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the zero-is-zero guarantee is upheld with

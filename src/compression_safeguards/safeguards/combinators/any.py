@@ -5,7 +5,8 @@ Logical any (or) combinator safeguard.
 __all__ = ["AnySafeguard"]
 
 from abc import ABC
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
+from typing import Any
 
 import numpy as np
 
@@ -81,7 +82,11 @@ class AnySafeguard(Safeguard):
         ...
 
     def check_pointwise(  # type: ignore
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Mapping[str, Any],
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check for which elements at least one of the combined safeguards
@@ -103,7 +108,10 @@ class AnySafeguard(Safeguard):
         ...
 
     def compute_safe_intervals(  # type: ignore
-        self, data: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Mapping[str, Any],
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the union of the safe intervals of the combined safeguards,
@@ -145,26 +153,35 @@ class _AnySafeguardBase(ABC):
         return self._safeguards  # type: ignore
 
     def check_pointwise(
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Mapping[str, Any],
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         front, *tail = self.safeguards
 
-        ok = front.check_pointwise(data, decoded)
+        ok = front.check_pointwise(data, decoded, late_bound=late_bound)
 
         for safeguard in tail:
-            ok |= safeguard.check_pointwise(data, decoded)
+            ok |= safeguard.check_pointwise(data, decoded, late_bound=late_bound)
 
         return ok
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Mapping[str, Any],
     ) -> IntervalUnion[T, int, int]:
         front, *tail = self.safeguards
 
-        valid = front.compute_safe_intervals(data)
+        valid = front.compute_safe_intervals(data, late_bound=late_bound)
 
         for safeguard in tail:
-            valid = valid.union(safeguard.compute_safe_intervals(data))
+            valid = valid.union(
+                safeguard.compute_safe_intervals(data, late_bound=late_bound)
+            )
 
         return valid
 

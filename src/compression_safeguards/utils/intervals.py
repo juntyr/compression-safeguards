@@ -117,6 +117,21 @@ class Interval(Generic[T, N]):
         self._lower = _lower
         self._upper = _upper
 
+    @property
+    def dtype(self) -> np.dtype[T]:
+        """
+        Dtype `T` of the interval.
+        """
+        return self._lower.dtype
+
+    @property
+    def n(self) -> N:
+        """
+        Size `N` of the interval.
+        """
+        (n,) = self._lower.shape
+        return n
+
     @staticmethod
     def empty(dtype: np.dtype[T], n: Ni) -> "Interval[T, Ni]":
         """
@@ -581,6 +596,29 @@ class IntervalUnion(Generic[T, N, U]):
     ) -> None:
         self._lower = _lower
         self._upper = _upper
+
+    @property
+    def dtype(self) -> np.dtype[T]:
+        """
+        Dtype `T` of the interval union.
+        """
+        return self._lower.dtype
+
+    @property
+    def n(self) -> N:
+        """
+        Size `N` of the interval union.
+        """
+        u, n = self._lower.shape
+        return n
+
+    @property
+    def u(self) -> U:
+        """
+        Number of intervals `U` in the interval union.
+        """
+        u, n = self._lower.shape
+        return u
 
     @staticmethod
     def empty(dtype: np.dtype[T], n: Ni, u: Ui) -> "IntervalUnion[T, Ni, Ui]":

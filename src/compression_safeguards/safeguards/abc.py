@@ -5,7 +5,7 @@ Abstract base class for the safeguards.
 __all__ = ["Safeguard"]
 
 from abc import ABC, abstractmethod
-from collections.abc import Set, Mapping
+from collections.abc import Mapping, Set
 from typing import Any
 
 import numpy as np
@@ -23,6 +23,18 @@ class Safeguard(ABC):
 
     @property
     def late_bound(self) -> Set[str]:
+        """
+        The set of the identifiers of the late-bound parameters that this
+        safeguard has.
+
+        Late-bound parameters are only bound when checking and applying the
+        safeguard, in contrast to the normal early-bound parameters that are
+        configured during safeguard initialisation.
+
+        Late-bound parameters can be used for parameters that depend on the
+        specific data that is to be safeguarded.
+        """
+
         return frozenset()
 
     @abstractmethod
