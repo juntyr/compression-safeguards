@@ -5,6 +5,8 @@ Abstract base class for the safeguards.
 __all__ = ["Safeguard"]
 
 from abc import ABC, abstractmethod
+from collections.abc import Set, Mapping
+from typing import Any
 
 import numpy as np
 from typing_extensions import Self  # MSPV 3.11
@@ -19,8 +21,18 @@ class Safeguard(ABC):
     kind: str
     """Safeguard kind."""
 
+    @property
+    def late_bound(self) -> Set[str]:
+        return frozenset()
+
     @abstractmethod
-    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
+    def check(
+        self,
+        data: np.ndarray,
+        decoded: np.ndarray,
+        *,
+        late_bound: Mapping[str, Any],
+    ) -> bool:
         """
         Check if the `decoded` array upholds the property enforced by this
         safeguard.

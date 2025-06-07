@@ -50,7 +50,7 @@ class AnySafeguard(Safeguard):
     ) -> "_AnyPointwiseSafeguard | _AnyStencilSafeguard":
         from ... import SafeguardKind
 
-        assert len(safeguards) > 1, "can only combine over at least one safeguard"
+        assert len(safeguards) > 0, "can only combine over at least one safeguard"
 
         safeguards_ = tuple(
             safeguard
@@ -179,7 +179,7 @@ class _AnySafeguardBase(ABC):
 
 
 class _AnyPointwiseSafeguard(_AnySafeguardBase, PointwiseSafeguard):
-    __slots__ = "_safeguards"
+    __slots__ = ("_safeguards",)
     _safeguards: tuple[PointwiseSafeguard, ...]
 
     def __init__(self, *safeguards: PointwiseSafeguard):
@@ -191,7 +191,7 @@ class _AnyPointwiseSafeguard(_AnySafeguardBase, PointwiseSafeguard):
 
 
 class _AnyStencilSafeguard(_AnySafeguardBase, StencilSafeguard):
-    __slots__ = "_safeguards"
+    __slots__ = ("_safeguards",)
     _safeguards: tuple[PointwiseSafeguard | StencilSafeguard, ...]
 
     def __init__(self, *safeguards: PointwiseSafeguard | StencilSafeguard):

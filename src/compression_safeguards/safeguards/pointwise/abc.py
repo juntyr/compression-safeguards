@@ -5,6 +5,7 @@ Abstract base class for the pointwise safeguards.
 __all__ = ["PointwiseSafeguard"]
 
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from typing import Any, final
 
 import numpy as np
@@ -26,7 +27,8 @@ class PointwiseSafeguard(Safeguard, ABC):
 
     @final
     def check(
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]], *,
+        late_bound: Mapping[str, Any],
     ) -> bool:
         """
         Check if the `decoded` array upholds the property enforced by this
@@ -45,11 +47,12 @@ class PointwiseSafeguard(Safeguard, ABC):
             `True` if the check succeeded.
         """
 
-        return bool(np.all(self.check_pointwise(data, decoded)))
+        return bool(np.all(self.check_pointwise(data, decoded, late_bound=late_bound)))
 
     @abstractmethod
     def check_pointwise(
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]], *,
+        late_bound: Mapping[str, Any],
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `decoded` array uphold the property
@@ -72,7 +75,8 @@ class PointwiseSafeguard(Safeguard, ABC):
 
     @abstractmethod
     def compute_safe_intervals(
-        self, data: np.ndarray[S, np.dtype[T]]
+        self, data: np.ndarray[S, np.dtype[T]], *,
+        late_bound: Mapping[str, Any],
     ) -> IntervalUnion[T, Any, Any]:
         """
         Compute the intervals in which the safeguard's guarantees with respect
