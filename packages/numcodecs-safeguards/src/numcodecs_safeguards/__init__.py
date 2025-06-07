@@ -82,6 +82,7 @@ import numpy as np
 import varint
 from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.abc import Safeguard
+from compression_safeguards.utils.binding import LateBound
 from compression_safeguards.utils.cast import as_bits
 from numcodecs.abc import Codec
 from numcodecs_combinators.abc import CodecCombinatorMixin
@@ -297,7 +298,9 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         # the codec always compresses the complete data ... at least chunking
         #  is not our concern
         correction: np.ndarray = self._safeguards.compute_correction(
-            data, decoded, late_bound={}
+            data,
+            decoded,
+            late_bound=LateBound.empty(),
         )
 
         if np.all(correction == 0):

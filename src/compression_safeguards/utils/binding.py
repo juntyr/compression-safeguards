@@ -29,6 +29,10 @@ class LateBound:
             {Parameter(name): value for name, value in kwargs.items()}
         )
 
+    @staticmethod
+    def empty() -> "LateBound":
+        return LateBound()
+
     def __contains__(self, param: Parameter) -> bool:
         return param in self._bindings
 
