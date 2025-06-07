@@ -9,6 +9,7 @@ from enum import Enum
 from .combinators.all import AllSafeguards
 from .combinators.any import AnySafeguard
 from .combinators.safe import AlwaysSafeguard
+from .combinators.select import SelectSafeguard
 from .pointwise.abs import AbsoluteErrorBoundSafeguard
 from .pointwise.qoi.abs import PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard
 from .pointwise.ratio import RatioErrorBoundSafeguard
@@ -62,3 +63,6 @@ class SafeguardKind(Enum):
 
     safe = AlwaysSafeguard
     """All elements are always safe."""
+
+    select = SelectSafeguard
+    """Select, pointwise, which safeguard's guarantees to enforce."""

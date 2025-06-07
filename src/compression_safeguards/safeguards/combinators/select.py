@@ -244,8 +244,24 @@ class _SelectSafeguardBase(ABC):
         valid: IntervalUnion[T, int, int] = IntervalUnion.empty(
             data.dtype, data.size, umax
         )
-        valid._lower = np.choose(selector, [v._lower.T for v in valids]).T
-        valid._upper = np.choose(selector, [v._upper.T for v in valids]).T
+        valid._lower = (
+            np.take_along_axis(
+                np.stack([v._lower.T for v in valids], axis=0),
+                selector.flatten().reshape((1, data.size, umax)),
+                axis=0,
+            )
+            .reshape(data.size, umax)
+            .T
+        )
+        valid._upper = (
+            np.take_along_axis(
+                np.stack([v._upper.T for v in valids], axis=0),
+                selector.flatten().reshape((1, data.size, umax)),
+                axis=0,
+            )
+            .reshape(data.size, umax)
+            .T
+        )
 
         return valid
 

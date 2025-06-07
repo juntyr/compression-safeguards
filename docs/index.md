@@ -91,6 +91,10 @@ This package currently implements the following [safeguards][compression_safegua
 
     All elements always meet their guarantees and are thus always safe. This truth-combinator can be used, with care, with other logical combinators.
 
+- [`select`][compression_safeguards.safeguards.combinators.select.SelectSafeguard] (logical select / switch case):
+
+    For each element, the guarantees of the pointwise selected safeguard are upheld. This combinator allows selecting between several safeguards with per-element granularity. It can be used to describe simple regions of interest where different safeguards, e.g. with different error bounds, are applied to different parts of the data. At the moment, only pointwise and stencil safeguards and combinations thereof can be combined by this select-combinator.
+
 
 ## Installation
 
