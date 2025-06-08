@@ -10,7 +10,7 @@ from operator import ge, gt, le, lt
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
-from ...utils.binding import Bindings
+from ...utils.bindings import Bindings
 from ...utils.cast import _isfinite, _isnan, from_total_order, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import S, T
@@ -211,6 +211,8 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             Data to be encoded.
         decoded : np.ndarray
             Decoded data.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
@@ -289,6 +291,8 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         ----------
         data : np.ndarray
             Data for which the safe intervals should be computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------

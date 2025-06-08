@@ -5,7 +5,7 @@ from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.combinators.select import SelectSafeguard
 from compression_safeguards.safeguards.pointwise.abc import PointwiseSafeguard
 from compression_safeguards.safeguards.stencil.abc import StencilSafeguard
-from compression_safeguards.utils.binding import Bindings
+from compression_safeguards.utils.bindings import Bindings
 
 from .codecs import encode_decode_mock
 

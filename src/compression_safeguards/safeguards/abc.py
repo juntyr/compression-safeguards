@@ -10,7 +10,7 @@ from collections.abc import Set
 import numpy as np
 from typing_extensions import Self  # MSPV 3.11
 
-from ..utils.binding import Bindings, Parameter
+from ..utils.bindings import Bindings, Parameter
 
 
 class Safeguard(ABC):
@@ -56,6 +56,8 @@ class Safeguard(ABC):
             Data to be encoded.
         decoded : np.ndarray
             Decoded data.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------

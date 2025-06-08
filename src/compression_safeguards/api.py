@@ -13,7 +13,7 @@ from .safeguards import SafeguardKind
 from .safeguards.abc import Safeguard
 from .safeguards.pointwise.abc import PointwiseSafeguard
 from .safeguards.stencil.abc import StencilSafeguard
-from .utils.binding import Bindings, Parameter
+from .utils.bindings import Bindings, Parameter
 from .utils.cast import as_bits
 from .utils.typing import C, S, T
 
@@ -88,6 +88,18 @@ class Safeguards:
 
     @property
     def late_bound(self) -> Set[Parameter]:
+        """
+        The set of the identifiers of the late-bound parameters that the
+        safeguards have.
+
+        Late-bound parameters are only bound when computing the correction, in
+        contrast to the normal early-bound parameters that are configured
+        during safeguard initialisation.
+
+        Late-bound parameters can be used for parameters that depend on the
+        specific data that is to be safeguarded.
+        """
+
         return frozenset(b for s in self.safeguards for b in s.late_bound)
 
     @property
@@ -131,6 +143,11 @@ class Safeguards:
             The data array, relative to which the safeguards are enforced.
         prediction : np.ndarray[S, np.dtype[T]]
             The prediction array for which the correction is computed.
+        late_bound : Bindings
+            The bindings for all late-bound parameters of the safeguards.
+
+            The bindings must resolve all late-bound parameters and include no
+            extraneous parameters.
 
         Returns
         -------
@@ -146,9 +163,9 @@ class Safeguards:
         assert data.shape == prediction.shape
 
         late_bound_reqs = self.late_bound
-        late_bound_keys = frozenset(late_bound.keys())
+        late_bound_keys = frozenset(late_bound.parameters())
         assert late_bound_reqs == late_bound_keys, (
-            f"late_bound is missing bindings for {late_bound_reqs - late_bound_keys} and has extraneous {late_bound_keys - late_bound_reqs}"
+            f"late_bound is missing bindings for {late_bound_reqs - late_bound_keys} / has extraneous bindings {late_bound_keys - late_bound_reqs}"
         )
 
         all_ok = True

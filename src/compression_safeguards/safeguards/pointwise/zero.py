@@ -6,7 +6,7 @@ __all__ = ["ZeroIsZeroSafeguard"]
 
 import numpy as np
 
-from ...utils.binding import Bindings
+from ...utils.bindings import Bindings
 from ...utils.cast import as_bits
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import S, T
@@ -58,6 +58,8 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
             Data to be encoded.
         decoded : np.ndarray
             Decoded data.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
@@ -83,6 +85,8 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
         ----------
         data : np.ndarray
             Data for which the safe intervals should be computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------

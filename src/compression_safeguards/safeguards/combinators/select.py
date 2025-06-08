@@ -9,7 +9,7 @@ from collections.abc import Collection, Set
 
 import numpy as np
 
-from ...utils.binding import Bindings, Parameter
+from ...utils.bindings import Bindings, Parameter
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import S, T
 from ..abc import Safeguard
@@ -136,6 +136,8 @@ class SelectSafeguard(Safeguard):
             Data to be encoded.
         decoded : np.ndarray
             Decoded data.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
@@ -163,6 +165,8 @@ class SelectSafeguard(Safeguard):
         -------
         intervals : IntervalUnion
             The safe intervals.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
         """
 
         ...

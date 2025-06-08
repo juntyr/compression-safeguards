@@ -2,7 +2,7 @@
 Types and helpers for late-bound safeguard parameters.
 """
 
-from collections.abc import KeysView
+from collections.abc import Set
 from types import MappingProxyType
 from typing import Any
 
@@ -25,6 +25,8 @@ class Parameter(str):
         pass
 
     def __new__(cls, param: str):
+        if isinstance(param, Parameter):
+            return param
         assert param.isidentifier(), f"parameter `{param}` must be a valid identifier"
         return super(Parameter, cls).__new__(cls, param)
 
@@ -33,6 +35,15 @@ class Parameter(str):
 
 
 class Bindings:
+    """
+    Bindings from parameter names to values.
+
+    Parameters
+    ----------
+    kwargs : Any
+        Mapping from parameters to values as keyword arguments.
+    """
+
     __slots__ = ("_bindings",)
     _bindings: MappingProxyType[Parameter, Any]
 
@@ -43,17 +54,58 @@ class Bindings:
 
     @staticmethod
     def empty() -> "Bindings":
+        """
+        Create empty bindings.
+
+        Returns
+        -------
+        empty : Bindings
+            Empty bindings.
+        """
+
         return Bindings()
 
     def __contains__(self, param: Parameter) -> bool:
         return param in self._bindings
 
-    def keys(self) -> KeysView[Parameter]:
+    def parameters(self) -> Set[Parameter]:
+        """
+        Access the set of parameter names for which bindings exist.
+
+        Returns
+        -------
+        params : Set[Parameter]
+            The set of parameters in these bindings.
+        """
+
         return self._bindings.keys()
 
     def resolve_ndarray(
         self, param: Parameter, shape: Si, dtype: np.dtype[T]
     ) -> np.ndarray[Si, np.dtype[T]]:
+        """
+        Resolve the `parameter` to a numpy array with the given `shape` and
+        `dtype`.
+
+        The `parameter` must be contained in the bindings and refer to a value
+        that can be broadcast to the `shape` and safely cast to the `dtype`.
+
+        Parameters
+        ----------
+        param : Parameter
+            The parameter that will be resolved.
+        shape : Si
+            The shape of the array to resolve to.
+        dtype : np.dtype[T]
+            The dtype of the array to resolve to.
+
+        Returns
+        -------
+        array : np.ndarray[Si, np.dtype[T]]
+            A read-only view to the resolved array of the given `shape` and
+            `dtype`.
+        """
+
         assert param in self._bindings, f"LateBound is missing binding for {param}"
 
         view = (

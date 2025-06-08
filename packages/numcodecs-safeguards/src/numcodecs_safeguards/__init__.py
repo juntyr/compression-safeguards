@@ -82,7 +82,7 @@ import numpy as np
 import varint
 from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.abc import Safeguard
-from compression_safeguards.utils.binding import Bindings
+from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.cast import as_bits
 from numcodecs.abc import Codec
 from numcodecs_combinators.abc import CodecCombinatorMixin
@@ -136,6 +136,10 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         Please refer to the
         [`SafeguardKind`][compression_safeguards.safeguards.SafeguardKind]
         for an enumeration of all supported safeguards.
+
+        The `SafeguardsCodec` does not (yet) support safeguards with late-
+        bound parameters such as the
+        [`SelectSafeguard`][compression_safeguards.safeguards.combinators.select.SelectSafeguard].
     lossless : None | dict | Lossless, optional
         The lossless encoding that is applied after the codec and the
         safeguards:

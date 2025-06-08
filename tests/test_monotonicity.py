@@ -8,7 +8,7 @@ from compression_safeguards.safeguards.stencil.monotonicity import (
     Monotonicity,
     MonotonicityPreservingSafeguard,
 )
-from compression_safeguards.utils.binding import Bindings
+from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.cast import as_bits
 
 from .codecs import (

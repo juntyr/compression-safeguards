@@ -6,7 +6,7 @@ __all__ = ["SignPreservingSafeguard"]
 
 import numpy as np
 
-from ...utils.binding import Bindings
+from ...utils.bindings import Bindings
 from ...utils.intervals import Interval, IntervalUnion, Lower, Maximum, Minimum, Upper
 from ...utils.typing import S, T
 from .abc import PointwiseSafeguard
@@ -47,6 +47,8 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             Data to be encoded.
         decoded : np.ndarray
             Decoded data.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
@@ -69,6 +71,8 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         ----------
         data : np.ndarray
             Data for which the safe intervals should be computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------

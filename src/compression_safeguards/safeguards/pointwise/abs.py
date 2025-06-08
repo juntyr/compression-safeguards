@@ -6,7 +6,7 @@ __all__ = ["AbsoluteErrorBoundSafeguard"]
 
 import numpy as np
 
-from ...utils.binding import Bindings
+from ...utils.bindings import Bindings
 from ...utils.cast import (
     _isfinite,
     _isinf,
@@ -74,6 +74,8 @@ class AbsoluteErrorBoundSafeguard(PointwiseSafeguard):
             Data to be encoded.
         decoded : np.ndarray
             Decoded data.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
@@ -120,6 +122,8 @@ class AbsoluteErrorBoundSafeguard(PointwiseSafeguard):
         ----------
         data : np.ndarray
             Data for which the safe intervals should be computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
