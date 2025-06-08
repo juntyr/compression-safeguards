@@ -98,7 +98,7 @@ class SelectSafeguard(Safeguard):
     @property
     def safeguards(self) -> tuple[PointwiseSafeguard | StencilSafeguard, ...]:  # type: ignore
         """
-        The set of safeguards between this combinator selects.
+        The set of safeguards between which this combinator selects.
         """
 
         ...
