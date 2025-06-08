@@ -32,6 +32,7 @@ with atheris.instrument_imports():
     from compression_safeguards.safeguards.pointwise.qoi import PointwiseExpr
     from compression_safeguards.safeguards.stencil import NeighbourhoodBoundaryAxis
     from compression_safeguards.safeguards.stencil.qoi import StencilExpr
+    from compression_safeguards.utils.binding import Parameter
 
 
 warnings.filterwarnings("error")
@@ -156,6 +157,9 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
                 atoms.append(f"({atom1}{op}{atom2})")
         [atom] = atoms
         return atom
+
+    if ty is Parameter:
+        return "param"
 
     assert False, f"unknown parameter type {ty!r}"
 

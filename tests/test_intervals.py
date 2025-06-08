@@ -3,6 +3,7 @@ import numpy as np
 from compression_safeguards.safeguards.pointwise.abs import AbsoluteErrorBoundSafeguard
 from compression_safeguards.safeguards.pointwise.sign import SignPreservingSafeguard
 from compression_safeguards.safeguards.pointwise.zero import ZeroIsZeroSafeguard
+from compression_safeguards.utils.binding import LateBound
 from compression_safeguards.utils.cast import as_bits
 from compression_safeguards.utils.intervals import (
     Interval,
@@ -17,7 +18,9 @@ from compression_safeguards.utils.intervals import (
 def test_sign():
     safeguard = SignPreservingSafeguard()
 
-    intervals = safeguard.compute_safe_intervals(np.arange(0, 10, dtype=np.uint8))
+    intervals = safeguard.compute_safe_intervals(
+        np.arange(0, 10, dtype=np.uint8), late_bound=LateBound.empty()
+    )
     np.testing.assert_equal(
         intervals._lower,
         np.array([[0] + [1] * 9], dtype=np.uint8),
@@ -27,7 +30,9 @@ def test_sign():
         np.array([[0] + [255] * 9], dtype=np.uint8),
     )
 
-    intervals = safeguard.compute_safe_intervals(np.arange(-9, 10, dtype=np.int8))
+    intervals = safeguard.compute_safe_intervals(
+        np.arange(-9, 10, dtype=np.int8), late_bound=LateBound.empty()
+    )
     np.testing.assert_equal(
         intervals._lower,
         np.array([[-128] * 9 + [0] + [1] * 9], dtype=np.int8),
@@ -38,7 +43,8 @@ def test_sign():
     )
 
     intervals = safeguard.compute_safe_intervals(
-        np.array([-np.nan, -np.inf, -5.0, -0.0, +0.0, 5.0, np.inf, np.nan])
+        np.array([-np.nan, -np.inf, -5.0, -0.0, +0.0, 5.0, np.inf, np.nan]),
+        late_bound=LateBound.empty(),
     )
     np.testing.assert_equal(
         as_bits(intervals._lower),
@@ -83,7 +89,9 @@ def test_sign():
 def test_abs():
     safeguard = AbsoluteErrorBoundSafeguard(eb_abs=2)
 
-    intervals = safeguard.compute_safe_intervals(np.arange(0, 10, dtype=np.uint8))
+    intervals = safeguard.compute_safe_intervals(
+        np.arange(0, 10, dtype=np.uint8), late_bound=LateBound.empty()
+    )
     np.testing.assert_equal(
         intervals._lower,
         np.array([[0, 0, 0, 1, 2, 3, 4, 5, 6, 7]], dtype=np.uint8),
@@ -93,7 +101,9 @@ def test_abs():
         np.array([[2, 3, 4, 5, 6, 7, 8, 9, 10, 11]], dtype=np.uint8),
     )
 
-    intervals = safeguard.compute_safe_intervals(np.arange(-9, 10, dtype=np.int8))
+    intervals = safeguard.compute_safe_intervals(
+        np.arange(-9, 10, dtype=np.int8), late_bound=LateBound.empty()
+    )
     np.testing.assert_equal(
         intervals._lower,
         np.arange(-11, 8, dtype=np.int8).reshape(1, -1),
@@ -104,7 +114,8 @@ def test_abs():
     )
 
     intervals = safeguard.compute_safe_intervals(
-        np.array([-128, -127, -126, -125, 124, 125, 126, 127], dtype=np.int8)
+        np.array([-128, -127, -126, -125, 124, 125, 126, 127], dtype=np.int8),
+        late_bound=LateBound.empty(),
     )
     np.testing.assert_equal(
         intervals._lower,
@@ -119,8 +130,12 @@ def test_abs():
 def test_sign_abs():
     data = np.arange(-4, 5, dtype=np.int8)
 
-    sign_intervals = SignPreservingSafeguard().compute_safe_intervals(data)
-    abs_intervals = AbsoluteErrorBoundSafeguard(eb_abs=2).compute_safe_intervals(data)
+    sign_intervals = SignPreservingSafeguard().compute_safe_intervals(
+        data, late_bound=LateBound.empty()
+    )
+    abs_intervals = AbsoluteErrorBoundSafeguard(eb_abs=2).compute_safe_intervals(
+        data, late_bound=LateBound.empty()
+    )
 
     intervals = sign_intervals.intersect(abs_intervals)
 
@@ -135,8 +150,12 @@ def test_sign_abs():
 
     data = np.arange(-4, 5, dtype=float)
 
-    sign_intervals = SignPreservingSafeguard().compute_safe_intervals(data)
-    abs_intervals = AbsoluteErrorBoundSafeguard(eb_abs=2.0).compute_safe_intervals(data)
+    sign_intervals = SignPreservingSafeguard().compute_safe_intervals(
+        data, late_bound=LateBound.empty()
+    )
+    abs_intervals = AbsoluteErrorBoundSafeguard(eb_abs=2.0).compute_safe_intervals(
+        data, late_bound=LateBound.empty()
+    )
 
     intervals = sign_intervals.intersect(abs_intervals)
 
@@ -181,8 +200,12 @@ def test_sign_abs():
 def test_zero_abs():
     data = np.arange(-4, 5, dtype=np.int8)
 
-    zero_intervals = ZeroIsZeroSafeguard(zero=-1).compute_safe_intervals(data)
-    abs_intervals = AbsoluteErrorBoundSafeguard(eb_abs=2).compute_safe_intervals(data)
+    zero_intervals = ZeroIsZeroSafeguard(zero=-1).compute_safe_intervals(
+        data, late_bound=LateBound.empty()
+    )
+    abs_intervals = AbsoluteErrorBoundSafeguard(eb_abs=2).compute_safe_intervals(
+        data, late_bound=LateBound.empty()
+    )
 
     intervals = zero_intervals.intersect(abs_intervals)
 
@@ -197,8 +220,12 @@ def test_zero_abs():
 
     data = np.arange(-4, 5, dtype=float)
 
-    zero_intervals = ZeroIsZeroSafeguard(zero=-1.0).compute_safe_intervals(data)
-    abs_intervals = AbsoluteErrorBoundSafeguard(eb_abs=2.0).compute_safe_intervals(data)
+    zero_intervals = ZeroIsZeroSafeguard(zero=-1.0).compute_safe_intervals(
+        data, late_bound=LateBound.empty()
+    )
+    abs_intervals = AbsoluteErrorBoundSafeguard(eb_abs=2.0).compute_safe_intervals(
+        data, late_bound=LateBound.empty()
+    )
 
     intervals = zero_intervals.intersect(abs_intervals)
 

@@ -4,6 +4,7 @@ from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.combinators.select import SelectSafeguard
 from compression_safeguards.safeguards.pointwise.abc import PointwiseSafeguard
 from compression_safeguards.safeguards.stencil.abc import StencilSafeguard
+from compression_safeguards.utils.binding import LateBound
 
 
 def test_select():
@@ -17,9 +18,12 @@ def test_select():
     )
 
     data = np.arange(10).reshape(2, 5)
-    selection = np.array([0, 1, 2, 0, 1, 2, 2, 1, 0, 1]).reshape(2, 5)
 
-    valid = safeguard.compute_safe_intervals(data, late_bound=dict(s=selection))
+    late_bound = LateBound(
+        s=np.array([0, 1, 2, 0, 1, 2, 2, 1, 0, 1]).reshape(2, 5),
+    )
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
     assert np.all(
         valid._lower
         == (data.flatten() - np.array([100, 10, 1, 100, 10, 1, 1, 10, 100, 10]))
@@ -29,7 +33,7 @@ def test_select():
         == (data.flatten() + np.array([100, 10, 1, 100, 10, 1, 1, 10, 100, 10]))
     )
 
-    ok = safeguard.check_pointwise(data, -data, late_bound=dict(s=selection))
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
     assert np.all(
         ok
         == np.array(
