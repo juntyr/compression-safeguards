@@ -89,8 +89,7 @@ class Safeguards:
     @property
     def late_bound(self) -> Set[Parameter]:
         """
-        The set of the identifiers of the late-bound parameters that the
-        safeguards have.
+        The set of late-bound parameters that the safeguards have.
 
         Late-bound parameters are only bound when computing the correction, in
         contrast to the normal early-bound parameters that are configured

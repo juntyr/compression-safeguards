@@ -138,7 +138,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         for an enumeration of all supported safeguards.
 
         The `SafeguardsCodec` does not (yet) support safeguards with late-
-        bound parameters such as the
+        bound parameters, e.g. the
         [`SelectSafeguard`][compression_safeguards.safeguards.combinators.select.SelectSafeguard].
     lossless : None | dict | Lossless, optional
         The lossless encoding that is applied after the codec and the

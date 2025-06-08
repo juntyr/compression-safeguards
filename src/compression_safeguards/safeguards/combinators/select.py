@@ -34,9 +34,9 @@ class SelectSafeguard(Safeguard):
 
     Parameters
     ----------
-    selector : str
-        Identifier for the late-bound parameter that is used to select between
-        the `safeguards`.
+    selector : str | Parameter
+        Late-bound parameter name that is used to select between the
+        `safeguards`.
     safeguards : Collection[dict | PointwiseSafeguard | StencilSafeguard]
         At least one safeguard configuration [`dict`][dict]s or already
         initialized
@@ -89,17 +89,16 @@ class SelectSafeguard(Safeguard):
             return _SelectStencilSafeguard(selector, *safeguards_)
 
     @property
-    def selector(self) -> str:  # type: ignore
+    def selector(self) -> Parameter:  # type: ignore
         """
-        The identifier for the late-bound selector parameter.
+        The late-bound selector parameter.
         """
         ...
 
     @property
     def safeguards(self) -> tuple[PointwiseSafeguard | StencilSafeguard, ...]:  # type: ignore
         """
-        The set of safeguards that this any combinator has been configured to
-        uphold.
+        The set of safeguards between this combinator selects.
         """
 
         ...
@@ -107,8 +106,7 @@ class SelectSafeguard(Safeguard):
     @property
     def late_bound(self) -> Set[Parameter]:  # type: ignore
         """
-        The set of the identifiers of the late-bound parameters that this
-        safeguard has.
+        The set of late-bound parameters that this safeguard has.
 
         Late-bound parameters are only bound when checking and applying the
         safeguard, in contrast to the normal early-bound parameters that are
@@ -160,13 +158,13 @@ class SelectSafeguard(Safeguard):
         ----------
         data : np.ndarray
             Data for which the safe intervals should be computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
         intervals : IntervalUnion
             The safe intervals.
-        late_bound : Bindings
-            Bindings for late-bound parameters, including for this safeguard.
         """
 
         ...

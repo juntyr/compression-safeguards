@@ -2,6 +2,8 @@
 Types and helpers for late-bound safeguard parameters.
 """
 
+__all__ = ["Parameter", "Bindings"]
+
 from collections.abc import Set
 from types import MappingProxyType
 from typing import Any
@@ -66,6 +68,20 @@ class Bindings:
         return Bindings()
 
     def __contains__(self, param: Parameter) -> bool:
+        """
+        Checks if the `param`eter is contained in the bindings.
+
+        Parameters
+        ----------
+        param : Parameter
+            The parameter for which to check.
+
+        Returns
+        -------
+        found : bool
+            [`True`][True] if the bindings contain the `param`eter,
+            [`False`][False] otherwise.
+        """
         return param in self._bindings
 
     def parameters(self) -> Set[Parameter]:
@@ -84,10 +100,10 @@ class Bindings:
         self, param: Parameter, shape: Si, dtype: np.dtype[T]
     ) -> np.ndarray[Si, np.dtype[T]]:
         """
-        Resolve the `parameter` to a numpy array with the given `shape` and
+        Resolve the `param`eter to a numpy array with the given `shape` and
         `dtype`.
 
-        The `parameter` must be contained in the bindings and refer to a value
+        The `param`eter must be contained in the bindings and refer to a value
         that can be broadcast to the `shape` and safely cast to the `dtype`.
 
         Parameters

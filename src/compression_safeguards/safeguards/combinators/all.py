@@ -84,8 +84,7 @@ class AllSafeguards(Safeguard):
     @property
     def late_bound(self) -> Set[Parameter]:  # type: ignore
         """
-        The set of the identifiers of the late-bound parameters that this
-        safeguard has.
+        The set of late-bound parameters that this safeguard has.
 
         Late-bound parameters are only bound when checking and applying the
         safeguard, in contrast to the normal early-bound parameters that are
