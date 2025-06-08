@@ -104,6 +104,22 @@ def test_inheritance():
     assert isinstance(safeguards.safeguards[0], StencilSafeguard)
 
 
+def test_parameter_validation():
+    with pytest.raises(
+        AssertionError,
+        match=r"parameter `` must be a valid identifier",
+    ):
+        Safeguards(
+            safeguards=[
+                dict(
+                    kind="select",
+                    selector="",
+                    safeguards=[dict(kind="zero"), dict(kind="sign")],
+                )
+            ]
+        )
+
+
 def test_numcodecs_validation():
     data = np.array([], dtype=np.uint8)
     decoded = np.array([], dtype=np.uint8)

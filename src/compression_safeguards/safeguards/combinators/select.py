@@ -52,7 +52,7 @@ class SelectSafeguard(Safeguard):
     def __init__(
         self,
         *,
-        selector: Parameter,
+        selector: str | Parameter,
         safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard],
     ):
         pass
@@ -60,10 +60,12 @@ class SelectSafeguard(Safeguard):
     def __new__(  # type: ignore
         cls,
         *,
-        selector: Parameter,
+        selector: str | Parameter,
         safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard],
     ) -> "_SelectPointwiseSafeguard | _SelectStencilSafeguard":
         from ... import SafeguardKind
+
+        selector = selector if isinstance(selector, Parameter) else Parameter(selector)
 
         assert len(safeguards) > 0, "can only select over at least one safeguard"
 

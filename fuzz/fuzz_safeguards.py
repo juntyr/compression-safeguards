@@ -94,6 +94,9 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
                 for p, v in signature(NeighbourhoodBoundaryAxis).parameters.items()
             }
 
+        if len(tys) == 2 and tys[0] is str and tys[1] is Parameter:
+            return "param"
+
         if (
             len(tys) > 1
             and tys[0] is dict
@@ -157,9 +160,6 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
                 atoms.append(f"({atom1}{op}{atom2})")
         [atom] = atoms
         return atom
-
-    if ty is Parameter:
-        return "param"
 
     assert False, f"unknown parameter type {ty!r}"
 
