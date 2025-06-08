@@ -6,7 +6,7 @@ __all__ = ["ZeroIsZeroSafeguard"]
 
 import numpy as np
 
-from ...utils.binding import LateBound
+from ...utils.binding import Bindings
 from ...utils.cast import as_bits
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import S, T
@@ -45,7 +45,7 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
         data: np.ndarray[S, np.dtype[T]],
         decoded: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: LateBound,
+        late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements are either
@@ -73,7 +73,7 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
         self,
         data: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: LateBound,
+        late_bound: Bindings,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the zero-is-zero guarantee is upheld with

@@ -13,7 +13,7 @@ from .safeguards import SafeguardKind
 from .safeguards.abc import Safeguard
 from .safeguards.pointwise.abc import PointwiseSafeguard
 from .safeguards.stencil.abc import StencilSafeguard
-from .utils.binding import LateBound, Parameter
+from .utils.binding import Bindings, Parameter
 from .utils.cast import as_bits
 from .utils.typing import C, S, T
 
@@ -117,7 +117,7 @@ class Safeguards:
         data: np.ndarray[S, np.dtype[T]],
         prediction: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: LateBound = LateBound.empty(),
+        late_bound: Bindings = Bindings.empty(),
     ) -> np.ndarray[S, np.dtype[C]]:
         """
         Compute the correction required to make the `prediction` array satisfy the safeguards relative to the `data` array.

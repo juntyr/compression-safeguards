@@ -6,7 +6,7 @@ __all__ = ["AlwaysSafeguard"]
 
 import numpy as np
 
-from ...utils.binding import LateBound
+from ...utils.binding import Bindings
 from ...utils.intervals import Interval, IntervalUnion
 from ...utils.typing import S, T
 from ..pointwise.abc import PointwiseSafeguard
@@ -32,7 +32,7 @@ class AlwaysSafeguard(PointwiseSafeguard):
         data: np.ndarray[S, np.dtype[T]],
         decoded: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: LateBound,
+        late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         All elements are safe and thus always succeed the check.
@@ -56,7 +56,7 @@ class AlwaysSafeguard(PointwiseSafeguard):
         self,
         data: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: LateBound,
+        late_bound: Bindings,
     ) -> IntervalUnion[T, int, int]:
         """
         Since all values are always safe, the safe intervals for each element

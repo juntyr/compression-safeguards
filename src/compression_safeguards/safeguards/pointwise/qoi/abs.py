@@ -9,7 +9,7 @@ import re
 import numpy as np
 import sympy as sp
 
-from ....utils.binding import LateBound
+from ....utils.binding import Bindings
 from ....utils.cast import (
     _isfinite,
     _isinf,
@@ -270,7 +270,7 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
         data: np.ndarray[S, np.dtype[T]],
         decoded: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: LateBound,
+        late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `decoded` array satisfy the absolute error
@@ -325,7 +325,7 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
         self,
         data: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: LateBound,
+        late_bound: Bindings,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the absolute error bound is upheld with

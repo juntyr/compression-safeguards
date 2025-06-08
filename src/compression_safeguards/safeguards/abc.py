@@ -10,7 +10,7 @@ from collections.abc import Set
 import numpy as np
 from typing_extensions import Self  # MSPV 3.11
 
-from ..utils.binding import LateBound, Parameter
+from ..utils.binding import Bindings, Parameter
 
 
 class Safeguard(ABC):
@@ -44,7 +44,7 @@ class Safeguard(ABC):
         data: np.ndarray,
         decoded: np.ndarray,
         *,
-        late_bound: LateBound,
+        late_bound: Bindings,
     ) -> bool:
         """
         Check if the `decoded` array upholds the property enforced by this

@@ -9,7 +9,7 @@ from collections.abc import Collection, Set
 
 import numpy as np
 
-from ...utils.binding import LateBound, Parameter
+from ...utils.binding import Bindings, Parameter
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import S, T
 from ..abc import Safeguard
@@ -125,7 +125,7 @@ class SelectSafeguard(Safeguard):
         data: np.ndarray[S, np.dtype[T]],
         decoded: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: LateBound,
+        late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check for which elements the selected safeguard succeed the check.
@@ -149,7 +149,7 @@ class SelectSafeguard(Safeguard):
         self,
         data: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: LateBound,
+        late_bound: Bindings,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the safe intervals for the selected safeguard.
@@ -204,7 +204,7 @@ class _SelectSafeguardBase(ABC):
         data: np.ndarray[S, np.dtype[T]],
         decoded: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: LateBound,
+        late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         selector = late_bound.resolve_ndarray(
             self.selector, data.shape, np.dtype(np.int_)
@@ -221,7 +221,7 @@ class _SelectSafeguardBase(ABC):
         self,
         data: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: LateBound,
+        late_bound: Bindings,
     ) -> IntervalUnion[T, int, int]:
         selector = late_bound.resolve_ndarray(
             self.selector, data.shape, np.dtype(np.int_)

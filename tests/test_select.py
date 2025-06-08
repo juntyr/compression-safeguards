@@ -5,7 +5,7 @@ from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.combinators.select import SelectSafeguard
 from compression_safeguards.safeguards.pointwise.abc import PointwiseSafeguard
 from compression_safeguards.safeguards.stencil.abc import StencilSafeguard
-from compression_safeguards.utils.binding import LateBound
+from compression_safeguards.utils.binding import Bindings
 
 from .codecs import encode_decode_mock
 
@@ -22,7 +22,7 @@ def test_select():
 
     data = np.arange(10).reshape(2, 5)
 
-    late_bound = LateBound(
+    late_bound = Bindings(
         s=np.array([0, 1, 2, 0, 1, 2, 2, 1, 0, 1]).reshape(2, 5),
     )
 
