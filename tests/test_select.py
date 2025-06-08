@@ -1,10 +1,13 @@
 import numpy as np
+import pytest
 
 from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.combinators.select import SelectSafeguard
 from compression_safeguards.safeguards.pointwise.abc import PointwiseSafeguard
 from compression_safeguards.safeguards.stencil.abc import StencilSafeguard
 from compression_safeguards.utils.binding import LateBound
+
+from .codecs import encode_decode_mock
 
 
 def test_select():
@@ -99,3 +102,53 @@ def test_inheritance():
     assert len(safeguards.safeguards) == 1
     assert not isinstance(safeguards.safeguards[0], PointwiseSafeguard)
     assert isinstance(safeguards.safeguards[0], StencilSafeguard)
+
+
+def test_numcodecs_validation():
+    data = np.array([], dtype=np.uint8)
+    decoded = np.array([], dtype=np.uint8)
+
+    with pytest.raises(
+        AssertionError,
+        match=r"SafeguardsCodec does not \(yet\) support late-bound parameters",
+    ):
+        encode_decode_mock(
+            data,
+            decoded,
+            safeguards=[
+                dict(
+                    kind="select",
+                    selector="param",
+                    safeguards=[
+                        dict(kind="qoi_abs_pw", qoi="(-(-x))", eb_abs=0),
+                        dict(kind="zero"),
+                    ],
+                ),
+            ],
+        )
+
+    for combinator in ["any", "all"]:
+        with pytest.raises(
+            AssertionError,
+            match=r"SafeguardsCodec does not \(yet\) support late-bound parameters",
+        ):
+            encode_decode_mock(
+                data,
+                decoded,
+                safeguards=[
+                    dict(
+                        kind=combinator,
+                        safeguards=[
+                            dict(
+                                kind="select",
+                                selector="param",
+                                safeguards=[
+                                    dict(kind="qoi_abs_pw", qoi="(-(-x))", eb_abs=0),
+                                    dict(kind="zero"),
+                                ],
+                            ),
+                            dict(kind="sign"),
+                        ],
+                    ),
+                ],
+            )

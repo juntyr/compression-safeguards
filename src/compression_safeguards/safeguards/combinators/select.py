@@ -103,7 +103,7 @@ class SelectSafeguard(Safeguard):
         ...
 
     @property
-    def late_bound(self) -> Set[str]:  # type: ignore
+    def late_bound(self) -> Set[Parameter]:  # type: ignore
         """
         The set of the identifiers of the late-bound parameters that this
         safeguard has.
@@ -115,6 +115,7 @@ class SelectSafeguard(Safeguard):
         Late-bound parameters can be used for parameters that depend on the
         specific data that is to be safeguarded.
         """
+
         ...
 
     def check_pointwise(  # type: ignore

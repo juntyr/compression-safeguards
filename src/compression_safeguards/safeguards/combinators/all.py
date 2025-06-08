@@ -5,11 +5,11 @@ Logical all (and) combinator safeguard.
 __all__ = ["AllSafeguards"]
 
 from abc import ABC
-from collections.abc import Collection
+from collections.abc import Collection, Set
 
 import numpy as np
 
-from ...utils.binding import LateBound
+from ...utils.binding import LateBound, Parameter
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import S, T
 from ..abc import Safeguard
@@ -77,6 +77,22 @@ class AllSafeguards(Safeguard):
         """
         The set of safeguards that this any combinator has been configured to
         uphold.
+        """
+
+        ...
+
+    @property
+    def late_bound(self) -> Set[Parameter]:  # type: ignore
+        """
+        The set of the identifiers of the late-bound parameters that this
+        safeguard has.
+
+        Late-bound parameters are only bound when checking and applying the
+        safeguard, in contrast to the normal early-bound parameters that are
+        configured during safeguard initialisation.
+
+        Late-bound parameters can be used for parameters that depend on the
+        specific data that is to be safeguarded.
         """
 
         ...
@@ -151,6 +167,10 @@ class _AllSafeguardsBase(ABC):
     @property
     def safeguards(self) -> tuple[PointwiseSafeguard | StencilSafeguard, ...]:
         return self._safeguards  # type: ignore
+
+    @property
+    def late_bound(self) -> Set[Parameter]:
+        return frozenset(b for s in self.safeguards for b in s.late_bound)
 
     def check_pointwise(
         self,

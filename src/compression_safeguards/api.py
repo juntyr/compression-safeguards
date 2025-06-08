@@ -88,7 +88,7 @@ class Safeguards:
 
     @property
     def late_bound(self) -> Set[Parameter]:
-        return frozenset([b for s in self.safeguards for b in s.late_bound])
+        return frozenset(b for s in self.safeguards for b in s.late_bound)
 
     @property
     def version(self) -> str:

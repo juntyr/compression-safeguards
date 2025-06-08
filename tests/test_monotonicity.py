@@ -195,7 +195,7 @@ def test_monotonicity():
             # if the window activates the safeguard ...
             if data_window in active_allowed:
                 # the check has to return the expected result
-                assert safeguard.check(data, decoded) == (
+                assert safeguard.check(data, decoded, late_bound=LateBound.empty()) == (
                     decoded_window in active_allowed[data_window]
                 )
 
@@ -203,11 +203,11 @@ def test_monotonicity():
                 corrected = safeguard.compute_safe_intervals(
                     data, late_bound=LateBound.empty()
                 ).pick(decoded)
-                assert safeguard.check(data, corrected)
+                assert safeguard.check(data, corrected, late_bound=LateBound.empty())
             else:
                 # the window doesn't activate the safeguard so the checks must
                 #  succeed
-                assert safeguard.check(data, decoded)
+                assert safeguard.check(data, decoded, late_bound=LateBound.empty())
 
                 # the window doesn't activate the safeguard so the corrected
                 #  array should be bit-equivalent to the decoded array

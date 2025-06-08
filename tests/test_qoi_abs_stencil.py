@@ -213,6 +213,12 @@ def test_mean():
         [(1, 1), (1, 1)],
     )
 
+    check_all_codecs(
+        np.arange(64, dtype=float).reshape(4, 4, 4),
+        "(X[I+A[-1,0]]*X[I+A[+1,0]]*X[I+A[0,-1]]*X[I+A[0,+1]])**(1/4)",
+        [(1, 1), (1, 1)],
+    )
+
 
 def test_findiff():
     from compression_safeguards.safeguards.stencil.qoi.abs import (
