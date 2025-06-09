@@ -6,6 +6,7 @@ __all__ = ["ZeroIsZeroSafeguard"]
 
 import numpy as np
 
+from ...utils.bindings import Bindings
 from ...utils.cast import as_bits
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import S, T
@@ -40,7 +41,11 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
         self._zero = zero
 
     def check_pointwise(
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements are either
@@ -53,6 +58,8 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
             Data to be encoded.
         decoded : np.ndarray
             Decoded data.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
@@ -65,7 +72,10 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
         return (as_bits(data) != zero_bits) | (as_bits(decoded) == zero_bits)
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the zero-is-zero guarantee is upheld with
@@ -75,6 +85,8 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
         ----------
         data : np.ndarray
             Data for which the safe intervals should be computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------

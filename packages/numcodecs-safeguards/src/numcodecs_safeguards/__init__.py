@@ -82,6 +82,7 @@ import numpy as np
 import varint
 from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.abc import Safeguard
+from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.cast import as_bits
 from numcodecs.abc import Codec
 from numcodecs_combinators.abc import CodecCombinatorMixin
@@ -135,6 +136,10 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         Please refer to the
         [`SafeguardKind`][compression_safeguards.safeguards.SafeguardKind]
         for an enumeration of all supported safeguards.
+
+        The `SafeguardsCodec` does not (yet) support safeguards with late-
+        bound parameters, e.g. the
+        [`SelectSafeguard`][compression_safeguards.safeguards.combinators.select.SelectSafeguard].
     lossless : None | dict | Lossless, optional
         The lossless encoding that is applied after the codec and the
         safeguards:
@@ -175,6 +180,9 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         _version: None | str = None,
     ):
         self._safeguards = Safeguards(safeguards=safeguards, _version=_version)
+        assert len(self._safeguards.late_bound) == 0, (
+            "SafeguardsCodec does not (yet) support late-bound parameters"
+        )
 
         self._codec = (
             codec if isinstance(codec, Codec) else numcodecs.registry.get_codec(codec)
@@ -293,7 +301,11 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         # the codec always compresses the complete data ... at least chunking
         #  is not our concern
-        correction: np.ndarray = self._safeguards.compute_correction(data, decoded)
+        correction: np.ndarray = self._safeguards.compute_correction(
+            data,
+            decoded,
+            late_bound=Bindings.empty(),
+        )
 
         if np.all(correction == 0):
             correction_bytes = b""

@@ -6,6 +6,7 @@ __all__ = ["SignPreservingSafeguard"]
 
 import numpy as np
 
+from ...utils.bindings import Bindings
 from ...utils.intervals import Interval, IntervalUnion, Lower, Maximum, Minimum, Upper
 from ...utils.typing import S, T
 from .abc import PointwiseSafeguard
@@ -30,7 +31,11 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         pass
 
     def check_pointwise(
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check for which elements in the `decoded` array the signs match the
@@ -42,6 +47,8 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             Data to be encoded.
         decoded : np.ndarray
             Decoded data.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
@@ -52,7 +59,10 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         return self._sign(data) == self._sign(decoded)
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the `data`'s sign is preserved.
@@ -61,6 +71,8 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         ----------
         data : np.ndarray
             Data for which the safe intervals should be computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------

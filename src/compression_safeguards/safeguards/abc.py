@@ -5,9 +5,12 @@ Abstract base class for the safeguards.
 __all__ = ["Safeguard"]
 
 from abc import ABC, abstractmethod
+from collections.abc import Set
 
 import numpy as np
 from typing_extensions import Self  # MSPV 3.11
+
+from ..utils.bindings import Bindings, Parameter
 
 
 class Safeguard(ABC):
@@ -19,8 +22,29 @@ class Safeguard(ABC):
     kind: str
     """Safeguard kind."""
 
+    @property
+    def late_bound(self) -> Set[Parameter]:
+        """
+        The set of late-bound parameters that this safeguard has.
+
+        Late-bound parameters are only bound when checking and applying the
+        safeguard, in contrast to the normal early-bound parameters that are
+        configured during safeguard initialisation.
+
+        Late-bound parameters can be used for parameters that depend on the
+        specific data that is to be safeguarded.
+        """
+
+        return frozenset()
+
     @abstractmethod
-    def check(self, data: np.ndarray, decoded: np.ndarray) -> bool:
+    def check(
+        self,
+        data: np.ndarray,
+        decoded: np.ndarray,
+        *,
+        late_bound: Bindings,
+    ) -> bool:
         """
         Check if the `decoded` array upholds the property enforced by this
         safeguard.
@@ -31,6 +55,8 @@ class Safeguard(ABC):
             Data to be encoded.
         decoded : np.ndarray
             Decoded data.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------

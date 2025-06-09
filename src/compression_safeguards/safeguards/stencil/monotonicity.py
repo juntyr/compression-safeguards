@@ -10,6 +10,7 @@ from operator import ge, gt, le, lt
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
+from ...utils.bindings import Bindings
 from ...utils.cast import _isfinite, _isnan, from_total_order, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import S, T
@@ -194,7 +195,11 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         return tuple(neighbourhood)
 
     def check_pointwise(
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which monotonic sequences centred on the points in the `data`
@@ -206,6 +211,8 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             Data to be encoded.
         decoded : np.ndarray
             Decoded data.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
@@ -271,7 +278,10 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         return ok  # type: ignore
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the monotonicity of the `data` is
@@ -281,6 +291,8 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         ----------
         data : np.ndarray
             Data for which the safe intervals should be computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------

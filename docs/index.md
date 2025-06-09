@@ -4,6 +4,13 @@ Lossy compression [^1] can be *scary* as valuable information or features of the
 
 By using safeguards to **guarantee** your safety requirements, lossy compression can be applied safely and *without fear*.
 
+With the `compression-safeguards` package, you can:
+
+- preserve properties over individual data elements (pointwise) or data neighbourhoods (stencil)
+- preserve properties over quantities of interest (QoIs) over the data
+- preserve regionally varying properties with regions of interest (RoIs)
+- combine safeguards arbitrarily with logical combinators
+
 [^1]: Lossy compression methods reduce data size by only storing an approximation of the data. In contrast to lossless compression methods, lossy compression loses information about the data, e.g. by reducing its resolution (only store every $n$th element) precision (only store $n$ digits after the decimal point), smoothing, etc. Therefore, lossy compression methods provide a tradeoff between size reduction and quality preservation.
 
 
@@ -13,7 +20,7 @@ Safeguards are a declarative way to describe the safety requirements that you ha
 
 By declaring your safety requirements as safeguards, we can **guarantee** that any lossy compression protected by these safeguards will *always* uphold your safety requirements.
 
-The [`compression-safeguards`][compression_safeguards] package provides several [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard]s with which you can express *your* safety requirements. Please refer to the [provided safeguards](#provided-safeguards) section or the [`SafeguardKind`][compression_safeguards.SafeguardKind] documentation for an enumeration.
+The [`compression-safeguards`][compression_safeguards] package provides several [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard]s with which you can express *your* safety requirements. Please refer to the [provided safeguards](#provided-safeguards) section or the [`SafeguardKind`][compression_safeguards.SafeguardKind] documentation for a complete list of the supported safeguards.
 
 We also provide the following integrations of the safeguards with popular compression APIs:
 
@@ -90,6 +97,10 @@ This package currently implements the following [safeguards][compression_safegua
 - [`safe`][compression_safeguards.safeguards.combinators.safe.AlwaysSafeguard] (logical truth):
 
     All elements always meet their guarantees and are thus always safe. This truth-combinator can be used, with care, with other logical combinators.
+
+- [`select`][compression_safeguards.safeguards.combinators.select.SelectSafeguard] (logical select / switch case):
+
+    For each element, the guarantees of the pointwise selected safeguard are upheld. This combinator allows selecting between several safeguards with per-element granularity. It can be used to describe simple regions of interest where different safeguards, e.g. with different error bounds, are applied to different parts of the data. At the moment, only pointwise and stencil safeguards and combinations thereof can be combined by this select-combinator.
 
 
 ## Installation

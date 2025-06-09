@@ -6,6 +6,7 @@ __all__ = ["RelativeErrorBoundSafeguard"]
 
 import numpy as np
 
+from ...utils.bindings import Bindings
 from ...utils.cast import (
     _isfinite,
     _isinf,
@@ -64,7 +65,11 @@ class RelativeErrorBoundSafeguard(PointwiseSafeguard):
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `decoded` array satisfy the relative error
@@ -76,6 +81,8 @@ class RelativeErrorBoundSafeguard(PointwiseSafeguard):
             Data to be encoded.
         decoded : np.ndarray
             Decoded data.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
@@ -116,7 +123,10 @@ class RelativeErrorBoundSafeguard(PointwiseSafeguard):
         return ok  # type: ignore
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the relative error bound is upheld with
@@ -126,6 +136,8 @@ class RelativeErrorBoundSafeguard(PointwiseSafeguard):
         ----------
         data : np.ndarray
             Data for which the safe intervals should be computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------

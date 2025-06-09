@@ -8,6 +8,7 @@ from compression_safeguards.safeguards.stencil.monotonicity import (
     Monotonicity,
     MonotonicityPreservingSafeguard,
 )
+from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.cast import as_bits
 
 from .codecs import (
@@ -194,22 +195,28 @@ def test_monotonicity():
             # if the window activates the safeguard ...
             if data_window in active_allowed:
                 # the check has to return the expected result
-                assert safeguard.check(data, decoded) == (
+                assert safeguard.check(data, decoded, late_bound=Bindings.empty()) == (
                     decoded_window in active_allowed[data_window]
                 )
 
                 # correcting the data must pass both checks
-                corrected = safeguard.compute_safe_intervals(data).pick(decoded)
-                assert safeguard.check(data, corrected)
+                corrected = safeguard.compute_safe_intervals(
+                    data, late_bound=Bindings.empty()
+                ).pick(decoded)
+                assert safeguard.check(data, corrected, late_bound=Bindings.empty())
             else:
                 # the window doesn't activate the safeguard so the checks must
                 #  succeed
-                assert safeguard.check(data, decoded)
+                assert safeguard.check(data, decoded, late_bound=Bindings.empty())
 
                 # the window doesn't activate the safeguard so the corrected
                 #  array should be bit-equivalent to the decoded array
                 assert np.array_equal(
-                    as_bits(safeguard.compute_safe_intervals(data).pick(decoded)),
+                    as_bits(
+                        safeguard.compute_safe_intervals(
+                            data, late_bound=Bindings.empty()
+                        ).pick(decoded)
+                    ),
                     as_bits(decoded),
                 )
 

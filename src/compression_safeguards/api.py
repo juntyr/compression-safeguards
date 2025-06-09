@@ -4,7 +4,7 @@ Implementation of the [`Safeguards`][compression_safeguards.api.Safeguards], whi
 
 __all__ = ["Safeguards"]
 
-from collections.abc import Collection
+from collections.abc import Collection, Set
 
 import numpy as np
 from typing_extensions import Self
@@ -13,6 +13,7 @@ from .safeguards import SafeguardKind
 from .safeguards.abc import Safeguard
 from .safeguards.pointwise.abc import PointwiseSafeguard
 from .safeguards.stencil.abc import StencilSafeguard
+from .utils.bindings import Bindings, Parameter
 from .utils.cast import as_bits
 from .utils.typing import C, S, T
 
@@ -86,6 +87,21 @@ class Safeguards:
         return self._pointwise_safeguards + self._stencil_safeguards
 
     @property
+    def late_bound(self) -> Set[Parameter]:
+        """
+        The set of late-bound parameters that the safeguards have.
+
+        Late-bound parameters are only bound when computing the correction, in
+        contrast to the normal early-bound parameters that are configured
+        during safeguard initialisation.
+
+        Late-bound parameters can be used for parameters that depend on the
+        specific data that is to be safeguarded.
+        """
+
+        return frozenset(b for s in self.safeguards for b in s.late_bound)
+
+    @property
     def version(self) -> str:
         """
         The version of the format of the correction computed by the
@@ -111,6 +127,8 @@ class Safeguards:
         self,
         data: np.ndarray[S, np.dtype[T]],
         prediction: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings = Bindings.empty(),
     ) -> np.ndarray[S, np.dtype[C]]:
         """
         Compute the correction required to make the `prediction` array satisfy the safeguards relative to the `data` array.
@@ -124,6 +142,11 @@ class Safeguards:
             The data array, relative to which the safeguards are enforced.
         prediction : np.ndarray[S, np.dtype[T]]
             The prediction array for which the correction is computed.
+        late_bound : Bindings
+            The bindings for all late-bound parameters of the safeguards.
+
+            The bindings must resolve all late-bound parameters and include no
+            extraneous parameters.
 
         Returns
         -------
@@ -138,9 +161,15 @@ class Safeguards:
         assert data.dtype == prediction.dtype
         assert data.shape == prediction.shape
 
+        late_bound_reqs = self.late_bound
+        late_bound_keys = frozenset(late_bound.parameters())
+        assert late_bound_reqs == late_bound_keys, (
+            f"late_bound is missing bindings for {late_bound_reqs - late_bound_keys} / has extraneous bindings {late_bound_keys - late_bound_reqs}"
+        )
+
         all_ok = True
         for safeguard in self.safeguards:
-            if not safeguard.check(data, prediction):
+            if not safeguard.check(data, prediction, late_bound=late_bound):
                 all_ok = False
                 break
 
@@ -149,7 +178,7 @@ class Safeguards:
 
         all_intervals = []
         for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
-            intervals = safeguard.compute_safe_intervals(data)
+            intervals = safeguard.compute_safe_intervals(data, late_bound=late_bound)
             assert np.all(intervals.contains(data)), (
                 f"pointwise safeguard {safeguard!r}'s intervals must contain the original data"
             )
@@ -164,7 +193,7 @@ class Safeguards:
             assert np.all(intervals.contains(correction)), (
                 f"{safeguard!r} interval does not contain the correction {correction!r}"
             )
-            assert safeguard.check(data, correction), (
+            assert safeguard.check(data, correction, late_bound=late_bound), (
                 f"{safeguard!r} check fails after correction {correction!r} on data {data!r}"
             )
 

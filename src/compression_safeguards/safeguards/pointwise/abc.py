@@ -5,10 +5,11 @@ Abstract base class for the pointwise safeguards.
 __all__ = ["PointwiseSafeguard"]
 
 from abc import ABC, abstractmethod
-from typing import Any, final
+from typing import final
 
 import numpy as np
 
+from ...utils.bindings import Bindings
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import S, T
 from ..abc import Safeguard
@@ -26,7 +27,11 @@ class PointwiseSafeguard(Safeguard, ABC):
 
     @final
     def check(
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
     ) -> bool:
         """
         Check if the `decoded` array upholds the property enforced by this
@@ -38,6 +43,8 @@ class PointwiseSafeguard(Safeguard, ABC):
             Data to be encoded.
         decoded : np.ndarray
             Decoded data.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
@@ -45,11 +52,15 @@ class PointwiseSafeguard(Safeguard, ABC):
             `True` if the check succeeded.
         """
 
-        return bool(np.all(self.check_pointwise(data, decoded)))
+        return bool(np.all(self.check_pointwise(data, decoded, late_bound=late_bound)))
 
     @abstractmethod
     def check_pointwise(
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `decoded` array uphold the property
@@ -61,6 +72,8 @@ class PointwiseSafeguard(Safeguard, ABC):
             Data to be encoded.
         decoded : np.ndarray
             Decoded data.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
@@ -72,8 +85,11 @@ class PointwiseSafeguard(Safeguard, ABC):
 
     @abstractmethod
     def compute_safe_intervals(
-        self, data: np.ndarray[S, np.dtype[T]]
-    ) -> IntervalUnion[T, Any, Any]:
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
+    ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the safeguard's guarantees with respect
         to the `data` are upheld.
@@ -83,12 +99,14 @@ class PointwiseSafeguard(Safeguard, ABC):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data for which the safe intervals should be computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
-        intervals : IntervalUnion
+        intervals : IntervalUnion[T, int, int]
             Union of intervals in which the safeguard's guarantees are upheld.
         """
 

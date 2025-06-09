@@ -5,10 +5,11 @@ Logical any (or) combinator safeguard.
 __all__ = ["AnySafeguard"]
 
 from abc import ABC
-from collections.abc import Collection
+from collections.abc import Collection, Set
 
 import numpy as np
 
+from ...utils.bindings import Bindings, Parameter
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import S, T
 from ..abc import Safeguard
@@ -50,7 +51,7 @@ class AnySafeguard(Safeguard):
     ) -> "_AnyPointwiseSafeguard | _AnyStencilSafeguard":
         from ... import SafeguardKind
 
-        assert len(safeguards) > 1, "can only combine over at least one safeguard"
+        assert len(safeguards) > 0, "can only combine over at least one safeguard"
 
         safeguards_ = tuple(
             safeguard
@@ -80,8 +81,27 @@ class AnySafeguard(Safeguard):
 
         ...
 
+    @property
+    def late_bound(self) -> Set[Parameter]:  # type: ignore
+        """
+        The set of late-bound parameters that this safeguard has.
+
+        Late-bound parameters are only bound when checking and applying the
+        safeguard, in contrast to the normal early-bound parameters that are
+        configured during safeguard initialisation.
+
+        Late-bound parameters can be used for parameters that depend on the
+        specific data that is to be safeguarded.
+        """
+
+        ...
+
     def check_pointwise(  # type: ignore
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check for which elements at least one of the combined safeguards
@@ -93,6 +113,8 @@ class AnySafeguard(Safeguard):
             Data to be encoded.
         decoded : np.ndarray
             Decoded data.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
@@ -103,7 +125,10 @@ class AnySafeguard(Safeguard):
         ...
 
     def compute_safe_intervals(  # type: ignore
-        self, data: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the union of the safe intervals of the combined safeguards,
@@ -113,6 +138,8 @@ class AnySafeguard(Safeguard):
         ----------
         data : np.ndarray
             Data for which the safe intervals should be computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
@@ -144,27 +171,40 @@ class _AnySafeguardBase(ABC):
     def safeguards(self) -> tuple[PointwiseSafeguard | StencilSafeguard, ...]:
         return self._safeguards  # type: ignore
 
+    @property
+    def late_bound(self) -> Set[Parameter]:
+        return frozenset(b for s in self.safeguards for b in s.late_bound)
+
     def check_pointwise(
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         front, *tail = self.safeguards
 
-        ok = front.check_pointwise(data, decoded)
+        ok = front.check_pointwise(data, decoded, late_bound=late_bound)
 
         for safeguard in tail:
-            ok |= safeguard.check_pointwise(data, decoded)
+            ok |= safeguard.check_pointwise(data, decoded, late_bound=late_bound)
 
         return ok
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
     ) -> IntervalUnion[T, int, int]:
         front, *tail = self.safeguards
 
-        valid = front.compute_safe_intervals(data)
+        valid = front.compute_safe_intervals(data, late_bound=late_bound)
 
         for safeguard in tail:
-            valid = valid.union(safeguard.compute_safe_intervals(data))
+            valid = valid.union(
+                safeguard.compute_safe_intervals(data, late_bound=late_bound)
+            )
 
         return valid
 
@@ -179,7 +219,7 @@ class _AnySafeguardBase(ABC):
 
 
 class _AnyPointwiseSafeguard(_AnySafeguardBase, PointwiseSafeguard):
-    __slots__ = "_safeguards"
+    __slots__ = ("_safeguards",)
     _safeguards: tuple[PointwiseSafeguard, ...]
 
     def __init__(self, *safeguards: PointwiseSafeguard):
@@ -191,7 +231,7 @@ class _AnyPointwiseSafeguard(_AnySafeguardBase, PointwiseSafeguard):
 
 
 class _AnyStencilSafeguard(_AnySafeguardBase, StencilSafeguard):
-    __slots__ = "_safeguards"
+    __slots__ = ("_safeguards",)
     _safeguards: tuple[PointwiseSafeguard | StencilSafeguard, ...]
 
     def __init__(self, *safeguards: PointwiseSafeguard | StencilSafeguard):

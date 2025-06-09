@@ -32,6 +32,7 @@ with atheris.instrument_imports():
     from compression_safeguards.safeguards.pointwise.qoi import PointwiseExpr
     from compression_safeguards.safeguards.stencil import NeighbourhoodBoundaryAxis
     from compression_safeguards.safeguards.stencil.qoi import StencilExpr
+    from compression_safeguards.utils.bindings import Parameter
 
 
 warnings.filterwarnings("error")
@@ -92,6 +93,11 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
                 p: generate_parameter(data, v.annotation, depth)
                 for p, v in signature(NeighbourhoodBoundaryAxis).parameters.items()
             }
+
+        if len(tys) == 2 and tys[0] is str and tys[1] is Parameter:
+            # since numcodecs_safeguards doesn't yet support late-bound
+            #  parameters, we can just generate a constant name here
+            return "param"
 
         if (
             len(tys) > 1

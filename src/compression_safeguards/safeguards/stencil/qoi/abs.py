@@ -13,6 +13,7 @@ import sympy as sp
 import sympy.tensor.array.expressions  # noqa: F401
 from numpy.lib.stride_tricks import sliding_window_view
 
+from ....utils.bindings import Bindings
 from ....utils.cast import (
     _isfinite,
     _isinf,
@@ -363,7 +364,8 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         self._qoi_expr = qoi_expr
 
     def compute_check_neighbourhood_for_data_shape(
-        self, data_shape: tuple[int, ...]
+        self,
+        data_shape: tuple[int, ...],
     ) -> tuple[None | NeighbourhoodAxis, ...]:
         """
         Compute the shape of the data neighbourhood for data of a given shape.
@@ -480,7 +482,11 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
-        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `decoded` array satisfy the absolute error
@@ -492,6 +498,8 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             Data to be encoded.
         decoded : np.ndarray
             Decoded data.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
@@ -591,7 +599,10 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         return ok  # type: ignore
 
     def compute_safe_intervals(
-        self, data: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the absolute error bound is upheld with
@@ -601,6 +612,8 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         ----------
         data : np.ndarray
             Data for which the safe intervals should be computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
