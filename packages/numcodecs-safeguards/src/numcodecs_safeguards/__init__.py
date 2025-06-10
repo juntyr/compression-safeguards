@@ -46,7 +46,7 @@ lossy_codec = FixedScaleOffset(
 sg_codec = SafeguardsCodec(codec=lossy_codec, safeguards=[
     # guarantee a relative error bound of 1%:
     #   |x - x'| <= |x| * 0.01
-    dict(kind="rel", eb_rel=0.01),
+    dict(kind="eb", type="rel", eb=0.01),
     # guarantee that the sign is preserved:
     #   sign(x) = sign(x')
     dict(kind="sign"),

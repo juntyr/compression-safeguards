@@ -14,9 +14,9 @@ def test_select():
     safeguard = SelectSafeguard(
         selector="s",
         safeguards=[
-            dict(kind="abs", eb_abs=100),
-            dict(kind="abs", eb_abs=10),
-            dict(kind="abs", eb_abs=1),
+            dict(kind="eb", type="abs", eb=100),
+            dict(kind="eb", type="abs", eb=10),
+            dict(kind="eb", type="abs", eb=1),
         ],
     )
 
@@ -46,7 +46,7 @@ def test_select():
 
 
 def test_inheritance():
-    pointwise_config = dict(kind="abs", eb_abs=1)
+    pointwise_config = dict(kind="eb", type="abs", eb=1)
     stencil_config = dict(
         kind="qoi_abs_stencil",
         qoi="findiff(x, order=1, accuracy=1, type=1, dx=1, axis=0)",

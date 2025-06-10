@@ -12,25 +12,25 @@ from .codecs import (
 def check_all_codecs(data: np.ndarray):
     decoded = encode_decode_zero(
         data,
-        safeguards=[dict(kind="rel", eb_rel=0.1)],
+        safeguards=[dict(kind="eb", type="rel", eb=0.1)],
     )
     np.testing.assert_allclose(decoded, data, rtol=0.1)
 
     decoded = encode_decode_neg(
         data,
-        safeguards=[dict(kind="rel", eb_rel=0.1)],
+        safeguards=[dict(kind="eb", type="rel", eb=0.1)],
     )
     np.testing.assert_allclose(decoded, data, rtol=0.1)
 
     decoded = encode_decode_identity(
         data,
-        safeguards=[dict(kind="rel", eb_rel=0.1)],
+        safeguards=[dict(kind="eb", type="rel", eb=0.1)],
     )
     np.testing.assert_allclose(decoded, data, rtol=0.0)
 
     decoded = encode_decode_noise(
         data,
-        safeguards=[dict(kind="rel", eb_rel=0.1)],
+        safeguards=[dict(kind="eb", type="rel", eb=0.1)],
     )
     np.testing.assert_allclose(decoded, data, rtol=0.1)
 
@@ -87,6 +87,6 @@ def test_fuzzer_inf_times_zero():
         decoded,
         safeguards=[
             dict(kind="zero", zero=0.0),
-            dict(kind="rel", eb_rel=4.287938165015999e290, equal_nan=False),
+            dict(kind="eb", type="rel", eb=4.287938165015999e290, equal_nan=False),
         ],
     )

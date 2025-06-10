@@ -43,7 +43,7 @@ from ..._qois.re import (
     QOI_INT_LITERAL_PATTERN,
     QOI_WHITESPACE_PATTERN,
 )
-from ...pointwise.abs import _compute_safe_eb_diff_interval
+from ...pointwise.eb import _compute_safe_eb_diff_interval
 from .. import (
     BoundaryCondition,
     NeighbourhoodAxis,

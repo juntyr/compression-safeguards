@@ -56,7 +56,7 @@ from compression_safeguards import Safeguards
 sg = Safeguards(safeguards=[
     # guarantee an absolute error bound of 0.1:
     #   |x - x'| <= 0.1
-    dict(kind="abs", eb_abs=0.1),
+    dict(kind="eb", type="abs", eb=0.1),
 ])
 
 # generate some random data to compress
@@ -92,7 +92,7 @@ The safeguards can be instantiated from JSON-like configuration:
 from compression_safeguards import Safeguards
 
 sg = Safeguards(safeguards=[
-    dict(kind="abs", eb_abs=0.1),
+    dict(kind="eb", type="abs", eb=0.1),
 ])
 ```
 
@@ -102,7 +102,7 @@ or by using the [`SafeguardKind`][compression_safeguards.SafeguardKind]:
 from compression_safeguards import Safeguards, SafeguardKind
 
 sg = Safeguards(safeguards=[
-    SafeguardKind.abs.value(eb_abs=0.1),
+    SafeguardKind.eb.value(type="abs", eb=0.1),
 ])
 ```
 
@@ -115,7 +115,7 @@ recreated from such configuration:
 from compression_safeguards import Safeguards
 
 sg = Safeguards(safeguards=[
-    dict(kind="abs", eb_abs=0.1),
+    dict(kind="eb", type="abs", eb=0.1),
 ])
 config = sg.get_config()
 
@@ -136,7 +136,7 @@ from compression_safeguards import Safeguards
 
 sg = Safeguards(safeguards=[
     # guarantee an absolute error bound
-    dict(kind="abs", eb_abs=0.1),
+    dict(kind="eb", type="abs", eb=0.1),
     # and that the data sign is preserved
     dict(kind="sign"),
 ])
@@ -152,8 +152,8 @@ sg = Safeguards(safeguards=[
     # guarantee that, for each element, *both* an absolute error bound of 0.1
     # *and* a relative error bound of 1% are upheld
     dict(kind="all", safeguards=[
-        dict(kind="abs", eb_abs=0.1),
-        dict(kind="rel", eb_rel=0.01),
+        dict(kind="eb", type="abs", eb=0.1),
+        dict(kind="eb", type="rel", eb=0.01),
     ]),
 ])
 
@@ -161,8 +161,8 @@ sg = Safeguards(safeguards=[
     # guarantee that, for each element, an absolute error bound of 0.1
     # *or* a relative error bound of 1% are upheld
     dict(kind="any", safeguards=[
-        dict(kind="abs", eb_abs=0.1),
-        dict(kind="rel", eb_rel=0.01),
+        dict(kind="eb", type="abs", eb=0.1),
+        dict(kind="eb", type="rel", eb=0.01),
     ]),
 ])
 ```

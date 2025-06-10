@@ -18,7 +18,7 @@ from numcodecs_wasm_zstd import Zstd
 from tqdm import tqdm
 
 from compression_safeguards.api import Safeguards
-from compression_safeguards.safeguards.pointwise.abs import AbsoluteErrorBoundSafeguard
+from compression_safeguards.safeguards.pointwise.eb import ErrorBoundSafeguard
 from compression_safeguards.utils.cast import as_bits
 
 
@@ -156,7 +156,7 @@ class MySafeguardsQuantizer(MyQuantizer):
 
     def __init__(self, eb_abs):
         self._safeguards = Safeguards(
-            safeguards=[AbsoluteErrorBoundSafeguard(eb_abs=eb_abs)]
+            safeguards=[ErrorBoundSafeguard(type="abs", eb=eb_abs)]
         )
 
     def encoded_dtype(self, dtype: np.dtype) -> np.dtype:
@@ -507,7 +507,7 @@ if __name__ == "__main__":
             gen_codecs_with_eb_abs(
                 lambda eb_abs: SafeguardsCodec(
                     codec=dict(id="zero"),
-                    safeguards=[dict(kind="abs", eb_abs=eb_abs)],
+                    safeguards=[dict(kind="eb", type="abs", eb=eb_abs)],
                 )
             ),
             # gen_codecs_with_eb_abs(

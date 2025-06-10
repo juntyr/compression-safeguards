@@ -20,8 +20,8 @@ def check_all_codecs(data: np.ndarray):
                 dict(
                     kind=combinator,
                     safeguards=[
-                        dict(kind="ratio", eb_ratio=1.1),
-                        dict(kind="abs", eb_abs=0.1),
+                        dict(kind="eb", type="ratio", eb=1.1),
+                        dict(kind="eb", type="abs", eb=0.1),
                     ],
                 )
             ],
@@ -34,8 +34,8 @@ def check_all_codecs(data: np.ndarray):
                 dict(
                     kind=combinator,
                     safeguards=[
-                        dict(kind="ratio", eb_ratio=1.1),
-                        dict(kind="abs", eb_abs=0.1),
+                        dict(kind="eb", type="ratio", eb=1.1),
+                        dict(kind="eb", type="abs", eb=0.1),
                     ],
                 )
             ],
@@ -48,8 +48,8 @@ def check_all_codecs(data: np.ndarray):
                 dict(
                     kind=combinator,
                     safeguards=[
-                        dict(kind="ratio", eb_ratio=1.1),
-                        dict(kind="abs", eb_abs=0.1),
+                        dict(kind="eb", type="ratio", eb=1.1),
+                        dict(kind="eb", type="abs", eb=0.1),
                     ],
                 )
             ],
@@ -62,8 +62,8 @@ def check_all_codecs(data: np.ndarray):
                 dict(
                     kind=combinator,
                     safeguards=[
-                        dict(kind="ratio", eb_ratio=1.1),
-                        dict(kind="abs", eb_abs=0.1),
+                        dict(kind="eb", type="ratio", eb=1.1),
+                        dict(kind="eb", type="abs", eb=0.1),
                     ],
                 )
             ],
@@ -103,7 +103,7 @@ def test_edge_cases():
 
 
 def test_inheritance():
-    pointwise_config = dict(kind="abs", eb_abs=1)
+    pointwise_config = dict(kind="eb", type="abs", eb=1)
     stencil_config = dict(
         kind="qoi_abs_stencil",
         qoi="findiff(x, order=1, accuracy=1, type=1, dx=1, axis=0)",

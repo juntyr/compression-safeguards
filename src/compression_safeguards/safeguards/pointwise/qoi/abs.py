@@ -36,7 +36,7 @@ from ..._qois.re import (
     QOI_WHITESPACE_PATTERN,
 )
 from ..abc import PointwiseSafeguard
-from ..abs import _compute_safe_eb_diff_interval
+from ..eb import _compute_safe_eb_diff_interval
 from . import PointwiseExpr
 
 

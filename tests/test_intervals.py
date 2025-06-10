@@ -1,6 +1,6 @@
 import numpy as np
 
-from compression_safeguards.safeguards.pointwise.abs import AbsoluteErrorBoundSafeguard
+from compression_safeguards.safeguards.pointwise.eb import ErrorBoundSafeguard
 from compression_safeguards.safeguards.pointwise.sign import SignPreservingSafeguard
 from compression_safeguards.safeguards.pointwise.zero import ZeroIsZeroSafeguard
 from compression_safeguards.utils.bindings import Bindings
@@ -87,7 +87,7 @@ def test_sign():
 
 
 def test_abs():
-    safeguard = AbsoluteErrorBoundSafeguard(eb_abs=2)
+    safeguard = ErrorBoundSafeguard(type="abs", eb=2)
 
     intervals = safeguard.compute_safe_intervals(
         np.arange(0, 10, dtype=np.uint8), late_bound=Bindings.empty()
@@ -133,7 +133,7 @@ def test_sign_abs():
     sign_intervals = SignPreservingSafeguard().compute_safe_intervals(
         data, late_bound=Bindings.empty()
     )
-    abs_intervals = AbsoluteErrorBoundSafeguard(eb_abs=2).compute_safe_intervals(
+    abs_intervals = ErrorBoundSafeguard(type="abs", eb=2).compute_safe_intervals(
         data, late_bound=Bindings.empty()
     )
 
@@ -153,7 +153,7 @@ def test_sign_abs():
     sign_intervals = SignPreservingSafeguard().compute_safe_intervals(
         data, late_bound=Bindings.empty()
     )
-    abs_intervals = AbsoluteErrorBoundSafeguard(eb_abs=2.0).compute_safe_intervals(
+    abs_intervals = ErrorBoundSafeguard(type="abs", eb=2.0).compute_safe_intervals(
         data, late_bound=Bindings.empty()
     )
 
@@ -203,7 +203,7 @@ def test_zero_abs():
     zero_intervals = ZeroIsZeroSafeguard(zero=-1).compute_safe_intervals(
         data, late_bound=Bindings.empty()
     )
-    abs_intervals = AbsoluteErrorBoundSafeguard(eb_abs=2).compute_safe_intervals(
+    abs_intervals = ErrorBoundSafeguard(type="abs", eb=2).compute_safe_intervals(
         data, late_bound=Bindings.empty()
     )
 
@@ -223,7 +223,7 @@ def test_zero_abs():
     zero_intervals = ZeroIsZeroSafeguard(zero=-1.0).compute_safe_intervals(
         data, late_bound=Bindings.empty()
     )
-    abs_intervals = AbsoluteErrorBoundSafeguard(eb_abs=2.0).compute_safe_intervals(
+    abs_intervals = ErrorBoundSafeguard(type="abs", eb=2.0).compute_safe_intervals(
         data, late_bound=Bindings.empty()
     )
 

@@ -2,6 +2,7 @@ from enum import Enum, auto
 
 import sympy as sp
 import sympy.tensor.array.expressions  # noqa: F401
+from typing_extensions import assert_never  # MSPV 3.11
 
 from ...utils.cast import _isfinite
 
@@ -115,6 +116,8 @@ def _finite_difference_offsets(
             return tuple(i for i in range(order + accuracy))
         case _FiniteDifference.backwards:
             return tuple(-i for i in range(order + accuracy))
+        case _:
+            assert_never(type)
 
 
 def _finite_difference_coefficients(

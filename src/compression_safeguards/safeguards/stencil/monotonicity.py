@@ -9,6 +9,7 @@ from operator import ge, gt, le, lt
 
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
+from typing_extensions import assert_never  # MSPV 3.11
 
 from ...utils.bindings import Bindings
 from ...utils.cast import _isfinite, _isnan, from_total_order, to_total_order
@@ -25,7 +26,7 @@ _WEAK = ((le, ge, False, True), (le, ge, True, True))
 
 class Monotonicity(Enum):
     """
-    Different levels of monotonicity that can be enforced by the
+    Different levels of monotonicity that can be preserved by the
     [`MonotonicityPreservingSafeguard`][compression_safeguards.safeguards.stencil.monotonicity.MonotonicityPreservingSafeguard].
     """
 
@@ -666,3 +667,5 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                     (decoded_monotonic == -data_monotonic) | _isnan(decoded_monotonic),
                     False,
                 )
+            case _:
+                assert_never(self._monotonicity)
