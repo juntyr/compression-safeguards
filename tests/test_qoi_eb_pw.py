@@ -18,10 +18,26 @@ def check_all_codecs(data: np.ndarray, qoi: str):
         encode_decode_identity,
         encode_decode_noise,
     ]:
-        for eb_abs in [10.0, 1.0, 0.1, 0.01, 0.0]:
+        for type, eb in [
+            ("abs", 10.0),
+            ("abs", 1.0),
+            ("abs", 0.1),
+            ("abs", 0.01),
+            ("abs", 0.0),
+            ("rel", 10.0),
+            ("rel", 1.0),
+            ("rel", 0.1),
+            ("rel", 0.01),
+            ("rel", 0.0),
+            ("ratio", 10.0),
+            ("ratio", 2.0),
+            ("ratio", 1.1),
+            ("ratio", 1.01),
+            ("ratio", 1.0),
+        ]:
             encode_decode(
                 data,
-                safeguards=[dict(kind="qoi_abs_pw", qoi=qoi, eb_abs=eb_abs)],
+                safeguards=[dict(kind="qoi_eb_pw", qoi=qoi, type=type, eb=eb)],
             )
 
 

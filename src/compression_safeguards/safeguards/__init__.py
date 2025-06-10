@@ -11,7 +11,7 @@ from .combinators.any import AnySafeguard
 from .combinators.safe import AlwaysSafeguard
 from .combinators.select import SelectSafeguard
 from .pointwise.eb import ErrorBoundSafeguard
-from .pointwise.qoi.abs import PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard
+from .pointwise.qoi.eb import PointwiseQuantityOfInterestErrorBoundSafeguard
 from .pointwise.sign import SignPreservingSafeguard
 from .pointwise.zero import ZeroIsZeroSafeguard
 from .stencil.monotonicity import MonotonicityPreservingSafeguard
@@ -33,11 +33,11 @@ class SafeguardKind(Enum):
 
     # pointwise error bounds
     eb = ErrorBoundSafeguard
-    """Enforce an absolute / relative / ratio (decimal) error bound."""
+    """Enforce a pointwise error bound."""
 
     # quantity of interest error bounds
-    qoi_abs_pw = PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard
-    """Enforce an absolute error bound on a pointwise derived quantity of interest."""
+    qoi_eb_pw = PointwiseQuantityOfInterestErrorBoundSafeguard
+    """Enforce an error bound on a pointwise derived quantity of interest."""
 
     qoi_abs_stencil = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard
     """Enforce an absolute error bound on a derived quantity of interest over a data neighbourhood."""

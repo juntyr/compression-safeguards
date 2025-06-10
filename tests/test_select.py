@@ -136,7 +136,7 @@ def test_numcodecs_validation():
                     kind="select",
                     selector="param",
                     safeguards=[
-                        dict(kind="qoi_abs_pw", qoi="(-(-x))", eb_abs=0),
+                        dict(kind="qoi_eb_pw", qoi="(-(-x))", type="abs", eb=0),
                         dict(kind="zero"),
                     ],
                 ),
@@ -159,7 +159,12 @@ def test_numcodecs_validation():
                                 kind="select",
                                 selector="param",
                                 safeguards=[
-                                    dict(kind="qoi_abs_pw", qoi="(-(-x))", eb_abs=0),
+                                    dict(
+                                        kind="qoi_eb_pw",
+                                        qoi="(-(-x))",
+                                        type="abs",
+                                        eb=0,
+                                    ),
                                     dict(kind="zero"),
                                 ],
                             ),
