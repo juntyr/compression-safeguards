@@ -1,5 +1,8 @@
 import numpy as np
 
+from compression_safeguards.safeguards.pointwise.eb import ErrorBoundSafeguard
+from compression_safeguards.utils.bindings import Bindings
+
 from .codecs import (
     encode_decode_identity,
     encode_decode_mock,
@@ -68,4 +71,23 @@ def test_fuzzer_rounding_error():
         safeguards=[
             dict(kind="eb", type="abs", eb=2.2250738585072014e-308, equal_nan=True),
         ],
+    )
+
+
+def test_late_bound_eb():
+    safeguard = ErrorBoundSafeguard(type="abs", eb="eb")
+
+    data = np.arange(6).reshape(2, 3)
+
+    late_bound = Bindings(
+        eb=np.array([5, 4, 3, 2, 1, 0]).reshape(2, 3),
+    )
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == (data.flatten() - np.array([5, 4, 3, 2, 1, 0])))
+    assert np.all(valid._upper == (data.flatten() + np.array([5, 4, 3, 2, 1, 0])))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(
+        ok == np.array([True, True, False, False, False, False]).reshape(2, 3)
     )

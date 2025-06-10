@@ -9,7 +9,7 @@ from enum import Enum, auto
 import numpy as np
 from typing_extensions import assert_never  # MSPV 3.11
 
-from ...utils.bindings import Bindings
+from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import (
     _isfinite,
     _isinf,
@@ -137,8 +137,9 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
     ----------
     type : str | ErrorBound
         The type of error bound that is enforced by this safeguard.
-    eb : int | float
-        The value of the error bound that is enforced by this safeguard.
+    eb : int | float | str | Parameter
+        The value of or late-bound parameter name for the error bound that is
+        enforced by this safeguard.
     equal_nan: bool
         Whether decoding a NaN value to a NaN value with a different bit
         pattern satisfies the error bound.
@@ -146,29 +147,28 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
 
     __slots__ = ("_type", "_eb", "_equal_nan")
     _type: ErrorBound
-    _eb: int | float
+    _eb: int | float | Parameter
     _equal_nan: bool
 
     kind = "eb"
 
     def __init__(
-        self, type: str | ErrorBound, eb: int | float, *, equal_nan: bool = False
+        self,
+        type: str | ErrorBound,
+        eb: int | float | str | Parameter,
+        *,
+        equal_nan: bool = False,
     ):
         self._type = type if isinstance(type, ErrorBound) else ErrorBound[type]
 
-        match self._type:
-            case ErrorBound.abs:
-                assert eb >= 0, "eb must be non-negative for an absolute error bound"
-            case ErrorBound.rel:
-                assert eb >= 0, "eb must be non-negative for a relative error bound"
-            case ErrorBound.ratio:
-                assert eb >= 1, "eb must be >= 1 for a ratio error bound"
-            case _:
-                assert_never(self._type)
+        if isinstance(eb, Parameter):
+            self._eb = eb
+        elif isinstance(eb, str):
+            self._eb = Parameter(eb)
+        else:
+            _check_error_bound(self._type, eb)
+            self._eb = eb
 
-        assert isinstance(eb, int) or _isfinite(eb), "eb must be finite"
-
-        self._eb = eb
         self._equal_nan = equal_nan
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -200,9 +200,20 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         data_float: np.ndarray = to_float(data)
         decoded_float: np.ndarray = to_float(decoded)
 
+        eb = (
+            late_bound.resolve_ndarray(
+                self._eb,
+                data_float.shape,
+                data_float.dtype,
+            )
+            if isinstance(self._eb, Parameter)
+            else self._eb
+        )
+        _check_error_bound(self._type, eb)
+
         finite_ok = _compute_finite_absolute_error(
             self._type, data_float, decoded_float
-        ) <= _compute_finite_absolute_error_bound(self._type, self._eb, data_float)
+        ) <= _compute_finite_absolute_error_bound(self._type, eb, data_float)
 
         # bitwise equality for inf and NaNs (unless equal_nan)
         same_bits = as_bits(data) == as_bits(decoded)
@@ -251,11 +262,22 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             .preserve_nan(dataf, equal_nan=self._equal_nan)
         )
 
-        lower, upper = _apply_finite_error_bound(
-            self._type, self._eb, data, to_float(data)
-        )
+        data_float: np.ndarray = to_float(data)
 
-        Lower(lower) <= valid[_isfinite(dataf)] <= Upper(upper)
+        eb = (
+            late_bound.resolve_ndarray(
+                self._eb,
+                data_float.shape,
+                data_float.dtype,
+            )
+            if isinstance(self._eb, Parameter)
+            else self._eb
+        )
+        _check_error_bound(self._type, eb)
+
+        lower, upper = _apply_finite_error_bound(self._type, eb, data, to_float(data))
+
+        Lower(lower.flatten()) <= valid[_isfinite(dataf)] <= Upper(upper.flatten())
 
         return valid.into_union()
 
@@ -277,9 +299,28 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         )
 
 
+def _check_error_bound(
+    type: ErrorBound,
+    eb: int | float | np.ndarray[S, np.dtype[F]],
+) -> None:
+    match type:
+        case ErrorBound.abs:
+            assert np.all(eb >= 0), (
+                "eb must be non-negative for an absolute error bound"
+            )
+        case ErrorBound.rel:
+            assert np.all(eb >= 0), "eb must be non-negative for a relative error bound"
+        case ErrorBound.ratio:
+            assert np.all(eb >= 1), "eb must be >= 1 for a ratio error bound"
+        case _:
+            assert_never(type)
+
+    assert isinstance(eb, int) or np.all(_isfinite(eb)), "eb must be finite"
+
+
 def _compute_finite_absolute_error_bound(
     type: ErrorBound,
-    eb: int | float,
+    eb: int | float | np.ndarray[S, np.dtype[F]],
     data_float: np.ndarray[S, np.dtype[F]],
 ) -> np.ndarray[tuple[()] | S, np.dtype[F]]:
     match type:
@@ -287,10 +328,10 @@ def _compute_finite_absolute_error_bound(
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
-                eb_abs: np.ndarray[tuple[()], np.dtype[F]] = to_finite_float(
+                eb_abs: np.ndarray[tuple[()] | S, np.dtype[F]] = to_finite_float(
                     eb, data_float.dtype
                 )
-            assert eb_abs >= 0
+            assert np.all(eb_abs >= 0)
 
             return eb_abs
         case ErrorBound.rel:
@@ -310,10 +351,10 @@ def _compute_finite_absolute_error_bound(
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
-                eb_ratio: np.ndarray[tuple[()], np.dtype[F]] = to_finite_float(
+                eb_ratio: np.ndarray[tuple[()] | S, np.dtype[F]] = to_finite_float(
                     eb, data_float.dtype
                 )
-            assert eb_ratio >= 1.0
+            assert np.all(eb_ratio >= 1.0)
 
             return eb_ratio
         case _:
@@ -348,7 +389,7 @@ def _compute_finite_absolute_error(
 
 def _apply_finite_error_bound(
     type: ErrorBound,
-    eb: int | float,
+    eb: int | float | np.ndarray[S, np.dtype[F]],
     data: np.ndarray[S, np.dtype[T]],
     data_float: np.ndarray[S, np.dtype[F]],
 ) -> tuple[np.ndarray[S, np.dtype[T]], np.ndarray[S, np.dtype[T]]]:
