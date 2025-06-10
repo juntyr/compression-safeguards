@@ -105,7 +105,7 @@ def test_edge_cases():
 def test_inheritance():
     pointwise_config = dict(kind="eb", type="abs", eb=1)
     stencil_config = dict(
-        kind="qoi_abs_stencil",
+        kind="qoi_eb_stencil",
         qoi="findiff(x, order=1, accuracy=1, type=1, dx=1, axis=0)",
         neighbourhood=[
             dict(
@@ -115,7 +115,8 @@ def test_inheritance():
                 boundary="valid",
             )
         ],
-        eb_abs=1,
+        type="abs",
+        eb=1,
     )
 
     for combinator in ["any", "all"]:

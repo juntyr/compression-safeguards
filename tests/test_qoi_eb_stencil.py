@@ -5,6 +5,10 @@ import pytest
 
 from compression_safeguards import Safeguards
 from compression_safeguards.safeguards.stencil import BoundaryCondition
+from compression_safeguards.safeguards.stencil.qoi.eb import (
+    StencilQuantityOfInterestErrorBoundSafeguard,
+)
+from compression_safeguards.utils.bindings import Bindings
 
 from .codecs import (
     encode_decode_identity,
@@ -22,17 +26,35 @@ def check_all_codecs(data: np.ndarray, qoi: str, shape: list[tuple[int, int]]):
         encode_decode_identity,
         encode_decode_noise,
     ]:
-        for axes, boundaries, eb_abs in zip(
+        for axes, boundaries, (type, eb) in zip(
             cycle(permutations(range(data.ndim), len(shape))),
             product(*[BoundaryCondition for _ in range(data.ndim)]),
-            cycle([10.0, 1.0, 0.1, 0.01, 0.0]),
+            cycle(
+                [
+                    ("abs", 10.0),
+                    ("abs", 1.0),
+                    ("abs", 0.1),
+                    ("abs", 0.01),
+                    ("abs", 0.0),
+                    ("rel", 10.0),
+                    ("rel", 1.0),
+                    ("rel", 0.1),
+                    ("rel", 0.01),
+                    ("rel", 0.0),
+                    ("ratio", 10.0),
+                    ("ratio", 2.0),
+                    ("ratio", 1.1),
+                    ("ratio", 1.01),
+                    ("ratio", 1.0),
+                ]
+            ),
         ):
             try:
                 encode_decode(
                     data,
                     safeguards=[
                         dict(
-                            kind="qoi_abs_stencil",
+                            kind="qoi_eb_stencil",
                             qoi=qoi,
                             neighbourhood=[
                                 dict(
@@ -48,12 +70,13 @@ def check_all_codecs(data: np.ndarray, qoi: str, shape: list[tuple[int, int]]):
                                     axes, boundaries, shape
                                 )
                             ],
-                            eb_abs=eb_abs,
+                            type=type,
+                            eb=eb,
                         )
                     ],
                 )
             except Exception as err:
-                print(qoi, shape, axes, boundaries, eb_abs)
+                print(qoi, shape, axes, boundaries, type, eb)
                 raise err
 
 
@@ -224,8 +247,8 @@ def test_mean():
 
 
 def test_findiff():
-    from compression_safeguards.safeguards.stencil.qoi.abs import (
-        StencilQuantityOfInterestAbsoluteErrorBoundSafeguard,
+    from compression_safeguards.safeguards.stencil.qoi.eb import (
+        StencilQuantityOfInterestErrorBoundSafeguard,
     )
 
     data = np.arange(81, dtype=float).reshape(9, 9)
@@ -234,7 +257,7 @@ def test_findiff():
         dict(axis=1, before=4, after=4, boundary="valid"),
     ]
 
-    safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "findiff(x,order=0,accuracy=2,type=0,dx=1,axis=0)",
         valid_5x5_neighbourhood,
         0,
@@ -246,7 +269,7 @@ def test_findiff():
         [(4, 4), (4, 4)],
     )
 
-    safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "findiff(x,order=1,accuracy=1,type=1,dx=1,axis=0)",
         valid_5x5_neighbourhood,
         0,
@@ -258,7 +281,7 @@ def test_findiff():
         [(4, 4), (4, 4)],
     )
 
-    safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "findiff(x,order=1,accuracy=1,type=-1,dx=1,axis=0)",
         valid_5x5_neighbourhood,
         0,
@@ -270,7 +293,7 @@ def test_findiff():
         [(4, 4), (4, 4)],
     )
 
-    safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "findiff(x,order=1,accuracy=2,type=0,dx=1,axis=0)",
         valid_5x5_neighbourhood,
         0,
@@ -282,7 +305,7 @@ def test_findiff():
         [(4, 4), (4, 4)],
     )
 
-    safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "findiff(x,order=1,accuracy=2,type=0,dx=1,axis=1)",
         valid_5x5_neighbourhood,
         0,
@@ -294,7 +317,7 @@ def test_findiff():
         [(4, 4), (4, 4)],
     )
 
-    safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "findiff(x,order=2,accuracy=2,type=0,dx=1,axis=0)",
         valid_5x5_neighbourhood,
         0,
@@ -306,7 +329,7 @@ def test_findiff():
         [(4, 4), (4, 4)],
     )
 
-    safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "findiff(findiff(x,order=1,accuracy=2,type=0,dx=1,axis=0),order=1,accuracy=2,type=0,dx=1,axis=0)",
         valid_5x5_neighbourhood,
         0,
@@ -318,7 +341,7 @@ def test_findiff():
         [(4, 4), (4, 4)],
     )
 
-    safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "findiff(findiff(x,order=1,accuracy=2,type=0,dx=1,axis=0),order=1,accuracy=2,type=0,dx=1,axis=1)",
         valid_5x5_neighbourhood,
         0,
@@ -332,8 +355,8 @@ def test_findiff():
 
 
 def test_matmul():
-    from compression_safeguards.safeguards.stencil.qoi.abs import (
-        StencilQuantityOfInterestAbsoluteErrorBoundSafeguard,
+    from compression_safeguards.safeguards.stencil.qoi.eb import (
+        StencilQuantityOfInterestErrorBoundSafeguard,
     )
 
     data = np.arange(16, dtype=float).reshape(4, 4)
@@ -342,7 +365,7 @@ def test_matmul():
         dict(axis=1, before=1, after=1, boundary="valid"),
     ]
 
-    safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "matmul(A[[-1, -2, -3]], matmul(X, tr(A[[1, 2, 3]])))[0,0]",
         valid_3x3_neighbourhood,
         0,
@@ -359,18 +382,18 @@ def test_matmul():
 
 
 def test_indexing():
-    from compression_safeguards.safeguards.stencil.qoi.abs import (
-        StencilQuantityOfInterestAbsoluteErrorBoundSafeguard,
+    from compression_safeguards.safeguards.stencil.qoi.eb import (
+        StencilQuantityOfInterestErrorBoundSafeguard,
     )
 
-    safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "X[I-1] + X[I+2]",
         [dict(axis=0, before=1, after=4, boundary="valid")],
         0,
     )
     assert f"{safeguard._qoi_expr}" == "X[0] + X[3]"
 
-    safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "X[I[0]][I[1]]",
         [
             dict(axis=0, before=1, after=1, boundary="valid"),
@@ -380,7 +403,7 @@ def test_indexing():
     )
     assert f"{safeguard._qoi_expr}" == "X[1, 1]"
 
-    safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "X[0][0]",
         [
             dict(axis=0, before=1, after=1, boundary="valid"),
@@ -390,7 +413,7 @@ def test_indexing():
     )
     assert f"{safeguard._qoi_expr}" == "X[0, 0]"
 
-    safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "(X[I+A[-1,0]]+X[I+A[+1,0]]+X[I+A[0,-1]]+X[I+A[0,+1]])/4",
         [
             dict(axis=0, before=1, after=1, boundary="valid"),
@@ -400,7 +423,7 @@ def test_indexing():
     )
     assert f"{safeguard._qoi_expr}" == "X[0, 1]/4 + X[1, 0]/4 + X[1, 2]/4 + X[2, 1]/4"
 
-    safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "asum(X * A[[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])",
         [
             dict(axis=0, before=1, after=1, boundary="valid"),
@@ -418,11 +441,11 @@ def test_lambdify_indexing():
     import inspect
 
     from compression_safeguards.safeguards._qois.compile import sympy_expr_to_numpy
-    from compression_safeguards.safeguards.stencil.qoi.abs import (
-        StencilQuantityOfInterestAbsoluteErrorBoundSafeguard,
+    from compression_safeguards.safeguards.stencil.qoi.eb import (
+        StencilQuantityOfInterestErrorBoundSafeguard,
     )
 
-    safeguard = StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "asum(X * A[[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])",
         [
             dict(axis=0, before=1, after=1, boundary="valid"),
@@ -450,10 +473,11 @@ def test_fuzzer_window():
         np.array([[2049]], dtype=np.int16),
         safeguards=[
             dict(
-                kind="qoi_abs_stencil",
+                kind="qoi_eb_stencil",
                 qoi="ln((x**(x**pi)))",
                 neighbourhood=[dict(axis=1, before=0, after=10, boundary="valid")],
-                eb_abs=1,
+                type="abs",
+                eb=1,
             )
         ],
     )
@@ -463,10 +487,11 @@ def test_fuzzer_window():
         np.array([], dtype=np.int16),
         safeguards=[
             dict(
-                kind="qoi_abs_stencil",
+                kind="qoi_eb_stencil",
                 qoi="ln((x**(x**pi)))",
                 neighbourhood=[dict(axis=0, before=0, after=10, boundary="valid")],
-                eb_abs=1,
+                type="abs",
+                eb=1,
             )
         ],
     )
@@ -482,7 +507,7 @@ def test_fuzzer_findiff_int_iter():
             decoded,
             safeguards=[
                 dict(
-                    kind="qoi_abs_stencil",
+                    kind="qoi_eb_stencil",
                     qoi="findiff(x, order=0, accuracy=1, type=-1, dx=2.2250738585072014e-308, axis=0)",
                     neighbourhood=[
                         dict(
@@ -495,7 +520,8 @@ def test_fuzzer_findiff_int_iter():
                             else None,
                         )
                     ],
-                    eb_abs=2.2250738585072014e-308,
+                    type="abs",
+                    eb=2.2250738585072014e-308,
                 ),
             ],
         )
@@ -511,7 +537,7 @@ def test_fuzzer_findiff_fraction_overflow():
             decoded,
             safeguards=[
                 dict(
-                    kind="qoi_abs_stencil",
+                    kind="qoi_eb_stencil",
                     qoi="findiff(x, order=7, accuracy=6, type=-1, dx=7.215110354450764e305, axis=0)",
                     neighbourhood=[
                         dict(
@@ -524,7 +550,8 @@ def test_fuzzer_findiff_fraction_overflow():
                             else None,
                         )
                     ],
-                    eb_abs=2.2250738585072014e-308,
+                    type="abs",
+                    eb=2.2250738585072014e-308,
                 ),
             ],
         )
@@ -539,7 +566,7 @@ def test_fuzzer_findiff_fraction_compare():
             safeguards=[
                 dict(kind="zero", zero=7),
                 dict(
-                    kind="qoi_abs_stencil",
+                    kind="qoi_eb_stencil",
                     qoi="findiff(x, order=7, accuracy=7, type=1, dx=2.2250738585072014e-308, axis=0)",
                     neighbourhood=[
                         dict(
@@ -552,7 +579,8 @@ def test_fuzzer_findiff_fraction_compare():
                             else None,
                         )
                     ],
-                    eb_abs=2.2250738585072014e-308,
+                    type="abs",
+                    eb=2.2250738585072014e-308,
                 ),
                 dict(kind="sign"),
             ],
@@ -569,7 +597,7 @@ def test_fuzzer_findiff_eb_abs():
             decoded,
             safeguards=[
                 dict(
-                    kind="qoi_abs_stencil",
+                    kind="qoi_eb_stencil",
                     qoi="findiff(x, order=4, accuracy=4, type=1, dx=4, axis=0)",
                     neighbourhood=[
                         dict(
@@ -582,7 +610,8 @@ def test_fuzzer_findiff_eb_abs():
                             else None,
                         )
                     ],
-                    eb_abs=1,
+                    type="abs",
+                    eb=1,
                 ),
                 dict(kind="sign"),
             ],
@@ -601,7 +630,7 @@ def test_fuzzer_findiff_fraction_float_overflow():
             decoded,
             safeguards=[
                 dict(
-                    kind="qoi_abs_stencil",
+                    kind="qoi_eb_stencil",
                     qoi="findiff(x, order=1, accuracy=3, type=1, dx=59, axis=0)",
                     neighbourhood=[
                         dict(
@@ -614,7 +643,8 @@ def test_fuzzer_findiff_fraction_float_overflow():
                             else None,
                         )
                     ],
-                    eb_abs=8.812221249325077e307,
+                    type="abs",
+                    eb=8.812221249325077e307,
                 ),
                 dict(kind="sign"),
             ],
@@ -633,7 +663,7 @@ def test_fuzzer_tuple_index_out_of_range():
             decoded,
             safeguards=[
                 dict(
-                    kind="qoi_abs_stencil",
+                    kind="qoi_eb_stencil",
                     qoi="(-(-x))",
                     neighbourhood=[
                         dict(
@@ -643,7 +673,8 @@ def test_fuzzer_tuple_index_out_of_range():
                             boundary="valid",
                         )
                     ],
-                    eb_abs=0,
+                    type="abs",
+                    eb=0,
                 ),
             ],
         )
@@ -658,7 +689,7 @@ def test_fuzzer_list_assignment_out_of_range():
         decoded,
         safeguards=[
             dict(
-                kind="qoi_abs_stencil",
+                kind="qoi_eb_stencil",
                 qoi="acsc((x-e))",
                 neighbourhood=[
                     dict(
@@ -668,7 +699,83 @@ def test_fuzzer_list_assignment_out_of_range():
                         boundary="valid",
                     )
                 ],
-                eb_abs=0,
+                type="abs",
+                eb=0,
             ),
         ],
     )
+
+
+def test_late_bound_eb_abs():
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi="x",
+        neighbourhood=[
+            dict(axis=0, before=1, after=0, boundary="valid"),
+            dict(axis=1, before=1, after=1, boundary="valid"),
+        ],
+        type="abs",
+        eb="eb",
+    )
+
+    data = np.arange(6).reshape(2, 3)
+
+    late_bound = Bindings(eb=np.array([[2]]))
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    # these bounds could be laxer but we're currently distributing across the
+    #  full neighbourhood
+    assert np.all(valid._lower == (data.flatten() - np.array([2, 2, 2, 2, 2, 2])))
+    assert np.all(valid._upper == (data.flatten() + np.array([2, 2, 2, 2, 2, 2])))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(ok == np.array([True, True, True, True, False, True]).reshape(2, 3))
+
+
+def test_late_bound_eb_rel():
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi="x",
+        neighbourhood=[
+            dict(axis=0, before=1, after=0, boundary="valid"),
+            dict(axis=1, before=1, after=1, boundary="valid"),
+        ],
+        type="rel",
+        eb="eb",
+    )
+
+    data = np.arange(6).reshape(2, 3)
+
+    late_bound = Bindings(eb=np.array([[2]]))
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    # these bounds could be laxer but we're currently distributing across the
+    #  full neighbourhood
+    assert np.all(valid._lower == (data.flatten() - np.array([8, 8, 8, 8, 8, 8])))
+    assert np.all(valid._upper == (data.flatten() + np.array([8, 8, 8, 8, 8, 8])))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(ok == np.array([True, True, True, True, True, True]).reshape(2, 3))
+
+
+def test_late_bound_eb_ratio():
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi="x",
+        neighbourhood=[
+            dict(axis=0, before=1, after=0, boundary="valid"),
+            dict(axis=1, before=1, after=1, boundary="valid"),
+        ],
+        type="ratio",
+        eb="eb",
+    )
+
+    data = np.arange(6).reshape(2, 3)
+
+    late_bound = Bindings(eb=np.array([[2]]))
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    # these bounds could be laxer but we're currently distributing across the
+    #  full neighbourhood
+    assert np.all(valid._lower == (data.flatten() - np.array([2, 2, 2, 2, 2, 2])))
+    assert np.all(valid._upper == (data.flatten() + np.array([4, 4, 4, 4, 4, 4])))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(ok == np.array([True, True, True, True, False, True]).reshape(2, 3))

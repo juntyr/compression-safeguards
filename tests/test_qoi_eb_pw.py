@@ -2,6 +2,10 @@ import numpy as np
 import pytest
 
 from compression_safeguards import Safeguards
+from compression_safeguards.safeguards.pointwise.qoi.eb import (
+    PointwiseQuantityOfInterestErrorBoundSafeguard,
+)
+from compression_safeguards.utils.bindings import Bindings
 
 from .codecs import (
     encode_decode_identity,
@@ -295,3 +299,64 @@ def test_lambdify_dtype():
 
     assert np.float16("2.71828") == np.float16(np.e)
     assert np.float16("3.14159") == np.float16(np.pi)
+
+
+def test_late_bound_eb_abs():
+    safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi="x", type="abs", eb="eb"
+    )
+
+    data = np.arange(6).reshape(2, 3)
+
+    late_bound = Bindings(
+        eb=np.array([5, 4, 3, 2, 1, 0]).reshape(2, 3),
+    )
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == (data.flatten() - np.array([5, 4, 3, 2, 1, 0])))
+    assert np.all(valid._upper == (data.flatten() + np.array([5, 4, 3, 2, 1, 0])))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(
+        ok == np.array([True, True, False, False, False, False]).reshape(2, 3)
+    )
+
+
+def test_late_bound_eb_rel():
+    safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi="x", type="rel", eb="eb"
+    )
+
+    data = np.arange(6).reshape(2, 3)
+
+    late_bound = Bindings(
+        eb=np.array([5, 4, 3, 2, 1, 0]).reshape(2, 3),
+    )
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == (data.flatten() - np.array([0, 4, 6, 6, 4, 0])))
+    assert np.all(valid._upper == (data.flatten() + np.array([0, 4, 6, 6, 4, 0])))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(ok == np.array([True, True, True, True, False, False]).reshape(2, 3))
+
+
+def test_late_bound_eb_ratio():
+    safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi="x", type="ratio", eb="eb"
+    )
+
+    data = np.arange(6).reshape(2, 3)
+
+    late_bound = Bindings(
+        eb=np.array([6, 5, 4, 3, 2, 1]).reshape(2, 3),
+    )
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == (data.flatten() - np.array([0, 0, 1, 2, 2, 0])))
+    assert np.all(valid._upper == (data.flatten() + np.array([0, 4, 6, 6, 4, 0])))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(
+        ok == np.array([True, False, False, False, False, False]).reshape(2, 3)
+    )

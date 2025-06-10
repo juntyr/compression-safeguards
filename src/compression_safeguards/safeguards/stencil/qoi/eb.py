@@ -1,8 +1,8 @@
 """
-Stencil quantity of interest (QoI) absolute error bound safeguard.
+Stencil quantity of interest (QoI) error bound safeguard.
 """
 
-__all__ = ["StencilQuantityOfInterestAbsoluteErrorBoundSafeguard"]
+__all__ = ["StencilQuantityOfInterestErrorBoundSafeguard"]
 
 import re
 from collections.abc import Sequence
@@ -13,7 +13,7 @@ import sympy as sp
 import sympy.tensor.array.expressions  # noqa: F401
 from numpy.lib.stride_tricks import sliding_window_view
 
-from ....utils.bindings import Bindings
+from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import (
     _isfinite,
     _isinf,
@@ -21,7 +21,6 @@ from ....utils.cast import (
     _nan_to_zero,
     _nextafter,
     as_bits,
-    to_finite_float,
     to_float,
 )
 from ....utils.intervals import Interval, IntervalUnion
@@ -44,6 +43,13 @@ from ..._qois.re import (
     QOI_INT_LITERAL_PATTERN,
     QOI_WHITESPACE_PATTERN,
 )
+from ...pointwise.eb import (
+    ErrorBound,
+    _check_error_bound,
+    _compute_finite_absolute_error,
+    _compute_finite_absolute_error_bound,
+)
+from ...pointwise.qoi.eb import _apply_finite_qoi_error_bound
 from .. import (
     BoundaryCondition,
     NeighbourhoodAxis,
@@ -57,12 +63,12 @@ Qs = TypeVar("Qs", bound=tuple[int, ...])
 Ns = TypeVar("Ns", bound=tuple[int, ...])
 
 
-class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
+class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     """
-    The `StencilQuantityOfInterestAbsoluteErrorBoundSafeguard` guarantees that
-    the pointwise absolute error on a derived quantity of interest (QoI) over a
+    The `StencilQuantityOfInterestErrorBoundSafeguard` guarantees that the
+    pointwise error `type` on a derived quantity of interest (QoI) over a
     neighbourhood of data points is less than or equal to the provided bound
-    `eb_abs`.
+    `eb`.
 
     The quantity of interest is specified as a non-constant expression, in
     string form, over the neighbourhood tensor `X` that is centred on the
@@ -72,9 +78,9 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     Note that `X` can be indexed absolute or relative to the centred data point
     `x` using the index array `I`.
 
-    The stencil QoI safeguard can also be used to bound the pointwise absolute
-    error of the finite-difference-approximated derivative over the data by
-    using the `findiff` function in the `qoi` expression.
+    The stencil QoI safeguard can also be used to bound the pointwise error of
+    the finite-difference-approximated derivative over the data by using the
+    `findiff` function in the `qoi` expression.
 
     The shape of the data neighbourhood is specified as an ordered list of
     unique data axes and boundary conditions that are applied to these axes.
@@ -232,8 +238,8 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
     The QoI expression can also contain whitespaces (space ` `, tab `\\t`,
     newline `\\n`) and single-line inline comments starting with a hash `#`.
 
-    The implementation of the absolute error bound on pointwise quantities of
-    interest is inspired by:
+    The implementation of the error bound on pointwise quantities of interest
+    is inspired by:
 
     > Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
     Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
@@ -254,31 +260,37 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         The per-axis boundary conditions are applied to the data in their order
         in the neighbourhood, i.e. earlier boundary extensions can influence
         later ones.
-    eb_abs : int | float
-        The non-negative absolute error bound on the quantity of interest that
-        is enforced by this safeguard.
+    type : str | ErrorBound
+        The type of error bound on the quantity of interest that is enforced by
+        this safeguard.
+    eb : int | float | str | Parameter
+        The value of or late-bound parameter name for the error bound on the
+        quantity of interest that is enforced by this safeguard.
     """
 
     __slots__ = (
         "_qoi",
         "_neighbourhood",
-        "_eb_abs",
+        "_type",
+        "_eb",
         "_qoi_expr",
         "_X",
     )
     _qoi: StencilExpr
     _neighbourhood: tuple[NeighbourhoodBoundaryAxis, ...]
-    _eb_abs: int | float
+    _type: ErrorBound
+    _eb: int | float | Parameter
     _qoi_expr: sp.Basic
     _X: sp.tensor.array.expressions.ArraySymbol
 
-    kind = "qoi_abs_stencil"
+    kind = "qoi_eb_stencil"
 
     def __init__(
         self,
         qoi: StencilExpr,
         neighbourhood: Sequence[dict | NeighbourhoodBoundaryAxis],
-        eb_abs: int | float,
+        type: str | ErrorBound,
+        eb: int | float | str | Parameter,
     ):
         self._neighbourhood = tuple(
             axis
@@ -291,9 +303,15 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             self._neighbourhood
         ), "neighbourhood axes must be unique"
 
-        assert eb_abs >= 0, "eb_abs must be non-negative"
-        assert isinstance(eb_abs, int) or _isfinite(eb_abs), "eb_abs must be finite"
-        self._eb_abs = eb_abs
+        self._type = type if isinstance(type, ErrorBound) else ErrorBound[type]
+
+        if isinstance(eb, Parameter):
+            self._eb = eb
+        elif isinstance(eb, str):
+            self._eb = Parameter(eb)
+        else:
+            _check_error_bound(self._type, eb)
+            self._eb = eb
 
         shape = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
         I = tuple(axis.before for axis in self._neighbourhood)  # noqa: E741
@@ -343,7 +361,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             # check if the expression is well-formed (e.g. no int's that cannot
             #  be printed) and if an error bound can be computed
             _canary_repr = str(qoi_expr)
-            _canary_eb_abs = _compute_data_eb_for_stencil_qoi_eb(
+            _canary_data_eb = _compute_data_eb_for_stencil_qoi_eb(
                 qoi_expr,
                 self._X,
                 np.zeros(shape),
@@ -489,8 +507,8 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check which elements in the `decoded` array satisfy the absolute error
-        bound for the quantity of interest over a neighbourhood on the `data`.
+        Check which elements in the `decoded` array satisfy the error bound for
+        the quantity of interest over a neighbourhood on the `data`.
 
         Parameters
         ----------
@@ -563,20 +581,27 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         qoi_data = (qoi_lambda)(data_windows_float)
         qoi_decoded = (qoi_lambda)(decoded_windows_float)
 
-        absolute_bound = (
-            np.where(
-                qoi_data > qoi_decoded,
-                qoi_data - qoi_decoded,
-                qoi_decoded - qoi_data,
+        eb = (
+            late_bound.resolve_ndarray(
+                self._eb,
+                qoi_data.shape,
+                qoi_data.dtype,
             )
-            <= self._eb_abs
+            if isinstance(self._eb, Parameter)
+            else self._eb
         )
+        _check_error_bound(self._type, eb)
+
+        finite_ok = _compute_finite_absolute_error(
+            self._type, qoi_data, qoi_decoded
+        ) <= _compute_finite_absolute_error_bound(self._type, eb, qoi_data)
+
         same_bits = as_bits(qoi_data, kind="V") == as_bits(qoi_decoded, kind="V")
         both_nan = _isnan(qoi_data) & _isnan(qoi_decoded)
 
         windows_ok = np.where(
             _isfinite(qoi_data),
-            absolute_bound,
+            finite_ok,
             np.where(
                 _isinf(qoi_data),
                 same_bits,
@@ -605,8 +630,8 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         late_bound: Bindings,
     ) -> IntervalUnion[T, int, int]:
         """
-        Compute the intervals in which the absolute error bound is upheld with
-        respect to the quantity of interest over a neighbourhood on the `data`.
+        Compute the intervals in which the error bound is upheld with respect
+        to the quantity of interest over a neighbourhood on the `data`.
 
         Parameters
         ----------
@@ -618,7 +643,7 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         Returns
         -------
         intervals : IntervalUnion
-            Union of intervals in which the absolute error bound is upheld.
+            Union of intervals in which the error bound is upheld.
         """
 
         # check that the data shape is compatible with the neighbourhood shape
@@ -654,58 +679,76 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             )  # type: ignore
         )
 
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            eb_abs: np.ndarray = to_finite_float(self._eb_abs, data_windows_float.dtype)
-        assert eb_abs >= 0
-
         qoi_lambda = compile_sympy_expr_to_numpy(
             [self._X], self._qoi_expr, data_windows_float.dtype
         )
+
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            data_qoi = (qoi_lambda)(data_windows_float)
+
+        eb = (
+            late_bound.resolve_ndarray(
+                self._eb,
+                data_qoi.shape,
+                data_qoi.dtype,
+            )
+            if isinstance(self._eb, Parameter)
+            else self._eb
+        )
+        _check_error_bound(self._type, eb)
+
+        qoi_lower_upper: tuple[np.ndarray, np.ndarray] = _apply_finite_qoi_error_bound(
+            self._type,
+            eb,
+            data_qoi,
+        )
+        qoi_lower, qoi_upper = qoi_lower_upper
 
         # ensure the error bounds are representable in QoI space
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            # compute the error-bound adjusted QoIs
-            data_qoi = (qoi_lambda)(data_windows_float)
-            qoi_lower = data_qoi - eb_abs
-            qoi_upper = data_qoi + eb_abs
-
-            # check if they're representable within the error bound
-            qoi_lower_outside_eb_abs = (data_qoi - qoi_lower) > eb_abs
-            qoi_upper_outside_eb_abs = (qoi_upper - data_qoi) > eb_abs
-
-            # otherwise nudge the error-bound adjusted QoIs
-            # we can nudge with nextafter since the QoIs are floating point and
-            #  only finite QoIs are nudged
-            qoi_lower = np.where(
-                qoi_lower_outside_eb_abs & _isfinite(data_qoi),
-                _nextafter(qoi_lower, data_qoi),
-                qoi_lower,
-            )
-            qoi_upper = np.where(
-                qoi_upper_outside_eb_abs & _isfinite(data_qoi),
-                _nextafter(qoi_upper, data_qoi),
-                qoi_upper,
-            )
-
             # compute the adjusted error bound
             eb_qoi_lower = _nan_to_zero(qoi_lower - data_qoi)
             eb_qoi_upper = _nan_to_zero(qoi_upper - data_qoi)
+
+            # check if they're representable within the error bound
+            eb_qoi_lower_outside = (data_qoi + eb_qoi_lower) < qoi_lower
+            eb_qoi_upper_outside = (data_qoi + eb_qoi_upper) > qoi_upper
+
+            # otherwise nudge the error-bound adjusted QoIs
+            # we can nudge with nextafter since the QoIs are floating point
+            eb_qoi_lower = np.where(
+                eb_qoi_lower_outside & _isfinite(qoi_lower),
+                _nextafter(eb_qoi_lower, 0),
+                eb_qoi_lower,
+            )
+            eb_qoi_upper = np.where(
+                eb_qoi_upper_outside & _isfinite(qoi_upper),
+                _nextafter(eb_qoi_upper, 0),
+                eb_qoi_upper,
+            )
 
         # check that the adjusted error bounds fulfil all requirements
         assert eb_qoi_lower.ndim == data.ndim
         assert eb_qoi_lower.dtype == data_windows_float.dtype
         assert eb_qoi_upper.ndim == data.ndim
         assert eb_qoi_upper.dtype == data_windows_float.dtype
-        assert np.all(
-            (eb_qoi_lower <= 0) & (eb_qoi_lower >= -eb_abs) & _isfinite(eb_qoi_lower)
-        )
-        assert np.all(
-            (eb_qoi_upper >= 0) & (eb_qoi_upper <= eb_abs) & _isfinite(eb_qoi_upper)
-        )
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            assert np.all(
+                (eb_qoi_lower <= 0)
+                & (((data_qoi + eb_qoi_lower) >= qoi_lower) | ~_isfinite(data_qoi))
+                & _isfinite(eb_qoi_lower)
+            )
+            assert np.all(
+                (eb_qoi_upper >= 0)
+                & (((data_qoi + eb_qoi_upper) <= qoi_upper) | ~_isfinite(data_qoi))
+                & _isfinite(eb_qoi_upper)
+            )
 
         s = [slice(None)] * data.ndim
         for axis in self._neighbourhood:
@@ -817,7 +860,8 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
             kind=type(self).kind,
             qoi=self._qoi,
             neighbourhood=[axis.get_config() for axis in self._neighbourhood],
-            eb_abs=self._eb_abs,
+            type=self._type.name,
+            eb=self._eb,
         )
 
 
