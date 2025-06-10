@@ -27,6 +27,7 @@ from ..._qois.eb import (
     compute_data_eb_for_stencil_qoi_eb_unchecked,
     ensure_bounded_derived_error,
 )
+from ..._qois.interval import compute_safe_eb_lower_upper_interval
 from ..._qois.math import CONSTANTS as MATH_CONSTANTS
 from ..._qois.math import FUNCTIONS as MATH_FUNCTIONS
 from ..._qois.re import (
@@ -36,7 +37,6 @@ from ..._qois.re import (
     QOI_WHITESPACE_PATTERN,
 )
 from ..abc import PointwiseSafeguard
-from ..eb import _compute_safe_eb_diff_interval
 from . import PointwiseExpr
 
 
@@ -412,15 +412,12 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
                 eb_qoi_lower,
                 eb_qoi_upper,
             )
-        assert np.all((eb_x_lower <= 0) & _isfinite(eb_x_lower))
-        assert np.all((eb_x_upper >= 0) & _isfinite(eb_x_upper))
 
-        return _compute_safe_eb_diff_interval(
+        return compute_safe_eb_lower_upper_interval(
             data,
             data_float,
             eb_x_lower,
             eb_x_upper,
-            equal_nan=True,
         ).into_union()
 
     def get_config(self) -> dict:

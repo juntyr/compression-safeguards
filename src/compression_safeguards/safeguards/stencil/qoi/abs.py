@@ -35,6 +35,7 @@ from ..._qois.eb import (
     ensure_bounded_derived_error,
 )
 from ..._qois.findiff import create_findiff_for_neighbourhood
+from ..._qois.interval import compute_safe_eb_lower_upper_interval
 from ..._qois.math import CONSTANTS as MATH_CONSTANTS
 from ..._qois.math import FUNCTIONS as MATH_FUNCTIONS
 from ..._qois.re import (
@@ -43,7 +44,6 @@ from ..._qois.re import (
     QOI_INT_LITERAL_PATTERN,
     QOI_WHITESPACE_PATTERN,
 )
-from ...pointwise.eb import _compute_safe_eb_diff_interval
 from .. import (
     BoundaryCondition,
     NeighbourhoodAxis,
@@ -795,15 +795,12 @@ class StencilQuantityOfInterestAbsoluteErrorBoundSafeguard(StencilSafeguard):
         eb_x_orig_upper = np.amin(
             eb_x_upper_flat[reverse_indices_windows], axis=1
         ).reshape(data.shape)
-        assert np.all((eb_x_orig_lower <= 0) & _isfinite(eb_x_orig_lower))
-        assert np.all((eb_x_orig_upper >= 0) & _isfinite(eb_x_orig_upper))
 
-        return _compute_safe_eb_diff_interval(
+        return compute_safe_eb_lower_upper_interval(
             data,
             data_float,
             eb_x_orig_lower,
             eb_x_orig_upper,
-            equal_nan=True,
         ).into_union()
 
     def get_config(self) -> dict:

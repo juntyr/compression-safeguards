@@ -99,6 +99,11 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
             #  parameters, we can just generate a constant name here
             return "param"
 
+        if len(tys) > 2 and str in tys and Parameter in tys:
+            # since numcodecs_safeguards doesn't yet support late-bound
+            #  parameters, we can just generate from the other options here
+            tys = tuple(t for t in tys if t not in (str, Parameter))
+
         if (
             len(tys) > 1
             and tys[0] is dict
