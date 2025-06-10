@@ -416,15 +416,14 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             eb_qoi_upper_outside = (data_qoi + eb_qoi_upper) > qoi_upper
 
             # otherwise nudge the error-bound adjusted QoIs
-            # we can nudge with nextafter since the QoIs are floating point and
-            #  only finite QoIs are nudged
+            # we can nudge with nextafter since the QoIs are floating point
             eb_qoi_lower = np.where(
-                eb_qoi_lower_outside & _isfinite(eb_qoi_lower),
+                eb_qoi_lower_outside & _isfinite(qoi_lower),
                 _nextafter(eb_qoi_lower, 0),
                 eb_qoi_lower,
             )
             eb_qoi_upper = np.where(
-                eb_qoi_upper_outside & _isfinite(eb_qoi_upper),
+                eb_qoi_upper_outside & _isfinite(qoi_upper),
                 _nextafter(eb_qoi_upper, 0),
                 eb_qoi_upper,
             )
@@ -439,12 +438,12 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         ):
             assert np.all(
                 (eb_qoi_lower <= 0)
-                & ((data_qoi + eb_qoi_lower) >= qoi_lower)
+                & (((data_qoi + eb_qoi_lower) >= qoi_lower) | ~_isfinite(data_qoi))
                 & _isfinite(eb_qoi_lower)
             )
             assert np.all(
                 (eb_qoi_upper >= 0)
-                & ((data_qoi + eb_qoi_upper) <= qoi_upper)
+                & (((data_qoi + eb_qoi_upper) <= qoi_upper) | ~_isfinite(data_qoi))
                 & _isfinite(eb_qoi_upper)
             )
 
@@ -572,7 +571,7 @@ def _apply_finite_qoi_error_bound(
     type: ErrorBound,
     eb: int | float | np.ndarray[S, np.dtype[F]],
     qoi_float: np.ndarray[S, np.dtype[F]],
-) -> tuple[np.ndarray[S, np.dtype[T]], np.ndarray[S, np.dtype[T]]]:
+) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
     eb_float = _compute_finite_absolute_error_bound(type, eb, qoi_float)
 
     match type:
@@ -590,15 +589,14 @@ def _apply_finite_qoi_error_bound(
                 lower_outside_eb = (qoi_float - lower) > eb_float
                 upper_outside_eb = (upper - qoi_float) > eb_float
 
-            # we can nudge with nextafter since the QoIs are floating point and
-            #  only finite QoIs are nudged
+            # we can nudge with nextafter since the QoIs are floating point
             lower = np.where(  # type: ignore
-                lower_outside_eb & _isfinite(lower),
+                lower_outside_eb & _isfinite(qoi_float),
                 _nextafter(lower, qoi_float),
                 lower,
             )
             upper = np.where(  # type: ignore
-                upper_outside_eb & _isfinite(upper),
+                upper_outside_eb & _isfinite(qoi_float),
                 _nextafter(upper, qoi_float),
                 upper,
             )
@@ -643,15 +641,14 @@ def _apply_finite_qoi_error_bound(
                     > eb_float
                 )
 
-            # we can nudge with nextafter since the QoIs are floating point and
-            #  only finite QoIs are nudged
+            # we can nudge with nextafter since the QoIs are floating point
             lower = np.where(  # type: ignore
-                lower_outside_eb & _isfinite(lower),
+                lower_outside_eb & _isfinite(qoi_float),
                 _nextafter(lower, qoi_float),
                 lower,
             )
             upper = np.where(  # type: ignore
-                upper_outside_eb & _isfinite(upper),
+                upper_outside_eb & _isfinite(qoi_float),
                 _nextafter(upper, qoi_float),
                 upper,
             )
