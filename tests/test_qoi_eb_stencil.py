@@ -247,10 +247,6 @@ def test_mean():
 
 
 def test_findiff():
-    from compression_safeguards.safeguards.stencil.qoi.eb import (
-        StencilQuantityOfInterestErrorBoundSafeguard,
-    )
-
     data = np.arange(81, dtype=float).reshape(9, 9)
     valid_5x5_neighbourhood = [
         dict(axis=0, before=4, after=4, boundary="valid"),
@@ -260,6 +256,7 @@ def test_findiff():
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "findiff(x,order=0,accuracy=2,type=0,dx=1,axis=0)",
         valid_5x5_neighbourhood,
+        "abs",
         0,
     )
     assert f"{safeguard._qoi_expr}" == "X[4, 4]"
@@ -272,6 +269,7 @@ def test_findiff():
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "findiff(x,order=1,accuracy=1,type=1,dx=1,axis=0)",
         valid_5x5_neighbourhood,
+        "abs",
         0,
     )
     assert f"{safeguard._qoi_expr}" == "-X[4, 4] + X[5, 4]"
@@ -284,6 +282,7 @@ def test_findiff():
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "findiff(x,order=1,accuracy=1,type=-1,dx=1,axis=0)",
         valid_5x5_neighbourhood,
+        "abs",
         0,
     )
     assert f"{safeguard._qoi_expr}" == "-X[3, 4] + X[4, 4]"
@@ -296,6 +295,7 @@ def test_findiff():
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "findiff(x,order=1,accuracy=2,type=0,dx=1,axis=0)",
         valid_5x5_neighbourhood,
+        "abs",
         0,
     )
     assert f"{safeguard._qoi_expr}" == "-X[3, 4]/2 + X[5, 4]/2"
@@ -308,6 +308,7 @@ def test_findiff():
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "findiff(x,order=1,accuracy=2,type=0,dx=1,axis=1)",
         valid_5x5_neighbourhood,
+        "abs",
         0,
     )
     assert f"{safeguard._qoi_expr}" == "-X[4, 3]/2 + X[4, 5]/2"
@@ -320,6 +321,7 @@ def test_findiff():
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "findiff(x,order=2,accuracy=2,type=0,dx=1,axis=0)",
         valid_5x5_neighbourhood,
+        "abs",
         0,
     )
     assert f"{safeguard._qoi_expr}" == "X[3, 4] - 2*X[4, 4] + X[5, 4]"
@@ -332,6 +334,7 @@ def test_findiff():
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "findiff(findiff(x,order=1,accuracy=2,type=0,dx=1,axis=0),order=1,accuracy=2,type=0,dx=1,axis=0)",
         valid_5x5_neighbourhood,
+        "abs",
         0,
     )
     assert f"{safeguard._qoi_expr}" == "X[2, 4]/4 - X[4, 4]/2 + X[6, 4]/4"
@@ -344,6 +347,7 @@ def test_findiff():
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "findiff(findiff(x,order=1,accuracy=2,type=0,dx=1,axis=0),order=1,accuracy=2,type=0,dx=1,axis=1)",
         valid_5x5_neighbourhood,
+        "abs",
         0,
     )
     assert f"{safeguard._qoi_expr}" == "X[3, 3]/4 - X[3, 5]/4 - X[5, 3]/4 + X[5, 5]/4"
@@ -355,10 +359,6 @@ def test_findiff():
 
 
 def test_matmul():
-    from compression_safeguards.safeguards.stencil.qoi.eb import (
-        StencilQuantityOfInterestErrorBoundSafeguard,
-    )
-
     data = np.arange(16, dtype=float).reshape(4, 4)
     valid_3x3_neighbourhood = [
         dict(axis=0, before=1, after=1, boundary="valid"),
@@ -368,6 +368,7 @@ def test_matmul():
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "matmul(A[[-1, -2, -3]], matmul(X, tr(A[[1, 2, 3]])))[0,0]",
         valid_3x3_neighbourhood,
+        "abs",
         0,
     )
     assert (
@@ -382,13 +383,10 @@ def test_matmul():
 
 
 def test_indexing():
-    from compression_safeguards.safeguards.stencil.qoi.eb import (
-        StencilQuantityOfInterestErrorBoundSafeguard,
-    )
-
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "X[I-1] + X[I+2]",
         [dict(axis=0, before=1, after=4, boundary="valid")],
+        "abs",
         0,
     )
     assert f"{safeguard._qoi_expr}" == "X[0] + X[3]"
@@ -399,6 +397,7 @@ def test_indexing():
             dict(axis=0, before=1, after=1, boundary="valid"),
             dict(axis=1, before=1, after=1, boundary="valid"),
         ],
+        "abs",
         0,
     )
     assert f"{safeguard._qoi_expr}" == "X[1, 1]"
@@ -409,6 +408,7 @@ def test_indexing():
             dict(axis=0, before=1, after=1, boundary="valid"),
             dict(axis=1, before=1, after=1, boundary="valid"),
         ],
+        "abs",
         0,
     )
     assert f"{safeguard._qoi_expr}" == "X[0, 0]"
@@ -419,6 +419,7 @@ def test_indexing():
             dict(axis=0, before=1, after=1, boundary="valid"),
             dict(axis=1, before=1, after=1, boundary="valid"),
         ],
+        "abs",
         0,
     )
     assert f"{safeguard._qoi_expr}" == "X[0, 1]/4 + X[1, 0]/4 + X[1, 2]/4 + X[2, 1]/4"
@@ -429,6 +430,7 @@ def test_indexing():
             dict(axis=0, before=1, after=1, boundary="valid"),
             dict(axis=1, before=1, after=1, boundary="valid"),
         ],
+        "abs",
         0,
     )
     assert (
@@ -441,9 +443,6 @@ def test_lambdify_indexing():
     import inspect
 
     from compression_safeguards.safeguards._qois.compile import sympy_expr_to_numpy
-    from compression_safeguards.safeguards.stencil.qoi.eb import (
-        StencilQuantityOfInterestErrorBoundSafeguard,
-    )
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "asum(X * A[[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])",
@@ -451,6 +450,7 @@ def test_lambdify_indexing():
             dict(axis=0, before=1, after=1, boundary="valid"),
             dict(axis=1, before=1, after=1, boundary="valid"),
         ],
+        "abs",
         0,
     )
 
