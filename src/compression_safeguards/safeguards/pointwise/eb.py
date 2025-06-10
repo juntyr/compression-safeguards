@@ -15,6 +15,7 @@ from ...utils.cast import (
     _isinf,
     _isnan,
     _nan_to_zero,
+    _sign,
     as_bits,
     from_float,
     from_total_order,
@@ -199,49 +200,9 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         data_float: np.ndarray = to_float(data)
         decoded_float: np.ndarray = to_float(decoded)
 
-        match self._type:
-            case ErrorBound.abs:
-                with np.errstate(
-                    divide="ignore", over="ignore", under="ignore", invalid="ignore"
-                ):
-                    eb_abs: np.ndarray = to_finite_float(self._eb, data_float.dtype)
-                assert eb_abs >= 0
-
-                finite_ok = np.abs(data_float - decoded_float) <= eb_abs
-            case ErrorBound.rel:
-                with np.errstate(
-                    divide="ignore", over="ignore", under="ignore", invalid="ignore"
-                ):
-                    eb_rel_as_abs: np.ndarray = to_finite_float(
-                        self._eb,
-                        data_float.dtype,
-                        map=lambda eb_rel: np.abs(data_float) * eb_rel,
-                    )
-                    eb_rel_as_abs = _nan_to_zero(eb_rel_as_abs)
-                assert np.all((eb_rel_as_abs >= 0) & _isfinite(eb_rel_as_abs))
-
-                finite_ok = np.abs(data_float - decoded_float) <= eb_rel_as_abs
-            case ErrorBound.ratio:
-                with np.errstate(
-                    divide="ignore", over="ignore", under="ignore", invalid="ignore"
-                ):
-                    eb_ratio: np.ndarray = to_finite_float(self._eb, data_float.dtype)
-                assert eb_ratio >= 1.0
-
-                finite_ok = (np.sign(data) == np.sign(decoded)) & (
-                    np.where(
-                        data == 0,
-                        decoded == 0,
-                        np.where(
-                            np.abs(data) > np.abs(decoded),
-                            data_float / decoded_float,
-                            decoded_float / data_float,
-                        )
-                        <= eb_ratio,
-                    )
-                )
-            case _:
-                assert_never(self._type)
+        finite_ok = _compute_finite_absolute_error(
+            self._type, data_float, decoded_float
+        ) <= _compute_finite_absolute_error_bound(self._type, self._eb, data_float)
 
         # bitwise equality for inf and NaNs (unless equal_nan)
         same_bits = as_bits(data) == as_bits(decoded)
@@ -282,56 +243,21 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             Union of intervals in which the error bound is upheld.
         """
 
-        data_float: np.ndarray = to_float(data)
+        dataf = data.flatten()
 
-        match self._type:
-            case ErrorBound.abs:
-                with np.errstate(
-                    divide="ignore", over="ignore", under="ignore", invalid="ignore"
-                ):
-                    eb_abs: np.ndarray = to_finite_float(self._eb, data_float.dtype)
-                assert eb_abs >= 0
+        valid = (
+            Interval.empty_like(dataf)
+            .preserve_inf(dataf)
+            .preserve_nan(dataf, equal_nan=self._equal_nan)
+        )
 
-                return _compute_safe_eb_diff_interval(
-                    data, data_float, -eb_abs, eb_abs, equal_nan=self._equal_nan
-                ).into_union()
-            case ErrorBound.rel:
-                with np.errstate(
-                    divide="ignore", over="ignore", under="ignore", invalid="ignore"
-                ):
-                    eb_rel_as_abs: np.ndarray = to_finite_float(
-                        self._eb,
-                        data_float.dtype,
-                        map=lambda eb_rel: np.abs(data_float) * eb_rel,
-                    )
-                    eb_rel_as_abs = _nan_to_zero(eb_rel_as_abs)
-                assert np.all((eb_rel_as_abs >= 0) & _isfinite(eb_rel_as_abs))
+        lower, upper = _apply_finite_error_bound(
+            self._type, self._eb, data, to_float(data)
+        )
 
-                valid = _compute_safe_eb_diff_interval(
-                    data,
-                    data_float,
-                    -eb_rel_as_abs,
-                    eb_rel_as_abs,
-                    equal_nan=self._equal_nan,
-                )
+        Lower(lower) <= valid[_isfinite(dataf)] <= Upper(upper)
 
-                # special case zero to handle +0.0 and -0.0
-                dataf = data.flatten()
-                Lower(dataf) <= valid[dataf == 0] <= Upper(dataf)
-
-                return valid.into_union()
-            case ErrorBound.ratio:
-                with np.errstate(
-                    divide="ignore", over="ignore", under="ignore", invalid="ignore"
-                ):
-                    eb_ratio: np.ndarray = to_finite_float(self._eb, data_float.dtype)
-                assert eb_ratio >= 1.0
-
-                return _compute_safe_eb_ratio_interval(
-                    data, data_float, eb_ratio, equal_nan=self._equal_nan
-                ).into_union()
-            case _:
-                assert_never(self._type)
+        return valid.into_union()
 
     def get_config(self) -> dict:
         """
@@ -349,6 +275,171 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             eb=self._eb,
             equal_nan=self._equal_nan,
         )
+
+
+def _compute_finite_absolute_error_bound(
+    type: ErrorBound,
+    eb: int | float,
+    data_float: np.ndarray[S, np.dtype[F]],
+) -> np.ndarray[tuple[()] | S, np.dtype[F]]:
+    match type:
+        case ErrorBound.abs:
+            with np.errstate(
+                divide="ignore", over="ignore", under="ignore", invalid="ignore"
+            ):
+                eb_abs: np.ndarray[tuple[()], np.dtype[F]] = to_finite_float(
+                    eb, data_float.dtype
+                )
+            assert eb_abs >= 0
+
+            return eb_abs
+        case ErrorBound.rel:
+            with np.errstate(
+                divide="ignore", over="ignore", under="ignore", invalid="ignore"
+            ):
+                eb_rel_as_abs: np.ndarray[S, np.dtype[F]] = to_finite_float(
+                    eb,
+                    data_float.dtype,
+                    map=lambda eb_rel: np.abs(data_float) * eb_rel,
+                )
+                eb_rel_as_abs = _nan_to_zero(eb_rel_as_abs)
+            assert np.all((eb_rel_as_abs >= 0) & _isfinite(eb_rel_as_abs))
+
+            return eb_rel_as_abs
+        case ErrorBound.ratio:
+            with np.errstate(
+                divide="ignore", over="ignore", under="ignore", invalid="ignore"
+            ):
+                eb_ratio: np.ndarray[tuple[()], np.dtype[F]] = to_finite_float(
+                    eb, data_float.dtype
+                )
+            assert eb_ratio >= 1.0
+
+            return eb_ratio
+        case _:
+            assert_never(type)
+
+
+def _compute_finite_absolute_error(
+    type: ErrorBound,
+    data_float: np.ndarray[S, np.dtype[F]],
+    decoded_float: np.ndarray[S, np.dtype[F]],
+) -> np.ndarray[S, np.dtype[F]]:
+    match type:
+        case ErrorBound.abs | ErrorBound.rel:
+            return np.abs(data_float - decoded_float)  # type: ignore
+        case ErrorBound.ratio:
+            return np.where(  # type: ignore
+                (data_float == 0) & (decoded_float == 0),
+                np.array(0, dtype=data_float.dtype),
+                np.where(
+                    _sign(data_float) != _sign(decoded_float),
+                    np.array(np.inf, dtype=data_float.dtype),
+                    np.where(
+                        np.abs(data_float) > np.abs(decoded_float),
+                        data_float / decoded_float,
+                        decoded_float / data_float,
+                    ),
+                ),
+            )
+        case _:
+            assert_never(type)
+
+
+def _apply_finite_error_bound(
+    type: ErrorBound,
+    eb: int | float,
+    data: np.ndarray[S, np.dtype[T]],
+    data_float: np.ndarray[S, np.dtype[F]],
+) -> tuple[np.ndarray[S, np.dtype[T]], np.ndarray[S, np.dtype[T]]]:
+    eb_float = _compute_finite_absolute_error_bound(type, eb, data_float)
+
+    match type:
+        case ErrorBound.abs | ErrorBound.rel:
+            with np.errstate(
+                divide="ignore", over="ignore", under="ignore", invalid="ignore"
+            ):
+                lower = from_float(data_float - eb_float, data.dtype)
+                upper = from_float(data_float + eb_float, data.dtype)
+
+            # correct rounding errors in the lower and upper bound
+            with np.errstate(
+                divide="ignore", over="ignore", under="ignore", invalid="ignore"
+            ):
+                lower_outside_eb = (data_float - to_float(lower)) > eb_float
+                upper_outside_eb = (to_float(upper) - data_float) > eb_float
+
+            lower = from_total_order(
+                to_total_order(lower) + lower_outside_eb,
+                data.dtype,
+            )
+            upper = from_total_order(
+                to_total_order(upper) - upper_outside_eb,
+                data.dtype,
+            )
+
+            # a zero-error bound must preserve exactly, e.g. even for -0.0
+            if np.any(eb == 0):
+                lower = np.where(eb == 0, data, lower)
+                upper = np.where(eb == 0, data, upper)
+        case ErrorBound.ratio:
+            with np.errstate(
+                divide="ignore", over="ignore", under="ignore", invalid="ignore"
+            ):
+                data_mul, data_div = (
+                    from_float(data_float * eb_float, data.dtype),
+                    from_float(data_float / eb_float, data.dtype),
+                )
+            lower = np.where(data < 0, data_mul, data_div)
+            upper = np.where(data < 0, data_div, data_mul)
+
+            # correct rounding errors in the lower and upper bound
+            with np.errstate(
+                divide="ignore", over="ignore", under="ignore", invalid="ignore"
+            ):
+                lower_outside_eb = (
+                    np.abs(
+                        np.where(
+                            data < 0,
+                            to_float(lower) / data_float,
+                            data_float / to_float(lower),
+                        )
+                    )
+                    > eb_float
+                )
+                upper_outside_eb = (
+                    np.abs(
+                        np.where(
+                            data < 0,
+                            data_float / to_float(upper),
+                            to_float(upper) / data_float,
+                        )
+                    )
+                    > eb_float
+                )
+
+            lower = from_total_order(
+                to_total_order(lower) + lower_outside_eb,
+                data.dtype,
+            )
+            upper = from_total_order(
+                to_total_order(upper) - upper_outside_eb,
+                data.dtype,
+            )
+
+            # a ratio of 1 bound must preserve exactly, e.g. even for -0.0
+            if np.any(eb == 1):
+                lower = np.where(eb == 1, data, lower)
+                upper = np.where(eb == 1, data, upper)
+        case _:
+            assert_never(type)
+
+    if type in (ErrorBound.rel, ErrorBound.ratio):
+        # special case zero to handle +0.0 and -0.0
+        lower = np.where(data == 0, data, lower)
+        upper = np.where(data == 0, data, upper)
+
+    return (lower, upper)
 
 
 def _compute_safe_eb_diff_interval(
@@ -397,68 +488,5 @@ def _compute_safe_eb_diff_interval(
         Lower(dataf) <= valid[_isfinite(dataf) & (eb_lowerf == 0)]
     if np.any(eb_upperf == 0):
         valid[_isfinite(dataf) & (eb_upperf == 0)] <= Upper(dataf)
-
-    return valid
-
-
-def _compute_safe_eb_ratio_interval(
-    data: np.ndarray[S, np.dtype[T]],
-    data_float: np.ndarray[S, np.dtype[F]],
-    eb_ratio: np.ndarray[tuple[()], np.dtype[F]],
-    equal_nan: bool,
-) -> Interval[T, int]:
-    dataf: np.ndarray[tuple[int], np.dtype[T]] = data.flatten()
-    dataf_float: np.ndarray[tuple[int], np.dtype[F]] = data_float.flatten()
-
-    valid = (
-        Interval.empty_like(dataf)
-        .preserve_inf(dataf)
-        .preserve_nan(dataf, equal_nan=equal_nan)
-    )
-
-    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        data_mul, data_div = (
-            from_float(dataf_float * eb_ratio, dataf.dtype),
-            from_float(dataf_float / eb_ratio, dataf.dtype),
-        )
-        Lower(np.where(dataf < 0, data_mul, data_div)) <= valid[
-            _isfinite(dataf)
-        ] <= Upper(np.where(dataf < 0, data_div, data_mul))
-
-    # correct rounding errors in the lower and upper bound
-    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        lower_bound_outside_eb_ratio = (
-            np.abs(
-                np.where(
-                    dataf < 0,
-                    to_float(valid._lower) / dataf_float,
-                    dataf_float / to_float(valid._lower),
-                )
-            )
-            > eb_ratio
-        )
-        upper_bound_outside_eb_ratio = (
-            np.abs(
-                np.where(
-                    dataf < 0,
-                    dataf_float / to_float(valid._upper),
-                    to_float(valid._upper) / dataf_float,
-                )
-            )
-            > eb_ratio
-        )
-
-    valid._lower[_isfinite(dataf)] = from_total_order(
-        to_total_order(valid._lower) + lower_bound_outside_eb_ratio,
-        dataf.dtype,
-    )[_isfinite(dataf)]
-    valid._upper[_isfinite(dataf)] = from_total_order(
-        to_total_order(valid._upper) - upper_bound_outside_eb_ratio,
-        dataf.dtype,
-    )[_isfinite(dataf)]
-
-    # a ratio of 1 bound must preserve exactly, e.g. even for -0.0
-    if np.any(eb_ratio == 1):
-        Lower(dataf) <= valid[_isfinite(dataf) & (eb_ratio == 1)] <= Upper(dataf)
 
     return valid
