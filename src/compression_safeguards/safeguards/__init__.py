@@ -31,11 +31,10 @@ class SafeguardKind(Enum):
     sign = SignPreservingSafeguard
     """Enforce that the sign (-1, 0, +1) of each element is preserved."""
 
-    # pointwise error bounds
+    # error bounds
     eb = ErrorBoundSafeguard
     """Enforce a pointwise error bound."""
 
-    # quantity of interest error bounds
     qoi_eb_pw = PointwiseQuantityOfInterestErrorBoundSafeguard
     """Enforce an error bound on a pointwise derived quantity of interest."""
 

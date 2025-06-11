@@ -170,9 +170,10 @@ sg = Safeguards(safeguards=[
 ### Regionally varying safeguards using late-bound parameters
 
 By default, all safeguards apply the same safety guarantees across the entire
-data domain. This package supports two approaches for varying the guarantees.
+data domain. This package supports two approaches for regionally varying the
+guarantees, i.e. applying different guarantees to different data regions.
 
-First, the select combinator can be used to switch between two or more
+First, the `select` combinator can be used to switch between two or more
 safeguards (or safeguard combinations) using a selection indices array. Unlike
 normal safeguard parameters, this selector is a late-bound parameter whose
 value is not specified during safeguard initialisation but only later when the
@@ -227,13 +228,13 @@ decompressed = sg.apply_correction(decompressed, correction)
 It is worth noting that the late-bound parameters are only needed at
 compression time, decompression is unchanged.
 
-While this first method can combine over any safeguards, it should only be used
-to select between a small number of different safeguards.
+While this first method can combine over any safeguards, it is only convenient
+for selecting between a small number of different safeguards.
 
 For the error bound safeguards (pointwise and on quantities of interest), the
-error bounds can be provided as late-bound parameters directly to allow for
+error bounds themselves can be provided as late-bound parameters to allow for
 smoothly varying error bounds across the data domain. The above example could
-be equivalently expressed as:
+then be equivalently expressed as:
 
 <!--
 ```py
@@ -250,6 +251,7 @@ from compression_safeguards import Safeguards
 from compression_safeguards.utils.bindings import Bindings
 
 sg = Safeguards(safeguards=[
+    # absolute error bound with a late-bound "eb" parameter
     dict(kind="eb", type="abs", eb="eb"),
 ])
 

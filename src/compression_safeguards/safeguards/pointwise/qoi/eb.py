@@ -114,6 +114,18 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         "V", "[", '"', ident, '"', "]"    (* variable *)
     ;
 
+    ident   =
+        ( letter | "_" )                  (* identifier *)
+      , { letter | digit | "_" }
+    ;
+    letter  =
+        "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k"
+      | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v"
+      | "w" | "x" | "y" | "z" | "A" | "B" | "C" | "D" | "E" | "F" | "G"
+      | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R"
+      | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
+    ;
+
     let     =
         "let", "(",
             var, ",", expr, ",", expr     (* let var=expr in expr scope *)
@@ -622,7 +634,7 @@ _QOI_ATOM_PATTERN = (
     + r"".join(rf"|(?:{f})" for f in MATH_FUNCTIONS)
     + r"".join(rf"|(?:{v})" for v in VARS_FUNCTIONS)
     + r"".join(
-        rf'|(?:{v}{QOI_WHITESPACE_PATTERN.pattern}*\[{QOI_WHITESPACE_PATTERN.pattern}*"[a-zA-Z_][a-zA-Z0-9]*"{QOI_WHITESPACE_PATTERN.pattern}*\])'
+        rf'|(?:{v}{QOI_WHITESPACE_PATTERN.pattern}*\[{QOI_WHITESPACE_PATTERN.pattern}*"[a-zA-Z_][a-zA-Z0-9_]*"{QOI_WHITESPACE_PATTERN.pattern}*\])'
         for v in VARS_CONSTRUCTORS
     )
     + r")"

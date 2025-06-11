@@ -1,12 +1,12 @@
 import sympy as sp
 
 
-def let(name: sp.Symbol, value: sp.Basic, within: sp.Basic) -> sp.Basic:
+def let(name: sp.Symbol, value: sp.Basic, within: sp.Basic, /) -> sp.Basic:
     assert (
         isinstance(name, sp.Symbol)
         and name.name.startswith("V[")
         and name.name.endswith("]")
-    ), 'let name must be a V["var"] expression'
+    ), 'let name must be a `V["var"]` expression'
     assert isinstance(value, sp.Basic), "let value must be an expression"
     assert isinstance(within, sp.Basic), "let within must be an expression"
     return within.subs(name, value)
