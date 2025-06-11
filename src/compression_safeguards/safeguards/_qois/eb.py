@@ -126,14 +126,14 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         eal = np.where(
             (eb_expr_lower == 0),
             zero,
-            np.exp(exprv + eb_expr_lower) - argv,
+            np.minimum(np.exp(exprv + eb_expr_lower) - argv, 0),
         )
         eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
 
         eau = np.where(
             (eb_expr_upper == 0),
             zero,
-            np.exp(exprv + eb_expr_upper) - argv,
+            np.maximum(0, np.exp(exprv + eb_expr_upper) - argv),
         )
         eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
 
@@ -176,14 +176,14 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         eal = np.where(
             (eb_expr_lower == 0),
             zero,
-            np.log(np.maximum(zero, exprv + eb_expr_lower)) - argv,
+            np.minimum(np.log(np.maximum(0, exprv + eb_expr_lower)) - argv, 0),
         )
         eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
 
         eau = np.where(
             (eb_expr_upper == 0),
             zero,
-            np.log(np.maximum(zero, exprv + eb_expr_upper)) - argv,
+            np.maximum(0, np.log(np.maximum(0, exprv + eb_expr_upper)) - argv),
         )
         eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
 
@@ -238,14 +238,18 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
             zero,
             # we need to compare to asin(sin(...)) instead of ... to account
             #  for asin's output domain
-            np.asin(np.maximum(-1, exprv + eb_expr_lower)) - np.asin(exprv),
+            np.minimum(
+                np.asin(np.maximum(-1, exprv + eb_expr_lower)) - np.asin(exprv), 0
+            ),
         )
         eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
 
         eau = np.where(
             (eb_expr_upper == 0),
             zero,
-            np.asin(np.minimum(exprv + eb_expr_upper, 1)) - np.asin(exprv),
+            np.maximum(
+                0, np.asin(np.minimum(exprv + eb_expr_upper, 1)) - np.asin(exprv)
+            ),
         )
         eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
 

@@ -39,10 +39,14 @@ def check_all_codecs(data: np.ndarray, qoi: str):
             ("ratio", 1.01),
             ("ratio", 1.0),
         ]:
-            encode_decode(
-                data,
-                safeguards=[dict(kind="qoi_eb_pw", qoi=qoi, type=type, eb=eb)],
-            )
+            try:
+                encode_decode(
+                    data,
+                    safeguards=[dict(kind="qoi_eb_pw", qoi=qoi, type=type, eb=eb)],
+                )
+            except Exception as err:
+                print(encode_decode, qoi, type, eb)
+                raise err
 
 
 def check_empty(qoi: str):
