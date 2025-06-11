@@ -45,13 +45,13 @@ from ..._qois.re import (
 )
 from ..._qois.vars import CONSTRUCTORS as VARS_CONSTRUCTORS
 from ..._qois.vars import FUNCTIONS as VARS_FUNCTIONS
-from ...pointwise.eb import (
+from ...eb import (
     ErrorBound,
+    _apply_finite_qoi_error_bound,
     _check_error_bound,
     _compute_finite_absolute_error,
     _compute_finite_absolute_error_bound,
 )
-from ...pointwise.qoi.eb import _apply_finite_qoi_error_bound
 from .. import (
     BoundaryCondition,
     NeighbourhoodAxis,

@@ -8,7 +8,6 @@ import re
 
 import numpy as np
 import sympy as sp
-from typing_extensions import assert_never  # MSPV 3.11
 
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import (
@@ -38,13 +37,14 @@ from ..._qois.re import (
 )
 from ..._qois.vars import CONSTRUCTORS as VARS_CONSTRUCTORS
 from ..._qois.vars import FUNCTIONS as VARS_FUNCTIONS
-from ..abc import PointwiseSafeguard
-from ..eb import (
+from ...eb import (
     ErrorBound,
+    _apply_finite_qoi_error_bound,
     _check_error_bound,
     _compute_finite_absolute_error,
     _compute_finite_absolute_error_bound,
 )
+from ..abc import PointwiseSafeguard
 from . import PointwiseExpr
 
 
@@ -582,107 +582,6 @@ def _compute_data_eb_for_qoi_eb(
     )
 
     return tl, tu
-
-
-def _apply_finite_qoi_error_bound(
-    type: ErrorBound,
-    eb: int | float | np.ndarray[S, np.dtype[F]],
-    qoi_float: np.ndarray[S, np.dtype[F]],
-) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
-    eb_float = _compute_finite_absolute_error_bound(type, eb, qoi_float)
-
-    match type:
-        case ErrorBound.abs | ErrorBound.rel:
-            with np.errstate(
-                divide="ignore", over="ignore", under="ignore", invalid="ignore"
-            ):
-                lower: np.ndarray[S, np.dtype[F]] = qoi_float - eb_float
-                upper: np.ndarray[S, np.dtype[F]] = qoi_float + eb_float
-
-            # correct rounding errors in the lower and upper bound
-            with np.errstate(
-                divide="ignore", over="ignore", under="ignore", invalid="ignore"
-            ):
-                lower_outside_eb = (qoi_float - lower) > eb_float
-                upper_outside_eb = (upper - qoi_float) > eb_float
-
-            # we can nudge with nextafter since the QoIs are floating point
-            lower = np.where(  # type: ignore
-                lower_outside_eb & _isfinite(qoi_float),
-                _nextafter(lower, qoi_float),
-                lower,
-            )
-            upper = np.where(  # type: ignore
-                upper_outside_eb & _isfinite(qoi_float),
-                _nextafter(upper, qoi_float),
-                upper,
-            )
-
-            # a zero-error bound must preserve exactly, e.g. even for -0.0
-            if np.any(eb == 0):
-                lower = np.where(eb == 0, qoi_float, lower)  # type: ignore
-                upper = np.where(eb == 0, qoi_float, upper)  # type: ignore
-        case ErrorBound.ratio:
-            with np.errstate(
-                divide="ignore", over="ignore", under="ignore", invalid="ignore"
-            ):
-                data_mul, data_div = (
-                    qoi_float * eb_float,
-                    qoi_float / eb_float,
-                )
-            lower = np.where(qoi_float < 0, data_mul, data_div)  # type: ignore
-            upper = np.where(qoi_float < 0, data_div, data_mul)  # type: ignore
-
-            # correct rounding errors in the lower and upper bound
-            with np.errstate(
-                divide="ignore", over="ignore", under="ignore", invalid="ignore"
-            ):
-                lower_outside_eb = (
-                    np.abs(
-                        np.where(
-                            qoi_float < 0,
-                            lower / qoi_float,
-                            qoi_float / lower,
-                        )
-                    )
-                    > eb_float
-                )
-                upper_outside_eb = (
-                    np.abs(
-                        np.where(
-                            qoi_float < 0,
-                            qoi_float / upper,
-                            upper / qoi_float,
-                        )
-                    )
-                    > eb_float
-                )
-
-            # we can nudge with nextafter since the QoIs are floating point
-            lower = np.where(  # type: ignore
-                lower_outside_eb & _isfinite(qoi_float),
-                _nextafter(lower, qoi_float),
-                lower,
-            )
-            upper = np.where(  # type: ignore
-                upper_outside_eb & _isfinite(qoi_float),
-                _nextafter(upper, qoi_float),
-                upper,
-            )
-
-            # a ratio of 1 bound must preserve exactly, e.g. even for -0.0
-            if np.any(eb == 1):
-                lower = np.where(eb == 1, qoi_float, lower)  # type: ignore
-                upper = np.where(eb == 1, qoi_float, upper)  # type: ignore
-        case _:
-            assert_never(type)
-
-    if type in (ErrorBound.rel, ErrorBound.ratio):
-        # special case zero to handle +0.0 and -0.0
-        lower = np.where(qoi_float == 0, qoi_float, lower)  # type: ignore
-        upper = np.where(qoi_float == 0, qoi_float, upper)  # type: ignore
-
-    return (lower, upper)  # type: ignore
 
 
 # pattern of syntactically weakly valid expressions
