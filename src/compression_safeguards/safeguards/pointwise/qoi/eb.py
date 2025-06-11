@@ -36,6 +36,8 @@ from ..._qois.re import (
     QOI_INT_LITERAL_PATTERN,
     QOI_WHITESPACE_PATTERN,
 )
+from ..._qois.vars import CONSTRUCTORS as VARS_CONSTRUCTORS
+from ..._qois.vars import FUNCTIONS as VARS_FUNCTIONS
 from ..abc import PointwiseSafeguard
 from ..eb import (
     ErrorBound,
@@ -72,7 +74,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
     expr    =
         literal
       | const
+      | data
       | var
+      | let
       | unary
       | binary
     ;
@@ -103,7 +107,17 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
       | "pi"                              (* pi *)
     ;
 
-    var     = "x";                        (* pointwise data value *)
+    data    = "x";                        (* pointwise data value *)
+
+    var     =
+        "V", "[", '"', ident, '"', "]"    (* variable *)
+    ;
+
+    let     =
+        "let", "(",
+            var, ",", expr, ",", expr     (* let var=expr in expr scope *)
+      , ")"
+    ;
 
     unary   =
         "(", expr, ")"                    (* parenthesis *)
@@ -223,6 +237,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                     x=self._x,
                     # === constants ===
                     **MATH_CONSTANTS,
+                    # === variables ===
+                    **VARS_CONSTRUCTORS,
+                    **VARS_FUNCTIONS,
                     # === operators ===
                     # poinwise math
                     **MATH_FUNCTIONS,
@@ -688,6 +705,11 @@ _QOI_ATOM_PATTERN = (
     + r"|(?:x)"
     + r"".join(rf"|(?:{c})" for c in MATH_CONSTANTS)
     + r"".join(rf"|(?:{f})" for f in MATH_FUNCTIONS)
+    + r"".join(rf"|(?:{v})" for v in VARS_FUNCTIONS)
+    + r"".join(
+        rf'|(?:{v}{QOI_WHITESPACE_PATTERN.pattern}*\[{QOI_WHITESPACE_PATTERN.pattern}*"[a-zA-Z_][a-zA-Z0-9]*"{QOI_WHITESPACE_PATTERN.pattern}*\])'
+        for v in VARS_CONSTRUCTORS
+    )
     + r")"
 )
 _QOI_SEPARATOR_PATTERN = rf"(?:{QOI_COMMENT_PATTERN.pattern}|(?:[ \t\n\(\),\+\-\*/]))"

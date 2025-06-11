@@ -43,6 +43,8 @@ from ..._qois.re import (
     QOI_INT_LITERAL_PATTERN,
     QOI_WHITESPACE_PATTERN,
 )
+from ..._qois.vars import CONSTRUCTORS as VARS_CONSTRUCTORS
+from ..._qois.vars import FUNCTIONS as VARS_FUNCTIONS
 from ...pointwise.eb import (
     ErrorBound,
     _check_error_bound,
@@ -115,9 +117,11 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     ```ebnf
     expr    =
         literal
-      | const
-      | var
       | array
+      | const
+      | data
+      | var
+      | let
       | unary
       | binary
       | findiff
@@ -156,9 +160,19 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
       | "pi"                              (* pi *)
     ;
 
-    var     =
+    data    =
         "x"                               (* pointwise data value *)
       | "X"                               (* data neighbourhood *)
+    ;
+
+    var     =
+        "V", "[", '"', ident, '"', "]"    (* variable *)
+    ;
+
+    let     =
+        "let", "(",
+            var, ",", expr, ",", expr     (* let var=expr in expr scope *)
+      , ")"
     ;
 
     unary   =
@@ -338,6 +352,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     I=NumPyLikeArray(I),
                     # === constants ===
                     **MATH_CONSTANTS,
+                    # === variables ===
+                    **VARS_CONSTRUCTORS,
+                    **VARS_FUNCTIONS,
                     # === operators ===
                     # poinwise math
                     **MATH_FUNCTIONS,
@@ -998,6 +1015,11 @@ _QOI_ATOM_PATTERN = (
     + r"".join(rf"|(?:{c})" for c in AMATH_CONSTRUCTORS)
     + r"".join(rf"|(?:{f})" for f in AMATH_FUNCTIONS)
     + r"|(?:findiff)"
+    + r"".join(rf"|(?:{v})" for v in VARS_FUNCTIONS)
+    + r"".join(
+        rf'|(?:{v}{QOI_WHITESPACE_PATTERN.pattern}*\[{QOI_WHITESPACE_PATTERN.pattern}*"[a-zA-Z_][a-zA-Z0-9]*"{QOI_WHITESPACE_PATTERN.pattern}*\])'
+        for v in VARS_CONSTRUCTORS
+    )
     + r")"
 )
 _QOI_SEPARATOR_PATTERN = (

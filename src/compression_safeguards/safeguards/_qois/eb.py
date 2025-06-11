@@ -14,6 +14,7 @@ from ...utils.cast import (
 )
 from ...utils.typing import F, S
 from .array import NumPyLikeArray
+from .vars import VariableSymbol
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -94,6 +95,16 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
     # x
     if check_is_x(expr):
         return (eb_expr_lower, eb_expr_upper)
+
+    # unresolved variable
+    if isinstance(expr, VariableSymbol):
+        raise ValueError(
+            f"expression contains unresolved variable {expr}, perhaps you forgot to define it within a let expression"
+        )
+
+    # unresolved index
+    if expr.func is sp.Indexed:
+        raise ValueError("invalid index on variable resulted in unresolved index")
 
     # array
     if expr.func in (sp.Array, NumPyLikeArray):
