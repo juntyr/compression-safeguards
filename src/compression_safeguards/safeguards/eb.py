@@ -128,6 +128,22 @@ def _check_error_bound(
     type: ErrorBound,
     eb: int | float | np.ndarray[S, np.dtype[F]],
 ) -> None:
+    """
+    Check if the error bound value `eb` is valid for the error bound `type`.
+
+    Parameters
+    ----------
+    type : ErrorBound
+        The error bound type.
+    eb : int | float | np.ndarray[S, np.dtype[F]]
+        The error bound value.
+
+    Raises
+    ------
+    AssertionError
+        If the error bound `value` is invalid.
+    """
+
     match type:
         case ErrorBound.abs:
             assert np.all(eb >= 0), (
@@ -148,6 +164,31 @@ def _compute_finite_absolute_error_bound(
     eb: int | float | np.ndarray[S, np.dtype[F]],
     data_float: np.ndarray[S, np.dtype[F]],
 ) -> np.ndarray[tuple[()] | S, np.dtype[F]]:
+    """
+    Compute the actual absolute error bound value, against which the error is
+    compared against, from the error bound `eb` and the data.
+
+    The computation is only defined for finite data elements, i.e. the produced
+    error bound should not be used for non-finite data elements.
+
+    Parameters
+    ----------
+    type : ErrorBound
+        The error bound type.
+    eb : int | float | np.ndarray[S, np.dtype[F]]
+        The error bound value.
+    data_float : np.ndarray[S, np.dtype[F]]
+        The original data array in floating point representation.
+
+    Returns
+    -------
+    eb_abs : np.ndarray[tuple[()] | S, np.dtype[F]]
+        The absolute error bound value.
+
+        The error bound is scalar if `eb` is scalar and the error bound does
+        not depend on the data, otherwise it has the same shape as the data.
+    """
+
     match type:
         case ErrorBound.abs:
             with np.errstate(
@@ -191,7 +232,32 @@ def _compute_finite_absolute_error(
     data_float: np.ndarray[S, np.dtype[F]],
     decoded_float: np.ndarray[S, np.dtype[F]],
 ) -> np.ndarray[S, np.dtype[F]]:
+    """
+    Compute the absolute error value, which is compared against the absolute
+    error bound, from the data and decoded arrays.
+
+    The computation is only defined for finite data elements, i.e. the produced
+    error should not be used for non-finite data or decoded elements.
+
+    Parameters
+    ----------
+    type : ErrorBound
+        The error bound type.
+    data_float : np.ndarray[S, np.dtype[F]]
+        The original data array in floating point representation.
+    decoded_float : np.ndarray[S, np.dtype[F]]
+        The decoded data array in floating point representation.
+
+    Returns
+    -------
+    err_abs : np.ndarray[S, np.dtype[F]]
+        The absolute error value between the original and decoded data.
+    """
+
     match type:
+        # for the relative error bound, we also just return the absolute error
+        #  here since the error bound will include the data value that together
+        #  form a relative error bound
         case ErrorBound.abs | ErrorBound.rel:
             return np.abs(data_float - decoded_float)  # type: ignore
         case ErrorBound.ratio:
@@ -218,6 +284,32 @@ def _apply_finite_error_bound(
     data: np.ndarray[S, np.dtype[T]],
     data_float: np.ndarray[S, np.dtype[F]],
 ) -> tuple[np.ndarray[S, np.dtype[T]], np.ndarray[S, np.dtype[T]]]:
+    """
+    Apply the error bound `eb` to the `data` to produce the inclusive lower and
+    upper bounds within which the error bound is satisfied.
+
+    This function calls `_compute_finite_absolute_error_bound` internally.
+
+    The computation is only defined for finite data elements, i.e. the produced
+    bounds should not be used for non-finite data elements.
+
+    Parameters
+    ----------
+    type : ErrorBound
+        The error bound type.
+    eb : int | float | np.ndarray[S, np.dtype[F]]
+        The error bound value.
+    data : np.ndarray[S, np.dtype[T]]
+        The original data array.
+    data_float : np.ndarray[S, np.dtype[F]]
+        The original data array in floating point representation.
+
+    Returns
+    -------
+    lower, upper : tuple[np.ndarray[S, np.dtype[T]], np.ndarray[S, np.dtype[T]]]
+        The lower and upper bounds within which the error bound is satisfied.
+    """
+
     eb_float = _compute_finite_absolute_error_bound(type, eb, data_float)
 
     match type:
@@ -313,6 +405,34 @@ def _apply_finite_qoi_error_bound(
     eb: int | float | np.ndarray[S, np.dtype[F]],
     qoi_float: np.ndarray[S, np.dtype[F]],
 ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+    """
+    Apply the error bound `eb` to the QoI array to produce the inclusive lower
+    and upper bounds within which the error bound is satisfied.
+
+    This function calls `_compute_finite_absolute_error_bound` internally.
+
+    Unlike `_apply_finite_error_bound`, which is applied in the original data
+    space, this function is applied in floating point QoI space and uses a
+    different approach for correcting rounding errors with nudging.
+
+    The computation is only defined for finite data elements, i.e. the produced
+    bounds should not be used for non-finite QoI elements.
+
+    Parameters
+    ----------
+    type : ErrorBound
+        The error bound type.
+    eb : int | float | np.ndarray[S, np.dtype[F]]
+        The error bound value.
+    qoi_float : np.ndarray[S, np.dtype[F]]
+        The floating point QoI array.
+
+    Returns
+    -------
+    lower, upper : tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]
+        The lower and upper bounds within which the error bound is satisfied.
+    """
+
     eb_float = _compute_finite_absolute_error_bound(type, eb, qoi_float)
 
     match type:
