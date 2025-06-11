@@ -166,6 +166,116 @@ sg = Safeguards(safeguards=[
     ]),
 ])
 ```
+
+### Regionally varying safeguards using late-bound parameters
+
+By default, all safeguards apply the same safety guarantees across the entire
+data domain. This package supports two approaches for varying the guarantees.
+
+First, the select combinator can be used to switch between two or more
+safeguards (or safeguard combinations) using a selection indices array. Unlike
+normal safeguard parameters, this selector is a late-bound parameter whose
+value is not specified during safeguard initialisation but only later when the
+safeguard is applied:
+
+<!--
+```py
+import numpy as np
+def compress(data):
+    return data
+def decompress(data):
+    return np.zeros_like(data)
+```
+-->
+<!--pytest-codeblocks:cont-->
+```py
+from compression_safeguards import Safeguards
+from compression_safeguards.utils.bindings import Bindings
+
+sg = Safeguards(safeguards=[
+    # select between a coarser, medium, and finer absolute error bound
+    #  safeguard based on the late-bound "mask" parameter
+    dict(kind="select", selector="mask", safeguards=[
+        dict(kind="eb", type="abs", eb=1.0),
+        dict(kind="eb", type="abs", eb=0.1),
+        dict(kind="eb", type="abs", eb=0.01),
+    ]),
+])
+
+# generate some random data to compress
+data = np.random.normal(size=(10, 10, 10))
+
+## compression (now with late-bound parameters)
+
+# compress and decompress the data using *some* compressor
+compressed = compress(data)
+decompressed = decompress(compressed)
+
+# compute the correction that the safeguards would need to apply to
+# guarantee the selected safety requirements
+correction = sg.compute_correction(data, decompressed, late_bound=Bindings(
+    # bind the selection mask that selects between the three safeguards
+    # the mask must be broadcastable to the data shape
+    mask=np.array([0, 0, 0, 1, 1, 1, 1, 2, 2, 2]).reshape((1, 10, 1)),
+))
+
+## decompression (as before)
+decompressed = decompress(compressed)
+decompressed = sg.apply_correction(decompressed, correction)
+```
+
+It is worth noting that the late-bound parameters are only needed at
+compression time, decompression is unchanged.
+
+While this first method can combine over any safeguards, it should only be used
+to select between a small number of different safeguards.
+
+For the error bound safeguards (pointwise and on quantities of interest), the
+error bounds can be provided as late-bound parameters directly to allow for
+smoothly varying error bounds across the data domain. The above example could
+be equivalently expressed as:
+
+<!--
+```py
+import numpy as np
+def compress(data):
+    return data
+def decompress(data):
+    return np.zeros_like(data)
+```
+-->
+<!--pytest-codeblocks:cont-->
+```py
+from compression_safeguards import Safeguards
+from compression_safeguards.utils.bindings import Bindings
+
+sg = Safeguards(safeguards=[
+    dict(kind="eb", type="abs", eb="eb"),
+])
+
+# generate some random data to compress
+data = np.random.normal(size=(10, 10, 10))
+
+## compression (now with late-bound parameters)
+
+# compress and decompress the data using *some* compressor
+compressed = compress(data)
+decompressed = decompress(compressed)
+
+# compute the correction that the safeguards would need to apply to
+# guarantee the selected safety requirements
+correction = sg.compute_correction(data, decompressed, late_bound=Bindings(
+    # bind the late-bound absolute error bound
+    # the bound must be broadcastable to the data shape
+    eb=np.array([
+        1.0, 1.0, 1.0, 0.1, 0.1, 0.1, 0.1, 0.01, 0.01, 0.01,
+    ]).reshape((1, 10, 1)),
+))
+
+## decompression (as before)
+decompressed = decompress(compressed)
+decompressed = sg.apply_correction(decompressed, correction)
+```
 """
 
 __all__ = ["Safeguards", "SafeguardKind"]
