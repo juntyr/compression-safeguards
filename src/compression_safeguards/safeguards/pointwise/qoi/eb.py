@@ -5,6 +5,7 @@ Pointwise quantity of interest (QoI) error bound safeguard.
 __all__ = ["PointwiseQuantityOfInterestErrorBoundSafeguard"]
 
 import re
+from collections.abc import Set
 
 import numpy as np
 import sympy as sp
@@ -272,6 +273,21 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         self._qoi = qoi
         self._qoi_expr = qoi_expr
+
+    @property
+    def late_bound(self) -> Set[Parameter]:
+        """
+        The set of late-bound parameters that this safeguard has.
+
+        Late-bound parameters are only bound when checking and applying the
+        safeguard, in contrast to the normal early-bound parameters that are
+        configured during safeguard initialisation.
+
+        Late-bound parameters can be used for parameters that depend on the
+        specific data that is to be safeguarded.
+        """
+
+        return frozenset([self._eb]) if isinstance(self._eb, Parameter) else frozenset()
 
     def evaluate_qoi(
         self, data: np.ndarray[S, np.dtype[T]]

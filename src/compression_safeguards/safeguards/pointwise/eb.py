@@ -4,6 +4,8 @@ Error bound safeguard.
 
 __all__ = ["ErrorBoundSafeguard"]
 
+from collections.abc import Set
+
 import numpy as np
 
 from ...utils.bindings import Bindings, Parameter
@@ -72,6 +74,21 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             self._eb = eb
 
         self._equal_nan = equal_nan
+
+    @property
+    def late_bound(self) -> Set[Parameter]:
+        """
+        The set of late-bound parameters that this safeguard has.
+
+        Late-bound parameters are only bound when checking and applying the
+        safeguard, in contrast to the normal early-bound parameters that are
+        configured during safeguard initialisation.
+
+        Late-bound parameters can be used for parameters that depend on the
+        specific data that is to be safeguarded.
+        """
+
+        return frozenset([self._eb]) if isinstance(self._eb, Parameter) else frozenset()
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
