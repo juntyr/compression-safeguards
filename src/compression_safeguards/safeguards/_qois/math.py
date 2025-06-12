@@ -1,6 +1,7 @@
 import sympy as sp
 
 from .array import NumPyLikeArray
+from .symfunc import trunc as sp_trunc
 
 
 def sqrt(x, /):
@@ -27,6 +28,24 @@ def log(x, /, *, base):
     else:
         ln_base = sp.ln(base)
     return ln_x / ln_base
+
+
+def floor(x, /):
+    if isinstance(x, NumPyLikeArray):
+        return x.applyfunc(sp.floor)
+    return sp.floor(x)
+
+
+def ceil(x, /):
+    if isinstance(x, NumPyLikeArray):
+        return x.applyfunc(sp.ceiling)
+    return sp.ceiling(x)
+
+
+def trunc(x, /):
+    if isinstance(x, NumPyLikeArray):
+        return x.applyfunc(sp_trunc)
+    return sp_trunc(x)
 
 
 def sin(x, /):
@@ -184,6 +203,10 @@ FUNCTIONS = dict(
     exp=exp,
     ln=ln,
     log=log,
+    # rounding functions
+    floor=floor,
+    ceil=ceil,
+    trunc=trunc,
     # trigonometric functions
     sin=sin,
     cos=cos,

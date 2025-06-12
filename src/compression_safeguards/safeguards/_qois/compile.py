@@ -115,4 +115,8 @@ def _create_sympy_numpy_printer_class(
             printed = f"{expr.name}[..., {', '.join([str(i) for i in indices])}]"
             return printed
 
+        def _print_trunc(self, expr):
+            (x,) = expr.args
+            return f"trunc({self._print(x)})"
+
     return NumPyDtypePrinter
