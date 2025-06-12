@@ -75,7 +75,7 @@ def create_findiff_for_neighbourhood(
 
         return sp.Add(
             *[apply_findiff(expr, axis, o) * c for o, c in zip(offsets, coefficients)]
-        )
+        ) / (dx**order)
 
     return findiff
 
