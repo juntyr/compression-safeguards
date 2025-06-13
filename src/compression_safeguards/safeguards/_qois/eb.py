@@ -824,7 +824,7 @@ def ensure_bounded_derived_error(
                 expr(eb_x_guess) == exprv,
                 _isnan(expr(eb_x_guess)),
             ),
-        )
+        ) & (eb_x_guess != 0)
 
     eb_exceeded = is_eb_exceeded(eb_x_guess)
 
