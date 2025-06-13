@@ -218,9 +218,10 @@ def test_sign(check):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_rounding(check):
-    check("floor(x)")
-    check("ceil(x)")
-    check("trunc(x)")
+    check("floor(x) * floor(1.5)")
+    check("ceil(x) * ceil(1.5)")
+    check("trunc(x) * trunc(1.5)")
+    check("round_ties_even(x) * round_ties_even(1.5)")
 
 
 @pytest.mark.parametrize("check", CHECKS)

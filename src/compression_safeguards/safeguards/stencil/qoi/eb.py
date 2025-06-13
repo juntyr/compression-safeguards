@@ -197,6 +197,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
       | "floor", "(", expr, ")"           (* round down, towards negative infinity *)
       | "ceil", "(", expr, ")"            (* round up, towards positive infinity *)
       | "trunc", "(", expr, ")"           (* round towards zero *)
+      | "round_ties_even", "(", expr, ")" (* round to nearest integer, ties to even *)
       | "asum", "(", expr, ")"            (* sum over an array *)
       | "tr", "(", expr, ")"              (* transpose of a matrix (2d array) *)
       | "sin", "(", expr, ")"             (* sine sin(x) *)

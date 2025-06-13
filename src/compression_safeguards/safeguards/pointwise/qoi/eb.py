@@ -142,6 +142,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
       | "floor", "(", expr, ")"           (* round down, towards negative infinity *)
       | "ceil", "(", expr, ")"            (* round up, towards positive infinity *)
       | "trunc", "(", expr, ")"           (* round towards zero *)
+      | "round_ties_even", "(", expr, ")" (* round to nearest integer, ties to even *)
       | "sin", "(", expr, ")"             (* sine sin(x) *)
       | "cos", "(", expr, ")"             (* cosine cos(x) *)
       | "tan", "(", expr, ")"             (* tangent tan(x) *)

@@ -1,6 +1,7 @@
 import sympy as sp
 
 from .array import NumPyLikeArray
+from .symfunc import round_ties_even as sp_round_ties_even
 from .symfunc import sign as sp_sign
 from .symfunc import trunc as sp_trunc
 
@@ -53,6 +54,12 @@ def trunc(x, /):
     if isinstance(x, NumPyLikeArray):
         return x.applyfunc(sp_trunc)
     return sp_trunc(x)
+
+
+def round_ties_even(x, /):
+    if isinstance(x, NumPyLikeArray):
+        return x.applyfunc(sp_round_ties_even)
+    return sp_round_ties_even(x)
 
 
 def sin(x, /):
@@ -216,6 +223,7 @@ FUNCTIONS = dict(
     floor=floor,
     ceil=ceil,
     trunc=trunc,
+    round_ties_even=round_ties_even,
     # trigonometric functions
     sin=sin,
     cos=cos,

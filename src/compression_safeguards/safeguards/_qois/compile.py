@@ -121,4 +121,8 @@ def _create_sympy_numpy_printer_class(
             (x,) = expr.args
             return f"trunc({self._print(x)})"
 
+        def _print_round_ties_even(self, expr):
+            (x,) = expr.args
+            return f"rint({self._print(x)})"
+
     return NumPyDtypePrinter
