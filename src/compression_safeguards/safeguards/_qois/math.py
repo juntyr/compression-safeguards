@@ -1,6 +1,7 @@
 import sympy as sp
 
 from .array import NumPyLikeArray
+from .symfunc import sign as sp_sign
 from .symfunc import trunc as sp_trunc
 
 
@@ -28,6 +29,12 @@ def log(x, /, *, base):
     else:
         ln_base = sp.ln(base)
     return ln_x / ln_base
+
+
+def sign(x, /):
+    if isinstance(x, NumPyLikeArray):
+        return x.applyfunc(sp_sign)
+    return sp_sign(x)
 
 
 def floor(x, /):
@@ -203,6 +210,8 @@ FUNCTIONS = dict(
     exp=exp,
     ln=ln,
     log=log,
+    # special functions
+    sign=sign,
     # rounding functions
     floor=floor,
     ceil=ceil,

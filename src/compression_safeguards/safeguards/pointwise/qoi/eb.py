@@ -138,6 +138,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
       | "sqrt", "(", expr, ")"            (* square root *)
       | "ln", "(", expr, ")"              (* natural logarithm *)
       | "exp", "(", expr, ")"             (* exponential e^x *)
+      | "sign", "(", expr, ")"            (* sign function, signed NaN for NaNs *)
       | "floor", "(", expr, ")"           (* round down, towards negative infinity *)
       | "ceil", "(", expr, ")"            (* round up, towards positive infinity *)
       | "trunc", "(", expr, ")"           (* round towards zero *)
@@ -236,7 +237,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             _check_error_bound(self._type, eb)
             self._eb = eb
 
-        self._x = sp.Symbol("x", real=True)
+        self._x = sp.Symbol("x", extended_real=True)
 
         qoi_stripped = QOI_WHITESPACE_PATTERN.sub(
             " ", QOI_COMMENT_PATTERN.sub(" ", qoi)

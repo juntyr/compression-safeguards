@@ -5,15 +5,19 @@ import sympy as sp
 import sympy.tensor.array.expressions  # noqa: F401
 
 from ...utils.cast import (
+    _float128_dtype,
+    _float128_smallest_subnormal,
     _isfinite,
     _isinf,
     _isnan,
     _nan_to_zero,
     _nextafter,
+    _sign,
     to_finite_float,
 )
 from ...utils.typing import F, S
 from .array import NumPyLikeArray
+from .symfunc import sign as sp_sign
 from .symfunc import trunc as sp_trunc
 from .vars import VariableSymbol
 
@@ -235,6 +239,67 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
             xv,
             eb_expr_lower,
             eb_expr_upper,
+        )
+
+    # sign(...)
+    if expr.func is sp_sign and len(expr.args) == 1:
+        # evaluate arg and sign(arg)
+        (arg,) = expr.args
+        argv = evaluate_sympy_expr_to_numpy(arg)
+        exprv = _sign(argv)
+
+        if xv.dtype == _float128_dtype:
+            smallest_subnormal = _float128_smallest_subnormal
+        else:
+            smallest_subnormal = np.finfo(xv.dtype).smallest_subnormal
+
+        argv_lower = np.where(
+            argv < 0, np.array(-np.inf, dtype=xv.dtype), smallest_subnormal
+        )
+        argv_upper = np.where(
+            argv > 0, np.array(np.inf, dtype=xv.dtype), -smallest_subnormal
+        )
+
+        # update the error bounds
+        eal = np.where(
+            (eb_expr_lower == 0) | (exprv == 0),
+            zero,
+            np.minimum(argv_lower - argv, 0),
+        )
+        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
+
+        eau = np.where(
+            (eb_expr_upper == 0),
+            zero,
+            np.maximum(0, argv_upper - argv),
+        )
+        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
+
+        # handle rounding errors in sign(...) early
+        eal = ensure_bounded_derived_error(
+            lambda eal: _sign(argv + eal),
+            exprv,
+            argv,
+            eal,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eau = ensure_bounded_derived_error(
+            lambda eau: _sign(argv + eau),
+            exprv,
+            argv,
+            eau,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eb_arg_lower, eb_arg_upper = eal, eau
+
+        # composition using Lemma 3 from Jiao et al.
+        return compute_data_eb_for_stencil_qoi_eb(
+            arg,
+            xv,
+            eb_arg_lower,  # type: ignore
+            eb_arg_upper,  # type: ignore
         )
 
     # floor(...): round down, towards negative infinity

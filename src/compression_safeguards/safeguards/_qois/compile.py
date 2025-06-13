@@ -5,7 +5,7 @@ import numpy as np
 import sympy as sp
 import sympy.tensor.array.expressions  # noqa: F401
 
-from ...utils.cast import _float128, _float128_dtype, _float128_precision
+from ...utils.cast import _float128, _float128_dtype, _float128_precision, _sign
 
 
 def sympy_expr_to_numpy(
@@ -30,6 +30,8 @@ def sympy_expr_to_numpy(
                 #  but that numpy supports (otherwise sympy polyfills)
                 [
                     dict(
+                        # special functions
+                        sign=_sign,
                         # hyperbolic functions
                         sinh=lambda x: (np.exp(x) - np.exp(-x)) / 2,
                         cosh=lambda x: (np.exp(x) + np.exp(-x)) / 2,

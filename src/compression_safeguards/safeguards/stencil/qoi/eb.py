@@ -193,6 +193,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
       | "sqrt", "(", expr, ")"            (* square root *)
       | "ln", "(", expr, ")"              (* natural logarithm *)
       | "exp", "(", expr, ")"             (* exponential e^x *)
+      | "sign", "(", expr, ")"            (* sign function, signed NaN for NaNs *)
       | "floor", "(", expr, ")"           (* round down, towards negative infinity *)
       | "ceil", "(", expr, ")"            (* round up, towards positive infinity *)
       | "trunc", "(", expr, ")"           (* round towards zero *)
@@ -345,7 +346,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         shape = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
         I = tuple(axis.before for axis in self._neighbourhood)  # noqa: E741
 
-        self._X = sp.tensor.array.expressions.ArraySymbol("X", shape)
+        self._X = sp.tensor.array.expressions.ArraySymbol(
+            sp.Symbol("X", extended_real=True), shape
+        )
         X = self._X.as_explicit()
         X.__class__ = NumPyLikeArray
 

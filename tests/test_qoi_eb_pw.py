@@ -210,6 +210,13 @@ def test_logarithm(check):
 
 
 @pytest.mark.parametrize("check", CHECKS)
+def test_sign(check):
+    check("sign(x)")
+    check("sign(x * 2)")
+    check("sign(e**x)")
+
+
+@pytest.mark.parametrize("check", CHECKS)
 def test_rounding(check):
     check("floor(x)")
     check("ceil(x)")
@@ -316,7 +323,7 @@ def test_lambdify_dtype():
         sympy_expr_to_numpy,
     )
 
-    x = sp.Symbol("x", real=True)
+    x = sp.Symbol("x", extended_real=True)
 
     fn = sympy_expr_to_numpy([x], x + sp.pi + sp.E, np.dtype(np.float16))
 
