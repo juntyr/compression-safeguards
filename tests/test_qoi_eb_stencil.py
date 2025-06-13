@@ -807,3 +807,40 @@ def test_late_bound_eb_ratio():
 
     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
     assert np.all(ok == np.array([True, True, True, True, False, True]).reshape(2, 3))
+
+
+def test_findiff_dx():
+    data = np.array([1, 2, 3], dtype=np.int8)
+    decoded = np.array([0, 0, 0], dtype=np.int8)
+
+    for boundary in BoundaryCondition:
+        safeguards = Safeguards(
+            safeguards=[
+                dict(
+                    kind="qoi_eb_stencil",
+                    qoi="findiff(x, order=1, accuracy=2, type=0, dx=0.1, axis=0)",
+                    neighbourhood=[
+                        dict(
+                            axis=0,
+                            before=1,
+                            after=1,
+                            boundary=boundary,
+                            constant_boundary=4.2
+                            if boundary == BoundaryCondition.constant
+                            else None,
+                        )
+                    ],
+                    type="abs",
+                    eb=1,
+                ),
+            ]
+        )
+
+        correction = safeguards.compute_correction(data, decoded)
+        corrected = safeguards.apply_correction(decoded, correction)
+
+        data_findiff = safeguards.safeguards[0].evaluate_qoi(data)
+        corrected_findiff = safeguards.safeguards[0].evaluate_qoi(corrected)
+
+        assert data_findiff[len(data_findiff) // 2] == 10
+        assert np.abs(10 - corrected_findiff[len(data_findiff) // 2]) <= 1
