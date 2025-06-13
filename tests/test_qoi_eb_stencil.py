@@ -734,6 +734,87 @@ def test_fuzzer_list_assignment_out_of_range():
     )
 
 
+def test_late_bound_broadcast():
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi="x",
+        neighbourhood=[
+            dict(axis=0, before=1, after=1, boundary="valid"),
+            dict(axis=1, before=1, after=1, boundary="valid"),
+        ],
+        type="abs",
+        eb="eb",
+    )
+
+    data = np.arange(16).reshape(4, 4)
+
+    with pytest.raises(ValueError, match="could not be broadcast together"):
+        safeguard.compute_safe_intervals(data, late_bound=Bindings(eb=np.ones((4, 4))))
+
+    safeguard.compute_safe_intervals(data, late_bound=Bindings(eb=np.ones(tuple())))
+    safeguard.compute_safe_intervals(data, late_bound=Bindings(eb=np.ones((1,))))
+    safeguard.compute_safe_intervals(data, late_bound=Bindings(eb=np.ones((1, 1))))
+    safeguard.compute_safe_intervals(data, late_bound=Bindings(eb=np.ones((2, 2))))
+
+    with pytest.raises(ValueError, match="more dimensions"):
+        safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(eb=np.ones((2, 2, 1)))
+        )
+
+
+def test_late_bound_safe_cast():
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi="x",
+        neighbourhood=[
+            dict(axis=0, before=0, after=0, boundary="valid"),
+            dict(axis=1, before=0, after=0, boundary="valid"),
+        ],
+        type="abs",
+        eb="eb",
+    )
+
+    data = np.arange(16, dtype=np.float32).reshape(4, 4)
+
+    safeguard.compute_safe_intervals(data, late_bound=Bindings(eb=data.astype(np.int8)))
+    safeguard.compute_safe_intervals(
+        data, late_bound=Bindings(eb=data.astype(np.uint8))
+    )
+    safeguard.compute_safe_intervals(
+        data, late_bound=Bindings(eb=data.astype(np.int16))
+    )
+    safeguard.compute_safe_intervals(
+        data, late_bound=Bindings(eb=data.astype(np.uint16))
+    )
+
+    with pytest.raises(TypeError, match="Cannot cast"):
+        safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(eb=data.astype(np.int32))
+        )
+    with pytest.raises(TypeError, match="Cannot cast"):
+        safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(eb=data.astype(np.uint32))
+        )
+    with pytest.raises(TypeError, match="Cannot cast"):
+        safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(eb=data.astype(np.int64))
+        )
+    with pytest.raises(TypeError, match="Cannot cast"):
+        safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(eb=data.astype(np.uint64))
+        )
+
+    safeguard.compute_safe_intervals(
+        data, late_bound=Bindings(eb=data.astype(np.float16))
+    )
+    safeguard.compute_safe_intervals(
+        data, late_bound=Bindings(eb=data.astype(np.float32))
+    )
+
+    with pytest.raises(TypeError, match="Cannot cast"):
+        safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(eb=data.astype(np.float64))
+        )
+
+
 def test_late_bound_eb_abs():
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         qoi="x",
