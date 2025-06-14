@@ -1,15 +1,16 @@
 """
-Pointwise quantity of interest (QoI) absolute error bound safeguard.
+Pointwise quantity of interest (QoI) error bound safeguard.
 """
 
-__all__ = ["PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard"]
+__all__ = ["PointwiseQuantityOfInterestErrorBoundSafeguard"]
 
 import re
+from collections.abc import Set
 
 import numpy as np
 import sympy as sp
 
-from ....utils.bindings import Bindings
+from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import (
     _isfinite,
     _isinf,
@@ -17,7 +18,6 @@ from ....utils.cast import (
     _nan_to_zero,
     _nextafter,
     as_bits,
-    to_finite_float,
     to_float,
 )
 from ....utils.intervals import IntervalUnion
@@ -27,6 +27,7 @@ from ..._qois.eb import (
     compute_data_eb_for_stencil_qoi_eb_unchecked,
     ensure_bounded_derived_error,
 )
+from ..._qois.interval import compute_safe_eb_lower_upper_interval
 from ..._qois.math import CONSTANTS as MATH_CONSTANTS
 from ..._qois.math import FUNCTIONS as MATH_FUNCTIONS
 from ..._qois.re import (
@@ -35,16 +36,24 @@ from ..._qois.re import (
     QOI_INT_LITERAL_PATTERN,
     QOI_WHITESPACE_PATTERN,
 )
+from ..._qois.vars import CONSTRUCTORS as VARS_CONSTRUCTORS
+from ..._qois.vars import FUNCTIONS as VARS_FUNCTIONS
+from ...eb import (
+    ErrorBound,
+    _apply_finite_qoi_error_bound,
+    _check_error_bound,
+    _compute_finite_absolute_error,
+    _compute_finite_absolute_error_bound,
+)
 from ..abc import PointwiseSafeguard
-from ..abs import _compute_safe_eb_diff_interval
 from . import PointwiseExpr
 
 
-class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard):
+class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
     """
-    The `PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard` guarantees
-    that the absolute error on a derived pointwise quantity of interest (QoI)
-    is less than or equal to the provided bound `eb_abs`.
+    The `PointwiseQuantityOfInterestErrorBoundSafeguard` guarantees that the
+    pointwise error `type` on a derived pointwise quantity of interest (QoI)
+    is less than or equal to the provided bound `eb`.
 
     The quantity of interest is specified as a non-constant expression, in
     string form, over the pointwise value `x`. For example, to bound the error
@@ -66,7 +75,9 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
     expr    =
         literal
       | const
+      | data
       | var
+      | let
       | unary
       | binary
     ;
@@ -97,7 +108,29 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
       | "pi"                              (* pi *)
     ;
 
-    var     = "x";                        (* pointwise data value *)
+    data    = "x";                        (* pointwise data value *)
+
+    var     =
+        "V", "[", '"', ident, '"', "]"    (* variable *)
+    ;
+
+    ident   =
+        ( letter | "_" )                  (* identifier *)
+      , { letter | digit | "_" }
+    ;
+    letter  =
+        "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k"
+      | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v"
+      | "w" | "x" | "y" | "z" | "A" | "B" | "C" | "D" | "E" | "F" | "G"
+      | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R"
+      | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
+    ;
+
+    let     =
+        "let", "(",
+            var, ",", expr, ",", expr     (* let var=expr in expr scope *)
+      , ")"
+    ;
 
     unary   =
         "(", expr, ")"                    (* parenthesis *)
@@ -105,6 +138,11 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
       | "sqrt", "(", expr, ")"            (* square root *)
       | "ln", "(", expr, ")"              (* natural logarithm *)
       | "exp", "(", expr, ")"             (* exponential e^x *)
+      | "sign", "(", expr, ")"            (* sign function, signed NaN for NaNs *)
+      | "floor", "(", expr, ")"           (* round down, towards negative infinity *)
+      | "ceil", "(", expr, ")"            (* round up, towards positive infinity *)
+      | "trunc", "(", expr, ")"           (* round towards zero *)
+      | "round_ties_even", "(", expr, ")" (* round to nearest integer, ties to even *)
       | "sin", "(", expr, ")"             (* sine sin(x) *)
       | "cos", "(", expr, ")"             (* cosine cos(x) *)
       | "tan", "(", expr, ")"             (* tangent tan(x) *)
@@ -147,8 +185,8 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
     The QoI expression can also contain whitespaces (space ` `, tab `\\t`,
     newline `\\n`) and single-line inline comments starting with a hash `#`.
 
-    The implementation of the absolute error bound on pointwise quantities of
-    interest is inspired by:
+    The implementation of the error bound on pointwise quantities of interest
+    is inspired by:
 
     > Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
     Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
@@ -161,31 +199,46 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
     qoi : PointwiseExpr
         The non-constant expression for computing the derived quantity of
         interest over a pointwise value `x`.
-    eb_abs : int | float
-        The non-negative absolute error bound on the quantity of interest that
-        is enforced by this safeguard.
+    type : str | ErrorBound
+        The type of error bound on the quantity of interest that is enforced by
+        this safeguard.
+    eb : int | float | str | Parameter
+        The value of or late-bound parameter name for the error bound on the
+        quantity of interest that is enforced by this safeguard.
     """
 
     __slots__ = (
         "_qoi",
-        "_eb_abs",
+        "_type",
+        "_eb",
         "_qoi_expr",
         "_x",
     )
     _qoi: PointwiseExpr
-    _eb_abs: int | float
+    _type: ErrorBound
+    _eb: int | float | Parameter
     _qoi_expr: sp.Basic
     _x: sp.Symbol
 
-    kind = "qoi_abs_pw"
+    kind = "qoi_eb_pw"
 
-    def __init__(self, qoi: PointwiseExpr, eb_abs: int | float):
-        assert eb_abs >= 0, "eb_abs must be non-negative"
-        assert isinstance(eb_abs, int) or _isfinite(eb_abs), "eb_abs must be finite"
+    def __init__(
+        self,
+        qoi: PointwiseExpr,
+        type: str | ErrorBound,
+        eb: int | float | str | Parameter,
+    ):
+        self._type = type if isinstance(type, ErrorBound) else ErrorBound[type]
 
-        self._eb_abs = eb_abs
+        if isinstance(eb, Parameter):
+            self._eb = eb
+        elif isinstance(eb, str):
+            self._eb = Parameter(eb)
+        else:
+            _check_error_bound(self._type, eb)
+            self._eb = eb
 
-        self._x = sp.Symbol("x", real=True)
+        self._x = sp.Symbol("x", extended_real=True)
 
         qoi_stripped = QOI_WHITESPACE_PATTERN.sub(
             " ", QOI_COMMENT_PATTERN.sub(" ", qoi)
@@ -202,6 +255,9 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
                     x=self._x,
                     # === constants ===
                     **MATH_CONSTANTS,
+                    # === variables ===
+                    **VARS_CONSTRUCTORS,
+                    **VARS_FUNCTIONS,
                     # === operators ===
                     # poinwise math
                     **MATH_FUNCTIONS,
@@ -220,7 +276,7 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
             # check if the expression is well-formed (e.g. no int's that cannot
             #  be printed) and if an error bound can be computed
             _canary_repr = str(qoi_expr)
-            _canary_eb_abs = _compute_data_eb_for_qoi_eb(
+            _canary_data_eb = _compute_data_eb_for_qoi_eb(
                 qoi_expr, self._x, np.empty(0), np.empty(0), np.empty(0)
             )
         except Exception as err:
@@ -234,6 +290,21 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
 
         self._qoi = qoi
         self._qoi_expr = qoi_expr
+
+    @property
+    def late_bound(self) -> Set[Parameter]:
+        """
+        The set of late-bound parameters that this safeguard has.
+
+        Late-bound parameters are only bound when checking and applying the
+        safeguard, in contrast to the normal early-bound parameters that are
+        configured during safeguard initialisation.
+
+        Late-bound parameters can be used for parameters that depend on the
+        specific data that is to be safeguarded.
+        """
+
+        return frozenset([self._eb]) if isinstance(self._eb, Parameter) else frozenset()
 
     def evaluate_qoi(
         self, data: np.ndarray[S, np.dtype[T]]
@@ -273,8 +344,8 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
         late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check which elements in the `decoded` array satisfy the absolute error
-        bound for the quantity of interest on the `data`.
+        Check which elements in the `decoded` array satisfy the error bound for
+        the quantity of interest on the `data`.
 
         Parameters
         ----------
@@ -300,20 +371,27 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
         qoi_data = (qoi_lambda)(data_float)
         qoi_decoded = (qoi_lambda)(to_float(decoded))
 
-        absolute_bound = (
-            np.where(
-                qoi_data > qoi_decoded,
-                qoi_data - qoi_decoded,
-                qoi_decoded - qoi_data,
+        eb = (
+            late_bound.resolve_ndarray(
+                self._eb,
+                qoi_data.shape,
+                qoi_data.dtype,
             )
-            <= self._eb_abs
+            if isinstance(self._eb, Parameter)
+            else self._eb
         )
+        _check_error_bound(self._type, eb)
+
+        finite_ok = _compute_finite_absolute_error(
+            self._type, qoi_data, qoi_decoded
+        ) <= _compute_finite_absolute_error_bound(self._type, eb, qoi_data)
+
         same_bits = as_bits(qoi_data, kind="V") == as_bits(qoi_decoded, kind="V")
         both_nan = _isnan(qoi_data) & _isnan(qoi_decoded)
 
         ok = np.where(
             _isfinite(qoi_data),
-            absolute_bound,
+            finite_ok,
             np.where(
                 _isinf(qoi_data),
                 same_bits,
@@ -330,7 +408,7 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
         late_bound: Bindings,
     ) -> IntervalUnion[T, int, int]:
         """
-        Compute the intervals in which the absolute error bound is upheld with
+        Compute the intervals in which the error bound is upheld with
         respect to the quantity of interest on the `data`.
 
         Parameters
@@ -343,63 +421,81 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
         Returns
         -------
         intervals : IntervalUnion
-            Union of intervals in which the absolute error bound is upheld.
+            Union of intervals in which the error bound is upheld.
         """
 
         data_float: np.ndarray = to_float(data)
-
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            eb_abs: np.ndarray = to_finite_float(self._eb_abs, data_float.dtype)
-        assert eb_abs >= 0
 
         qoi_lambda = compile_sympy_expr_to_numpy(
             [self._x], self._qoi_expr, data_float.dtype
         )
 
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            data_qoi = (qoi_lambda)(data_float)
+
+        eb = (
+            late_bound.resolve_ndarray(
+                self._eb,
+                data_qoi.shape,
+                data_qoi.dtype,
+            )
+            if isinstance(self._eb, Parameter)
+            else self._eb
+        )
+        _check_error_bound(self._type, eb)
+
+        qoi_lower_upper: tuple[np.ndarray, np.ndarray] = _apply_finite_qoi_error_bound(
+            self._type,
+            eb,
+            data_qoi,
+        )
+        qoi_lower, qoi_upper = qoi_lower_upper
+
         # ensure the error bounds are representable in QoI space
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            # compute the error-bound adjusted QoIs
-            data_qoi = (qoi_lambda)(data_float)
-            qoi_lower = data_qoi - eb_abs
-            qoi_upper = data_qoi + eb_abs
-
-            # check if they're representable within the error bound
-            qoi_lower_outside_eb_abs = (data_qoi - qoi_lower) > eb_abs
-            qoi_upper_outside_eb_abs = (qoi_upper - data_qoi) > eb_abs
-
-            # otherwise nudge the error-bound adjusted QoIs
-            # we can nudge with nextafter since the QoIs are floating point and
-            #  only finite QoIs are nudged
-            qoi_lower = np.where(
-                qoi_lower_outside_eb_abs & _isfinite(data_qoi),
-                _nextafter(qoi_lower, data_qoi),
-                qoi_lower,
-            )
-            qoi_upper = np.where(
-                qoi_upper_outside_eb_abs & _isfinite(data_qoi),
-                _nextafter(qoi_upper, data_qoi),
-                qoi_upper,
-            )
-
             # compute the adjusted error bound
             eb_qoi_lower = _nan_to_zero(qoi_lower - data_qoi)
             eb_qoi_upper = _nan_to_zero(qoi_upper - data_qoi)
+
+            # check if they're representable within the error bound
+            eb_qoi_lower_outside = (data_qoi + eb_qoi_lower) < qoi_lower
+            eb_qoi_upper_outside = (data_qoi + eb_qoi_upper) > qoi_upper
+
+            # otherwise nudge the error-bound adjusted QoIs
+            # we can nudge with nextafter since the QoIs are floating point
+            eb_qoi_lower = np.where(
+                eb_qoi_lower_outside & _isfinite(qoi_lower),
+                _nextafter(eb_qoi_lower, 0),
+                eb_qoi_lower,
+            )
+            eb_qoi_upper = np.where(
+                eb_qoi_upper_outside & _isfinite(qoi_upper),
+                _nextafter(eb_qoi_upper, 0),
+                eb_qoi_upper,
+            )
 
         # check that the adjusted error bounds fulfil all requirements
         assert eb_qoi_lower.shape == data.shape
         assert eb_qoi_lower.dtype == data_float.dtype
         assert eb_qoi_upper.shape == data.shape
         assert eb_qoi_upper.dtype == data_float.dtype
-        assert np.all(
-            (eb_qoi_lower <= 0) & (eb_qoi_lower >= -eb_abs) & _isfinite(eb_qoi_lower)
-        )
-        assert np.all(
-            (eb_qoi_upper >= 0) & (eb_qoi_upper <= eb_abs) & _isfinite(eb_qoi_upper)
-        )
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            assert np.all(
+                (eb_qoi_lower <= 0)
+                & (((data_qoi + eb_qoi_lower) >= qoi_lower) | ~_isfinite(data_qoi))
+                & _isfinite(eb_qoi_lower)
+            )
+            assert np.all(
+                (eb_qoi_upper >= 0)
+                & (((data_qoi + eb_qoi_upper) <= qoi_upper) | ~_isfinite(data_qoi))
+                & _isfinite(eb_qoi_upper)
+            )
 
         # compute the error bound in data space
         with np.errstate(
@@ -412,15 +508,12 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
                 eb_qoi_lower,
                 eb_qoi_upper,
             )
-        assert np.all((eb_x_lower <= 0) & _isfinite(eb_x_lower))
-        assert np.all((eb_x_upper >= 0) & _isfinite(eb_x_upper))
 
-        return _compute_safe_eb_diff_interval(
+        return compute_safe_eb_lower_upper_interval(
             data,
             data_float,
             eb_x_lower,
             eb_x_upper,
-            equal_nan=True,
         ).into_union()
 
     def get_config(self) -> dict:
@@ -433,7 +526,9 @@ class PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard(PointwiseSafeguard)
             Configuration of the safeguard.
         """
 
-        return dict(kind=type(self).kind, qoi=self._qoi, eb_abs=self._eb_abs)
+        return dict(
+            kind=type(self).kind, qoi=self._qoi, type=self._type.name, eb=self._eb
+        )
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -542,6 +637,11 @@ _QOI_ATOM_PATTERN = (
     + r"|(?:x)"
     + r"".join(rf"|(?:{c})" for c in MATH_CONSTANTS)
     + r"".join(rf"|(?:{f})" for f in MATH_FUNCTIONS)
+    + r"".join(rf"|(?:{v})" for v in VARS_FUNCTIONS)
+    + r"".join(
+        rf'|(?:{v}{QOI_WHITESPACE_PATTERN.pattern}*\[{QOI_WHITESPACE_PATTERN.pattern}*"[a-zA-Z_][a-zA-Z0-9_]*"{QOI_WHITESPACE_PATTERN.pattern}*\])'
+        for v in VARS_CONSTRUCTORS
+    )
     + r")"
 )
 _QOI_SEPARATOR_PATTERN = rf"(?:{QOI_COMMENT_PATTERN.pattern}|(?:[ \t\n\(\),\+\-\*/]))"

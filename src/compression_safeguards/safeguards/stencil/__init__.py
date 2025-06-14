@@ -7,7 +7,7 @@ __all__ = ["BoundaryCondition", "NeighbourhoodAxis", "NeighbourhoodBoundaryAxis"
 from enum import Enum, auto
 
 import numpy as np
-from typing_extensions import Self  # MSPV 3.11
+from typing_extensions import Self, assert_never  # MSPV 3.11
 
 
 class BoundaryCondition(Enum):
@@ -302,5 +302,7 @@ def _pad_with_boundary(
             kwargs["reflect_type"] = "even"  # type: ignore
         case BoundaryCondition.wrap:
             mode = "wrap"
+        case _:
+            assert_never(boundary)
 
     return np.pad(a, pad_width, mode, **kwargs)  # type: ignore

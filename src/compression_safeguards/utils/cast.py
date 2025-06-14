@@ -287,6 +287,14 @@ def _nan_to_zero(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
     return np.where(_isnan(a), _float128(0), a)  # type: ignore
 
 
+# wrapper around np.sign that also works for numpy_quaddtype
+@np.errstate(invalid="ignore")
+def _sign(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[np.int_ | T]]:
+    if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
+        return np.sign(a)
+    return np.where(_isnan(a), a, np.where(a == 0, 0, np.where(a < 0, -1, +1)))  # type: ignore
+
+
 # wrapper around np.nextafter that also works for numpy_quaddtype
 # Implementation is variant 2 from https://stackoverflow.com/a/70512834
 @np.errstate(invalid="ignore")

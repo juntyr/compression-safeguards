@@ -46,27 +46,19 @@ This package currently implements the following [safeguards][compression_safegua
 
 ### Error Bounds (pointwise)
 
-- [`abs`][compression_safeguards.safeguards.pointwise.abs.AbsoluteErrorBoundSafeguard] (absolute error bound):
+- [`eb`][compression_safeguards.safeguards.pointwise.eb.ErrorBoundSafeguard] (error bound):
 
-    The pointwise absolute error is guaranteed to be less than or equal to the provided bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bit pattern also satisfies the error bound.
-
-- [`rel`][compression_safeguards.safeguards.pointwise.rel.RelativeErrorBoundSafeguard] (relative error bound):
-
-    The pointwise relative error is guaranteed to be less than or equal to the provided bound. Zero values are preserved with the same bit pattern. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bit pattern also satisfies the error bound.
-
-- [`ratio`][compression_safeguards.safeguards.pointwise.ratio.RatioErrorBoundSafeguard] (ratio [decimal] error bound):
-
-    It is guaranteed that the ratios between the original and the decoded values and their inverse ratios are less than or equal to the provided bound. The ratio error is defined to be infinite if the signs of the data and decoded data do not match. Since the provided error bound must be finite, this safeguard also guarantees that the sign of each decoded value matches the sign of each original value and that a decoded value is zero if and only if it is zero in the original data. The ratio error bound is sometimes also known as a decimal error bound if the ratio is expressed as the difference in orders of magnitude. This safeguard can also be used to guarantee a relative-like error bound. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bit pattern also satisfies the error bound.
+    The pointwise error is guaranteed to be less than or equal to the provided bound. Three types of [error bounds][compression_safeguards.safeguards.eb.ErrorBound] can be enforced: `abs` (absolute), `rel` (relative), and `ratio` (ratio / decimal). For the relative and ratio error bounds, zero values are preserved with the same bit pattern. For the ratio error bound, the sign of the data is preserved. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bit pattern also satisfies the error bound.
 
 ### Error Bounds on derived Quantities of Interest (QoIs)
 
-- [`qoi_abs_pw`][compression_safeguards.safeguards.pointwise.qoi.abs.PointwiseQuantityOfInterestAbsoluteErrorBoundSafeguard] (absolute error bound on pointwise quantities of interest):
+- [`qoi_eb_pw`][compression_safeguards.safeguards.pointwise.qoi.eb.PointwiseQuantityOfInterestErrorBoundSafeguard] (error bound on pointwise quantities of interest):
 
-    The absolute error on a derived pointwise quantity of interest (QoI) is guaranteed to be less than or equal to the provided bound. The non-constant quantity of interest expression can contain the addition, multiplication, division, square root, exponentiation, logarithm, trigonometric, and hyperbolic operations over integer and floating point constants and the pointwise data value. Infinite quantities of interest are preserved with the same bit pattern. NaN quantities of interest remain NaN though not necessarily with the same bit pattern.
+    The error on a derived pointwise quantity of interest (QoI) is guaranteed to be less than or equal to the provided bound. Three types of [error bounds][compression_safeguards.safeguards.eb.ErrorBound] can be enforced: `abs` (absolute), `rel` (relative), and `ratio` (ratio / decimal). The non-constant quantity of interest expression can contain the addition, multiplication, division, square root, exponentiation, logarithm, rounding, trigonometric, and hyperbolic operations over integer and floating point constants and the pointwise data value. For the ratio error bound, the sign of the quantity of interest is preserved. Infinite quantities of interest are preserved with the same bit pattern. NaN quantities of interest remain NaN though not necessarily with the same bit pattern.
 
-- [`qoi_abs_stencil`][compression_safeguards.safeguards.stencil.qoi.abs.StencilQuantityOfInterestAbsoluteErrorBoundSafeguard] (absolute error bound on quantities of interest over a neighbourhood):
+- [`qoi_eb_stencil`][compression_safeguards.safeguards.stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard] (error bound on quantities of interest over a neighbourhood):
 
-    The absolute error on a derived quantity of interest (QoI) over a neighbourhood of data points is guaranteed to be less than or equal to the provided bound. The non-constant quantity of interest expression can contain the addition, multiplication, division, square root, exponentiation, logarithm, trigonometric, hyperbolic, array sum, matrix transpose, matrix multiplication, and finite difference operations over integer and floating point constants and arrays and the data neighbourhood. If applied to data with more dimensions than the data neighbourhood of the QoI requires, the data neighbourhood is applied independently along these extra axes. If the data neighbourhood uses the [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid] boundary condition along an axis, only data neighbourhoods centred on data points that have sufficient points before and after are safeguarded. If the axis is smaller than required by the neighbourhood along this axis, the data is not safeguarded at all. Using a different [`BoundaryCondition`][compression_safeguards.safeguards.stencil.BoundaryCondition] ensures that all data points are safeguarded. Infinite quantities of interest are preserved with the same bit pattern. NaN quantities of interest remain NaN though not necessarily with the same bit pattern.
+    The error on a derived quantity of interest (QoI) over a neighbourhood of data points is guaranteed to be less than or equal to the provided bound. Three types of [error bounds][compression_safeguards.safeguards.eb.ErrorBound] can be enforced: `abs` (absolute), `rel` (relative), and `ratio` (ratio / decimal). The non-constant quantity of interest expression can contain the addition, multiplication, division, square root, exponentiation, logarithm, rounding, trigonometric, hyperbolic, array sum, matrix transpose, matrix multiplication, and finite difference operations over integer and floating point constants and arrays and the data neighbourhood. If applied to data with more dimensions than the data neighbourhood of the QoI requires, the data neighbourhood is applied independently along these extra axes. If the data neighbourhood uses the [`valid`][compression_safeguards.safeguards.stencil.BoundaryCondition.valid] boundary condition along an axis, only data neighbourhoods centred on data points that have sufficient points before and after are safeguarded. If the axis is smaller than required by the neighbourhood along this axis, the data is not safeguarded at all. Using a different [`BoundaryCondition`][compression_safeguards.safeguards.stencil.BoundaryCondition] ensures that all data points are safeguarded. For the ratio error bound, the sign of the quantity of interest is preserved. Infinite quantities of interest are preserved with the same bit pattern. NaN quantities of interest remain NaN though not necessarily with the same bit pattern.
 
 ### Pointwise properties
 
@@ -82,7 +74,7 @@ This package currently implements the following [safeguards][compression_safegua
 
 - [`monotonicity`][compression_safeguards.safeguards.stencil.monotonicity.MonotonicityPreservingSafeguard] (monotonicity-preserving):
 
-    Sequences that are monotonic in the input are guaranteed to be monotonic in the decompressed output. Monotonic sequences are detected using per-axis moving windows of constant size. Typically, the window size should be chosen to be large enough to ignore noise but small enough to capture details. Four levels of [monotonicity][compression_safeguards.safeguards.stencil.monotonicity.Monotonicity] can be enforced: `strict`, `strict_with_consts`, `strict_to_weak`, `weak`. Windows that are not monotonic or contain non-finite data are skipped. If the [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid] boundary condition is used, axes that have fewer elements than the window size are skipped as well.
+    Sequences that are monotonic in the input are guaranteed to be monotonic in the decompressed output. Monotonic sequences are detected using per-axis moving windows of constant size. Typically, the window size should be chosen to be large enough to ignore noise but small enough to capture details. Four levels of [monotonicity][compression_safeguards.safeguards.stencil.monotonicity.Monotonicity] can be enforced: `strict`, `strict_with_consts`, `strict_to_weak`, and `weak`. Windows that are not monotonic or contain non-finite data are skipped. If the [`valid`][compression_safeguards.safeguards.stencil.BoundaryCondition.valid] boundary condition is used, axes that have fewer elements than the window size are skipped as well.
 
 ### Logical combinators (~pointwise)
 
@@ -153,7 +145,7 @@ lossy_codec = FixedScaleOffset(
 sg_codec = SafeguardsCodec(codec=lossy_codec, safeguards=[
     # guarantee a relative error bound of 1%:
     #   |x - x'| <= |x| * 0.01
-    dict(kind="rel", eb_rel=0.01),
+    dict(kind="eb", type="rel", eb=0.01),
     # guarantee that the sign is preserved:
     #   sign(x) = sign(x')
     dict(kind="sign"),
@@ -193,7 +185,7 @@ from compression_safeguards import Safeguards
 sg = Safeguards(safeguards=[
     # guarantee an absolute error bound of 0.1:
     #   |x - x'| <= 0.1
-    dict(kind="abs", eb_abs=0.1),
+    dict(kind="eb", type="abs", eb=0.1),
 ])
 
 # generate some random data to compress

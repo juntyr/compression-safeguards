@@ -1,6 +1,9 @@
 import sympy as sp
 
 from .array import NumPyLikeArray
+from .symfunc import round_ties_even as sp_round_ties_even
+from .symfunc import sign as sp_sign
+from .symfunc import trunc as sp_trunc
 
 
 def sqrt(x, /):
@@ -27,6 +30,36 @@ def log(x, /, *, base):
     else:
         ln_base = sp.ln(base)
     return ln_x / ln_base
+
+
+def sign(x, /):
+    if isinstance(x, NumPyLikeArray):
+        return x.applyfunc(sp_sign)
+    return sp_sign(x)
+
+
+def floor(x, /):
+    if isinstance(x, NumPyLikeArray):
+        return x.applyfunc(sp.floor)
+    return sp.floor(x)
+
+
+def ceil(x, /):
+    if isinstance(x, NumPyLikeArray):
+        return x.applyfunc(sp.ceiling)
+    return sp.ceiling(x)
+
+
+def trunc(x, /):
+    if isinstance(x, NumPyLikeArray):
+        return x.applyfunc(sp_trunc)
+    return sp_trunc(x)
+
+
+def round_ties_even(x, /):
+    if isinstance(x, NumPyLikeArray):
+        return x.applyfunc(sp_round_ties_even)
+    return sp_round_ties_even(x)
 
 
 def sin(x, /):
@@ -184,6 +217,13 @@ FUNCTIONS = dict(
     exp=exp,
     ln=ln,
     log=log,
+    # special functions
+    sign=sign,
+    # rounding functions
+    floor=floor,
+    ceil=ceil,
+    trunc=trunc,
+    round_ties_even=round_ties_even,
     # trigonometric functions
     sin=sin,
     cos=cos,

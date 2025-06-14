@@ -5,7 +5,7 @@ import numpy as np
 import sympy as sp
 import sympy.tensor.array.expressions  # noqa: F401
 
-from ...utils.cast import _float128, _float128_dtype, _float128_precision
+from ...utils.cast import _float128, _float128_dtype, _float128_precision, _sign
 
 
 def sympy_expr_to_numpy(
@@ -30,6 +30,8 @@ def sympy_expr_to_numpy(
                 #  but that numpy supports (otherwise sympy polyfills)
                 [
                     dict(
+                        # special functions
+                        sign=_sign,
                         # hyperbolic functions
                         sinh=lambda x: (np.exp(x) - np.exp(-x)) / 2,
                         cosh=lambda x: (np.exp(x) + np.exp(-x)) / 2,
@@ -114,5 +116,13 @@ def _create_sympy_numpy_printer_class(
                 indices.append(i.p)
             printed = f"{expr.name}[..., {', '.join([str(i) for i in indices])}]"
             return printed
+
+        def _print_trunc(self, expr):
+            (x,) = expr.args
+            return f"trunc({self._print(x)})"
+
+        def _print_round_ties_even(self, expr):
+            (x,) = expr.args
+            return f"rint({self._print(x)})"
 
     return NumPyDtypePrinter

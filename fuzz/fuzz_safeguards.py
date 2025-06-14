@@ -99,6 +99,11 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
             #  parameters, we can just generate a constant name here
             return "param"
 
+        if len(tys) > 2 and str in tys and Parameter in tys:
+            # since numcodecs_safeguards doesn't yet support late-bound
+            #  parameters, we can just generate from the other options here
+            tys = tuple(t for t in tys if t not in (str, Parameter))
+
         if (
             len(tys) > 1
             and tys[0] is dict
@@ -111,8 +116,9 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
         return generate_parameter(data, ty, depth)
 
     if ty in (PointwiseExpr, StencilExpr):
-        ATOMS = ["x", int, float] + list(MATH_CONSTANTS)
+        ATOMS = ["x", int, float] + list(MATH_CONSTANTS) + ["V"]
         OPS = [
+            "let",
             "neg",
             "+",
             "-",
@@ -132,6 +138,8 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
                 atom = str(data.ConsumeInt(2))
             elif atom is float:
                 atom = str(data.ConsumeRegularFloat())
+            elif atom == "V":
+                atom = f'V["{data.ConsumeString(2)}"]'
             atoms.append(atom)
 
         done = False
@@ -144,7 +152,9 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
                 else "1"
             )
             op = OPS[data.ConsumeIntInRange(0, len(OPS) - 1)]
-            if op == "neg":
+            if op == "let":
+                atoms.append(f'let(V["{data.ConsumeString(2)}"],{atom1},{atom2})')
+            elif op == "neg":
                 atoms.append(f"(-{atom1})")
             elif op in ("log", "matmul"):
                 atoms.append(f"log({atom1},{atom2})")

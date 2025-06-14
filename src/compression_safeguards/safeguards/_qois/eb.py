@@ -5,15 +5,22 @@ import sympy as sp
 import sympy.tensor.array.expressions  # noqa: F401
 
 from ...utils.cast import (
+    _float128_dtype,
+    _float128_smallest_subnormal,
     _isfinite,
     _isinf,
     _isnan,
     _nan_to_zero,
     _nextafter,
+    _sign,
     to_finite_float,
 )
 from ...utils.typing import F, S
 from .array import NumPyLikeArray
+from .symfunc import round_ties_even as sp_round_ties_even
+from .symfunc import sign as sp_sign
+from .symfunc import trunc as sp_trunc
+from .vars import VariableSymbol
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -95,6 +102,16 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
     if check_is_x(expr):
         return (eb_expr_lower, eb_expr_upper)
 
+    # unresolved variable
+    if isinstance(expr, VariableSymbol):
+        raise ValueError(
+            f"expression contains unresolved variable {expr}, perhaps you forgot to define it within a let expression"
+        )
+
+    # unresolved index
+    if expr.func is sp.Indexed:
+        raise ValueError("invalid index on variable resulted in unresolved index")
+
     # array
     if expr.func in (sp.Array, NumPyLikeArray):
         raise ValueError("expression must evaluate to a scalar not an array")
@@ -126,14 +143,14 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         eal = np.where(
             (eb_expr_lower == 0),
             zero,
-            np.exp(exprv + eb_expr_lower) - argv,
+            np.minimum(np.exp(exprv + eb_expr_lower) - argv, 0),
         )
         eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
 
         eau = np.where(
             (eb_expr_upper == 0),
             zero,
-            np.exp(exprv + eb_expr_upper) - argv,
+            np.maximum(0, np.exp(exprv + eb_expr_upper) - argv),
         )
         eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
 
@@ -176,14 +193,14 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         eal = np.where(
             (eb_expr_lower == 0),
             zero,
-            np.log(np.maximum(zero, exprv + eb_expr_lower)) - argv,
+            np.minimum(np.log(np.maximum(0, exprv + eb_expr_lower)) - argv, 0),
         )
         eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
 
         eau = np.where(
             (eb_expr_upper == 0),
             zero,
-            np.log(np.maximum(zero, exprv + eb_expr_upper)) - argv,
+            np.maximum(0, np.log(np.maximum(0, exprv + eb_expr_upper)) - argv),
         )
         eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
 
@@ -225,6 +242,275 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
             eb_expr_upper,
         )
 
+    # sign(...)
+    if expr.func is sp_sign and len(expr.args) == 1:
+        # evaluate arg and sign(arg)
+        (arg,) = expr.args
+        argv = evaluate_sympy_expr_to_numpy(arg)
+        exprv = _sign(argv)
+
+        if xv.dtype == _float128_dtype:
+            smallest_subnormal = _float128_smallest_subnormal
+        else:
+            smallest_subnormal = np.finfo(xv.dtype).smallest_subnormal
+
+        argv_lower = np.where(
+            argv < 0, np.array(-np.inf, dtype=xv.dtype), smallest_subnormal
+        )
+        argv_upper = np.where(
+            argv > 0, np.array(np.inf, dtype=xv.dtype), -smallest_subnormal
+        )
+
+        # update the error bounds
+        eal = np.where(
+            (eb_expr_lower == 0) | (exprv == 0),
+            zero,
+            np.minimum(argv_lower - argv, 0),
+        )
+        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
+
+        eau = np.where(
+            (eb_expr_upper == 0),
+            zero,
+            np.maximum(0, argv_upper - argv),
+        )
+        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
+
+        # handle rounding errors in sign(...) early
+        eal = ensure_bounded_derived_error(
+            lambda eal: _sign(argv + eal),
+            exprv,
+            argv,
+            eal,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eau = ensure_bounded_derived_error(
+            lambda eau: _sign(argv + eau),
+            exprv,
+            argv,
+            eau,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eb_arg_lower, eb_arg_upper = eal, eau
+
+        # composition using Lemma 3 from Jiao et al.
+        return compute_data_eb_for_stencil_qoi_eb(
+            arg,
+            xv,
+            eb_arg_lower,  # type: ignore
+            eb_arg_upper,  # type: ignore
+        )
+
+    # floor(...): round down, towards negative infinity
+    if expr.func is sp.floor and len(expr.args) == 1:
+        # evaluate arg and floor(arg)
+        (arg,) = expr.args
+        argv = evaluate_sympy_expr_to_numpy(arg)
+        exprv = np.floor(argv)
+
+        # compute the rounded result that meets the error bounds
+        exprv_lower = np.trunc(exprv + eb_expr_lower)
+        exprv_upper = np.trunc(exprv + eb_expr_upper)
+
+        # compute the argv that will round to meet the error bounds
+        argv_lower = exprv_lower
+        argv_upper = _nextafter(exprv_upper + 1, exprv_upper)
+
+        # update the error bounds
+        # rounding allows zero error bounds on the expression to expand into
+        #  non-zero error bounds on the argument
+        eal = np.minimum(argv_lower - argv, 0)
+        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
+
+        eau = np.maximum(0, argv_upper - argv)
+        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
+
+        # handle rounding errors in floor(...) early
+        eal = ensure_bounded_derived_error(
+            lambda eal: np.floor(argv + eal),
+            exprv,
+            argv,
+            eal,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eau = ensure_bounded_derived_error(
+            lambda eau: np.floor(argv + eau),
+            exprv,
+            argv,
+            eau,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eb_arg_lower, eb_arg_upper = eal, eau
+
+        # composition using Lemma 3 from Jiao et al.
+        return compute_data_eb_for_stencil_qoi_eb(
+            arg,
+            xv,
+            eb_arg_lower,  # type: ignore
+            eb_arg_upper,  # type: ignore
+        )
+
+    # ceil(...): round up, towards positive infinity
+    if expr.func is sp.ceiling and len(expr.args) == 1:
+        # evaluate arg and ceil(arg)
+        (arg,) = expr.args
+        argv = evaluate_sympy_expr_to_numpy(arg)
+        exprv = np.ceil(argv)
+
+        # compute the rounded result that meets the error bounds
+        exprv_lower = np.trunc(exprv + eb_expr_lower)
+        exprv_upper = np.trunc(exprv + eb_expr_upper)
+
+        # compute the argv that will round to meet the error bounds
+        argv_lower = _nextafter(exprv_lower - 1, exprv_lower)
+        argv_upper = exprv_upper
+
+        # update the error bounds
+        # rounding allows zero error bounds on the expression to expand into
+        #  non-zero error bounds on the argument
+        eal = np.minimum(argv_lower - argv, 0)
+        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
+
+        eau = np.maximum(0, argv_upper - argv)
+        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
+
+        # handle rounding errors in ceil(...) early
+        eal = ensure_bounded_derived_error(
+            lambda eal: np.ceil(argv + eal),
+            exprv,
+            argv,
+            eal,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eau = ensure_bounded_derived_error(
+            lambda eau: np.ceil(argv + eau),
+            exprv,
+            argv,
+            eau,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eb_arg_lower, eb_arg_upper = eal, eau
+
+        # composition using Lemma 3 from Jiao et al.
+        return compute_data_eb_for_stencil_qoi_eb(
+            arg,
+            xv,
+            eb_arg_lower,  # type: ignore
+            eb_arg_upper,  # type: ignore
+        )
+
+    # trunc(...): round towards zero
+    if expr.func is sp_trunc and len(expr.args) == 1:
+        # evaluate arg and trunc(arg)
+        (arg,) = expr.args
+        argv = evaluate_sympy_expr_to_numpy(arg)
+        exprv = np.trunc(argv)
+
+        # compute the truncated result that meets the error bounds
+        exprv_lower = np.trunc(exprv + eb_expr_lower)
+        exprv_upper = np.trunc(exprv + eb_expr_upper)
+
+        # compute the argv that will truncate to meet the error bounds
+        argv_lower = np.where(
+            exprv_lower <= 0, _nextafter(exprv_lower - 1, exprv_lower), exprv_lower
+        )
+        argv_upper = np.where(
+            exprv_upper >= 0, _nextafter(exprv_upper + 1, exprv_upper), exprv_upper
+        )
+
+        # update the error bounds
+        # rounding allows zero error bounds on the expression to expand into
+        #  non-zero error bounds on the argument
+        eal = np.minimum(argv_lower - argv, 0)
+        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
+
+        eau = np.maximum(0, argv_upper - argv)
+        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
+
+        # handle rounding errors in trunc(...) early
+        eal = ensure_bounded_derived_error(
+            lambda eal: np.trunc(argv + eal),
+            exprv,
+            argv,
+            eal,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eau = ensure_bounded_derived_error(
+            lambda eau: np.trunc(argv + eau),
+            exprv,
+            argv,
+            eau,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eb_arg_lower, eb_arg_upper = eal, eau
+
+        # composition using Lemma 3 from Jiao et al.
+        return compute_data_eb_for_stencil_qoi_eb(
+            arg,
+            xv,
+            eb_arg_lower,  # type: ignore
+            eb_arg_upper,  # type: ignore
+        )
+
+    # round_ties_even(...)
+    if expr.func is sp_round_ties_even and len(expr.args) == 1:
+        # evaluate arg and round_ties_even(arg)
+        (arg,) = expr.args
+        argv = evaluate_sympy_expr_to_numpy(arg)
+        exprv = np.rint(argv)
+
+        # compute the rounded result that meets the error bounds
+        exprv_lower = np.trunc(exprv + eb_expr_lower)
+        exprv_upper = np.trunc(exprv + eb_expr_upper)
+
+        # compute the argv that will round to meet the error bounds
+        argv_lower = exprv_lower - 0.5
+        argv_upper = exprv_upper + 0.5
+
+        # update the error bounds
+        # rounding allows zero error bounds on the expression to expand into
+        #  non-zero error bounds on the argument
+        eal = np.minimum(argv_lower - argv, 0)
+        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
+
+        eau = np.maximum(0, argv_upper - argv)
+        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
+
+        # handle rounding errors in round_ties_even(...) early
+        eal = ensure_bounded_derived_error(
+            lambda eal: np.rint(argv + eal),
+            exprv,
+            argv,
+            eal,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eau = ensure_bounded_derived_error(
+            lambda eau: np.rint(argv + eau),
+            exprv,
+            argv,
+            eau,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eb_arg_lower, eb_arg_upper = eal, eau
+
+        # composition using Lemma 3 from Jiao et al.
+        return compute_data_eb_for_stencil_qoi_eb(
+            arg,
+            xv,
+            eb_arg_lower,  # type: ignore
+            eb_arg_upper,  # type: ignore
+        )
+
     # sin(...)
     if expr.func is sp.sin and len(expr.args) == 1:
         # evaluate arg and sin(arg)
@@ -238,14 +524,18 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
             zero,
             # we need to compare to asin(sin(...)) instead of ... to account
             #  for asin's output domain
-            np.asin(np.maximum(-1, exprv + eb_expr_lower)) - np.asin(exprv),
+            np.minimum(
+                np.asin(np.maximum(-1, exprv + eb_expr_lower)) - np.asin(exprv), 0
+            ),
         )
         eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
 
         eau = np.where(
             (eb_expr_upper == 0),
             zero,
-            np.asin(np.minimum(exprv + eb_expr_upper, 1)) - np.asin(exprv),
+            np.maximum(
+                0, np.asin(np.minimum(exprv + eb_expr_upper, 1)) - np.asin(exprv)
+            ),
         )
         eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
 
@@ -568,7 +858,7 @@ def ensure_bounded_derived_error(
                 expr(eb_x_guess) == exprv,
                 _isnan(expr(eb_x_guess)),
             ),
-        )
+        ) & (eb_x_guess != 0)
 
     eb_exceeded = is_eb_exceeded(eb_x_guess)
 

@@ -1,5 +1,8 @@
 import numpy as np
 
+from compression_safeguards.safeguards.pointwise.eb import ErrorBoundSafeguard
+from compression_safeguards.utils.bindings import Bindings
+
 from .codecs import (
     encode_decode_identity,
     encode_decode_mock,
@@ -12,28 +15,28 @@ from .codecs import (
 def check_all_codecs(data: np.ndarray):
     decoded = encode_decode_zero(
         data,
-        safeguards=[dict(kind="ratio", eb_ratio=10**1.0)],
+        safeguards=[dict(kind="eb", type="ratio", eb=10**1.0)],
     )
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         np.testing.assert_allclose(decoded, data, rtol=10.0, atol=0.0)
 
     decoded = encode_decode_neg(
         data,
-        safeguards=[dict(kind="ratio", eb_ratio=10**1.0)],
+        safeguards=[dict(kind="eb", type="ratio", eb=10**1.0)],
     )
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         np.testing.assert_allclose(decoded, data, rtol=10.0, atol=0.0)
 
     decoded = encode_decode_identity(
         data,
-        safeguards=[dict(kind="ratio", eb_ratio=10**1.0)],
+        safeguards=[dict(kind="eb", type="ratio", eb=10**1.0)],
     )
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         np.testing.assert_allclose(decoded, data, rtol=10.0, atol=0.0)
 
     decoded = encode_decode_noise(
         data,
-        safeguards=[dict(kind="ratio", eb_ratio=10**1.0)],
+        safeguards=[dict(kind="eb", type="ratio", eb=10**1.0)],
     )
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         np.testing.assert_allclose(decoded, data, rtol=10.0, atol=0.0)
@@ -79,7 +82,7 @@ def test_fuzzer_overcorrect():
         decoded,
         safeguards=[
             dict(kind="zero", zero=-1),
-            dict(kind="ratio", eb_ratio=3.567564553293311e293),
+            dict(kind="eb", type="ratio", eb=3.567564553293311e293),
         ],
     )
 
@@ -94,7 +97,7 @@ def test_fuzzer_overflow():
         data,
         decoded,
         safeguards=[
-            dict(kind="ratio", eb_ratio=10**61, equal_nan=True),
+            dict(kind="eb", type="ratio", eb=10**61, equal_nan=True),
         ],
     )
 
@@ -112,7 +115,7 @@ def test_fuzzer_rounding_error():
         decoded,
         safeguards=[
             dict(kind="zero", zero=1.6989962568688874e308),
-            dict(kind="ratio", eb_ratio=2.5924625501554395e303, equal_nan=False),
+            dict(kind="eb", type="ratio", eb=2.5924625501554395e303, equal_nan=False),
         ],
     )
 
@@ -125,7 +128,9 @@ def test_fuzzer_int_to_float_precision():
         data,
         decoded,
         safeguards=[
-            dict(kind="ratio", eb_ratio=10**2.2250738585072014e-308, equal_nan=True),
+            dict(
+                kind="eb", type="ratio", eb=10**2.2250738585072014e-308, equal_nan=True
+            ),
         ],
     )
 
@@ -162,8 +167,27 @@ def test_fuzzer_issue_9():
         data,
         decoded,
         safeguards=[
-            dict(kind="ratio", eb_ratio=1.0645163269184692e308, equal_nan=True),
+            dict(kind="eb", type="ratio", eb=1.0645163269184692e308, equal_nan=True),
             # neither the findiff-abs nor monotonicity safeguards apply since
             #  they require windows larger than the data
         ],
+    )
+
+
+def test_late_bound_eb():
+    safeguard = ErrorBoundSafeguard(type="ratio", eb="eb")
+
+    data = np.arange(6).reshape(2, 3)
+
+    late_bound = Bindings(
+        eb=np.array([6, 5, 4, 3, 2, 1]).reshape(2, 3),
+    )
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == (data.flatten() - np.array([0, 0, 1, 2, 2, 0])))
+    assert np.all(valid._upper == (data.flatten() + np.array([0, 4, 6, 6, 4, 0])))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(
+        ok == np.array([True, False, False, False, False, False]).reshape(2, 3)
     )

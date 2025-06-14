@@ -2,6 +2,10 @@ import numpy as np
 import pytest
 
 from compression_safeguards import Safeguards
+from compression_safeguards.safeguards.pointwise.qoi.eb import (
+    PointwiseQuantityOfInterestErrorBoundSafeguard,
+)
+from compression_safeguards.utils.bindings import Bindings
 
 from .codecs import (
     encode_decode_identity,
@@ -18,11 +22,31 @@ def check_all_codecs(data: np.ndarray, qoi: str):
         encode_decode_identity,
         encode_decode_noise,
     ]:
-        for eb_abs in [10.0, 1.0, 0.1, 0.01, 0.0]:
-            encode_decode(
-                data,
-                safeguards=[dict(kind="qoi_abs_pw", qoi=qoi, eb_abs=eb_abs)],
-            )
+        for type, eb in [
+            ("abs", 10.0),
+            ("abs", 1.0),
+            ("abs", 0.1),
+            ("abs", 0.01),
+            ("abs", 0.0),
+            ("rel", 10.0),
+            ("rel", 1.0),
+            ("rel", 0.1),
+            ("rel", 0.01),
+            ("rel", 0.0),
+            ("ratio", 10.0),
+            ("ratio", 2.0),
+            ("ratio", 1.1),
+            ("ratio", 1.01),
+            ("ratio", 1.0),
+        ]:
+            try:
+                encode_decode(
+                    data,
+                    safeguards=[dict(kind="qoi_eb_pw", qoi=qoi, type=type, eb=eb)],
+                )
+            except Exception as err:
+                print(encode_decode, qoi, type, eb)
+                raise err
 
 
 def check_empty(qoi: str):
@@ -117,6 +141,23 @@ def test_comment():
     )
 
 
+def test_variables():
+    with pytest.raises(AssertionError, match=r'unresolved variable V\["a"\]'):
+        check_all_codecs(np.array([]), 'V["a"]')
+    with pytest.raises(AssertionError, match=r'unresolved variable V\["b"\]'):
+        check_all_codecs(np.array([]), 'let(V["a"], 3, x + V["b"])')
+    with pytest.raises(AssertionError, match="let name"):
+        check_all_codecs(np.array([]), "let(1, 2, x)")
+    with pytest.raises(AssertionError, match="let value"):
+        check_all_codecs(np.array([]), 'let(V["a"], log, x + V["a"])')
+    with pytest.raises(AssertionError, match="let within"):
+        check_all_codecs(np.array([]), 'let(V["a"], x + 1, log)')
+    check_all_codecs(np.array([]), 'let(V["a"], 3, x + V["a"])')
+    check_all_codecs(
+        np.array([]), 'let(V["a"], 3, x + let(V["b"], V["a"] - 1, V["b"] * 2))'
+    )
+
+
 @pytest.mark.parametrize("check", CHECKS)
 def test_constant(check):
     with pytest.raises(AssertionError, match="constant"):
@@ -166,6 +207,21 @@ def test_logarithm(check):
     check("ln(x)")
     check("ln(x + 1)")
     check("log(2, base=x)")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_sign(check):
+    check("sign(x)")
+    check("sign(x * 2)")
+    check("sign(e**x)")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_rounding(check):
+    check("floor(x) * floor(1.5)")
+    check("ceil(x) * ceil(1.5)")
+    check("trunc(x) * trunc(1.5)")
+    check("round_ties_even(x) * round_ties_even(1.5)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -268,7 +324,7 @@ def test_lambdify_dtype():
         sympy_expr_to_numpy,
     )
 
-    x = sp.Symbol("x", real=True)
+    x = sp.Symbol("x", extended_real=True)
 
     fn = sympy_expr_to_numpy([x], x + sp.pi + sp.E, np.dtype(np.float16))
 
@@ -279,3 +335,64 @@ def test_lambdify_dtype():
 
     assert np.float16("2.71828") == np.float16(np.e)
     assert np.float16("3.14159") == np.float16(np.pi)
+
+
+def test_late_bound_eb_abs():
+    safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi="x", type="abs", eb="eb"
+    )
+
+    data = np.arange(6).reshape(2, 3)
+
+    late_bound = Bindings(
+        eb=np.array([5, 4, 3, 2, 1, 0]).reshape(2, 3),
+    )
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == (data.flatten() - np.array([5, 4, 3, 2, 1, 0])))
+    assert np.all(valid._upper == (data.flatten() + np.array([5, 4, 3, 2, 1, 0])))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(
+        ok == np.array([True, True, False, False, False, False]).reshape(2, 3)
+    )
+
+
+def test_late_bound_eb_rel():
+    safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi="x", type="rel", eb="eb"
+    )
+
+    data = np.arange(6).reshape(2, 3)
+
+    late_bound = Bindings(
+        eb=np.array([5, 4, 3, 2, 1, 0]).reshape(2, 3),
+    )
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == (data.flatten() - np.array([0, 4, 6, 6, 4, 0])))
+    assert np.all(valid._upper == (data.flatten() + np.array([0, 4, 6, 6, 4, 0])))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(ok == np.array([True, True, True, True, False, False]).reshape(2, 3))
+
+
+def test_late_bound_eb_ratio():
+    safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi="x", type="ratio", eb="eb"
+    )
+
+    data = np.arange(6).reshape(2, 3)
+
+    late_bound = Bindings(
+        eb=np.array([6, 5, 4, 3, 2, 1]).reshape(2, 3),
+    )
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == (data.flatten() - np.array([0, 0, 1, 2, 2, 0])))
+    assert np.all(valid._upper == (data.flatten() + np.array([0, 4, 6, 6, 4, 0])))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(
+        ok == np.array([True, False, False, False, False, False]).reshape(2, 3)
+    )
