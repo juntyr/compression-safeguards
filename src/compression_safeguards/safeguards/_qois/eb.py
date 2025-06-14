@@ -319,18 +319,12 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         argv_upper = _nextafter(exprv_upper + 1, exprv_upper)
 
         # update the error bounds
-        eal = np.where(
-            (eb_expr_lower == 0),
-            zero,
-            np.minimum(argv_lower - argv, 0),
-        )
+        # rounding allows zero error bounds on the expression to expand into
+        #  non-zero error bounds on the argument
+        eal = np.minimum(argv_lower - argv, 0)
         eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
 
-        eau = np.where(
-            (eb_expr_upper == 0),
-            zero,
-            np.maximum(0, argv_upper - argv),
-        )
+        eau = np.maximum(0, argv_upper - argv)
         eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
 
         # handle rounding errors in floor(...) early
@@ -376,18 +370,12 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         argv_upper = exprv_upper
 
         # update the error bounds
-        eal = np.where(
-            (eb_expr_lower == 0),
-            zero,
-            np.minimum(argv_lower - argv, 0),
-        )
+        # rounding allows zero error bounds on the expression to expand into
+        #  non-zero error bounds on the argument
+        eal = np.minimum(argv_lower - argv, 0)
         eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
 
-        eau = np.where(
-            (eb_expr_upper == 0),
-            zero,
-            np.maximum(0, argv_upper - argv),
-        )
+        eau = np.maximum(0, argv_upper - argv)
         eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
 
         # handle rounding errors in ceil(...) early
@@ -437,18 +425,12 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         )
 
         # update the error bounds
-        eal = np.where(
-            (eb_expr_lower == 0),
-            zero,
-            np.minimum(argv_lower - argv, 0),
-        )
+        # rounding allows zero error bounds on the expression to expand into
+        #  non-zero error bounds on the argument
+        eal = np.minimum(argv_lower - argv, 0)
         eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
 
-        eau = np.where(
-            (eb_expr_upper == 0),
-            zero,
-            np.maximum(0, argv_upper - argv),
-        )
+        eau = np.maximum(0, argv_upper - argv)
         eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
 
         # handle rounding errors in trunc(...) early
@@ -494,18 +476,12 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         argv_upper = exprv_upper + 0.5
 
         # update the error bounds
-        eal = np.where(
-            (eb_expr_lower == 0),
-            zero,
-            np.minimum(argv_lower - argv, 0),
-        )
+        # rounding allows zero error bounds on the expression to expand into
+        #  non-zero error bounds on the argument
+        eal = np.minimum(argv_lower - argv, 0)
         eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
 
-        eau = np.where(
-            (eb_expr_upper == 0),
-            zero,
-            np.maximum(0, argv_upper - argv),
-        )
+        eau = np.maximum(0, argv_upper - argv)
         eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
 
         # handle rounding errors in round_ties_even(...) early
