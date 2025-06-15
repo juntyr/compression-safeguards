@@ -81,7 +81,7 @@ def test_fuzzer_overcorrect():
         data,
         decoded,
         safeguards=[
-            dict(kind="zero", zero=-1),
+            dict(kind="same", value=-1),
             dict(kind="eb", type="ratio", eb=3.567564553293311e293),
         ],
     )
@@ -114,7 +114,7 @@ def test_fuzzer_rounding_error():
         data,
         decoded,
         safeguards=[
-            dict(kind="zero", zero=1.6989962568688874e308),
+            dict(kind="same", value=1.6989962568688874e308),
             dict(kind="eb", type="ratio", eb=2.5924625501554395e303, equal_nan=False),
         ],
     )

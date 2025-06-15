@@ -12,8 +12,8 @@ from .combinators.safe import AlwaysSafeguard
 from .combinators.select import SelectSafeguard
 from .pointwise.eb import ErrorBoundSafeguard
 from .pointwise.qoi.eb import PointwiseQuantityOfInterestErrorBoundSafeguard
+from .pointwise.same import SameValueSafeguard
 from .pointwise.sign import SignPreservingSafeguard
-from .pointwise.zero import ZeroIsZeroSafeguard
 from .stencil.monotonicity import MonotonicityPreservingSafeguard
 from .stencil.qoi.eb import StencilQuantityOfInterestErrorBoundSafeguard
 
@@ -23,9 +23,9 @@ class SafeguardKind(Enum):
     Enumeration of all supported safeguards:
     """
 
-    # exact values
-    zero = ZeroIsZeroSafeguard
-    """Enforce that zero (or another constant) is exactly preserved."""
+    # same value
+    same = SameValueSafeguard
+    """Enforce that a special value is exactly preserved."""
 
     # sign
     sign = SignPreservingSafeguard

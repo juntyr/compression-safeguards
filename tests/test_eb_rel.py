@@ -89,7 +89,7 @@ def test_fuzzer_inf_times_zero():
         data,
         decoded,
         safeguards=[
-            dict(kind="zero", zero=0.0),
+            dict(kind="same", value=0.0),
             dict(kind="eb", type="rel", eb=4.287938165015999e290, equal_nan=False),
         ],
     )

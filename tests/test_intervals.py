@@ -1,8 +1,8 @@
 import numpy as np
 
 from compression_safeguards.safeguards.pointwise.eb import ErrorBoundSafeguard
+from compression_safeguards.safeguards.pointwise.same import SameValueSafeguard
 from compression_safeguards.safeguards.pointwise.sign import SignPreservingSafeguard
-from compression_safeguards.safeguards.pointwise.zero import ZeroIsZeroSafeguard
 from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.cast import as_bits
 from compression_safeguards.utils.intervals import (
@@ -197,17 +197,17 @@ def test_sign_abs():
     )
 
 
-def test_zero_abs():
+def test_same_abs():
     data = np.arange(-4, 5, dtype=np.int8)
 
-    zero_intervals = ZeroIsZeroSafeguard(zero=-1).compute_safe_intervals(
+    same_intervals = SameValueSafeguard(value=-1).compute_safe_intervals(
         data, late_bound=Bindings.empty()
     )
     abs_intervals = ErrorBoundSafeguard(type="abs", eb=2).compute_safe_intervals(
         data, late_bound=Bindings.empty()
     )
 
-    intervals = zero_intervals.intersect(abs_intervals)
+    intervals = same_intervals.intersect(abs_intervals)
 
     np.testing.assert_equal(
         intervals._lower,
@@ -220,14 +220,14 @@ def test_zero_abs():
 
     data = np.arange(-4, 5, dtype=float)
 
-    zero_intervals = ZeroIsZeroSafeguard(zero=-1.0).compute_safe_intervals(
+    same_intervals = SameValueSafeguard(value=-1.0).compute_safe_intervals(
         data, late_bound=Bindings.empty()
     )
     abs_intervals = ErrorBoundSafeguard(type="abs", eb=2.0).compute_safe_intervals(
         data, late_bound=Bindings.empty()
     )
 
-    intervals = zero_intervals.intersect(abs_intervals)
+    intervals = same_intervals.intersect(abs_intervals)
 
     np.testing.assert_equal(
         intervals._lower,
