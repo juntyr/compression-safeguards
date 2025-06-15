@@ -22,15 +22,16 @@ class SameValueSafeguard(PointwiseSafeguard):
     This safeguard can be used for preserving e.g. zero values, missing values,
     pre-computed extreme values, or any other value of importance.
 
-    By default, elements that do *not* have the `value` in the input may still
-    have the value in the output. Enabling the `exclusive` flag enforces that
-    an element in the output only has the `value` if and only if it also has
-    `value` in the input, e.g. to ensure that only missing values in the input
-    have the missing value bitpattern in the output.
+    By default, elements that do *not* have the special `value` in the input
+    may still have the value in the output. Enabling the `exclusive` flag
+    enforces that an element in the output only has the special `value` if and
+    only if it also has the `value` in the input, e.g. to ensure that only
+    missing values in the input have the missing value bitpattern in the
+    output.
 
     Beware that +0.0 and -0.0 are semantically equivalent in floating point but
-    have different bitwise patterns. To preserve both, two safeguards are
-    needed.
+    have different bitwise patterns. To preserve both, two same value
+    safeguards are needed, one for each bitpattern.
 
     Parameters
     ----------
