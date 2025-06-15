@@ -592,7 +592,7 @@ def test_fuzzer_findiff_fraction_compare():
         encode_decode_zero(
             data,
             safeguards=[
-                dict(kind="zero", zero=7),
+                dict(kind="same", value=7),
                 dict(
                     kind="qoi_eb_stencil",
                     qoi="findiff(x, order=7, accuracy=7, type=1, dx=2.2250738585072014e-308, axis=0)",

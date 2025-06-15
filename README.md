@@ -62,9 +62,9 @@ This package currently implements the following safeguards:
 
 ### Pointwise properties
 
-- `zero` (zero/constant preserving):
+- `same` (value preserving):
 
-    Values that are zero in the input are guaranteed to also be *exactly* zero in the decompressed output. By default, non-zero values may be zero in the output, though it is also possible to enforce that only zero values are zero after decompression. This safeguard can also be used to enforce that another constant value is bitwise preserved, e.g. a missing value constant or a semantic "zero" value that is represented as a non-zero number. Beware that +0.0 and -0.0 are semantically equivalent in floating point but have different bitwise patterns. If you want to preserve both, you need to use two safeguards, one configured for each zero.
+    If an element has a special value in the input, that element is guaranteed to also have bitwise the same value in the decompressed output. This safeguard can be used for preserving e.g. zero values, missing values, pre-computed extreme values, or any other value of importance. By default, elements that do *not* have the value in the input may still have the value in the output. It is also possible to enforce that an element in the output only has the value if and only if it also has value in the input, e.g. to ensure that only missing values in the input have the missing value bitpattern in the output. Beware that +0.0 and -0.0 are semantically equivalent in floating point but have different bitwise patterns. To preserve both, two safeguards are needed.
 
 - `sign` (sign-preserving):
 

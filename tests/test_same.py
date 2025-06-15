@@ -1,6 +1,6 @@
 import numpy as np
 
-from compression_safeguards.safeguards.pointwise.zero import ZeroIsZeroSafeguard
+from compression_safeguards.safeguards.pointwise.same import SameValueSafeguard
 from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.cast import as_bits
 
@@ -14,25 +14,21 @@ from .codecs import (
 
 
 def check_all_codecs(data: np.ndarray):
-    for zero in [None, 0, 42, -1024, np.finfo(float).min]:
-        safeguard = dict(kind="zero")
-        if zero is not None:
-            safeguard["zero"] = zero
-        else:
-            zero = 0
-        zero = as_bits(np.full((), zero, dtype=data.dtype))
+    for value in [0, 42, -1024, np.finfo(float).min]:
+        safeguard = dict(kind="same", value=value)
+        value = as_bits(np.full((), value, dtype=data.dtype))
 
         decoded = encode_decode_zero(data, safeguards=[safeguard])
-        assert np.all((as_bits(data) != zero) | (as_bits(decoded) == zero))
+        assert np.all((as_bits(data) != value) | (as_bits(decoded) == value))
 
         decoded = encode_decode_neg(data, safeguards=[safeguard])
-        assert np.all((as_bits(data) != zero) | (as_bits(decoded) == zero))
+        assert np.all((as_bits(data) != value) | (as_bits(decoded) == value))
 
         decoded = encode_decode_identity(data, safeguards=[safeguard])
-        assert np.all((as_bits(data) != zero) | (as_bits(decoded) == zero))
+        assert np.all((as_bits(data) != value) | (as_bits(decoded) == value))
 
         decoded = encode_decode_noise(data, safeguards=[safeguard])
-        assert np.all((as_bits(data) != zero) | (as_bits(decoded) == zero))
+        assert np.all((as_bits(data) != value) | (as_bits(decoded) == value))
 
 
 def test_empty():
@@ -73,19 +69,19 @@ def test_fuzzer_invalid_cast():
     encode_decode_mock(
         data,
         decoded,
-        safeguards=[dict(kind="zero", zero=5.760455112138539e292)],
+        safeguards=[dict(kind="same", value=5.760455112138539e292)],
     )
 
 
 def test_late_bound_inclusive():
-    safeguard = ZeroIsZeroSafeguard(zero="zero")
+    safeguard = SameValueSafeguard(value="same")
 
     data = np.arange(6).reshape(2, 3)
 
     vmin, vmax = np.iinfo(data.dtype).min, np.iinfo(data.dtype).max
 
     late_bound = Bindings(
-        zero=np.array([1, 0, 4, 3, 2, 5]).reshape(2, 3),
+        same=np.array([1, 0, 4, 3, 2, 5]).reshape(2, 3),
     )
 
     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
@@ -97,14 +93,14 @@ def test_late_bound_inclusive():
 
 
 def test_late_bound_exclusive():
-    safeguard = ZeroIsZeroSafeguard(zero="zero", exclusive=True)
+    safeguard = SameValueSafeguard(value="value", exclusive=True)
 
     data = np.arange(6, dtype=np.uint8).reshape(2, 3)
 
     vmin, vmax = np.iinfo(data.dtype).min, np.iinfo(data.dtype).max
 
     late_bound = Bindings(
-        zero=np.array([1, 0, 4, 3, 2, 5], dtype=np.uint8).reshape(2, 3),
+        value=np.array([1, 0, 4, 3, 2, 5], dtype=np.uint8).reshape(2, 3),
     )
 
     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)

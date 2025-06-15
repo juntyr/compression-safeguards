@@ -115,7 +115,7 @@ def test_parameter_validation():
                 dict(
                     kind="select",
                     selector="",
-                    safeguards=[dict(kind="zero"), dict(kind="sign")],
+                    safeguards=[dict(kind="same", value=0), dict(kind="sign")],
                 )
             ]
         )
@@ -138,7 +138,7 @@ def test_numcodecs_validation():
                     selector="param",
                     safeguards=[
                         dict(kind="qoi_eb_pw", qoi="(-(-x))", type="abs", eb=0),
-                        dict(kind="zero"),
+                        dict(kind="same", value=0),
                     ],
                 ),
             ],
@@ -166,7 +166,7 @@ def test_numcodecs_validation():
                                         type="abs",
                                         eb=0,
                                     ),
-                                    dict(kind="zero"),
+                                    dict(kind="same", value=0),
                                 ],
                             ),
                             dict(kind="sign"),
