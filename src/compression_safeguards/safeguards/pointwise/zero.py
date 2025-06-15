@@ -130,11 +130,10 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
                 self._zero,
                 data.shape,
                 data.dtype,
-            )
+            ).flatten()
             if isinstance(self._zero, Parameter)
             else self._zero_like(data.dtype)
         )
-        zerof = zero.flatten()
 
         dataf = data.flatten()
         valid = Interval.empty_like(dataf)
@@ -142,30 +141,30 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
         if not self._exclusive:
             # preserve zero values exactly, do not constrain other values
             valid = Interval.full_like(dataf)
-            Lower(zerof) <= valid[as_bits(dataf) == as_bits(zerof)] <= Upper(zerof)
+            Lower(zero) <= valid[as_bits(dataf) == as_bits(zero)] <= Upper(zero)
             return valid.into_union()
 
-        zerof_total: np.ndarray = to_total_order(zerof)
+        zero_total: np.ndarray = to_total_order(zero)
 
-        total_min = np.iinfo(zerof_total.dtype).min
-        total_max = np.iinfo(zerof_total.dtype).max
+        total_min = np.iinfo(zero_total.dtype).min
+        total_max = np.iinfo(zero_total.dtype).max
 
         valid_below = Interval.empty_like(dataf)
         valid_above = Interval.empty_like(dataf)
 
-        Lower(zerof) <= valid_below[as_bits(dataf) == as_bits(zerof)] <= Upper(zerof)
+        Lower(zero) <= valid_below[as_bits(dataf) == as_bits(zero)] <= Upper(zero)
 
-        upper = from_total_order(zerof_total - 1, data.dtype)
-        lower = from_total_order(zerof_total + 1, data.dtype)
+        upper = from_total_order(zero_total - 1, data.dtype)
+        lower = from_total_order(zero_total + 1, data.dtype)
 
         # non-zero values must exclude zero from their interval,
         #  leading to a union of two intervals, below and above zero
         Minimum <= valid_below[
-            (as_bits(dataf) != as_bits(zerof)) & (zerof_total > total_min)
+            (as_bits(dataf) != as_bits(zero)) & (zero_total > total_min)
         ] <= Upper(upper)
 
         Lower(lower) <= valid_above[
-            (as_bits(dataf) != as_bits(zerof)) & (zerof_total < total_max)
+            (as_bits(dataf) != as_bits(zero)) & (zero_total < total_max)
         ] <= Maximum
 
         return valid_below.union(valid_above)
