@@ -197,17 +197,17 @@ def test_sign_abs():
     )
 
 
-def test_zero_abs():
+def test_same_abs():
     data = np.arange(-4, 5, dtype=np.int8)
 
-    zero_intervals = SameValueSafeguard(zero=-1).compute_safe_intervals(
+    same_intervals = SameValueSafeguard(value=-1).compute_safe_intervals(
         data, late_bound=Bindings.empty()
     )
     abs_intervals = ErrorBoundSafeguard(type="abs", eb=2).compute_safe_intervals(
         data, late_bound=Bindings.empty()
     )
 
-    intervals = zero_intervals.intersect(abs_intervals)
+    intervals = same_intervals.intersect(abs_intervals)
 
     np.testing.assert_equal(
         intervals._lower,
@@ -220,14 +220,14 @@ def test_zero_abs():
 
     data = np.arange(-4, 5, dtype=float)
 
-    zero_intervals = SameValueSafeguard(zero=-1.0).compute_safe_intervals(
+    same_intervals = SameValueSafeguard(value=-1.0).compute_safe_intervals(
         data, late_bound=Bindings.empty()
     )
     abs_intervals = ErrorBoundSafeguard(type="abs", eb=2.0).compute_safe_intervals(
         data, late_bound=Bindings.empty()
     )
 
-    intervals = zero_intervals.intersect(abs_intervals)
+    intervals = same_intervals.intersect(abs_intervals)
 
     np.testing.assert_equal(
         intervals._lower,
