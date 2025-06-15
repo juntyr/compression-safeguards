@@ -64,7 +64,7 @@ This package currently implements the following [safeguards][compression_safegua
 
 - [`zero`][compression_safeguards.safeguards.pointwise.zero.ZeroIsZeroSafeguard] (zero/constant preserving):
 
-    Values that are zero in the input are guaranteed to also be *exactly* zero in the decompressed output. This safeguard can also be used to enforce that another constant value is bitwise preserved, e.g. a missing value constant or a semantic "zero" value that is represented as a non-zero number. Beware that +0.0 and -0.0 are semantically equivalent in floating point but have different bitwise patterns. If you want to preserve both, you need to use two safeguards, one configured for each zero.
+    Values that are zero in the input are guaranteed to also be *exactly* zero in the decompressed output. By default, non-zero values may be zero in the output, though it is also possible to enforce that only zero values are zero after decompression. This safeguard can also be used to enforce that another constant value is bitwise preserved, e.g. a missing value constant or a semantic "zero" value that is represented as a non-zero number. Beware that +0.0 and -0.0 are semantically equivalent in floating point but have different bitwise patterns. If you want to preserve both, you need to use two safeguards, one configured for each zero.
 
 - [`sign`][compression_safeguards.safeguards.pointwise.sign.SignPreservingSafeguard] (sign-preserving):
 

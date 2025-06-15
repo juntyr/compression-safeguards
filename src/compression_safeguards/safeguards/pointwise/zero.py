@@ -6,9 +6,9 @@ __all__ = ["ZeroIsZeroSafeguard"]
 
 import numpy as np
 
-from ...utils.bindings import Bindings
-from ...utils.cast import as_bits
-from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
+from ...utils.bindings import Bindings, Parameter
+from ...utils.cast import as_bits, from_total_order, to_total_order
+from ...utils.intervals import Interval, IntervalUnion, Lower, Maximum, Minimum, Upper
 from ...utils.typing import S, T
 from .abc import PointwiseSafeguard
 
@@ -16,7 +16,9 @@ from .abc import PointwiseSafeguard
 class ZeroIsZeroSafeguard(PointwiseSafeguard):
     """
     The `ZeroIsZeroSafeguard` guarantees that values that are zero in the input
-    are also *exactly* zero in the decompressed output.
+    are also *exactly* zero in the decompressed output. By default, non-zero
+    values may be zero in the output, though the `exclusive` parameter can also
+    enforce that only zero values are zero after decompression.
 
     This safeguard can also be used to enforce that another constant value is
     bitwise preserved, e.g. a missing value constant or a semantic "zero" value
@@ -28,17 +30,32 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
 
     Parameters
     ----------
-    zero : int | float, optional
-        The constant "zero" value that is preserved by this safeguard.
+    zero : int | float | str | Parameter, optional
+        The value of or the late-bound parameter name for the constant "zero"
+        value that is preserved by this safeguard.
+    exclusive : bool
+        If [`True`][True], non-`zero` values in the data stay non-`zero` after
+        decoding. If [`False`][False], non-`zero` values may be `zero` after
+        decoding.
     """
 
-    __slots__ = ("_zero",)
-    _zero: int | float
+    __slots__ = ("_zero", "_exclusive")
+    _zero: int | float | Parameter
+    _exclusive: bool
 
     kind = "zero"
 
-    def __init__(self, zero: int | float = 0):
-        self._zero = zero
+    def __init__(
+        self, zero: int | float | str | Parameter = 0, exclusive: bool = False
+    ):
+        if isinstance(zero, Parameter):
+            self._zero = zero
+        elif isinstance(zero, str):
+            self._zero = Parameter(zero)
+        else:
+            self._zero = zero
+
+        self._exclusive = exclusive
 
     def check_pointwise(
         self,
@@ -67,8 +84,22 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        zero_bits = as_bits(self._zero_like(data.dtype))
+        zero: np.ndarray[tuple[()] | S, np.dtype[T]] = (
+            late_bound.resolve_ndarray(
+                self._zero,
+                data.shape,
+                data.dtype,
+            )
+            if isinstance(self._zero, Parameter)
+            else self._zero_like(data.dtype)
+        )
+        zero_bits = as_bits(zero)
 
+        if self._exclusive:
+            # must only be zero where zero
+            return (as_bits(data) == zero_bits) == (as_bits(decoded) == zero_bits)
+
+        # zeros must stay zeros, everything else can be arbitrary
         return (as_bits(data) != zero_bits) | (as_bits(decoded) == zero_bits)
 
     def compute_safe_intervals(
@@ -94,15 +125,50 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
             Union of intervals in which the zero-is-zero guarantee is upheld.
         """
 
-        zero = self._zero_like(data.dtype)
+        zero = (
+            late_bound.resolve_ndarray(
+                self._zero,
+                data.shape,
+                data.dtype,
+            )
+            if isinstance(self._zero, Parameter)
+            else self._zero_like(data.dtype)
+        )
+        zerof = zero.flatten()
 
         dataf = data.flatten()
-        valid = Interval.full_like(dataf)
+        valid = Interval.empty_like(dataf)
 
-        # preserve zero values exactly, do not constrain other values
-        Lower(zero) <= valid[as_bits(dataf) == as_bits(zero)] <= Upper(zero)
+        if not self._exclusive:
+            # preserve zero values exactly, do not constrain other values
+            valid = Interval.full_like(dataf)
+            Lower(zerof) <= valid[as_bits(dataf) == as_bits(zerof)] <= Upper(zerof)
+            return valid.into_union()
 
-        return valid.into_union()
+        zerof_total: np.ndarray = to_total_order(zerof)
+
+        total_min = np.iinfo(zerof_total.dtype).min
+        total_max = np.iinfo(zerof_total.dtype).max
+
+        valid_below = Interval.empty_like(dataf)
+        valid_above = Interval.empty_like(dataf)
+
+        Lower(zerof) <= valid_below[as_bits(dataf) == as_bits(zerof)] <= Upper(zerof)
+
+        upper = from_total_order(zerof_total - 1, data.dtype)
+        lower = from_total_order(zerof_total + 1, data.dtype)
+
+        # non-zero values must exclude zero from their interval,
+        #  leading to a union of two intervals, below and above zero
+        Minimum <= valid_below[
+            (as_bits(dataf) != as_bits(zerof)) & (zerof_total > total_min)
+        ] <= Upper(upper)
+
+        Lower(lower) <= valid_above[
+            (as_bits(dataf) != as_bits(zerof)) & (zerof_total < total_max)
+        ] <= Maximum
+
+        return valid_below.union(valid_above)
 
     def get_config(self) -> dict:
         """
@@ -114,7 +180,7 @@ class ZeroIsZeroSafeguard(PointwiseSafeguard):
             Configuration of the safeguard.
         """
 
-        return dict(kind=type(self).kind, zero=self._zero)
+        return dict(kind=type(self).kind, zero=self._zero, exclusive=self._exclusive)
 
     def _zero_like(self, dtype: np.dtype[T]) -> np.ndarray[tuple[()], np.dtype[T]]:
         zero = np.array(self._zero)

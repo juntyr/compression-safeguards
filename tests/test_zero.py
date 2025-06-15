@@ -1,5 +1,7 @@
 import numpy as np
 
+from compression_safeguards.safeguards.pointwise.zero import ZeroIsZeroSafeguard
+from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.cast import as_bits
 
 from .codecs import (
@@ -73,3 +75,53 @@ def test_fuzzer_invalid_cast():
         decoded,
         safeguards=[dict(kind="zero", zero=5.760455112138539e292)],
     )
+
+
+def test_late_bound_inclusive():
+    safeguard = ZeroIsZeroSafeguard(zero="zero")
+
+    data = np.arange(6).reshape(2, 3)
+
+    vmin, vmax = np.iinfo(data.dtype).min, np.iinfo(data.dtype).max
+
+    late_bound = Bindings(
+        zero=np.array([1, 0, 4, 3, 2, 5]).reshape(2, 3),
+    )
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == np.array([vmin, vmin, vmin, 3, vmin, 5]))
+    assert np.all(valid._upper == np.array([vmax, vmax, vmax, 3, vmax, 5]))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(ok == np.array([True, True, True, False, True, False]).reshape(2, 3))
+
+
+def test_late_bound_exclusive():
+    safeguard = ZeroIsZeroSafeguard(zero="zero", exclusive=True)
+
+    data = np.arange(6, dtype=np.uint8).reshape(2, 3)
+
+    vmin, vmax = np.iinfo(data.dtype).min, np.iinfo(data.dtype).max
+
+    late_bound = Bindings(
+        zero=np.array([1, 0, 4, 3, 2, 5], dtype=np.uint8).reshape(2, 3),
+    )
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(
+        valid._lower
+        == np.array(
+            [[vmin, 0 + 1, vmin, 3, vmin, 5], [1 + 1, vmax, 4 + 1, vmax, 2 + 1, vmax]],
+            dtype=np.uint8,
+        )
+    )
+    assert np.all(
+        valid._upper
+        == np.array(
+            [[1 - 1, vmax, 4 - 1, 3, 2 - 1, 5], [vmax, vmin, vmax, vmin, vmax, vmin]],
+            dtype=np.uint8,
+        )
+    )
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(ok == np.array([True, True, True, False, True, False]).reshape(2, 3))
