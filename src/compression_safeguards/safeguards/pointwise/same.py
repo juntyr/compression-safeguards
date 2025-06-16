@@ -50,7 +50,9 @@ class SameValueSafeguard(PointwiseSafeguard):
 
     kind = "same"
 
-    def __init__(self, value: int | float | str | Parameter, exclusive: bool = False):
+    def __init__(
+        self, value: int | float | str | Parameter, *, exclusive: bool = False
+    ):
         if isinstance(value, Parameter):
             self._value = value
         elif isinstance(value, str):
@@ -162,16 +164,17 @@ class SameValueSafeguard(PointwiseSafeguard):
 
         Lower(valuef) <= valid_below[dataf_bits == valuef_bits] <= Upper(valuef)
 
-        upper = from_total_order(valuef_total - 1, data.dtype)
-        lower = from_total_order(valuef_total + 1, data.dtype)
+        with np.errstate(over="ignore", under="ignore"):
+            below_upper = np.array(from_total_order(valuef_total - 1, data.dtype))
+            above_lower = np.array(from_total_order(valuef_total + 1, data.dtype))
 
         # non-value elements must exclude value from their interval,
         #  leading to a union of two intervals, below and above value
         Minimum <= valid_below[
             (dataf_bits != valuef_bits) & (valuef_total > total_min)
-        ] <= Upper(upper)
+        ] <= Upper(below_upper)
 
-        Lower(lower) <= valid_above[
+        Lower(above_lower) <= valid_above[
             (dataf_bits != valuef_bits) & (valuef_total < total_max)
         ] <= Maximum
 

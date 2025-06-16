@@ -1,9 +1,12 @@
 import numpy as np
 
 from compression_safeguards.safeguards.pointwise.sign import SignPreservingSafeguard
+from compression_safeguards.utils.bindings import Bindings
+from compression_safeguards.utils.cast import as_bits
 
 from .codecs import (
     encode_decode_identity,
+    encode_decode_mock,
     encode_decode_neg,
     encode_decode_noise,
     encode_decode_zero,
@@ -13,26 +16,38 @@ from .codecs import (
 def check_all_codecs(data: np.ndarray):
     decoded = encode_decode_zero(data, safeguards=[dict(kind="sign")])
     assert np.all(
-        SignPreservingSafeguard()._sign(data)
-        == SignPreservingSafeguard()._sign(decoded)
+        np.where(
+            np.isnan(data),
+            np.isnan(decoded) & (np.signbit(data) == np.signbit(decoded)),
+            np.sign(data) == np.sign(decoded),
+        )
     )
 
     decoded = encode_decode_neg(data, safeguards=[dict(kind="sign")])
     assert np.all(
-        SignPreservingSafeguard()._sign(data)
-        == SignPreservingSafeguard()._sign(decoded)
+        np.where(
+            np.isnan(data),
+            np.isnan(decoded) & (np.signbit(data) == np.signbit(decoded)),
+            np.sign(data) == np.sign(decoded),
+        )
     )
 
     decoded = encode_decode_identity(data, safeguards=[dict(kind="sign")])
     assert np.all(
-        SignPreservingSafeguard()._sign(data)
-        == SignPreservingSafeguard()._sign(decoded)
+        np.where(
+            np.isnan(data),
+            np.isnan(decoded) & (np.signbit(data) == np.signbit(decoded)),
+            np.sign(data) == np.sign(decoded),
+        )
     )
 
     decoded = encode_decode_noise(data, safeguards=[dict(kind="sign")])
     assert np.all(
-        SignPreservingSafeguard()._sign(data)
-        == SignPreservingSafeguard()._sign(decoded)
+        np.where(
+            np.isnan(data),
+            np.isnan(decoded) & (np.signbit(data) == np.signbit(decoded)),
+            np.sign(data) == np.sign(decoded),
+        )
     )
 
 
@@ -64,4 +79,74 @@ def test_edge_cases():
                 +0.0,
             ]
         )
+    )
+
+
+def test_late_bound():
+    safeguard = SignPreservingSafeguard(offset="offset")
+
+    data = np.arange(6, dtype=np.uint8).reshape(2, 3)
+
+    vmin, vmax = np.iinfo(data.dtype).min, np.iinfo(data.dtype).max
+
+    late_bound = Bindings(
+        offset=np.array([0, 2, 2, 2, 2, 5], dtype=np.uint8).reshape(2, 3),
+    )
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    print(valid)
+    assert np.all(
+        valid._lower
+        == np.array(
+            [0, vmin, 2, 2 + 1, 2 + 1, 5],
+            dtype=np.uint8,
+        )
+    )
+    assert np.all(
+        valid._upper
+        == np.array(
+            [0, 2 - 1, 2, vmax, vmax, 5],
+            dtype=np.uint8,
+        )
+    )
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    # -data wraps around for uint8
+    assert np.all(ok == np.array([True, False, False, True, True, False]).reshape(2, 3))
+
+
+def test_fuzzer_offset_overflow():
+    data = np.array([[33, -1, 43]], dtype=np.int8)
+    decoded = np.array([[58, 1, 33]], dtype=np.int8)
+
+    encode_decode_mock(data, decoded, safeguards=[dict(kind="sign", offset=0)])
+
+
+def test_sign_intervals_zero():
+    data = np.array([-1.0, 1.0])
+
+    intervals = SignPreservingSafeguard(offset=+0.0).compute_safe_intervals(
+        data, late_bound=Bindings.empty()
+    )
+
+    np.testing.assert_equal(
+        as_bits(intervals._lower),
+        as_bits(np.array([[-np.inf, np.finfo(float).smallest_subnormal]])),
+    )
+    np.testing.assert_equal(
+        as_bits(intervals._upper),
+        as_bits(np.array([[-np.finfo(float).smallest_subnormal, np.inf]])),
+    )
+
+    intervals = SignPreservingSafeguard(offset=-0.0).compute_safe_intervals(
+        data, late_bound=Bindings.empty()
+    )
+
+    np.testing.assert_equal(
+        as_bits(intervals._lower),
+        as_bits(np.array([[-np.inf, np.finfo(float).smallest_subnormal]])),
+    )
+    np.testing.assert_equal(
+        as_bits(intervals._upper),
+        as_bits(np.array([[-np.finfo(float).smallest_subnormal, np.inf]])),
     )
