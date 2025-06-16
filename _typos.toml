@@ -1,3 +1,6 @@
+[default]
+extend-ignore-identifiers-re = ["arange"]
+
 [default.extend-identifiers]
 check_arange = "check_arange"
 dout = "dout"
