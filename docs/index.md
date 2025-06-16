@@ -68,7 +68,7 @@ This package currently implements the following [safeguards][compression_safegua
 
 - [`sign`][compression_safeguards.safeguards.pointwise.sign.SignPreservingSafeguard] (sign-preserving):
 
-    Values are guaranteed to have the same sign (-1, 0, +1) in the decompressed output as they have in the input data. NaN values are preserved as NaN values with the same sign bit. This safeguard can be configured to preserve the sign relative to a custom offset, e.g. to preserve global maxima and minima. This safeguard should be combined with e.g. an error bound, as it by itself accepts *any* value with the same sign.
+    Values are guaranteed to have the same sign (-1, 0, +1) in the decompressed output as they have in the input data. NaN values are preserved as NaN values with the same sign bit. This safeguard can be configured to preserve the sign relative to a custom offset, e.g. to preserve global minima and maxima. This safeguard should be combined with e.g. an error bound, as it by itself accepts *any* value with the same sign.
 
 ### Relationships between neighboring elements
 

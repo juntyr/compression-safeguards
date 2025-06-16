@@ -21,7 +21,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
     NaN values are preserved as NaN values with the same sign bit.
 
     This safeguard can be configured to preserve the sign relative to a custom
-    `offset`, e.g. to preserve global maxima and minima.
+    `offset`, e.g. to preserve global minima and maxima.
 
     This safeguard should be combined with e.g. an error bound, as it by itself
     accepts *any* value with the same sign.
@@ -46,8 +46,8 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         elif isinstance(offset, str):
             self._offset = Parameter(offset)
         else:
-            assert isinstance(offset, int) or np.all(np.isfinite(offset)), (
-                "offset must be finite"
+            assert isinstance(offset, int) or (not np.isnan(offset)), (
+                "offset must not be NaN"
             )
             self._offset = offset
 
@@ -86,7 +86,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             if isinstance(self._offset, Parameter)
             else self._offset_like(data.dtype)
         )
-        assert np.all(np.isfinite(offset)), "offset must be finite"
+        assert np.all(~np.isnan(offset)), "offset must not contain NaNs"
 
         ok = np.where(
             # NaN values keep their sign bit
@@ -135,7 +135,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             if isinstance(self._offset, Parameter)
             else self._offset_like(data.dtype)
         )
-        assert np.all(np.isfinite(offsetf)), "offset must be finite"
+        assert np.all(~np.isnan(offsetf)), "offset must not contain NaNs"
         offsetf_total: np.ndarray = to_total_order(offsetf)
 
         below_upper = np.array(from_total_order(offsetf_total - 1, data.dtype))
