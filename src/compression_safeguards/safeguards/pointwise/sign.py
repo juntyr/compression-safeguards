@@ -138,8 +138,9 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         assert np.all(~np.isnan(offsetf)), "offset must not contain NaNs"
         offsetf_total: np.ndarray = to_total_order(offsetf)
 
-        below_upper = np.array(from_total_order(offsetf_total - 1, data.dtype))
-        above_lower = np.array(from_total_order(offsetf_total + 1, data.dtype))
+        with np.errstate(over="ignore", under="ignore"):
+            below_upper = np.array(from_total_order(offsetf_total - 1, data.dtype))
+            above_lower = np.array(from_total_order(offsetf_total + 1, data.dtype))
 
         dataf = data.flatten()
         valid = (

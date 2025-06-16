@@ -5,6 +5,7 @@ from compression_safeguards.utils.bindings import Bindings
 
 from .codecs import (
     encode_decode_identity,
+    encode_decode_mock,
     encode_decode_neg,
     encode_decode_noise,
     encode_decode_zero,
@@ -111,3 +112,10 @@ def test_late_bound():
     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
     # -data wraps around for uint8
     assert np.all(ok == np.array([True, False, False, True, True, False]).reshape(2, 3))
+
+
+def test_fuzzer_offset_overflow():
+    data = np.array([[33, -1, 43]], dtype=np.int8)
+    decoded = np.array([[58, 1, 33]], dtype=np.int8)
+
+    encode_decode_mock(data, decoded, safeguards=[dict(kind="sign", offset=0)])
