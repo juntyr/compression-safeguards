@@ -121,3 +121,17 @@ def test_late_bound_exclusive():
 
     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
     assert np.all(ok == np.array([True, True, True, False, True, False]).reshape(2, 3))
+
+
+def test_fuzzer_pick_negative_shape_mismatch():
+    data = np.array([[801]], dtype=np.int16)
+    decoded = np.array([[15934]], dtype=np.int16)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(kind="same", value=49, exclusive=True),
+            dict(kind="eb", type="rel", eb=1, equal_nan=True),
+        ],
+    )

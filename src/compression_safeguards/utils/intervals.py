@@ -956,6 +956,7 @@ class IntervalUnion(Generic[T, N, U]):
         #    lower bound, ensuring that empty intervals are not picked
         least = np.where(interval_nonempty, lower, allbits).argmin(axis=0)
         lower, upper = lower[least, np.arange(n)], upper[least, np.arange(n)]
+        negative = negative[least, np.arange(n)]
         assert np.all(lower <= upper)
 
         # 7. count the number of leading zero bits in lower and upper
