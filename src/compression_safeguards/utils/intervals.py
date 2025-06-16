@@ -88,8 +88,9 @@ class Interval(Generic[T, N]):
     The following common lower and upper bounds are provided for ease of use:
 
     - [`Interval.preserve_inf`][compression_safeguards.utils.intervals.Interval.preserve_inf]
-    - [`Interval.preserve_nan`][compression_safeguards.utils.intervals.Interval.preserve_nan]
+    - [`Interval.preserve_signed_nan`][compression_safeguards.utils.intervals.Interval.preserve_signed_nan]
     - [`Interval.preserve_finite`][compression_safeguards.utils.intervals.Interval.preserve_finite]
+    - [`Interval.preserve_non_nan`][compression_safeguards.utils.intervals.Interval.preserve_non_nan]
 
     ## Interval operations
 
@@ -250,16 +251,17 @@ class Interval(Generic[T, N]):
 
         return self
 
-    def preserve_nan(
+    def preserve_signed_nan(
         self, a: np.ndarray[tuple[N], np.dtype[T]], *, equal_nan: bool
     ) -> Self:
         """
-        Preserve all NaN values in `a`.
+        Preserve all NaN values in `a`, preserving their sign bit.
 
         - If `equal_nan` is [`True`][True], all NaN values are preserved
           exactly.
-        - If `equal_nan` is [`False`][False], the intervals corresponding to the
-          NaN values will include all possible NaN values.
+        - If `equal_nan` is [`False`][False], the intervals corresponding to
+          the NaN values will include all possible NaN values with the same
+          sign bit.
 
         Parameters
         ----------
@@ -327,6 +329,7 @@ class Interval(Generic[T, N]):
         """
 
         if not np.issubdtype(a.dtype, np.floating):
+            Minimum <= self[:] <= Maximum
             return self
 
         # nextafter produces the largest and smallest finite floating point
@@ -334,6 +337,34 @@ class Interval(Generic[T, N]):
         Lower(np.array(_nextafter(np.array(-np.inf, dtype=a.dtype), 0))) <= self[
             _isfinite(a)
         ] <= Upper(np.array(_nextafter(np.array(np.inf, dtype=a.dtype), 0)))
+
+        return self
+
+    def preserve_non_nan(self, a: np.ndarray[tuple[N], np.dtype[T]]) -> Self:
+        """
+        Preserve all non-NaN values in `a` as non-NaN values.
+
+        Specifically, set their lower and upper bounds to exclude NaN values.
+
+        Parameters
+        ----------
+        a : np.ndarray[tuple[N], np.dtype[T]]
+            The arrays whose non-NaN values this interval should preserve as
+            non-NaN.
+
+        Returns
+        -------
+        self : Self
+            Returns the modified `self`
+        """
+
+        if not np.issubdtype(a.dtype, np.floating):
+            Minimum <= self[:] <= Maximum
+            return self
+
+        Lower(np.array(-np.inf, dtype=a.dtype)) <= self[~_isnan(a)] <= Upper(
+            np.array(np.inf, dtype=a.dtype)
+        )
 
         return self
 

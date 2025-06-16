@@ -53,7 +53,7 @@ def compute_safe_eb_lower_upper_interval(
     valid = (
         Interval.empty_like(dataf)
         .preserve_inf(dataf)
-        .preserve_nan(dataf, equal_nan=True)
+        .preserve_signed_nan(dataf, equal_nan=True)
     )
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):

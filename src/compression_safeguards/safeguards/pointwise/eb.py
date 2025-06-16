@@ -178,7 +178,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         valid = (
             Interval.empty_like(dataf)
             .preserve_inf(dataf)
-            .preserve_nan(dataf, equal_nan=self._equal_nan)
+            .preserve_signed_nan(dataf, equal_nan=self._equal_nan)
         )
 
         data_float: np.ndarray = to_float(data)
