@@ -2,6 +2,7 @@ import numpy as np
 
 from compression_safeguards.safeguards.pointwise.sign import SignPreservingSafeguard
 from compression_safeguards.utils.bindings import Bindings
+from compression_safeguards.utils.cast import as_bits
 
 from .codecs import (
     encode_decode_identity,
@@ -119,3 +120,33 @@ def test_fuzzer_offset_overflow():
     decoded = np.array([[58, 1, 33]], dtype=np.int8)
 
     encode_decode_mock(data, decoded, safeguards=[dict(kind="sign", offset=0)])
+
+
+def test_sign_intervals_zero():
+    data = np.array([-1.0, 1.0])
+
+    intervals = SignPreservingSafeguard(offset=+0.0).compute_safe_intervals(
+        data, late_bound=Bindings.empty()
+    )
+
+    np.testing.assert_equal(
+        as_bits(intervals._lower),
+        as_bits(np.array([[-np.inf, np.finfo(float).smallest_subnormal]])),
+    )
+    np.testing.assert_equal(
+        as_bits(intervals._upper),
+        as_bits(np.array([[-np.finfo(float).smallest_subnormal, np.inf]])),
+    )
+
+    intervals = SignPreservingSafeguard(offset=-0.0).compute_safe_intervals(
+        data, late_bound=Bindings.empty()
+    )
+
+    np.testing.assert_equal(
+        as_bits(intervals._lower),
+        as_bits(np.array([[-np.inf, np.finfo(float).smallest_subnormal]])),
+    )
+    np.testing.assert_equal(
+        as_bits(intervals._upper),
+        as_bits(np.array([[-np.finfo(float).smallest_subnormal, np.inf]])),
+    )

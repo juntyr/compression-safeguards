@@ -53,13 +53,15 @@ def test_sign():
                 [
                     [
                         _minimum(np.dtype(float)),
-                        _minimum(np.dtype(float)),
-                        _minimum(np.dtype(float)),
+                        -np.inf,
+                        -np.inf,
                         -0.0,
                         0.0,
                         np.finfo(float).smallest_subnormal,
                         np.finfo(float).smallest_subnormal,
-                        np.finfo(float).smallest_subnormal,
+                        np.array(as_bits(np.array(np.inf, dtype=float)) + 1).view(
+                            float
+                        ),
                     ]
                 ]
             )
@@ -71,13 +73,15 @@ def test_sign():
             np.array(
                 [
                     [
-                        -np.finfo(float).smallest_subnormal,
+                        -np.array(as_bits(np.array(np.inf, dtype=float)) + 1).view(
+                            float
+                        ),
                         -np.finfo(float).smallest_subnormal,
                         -np.finfo(float).smallest_subnormal,
                         -0.0,
                         0.0,
-                        _maximum(np.dtype(float)),
-                        _maximum(np.dtype(float)),
+                        np.inf,
+                        np.inf,
                         _maximum(np.dtype(float)),
                     ]
                 ]

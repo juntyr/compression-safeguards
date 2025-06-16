@@ -257,11 +257,11 @@ class Interval(Generic[T, N]):
         """
         Preserve all NaN values in `a`, preserving their sign bit.
 
-        - If `equal_nan` is [`True`][True], all NaN values are preserved
-          exactly.
-        - If `equal_nan` is [`False`][False], the intervals corresponding to
+        - If `equal_nan` is [`True`][True], the intervals corresponding to
           the NaN values will include all possible NaN values with the same
           sign bit.
+        - If `equal_nan` is [`False`][False], all NaN values are preserved
+          exactly.
 
         Parameters
         ----------
