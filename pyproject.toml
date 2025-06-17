@@ -18,7 +18,7 @@ dependencies = [
 [dependency-groups]
 bench = [
     "earthkit-plots~=0.3.1",
-    "numcodecs-wasm~=0.1.6",
+    "numcodecs-wasm~=0.1.7",
     "numcodecs-wasm-sz3~=0.6.0",
     "numcodecs-wasm-zfp~=0.5.1",
     "numcodecs-wasm-zstd~=0.3.0",
@@ -32,7 +32,8 @@ dev = ["ruff~=0.9"]
 examples = [
     "cdsapi~=0.7.6",
     "jupyterlab",
-    "numcodecs-wasm~=0.1.6",
+    "numcodecs-wasm~=0.1.7",
+    "numcodecs-wasm-sperr~=0.1.0",
     "numcodecs-wasm-sz3~=0.6.0",
     "numcodecs-wasm-tthresh~=0.2.0",
     "numcodecs-wasm-zfp-classic~=0.3.1",
