@@ -12,7 +12,7 @@ from numpy.lib.stride_tricks import sliding_window_view
 from typing_extensions import assert_never  # MSPV 3.11
 
 from ...utils.bindings import Bindings
-from ...utils.cast import _isfinite, _isnan, from_total_order, to_total_order
+from ...utils.cast import _isnan, from_total_order, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import S, T
 from . import BoundaryCondition, NeighbourhoodAxis, _pad_with_boundary
@@ -35,8 +35,8 @@ class Monotonicity(Enum):
     Strictly increasing/decreasing sequences in the input array are guaranteed
     to be strictly increasing/decreasing in the decoded array.
 
-    Sequences that are not strictly increasing/decreasing or contain non-finite
-    values are not affected.
+    Sequences that are not strictly increasing/decreasing or contain NaN values
+    are not affected.
     """
 
     strict_with_consts = _STRICT_WITH_CONSTS
@@ -46,7 +46,7 @@ class Monotonicity(Enum):
     array.
 
     Sequences that are not strictly increasing/decreasing/constant or contain
-    non-finite values are not affected.
+    NaN values are not affected.
     """
 
     strict_to_weak = _STRICT_TO_WEAK
@@ -54,8 +54,8 @@ class Monotonicity(Enum):
     Strictly increasing/decreasing sequences in the input array are guaranteed
     to be *weakly* increasing/decreasing (or constant) in the decoded array.
 
-    Sequences that are not strictly increasing/decreasing or contain non-finite
-    values are not affected.
+    Sequences that are not strictly increasing/decreasing or contain NaN values
+    are not affected.
     """
 
     weak = _WEAK
@@ -65,7 +65,7 @@ class Monotonicity(Enum):
     the decoded array.
 
     Sequences that are not weakly increasing/decreasing or are constant or
-    contain non-finite values are not affected.
+    contain NaN values are not affected.
     """
 
 
@@ -75,16 +75,16 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     monotonic in the input are guaranteed to be monotonic in the decompressed
     output.
 
-    Monotonic sequences are detected using per-axis moving windows with a
-    constant symmetric size of $(1 + window \cdot 2)$. Typically, the window
-    size should be chosen to be large enough to ignore noise, i.e. $>1$, but
-    small enough to capture details.
+    Monotonic sequences are detected using arithmetic comparisons in per-axis
+    moving windows with a constant symmetric size of $(1 + window \cdot 2)$.
+    Typically, the window size should be chosen to be large enough to ignore
+    noise, i.e. $>1$, but small enough to capture details.
 
     The safeguard supports enforcing four levels of
     [`Monotonicity`][compression_safeguards.safeguards.stencil.monotonicity.Monotonicity]:
     `strict`, `strict_with_consts`, `strict_to_weak`, `weak`.
 
-    Windows that are not monotonic or contain non-finite data are skipped.
+    Windows that are not monotonic or contain NaN values are skipped.
 
     If the provided `axis` index is out of range for some data shape, the
     safeguard is not applied to that data.
@@ -566,10 +566,10 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         valid._lower = from_total_order(((lt ^ dt) >> 1) + (lt & dt), data.dtype)
         valid._upper = from_total_order(((ut ^ dt) >> 1) + (ut & dt), data.dtype)
 
-        # ensure that finite values remain finite since they can otherwise
+        # ensure that non-NaN values remain non-NaN since they can otherwise
         #  invalidate the monotonicity of their window
         valid = valid.intersect(
-            Interval.full_like(data).preserve_finite(data.flatten())
+            Interval.full_like(data).preserve_non_nan(data.flatten())
         )
 
         # only apply the safe interval restrictions to elements onto which any
@@ -643,9 +643,9 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             np.all(x[..., 1:] == x[..., :-1], axis=-1), 0 if eq else np.nan, monotonic
         )
 
-        # non-finite values cannot participate in monotonic sequences
-        # NaN: any(!isfinite(x[i]))
-        monotonic = np.where(np.all(_isfinite(x), axis=-1), monotonic, np.nan)
+        # NaN values cannot participate in monotonic sequences
+        # NaN: any(isnan(x[i]))
+        monotonic = np.where(np.any(_isnan(x), axis=-1), np.nan, monotonic)
 
         # return the result in a shape that's broadcastable to x
         return monotonic[..., np.newaxis]
@@ -656,16 +656,16 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         match self._monotonicity:
             case Monotonicity.strict | Monotonicity.strict_with_consts:
                 return np.where(
-                    _isfinite(data_monotonic),
-                    decoded_monotonic != data_monotonic,
+                    _isnan(data_monotonic),
                     False,
+                    decoded_monotonic != data_monotonic,
                 )
             case Monotonicity.strict_to_weak | Monotonicity.weak:
                 return np.where(
-                    _isfinite(data_monotonic),
+                    _isnan(data_monotonic),
+                    False,
                     # having the opposite sign or no sign are both not equal
                     (decoded_monotonic == -data_monotonic) | _isnan(decoded_monotonic),
-                    False,
                 )
             case _:
                 assert_never(self._monotonicity)
