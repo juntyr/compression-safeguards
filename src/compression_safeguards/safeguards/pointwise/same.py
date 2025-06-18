@@ -37,7 +37,8 @@ class SameValueSafeguard(PointwiseSafeguard):
     ----------
     value : int | float | str | Parameter
         The value of or the late-bound parameter name for the certain `value`
-        that is preserved by this safeguard.
+        that is preserved by this safeguard. Literal values are (unsafely) cast
+        to the data dtype before binary comparison.
     exclusive : bool
         If [`True`][True], non-`value` elements in the data stay non-`value`
         after decoding. If [`False`][False], non-`value` values may have the

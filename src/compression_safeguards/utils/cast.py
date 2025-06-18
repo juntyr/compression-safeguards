@@ -86,16 +86,14 @@ def to_finite_float(
         The converted value or array with `dtype`.
     """
 
-    # precondition: dtype comes from to_float
-    # lossless cast from integer to floating point with a sufficiently large
-    #  mantissa
-    xf: np.ndarray[S, np.dtype[F]] = np.array(x).astype(dtype, casting="safe")
+    # to_finite_float is meant to evaluate and cast to a given floating dtype,
+    #  even if the cast is lossy
+    xf: np.ndarray[S, np.dtype[F]] = np.array(x).astype(dtype, casting="unsafe")
 
     if map is not None:
-        # precondition: dtype comes from to_float
-        # lossless cast from integer to floating point with a sufficiently
-        #  large mantissa
-        xf = np.array(map(xf)).astype(dtype, casting="safe")
+        # to_finite_float is meant to evaluate and cast to a given floating
+        #  dtype, even if the cast is lossy
+        xf = np.array(map(xf)).astype(dtype, casting="unsafe")
 
     if np.dtype(dtype) == _float128_dtype:
         minv, maxv = _float128_min, _float128_max

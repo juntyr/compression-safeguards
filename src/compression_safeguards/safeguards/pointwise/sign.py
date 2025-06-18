@@ -21,7 +21,18 @@ class SignPreservingSafeguard(PointwiseSafeguard):
     NaN values are preserved as NaN values with the same sign bit.
 
     This safeguard can be configured to preserve the sign relative to a custom
-    `offset`, e.g. to preserve global minima and maxima.
+    `offset`, e.g. to preserve global minima and maxima. The sign is then
+    defined based on arithmetic comparison, i.e.
+
+    \[
+        \text{sign}(x, offset) = \begin{cases}
+            -\text{NaN} \quad &\text{if } x \text{ is} -\text{NaN} \\
+            -1 \quad &\text{if } x < offset \\
+            0 \quad &\text{if } x = offset \\
+            +1 \quad &\text{if } x > offset \\
+            +\text{NaN} \quad &\text{if } x \text{ is} +\text{NaN}
+        \end{cases}
+    \]
 
     This safeguard should be combined with e.g. an error bound, as it by itself
     accepts *any* value with the same sign.
@@ -33,6 +44,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         compared to which the sign is computed. By default, the offset is
         zero. Values that are above / below / equal to the offset are
         guaranteed to stay above / below / equal to the offset, respectively.
+        Literal values are (unsafely) cast to the data dtype before comparison.
     """
 
     __slots__ = "_offset"

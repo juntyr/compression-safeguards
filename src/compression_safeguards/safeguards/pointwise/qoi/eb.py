@@ -66,6 +66,12 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
     decoded value is also NaN, but does not guarantee that it has the same
     bit pattern.
 
+    The error bound can be verified by evaluating the QoI using the
+    [`evaluate_qoi`][compression_safeguards.safeguards.pointwise.qoi.eb.PointwiseQuantityOfInterestErrorBoundSafeguard.evaluate_qoi]
+    method, which returns the the QoI in a sufficiently large floating point
+    type (keeps the same dtype for floating point data, chooses a dtype with a
+    mantissa that has at least as many bits as / for the integer dtype).
+
     The QoI expression is written using the following EBNF grammar[^1] for
     `expr`:
 
