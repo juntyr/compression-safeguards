@@ -193,5 +193,6 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
-                offset = offset.astype(dtype)
+                # TODO: should we silently cast here
+                offset = offset.astype(dtype, casting="unsafe")
         return offset  # type: ignore

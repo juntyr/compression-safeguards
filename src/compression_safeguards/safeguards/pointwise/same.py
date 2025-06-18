@@ -198,5 +198,6 @@ class SameValueSafeguard(PointwiseSafeguard):
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
-                value = value.astype(dtype)
+                # TODO: should we silently cast here
+                value = value.astype(dtype, casting="unsafe")
         return value  # type: ignore

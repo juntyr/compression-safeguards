@@ -7,7 +7,6 @@ from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.cast import as_bits
 from compression_safeguards.utils.intervals import (
     Interval,
-    IntervalUnion,
     Lower,
     Upper,
     _maximum,
@@ -241,24 +240,6 @@ def test_same_abs():
         intervals._upper,
         np.array([[-2.0, -1.0, 0.0, -1.0, 2.0, 3.0, 4.0, 5.0, 6.0]]),
     )
-
-
-def generate_random_interval_union() -> tuple[IntervalUnion, set]:
-    n = np.random.randint(1, 5)
-
-    pivots = np.sort(np.random.randint(0, 100, n * 2))
-
-    intervals = IntervalUnion.empty(np.dtype(int), 1, 1)
-    elems = set()
-
-    for i in range(n):
-        low, high = pivots[i * 2], pivots[i * 2 + 1]
-        interval = Interval.empty(np.dtype(int), 1)
-        Lower(np.array(low)) <= interval[:] <= Upper(np.array(high))
-        intervals = intervals.union(interval.into_union())
-        elems = elems.union(range(low, high + 1))
-
-    return (intervals, elems)
 
 
 def test_union_no_overlap():

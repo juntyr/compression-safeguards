@@ -1045,12 +1045,13 @@ def _count_leading_zeros(x: np.ndarray) -> np.ndarray:
     assert nbits <= 64
 
     if nbits <= 16:
-        return (nbits - np.frexp(x_bits.astype(np.uint32))[1]).astype(np.uint8)
+        # safe cast from integer type to a larger integer type
+        return nbits - np.frexp(x_bits.astype(np.uint32, casting="safe"))[1]
 
     if nbits <= 32:
-        return (nbits - np.frexp(x_bits.astype(np.uint64))[1]).astype(np.uint8)
+        return nbits - np.frexp(x_bits.astype(np.uint64, casting="safe"))[1]
 
     # nbits <= 64
-    _, high_exp = np.frexp(x_bits.astype(np.uint64) >> 32)
-    _, low_exp = np.frexp(x_bits.astype(np.uint64) & 0xFFFFFFFF)
-    return (nbits - np.where(high_exp, high_exp + 32, low_exp)).astype(np.uint8)
+    _, high_exp = np.frexp(x_bits.astype(np.uint64, casting="safe") >> 32)
+    _, low_exp = np.frexp(x_bits.astype(np.uint64, casting="safe") & 0xFFFFFFFF)
+    return nbits - np.where(high_exp, high_exp + 32, low_exp)

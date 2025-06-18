@@ -50,7 +50,9 @@ def to_float(x: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[F]]:
         np.dtype(np.uint64): _float128_dtype,
     }[x.dtype]
 
-    return x.astype(ftype)  # type: ignore
+    # lossless cast from integer to floating point with a sufficiently large
+    #  mantissa
+    return x.astype(ftype, casting="safe")  # type: ignore
 
 
 def to_finite_float(
@@ -84,10 +86,16 @@ def to_finite_float(
         The converted value or array with `dtype`.
     """
 
-    xf: np.ndarray[S, np.dtype[F]] = np.array(x).astype(dtype)
+    # precondition: dtype comes from to_float
+    # lossless cast from integer to floating point with a sufficiently large
+    #  mantissa
+    xf: np.ndarray[S, np.dtype[F]] = np.array(x).astype(dtype, casting="safe")
 
     if map is not None:
-        xf = np.array(map(xf)).astype(dtype)
+        # precondition: dtype comes from to_float
+        # lossless cast from integer to floating point with a sufficiently
+        #  large mantissa
+        xf = np.array(map(xf)).astype(dtype, casting="safe")
 
     if np.dtype(dtype) == _float128_dtype:
         minv, maxv = _float128_min, _float128_max
@@ -129,7 +137,13 @@ def from_float(
     imin, imax = np.array(info.min, dtype=dtype), np.array(info.max, dtype=dtype)
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        return np.where(x < imin, imin, np.where(x <= imax, x.astype(dtype), imax))  # type: ignore
+        # lossy cast from floating point to integer
+        # round first with rint (round to nearest, ties to nearest even)
+        return np.where(
+            x < imin,
+            imin,
+            np.where(x <= imax, np.rint(x).astype(dtype, casting="unsafe"), imax),
+        )  # type: ignore
 
 
 def as_bits(
