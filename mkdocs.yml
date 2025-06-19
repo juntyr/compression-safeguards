@@ -37,6 +37,7 @@ plugins:
       glob:
         - requirements.txt
   - search
+  - open-in-new-tab
   - autorefs
   - mkdocstrings-python-generator:
       source_dirs:
