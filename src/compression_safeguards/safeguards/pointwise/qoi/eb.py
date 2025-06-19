@@ -38,6 +38,7 @@ from ..._qois.re import (
 )
 from ..._qois.vars import CONSTRUCTORS as VARS_CONSTRUCTORS
 from ..._qois.vars import FUNCTIONS as VARS_FUNCTIONS
+from ..._qois.vars import LateBoundConstant, create_late_bound_constant_environment
 from ...eb import (
     ErrorBound,
     _apply_finite_qoi_error_bound,
@@ -112,6 +113,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
     const   =
         "e"                               (* Euler's number *)
       | "pi"                              (* pi *)
+      | "C", "[", '"', ident, '"', "]"    (* late-bound constant *)
     ;
 
     data    = "x";                        (* pointwise data value *)
@@ -219,12 +221,14 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         "_eb",
         "_qoi_expr",
         "_x",
+        "_late_bound_constants",
     )
     _qoi: PointwiseExpr
     _type: ErrorBound
     _eb: int | float | Parameter
     _qoi_expr: sp.Basic
     _x: sp.Symbol
+    _late_bound_constants: frozenset[LateBoundConstant]
 
     kind = "qoi_eb_pw"
 
@@ -261,6 +265,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                     x=self._x,
                     # === constants ===
                     **MATH_CONSTANTS,
+                    C=create_late_bound_constant_environment(
+                        lambda name: LateBoundConstant(name, extended_real=True)
+                    ),
                     # === variables ===
                     **VARS_CONSTRUCTORS,
                     **VARS_FUNCTIONS,
@@ -279,17 +286,27 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             assert isinstance(qoi_expr, sp.Basic), (
                 "QoI expression must evaluate to a numeric expression"
             )
+            self._late_bound_constants = frozenset(
+                s for s in qoi_expr.free_symbols if isinstance(s, LateBoundConstant)
+            )
             # check if the expression is well-formed (e.g. no int's that cannot
             #  be printed) and if an error bound can be computed
             _canary_repr = str(qoi_expr)
             _canary_data_eb = _compute_data_eb_for_qoi_eb(
-                qoi_expr, self._x, np.empty(0), np.empty(0), np.empty(0)
+                qoi_expr,
+                self._x,
+                np.empty(0),
+                np.empty(0),
+                np.empty(0),
+                {c: np.empty(0) for c in self._late_bound_constants},
             )
         except Exception as err:
             raise AssertionError(
                 f"failed to parse QoI expression {qoi!r}: {err}"
             ) from err
-        assert len(qoi_expr.free_symbols) > 0, "QoI expression must not be constant"
+        assert len(qoi_expr.free_symbols - self._late_bound_constants) > 0, (
+            "QoI expression must not be constant"
+        )
         assert not qoi_expr.has(sp.I), (
             "QoI expression must not contain imaginary numbers"
         )
@@ -310,10 +327,17 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         specific data that is to be safeguarded.
         """
 
-        return frozenset([self._eb]) if isinstance(self._eb, Parameter) else frozenset()
+        parameters = [c.parameter for c in self._late_bound_constants]
+
+        if isinstance(self._eb, Parameter):
+            parameters.append(self._eb)
+
+        return frozenset(parameters)
 
     def evaluate_qoi(
-        self, data: np.ndarray[S, np.dtype[T]]
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[F]]:
         """
         Evaluate the derived quantity of interest on the `data`.
@@ -326,6 +350,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         ----------
         data : np.ndarray[S, np.dtype[T]]
             Data for which the quantity of interest is evaluated.
+        late_bound : Bindings
+            Bindings for late-bound constants in the quantity of interest.
 
         Returns
         -------
@@ -335,11 +361,19 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         data_float: np.ndarray = to_float(data)
 
+        late_bound_constants = {
+            c: late_bound.resolve_ndarray(c.parameter, data.shape, data_float.dtype)
+            for c in self._late_bound_constants
+        }
+
         qoi_lambda = compile_sympy_expr_to_numpy(
-            [self._x], self._qoi_expr, data_float.dtype
+            [self._x, *late_bound_constants.keys()], self._qoi_expr, data_float.dtype
         )
 
-        return (qoi_lambda)(data_float)
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            return (qoi_lambda)(data_float, *late_bound_constants.values())
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
@@ -370,12 +404,22 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         data_float: np.ndarray = to_float(data)
 
+        late_bound_constants = {
+            c: late_bound.resolve_ndarray(c.parameter, data.shape, data_float.dtype)
+            for c in self._late_bound_constants
+        }
+
         qoi_lambda = compile_sympy_expr_to_numpy(
-            [self._x], self._qoi_expr, data_float.dtype
+            [self._x, *late_bound_constants.keys()], self._qoi_expr, data_float.dtype
         )
 
-        qoi_data = (qoi_lambda)(data_float)
-        qoi_decoded = (qoi_lambda)(to_float(decoded))
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            qoi_data = (qoi_lambda)(data_float, *late_bound_constants.values())
+            qoi_decoded = (qoi_lambda)(
+                to_float(decoded), *late_bound_constants.values()
+            )
 
         eb = (
             late_bound.resolve_ndarray(
@@ -432,14 +476,19 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         data_float: np.ndarray = to_float(data)
 
+        late_bound_constants = {
+            c: late_bound.resolve_ndarray(c.parameter, data.shape, data_float.dtype)
+            for c in self._late_bound_constants
+        }
+
         qoi_lambda = compile_sympy_expr_to_numpy(
-            [self._x], self._qoi_expr, data_float.dtype
+            [self._x, *late_bound_constants.keys()], self._qoi_expr, data_float.dtype
         )
 
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            data_qoi = (qoi_lambda)(data_float)
+            data_qoi = (qoi_lambda)(data_float, *late_bound_constants.values())
 
         eb = (
             late_bound.resolve_ndarray(
@@ -503,6 +552,11 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                 & _isfinite(eb_qoi_upper)
             )
 
+        late_bound_constants = {
+            c: late_bound.resolve_ndarray(c.parameter, data.shape, data_float.dtype)
+            for c in self._late_bound_constants
+        }
+
         # compute the error bound in data space
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
@@ -513,6 +567,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                 data_float,
                 eb_qoi_lower,
                 eb_qoi_upper,
+                late_bound_constants,
             )
 
         return compute_safe_eb_lower_upper_interval(
@@ -544,6 +599,7 @@ def _compute_data_eb_for_qoi_eb(
     xv: np.ndarray[S, np.dtype[F]],
     tauv_lower: np.ndarray[S, np.dtype[F]],
     tauv_upper: np.ndarray[S, np.dtype[F]],
+    late_bound_constants: dict[LateBoundConstant, np.ndarray[S, np.dtype[F]]],
 ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
     """
     Translate an error bound on a derived quantity of interest (QoI) into an
@@ -564,6 +620,8 @@ def _compute_data_eb_for_qoi_eb(
         Finite pointwise lower bound on the QoI error, must be negative or zero.
     eb_expr_upper : np.ndarray[S, np.dtype[F]]
         Finite pointwise upper bound on the QoI error, must be positive or zero.
+    late_bound_constants : dict[LateBoundConstant, np.ndarray[S, np.dtype[F]]]
+        Values of the late-bound constants that are not counted as symbols.
 
     Returns
     -------
@@ -585,8 +643,9 @@ def _compute_data_eb_for_qoi_eb(
         tauv_upper,
         check_is_x=lambda expr: expr == x,
         evaluate_sympy_expr_to_numpy=lambda expr: compile_sympy_expr_to_numpy(
-            [x], expr, xv.dtype
-        )(xv),
+            [x, *late_bound_constants.keys()], expr, xv.dtype
+        )(xv, *late_bound_constants.values()),
+        late_bound_constants=frozenset(late_bound_constants.keys()),
         compute_data_eb_for_stencil_qoi_eb=lambda expr,
         xv,
         tauv_lower,
@@ -596,15 +655,20 @@ def _compute_data_eb_for_qoi_eb(
             xv,
             tauv_lower,
             tauv_upper,
+            late_bound_constants,
         ),
     )
 
-    exprl = compile_sympy_expr_to_numpy([x], expr, xv.dtype)
-    exprv = (exprl)(xv)
+    exprl = compile_sympy_expr_to_numpy(
+        [x, *late_bound_constants.keys()], expr, xv.dtype
+    )
+    exprv = (exprl)(xv, *late_bound_constants.values())
 
     # handle rounding errors in the lower error bound computation
     tl = ensure_bounded_derived_error(
-        lambda tl: np.where(tl == 0, exprv, (exprl)(xv + tl)),  # type: ignore
+        lambda tl: np.where(  # type: ignore
+            tl == 0, exprv, (exprl)(xv + tl, *late_bound_constants.values())
+        ),
         exprv,
         xv,
         tl,
@@ -612,7 +676,9 @@ def _compute_data_eb_for_qoi_eb(
         tauv_upper,
     )
     tu = ensure_bounded_derived_error(
-        lambda tu: np.where(tu == 0, exprv, (exprl)(xv + tu)),  # type: ignore
+        lambda tu: np.where(  # type: ignore
+            tu == 0, exprv, (exprl)(xv + tu, *late_bound_constants.values())
+        ),
         exprv,
         xv,
         tu,
@@ -646,7 +712,7 @@ _QOI_ATOM_PATTERN = (
     + r"".join(rf"|(?:{v})" for v in VARS_FUNCTIONS)
     + r"".join(
         rf'|(?:{v}{QOI_WHITESPACE_PATTERN.pattern}*\[{QOI_WHITESPACE_PATTERN.pattern}*"[a-zA-Z_][a-zA-Z0-9_]*"{QOI_WHITESPACE_PATTERN.pattern}*\])'
-        for v in VARS_CONSTRUCTORS
+        for v in (["C"] + list(VARS_CONSTRUCTORS))
     )
     + r")"
 )

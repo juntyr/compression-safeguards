@@ -396,3 +396,22 @@ def test_late_bound_eb_ratio():
     assert np.all(
         ok == np.array([True, False, False, False, False, False]).reshape(2, 3)
     )
+
+
+def test_late_bound_constant():
+    safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi='x / C["f"]', type="abs", eb=1
+    )
+
+    data = np.arange(6).reshape(2, 3)
+
+    late_bound = Bindings(
+        f=np.array([16, 8, 4, 2, 1, 0]).reshape(2, 3),
+    )
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == (data.flatten() - np.array([16, 8, 4, 2, 1, 0])))
+    assert np.all(valid._upper == (data.flatten() + np.array([16, 8, 4, 2, 1, 0])))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(ok == np.array([True, True, True, False, False, False]).reshape(2, 3))

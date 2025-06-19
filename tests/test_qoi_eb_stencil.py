@@ -920,8 +920,36 @@ def test_findiff_dx():
         correction = safeguards.compute_correction(data, decoded)
         corrected = safeguards.apply_correction(decoded, correction)
 
-        data_findiff = safeguards.safeguards[0].evaluate_qoi(data)
-        corrected_findiff = safeguards.safeguards[0].evaluate_qoi(corrected)
+        data_findiff = safeguards.safeguards[0].evaluate_qoi(data, Bindings.empty())
+        corrected_findiff = safeguards.safeguards[0].evaluate_qoi(
+            corrected, Bindings.empty()
+        )
 
         assert data_findiff[len(data_findiff) // 2] == 10
         assert np.abs(10 - corrected_findiff[len(data_findiff) // 2]) <= 1
+
+
+def test_late_bound_constant():
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='X[0,0] * C["zero"][0,0] + X[I] / C["f"][I]',
+        neighbourhood=[
+            dict(axis=0, before=1, after=0, boundary="valid"),
+            dict(axis=1, before=0, after=0, boundary="valid"),
+        ],
+        type="abs",
+        eb=1,
+    )
+
+    data = np.arange(6).reshape(2, 3)
+
+    late_bound = Bindings(
+        f=np.array([16, 8, 4]),
+        zero=0,
+    )
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == (data.flatten() - np.array([16, 8, 4, 16, 8, 4])))
+    assert np.all(valid._upper == (data.flatten() + np.array([16, 8, 4, 16, 8, 4])))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(ok == np.array([True, True, True, True, True, False]).reshape(2, 3))
