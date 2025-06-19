@@ -36,9 +36,12 @@ from ..._qois.re import (
     QOI_INT_LITERAL_PATTERN,
     QOI_WHITESPACE_PATTERN,
 )
-from ..._qois.vars import CONSTRUCTORS as VARS_CONSTRUCTORS
 from ..._qois.vars import FUNCTIONS as VARS_FUNCTIONS
-from ..._qois.vars import LateBoundConstant, create_late_bound_constant_environment
+from ..._qois.vars import (
+    LateBoundConstant,
+    LateBoundConstantEnvironment,
+    VariableEnvironment,
+)
 from ...eb import (
     ErrorBound,
     _apply_finite_qoi_error_bound,
@@ -265,11 +268,11 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                     x=self._x,
                     # === constants ===
                     **MATH_CONSTANTS,
-                    C=create_late_bound_constant_environment(
+                    C=LateBoundConstantEnvironment(
                         lambda name: LateBoundConstant(name, extended_real=True)
                     ),
                     # === variables ===
-                    **VARS_CONSTRUCTORS,
+                    V=VariableEnvironment(),
                     **VARS_FUNCTIONS,
                     # === operators ===
                     # poinwise math
@@ -712,7 +715,7 @@ _QOI_ATOM_PATTERN = (
     + r"".join(rf"|(?:{v})" for v in VARS_FUNCTIONS)
     + r"".join(
         rf'|(?:{v}{QOI_WHITESPACE_PATTERN.pattern}*\[{QOI_WHITESPACE_PATTERN.pattern}*"[a-zA-Z_][a-zA-Z0-9_]*"{QOI_WHITESPACE_PATTERN.pattern}*\])'
-        for v in (["C"] + list(VARS_CONSTRUCTORS))
+        for v in ["C", "V"]
     )
     + r")"
 )

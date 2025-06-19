@@ -20,7 +20,7 @@ from .array import NumPyLikeArray
 from .symfunc import round_ties_even as sp_round_ties_even
 from .symfunc import sign as sp_sign
 from .symfunc import trunc as sp_trunc
-from .vars import LateBoundConstant, VariableSymbol
+from .vars import LateBoundConstant, UnresolvedVariable
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -108,14 +108,10 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         return (eb_expr_lower, eb_expr_upper)
 
     # unresolved variable
-    if isinstance(expr, VariableSymbol):
+    if isinstance(expr, UnresolvedVariable):
         raise ValueError(
             f"expression contains unresolved variable {expr}, perhaps you forgot to define it within a let expression"
         )
-
-    # unresolved index
-    if expr.func is sp.Indexed:
-        raise ValueError("invalid index on variable resulted in unresolved index")
 
     # array
     if expr.func in (sp.Array, NumPyLikeArray):

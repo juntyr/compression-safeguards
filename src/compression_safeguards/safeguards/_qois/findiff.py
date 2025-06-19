@@ -62,7 +62,10 @@ def create_findiff_for_neighbourhood(
             if (
                 expr.func is sp.tensor.array.expressions.ArrayElement
                 and len(expr.args) == 2
-                and expr.args[0] == X
+                and (
+                    expr.args[0] == X
+                    or isinstance(expr.args[0].name, LateBoundConstant)  # type: ignore
+                )
             ):
                 name, idxs = expr.args
                 indices = list(idxs)  # type: ignore

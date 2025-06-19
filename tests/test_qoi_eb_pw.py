@@ -142,19 +142,19 @@ def test_comment():
 
 
 def test_variables():
-    with pytest.raises(AssertionError, match=r'unresolved variable V\["a"\]'):
+    with pytest.raises(AssertionError, match="numeric expression"):
         check_all_codecs(np.array([]), 'V["a"]')
-    with pytest.raises(AssertionError, match=r'unresolved variable V\["b"\]'):
-        check_all_codecs(np.array([]), 'let(V["a"], 3, x + V["b"])')
+    with pytest.raises(AssertionError, match="UnresolvedVariable"):
+        check_all_codecs(np.array([]), 'let(V["a"], 3)(x + V["b"])')
     with pytest.raises(AssertionError, match="let name"):
-        check_all_codecs(np.array([]), "let(1, 2, x)")
+        check_all_codecs(np.array([]), "let(1, 2)(x)")
     with pytest.raises(AssertionError, match="let value"):
-        check_all_codecs(np.array([]), 'let(V["a"], log, x + V["a"])')
+        check_all_codecs(np.array([]), 'let(V["a"], log)(x + V["a"])')
     with pytest.raises(AssertionError, match="let within"):
-        check_all_codecs(np.array([]), 'let(V["a"], x + 1, log)')
-    check_all_codecs(np.array([]), 'let(V["a"], 3, x + V["a"])')
+        check_all_codecs(np.array([]), 'let(V["a"], x + 1)(log)')
+    check_all_codecs(np.array([]), 'let(V["a"], 3)(x + V["a"])')
     check_all_codecs(
-        np.array([]), 'let(V["a"], 3, x + let(V["b"], V["a"] - 1, V["b"] * 2))'
+        np.array([]), 'let(V["a"], 3)(x + let(V["b"], V["a"] - 1)(V["b"] * 2))'
     )
 
 
