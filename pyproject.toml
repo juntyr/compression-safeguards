@@ -30,6 +30,7 @@ bench = [
 ]
 dev = ["ruff~=0.9"]
 examples = [
+    "astropy~=6.0",
     "cdsapi~=0.7.6",
     "jupyterlab",
     "numcodecs-wasm~=0.1.7",
