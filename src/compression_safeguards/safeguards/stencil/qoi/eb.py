@@ -47,6 +47,7 @@ from ..._qois.vars import FUNCTIONS as VARS_FUNCTIONS
 from ..._qois.vars import (
     LateBoundConstant,
     LateBoundConstantEnvironment,
+    UnresolvedVariable,
     VariableEnvironment,
 )
 from ...eb import (
@@ -415,6 +416,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     Rational=sp.Rational,
                 ),
                 transformations=(sp.parsing.sympy_parser.auto_number,),
+            )
+            assert not isinstance(qoi_expr, UnresolvedVariable), (
+                f'unresolved variable V["{qoi_expr._name}"], perhaps you forgot to define it within a let expression'
             )
             assert isinstance(qoi_expr, sp.Basic), (
                 "QoI expression must evaluate to a numeric expression"

@@ -142,9 +142,9 @@ def test_comment():
 
 
 def test_variables():
-    with pytest.raises(AssertionError, match="numeric expression"):
+    with pytest.raises(AssertionError, match=r'unresolved variable V\["a"\]'):
         check_all_codecs(np.array([]), 'V["a"]')
-    with pytest.raises(AssertionError, match="UnresolvedVariable"):
+    with pytest.raises(AssertionError, match=r'unresolved variable V\["b"\]'):
         check_all_codecs(np.array([]), 'let(V["a"], 3)(x + V["b"])')
     with pytest.raises(AssertionError, match="let name"):
         check_all_codecs(np.array([]), "let(1, 2)(x)")

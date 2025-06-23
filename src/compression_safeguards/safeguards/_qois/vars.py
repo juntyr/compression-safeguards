@@ -35,8 +35,10 @@ class UnresolvedVariable:
         self._name = name
         self._env = env
 
-    def __str__(self) -> str:
-        return f'V["{self._name}"]'
+    def _sympy_(self):
+        raise TypeError(
+            f'unresolved variable V["{self._name}"], perhaps you forgot to define it within a let expression'
+        )
 
 
 class LateBoundConstant(sp.Symbol):
