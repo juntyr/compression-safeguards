@@ -26,6 +26,19 @@ theme:
 
 nav:
   - Home: index.md
+  - Examples:
+      - Special values:
+        - Missing Values: examples/nan.ipynb
+        - Precipitation extrema: examples/precipitation.ipynb
+      - Error bound distributions:
+        - Compressor comparison: examples/soft.ipynb
+      - Regions of Interest (RoIs):
+        - Latent Heat Flux: examples/latent-heat-flux.ipynb
+      - Quantities of Interest (QoIs):
+        - "Pointwise: Kinetic energy": examples/kinetic-energy.ipynb
+        - Higher-order derivatives: examples/derivative.ipynb
+        - "Neighbourhood: Vorticity": examples/vorticity.ipynb
+        - Bounding the dSSIM metric: examples/dssim.ipynb
   - Links:
       - GitHub: https://github.com/juntyr/compression-safeguards
       - PyPI:
@@ -36,6 +49,7 @@ plugins:
   - exclude:
       glob:
         - requirements.txt
+        - examples/*.py
   - search
   - open-in-new-tab
   - autorefs
@@ -46,6 +60,8 @@ plugins:
           ignore: ["_qois"]
         - nav_heading: [API Reference]
           base: packages/numcodecs-safeguards/src
+  - mkdocs-jupyter:
+      ignore_h1_titles: True
   - mkdocstrings:
       enable_inventory: true
       handlers:
