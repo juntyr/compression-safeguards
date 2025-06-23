@@ -253,12 +253,12 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         self._x = sp.Symbol("x", extended_real=True)
 
-        qoi_stripped = QOI_WHITESPACE_PATTERN.sub(
-            " ", QOI_COMMENT_PATTERN.sub(" ", qoi)
-        ).strip()
+        qoi_stripped = QOI_WHITESPACE_PATTERN.sub("", QOI_COMMENT_PATTERN.sub(" ", qoi))
 
         assert len(qoi_stripped) > 0, "QoI expression must not be empty"
-        assert _QOI_PATTERN.fullmatch(qoi) is not None, "invalid QoI expression"
+        assert _QOI_PATTERN.fullmatch(qoi_stripped) is not None, (
+            "invalid QoI expression"
+        )
         try:
             qoi_expr = sp.parse_expr(
                 qoi_stripped,
@@ -695,31 +695,21 @@ def _compute_data_eb_for_qoi_eb(
 # pattern of syntactically weakly valid expressions
 # we only check against forbidden tokens, not for semantic validity
 #  i.e. just enough that it's safe to eval afterwards
-_QOI_KWARG_PATTERN = (
-    r"(?:"
-    + r"|".join(
-        rf"(?:{k}(?:{QOI_COMMENT_PATTERN.pattern}|(?:[ \t\n]))*=(?:{QOI_COMMENT_PATTERN.pattern}|(?:[ \t\n]))*)"
-        for k in ("base",)
-    )
-    + r")"
-)
+_QOI_KWARG_PATTERN = r"(?:" + r"|".join(rf"(?:{k}=)" for k in ("base",)) + r")"
 _QOI_ATOM_PATTERN = (
     r"(?:"
-    + r"".join(
-        rf"|(?:{l})"
+    + r"|".join(
+        rf"(?:{l})"
         for l in (QOI_INT_LITERAL_PATTERN, QOI_FLOAT_LITERAL_PATTERN)  # noqa: E741
     )
     + r"|(?:x)"
     + r"".join(rf"|(?:{c})" for c in MATH_CONSTANTS)
     + r"".join(rf"|(?:{f})" for f in MATH_FUNCTIONS)
     + r"".join(rf"|(?:{v})" for v in VARS_FUNCTIONS)
-    + r"".join(
-        rf'|(?:{v}{QOI_WHITESPACE_PATTERN.pattern}*\[{QOI_WHITESPACE_PATTERN.pattern}*"[a-zA-Z_][a-zA-Z0-9_]*"{QOI_WHITESPACE_PATTERN.pattern}*\])'
-        for v in ["C", "V"]
-    )
+    + r"".join(rf'|(?:{v}*\[*"[a-zA-Z_][a-zA-Z0-9_]*"*\])' for v in ["C", "V"])
     + r")"
 )
-_QOI_SEPARATOR_PATTERN = rf"(?:{QOI_COMMENT_PATTERN.pattern}|(?:[ \t\n\(\),\+\-\*/]))"
+_QOI_SEPARATOR_PATTERN = r"(?:[\(\),\+\-\*/])"
 _QOI_PATTERN = re.compile(
     rf"{_QOI_SEPARATOR_PATTERN}*{_QOI_ATOM_PATTERN}(?:{_QOI_SEPARATOR_PATTERN}+{_QOI_KWARG_PATTERN}?{_QOI_ATOM_PATTERN})*{_QOI_SEPARATOR_PATTERN}*"
 )
