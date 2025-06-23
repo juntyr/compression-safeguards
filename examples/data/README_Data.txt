@@ -53,3 +53,13 @@ Request:
 	Product type: Reanalysis
 	Variable: Surface latent heat flux, land/sea mask
 	Date Range: 2024-04-02 12:00
+
+### ERA5_Q.nc ###
+
+Contains the specific humidity (q) in kg/kg at 2024-04-02 12:00 UTC
+
+Source: https://cds.climate.copernicus.eu/datasets/reanalysis-era5-pressure-levels?tab=download
+Request:
+        Product type: Reanalysis
+        Variable: Specific humidity
+        Date Range: 2024-04-02 12:00
