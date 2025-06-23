@@ -205,11 +205,22 @@ def test_variables():
         check_all_codecs(np.array([]), 'let(V["a"], log)(x + V["a"])', [(0, 0)])
     with pytest.raises(AssertionError, match="let within"):
         check_all_codecs(np.array([]), 'let(V["a"], x + 1)(log)', [(0, 0)])
+    with pytest.raises(AssertionError, match=r"fresh \(not overridden\)"):
+        check_all_codecs(
+            np.array([]), 'let(V["a"], x + 1)(let(V["a"], V["a"])(V["a"]))', [(0, 0)]
+        )
+    with pytest.raises(AssertionError, match="pairs of names and values"):
+        check_all_codecs(
+            np.array([]), 'let(V["a"], x + 1, V["b"])(V["a"] + V["b"])', [(0, 0)]
+        )
     check_all_codecs(np.array([]), 'let(V["a"], 3)(x + V["a"])', [(0, 0)])
     check_all_codecs(
         np.array([]),
         'let(V["a"], 3)(x + let(V["b"], V["a"] - 1)(V["b"] * 2))',
         [(0, 0)],
+    )
+    check_all_codecs(
+        np.array([]), 'let(V["a"], x + 1, V["b"], x - 1)(V["a"] + V["b"])', [(0, 0)]
     )
 
     with pytest.raises(AssertionError, match="out of border"):

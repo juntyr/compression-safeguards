@@ -194,8 +194,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
     let     =
         "let", "(",
-            var, ",", expr, ",", expr     (* let var=expr in expr scope *)
-      , ")"
+            var, ",", expr, {
+                ",", var, ",", expr       (* let var=expr in expr scope *)
+            },
+        ")", "(", expr, ")"
     ;
 
     unary   =

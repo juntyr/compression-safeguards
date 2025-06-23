@@ -64,17 +64,32 @@ class LateBoundConstantEnvironment:
         return self._create_symbol(f'C["{name}"]')
 
 
-def let(name: UnresolvedVariable, value: sp.Basic, /) -> Callable[[sp.Basic], sp.Basic]:
-    assert isinstance(name, UnresolvedVariable), (
-        'let name must be a fresh (not overridden) `V["var"]` expression'
-    )
-    assert isinstance(value, sp.Basic), "let value must be an expression"
+def let(
+    name: UnresolvedVariable, value: sp.Basic, /, *args: UnresolvedVariable | sp.Basic
+) -> Callable[[sp.Basic], sp.Basic]:
+    assert len(args) % 2 == 0, "let must be called with pairs of names and values"
 
-    name._env._variables[name._name] = value
+    names = (name,) + args[0::2]
+    values = (value,) + args[1::2]
+
+    env: dict[str, sp.Basic] = dict()
+
+    for n, v in zip(names, values):
+        assert isinstance(n, UnresolvedVariable), (
+            'let name must be a fresh (not overridden) `V["var"]` expression'
+        )
+        assert isinstance(v, sp.Basic), "let value must be an expression"
+
+        env[n._name] = v
+
+    name._env._variables.update(env)
 
     def let_(within: sp.Basic, /) -> sp.Basic:
         assert isinstance(within, sp.Basic), "let within must be an expression"
-        del name._env._variables[name._name]
+
+        for n in env:
+            del name._env._variables[n]
+
         return within
 
     return let_
