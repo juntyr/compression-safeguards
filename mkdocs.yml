@@ -35,7 +35,8 @@ nav:
       - Regions of Interest (RoIs):
         - Latent Heat Flux: examples/latent-heat-flux.ipynb
       - Quantities of Interest (QoIs):
-        - "Pointwise: Kinetic energy": examples/kinetic-energy.ipynb
+        - "Pointwise: Log-scale Specific Humidity": examples/log-scale.ipynb
+        - "Semi-Pointwise: Kinetic energy": examples/kinetic-energy.ipynb
         - Higher-order derivatives: examples/derivative.ipynb
         - "Neighbourhood: Vorticity": examples/vorticity.ipynb
         - Bounding the dSSIM metric: examples/dssim.ipynb
