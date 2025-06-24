@@ -373,7 +373,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         qoi_stripped = QOI_WHITESPACE_PATTERN.sub(
             " ", QOI_COMMENT_PATTERN.sub(" ", qoi)
-        )
+        ).strip()
 
         def create_late_bound_array_symbol(name: str) -> NumPyLikeArray:
             C = sp.tensor.array.expressions.ArraySymbol(

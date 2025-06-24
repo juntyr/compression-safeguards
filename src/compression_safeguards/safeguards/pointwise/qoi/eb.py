@@ -259,7 +259,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         qoi_stripped = QOI_WHITESPACE_PATTERN.sub(
             " ", QOI_COMMENT_PATTERN.sub(" ", qoi)
-        )
+        ).strip()
 
         assert len(qoi_stripped) > 0, "QoI expression must not be empty"
         assert _QOI_PATTERN.fullmatch(qoi_stripped) is not None, (
