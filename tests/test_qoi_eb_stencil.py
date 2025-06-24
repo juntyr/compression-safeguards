@@ -173,6 +173,8 @@ def test_empty(check):
 def test_non_expression():
     with pytest.raises(AssertionError, match="numeric expression"):
         check_all_codecs(np.empty(0), "exp", [(0, 0)])
+    with pytest.raises(AssertionError, match="invalid QoI expression"):
+        check_all_codecs(np.empty(0), "e x p", [(0, 0)])
 
 
 def test_whitespace():
@@ -195,6 +197,10 @@ def test_comment():
 
 
 def test_variables():
+    with pytest.raises(AssertionError, match="invalid QoI expression"):
+        check_all_codecs(np.array([]), 'v["123"]', [(0, 0)])
+    with pytest.raises(AssertionError, match="invalid QoI expression"):
+        check_all_codecs(np.array([]), 'v["a 123"]', [(0, 0)])
     with pytest.raises(AssertionError, match=r'unresolved variable V\["a"\]'):
         check_all_codecs(np.array([]), 'V["a"]', [(0, 0)])
     with pytest.raises(AssertionError, match=r'unresolved variable V\["b"\]'):

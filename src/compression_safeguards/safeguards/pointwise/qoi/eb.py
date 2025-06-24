@@ -33,6 +33,7 @@ from ..._qois.math import FUNCTIONS as MATH_FUNCTIONS
 from ..._qois.re import (
     QOI_COMMENT_PATTERN,
     QOI_FLOAT_LITERAL_PATTERN,
+    QOI_IDENTIFIER_PATTERN,
     QOI_INT_LITERAL_PATTERN,
     QOI_WHITESPACE_PATTERN,
 )
@@ -256,7 +257,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         self._x = sp.Symbol("x", extended_real=True)
 
-        qoi_stripped = QOI_WHITESPACE_PATTERN.sub("", QOI_COMMENT_PATTERN.sub(" ", qoi))
+        qoi_stripped = QOI_WHITESPACE_PATTERN.sub(
+            " ", QOI_COMMENT_PATTERN.sub(" ", qoi)
+        )
 
         assert len(qoi_stripped) > 0, "QoI expression must not be empty"
         assert _QOI_PATTERN.fullmatch(qoi_stripped) is not None, (
@@ -701,7 +704,7 @@ def _compute_data_eb_for_qoi_eb(
 # pattern of syntactically weakly valid expressions
 # we only check against forbidden tokens, not for semantic validity
 #  i.e. just enough that it's safe to eval afterwards
-_QOI_KWARG_PATTERN = r"(?:" + r"|".join(rf"(?:{k}=)" for k in ("base",)) + r")"
+_QOI_KWARG_PATTERN = r"(?:" + r"|".join(rf"(?:{k}[ ]?=)" for k in ("base",)) + r")"
 _QOI_ATOM_PATTERN = (
     r"(?:"
     + r"|".join(
@@ -712,10 +715,12 @@ _QOI_ATOM_PATTERN = (
     + r"".join(rf"|(?:{c})" for c in MATH_CONSTANTS)
     + r"".join(rf"|(?:{f})" for f in MATH_FUNCTIONS)
     + r"".join(rf"|(?:{v})" for v in VARS_FUNCTIONS)
-    + r"".join(rf'|(?:{v}*\[*"[a-zA-Z_][a-zA-Z0-9_]*"*\])' for v in ("c", "v"))
+    + r"".join(
+        rf'|(?:{v}[ ]?\[[ ]?"{QOI_IDENTIFIER_PATTERN}"[ ]?\])' for v in ("c", "v")
+    )
     + r")"
 )
-_QOI_SEPARATOR_PATTERN = r"(?:[\(\),\+\-\*/])"
+_QOI_SEPARATOR_PATTERN = r"(?:[ \(\),\+\-\*/])"
 _QOI_PATTERN = re.compile(
     rf"{_QOI_SEPARATOR_PATTERN}*{_QOI_ATOM_PATTERN}(?:{_QOI_SEPARATOR_PATTERN}+{_QOI_KWARG_PATTERN}?{_QOI_ATOM_PATTERN})*{_QOI_SEPARATOR_PATTERN}*"
 )
