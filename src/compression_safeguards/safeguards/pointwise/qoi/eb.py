@@ -704,7 +704,7 @@ def _compute_data_eb_for_qoi_eb(
 # pattern of syntactically weakly valid expressions
 # we only check against forbidden tokens, not for semantic validity
 #  i.e. just enough that it's safe to eval afterwards
-_QOI_KWARG_PATTERN = r"(?:" + r"|".join(rf"(?:{k}[ ]?=)" for k in ("base",)) + r")"
+_QOI_KWARG_PATTERN = r"(?:" + r"|".join(rf"(?:{k}[ ]?=[ ]?)" for k in ("base",)) + r")"
 _QOI_ATOM_PATTERN = (
     r"(?:"
     + r"|".join(

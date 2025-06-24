@@ -94,7 +94,6 @@ def test_late_bound():
     )
 
     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
-    print(valid)
     assert np.all(
         valid._lower
         == np.array(

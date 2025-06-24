@@ -1192,7 +1192,8 @@ def _compute_data_eb_for_stencil_qoi_eb(
 _QOI_KWARG_PATTERN = (
     r"(?:"
     + r"|".join(
-        rf"(?:{k}[ ]?=)" for k in ("base", "order", "accuracy", "type", "dx", "axis")
+        rf"(?:{k}[ ]?=[ ]?)"
+        for k in ("base", "order", "accuracy", "type", "dx", "axis")
     )
     + r")"
 )
