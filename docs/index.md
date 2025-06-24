@@ -1,8 +1,8 @@
-# Fearless lossy compression with `compression-safeguards`
+# Safe and Fearless lossy compression with `compression-safeguards`
 
 Lossy compression [^1] can be *scary* as valuable information or features of the data may be lost.
 
-By using safeguards to **guarantee** your safety requirements, lossy compression can be applied safely and *without fear*.
+By using safeguards to **guarantee** your safety requirements, lossy compression can be applied *safely* and *without fear*.
 
 With the `compression-safeguards` package, you can:
 
@@ -220,6 +220,37 @@ Please refer to the [`compression_safeguards`][compression_safeguards] documenta
 The safeguards can also fill the role of a quantizer, which is part of many (predictive) (error-bounded) compressors. If you currently use e.g. a linear quantizer module in your compressor to provide an absolute error bound, you could instead adapt the [`Safeguards`][compression_safeguards.Safeguards], quantize to their [`Safeguards.compute_correction`][compression_safeguards.Safeguards.compute_correction] values, and thereby offer a larger selection of safety requirements that your compressor can then guarantee. Note, however, that only pointwise safeguards can be used when quantizing data elements one-by-one.
 
 
+## How to safeguard ...?
+
+- ... a pointwise absolute / relative / ratio error bound on the data?
+
+  > Use the `eb` safeguard and configure it with the `type` and range of the error bound.
+
+- ... a pointwise normalised or range-relative absolute error bound?
+
+  > Use the `eb` safeguard for an absolute error bound but provide a late-bound parameter for the bound `value`. Since the data range is tightly tied to the data itself, it makes sense to only fill in the actual when applying the safeguards to the actual data. You still have to compute the range yourself, but can then provide it as a `late_bound` binding when computing the safeguard corrections.
+
+- ... a global error bound, e.g. a mean error, mean squared error, root mean square error, or peak signal to noise ratio?
+
+  > The `compression-safeguards` do not currently support global safeguards. However, you can emulate a global error bound using a pointwise error bound, which provides a stricter guarantee. For all of the abovementioned global error bounds, use the `eb` safeguard with a pointwise absolute error bound of
+  >
+  > - $\epsilon_{abs} = |\epsilon_{ME}|$ for the mean error
+  > - $\epsilon_{abs} = \sqrt{\epsilon_{MSE}}$ for the mean square error
+  > - $\epsilon_{abs} = \epsilon_{RMSE}$ for the root mean square error
+  > - $\epsilon_{abs} = (\text{max}(X) - \text{min}(X)) \cdot {10}^{-\text{PSNR} / 20}$ for the peak signal to noise ratio where $\text{PSNR}$ is given in dB
+
+- ... a missing value?
+
+  > If missing values are encoded as NaNs, the `eb` safeguards already guarantee that NaN values are preserved (if any NaN value works, be sure to enable the `equal_nan` flag). For other values, use the `same` safeguard and enable its `exclusive` flag.
+
+- ... a global extrema (minimum / maximum)?
+
+  > Use the `sign` safeguard with the `offset` corresponding to the extrema to ensure the extrema itself and its relationship to other values is preserved
+
+- ... a data distribution histogram?
+
+  > The `compression-safeguards` do not currently support global safeguards. However, we can preserve the histogram bin that each data element falls into using the `qoi_eb_pw` safeguard, which provides a stricter guarantee. For instance, the `'round(100 * (x - c["x_min"]) / (c["x_max"] - c["x_min"]))'` QoI would preserve the index amongst 100 bins. Note that we are using late-bound constants to provide the data minimum `c["x_min"]` and maximum `c["x_max"]` here.
+
 ## Related Projects
 
 ### SZ3 error compression
@@ -235,7 +266,7 @@ SZ3's error compression can provide higher compression ratios if most data eleme
 
 Please cite this work as follows:
 
-> Tyree, J. (2025). `compression-safeguards` &ndash; Fearless lossy compression using safeguards. Available from: <https://github.com/juntyr/compression-safeguards>
+> Tyree, J. (2025). `compression-safeguards` &ndash; Safe and Fearless lossy compression using safeguards. Available from: <https://github.com/juntyr/compression-safeguards>
 
 Please also refer to the [CITATION.cff](https://github.com/juntyr/compression-safeguards/blob/main/CITATION.cff) file and refer to <https://citation-file-format.github.io> to extract the citation in a format of your choice.
 

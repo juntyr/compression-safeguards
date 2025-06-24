@@ -20,7 +20,7 @@ from .array import NumPyLikeArray
 from .symfunc import round_ties_even as sp_round_ties_even
 from .symfunc import sign as sp_sign
 from .symfunc import trunc as sp_trunc
-from .vars import VariableSymbol
+from .vars import LateBoundConstant
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -31,6 +31,7 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
     eb_expr_upper: np.ndarray[S, np.dtype[F]],
     check_is_x: Callable[[sp.Basic], bool],
     evaluate_sympy_expr_to_numpy: Callable[[sp.Basic], np.ndarray],
+    late_bound_constants: frozenset[LateBoundConstant],
     compute_data_eb_for_stencil_qoi_eb: Callable[
         [
             # expr
@@ -64,6 +65,8 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         Finite pointwise upper bound on the QoI error, must be positive or zero.
     check_is_x : Callable[[sp.Basic], bool]
         Check if an expression is equal to `x` the data symbol.
+    late_bound_constants : frozenset[LateBoundConstant]
+        Set of late-bound constants that are not counted as symbols.
     evaluate_sympy_expr_to_numpy : Callable[[sp.Basic], np.ndarray]
         Evaluate a sympy expression to a numpy array.
     compute_data_eb_for_stencil_qoi_eb : Callable[
@@ -94,23 +97,15 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
     2022), 697-710. Available from: https://doi.org/10.14778/3574245.3574255.
     """
 
-    assert len(expr.free_symbols) > 0, "constants have no error bounds"
+    assert len(expr.free_symbols - late_bound_constants) > 0, (
+        "constants have no error bounds"
+    )
 
     zero = np.array(0, dtype=xv.dtype)
 
     # x
     if check_is_x(expr):
         return (eb_expr_lower, eb_expr_upper)
-
-    # unresolved variable
-    if isinstance(expr, VariableSymbol):
-        raise ValueError(
-            f"expression contains unresolved variable {expr}, perhaps you forgot to define it within a let expression"
-        )
-
-    # unresolved index
-    if expr.func is sp.Indexed:
-        raise ValueError("invalid index on variable resulted in unresolved index")
 
     # array
     if expr.func in (sp.Array, NumPyLikeArray):
@@ -684,7 +679,9 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
     # using Corollary 2 and Lemma 4 from Jiao et al.
     if expr.is_Add:
         # find all non-constant terms
-        terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
+        terms = [
+            arg for arg in expr.args if len(arg.free_symbols - late_bound_constants) > 0
+        ]
 
         factors = []
         for i, term in enumerate(terms):
@@ -693,16 +690,29 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
                 factors.append(
                     evaluate_sympy_expr_to_numpy(
                         sp.Mul(
-                            *[arg for arg in term.args if len(arg.free_symbols) == 0]  # type: ignore
+                            *[
+                                arg
+                                for arg in term.args
+                                if len(arg.free_symbols - late_bound_constants) == 0
+                            ]  # type: ignore
                         ),
                     )
                 )
                 terms[i] = sp.Mul(
-                    *[arg for arg in term.args if len(arg.free_symbols) > 0]  # type: ignore
+                    *[
+                        arg
+                        for arg in term.args
+                        if len(arg.free_symbols - late_bound_constants) > 0
+                    ]  # type: ignore
                 )
             else:
-                factors.append(np.array(1))
-        total_abs_factor = np.sum(np.abs(factors))
+                factors.append(np.array(1, dtype=xv.dtype))
+
+        # compute the sum of absolute factors
+        # unrolled loop in case a factor is a late-bound constant array
+        total_abs_factor = np.abs(factors[0])
+        for factor in factors[1:]:
+            total_abs_factor += np.abs(factor)
 
         etl: np.ndarray = _nan_to_zero(
             to_finite_float(eb_expr_lower / total_abs_factor, xv.dtype)
@@ -736,8 +746,8 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
                 term,
                 xv,
                 # flip the lower/upper error bound if the factor is negative
-                -etu if factor < 0 else etl,
-                -etl if factor < 0 else etu,
+                np.where(factor < 0, -etu, etl),  # type: ignore
+                np.where(factor < 0, -etl, etu),  # type: ignore
             )
             # combine the inner error bounds
             if eb_x_lower is None:
@@ -757,7 +767,13 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
     if expr.is_Mul:
         # extract the constant factor and reduce tauv
         factor = evaluate_sympy_expr_to_numpy(
-            sp.Mul(*[arg for arg in expr.args if len(arg.free_symbols) == 0]),  # type: ignore
+            sp.Mul(
+                *[
+                    arg
+                    for arg in expr.args
+                    if len(arg.free_symbols - late_bound_constants) == 0
+                ]  # type: ignore
+            ),
         )
 
         efl: np.ndarray = _nan_to_zero(
@@ -786,22 +802,27 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         )
 
         # flip the lower/upper error bound if the factor is negative
-        eb_factor_lower = -efu if factor < 0 else efl
-        eb_factor_upper = -efl if factor < 0 else efu
+        eb_factor_lower = np.where(factor < 0, -efu, efl)
+        eb_factor_upper = np.where(factor < 0, -efl, efu)
 
         # find all non-constant terms
-        terms = [arg for arg in expr.args if len(arg.free_symbols) > 0]
+        terms = [
+            arg for arg in expr.args if len(arg.free_symbols - late_bound_constants) > 0
+        ]
 
         if len(terms) == 1:
             return compute_data_eb_for_stencil_qoi_eb(
-                terms[0], xv, eb_factor_lower, eb_factor_upper
+                terms[0],
+                xv,
+                eb_factor_lower,  # type: ignore
+                eb_factor_upper,  # type: ignore
             )
 
         return compute_data_eb_for_stencil_qoi_eb(
             sp.exp(sp.Add(*[sp.log(sp.Abs(term)) for term in terms]), evaluate=False),
             xv,
-            eb_factor_lower,
-            eb_factor_upper,
+            eb_factor_lower,  # type: ignore
+            eb_factor_upper,  # type: ignore
         )
 
     raise ValueError(f"unsupported expression kind {expr} (= {sp.srepr(expr)} =)")

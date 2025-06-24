@@ -122,6 +122,8 @@ def test_empty(check):
 def test_non_expression():
     with pytest.raises(AssertionError, match="numeric expression"):
         check_all_codecs(np.empty(0), "exp")
+    with pytest.raises(AssertionError, match="invalid QoI expression"):
+        check_all_codecs(np.empty(0), "e x p")
 
 
 def test_whitespace():
@@ -142,20 +144,31 @@ def test_comment():
 
 
 def test_variables():
-    with pytest.raises(AssertionError, match=r'unresolved variable V\["a"\]'):
-        check_all_codecs(np.array([]), 'V["a"]')
-    with pytest.raises(AssertionError, match=r'unresolved variable V\["b"\]'):
-        check_all_codecs(np.array([]), 'let(V["a"], 3, x + V["b"])')
+    with pytest.raises(AssertionError, match="invalid QoI expression"):
+        check_all_codecs(np.array([]), 'v["123"]')
+    with pytest.raises(AssertionError, match="invalid QoI expression"):
+        check_all_codecs(np.array([]), 'v["a 123"]')
+    with pytest.raises(AssertionError, match=r'unresolved variable v\["a"\]'):
+        check_all_codecs(np.array([]), 'v["a"]')
+    with pytest.raises(AssertionError, match=r'unresolved variable v\["b"\]'):
+        check_all_codecs(np.array([]), 'let(v["a"], 3)(x + v["b"])')
     with pytest.raises(AssertionError, match="let name"):
-        check_all_codecs(np.array([]), "let(1, 2, x)")
+        check_all_codecs(np.array([]), "let(1, 2)(x)")
     with pytest.raises(AssertionError, match="let value"):
-        check_all_codecs(np.array([]), 'let(V["a"], log, x + V["a"])')
+        check_all_codecs(np.array([]), 'let(v["a"], log)(x + v["a"])')
     with pytest.raises(AssertionError, match="let within"):
-        check_all_codecs(np.array([]), 'let(V["a"], x + 1, log)')
-    check_all_codecs(np.array([]), 'let(V["a"], 3, x + V["a"])')
+        check_all_codecs(np.array([]), 'let(v["a"], x + 1)(log)')
+    with pytest.raises(AssertionError, match=r"fresh \(not overridden\)"):
+        check_all_codecs(
+            np.array([]), 'let(v["a"], x + 1)(let(v["a"], v["a"])(v["a"]))'
+        )
+    with pytest.raises(AssertionError, match="pairs of names and values"):
+        check_all_codecs(np.array([]), 'let(v["a"], x + 1, v["b"])(v["a"] + v["b"])')
+    check_all_codecs(np.array([]), 'let(v["a"], 3)(x + v["a"])')
     check_all_codecs(
-        np.array([]), 'let(V["a"], 3, x + let(V["b"], V["a"] - 1, V["b"] * 2))'
+        np.array([]), 'let(v["a"], 3)(x + let(v["b"], v["a"] - 1)(v["b"] * 2))'
     )
+    check_all_codecs(np.array([]), 'let(v["a"], x + 1, v["b"], x - 1)(v["a"] + v["b"])')
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -396,3 +409,22 @@ def test_late_bound_eb_ratio():
     assert np.all(
         ok == np.array([True, False, False, False, False, False]).reshape(2, 3)
     )
+
+
+def test_late_bound_constant():
+    safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi='x / c["f"]', type="abs", eb=1
+    )
+
+    data = np.arange(6).reshape(2, 3)
+
+    late_bound = Bindings(
+        f=np.array([16, 8, 4, 2, 1, 0]).reshape(2, 3),
+    )
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == (data.flatten() - np.array([16, 8, 4, 2, 1, 0])))
+    assert np.all(valid._upper == (data.flatten() + np.array([16, 8, 4, 2, 1, 0])))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(ok == np.array([True, True, True, False, False, False]).reshape(2, 3))

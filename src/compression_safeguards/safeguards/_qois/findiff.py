@@ -5,6 +5,7 @@ import sympy.tensor.array.expressions  # noqa: F401
 from typing_extensions import assert_never  # MSPV 3.11
 
 from ...utils.cast import _isfinite
+from .vars import LateBoundConstant
 
 
 def create_findiff_for_neighbourhood(
@@ -14,7 +15,9 @@ def create_findiff_for_neighbourhood(
 ):
     def findiff(expr, /, *, order, accuracy, type, dx, axis):
         assert isinstance(expr, sp.Basic), "findiff expr must be an expression"
-        assert len(expr.free_symbols) > 0, "findiff expr must not be constant"
+        assert any(not isinstance(s, LateBoundConstant) for s in expr.free_symbols), (
+            "findiff expr must not be constant"
+        )
 
         assert isinstance(order, sp.Integer), "findiff order must be an integer"
         order = int(order)
@@ -59,7 +62,10 @@ def create_findiff_for_neighbourhood(
             if (
                 expr.func is sp.tensor.array.expressions.ArrayElement
                 and len(expr.args) == 2
-                and expr.args[0] == X
+                and (
+                    expr.args[0] == X
+                    or isinstance(expr.args[0].name, LateBoundConstant)  # type: ignore
+                )
             ):
                 name, idxs = expr.args
                 indices = list(idxs)  # type: ignore

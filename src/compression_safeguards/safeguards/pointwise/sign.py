@@ -47,7 +47,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         Literal values are (unsafely) cast to the data dtype before comparison.
     """
 
-    __slots__ = "_offset"
+    __slots__ = ("_offset",)
     _offset: int | float | Parameter
 
     kind = "sign"

@@ -124,11 +124,11 @@ class Bindings:
 
         assert param in self._bindings, f"LateBound is missing binding for {param}"
 
-        view = (
-            np.broadcast_to(self._bindings[param], shape)
-            .astype(dtype, casting="safe")
-            .view()
-        )
+        # cast first then broadcast to allow zero-copy broadcasts of scalars
+        #  to arrays of any shape
+        view = np.broadcast_to(
+            np.array(self._bindings[param]).astype(dtype, casting="safe"), shape
+        ).view()
         view.flags.writeable = False
 
-        return view
+        return view  # type: ignore

@@ -173,6 +173,8 @@ def test_empty(check):
 def test_non_expression():
     with pytest.raises(AssertionError, match="numeric expression"):
         check_all_codecs(np.empty(0), "exp", [(0, 0)])
+    with pytest.raises(AssertionError, match="invalid QoI expression"):
+        check_all_codecs(np.empty(0), "e x p", [(0, 0)])
 
 
 def test_whitespace():
@@ -195,31 +197,46 @@ def test_comment():
 
 
 def test_variables():
+    with pytest.raises(AssertionError, match="invalid QoI expression"):
+        check_all_codecs(np.array([]), 'v["123"]', [(0, 0)])
+    with pytest.raises(AssertionError, match="invalid QoI expression"):
+        check_all_codecs(np.array([]), 'v["a 123"]', [(0, 0)])
     with pytest.raises(AssertionError, match=r'unresolved variable V\["a"\]'):
         check_all_codecs(np.array([]), 'V["a"]', [(0, 0)])
     with pytest.raises(AssertionError, match=r'unresolved variable V\["b"\]'):
-        check_all_codecs(np.array([]), 'let(V["a"], 3, x + V["b"])', [(0, 0)])
+        check_all_codecs(np.array([]), 'let(V["a"], 3)(x + V["b"])', [(0, 0)])
     with pytest.raises(AssertionError, match="let name"):
-        check_all_codecs(np.array([]), "let(1, 2, x)", [(0, 0)])
+        check_all_codecs(np.array([]), "let(1, 2)(x)", [(0, 0)])
     with pytest.raises(AssertionError, match="let value"):
-        check_all_codecs(np.array([]), 'let(V["a"], log, x + V["a"])', [(0, 0)])
+        check_all_codecs(np.array([]), 'let(V["a"], log)(x + V["a"])', [(0, 0)])
     with pytest.raises(AssertionError, match="let within"):
-        check_all_codecs(np.array([]), 'let(V["a"], x + 1, log)', [(0, 0)])
-    check_all_codecs(np.array([]), 'let(V["a"], 3, x + V["a"])', [(0, 0)])
+        check_all_codecs(np.array([]), 'let(V["a"], x + 1)(log)', [(0, 0)])
+    with pytest.raises(AssertionError, match=r"fresh \(not overridden\)"):
+        check_all_codecs(
+            np.array([]), 'let(V["a"], x + 1)(let(V["a"], V["a"])(V["a"]))', [(0, 0)]
+        )
+    with pytest.raises(AssertionError, match="pairs of names and values"):
+        check_all_codecs(
+            np.array([]), 'let(V["a"], x + 1, V["b"])(V["a"] + V["b"])', [(0, 0)]
+        )
+    check_all_codecs(np.array([]), 'let(V["a"], 3)(x + V["a"])', [(0, 0)])
     check_all_codecs(
         np.array([]),
-        'let(V["a"], 3, x + let(V["b"], V["a"] - 1, V["b"] * 2))',
+        'let(V["a"], 3)(x + let(V["b"], V["a"] - 1)(V["b"] * 2))',
         [(0, 0)],
+    )
+    check_all_codecs(
+        np.array([]), 'let(V["a"], x + 1, V["b"], x - 1)(V["a"] + V["b"])', [(0, 0)]
     )
 
     with pytest.raises(AssertionError, match="out of border"):
-        check_all_codecs(np.array([]), 'let(V["a"], X + 1, V["a"][1])', [(0, 0)])
-    with pytest.raises(AssertionError, match="unresolved index"):
-        check_all_codecs(np.array([]), 'let(V["a"], X + 1, V["a"][0,1])', [(0, 0)])
-    check_all_codecs(np.array([]), 'let(V["a"], 3, X + V["a"])[0]', [(0, 0)])
-    check_all_codecs(np.array([]), 'let(V["a"], X, V["a"][0])', [(0, 0)])
-    check_all_codecs(np.array([]), 'let(V["a"], X, V["a"][0,0])', [(0, 0), (0, 0)])
-    check_all_codecs(np.array([]), 'let(V["a"], X, V["a"][I])', [(0, 0), (0, 0)])
+        check_all_codecs(np.array([]), 'let(V["a"], X + 1)(V["a"][1])', [(0, 0)])
+    with pytest.raises(AssertionError, match="index greater"):
+        check_all_codecs(np.array([]), 'let(V["a"], X + 1)(V["a"][0,1])', [(0, 0)])
+    check_all_codecs(np.array([]), 'let(V["a"], 3)(X + V["a"])[0]', [(0, 0)])
+    check_all_codecs(np.array([]), 'let(V["a"], X)(V["a"][0])', [(0, 0)])
+    check_all_codecs(np.array([]), 'let(V["a"], X)(V["a"][0,0])', [(0, 0), (0, 0)])
+    check_all_codecs(np.array([]), 'let(V["a"], X)(V["a"][I])', [(0, 0), (0, 0)])
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -920,8 +937,36 @@ def test_findiff_dx():
         correction = safeguards.compute_correction(data, decoded)
         corrected = safeguards.apply_correction(decoded, correction)
 
-        data_findiff = safeguards.safeguards[0].evaluate_qoi(data)
-        corrected_findiff = safeguards.safeguards[0].evaluate_qoi(corrected)
+        data_findiff = safeguards.safeguards[0].evaluate_qoi(data, Bindings.empty())
+        corrected_findiff = safeguards.safeguards[0].evaluate_qoi(
+            corrected, Bindings.empty()
+        )
 
         assert data_findiff[len(data_findiff) // 2] == 10
         assert np.abs(10 - corrected_findiff[len(data_findiff) // 2]) <= 1
+
+
+def test_late_bound_constant():
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='X[0,0] * c["zero"] + X[I] / C["f"][I]',
+        neighbourhood=[
+            dict(axis=0, before=1, after=0, boundary="valid"),
+            dict(axis=1, before=0, after=0, boundary="valid"),
+        ],
+        type="abs",
+        eb=1,
+    )
+
+    data = np.arange(6).reshape(2, 3)
+
+    late_bound = Bindings(
+        f=np.array([16, 8, 4]),
+        zero=0,
+    )
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == (data.flatten() - np.array([16, 8, 4, 16, 8, 4])))
+    assert np.all(valid._upper == (data.flatten() + np.array([16, 8, 4, 16, 8, 4])))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(ok == np.array([True, True, True, True, True, False]).reshape(2, 3))
