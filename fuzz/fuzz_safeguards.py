@@ -139,7 +139,9 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
             elif atom is float:
                 atom = str(data.ConsumeRegularFloat())
             elif atom == "V":
-                atom = f'V["{data.ConsumeString(2)}"]'
+                atom = (
+                    f'{"v" if ty is PointwiseExpr else "V"}["{data.ConsumeString(2)}"]'
+                )
             atoms.append(atom)
 
         done = False
@@ -153,7 +155,9 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
             )
             op = OPS[data.ConsumeIntInRange(0, len(OPS) - 1)]
             if op == "let":
-                atoms.append(f'let(V["{data.ConsumeString(2)}"],{atom1})({atom2})')
+                atoms.append(
+                    f'let({"v" if ty is PointwiseExpr else "V"}["{data.ConsumeString(2)}"],{atom1})({atom2})'
+                )
             elif op == "neg":
                 atoms.append(f"(-{atom1})")
             elif op in ("log", "matmul"):

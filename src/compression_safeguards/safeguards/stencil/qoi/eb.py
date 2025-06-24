@@ -169,7 +169,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     const   =
         "e"                               (* Euler's number *)
       | "pi"                              (* pi *)
-      | "C", "[", '"', ident, '"', "]"    (* late-bound constant *)
+      | "c", "[", '"', ident, '"', "]"    (* late-bound constant value *)
+      | "C", "[", '"', ident, '"', "]"    (* late-bound constant neighbourhood *)
     ;
 
     data    =
@@ -378,6 +379,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             C.__class__ = NumPyLikeArray
             return C
 
+        def create_late_bound_value_symbol(name: str):
+            return create_late_bound_array_symbol(name)[I]
+
         assert len(qoi_stripped) > 0, "QoI expression must not be empty"
         assert _QOI_PATTERN.fullmatch(qoi_stripped) is not None, (
             "invalid QoI expression"
@@ -389,16 +393,21 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     # === data ===
                     # data neighbourhood
                     X=X,
-                    x=X.__getitem__(I),
+                    x=X[I],
                     # neighbourhood index
                     I=NumPyLikeArray(I),
                     # === constants ===
                     **MATH_CONSTANTS,
+                    c=LateBoundConstantEnvironment(
+                        "c",
+                        create_late_bound_value_symbol,  # type: ignore
+                    ),
                     C=LateBoundConstantEnvironment(
-                        create_late_bound_array_symbol  # type: ignore
+                        "C",
+                        create_late_bound_array_symbol,  # type: ignore
                     ),
                     # === variables ===
-                    V=VariableEnvironment(),
+                    V=VariableEnvironment("V"),
                     **VARS_FUNCTIONS,
                     # === operators ===
                     # poinwise math
@@ -418,7 +427,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 transformations=(sp.parsing.sympy_parser.auto_number,),
             )
             assert not isinstance(qoi_expr, UnresolvedVariable), (
-                f'unresolved variable V["{qoi_expr._name}"], perhaps you forgot to define it within a let expression'
+                f'unresolved variable {qoi_expr._env._symbol}["{qoi_expr._name}"], perhaps you forgot to define it within a let expression'
             )
             assert isinstance(qoi_expr, sp.Basic), (
                 "QoI expression must evaluate to a numeric expression"
@@ -1199,7 +1208,7 @@ _QOI_ATOM_PATTERN = (
     + r"".join(rf"|(?:{f})" for f in AMATH_FUNCTIONS)
     + r"|(?:findiff)"
     + r"".join(rf"|(?:{v})" for v in VARS_FUNCTIONS)
-    + r"".join(rf'|(?:{v}\["[a-zA-Z_][a-zA-Z0-9_]*"\])' for v in ["C", "V"])
+    + r"".join(rf'|(?:{v}\["[a-zA-Z_][a-zA-Z0-9_]*"\])' for v in ("c", "C", "V"))
     + r")"
 )
 _QOI_SEPARATOR_PATTERN = r"(?:[\(\)\[\],:\+\-\*/])"

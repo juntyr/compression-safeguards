@@ -942,7 +942,7 @@ def test_findiff_dx():
 
 def test_late_bound_constant():
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-        qoi='X[0,0] * C["zero"][0,0] + X[I] / C["f"][I]',
+        qoi='X[0,0] * c["zero"] + X[I] / C["f"][I]',
         neighbourhood=[
             dict(axis=0, before=1, after=0, boundary="valid"),
             dict(axis=1, before=0, after=0, boundary="valid"),

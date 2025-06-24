@@ -117,13 +117,13 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
     const   =
         "e"                               (* Euler's number *)
       | "pi"                              (* pi *)
-      | "C", "[", '"', ident, '"', "]"    (* late-bound constant *)
+      | "c", "[", '"', ident, '"', "]"    (* late-bound constant value *)
     ;
 
     data    = "x";                        (* pointwise data value *)
 
     var     =
-        "V", "[", '"', ident, '"', "]"    (* variable *)
+        "v", "[", '"', ident, '"', "]"    (* variable *)
     ;
 
     ident   =
@@ -271,11 +271,11 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                     x=self._x,
                     # === constants ===
                     **MATH_CONSTANTS,
-                    C=LateBoundConstantEnvironment(
-                        lambda name: LateBoundConstant(name, extended_real=True)
+                    c=LateBoundConstantEnvironment(
+                        "c", lambda name: LateBoundConstant(name, extended_real=True)
                     ),
                     # === variables ===
-                    V=VariableEnvironment(),
+                    v=VariableEnvironment("v"),
                     **VARS_FUNCTIONS,
                     # === operators ===
                     # poinwise math
@@ -290,7 +290,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                 transformations=(sp.parsing.sympy_parser.auto_number,),
             )
             assert not isinstance(qoi_expr, UnresolvedVariable), (
-                f'unresolved variable V["{qoi_expr._name}"], perhaps you forgot to define it within a let expression'
+                f'unresolved variable {qoi_expr._env._symbol}["{qoi_expr._name}"], perhaps you forgot to define it within a let expression'
             )
             assert isinstance(qoi_expr, sp.Basic), (
                 "QoI expression must evaluate to a numeric expression"
@@ -712,7 +712,7 @@ _QOI_ATOM_PATTERN = (
     + r"".join(rf"|(?:{c})" for c in MATH_CONSTANTS)
     + r"".join(rf"|(?:{f})" for f in MATH_FUNCTIONS)
     + r"".join(rf"|(?:{v})" for v in VARS_FUNCTIONS)
-    + r"".join(rf'|(?:{v}*\[*"[a-zA-Z_][a-zA-Z0-9_]*"*\])' for v in ["C", "V"])
+    + r"".join(rf'|(?:{v}*\[*"[a-zA-Z_][a-zA-Z0-9_]*"*\])' for v in ("c", "v"))
     + r")"
 )
 _QOI_SEPARATOR_PATTERN = r"(?:[\(\),\+\-\*/])"

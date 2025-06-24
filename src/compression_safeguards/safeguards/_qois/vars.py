@@ -6,18 +6,19 @@ from ...utils.bindings import Parameter
 
 
 class VariableEnvironment:
-    __slots__ = "_variables"
+    __slots__ = ("_symbol", "_variables")
     _variables: dict[str, sp.Basic]
 
-    def __init__(self):
+    def __init__(self, symbol: str):
+        self._symbol = symbol
         self._variables = dict()
 
     def __call__(self, *args, **kwargs):
-        raise TypeError("cannot call variable environment `V`")
+        raise TypeError(f"cannot call variable environment `{self._symbol}`")
 
     def __getitem__(self, name: str) -> "UnresolvedVariable | sp.Basic":
         assert isinstance(name, str) and name.isidentifier(), (
-            "variable environment `V` name must be a valid identifier string"
+            f"variable environment `{self._symbol}` name must be a valid identifier string"
         )
 
         if name in self._variables:
@@ -37,7 +38,7 @@ class UnresolvedVariable:
 
     def _sympy_(self):
         raise TypeError(
-            f'unresolved variable V["{self._name}"], perhaps you forgot to define it within a let expression'
+            f'unresolved variable {self._env._symbol}["{self._name}"], perhaps you forgot to define it within a let expression'
         )
 
 
@@ -46,24 +47,26 @@ class LateBoundConstant(sp.Symbol):
 
     @property
     def parameter(self) -> Parameter:
-        return Parameter(self.name[3:-2])
+        return Parameter(self.name[self.name.index("[") + 2 : -2])
 
 
 class LateBoundConstantEnvironment:
-    __slots__ = ("_create_symbol",)
+    __slots__ = ("_symbol", "_create_symbol")
+    _symbol: str
     _create_symbol: Callable[[str], LateBoundConstant]
 
-    def __init__(self, create_symbol: Callable[[str], LateBoundConstant]):
+    def __init__(self, symbol: str, create_symbol: Callable[[str], LateBoundConstant]):
+        self._symbol = symbol
         self._create_symbol = create_symbol
 
     def __call__(self, *args, **kwargs):
-        raise TypeError("cannot call constant environment `C`")
+        raise TypeError(f"cannot call constant environment `{self._symbol}`")
 
     def __getitem__(self, name: str) -> LateBoundConstant:
         assert isinstance(name, str) and name.isidentifier(), (
-            "constant environment `C` name must be a valid identifier string"
+            f"constant environment `{self._symbol}` name must be a valid identifier string"
         )
-        return self._create_symbol(f'C["{name}"]')
+        return self._create_symbol(f'{self._symbol}["{name}"]')
 
 
 def let(
@@ -78,7 +81,12 @@ def let(
 
     for n, v in zip(names, values):
         assert isinstance(n, UnresolvedVariable), (
-            'let name must be a fresh (not overridden) `V["var"]` expression'
+            "let name must be a fresh (not overridden) variable"
+            + (
+                f' `{name._env._symbol}["var"]`'
+                if isinstance(name, UnresolvedVariable)
+                else ""
+            )
         )
         assert isinstance(v, sp.Basic), "let value must be an expression"
 
