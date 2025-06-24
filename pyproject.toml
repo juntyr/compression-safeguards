@@ -17,6 +17,7 @@ dependencies = [
 
 [dependency-groups]
 bench = [
+    "earthkit-data~=0.14.0",
     "earthkit-plots~=0.3.1",
     "numcodecs-wasm~=0.1.7",
     "numcodecs-wasm-sz3~=0.6.0",
@@ -32,6 +33,8 @@ dev = ["ruff~=0.9"]
 examples = [
     "astropy~=6.0",
     "cdsapi~=0.7.6",
+    "earthkit-data~=0.14.0",
+    "earthkit-plots~=0.3.1",
     "jupyterlab",
     "numcodecs-wasm~=0.1.7",
     "numcodecs-wasm-sperr~=0.1.0",
