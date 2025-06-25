@@ -14,6 +14,22 @@ With the `compression-safeguards` package, you can:
 [^1]: Lossy compression methods reduce data size by only storing an approximation of the data. In contrast to lossless compression methods, lossy compression loses information about the data, e.g. by reducing its resolution (only store every $n$th element) precision (only store $n$ digits after the decimal point), smoothing, etc. Therefore, lossy compression methods provide a tradeoff between size reduction and quality preservation.
 
 
+
+## Table of Contents
+
+* [What are safeguards?](#what-are-safeguards)
+* [Design and Guarantees](#design-and-guarantees)
+* [Provided safeguards](#provided-safeguards)
+* [Installation](#installation)
+* [Usage](#usage)
+* [How to safeguard ...?](#how-to-safeguard)
+* [Limitations](#limitations)
+* [Related Projects](#related-projects)
+* [Citation](#citation)
+* [License](#license)
+* [Funding](#funding)
+
+
 ## What are safeguards?
 
 Safeguards are a declarative way to describe the safety requirements that you have for lossy compression. They range from simple (e.g. error bounds on the data, preserving special values and data signs) to complex (e.g. error bounds on derived quantities over data neighbourhoods, preserving monotonic sequences).

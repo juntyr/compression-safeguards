@@ -3,3 +3,7 @@ bench/era5_tp_2024_08_02_10:00.nc filter=lfs diff=lfs merge=lfs -text
 bench/era5_o3_pv_2024_08_02_12:00.nc filter=lfs diff=lfs merge=lfs -text
 
 examples/data/hoaps-c.r30.h06.wvpa.2020-08/data.nc filter=lfs diff=lfs merge=lfs -text
+
+bench/* linguist-vendored
+docs/js/* linguist-vendored
+examples/* linguist-vendored
