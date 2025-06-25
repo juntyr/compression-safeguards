@@ -5,6 +5,7 @@ import sympy.tensor.array.expressions  # noqa: F401
 from typing_extensions import assert_never  # MSPV 3.11
 
 from ...utils.cast import _isfinite
+from .array import NumPyLikeArray
 from .vars import LateBoundConstant
 
 
@@ -47,11 +48,16 @@ def create_finite_difference_for_neighbourhood(
                 "accuracy must be even for a central finite difference"
             )
 
-        assert isinstance(dx, sp.Number), "finite_difference dx must be a number"
-        assert dx > 0, "dx must be positive"
-        assert isinstance(dx, (sp.Integer, sp.Rational)) or _isfinite(float(dx)), (
-            "finite_difference dx must be finite"
-        )
+        assert isinstance(dx, sp.Number) or (
+            isinstance(dx, sp.Basic)
+            and (not dx.has(NumPyLikeArray))
+            and all(isinstance(s, LateBoundConstant) for s in dx.free_symbols)
+        ), "finite_difference dx must be a number or a constant scalar expression"
+        if isinstance(dx, sp.Number):
+            assert dx > 0, "dx must be positive"
+            assert isinstance(dx, (sp.Integer, sp.Rational)) or _isfinite(float(dx)), (
+                "finite_difference dx must be finite"
+            )
 
         assert isinstance(axis, sp.Integer), "finite_difference axis must be an integer"
         axis = int(axis)
@@ -65,6 +71,9 @@ def create_finite_difference_for_neighbourhood(
         def apply_finite_difference(expr: sp.Basic, axis: int, offset: int):
             if expr.is_Number:
                 return expr
+            assert expr.func is not NumPyLikeArray, (
+                "cannot compute the finite_difference with respect to an array expression, provide a scalar expression (e.g. the centre value) instead"
+            )
             if (
                 expr.func is sp.tensor.array.expressions.ArrayElement
                 and len(expr.args) == 2

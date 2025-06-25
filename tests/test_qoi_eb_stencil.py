@@ -403,6 +403,92 @@ def test_finite_difference():
     )
 
 
+def test_finite_difference_array():
+    data = np.arange(5)
+    decoded = np.zeros(5)
+
+    with pytest.raises(AssertionError, match="with respect to an array expression"):
+        encode_decode_mock(
+            data,
+            decoded,
+            safeguards=[
+                dict(
+                    kind="qoi_eb_stencil",
+                    qoi="finite_difference(X[1:-1], order=1, accuracy=2, type=0, dx=1, axis=0)",
+                    neighbourhood=[
+                        dict(
+                            axis=0,
+                            before=1,
+                            after=1,
+                            boundary="valid",
+                        )
+                    ],
+                    type="abs",
+                    eb=0.1,
+                ),
+            ],
+        )
+
+
+def test_finite_difference_constant_dx():
+    data = np.arange(5, dtype=float)
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='finite_difference(x, order=1, accuracy=2, type=0, dx=c["dx"], axis=0)',
+        neighbourhood=[
+            dict(
+                axis=0,
+                before=1,
+                after=1,
+                boundary="valid",
+            )
+        ],
+        type="abs",
+        eb=0.1,
+    )
+
+    safeguard.compute_safe_intervals(data, late_bound=Bindings(dx=1.0))
+    safeguard.compute_safe_intervals(
+        data, late_bound=Bindings(dx=np.array([0.1, 0.2, 0.3, 0.2, 0.1]))
+    )
+
+    with pytest.raises(
+        AssertionError, match="dx must be a number or a constant scalar expression"
+    ):
+        safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+            qoi='finite_difference(x, order=1, accuracy=2, type=0, dx=C["dx"], axis=0)',
+            neighbourhood=[
+                dict(
+                    axis=0,
+                    before=1,
+                    after=1,
+                    boundary="valid",
+                )
+            ],
+            type="abs",
+            eb=0.1,
+        )
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='finite_difference(x, order=1, accuracy=2, type=0, dx=sin(c["dx"])**2, axis=0)',
+        neighbourhood=[
+            dict(
+                axis=0,
+                before=1,
+                after=1,
+                boundary="valid",
+            )
+        ],
+        type="abs",
+        eb=0.1,
+    )
+
+    safeguard.compute_safe_intervals(data, late_bound=Bindings(dx=1.0))
+    safeguard.compute_safe_intervals(
+        data, late_bound=Bindings(dx=np.array([0.1, 0.2, 0.3, 0.2, 0.1]))
+    )
+
+
 def test_matmul():
     data = np.arange(16, dtype=float).reshape(4, 4)
     valid_3x3_neighbourhood = [
