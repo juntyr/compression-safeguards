@@ -27,6 +27,25 @@ We also provide the following integrations of the safeguards with popular compre
 - [`numcodecs-safeguards`][numcodecs_safeguards]: provides the [`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec] meta-compressor that conveniently applies safeguards to any compressor using the [`numcodecs.abc.Codec`][numcodecs.abc.Codec] API.
 
 
+### Other terminology used by the compression safeguards
+
+- *safeguard*: Declares a safety requirements and enforces that it is met after (lossy) compression.
+
+- *pointwise safeguard*: A safety requirement that concerns just a single data element and can be checked and guaranteed independently for each data point.
+
+- *stencil safeguard*: A safety requirement that is formulated over a neighbourhood of nearby points for each data element.
+
+- *combinator safeguard*: A meta-safeguard that combines over several other safeguard with a logical combinator such as logical 'and' or 'or'.
+
+- *parameter*: A configuration option for a safeguard that is provided when declaring the safeguard and cannot be changed
+
+- *late-bound parameter*: A configuration option for a safeguard that is not constant but depends on the data being compressed. At declaration time, a late-bound parameter is only given a name but not a value. When the safeguards are later applied to data, all late-bound parameters must be resolved by providing their values.
+
+- *quantity of interest*: We are often not just interested in data itself, but also in quantities derived from it. For instance, we might later plot the data logarithm, compute a derivative, or apply a smoothing kernel. In these cases, we often want to safeguard not just properties on the data but also on these derived quantities of interest.
+
+- *region of interest*: Sometimes we have regionally varing safety requirements, e.g. because a region has interesting behaviour that we want to especially preserve.
+
+
 ## Design and Guarantees
 
 The safeguards are designed to be convenient to apply to any lossy compression task:
@@ -86,9 +105,9 @@ This package currently implements the following [safeguards][compression_safegua
 
     For each element, at least one of the combined safeguards' guarantees is upheld. At the moment, only pointwise and stencil safeguards and combinations thereof can be combined by this any-combinator.
 
-- [`safe`][compression_safeguards.safeguards.combinators.safe.AlwaysSafeguard] (logical truth):
+- [`assume_safe`][compression_safeguards.safeguards.combinators.safe.AssumeAlwaysSafeguard] (logical truth):
 
-    All elements always meet their guarantees and are thus always safe. This truth-combinator can be used, with care, with other logical combinators.
+    All elements are assumed to always meet their guarantees and are thus always safe. This truth-combinator can be used with the [`select`][compression_safeguards.safeguards.combinators.select.SelectSafeguard] combinator to express regions that are *not* of interest, i.e. where no additional safety requirements are imposed.
 
 - [`select`][compression_safeguards.safeguards.combinators.select.SelectSafeguard] (logical select / switch case):
 
@@ -224,32 +243,44 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
 - ... a pointwise absolute / relative / ratio error bound on the data?
 
-  > Use the `eb` safeguard and configure it with the `type` and range of the error bound.
+    > Use the `eb` safeguard and configure it with the `type` and range of the error bound.
 
 - ... a pointwise normalised or range-relative absolute error bound?
 
-  > Use the `eb` safeguard for an absolute error bound but provide a late-bound parameter for the bound `value`. Since the data range is tightly tied to the data itself, it makes sense to only fill in the actual when applying the safeguards to the actual data. You still have to compute the range yourself, but can then provide it as a `late_bound` binding when computing the safeguard corrections.
+    > Use the `eb` safeguard for an absolute error bound but provide a late-bound parameter for the bound value. Since the data range is tightly tied to the data itself, it makes sense to only fill in the actual when applying the safeguards to the actual data. You still have to compute the range yourself, but can then provide it as a `late_bound` binding when computing the safeguard corrections.
 
 - ... a global error bound, e.g. a mean error, mean squared error, root mean square error, or peak signal to noise ratio?
 
-  > The `compression-safeguards` do not currently support global safeguards. However, you can emulate a global error bound using a pointwise error bound, which provides a stricter guarantee. For all of the abovementioned global error bounds, use the `eb` safeguard with a pointwise absolute error bound of
-  >
-  > - $\epsilon_{abs} = |\epsilon_{ME}|$ for the mean error
-  > - $\epsilon_{abs} = \sqrt{\epsilon_{MSE}}$ for the mean square error
-  > - $\epsilon_{abs} = \epsilon_{RMSE}$ for the root mean square error
-  > - $\epsilon_{abs} = (\text{max}(X) - \text{min}(X)) \cdot {10}^{-\text{PSNR} / 20}$ for the peak signal to noise ratio where $\text{PSNR}$ is given in dB
+    > The `compression-safeguards` do not currently support global safeguards. However, you can emulate a global error bound using a pointwise error bound, which provides a stricter guarantee. For all of the abovementioned global error bounds, use the `eb` safeguard with a pointwise absolute error bound of
+    >
+    > - $\epsilon_{abs} = |\epsilon_{ME}|$ for the mean error
+    > - $\epsilon_{abs} = \sqrt{\epsilon_{MSE}}$ for the mean square error
+    > - $\epsilon_{abs} = \epsilon_{RMSE}$ for the root mean square error
+    > - $\epsilon_{abs} = (\text{max}(X) - \text{min}(X)) \cdot {10}^{-\text{PSNR} / 20}$ for the peak signal to noise ratio where $\text{PSNR}$ is given in dB
 
 - ... a missing value?
 
-  > If missing values are encoded as NaNs, the `eb` safeguards already guarantee that NaN values are preserved (if any NaN value works, be sure to enable the `equal_nan` flag). For other values, use the `same` safeguard and enable its `exclusive` flag.
+    > If missing values are encoded as NaNs, the `eb` safeguards already guarantee that NaN values are preserved (if any NaN value works, be sure to enable the `equal_nan` flag). For other values, use the `same` safeguard and enable its `exclusive` flag.
 
 - ... a global extrema (minimum / maximum)?
 
-  > Use the `sign` safeguard with the `offset` corresponding to the extrema to ensure the extrema itself and its relationship to other values is preserved
+    > Use the `sign` safeguard with the `offset` corresponding to the extrema to ensure the extrema itself and its relationship to other values is preserved
+
+- ... local extrema or other topological features?
+
+    > Identifying local topological features, especially for noisy data, is a hard problem that you are likely using a custom algorithm for. To safeguard that algorithm's results, you should apply it to the original data before compression and identify how tolerant the algorithm is to errors around the extrema, giving you a regionally varying error bound that is tighter around the topological features, i.e. your regions of interest. Then, you can use the `eb` safeguard but provide a late-bound parameter for the bound value. At compression time, you then bind your regionally varying error tolerance to this parameter. If you also need to preserve whether values around the features are above/below a value, you can use a `sign` safeguard with a matching `offset` for each local feature and select over them using the `select` combinator and a late-bound `selector` mask that is based on your a priori analysis. If regions of interest overlap, you can combine several `select` combinators. For regions that are not of interest, the `select` combinator can fallback to the `assume_safe` safeguard, which imposes no additional safety requirements.
 
 - ... a data distribution histogram?
 
-  > The `compression-safeguards` do not currently support global safeguards. However, we can preserve the histogram bin that each data element falls into using the `qoi_eb_pw` safeguard, which provides a stricter guarantee. For instance, the `'round(100 * (x - c["x_min"]) / (c["x_max"] - c["x_min"]))'` QoI would preserve the index amongst 100 bins. Note that we are using late-bound constants to provide the data minimum `c["x_min"]` and maximum `c["x_max"]` here.
+    > The `compression-safeguards` do not currently support global safeguards. However, we can preserve the histogram bin that each data element falls into using the `qoi_eb_pw` safeguard, which provides a stricter guarantee. For instance, the `'round(100 * (x - c["x_min"]) / (c["x_max"] - c["x_min"]))'` QoI would preserve the index amongst 100 bins. Note that we are using late-bound constants to provide the data minimum `c["x_min"]` and maximum `c["x_max"]` here.
+
+
+## Limitations
+
+- The `compression-safeguards` implementation do not currently support global safeguards, such as preserving mean errors or global data distributions. In many cases, it is possible to preserve these properties using stricter pointwise safeguards, at the cost of achieving lower compression ratios. Please refer to the [How to safeguard](#how-to-safeguard) section above for further details and examples.
+
+- The `compression-safeguards` (and `numcodecs-safeguards` frontend) assume that they are applied to the entire data at once, i.e. that they are not applied to data chunks one by one. If you are only using pointwise safeguards, you can also safely apply the safeguards to chunks. However, if you are using stencil safeguard, which upholds safety guarantees over local neighbourhoods of points, compressing each chunk independently would likely violate the safety requirements around the chunk boundaries. For instance, cross-chunk-boundary monotonic sequences would might no longer be preserved as monotonic by the `monotonicity` safeguard. *Apply stencil safeguards to individual chunks at your own risk!* We are working on further frontends that will correctly handle cross-chunk safeguards.
+
 
 ## Related Projects
 

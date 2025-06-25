@@ -8,7 +8,7 @@ from enum import Enum
 
 from .combinators.all import AllSafeguards
 from .combinators.any import AnySafeguard
-from .combinators.safe import AlwaysSafeguard
+from .combinators.assume_safe import AssumeAlwaysSafeguard
 from .combinators.select import SelectSafeguard
 from .pointwise.eb import ErrorBoundSafeguard
 from .pointwise.qoi.eb import PointwiseQuantityOfInterestErrorBoundSafeguard
@@ -52,8 +52,8 @@ class SafeguardKind(Enum):
     any = AnySafeguard
     """Enforce that any one of the inner safeguards' guarantees are met."""
 
-    safe = AlwaysSafeguard
-    """All elements are always safe."""
+    assume_safe = AssumeAlwaysSafeguard
+    """All elements are assumed to always be safe."""
 
     select = SelectSafeguard
     """Select, pointwise, which safeguard's guarantees to enforce."""

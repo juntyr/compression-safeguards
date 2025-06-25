@@ -2,7 +2,7 @@
 Always safe (logical truth) combinator safeguard.
 """
 
-__all__ = ["AlwaysSafeguard"]
+__all__ = ["AssumeAlwaysSafeguard"]
 
 import numpy as np
 
@@ -12,17 +12,20 @@ from ...utils.typing import S, T
 from ..pointwise.abc import PointwiseSafeguard
 
 
-class AlwaysSafeguard(PointwiseSafeguard):
+class AssumeAlwaysSafeguard(PointwiseSafeguard):
     """
-    The `AlwaysSafeguard` states that all elements always meet their guarantees
+    The `AssumeAlwaysSafeguard` assumes that all elements always meet their guarantees
     and are thus always safe.
 
-    This safeguards can be used, with care, with other logical combinators.
+    This safeguards can be used with the
+    [`SelectSafeguard`][compression_safeguards.safeguards.combinators.select.SelectSafeguard]
+    to express regions that are *not* of interest, i.e. where no additional
+    safety requirements are imposed.
     """
 
     __slots__ = ()
 
-    kind = "safe"
+    kind = "assume_safe"
 
     def __init__(self):
         pass

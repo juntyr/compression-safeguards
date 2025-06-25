@@ -461,9 +461,9 @@ class IndexedInterval(Generic[T, N]):
         self._index = _index
 
 
-def _minimum(dtype: np.dtype):
+def _minimum(dtype: np.dtype[T]) -> np.ndarray[tuple[()], np.dtype[T]]:
     if np.issubdtype(dtype, np.integer):
-        return np.iinfo(dtype).min
+        return np.array(np.iinfo(dtype).min, dtype=dtype)  # type: ignore
 
     if np.issubdtype(dtype, np.floating):
         btype = dtype.str.replace("f", "u")
@@ -489,14 +489,14 @@ Minimum = _Minimum()
 """ The smallest representable value """
 
 
-def _maximum(dtype: np.dtype):
+def _maximum(dtype: np.dtype[T]) -> np.ndarray[tuple[()], np.dtype[T]]:
     if np.issubdtype(dtype, np.integer):
-        return np.iinfo(dtype).max
+        return np.array(np.iinfo(dtype).max, dtype=dtype)  # type: ignore
 
     if np.issubdtype(dtype, np.floating):
         btype = dtype.str.replace("f", "u")
         bmin = np.iinfo(btype).max  # produces -NaN (0xffff...)
-        return np.copysign(np.array(bmin, dtype=btype).view(dtype), +1)
+        return np.copysign(np.array(bmin, dtype=btype).view(dtype), +1)  # type: ignore
 
     raise TypeError(f"unsupported interval type {dtype}")
 
