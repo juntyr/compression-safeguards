@@ -243,7 +243,9 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             Encoded data as a bytestring.
         """
 
-        data = numcodecs.compat.ensure_ndarray(buf)
+        data = (
+            buf if isinstance(buf, np.ndarray) else numcodecs.compat.ensure_ndarray(buf)
+        )
 
         assert data.dtype in Safeguards.supported_dtypes(), (
             f"can only encode arrays of dtype {', '.join(d.str for d in Safeguards.supported_dtypes())}"

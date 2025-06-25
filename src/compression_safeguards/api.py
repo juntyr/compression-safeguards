@@ -158,6 +158,11 @@ class Safeguards:
             f"can only safeguard arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
         )
 
+        if len(self._stencil_safeguards) > 0:
+            assert not getattr(data, "chunked", False), (
+                "computing the safeguards correction for an individual chunk in a chunked array is unsafe when using stencil safeguards since their safety requirements cannot be guaranteed across chunk boundaries"
+            )
+
         assert data.dtype == prediction.dtype
         assert data.shape == prediction.shape
 
