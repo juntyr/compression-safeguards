@@ -43,7 +43,7 @@ We also provide the following integrations of the safeguards with popular compre
 
 - *quantity of interest*: We are often not just interested in data itself, but also in quantities derived from it. For instance, we might later plot the data logarithm, compute a derivative, or apply a smoothing kernel. In these cases, we often want to safeguard not just properties on the data but also on these derived quantities of interest.
 
-- *region of interest*: Sometimes we have regionally varing safety requirements, e.g. because a region has interesting behaviour that we want to especially preserve.
+- *region of interest*: Sometimes we have regionally varying safety requirements, e.g. because a region has interesting behaviour that we want to especially preserve.
 
 
 ## Design and Guarantees

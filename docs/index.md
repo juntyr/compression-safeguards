@@ -43,7 +43,7 @@ We also provide the following integrations of the safeguards with popular compre
 
 - *quantity of interest*: We are often not just interested in data itself, but also in quantities derived from it. For instance, we might later plot the data logarithm, compute a derivative, or apply a smoothing kernel. In these cases, we often want to safeguard not just properties on the data but also on these derived quantities of interest.
 
-- *region of interest*: Sometimes we have regionally varing safety requirements, e.g. because a region has interesting behaviour that we want to especially preserve.
+- *region of interest*: Sometimes we have regionally varying safety requirements, e.g. because a region has interesting behaviour that we want to especially preserve.
 
 
 ## Design and Guarantees
@@ -105,7 +105,7 @@ This package currently implements the following [safeguards][compression_safegua
 
     For each element, at least one of the combined safeguards' guarantees is upheld. At the moment, only pointwise and stencil safeguards and combinations thereof can be combined by this any-combinator.
 
-- [`assume_safe`][compression_safeguards.safeguards.combinators.safe.AssumeAlwaysSafeguard] (logical truth):
+- [`assume_safe`][compression_safeguards.safeguards.combinators.assume_safe.AssumeAlwaysSafeguard] (logical truth):
 
     All elements are assumed to always meet their guarantees and are thus always safe. This truth-combinator can be used with the [`select`][compression_safeguards.safeguards.combinators.select.SelectSafeguard] combinator to express regions that are *not* of interest, i.e. where no additional safety requirements are imposed.
 
