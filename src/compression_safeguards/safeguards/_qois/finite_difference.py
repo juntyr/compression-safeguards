@@ -8,27 +8,33 @@ from ...utils.cast import _isfinite
 from .vars import LateBoundConstant
 
 
-def create_findiff_for_neighbourhood(
+def create_finite_difference_for_neighbourhood(
     X: sp.tensor.array.expressions.ArraySymbol,
     shape: tuple[int, ...],
     I: tuple[int, ...],  # noqa: E741
 ):
-    def findiff(expr, /, *, order, accuracy, type, dx, axis):
-        assert isinstance(expr, sp.Basic), "findiff expr must be an expression"
+    def finite_difference(expr, /, *, order, accuracy, type, dx, axis):
+        assert isinstance(expr, sp.Basic), (
+            "finite_difference expr must be an expression"
+        )
         assert any(not isinstance(s, LateBoundConstant) for s in expr.free_symbols), (
-            "findiff expr must not be constant"
+            "finite_difference expr must not be constant"
         )
 
-        assert isinstance(order, sp.Integer), "findiff order must be an integer"
+        assert isinstance(order, sp.Integer), (
+            "finite_difference order must be an integer"
+        )
         order = int(order)
-        assert order >= 0, "findiff order must be non-negative"
-        assert isinstance(accuracy, sp.Integer), "findiff accuracy must be an integer"
+        assert order >= 0, "finite_difference order must be non-negative"
+        assert isinstance(accuracy, sp.Integer), (
+            "finite_difference accuracy must be an integer"
+        )
         accuracy = int(accuracy)
-        assert accuracy > 0, "findiff accuracy must be positive"
+        assert accuracy > 0, "finite_difference accuracy must be positive"
 
-        assert isinstance(type, sp.Integer), "findiff type must be an integer"
+        assert isinstance(type, sp.Integer), "finite_difference type must be an integer"
         assert type in (-1, 0, +1), (
-            "findiff type must be 1 (forward), 0 (central), or -1 (backward)"
+            "finite_difference type must be 1 (forward), 0 (central), or -1 (backward)"
         )
         type = [
             _FiniteDifference.central,
@@ -41,22 +47,22 @@ def create_findiff_for_neighbourhood(
                 "accuracy must be even for a central finite difference"
             )
 
-        assert isinstance(dx, sp.Number), "findiff dx must be a number"
+        assert isinstance(dx, sp.Number), "finite_difference dx must be a number"
         assert dx > 0, "dx must be positive"
         assert isinstance(dx, (sp.Integer, sp.Rational)) or _isfinite(float(dx)), (
-            "findiff dx must be finite"
+            "finite_difference dx must be finite"
         )
 
-        assert isinstance(axis, sp.Integer), "findiff axis must be an integer"
+        assert isinstance(axis, sp.Integer), "finite_difference axis must be an integer"
         axis = int(axis)
         assert axis >= -len(shape) and axis < len(shape), (
-            "findiff axis must be in range of the dimension of the neighbourhood"
+            "finite_difference axis must be in range of the dimension of the neighbourhood"
         )
 
         offsets = _finite_difference_offsets(type, order, accuracy)
         coefficients = _finite_difference_coefficients(order, offsets)
 
-        def apply_findiff(expr: sp.Basic, axis: int, offset: int):
+        def apply_finite_difference(expr: sp.Basic, axis: int, offset: int):
             if expr.is_Number:
                 return expr
             if (
@@ -71,19 +77,24 @@ def create_findiff_for_neighbourhood(
                 indices = list(idxs)  # type: ignore
                 indices[axis] += offset
                 assert indices[axis] >= 0, (
-                    f"cannot compute the findiff on axis {axis} since the neighbourhood is insufficiently large: before should be at least {I[axis] - indices[axis]}"
+                    f"cannot compute the finite_difference on axis {axis} since the neighbourhood is insufficiently large: before should be at least {I[axis] - indices[axis]}"
                 )
                 assert indices[axis] < shape[axis], (
-                    f"cannot compute the findiff on axis {axis} since the neighbourhood is insufficiently large: after should be at least {indices[axis] - I[axis]}"
+                    f"cannot compute the finite_difference on axis {axis} since the neighbourhood is insufficiently large: after should be at least {indices[axis] - I[axis]}"
                 )
                 return sp.tensor.array.expressions.ArrayElement(name, indices)
-            return expr.func(*[apply_findiff(a, axis, offset) for a in expr.args])
+            return expr.func(
+                *[apply_finite_difference(a, axis, offset) for a in expr.args]
+            )
 
         return sp.Add(
-            *[apply_findiff(expr, axis, o) * c for o, c in zip(offsets, coefficients)]
+            *[
+                apply_finite_difference(expr, axis, o) * c
+                for o, c in zip(offsets, coefficients)
+            ]
         ) / (dx**order)
 
-    return findiff
+    return finite_difference
 
 
 class _FiniteDifference(Enum):

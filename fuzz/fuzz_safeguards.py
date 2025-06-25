@@ -129,7 +129,7 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
 
         if ty is StencilExpr:
             ATOMS += ["X", "I"]
-            OPS += ["index", "findiff"] + list(AMATH_FUNCTIONS)
+            OPS += ["index", "finite_difference"] + list(AMATH_FUNCTIONS)
 
         atoms = []
         for _ in range(data.ConsumeIntInRange(2, 4)):
@@ -168,9 +168,9 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
                 atoms.append(
                     f"{atom1}[{data.ConsumeIntInRange(0, 20)}, {data.ConsumeIntInRange(0, 20)}]"
                 )
-            elif op == "findiff":
+            elif op == "finite_difference":
                 atoms.append(
-                    f"findiff({atom1}, order={data.ConsumeIntInRange(0, 3)}, accuracy={data.ConsumeIntInRange(1, 4)}, type={data.ConsumeIntInRange(-1, 1)}, dx={data.ConsumeRegularFloat()}, axis={data.ConsumeIntInRange(0, 1)})"
+                    f"finite_difference({atom1}, order={data.ConsumeIntInRange(0, 3)}, accuracy={data.ConsumeIntInRange(1, 4)}, type={data.ConsumeIntInRange(-1, 1)}, dx={data.ConsumeRegularFloat()}, axis={data.ConsumeIntInRange(0, 1)})"
                 )
             else:
                 atoms.append(f"({atom1}{op}{atom2})")

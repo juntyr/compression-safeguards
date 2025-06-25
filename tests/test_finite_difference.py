@@ -8,7 +8,7 @@ https://doi.org/10.1090/s0025-5718-1988-0935077-0.
 
 from sympy import Rational as F
 
-from compression_safeguards.safeguards._qois.findiff import (
+from compression_safeguards.safeguards._qois.finite_difference import (
     _finite_difference_coefficients,
 )
 

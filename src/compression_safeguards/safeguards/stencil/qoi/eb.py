@@ -33,7 +33,7 @@ from ..._qois.eb import (
     compute_data_eb_for_stencil_qoi_eb_unchecked,
     ensure_bounded_derived_error,
 )
-from ..._qois.findiff import create_findiff_for_neighbourhood
+from ..._qois.finite_difference import create_finite_difference_for_neighbourhood
 from ..._qois.interval import compute_safe_eb_lower_upper_interval
 from ..._qois.math import CONSTANTS as MATH_CONSTANTS
 from ..._qois.math import FUNCTIONS as MATH_FUNCTIONS
@@ -88,7 +88,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
     The stencil QoI safeguard can also be used to bound the pointwise error of
     the finite-difference-approximated derivative over the data by using the
-    `findiff` function in the `qoi` expression.
+    `finite_difference` function in the `qoi` expression.
 
     The shape of the data neighbourhood is specified as an ordered list of
     unique data axes and boundary conditions that are applied to these axes.
@@ -136,7 +136,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
       | let
       | unary
       | binary
-      | findiff
+      | finite_difference
     ;
 
     literal =
@@ -268,8 +268,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
       | [expr], ":", [expr]               (* slicing *)
     ;
 
-    findiff =
-        "findiff", "("                    (* finite difference over an expression *)
+    finite_difference =
+        "finite_difference", "("          (* finite difference over an expression *)
           , expr, ","
           , "order", "=", int, ","           (* order of the derivative *)
           , "accuracy", "=", int, ","        (* order of accuracy of the approximation *)
@@ -419,7 +419,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     **AMATH_CONSTRUCTORS,
                     **AMATH_FUNCTIONS,
                     # finite difference
-                    findiff=create_findiff_for_neighbourhood(self._X, shape, I),
+                    finite_difference=create_finite_difference_for_neighbourhood(
+                        self._X, shape, I
+                    ),
                 ),
                 global_dict=dict(
                     # literals
@@ -1210,7 +1212,7 @@ _QOI_ATOM_PATTERN = (
     + r"".join(rf"|(?:{f})" for f in MATH_FUNCTIONS)
     + r"".join(rf"|(?:{c})" for c in AMATH_CONSTRUCTORS)
     + r"".join(rf"|(?:{f})" for f in AMATH_FUNCTIONS)
-    + r"|(?:findiff)"
+    + r"|(?:finite_difference)"
     + r"".join(rf"|(?:{v})" for v in VARS_FUNCTIONS)
     + r"".join(
         rf'|(?:{v}[ ]?\[[ ]?"{QOI_IDENTIFIER_PATTERN}"[ ]?\])' for v in ("c", "C", "V")

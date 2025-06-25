@@ -106,7 +106,7 @@ def test_inheritance():
     pointwise_config = dict(kind="eb", type="abs", eb=1)
     stencil_config = dict(
         kind="qoi_eb_stencil",
-        qoi="findiff(x, order=1, accuracy=1, type=1, dx=1, axis=0)",
+        qoi="finite_difference(x, order=1, accuracy=1, type=1, dx=1, axis=0)",
         neighbourhood=[
             dict(
                 axis=0,

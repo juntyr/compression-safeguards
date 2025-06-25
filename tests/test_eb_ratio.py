@@ -168,8 +168,6 @@ def test_fuzzer_issue_9():
         decoded,
         safeguards=[
             dict(kind="eb", type="ratio", eb=1.0645163269184692e308, equal_nan=True),
-            # neither the findiff-abs nor monotonicity safeguards apply since
-            #  they require windows larger than the data
         ],
     )
 
