@@ -9,6 +9,7 @@ from types import MappingProxyType
 from typing import Any
 
 import numpy as np
+from typing_extensions import Self
 
 from .typing import Si, T
 
@@ -23,14 +24,26 @@ class Parameter(str):
         Name of the parameter, which must be a valid identifier.
     """
 
+    __slots__ = ()
+
     def __init__(self, param: str):
         pass
 
     def __new__(cls, param: str):
         if isinstance(param, Parameter):
             return param
-        assert param.isidentifier(), f"parameter `{param}` must be a valid identifier"
+        assert (param[1:] if param.startswith("$") else param).isidentifier(), (
+            f"parameter `{param}` must be a valid identifier"
+        )
         return super(Parameter, cls).__new__(cls, param)
+
+    @property
+    def is_builtin(self) -> bool:
+        """
+        Is the parameter a built-in parameter (starts with an `$`)?
+        """
+
+        return self.startswith("$")
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self})"
@@ -66,6 +79,24 @@ class Bindings:
         """
 
         return Bindings()
+
+    def update(self, **kwargs) -> Self:
+        """
+        Create new bindings that contain the old and the new parameters, where
+        new parameters may override old ones.
+
+        Parameters
+        ----------
+        kwargs : Any
+            Mapping from new parameters to values as keyword arguments.
+
+        Returns
+        -------
+        bindings : Bindings
+            The updated bindings.
+        """
+
+        return Bindings(**self._bindings, **kwargs)  # type: ignore
 
     def __contains__(self, param: Parameter) -> bool:
         """

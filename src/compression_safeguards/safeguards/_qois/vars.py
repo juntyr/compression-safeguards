@@ -63,8 +63,11 @@ class LateBoundConstantEnvironment:
         raise TypeError(f"cannot call constant environment `{self._symbol}`")
 
     def __getitem__(self, name: str) -> LateBoundConstant:
-        assert isinstance(name, str) and name.isidentifier(), (
-            f"constant environment `{self._symbol}` name must be a valid identifier string"
+        assert (
+            isinstance(name, str)
+            and (name[1:] if name.startswith("$") else name).isidentifier()
+        ), (
+            f"constant environment `{self._symbol}` name must be a valid (built-in) identifier string"
         )
         return self._create_symbol(f'{self._symbol}["{name}"]')
 

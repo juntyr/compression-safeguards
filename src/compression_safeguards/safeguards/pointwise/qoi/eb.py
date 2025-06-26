@@ -119,6 +119,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         "e"                               (* Euler's number *)
       | "pi"                              (* pi *)
       | "c", "[", '"', ident, '"', "]"    (* late-bound constant value *)
+      | "c", "[",
+            '"', "$", ident, '"'          (* late-bound built-in constant value *)
+      , "]"
     ;
 
     data    = "x";                        (* pointwise data value *)
@@ -716,7 +719,7 @@ _QOI_ATOM_PATTERN = (
     + r"".join(rf"|(?:{f})" for f in MATH_FUNCTIONS)
     + r"".join(rf"|(?:{v})" for v in VARS_FUNCTIONS)
     + r"".join(
-        rf'|(?:{v}[ ]?\[[ ]?"{QOI_IDENTIFIER_PATTERN}"[ ]?\])' for v in ("c", "v")
+        rf'|(?:{v}[ ]?\[[ ]?"[\$?]?{QOI_IDENTIFIER_PATTERN}"[ ]?\])' for v in ("c", "v")
     )
     + r")"
 )
