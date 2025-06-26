@@ -32,7 +32,7 @@ nav:
           - Missing values: examples/missing.ipynb
           - Precipitation extrema: examples/precipitation.ipynb
       - Error bound distributions:
-          - Compressor comparison: examples/soft.ipynb
+          - Compressor comparison: examples/error-distribution.ipynb
       - Regions of Interest (RoIs):
           - Latent Heat Flux: examples/latent-heat-flux.ipynb
       - Quantities of Interest (QoIs):
