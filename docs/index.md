@@ -39,11 +39,11 @@ We also provide the following integrations of the safeguards with popular compre
 
 - *parameter*: A configuration option for a safeguard that is provided when declaring the safeguard and cannot be changed
 
-- *late-bound parameter*: A configuration option for a safeguard that is not constant but depends on the data being compressed. At declaration time, a late-bound parameter is only given a name but not a value. When the safeguards are later applied to data, all late-bound parameters must be resolved by providing their values.
+- *late-bound parameter*: A configuration option for a safeguard that is not constant but depends on the data being compressed. At declaration time, a late-bound parameter is only given a name but not a value. When the safeguards are later applied to data, all late-bound parameters must be resolved by providing their values. The `compression-safeguards` and `numcodecs-safeguards` frontend also provide a few built-in late-bound constants automatically, including `$x` to refer to the data as a constant.
 
-- *quantity of interest*: We are often not just interested in data itself, but also in quantities derived from it. For instance, we might later plot the data logarithm, compute a derivative, or apply a smoothing kernel. In these cases, we often want to safeguard not just properties on the data but also on these derived quantities of interest.
+- *quantity of interest* (*QoI*): We are often not just interested in data itself, but also in quantities derived from it. For instance, we might later plot the data logarithm, compute a derivative, or apply a smoothing kernel. In these cases, we often want to safeguard not just properties on the data but also on these derived quantities of interest.
 
-- *region of interest*: Sometimes we have regionally varying safety requirements, e.g. because a region has interesting behaviour that we want to especially preserve.
+- *region of interest* (*RoI*): Sometimes we have regionally varying safety requirements, e.g. because a region has interesting behaviour that we want to especially preserve.
 
 
 ## Design and Guarantees
@@ -247,7 +247,7 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
 - ... a pointwise normalised or range-relative absolute error bound?
 
-    > Use the `eb` safeguard for an absolute error bound but provide a late-bound parameter for the bound value. Since the data range is tightly tied to the data itself, it makes sense to only fill in the actual when applying the safeguards to the actual data. You still have to compute the range yourself, but can then provide it as a `late_bound` binding when computing the safeguard corrections.
+    > Use the `eb` safeguard for an absolute error bound but provide a late-bound parameter for the bound value. Since the data range is tightly tied to the data itself, it makes sense to only fill in the actual when applying the safeguards to the actual data. You can either compute the range yourself and then provide it as a `late_bound` binding when computing the safeguard corrections. Alternatively, you can also use the `qoi_eb_pw` safeguard with the `'(x - c["$x_min"]) / (c["$x_max"] - c["$x_min"])'` QoI. Note that we are using the late-bound constants `c["$x_min"]` and `c["$x_max"]` for the data minimum and maximum, which are automatically provided by `numcodecs-safeguards`.
 
 - ... a global error bound, e.g. a mean error, mean squared error, root mean square error, or peak signal to noise ratio?
 
@@ -272,7 +272,7 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
 - ... a data distribution histogram?
 
-    > The `compression-safeguards` do not currently support global safeguards. However, we can preserve the histogram bin that each data element falls into using the `qoi_eb_pw` safeguard, which provides a stricter guarantee. For instance, the `'round(100 * (x - c["x_min"]) / (c["x_max"] - c["x_min"]))'` QoI would preserve the index amongst 100 bins. Note that we are using late-bound constants to provide the data minimum `c["x_min"]` and maximum `c["x_max"]` here.
+    > The `compression-safeguards` do not currently support global safeguards. However, we can preserve the histogram bin that each data element falls into using the `qoi_eb_pw` safeguard, which provides a stricter guarantee. For instance, the `'round(100 * (x - c["$x_min"]) / (c["$x_max"] - c["$x_min"]))'` QoI would preserve the index amongst 100 bins. Note that we are using the late-bound constants `c["$x_min"]` and `c["$x_max"]` for the data minimum and maximum, which are automatically provided by `numcodecs-safeguards`.
 
 
 ## Limitations

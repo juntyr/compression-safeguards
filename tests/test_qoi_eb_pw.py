@@ -148,6 +148,8 @@ def test_variables():
         check_all_codecs(np.array([]), 'v["123"]')
     with pytest.raises(AssertionError, match="invalid QoI expression"):
         check_all_codecs(np.array([]), 'v["a 123"]')
+    with pytest.raises(AssertionError, match="identifier"):
+        check_all_codecs(np.array([]), 'v["$a"]')
     with pytest.raises(AssertionError, match=r'unresolved variable v\["a"\]'):
         check_all_codecs(np.array([]), 'v["a"]')
     with pytest.raises(AssertionError, match=r'unresolved variable v\["b"\]'):
@@ -169,6 +171,7 @@ def test_variables():
         np.array([]), 'let(v["a"], 3)(x + let(v["b"], v["a"] - 1)(v["b"] * 2))'
     )
     check_all_codecs(np.array([]), 'let(v["a"], x + 1, v["b"], x - 1)(v["a"] + v["b"])')
+    check_all_codecs(np.array([]), 'c["$x"] * x')
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -428,3 +431,14 @@ def test_late_bound_constant():
 
     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
     assert np.all(ok == np.array([True, True, True, False, False, False]).reshape(2, 3))
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_pointwise_normalised_absolute_error(check):
+    # pointwise normalised / range-relative absolute error bound
+    check('(x - c["$x_min"]) / (c["$x_max"] - c["$x_min"])')
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_pointwise_histogram_index(check):
+    check('round_ties_even(100 * (x - c["$x_min"]) / (c["$x_max"] - c["$x_min"]))')

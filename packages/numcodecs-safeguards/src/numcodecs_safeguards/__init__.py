@@ -71,7 +71,7 @@ for an enumeration of all supported safeguards.
 
 __all__ = ["SafeguardsCodec"]
 
-from collections.abc import Collection
+from collections.abc import Collection, Set
 from io import BytesIO
 from typing import Callable
 
@@ -82,7 +82,7 @@ import numpy as np
 import varint
 from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.abc import Safeguard
-from compression_safeguards.utils.bindings import Bindings
+from compression_safeguards.utils.bindings import Bindings, Parameter
 from compression_safeguards.utils.cast import as_bits
 from numcodecs.abc import Codec
 from numcodecs_combinators.abc import CodecCombinatorMixin
@@ -180,8 +180,9 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         _version: None | str = None,
     ):
         self._safeguards = Safeguards(safeguards=safeguards, _version=_version)
-        assert len(self._safeguards.late_bound) == 0, (
-            "SafeguardsCodec does not (yet) support late-bound parameters"
+
+        assert len(self._safeguards.late_bound - self.builtin_late_bound) == 0, (
+            "SafeguardsCodec does not (yet) support non-built-in late-bound parameters"
         )
 
         self._codec = (
@@ -206,6 +207,18 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             lossless.for_safeguards
             if isinstance(lossless.for_safeguards, Codec)
             else numcodecs.registry.get_codec(lossless.for_safeguards)
+        )
+
+    @property
+    def builtin_late_bound(self) -> Set[Parameter]:
+        """
+        The set of built-in late-bound constants that the numcodecs-safeguards
+        provide automatically, which include the safeguards' built-ins as well
+        as `$x_min` and `$x_max`.
+        """
+
+        return frozenset(self._safeguards.builtin_late_bound) | frozenset(
+            [Parameter("$x_min"), Parameter("$x_max")]
         )
 
     def encode(self, buf: Buffer) -> bytes:
@@ -301,12 +314,32 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             else:
                 raise ValueError(message) from err
 
+        late_bound = Bindings.empty()
+        late_bound_reqs = self._safeguards.late_bound
+
+        if "$x_min" in late_bound_reqs:
+            late_bound = late_bound.update(
+                **{
+                    "$x_min": np.nanmin(data)
+                    if data.size > 0
+                    else np.array(0, dtype=data.dtype)
+                }
+            )
+        if "$x_max" in late_bound_reqs:
+            late_bound = late_bound.update(
+                **{
+                    "$x_max": np.nanmax(data)
+                    if data.size > 0
+                    else np.array(0, dtype=data.dtype)
+                }
+            )
+
         # the codec always compresses the complete data ... at least chunking
         #  is not our concern
         correction: np.ndarray = self._safeguards.compute_correction(
             data,
             decoded,
-            late_bound=Bindings.empty(),
+            late_bound=late_bound,
         )
 
         if np.all(correction == 0):

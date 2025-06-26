@@ -102,6 +102,15 @@ class Safeguards:
         return frozenset(b for s in self.safeguards for b in s.late_bound)
 
     @property
+    def builtin_late_bound(self) -> Set[Parameter]:
+        """
+        The set of built-in late-bound constants that the safeguards provide
+        automatically, which include `$x` and `$X`.
+        """
+
+        return frozenset([Parameter("$x"), Parameter("$X")])
+
+    @property
     def version(self) -> str:
         """
         The version of the format of the correction computed by the
@@ -148,6 +157,9 @@ class Safeguards:
             The bindings must resolve all late-bound parameters and include no
             extraneous parameters.
 
+            The safeguards automatically provide the `$x` and `$X` built-in
+            constants, which must not be included.
+
         Returns
         -------
         correction : np.ndarray[S, np.dtype[C]]
@@ -167,10 +179,17 @@ class Safeguards:
         assert data.shape == prediction.shape
 
         late_bound_reqs = self.late_bound
+        late_bound_builtin = {
+            p: data for p in late_bound_reqs if p in self.builtin_late_bound
+        }
+        late_bound_reqs = late_bound_reqs - late_bound_builtin.keys()
         late_bound_keys = frozenset(late_bound.parameters())
         assert late_bound_reqs == late_bound_keys, (
-            f"late_bound is missing bindings for {list(late_bound_reqs - late_bound_keys)} / has extraneous bindings {list(late_bound_keys - late_bound_reqs)}"
+            f"late_bound is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} / has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
         )
+
+        if len(late_bound_builtin) > 0:
+            late_bound = late_bound.update(**late_bound_builtin)  # type: ignore
 
         all_ok = True
         for safeguard in self.safeguards:

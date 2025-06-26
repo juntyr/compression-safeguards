@@ -198,9 +198,11 @@ def test_comment():
 
 def test_variables():
     with pytest.raises(AssertionError, match="invalid QoI expression"):
-        check_all_codecs(np.array([]), 'v["123"]', [(0, 0)])
+        check_all_codecs(np.array([]), 'V["123"]', [(0, 0)])
     with pytest.raises(AssertionError, match="invalid QoI expression"):
-        check_all_codecs(np.array([]), 'v["a 123"]', [(0, 0)])
+        check_all_codecs(np.array([]), 'V["a 123"]', [(0, 0)])
+    with pytest.raises(AssertionError, match="identifier"):
+        check_all_codecs(np.array([]), 'V["$a"]', [(0, 0)])
     with pytest.raises(AssertionError, match=r'unresolved variable V\["a"\]'):
         check_all_codecs(np.array([]), 'V["a"]', [(0, 0)])
     with pytest.raises(AssertionError, match=r'unresolved variable V\["b"\]'):
@@ -228,6 +230,7 @@ def test_variables():
     check_all_codecs(
         np.array([]), 'let(V["a"], x + 1, V["b"], x - 1)(V["a"] + V["b"])', [(0, 0)]
     )
+    check_all_codecs(np.array([]), 'c["$x"] * x', [(0, 0)])
 
     with pytest.raises(AssertionError, match="out of border"):
         check_all_codecs(np.array([]), 'let(V["a"], X + 1)(V["a"][1])', [(0, 0)])
@@ -237,6 +240,7 @@ def test_variables():
     check_all_codecs(np.array([]), 'let(V["a"], X)(V["a"][0])', [(0, 0)])
     check_all_codecs(np.array([]), 'let(V["a"], X)(V["a"][0,0])', [(0, 0), (0, 0)])
     check_all_codecs(np.array([]), 'let(V["a"], X)(V["a"][I])', [(0, 0), (0, 0)])
+    check_all_codecs(np.array([]), 'asum(C["$X"] * X)', [(1, 1)])
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -1061,3 +1065,9 @@ def test_late_bound_constant():
 
     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
     assert np.all(ok == np.array([True, True, True, True, True, False]).reshape(2, 3))
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_pointwise_normalised_absolute_error(check):
+    # pointwise normalised / range-relative absolute error bound
+    check('(x - c["$x_min"]) / (c["$x_max"] - c["$x_min"])')

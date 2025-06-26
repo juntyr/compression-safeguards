@@ -172,6 +172,12 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
       | "pi"                              (* pi *)
       | "c", "[", '"', ident, '"', "]"    (* late-bound constant value *)
       | "C", "[", '"', ident, '"', "]"    (* late-bound constant neighbourhood *)
+      | "c", "[",
+            '"', "$", ident, '"'          (* late-bound built-in constant value *)
+        , "]"
+      | "C", "[",
+            '"', "$", ident, '"'          (* late-bound built-in constant neighbourhood *)
+        , "]"
     ;
 
     data    =
@@ -1215,7 +1221,8 @@ _QOI_ATOM_PATTERN = (
     + r"|(?:finite_difference)"
     + r"".join(rf"|(?:{v})" for v in VARS_FUNCTIONS)
     + r"".join(
-        rf'|(?:{v}[ ]?\[[ ]?"{QOI_IDENTIFIER_PATTERN}"[ ]?\])' for v in ("c", "C", "V")
+        rf'|(?:{v}[ ]?\[[ ]?"[\$]?{QOI_IDENTIFIER_PATTERN}"[ ]?\])'
+        for v in ("c", "C", "V")
     )
     + r")"
 )
