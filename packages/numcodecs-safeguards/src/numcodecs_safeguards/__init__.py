@@ -210,6 +210,14 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         )
 
     @property
+    def safeguards(self) -> Collection[Safeguard]:
+        """
+        The collection of safeguards that will be applied.
+        """
+
+        return self._safeguards.safeguards
+
+    @property
     def builtin_late_bound(self) -> Set[Parameter]:
         """
         The set of built-in late-bound constants that the numcodecs-safeguards
