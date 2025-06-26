@@ -55,7 +55,7 @@ We also provide the following integrations of the safeguards with popular compre
 
 - *parameter*: A configuration option for a safeguard that is provided when declaring the safeguard and cannot be changed
 
-- *late-bound parameter*: A configuration option for a safeguard that is not constant but depends on the data being compressed. At declaration time, a late-bound parameter is only given a name but not a value. When the safeguards are later applied to data, all late-bound parameters must be resolved by providing their values.
+- *late-bound parameter*: A configuration option for a safeguard that is not constant but depends on the data being compressed. At declaration time, a late-bound parameter is only given a name but not a value. When the safeguards are later applied to data, all late-bound parameters must be resolved by providing their values. The `compression-safeguards` and `numcodecs-safeguards` frontend also provide a few built-in late-bound constants automatically, including `$x` to refer to the data as a constant.
 
 - *quantity of interest* (*QoI*): We are often not just interested in data itself, but also in quantities derived from it. For instance, we might later plot the data logarithm, compute a derivative, or apply a smoothing kernel. In these cases, we often want to safeguard not just properties on the data but also on these derived quantities of interest.
 
