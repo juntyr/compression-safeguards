@@ -127,7 +127,7 @@ def test_numcodecs_validation():
 
     with pytest.raises(
         AssertionError,
-        match=r"SafeguardsCodec does not \(yet\) support late-bound parameters",
+        match=r"SafeguardsCodec does not \(yet\) support non-built-in late-bound parameters",
     ):
         encode_decode_mock(
             data,
@@ -147,7 +147,7 @@ def test_numcodecs_validation():
     for combinator in ["any", "all"]:
         with pytest.raises(
             AssertionError,
-            match=r"SafeguardsCodec does not \(yet\) support late-bound parameters",
+            match=r"SafeguardsCodec does not \(yet\) support non-built-in late-bound parameters",
         ):
             encode_decode_mock(
                 data,
