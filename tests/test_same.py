@@ -75,6 +75,7 @@ def test_fuzzer_invalid_cast():
 
 def test_late_bound_inclusive():
     safeguard = SameValueSafeguard(value="same")
+    assert safeguard.late_bound == {"same"}
 
     data = np.arange(6).reshape(2, 3)
 
@@ -94,6 +95,7 @@ def test_late_bound_inclusive():
 
 def test_late_bound_exclusive():
     safeguard = SameValueSafeguard(value="value", exclusive=True)
+    assert safeguard.late_bound == {"value"}
 
     data = np.arange(6, dtype=np.uint8).reshape(2, 3)
 

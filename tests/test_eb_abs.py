@@ -76,6 +76,7 @@ def test_fuzzer_rounding_error():
 
 def test_late_bound_eb():
     safeguard = ErrorBoundSafeguard(type="abs", eb="eb")
+    assert safeguard.late_bound == {"eb"}
 
     data = np.arange(6).reshape(2, 3)
 

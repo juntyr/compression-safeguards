@@ -174,6 +174,7 @@ def test_fuzzer_issue_9():
 
 def test_late_bound_eb():
     safeguard = ErrorBoundSafeguard(type="ratio", eb="eb")
+    assert safeguard.late_bound == {"eb"}
 
     data = np.arange(6).reshape(2, 3)
 

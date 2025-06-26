@@ -4,6 +4,8 @@ Same value safeguard.
 
 __all__ = ["SameValueSafeguard"]
 
+from collections.abc import Set
+
 import numpy as np
 
 from ...utils.bindings import Bindings, Parameter
@@ -62,6 +64,25 @@ class SameValueSafeguard(PointwiseSafeguard):
             self._value = value
 
         self._exclusive = exclusive
+
+    @property
+    def late_bound(self) -> Set[Parameter]:
+        """
+        The set of late-bound parameters that this safeguard has.
+
+        Late-bound parameters are only bound when checking and applying the
+        safeguard, in contrast to the normal early-bound parameters that are
+        configured during safeguard initialisation.
+
+        Late-bound parameters can be used for parameters that depend on the
+        specific data that is to be safeguarded.
+        """
+
+        return (
+            frozenset([self._value])
+            if isinstance(self._value, Parameter)
+            else frozenset()
+        )
 
     def check_pointwise(
         self,

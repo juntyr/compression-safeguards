@@ -357,6 +357,7 @@ def test_late_bound_eb_abs():
     safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
         qoi="x", type="abs", eb="eb"
     )
+    assert safeguard.late_bound == {"eb"}
 
     data = np.arange(6).reshape(2, 3)
 
@@ -378,6 +379,7 @@ def test_late_bound_eb_rel():
     safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
         qoi="x", type="rel", eb="eb"
     )
+    assert safeguard.late_bound == {"eb"}
 
     data = np.arange(6).reshape(2, 3)
 
@@ -397,6 +399,7 @@ def test_late_bound_eb_ratio():
     safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
         qoi="x", type="ratio", eb="eb"
     )
+    assert safeguard.late_bound == {"eb"}
 
     data = np.arange(6).reshape(2, 3)
 
@@ -418,6 +421,7 @@ def test_late_bound_constant():
     safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
         qoi='x / c["f"]', type="abs", eb=1
     )
+    assert safeguard.late_bound == {"f"}
 
     data = np.arange(6).reshape(2, 3)
 

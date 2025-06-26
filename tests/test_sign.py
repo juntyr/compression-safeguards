@@ -84,6 +84,7 @@ def test_edge_cases():
 
 def test_late_bound():
     safeguard = SignPreservingSafeguard(offset="offset")
+    assert safeguard.late_bound == {"offset"}
 
     data = np.arange(6, dtype=np.uint8).reshape(2, 3)
 

@@ -97,6 +97,7 @@ def test_fuzzer_inf_times_zero():
 
 def test_late_bound_eb():
     safeguard = ErrorBoundSafeguard(type="rel", eb="eb")
+    assert safeguard.late_bound == {"eb"}
 
     data = np.arange(6).reshape(2, 3)
 

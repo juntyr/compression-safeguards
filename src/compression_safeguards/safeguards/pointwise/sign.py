@@ -4,6 +4,8 @@ Sign-preserving safeguard.
 
 __all__ = ["SignPreservingSafeguard"]
 
+from collections.abc import Set
+
 import numpy as np
 
 from ...utils.bindings import Bindings, Parameter
@@ -62,6 +64,25 @@ class SignPreservingSafeguard(PointwiseSafeguard):
                 "offset must not be NaN"
             )
             self._offset = offset
+
+    @property
+    def late_bound(self) -> Set[Parameter]:
+        """
+        The set of late-bound parameters that this safeguard has.
+
+        Late-bound parameters are only bound when checking and applying the
+        safeguard, in contrast to the normal early-bound parameters that are
+        configured during safeguard initialisation.
+
+        Late-bound parameters can be used for parameters that depend on the
+        specific data that is to be safeguarded.
+        """
+
+        return (
+            frozenset([self._offset])
+            if isinstance(self._offset, Parameter)
+            else frozenset()
+        )
 
     def check_pointwise(
         self,

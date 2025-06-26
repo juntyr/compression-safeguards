@@ -851,6 +851,7 @@ def test_late_bound_broadcast():
         type="abs",
         eb="eb",
     )
+    assert safeguard.late_bound == {"eb"}
 
     data = np.arange(16).reshape(4, 4)
 
@@ -878,6 +879,7 @@ def test_late_bound_safe_cast():
         type="abs",
         eb="eb",
     )
+    assert safeguard.late_bound == {"eb"}
 
     data = np.arange(16, dtype=np.float32).reshape(4, 4)
 
@@ -932,6 +934,7 @@ def test_late_bound_eb_abs():
         type="abs",
         eb="eb",
     )
+    assert safeguard.late_bound == {"eb"}
 
     data = np.arange(6).reshape(2, 3)
 
@@ -957,6 +960,7 @@ def test_late_bound_eb_rel():
         type="rel",
         eb="eb",
     )
+    assert safeguard.late_bound == {"eb"}
 
     data = np.arange(6).reshape(2, 3)
 
@@ -982,6 +986,7 @@ def test_late_bound_eb_ratio():
         type="ratio",
         eb="eb",
     )
+    assert safeguard.late_bound == {"eb"}
 
     data = np.arange(6).reshape(2, 3)
 
@@ -1051,6 +1056,7 @@ def test_late_bound_constant():
         type="abs",
         eb=1,
     )
+    assert safeguard.late_bound == {"f", "zero"}
 
     data = np.arange(6).reshape(2, 3)
 
