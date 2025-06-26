@@ -719,7 +719,7 @@ _QOI_ATOM_PATTERN = (
     + r"".join(rf"|(?:{f})" for f in MATH_FUNCTIONS)
     + r"".join(rf"|(?:{v})" for v in VARS_FUNCTIONS)
     + r"".join(
-        rf'|(?:{v}[ ]?\[[ ]?"[\$?]?{QOI_IDENTIFIER_PATTERN}"[ ]?\])' for v in ("c", "v")
+        rf'|(?:{v}[ ]?\[[ ]?"[\$]?{QOI_IDENTIFIER_PATTERN}"[ ]?\])' for v in ("c", "v")
     )
     + r")"
 )

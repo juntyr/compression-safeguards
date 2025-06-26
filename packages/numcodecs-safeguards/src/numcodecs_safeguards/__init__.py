@@ -318,9 +318,21 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         late_bound_reqs = self._safeguards.late_bound
 
         if "$x_min" in late_bound_reqs:
-            late_bound = Bindings.update(**{"$x_min": np.nanmin(data)})
+            late_bound = late_bound.update(
+                **{
+                    "$x_min": np.nanmin(data)
+                    if data.size > 0
+                    else np.array(0, dtype=data.dtype)
+                }
+            )
         if "$x_max" in late_bound_reqs:
-            late_bound = Bindings.update(**{"$x_max": np.nanmax(data)})
+            late_bound = late_bound.update(
+                **{
+                    "$x_max": np.nanmax(data)
+                    if data.size > 0
+                    else np.array(0, dtype=data.dtype)
+                }
+            )
 
         # the codec always compresses the complete data ... at least chunking
         #  is not our concern

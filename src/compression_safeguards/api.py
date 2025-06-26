@@ -185,7 +185,7 @@ class Safeguards:
         late_bound_reqs = late_bound_reqs - late_bound_builtin.keys()
         late_bound_keys = frozenset(late_bound.parameters())
         assert late_bound_reqs == late_bound_keys, (
-            f"late_bound is missing bindings for {list(late_bound_reqs - late_bound_keys)} / has extraneous bindings {list(late_bound_keys - late_bound_reqs)}"
+            f"late_bound is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} / has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
         )
 
         if len(late_bound_builtin) > 0:
