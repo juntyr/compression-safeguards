@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 import pytest
 import xarray as xr
@@ -71,3 +73,73 @@ def test_codec_stack_stencil():
         encoded_decoded_da = stack.encode_decode_data_array(
             xr.DataArray(data).chunk(10)
         ).compute()
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 11), reason="zarr v3 requires >= Python 3.11"
+)
+def test_zarr_pointwise():
+    import zarr
+
+    data = np.arange(100, dtype=float)
+
+    store = zarr.storage.MemoryStore()
+
+    zarr.save_array(
+        store,
+        data,
+        codecs=[
+            dict(
+                name="any-numcodecs.array-bytes",
+                configuration=dict(
+                    id="safeguards",
+                    codec=dict(id="zero"),
+                    safeguards=[
+                        dict(
+                            kind="eb",
+                            type="abs",
+                            eb=0.5,
+                        )
+                    ],
+                ),
+            ),
+        ],
+    )
+
+    a = zarr.open_array(store)
+
+    assert np.all(np.abs(np.asarray(a) - data) <= 0.5)
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 11), reason="zarr v3 requires >= Python 3.11"
+)
+def test_zarr_stencil():
+    import zarr
+
+    data = np.arange(100, dtype=float)
+
+    store = zarr.storage.MemoryStore()
+
+    with pytest.raises(AssertionError, match="chunked array"):
+        zarr.save_array(
+            store,
+            data,
+            codecs=[
+                dict(
+                    name="any-numcodecs.array-bytes",
+                    configuration=dict(
+                        id="safeguards",
+                        codec=dict(id="zero"),
+                        safeguards=[
+                            dict(
+                                kind="monotonicity",
+                                monotonicity="strict",
+                                window=1,
+                                boundary="valid",
+                            )
+                        ],
+                    ),
+                ),
+            ],
+        )

@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 dependencies = [
     "compression-safeguards==0.0.1",
     "numcodecs>=0.13.0,<0.17",
-    "numcodecs-combinators~=0.2.9",
+    "numcodecs-combinators~=0.2.10",
     "numcodecs-delta~=0.1.0",
     "numcodecs-huffman~=0.1.0",
     "numcodecs-zero~=0.1.0",
