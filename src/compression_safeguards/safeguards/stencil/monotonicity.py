@@ -4,6 +4,7 @@ Monotonicity-preserving safeguard.
 
 __all__ = ["Monotonicity", "MonotonicityPreservingSafeguard"]
 
+from collections.abc import Set
 from enum import Enum
 from operator import ge, gt, le, lt
 
@@ -11,8 +12,8 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 from typing_extensions import assert_never  # MSPV 3.11
 
-from ...utils.bindings import Bindings
-from ...utils.cast import _isnan, from_total_order, to_total_order
+from ...utils.bindings import Bindings, Parameter
+from ...utils.cast import _isnan, from_total_order, lossless_cast, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import S, T
 from . import BoundaryCondition, NeighbourhoodAxis, _pad_with_boundary
@@ -107,10 +108,10 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     boundary : str | BoundaryCondition
         Boundary condition for evaluating the monotonicity near the data array
         domain boundaries, e.g. by extending values.
-    constant_boundary : None | int | float
-        Optional constant value with which the data array domain is extended
-        for a constant boundary. The value must be safely convertible (without
-        over- or underflow or invalid values) to the data type.
+    constant_boundary : None | int | float | str | Parameter
+        The optional value of or the late-bound parameter name for the constant
+        value with which the data array domain is extended for a constant
+        boundary. The value must be losslessly convertible to the data dtype.
     axis : None | int
         The axis along which the monotonicity is preserved. The default,
         [`None`][None], is to preserve along all axes.
@@ -120,7 +121,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     _monotonicity: Monotonicity
     _window: int
     _boundary: BoundaryCondition
-    _constant_boundary: None | int | float
+    _constant_boundary: None | int | float | Parameter
     _axis: None | int
 
     kind = "monotonicity"
@@ -130,7 +131,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         monotonicity: str | Monotonicity,
         window: int,
         boundary: str | BoundaryCondition,
-        constant_boundary: None | int | float = None,
+        constant_boundary: None | int | float | str | Parameter = None,
         axis: None | int = None,
     ):
         self._monotonicity = (
@@ -152,9 +153,34 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         ), (
             "constant_boundary must be provided if and only if the constant boundary condition is used"
         )
-        self._constant_boundary = constant_boundary
+
+        if isinstance(constant_boundary, Parameter):
+            self._constant_boundary = constant_boundary
+        elif isinstance(constant_boundary, str):
+            self._constant_boundary = Parameter(constant_boundary)
+        else:
+            self._constant_boundary = constant_boundary
 
         self._axis = axis
+
+    @property
+    def late_bound(self) -> Set[Parameter]:
+        """
+        The set of late-bound parameters that this safeguard has.
+
+        Late-bound parameters are only bound when checking and applying the
+        safeguard, in contrast to the normal early-bound parameters that are
+        configured during safeguard initialisation.
+
+        Late-bound parameters can be used for parameters that depend on the
+        specific data that is to be safeguarded.
+        """
+
+        return (
+            frozenset([self._constant_boundary])
+            if isinstance(self._constant_boundary, Parameter)
+            else frozenset()
+        )
 
     def compute_check_neighbourhood_for_data_shape(
         self, data_shape: tuple[int, ...]
@@ -221,6 +247,20 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             Pointwise, `True` if the check succeeded for this element.
         """
 
+        constant_boundary = (
+            None
+            if self._constant_boundary is None
+            else late_bound.resolve_ndarray_with_lossless_cast(
+                self._constant_boundary, (), data.dtype
+            )
+            if isinstance(self._constant_boundary, Parameter)
+            else lossless_cast(
+                self._constant_boundary,
+                data.dtype,
+                "monotonicity safeguard constant boundary",
+            )
+        )
+
         ok = np.ones_like(data, dtype=np.bool)
 
         window = 1 + self._window * 2
@@ -244,7 +284,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 self._boundary,
                 self._window,
                 self._window,
-                self._constant_boundary,
+                constant_boundary,
                 axis,
             )
             decoded_boundary = _pad_with_boundary(
@@ -252,7 +292,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 self._boundary,
                 self._window,
                 self._window,
-                self._constant_boundary,
+                constant_boundary,
                 axis,
             )
 
@@ -301,6 +341,20 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             Union of intervals in which the monotonicity is preserved.
         """
 
+        constant_boundary = (
+            None
+            if self._constant_boundary is None
+            else late_bound.resolve_ndarray_with_lossless_cast(
+                self._constant_boundary, (), data.dtype
+            )
+            if isinstance(self._constant_boundary, Parameter)
+            else lossless_cast(
+                self._constant_boundary,
+                data.dtype,
+                "monotonicity safeguard constant boundary",
+            )
+        )
+
         window = 1 + self._window * 2
 
         (_lt, _gt, _eq, is_weak) = self._monotonicity.value[1]
@@ -331,7 +385,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 self._boundary,
                 self._window,
                 self._window,
-                self._constant_boundary,
+                constant_boundary,
                 axis,
             )
             data_windows = sliding_window_view(data_boundary, window, axis=axis)

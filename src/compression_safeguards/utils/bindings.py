@@ -11,6 +11,7 @@ from typing import Any
 import numpy as np
 from typing_extensions import Self
 
+from .cast import lossless_cast
 from .typing import Si, T
 
 
@@ -127,7 +128,7 @@ class Bindings:
 
         return self._bindings.keys()
 
-    def resolve_ndarray(
+    def resolve_ndarray_with_lossless_cast(
         self, param: Parameter, shape: Si, dtype: np.dtype[T]
     ) -> np.ndarray[Si, np.dtype[T]]:
         """
@@ -135,7 +136,8 @@ class Bindings:
         `dtype`.
 
         The `param`eter must be contained in the bindings and refer to a value
-        that can be broadcast to the `shape` and safely cast to the `dtype`.
+        that can be broadcast to the `shape` and losslessly converted to the
+        `dtype`.
 
         Parameters
         ----------
@@ -158,7 +160,10 @@ class Bindings:
         # cast first then broadcast to allow zero-copy broadcasts of scalars
         #  to arrays of any shape
         view = np.broadcast_to(
-            np.array(self._bindings[param]).astype(dtype, casting="safe"), shape
+            lossless_cast(
+                self._bindings[param], dtype, f"late-bound parameter {param}"
+            ),
+            shape,
         ).view()
         view.flags.writeable = False
 

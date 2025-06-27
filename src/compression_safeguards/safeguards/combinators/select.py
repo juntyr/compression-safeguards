@@ -208,7 +208,7 @@ class _SelectSafeguardBase(ABC):
         *,
         late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
-        selector = late_bound.resolve_ndarray(
+        selector = late_bound.resolve_ndarray_with_lossless_cast(
             self.selector, data.shape, np.dtype(np.int_)
         )
 
@@ -225,7 +225,7 @@ class _SelectSafeguardBase(ABC):
         *,
         late_bound: Bindings,
     ) -> IntervalUnion[T, int, int]:
-        selector = late_bound.resolve_ndarray(
+        selector = late_bound.resolve_ndarray_with_lossless_cast(
             self.selector, data.shape, np.dtype(np.int_)
         )
 

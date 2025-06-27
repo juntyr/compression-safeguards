@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from compression_safeguards.safeguards.pointwise.same import SameValueSafeguard
 from compression_safeguards.utils.bindings import Bindings
@@ -66,11 +67,15 @@ def test_fuzzer_invalid_cast():
     data = np.array([115491483746327])
     decoded = np.array([150740651871305728])
 
-    encode_decode_mock(
-        data,
-        decoded,
-        safeguards=[dict(kind="same", value=5.760455112138539e292)],
-    )
+    with pytest.raises(
+        TypeError,
+        match="cannot losslessly cast same safeguard value from float64 to int64",
+    ):
+        encode_decode_mock(
+            data,
+            decoded,
+            safeguards=[dict(kind="same", value=5.760455112138539e292)],
+        )
 
 
 def test_late_bound_inclusive():

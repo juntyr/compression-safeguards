@@ -125,12 +125,13 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         decoded_float: np.ndarray = to_float(decoded)
 
         eb = (
-            late_bound.resolve_ndarray(
+            late_bound.resolve_ndarray_with_lossless_cast(
                 self._eb,
                 data_float.shape,
                 data_float.dtype,
             )
             if isinstance(self._eb, Parameter)
+            # eb is converted to a finite floating bound below
             else self._eb
         )
         _check_error_bound(self._type, eb)
@@ -189,12 +190,13 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         data_float: np.ndarray = to_float(data)
 
         eb = (
-            late_bound.resolve_ndarray(
+            late_bound.resolve_ndarray_with_lossless_cast(
                 self._eb,
                 data_float.shape,
                 data_float.dtype,
             )
             if isinstance(self._eb, Parameter)
+            # eb is converted to a finite floating bound below
             else self._eb
         )
         _check_error_bound(self._type, eb)

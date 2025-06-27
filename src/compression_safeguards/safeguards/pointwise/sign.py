@@ -9,7 +9,7 @@ from collections.abc import Set
 import numpy as np
 
 from ...utils.bindings import Bindings, Parameter
-from ...utils.cast import from_total_order, to_total_order
+from ...utils.cast import from_total_order, lossless_cast, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import S, T
 from .abc import PointwiseSafeguard
@@ -111,13 +111,13 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         """
 
         offset: np.ndarray[tuple[()] | S, np.dtype[T]] = (
-            late_bound.resolve_ndarray(
+            late_bound.resolve_ndarray_with_lossless_cast(
                 self._offset,
                 data.shape,
                 data.dtype,
             )
             if isinstance(self._offset, Parameter)
-            else self._offset_like(data.dtype)
+            else lossless_cast(self._offset, data.dtype, "sign safeguard offset")
         )
         assert np.all(~np.isnan(offset)), "offset must not contain NaNs"
 
@@ -160,13 +160,13 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         """
 
         offsetf: np.ndarray[tuple[()] | tuple[int], np.dtype[T]] = (
-            late_bound.resolve_ndarray(
+            late_bound.resolve_ndarray_with_lossless_cast(
                 self._offset,
                 data.shape,
                 data.dtype,
             ).flatten()
             if isinstance(self._offset, Parameter)
-            else self._offset_like(data.dtype)
+            else lossless_cast(self._offset, data.dtype, "sign safeguard offset")
         )
         assert np.all(~np.isnan(offsetf)), "offset must not contain NaNs"
         offsetf_total: np.ndarray = to_total_order(offsetf)
@@ -219,13 +219,3 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         """
 
         return dict(kind=type(self).kind, offset=self._offset)
-
-    def _offset_like(self, dtype: np.dtype[T]) -> np.ndarray[tuple[()], np.dtype[T]]:
-        offset = np.array(self._offset)
-        if offset.dtype != dtype:
-            with np.errstate(
-                divide="ignore", over="ignore", under="ignore", invalid="ignore"
-            ):
-                # TODO: should we silently cast here
-                offset = offset.astype(dtype, casting="unsafe")
-        return offset  # type: ignore

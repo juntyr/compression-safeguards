@@ -257,10 +257,7 @@ def check_one_input(data) -> None:
                 and ("normalised to" in str(err))
                 and ("for array of shape" in str(err))
             )
-            or (
-                isinstance(err, ValueError)
-                and ("constant boundary has invalid value" in str(err))
-            )
+            or (isinstance(err, ValueError) and ("cannot losslessly cast" in str(err)))
         ):
             return
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")

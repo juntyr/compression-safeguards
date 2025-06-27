@@ -9,7 +9,7 @@ from collections.abc import Set
 import numpy as np
 
 from ...utils.bindings import Bindings, Parameter
-from ...utils.cast import as_bits, from_total_order, to_total_order
+from ...utils.cast import as_bits, from_total_order, lossless_cast, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Maximum, Minimum, Upper
 from ...utils.typing import S, T
 from .abc import PointwiseSafeguard
@@ -111,13 +111,13 @@ class SameValueSafeguard(PointwiseSafeguard):
         """
 
         value: np.ndarray[tuple[()] | S, np.dtype[T]] = (
-            late_bound.resolve_ndarray(
+            late_bound.resolve_ndarray_with_lossless_cast(
                 self._value,
                 data.shape,
                 data.dtype,
             )
             if isinstance(self._value, Parameter)
-            else self._value_like(data.dtype)
+            else lossless_cast(self._value, data.dtype, "same safeguard value")
         )
         value_bits = as_bits(value)
 
@@ -155,13 +155,13 @@ class SameValueSafeguard(PointwiseSafeguard):
         """
 
         valuef = (
-            late_bound.resolve_ndarray(
+            late_bound.resolve_ndarray_with_lossless_cast(
                 self._value,
                 data.shape,
                 data.dtype,
             ).flatten()
             if isinstance(self._value, Parameter)
-            else self._value_like(data.dtype)
+            else lossless_cast(self._value, data.dtype, "same safeguard value")
         )
         valuef_bits = as_bits(valuef)
 
@@ -213,13 +213,3 @@ class SameValueSafeguard(PointwiseSafeguard):
         """
 
         return dict(kind=type(self).kind, value=self._value, exclusive=self._exclusive)
-
-    def _value_like(self, dtype: np.dtype[T]) -> np.ndarray[tuple[()], np.dtype[T]]:
-        value = np.array(self._value)
-        if value.dtype != dtype:
-            with np.errstate(
-                divide="ignore", over="ignore", under="ignore", invalid="ignore"
-            ):
-                # TODO: should we silently cast here
-                value = value.astype(dtype, casting="unsafe")
-        return value  # type: ignore

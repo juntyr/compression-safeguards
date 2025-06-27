@@ -9,6 +9,7 @@ __all__ = [
     "as_bits",
     "to_total_order",
     "from_total_order",
+    "lossless_cast",
 ]
 
 from typing import Any, Callable
@@ -267,6 +268,60 @@ def from_total_order(
     )
 
     return (a ^ mask).view(dtype=dtype)
+
+
+def lossless_cast(
+    x: int | float | np.ndarray[S, np.dtype[np.number]],
+    dtype: np.dtype[T],
+    context: str,
+) -> np.ndarray[tuple[()] | S, np.dtype[T]]:
+    """
+    Try to losslessly convert `x` to the provided `dtype`.
+
+    A lossless conversion is one that can be reversed while preserving the
+    original value. Integer values can be losslessly converted to integer or
+    floating point types with sufficient precision. Floating point values
+    can only be converted to floating point types.
+
+    Parameters
+    ----------
+    x : int | float | np.ndarray[S, np.dtype[np.number]]
+        The value or array to convert.
+    dtype : np.dtype[T]
+        The dtype to which the value or array should be converted.
+
+    Returns
+    -------
+    converted : np.narray[tuple[()] | S, np.dtype[T]]
+        The losslessly converted value or array with the given `dtype`.
+
+    Raises
+    ------
+    TypeError
+        If not all values could be losslessly converted.
+    """
+
+    xa = np.array(x)
+    dtype_from = xa.dtype
+
+    if np.issubdtype(dtype_from, np.floating) and not np.issubdtype(dtype, np.floating):
+        raise TypeError(
+            f"cannot losslessly cast {context} from {dtype_from} to {dtype}"
+        )
+
+    # we use unsafe casts here since we later check them for safety
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        xa_to = np.array(xa).astype(dtype, casting="unsafe")
+        xa_back = xa_to.astype(dtype_from, casting="unsafe")
+
+    lossless_same = np.where(_isnan(xa), _isnan(xa_back), xa == xa_back)
+
+    if not np.all(lossless_same):
+        raise TypeError(
+            f"cannot losslessly cast (some) {context} values from {dtype_from} to {dtype}"
+        )
+
+    return xa_to
 
 
 # wrapper around np.isnan that also works for numpy_quaddtype

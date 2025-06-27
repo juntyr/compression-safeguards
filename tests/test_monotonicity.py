@@ -3,6 +3,7 @@ from itertools import product
 import numpy as np
 import pytest
 
+from compression_safeguards import Safeguards
 from compression_safeguards.safeguards.stencil import BoundaryCondition
 from compression_safeguards.safeguards.stencil.monotonicity import (
     Monotonicity,
@@ -244,7 +245,10 @@ def test_fuzzer_padding_overflow():
     data = np.array([[0.0]], dtype=np.float32)
     decoded = np.array([[-9.444733e21]], dtype=np.float32)
 
-    with pytest.raises(ValueError, match="constant boundary has invalid value"):
+    with pytest.raises(
+        TypeError,
+        match=r"cannot losslessly cast \(some\) monotonicity safeguard constant boundary values from float64 to float32",
+    ):
         encode_decode_mock(
             data,
             decoded,
@@ -259,4 +263,51 @@ def test_fuzzer_padding_overflow():
                 ),
                 dict(kind="sign"),
             ],
+        )
+
+
+def test_late_bound_constant_boundary():
+    data = np.array([14, 47, 0, 0, 254, 255, 255, 255, 0, 0], dtype=np.uint8)
+    decoded = np.array([73, 0, 0, 0, 0, 27, 49, 14, 14, 50], dtype=np.uint8)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(
+                kind="monotonicity",
+                monotonicity="strict_to_weak",
+                window=1,
+                boundary="constant",
+                constant_boundary=4,
+            ),
+            dict(kind="sign"),
+        ],
+    )
+
+    safeguards = Safeguards(
+        safeguards=[
+            dict(
+                kind="monotonicity",
+                monotonicity="strict_to_weak",
+                window=1,
+                boundary="constant",
+                constant_boundary="const",
+            ),
+            dict(kind="sign"),
+        ],
+    )
+    assert safeguards.late_bound == {"const"}
+
+    correction = safeguards.compute_correction(
+        data, decoded, late_bound=Bindings(const=4)
+    )
+    safeguards.apply_correction(decoded, correction)
+
+    with pytest.raises(
+        TypeError,
+        match=r"cannot losslessly cast \(some\) late-bound parameter const values from int64 to uint8",
+    ):
+        correction = safeguards.compute_correction(
+            data, decoded, late_bound=Bindings(const=-1)
         )

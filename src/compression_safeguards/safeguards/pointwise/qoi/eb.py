@@ -377,7 +377,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         data_float: np.ndarray = to_float(data)
 
         late_bound_constants = {
-            c: late_bound.resolve_ndarray(c.parameter, data.shape, data_float.dtype)
+            c: late_bound.resolve_ndarray_with_lossless_cast(
+                c.parameter, data.shape, data_float.dtype
+            )
             for c in self._late_bound_constants
         }
 
@@ -420,7 +422,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         data_float: np.ndarray = to_float(data)
 
         late_bound_constants = {
-            c: late_bound.resolve_ndarray(c.parameter, data.shape, data_float.dtype)
+            c: late_bound.resolve_ndarray_with_lossless_cast(
+                c.parameter, data.shape, data_float.dtype
+            )
             for c in self._late_bound_constants
         }
 
@@ -437,12 +441,13 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             )
 
         eb = (
-            late_bound.resolve_ndarray(
+            late_bound.resolve_ndarray_with_lossless_cast(
                 self._eb,
                 qoi_data.shape,
                 qoi_data.dtype,
             )
             if isinstance(self._eb, Parameter)
+            # eb is converted to a finite floating bound below
             else self._eb
         )
         _check_error_bound(self._type, eb)
@@ -492,7 +497,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         data_float: np.ndarray = to_float(data)
 
         late_bound_constants = {
-            c: late_bound.resolve_ndarray(c.parameter, data.shape, data_float.dtype)
+            c: late_bound.resolve_ndarray_with_lossless_cast(
+                c.parameter, data.shape, data_float.dtype
+            )
             for c in self._late_bound_constants
         }
 
@@ -506,12 +513,13 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             data_qoi = (qoi_lambda)(data_float, *late_bound_constants.values())
 
         eb = (
-            late_bound.resolve_ndarray(
+            late_bound.resolve_ndarray_with_lossless_cast(
                 self._eb,
                 data_qoi.shape,
                 data_qoi.dtype,
             )
             if isinstance(self._eb, Parameter)
+            # eb is converted to a finite floating bound below
             else self._eb
         )
         _check_error_bound(self._type, eb)
@@ -568,7 +576,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             )
 
         late_bound_constants = {
-            c: late_bound.resolve_ndarray(c.parameter, data.shape, data_float.dtype)
+            c: late_bound.resolve_ndarray_with_lossless_cast(
+                c.parameter, data.shape, data_float.dtype
+            )
             for c in self._late_bound_constants
         }
 
