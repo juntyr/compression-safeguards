@@ -9,6 +9,9 @@ from enum import Enum, auto
 import numpy as np
 from typing_extensions import Self, assert_never  # MSPV 3.11
 
+from ...utils.bindings import Parameter
+from ...utils.typing import S, T
+
 
 class BoundaryCondition(Enum):
     """
@@ -138,17 +141,17 @@ class NeighbourhoodBoundaryAxis:
         The boundary condition that is applied to this axis near the data
         array domain boundary to fill the data neighbourhood, e.g. by extending
         values.
-    constant_boundary : None | int | float
-        Optional constant value with which the data array domain is extended
-        for a constant boundary. The value must be safely convertible (without
-        over- or underflow or invalid values) to the data type.
+    constant_boundary : None | int | float | str | Parameter
+        The optional value of or the late-bound parameter name for the constant
+        value with which the data array domain is extended for a constant
+        boundary. The value must be losslessly convertible to the data dtype.
     """
 
     __slots__ = ("_axis", "_shape", "_boundary", "_constant_boundary")
     _axis: int
     _shape: NeighbourhoodAxis
     _boundary: BoundaryCondition
-    _constant_boundary: None | int | float
+    _constant_boundary: None | int | float | Parameter
 
     def __init__(
         self,
@@ -156,7 +159,7 @@ class NeighbourhoodBoundaryAxis:
         before: int,
         after: int,
         boundary: str | BoundaryCondition,
-        constant_boundary: None | int | float = None,
+        constant_boundary: None | int | float | str | Parameter = None,
     ):
         self._axis = axis
         self._shape = NeighbourhoodAxis(before, after)
@@ -171,7 +174,13 @@ class NeighbourhoodBoundaryAxis:
         ), (
             "constant_boundary must be provided if and only if the constant boundary condition is used"
         )
-        self._constant_boundary = constant_boundary
+
+        if isinstance(constant_boundary, Parameter):
+            self._constant_boundary = constant_boundary
+        elif isinstance(constant_boundary, str):
+            self._constant_boundary = Parameter(constant_boundary)
+        else:
+            self._constant_boundary = constant_boundary
 
     @property
     def axis(self) -> int:
@@ -213,10 +222,11 @@ class NeighbourhoodBoundaryAxis:
         return self._boundary
 
     @property
-    def constant_boundary(self) -> None | int | float:
+    def constant_boundary(self) -> None | int | float | Parameter:
         """
-        Optional constant value with which the data array domain is extended
-        for a constant boundary.
+        The optional value of or the late-bound parameter name for the constant
+        value with which the data array domain is extended for a constant
+        boundary.
         """
         return self._constant_boundary
 
@@ -266,13 +276,13 @@ class NeighbourhoodBoundaryAxis:
 
 
 def _pad_with_boundary(
-    a: np.ndarray,
+    a: np.ndarray[S, np.dtype[T]],
     boundary: BoundaryCondition,
     pad_before: int,
     pad_after: int,
-    constant: None | int | float,
+    constant: None | np.ndarray[tuple[()], np.dtype[T]],
     axis: int,
-) -> np.ndarray:
+) -> np.ndarray[tuple[int, ...], np.dtype[T]]:
     if (axis >= a.ndim) or (axis < -a.ndim):
         return a
 
@@ -285,13 +295,7 @@ def _pad_with_boundary(
             return a
         case BoundaryCondition.constant:
             mode = "constant"
-            try:
-                with np.errstate(over="raise", under="raise", invalid="raise"):
-                    kwargs["constant_values"] = np.array(constant, dtype=a.dtype)
-            except Exception as err:
-                raise ValueError(
-                    f"constant boundary has invalid value {constant} for data array of dtype {a.dtype.name}"
-                ) from err
+            kwargs["constant_values"] = constant
         case BoundaryCondition.edge:
             mode = "edge"
         case BoundaryCondition.reflect:

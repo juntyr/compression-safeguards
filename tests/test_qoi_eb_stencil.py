@@ -62,7 +62,7 @@ def check_all_codecs(data: np.ndarray, qoi: str, shape: list[tuple[int, int]]):
                                     before=before,
                                     after=after,
                                     boundary=boundary,
-                                    constant_boundary=4.2
+                                    constant_boundary=42
                                     if boundary == BoundaryCondition.constant
                                     else None,
                                 )
@@ -650,7 +650,7 @@ def test_fuzzer_finite_difference_int_iter():
                             before=0,
                             after=0,
                             boundary=boundary,
-                            constant_boundary=4.2
+                            constant_boundary=42
                             if boundary == BoundaryCondition.constant
                             else None,
                         )
@@ -680,7 +680,7 @@ def test_fuzzer_finite_difference_fraction_overflow():
                             before=12,
                             after=0,
                             boundary=boundary,
-                            constant_boundary=4.2
+                            constant_boundary=42
                             if boundary == BoundaryCondition.constant
                             else None,
                         )
@@ -709,7 +709,7 @@ def test_fuzzer_finite_difference_fraction_compare():
                             before=0,
                             after=13,
                             boundary=boundary,
-                            constant_boundary=4.2
+                            constant_boundary=42
                             if boundary == BoundaryCondition.constant
                             else None,
                         )
@@ -740,7 +740,7 @@ def test_fuzzer_finite_difference_eb_abs():
                             before=0,
                             after=7,
                             boundary=boundary,
-                            constant_boundary=4.2
+                            constant_boundary=42
                             if boundary == BoundaryCondition.constant
                             else None,
                         )
@@ -773,7 +773,7 @@ def test_fuzzer_finite_difference_fraction_float_overflow():
                             before=0,
                             after=3,
                             boundary=boundary,
-                            constant_boundary=4.2
+                            constant_boundary=42
                             if boundary == BoundaryCondition.constant
                             else None,
                         )
@@ -869,58 +869,58 @@ def test_late_bound_broadcast():
         )
 
 
-def test_late_bound_safe_cast():
+def test_late_bound_lossless_cast():
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-        qoi="x",
+        qoi='x + c["c"]',
         neighbourhood=[
             dict(axis=0, before=0, after=0, boundary="valid"),
             dict(axis=1, before=0, after=0, boundary="valid"),
         ],
         type="abs",
-        eb="eb",
+        eb=0.1,
     )
-    assert safeguard.late_bound == {"eb"}
+    assert safeguard.late_bound == {"c"}
 
     data = np.arange(16, dtype=np.float32).reshape(4, 4)
 
-    safeguard.compute_safe_intervals(data, late_bound=Bindings(eb=data.astype(np.int8)))
+    safeguard.compute_safe_intervals(data, late_bound=Bindings(c=np.iinfo(np.int8).max))
     safeguard.compute_safe_intervals(
-        data, late_bound=Bindings(eb=data.astype(np.uint8))
+        data, late_bound=Bindings(c=np.iinfo(np.uint8).max)
     )
     safeguard.compute_safe_intervals(
-        data, late_bound=Bindings(eb=data.astype(np.int16))
+        data, late_bound=Bindings(c=np.iinfo(np.int16).max)
     )
     safeguard.compute_safe_intervals(
-        data, late_bound=Bindings(eb=data.astype(np.uint16))
-    )
-
-    with pytest.raises(TypeError, match="Cannot cast"):
-        safeguard.compute_safe_intervals(
-            data, late_bound=Bindings(eb=data.astype(np.int32))
-        )
-    with pytest.raises(TypeError, match="Cannot cast"):
-        safeguard.compute_safe_intervals(
-            data, late_bound=Bindings(eb=data.astype(np.uint32))
-        )
-    with pytest.raises(TypeError, match="Cannot cast"):
-        safeguard.compute_safe_intervals(
-            data, late_bound=Bindings(eb=data.astype(np.int64))
-        )
-    with pytest.raises(TypeError, match="Cannot cast"):
-        safeguard.compute_safe_intervals(
-            data, late_bound=Bindings(eb=data.astype(np.uint64))
-        )
-
-    safeguard.compute_safe_intervals(
-        data, late_bound=Bindings(eb=data.astype(np.float16))
-    )
-    safeguard.compute_safe_intervals(
-        data, late_bound=Bindings(eb=data.astype(np.float32))
+        data, late_bound=Bindings(c=np.iinfo(np.uint16).max)
     )
 
-    with pytest.raises(TypeError, match="Cannot cast"):
+    with pytest.raises(ValueError, match="cannot losslessly cast"):
         safeguard.compute_safe_intervals(
-            data, late_bound=Bindings(eb=data.astype(np.float64))
+            data, late_bound=Bindings(c=np.iinfo(np.int32).max)
+        )
+    with pytest.raises(ValueError, match="cannot losslessly cast"):
+        safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(c=np.iinfo(np.uint32).max)
+        )
+    with pytest.raises(ValueError, match="cannot losslessly cast"):
+        safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(c=np.iinfo(np.int64).max)
+        )
+    with pytest.raises(ValueError, match="cannot losslessly cast"):
+        safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(c=np.iinfo(np.uint64).max)
+        )
+
+    safeguard.compute_safe_intervals(
+        data, late_bound=Bindings(c=np.finfo(np.float16).smallest_subnormal)
+    )
+    safeguard.compute_safe_intervals(
+        data, late_bound=Bindings(c=np.finfo(np.float32).smallest_subnormal)
+    )
+
+    with pytest.raises(ValueError, match="cannot losslessly cast"):
+        safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(c=np.finfo(np.float64).smallest_subnormal)
         )
 
 
@@ -1018,7 +1018,7 @@ def test_finite_difference_dx():
                             before=1,
                             after=1,
                             boundary=boundary,
-                            constant_boundary=4.2
+                            constant_boundary=42
                             if boundary == BoundaryCondition.constant
                             else None,
                         )
@@ -1077,3 +1077,45 @@ def test_late_bound_constant():
 def test_pointwise_normalised_absolute_error(check):
     # pointwise normalised / range-relative absolute error bound
     check('(x - c["$x_min"]) / (c["$x_max"] - c["$x_min"])')
+
+
+def test_late_bound_constant_boundary():
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi="X[0,0] - X[2,0]",
+        neighbourhood=[
+            dict(
+                axis=0,
+                before=1,
+                after=1,
+                boundary="constant",
+                constant_boundary="const",
+            ),
+            dict(
+                axis=1,
+                before=0,
+                after=0,
+                boundary="constant",
+                constant_boundary="const2",
+            ),
+        ],
+        type="abs",
+        eb=1,
+    )
+    assert safeguard.late_bound == {"const", "const2"}
+
+    data = np.arange(6, dtype="uint8").reshape(2, 3)
+
+    with pytest.raises(
+        ValueError, match="cannot broadcast a non-scalar to a scalar array"
+    ):
+        safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(const=data, const2=4)
+        )
+
+    with pytest.raises(
+        ValueError,
+        match=r"cannot losslessly cast \(some\) late-bound parameter const2 values from int64 to uint8",
+    ):
+        safeguard.compute_safe_intervals(data, late_bound=Bindings(const=1, const2=256))
+
+    safeguard.compute_safe_intervals(data, late_bound=Bindings(const=1, const2=255))

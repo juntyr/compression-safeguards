@@ -258,8 +258,8 @@ def check_one_input(data) -> None:
                 and ("for array of shape" in str(err))
             )
             or (
-                isinstance(err, ValueError)
-                and ("constant boundary has invalid value" in str(err))
+                isinstance(err, (TypeError, ValueError))
+                and ("cannot losslessly cast" in str(err))
             )
         ):
             return

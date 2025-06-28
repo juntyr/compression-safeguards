@@ -11,12 +11,11 @@ from typing_extensions import assert_never  # MSPV 3.11
 
 from ..utils.cast import (
     _isfinite,
-    _nan_to_zero,
+    _nan_to_zero_inf_to_finite,
     _nextafter,
     _sign,
     from_float,
     from_total_order,
-    to_finite_float,
     to_float,
     to_total_order,
 )
@@ -126,7 +125,7 @@ class ErrorBound(Enum):
 
 def _check_error_bound(
     type: ErrorBound,
-    eb: int | float | np.ndarray[S, np.dtype[F]],
+    eb: int | float | np.ndarray[tuple[()] | S, np.dtype[F]],
 ) -> None:
     """
     Check if the error bound value `eb` is valid for the error bound `type`.
@@ -135,7 +134,7 @@ def _check_error_bound(
     ----------
     type : ErrorBound
         The error bound type.
-    eb : int | float | np.ndarray[S, np.dtype[F]]
+    eb : int | float | np.ndarray[tuple[()] | S, np.dtype[F]]
         The error bound value.
 
     Raises
@@ -161,7 +160,7 @@ def _check_error_bound(
 
 def _compute_finite_absolute_error_bound(
     type: ErrorBound,
-    eb: int | float | np.ndarray[S, np.dtype[F]],
+    eb: np.ndarray[tuple[()] | S, np.dtype[F]],
     data_float: np.ndarray[S, np.dtype[F]],
 ) -> np.ndarray[tuple[()] | S, np.dtype[F]]:
     """
@@ -175,8 +174,9 @@ def _compute_finite_absolute_error_bound(
     ----------
     type : ErrorBound
         The error bound type.
-    eb : int | float | np.ndarray[S, np.dtype[F]]
-        The error bound value.
+    eb : np.ndarray[tuple[()] | S, np.dtype[F]]
+        The error bound value. It must have already been checked using
+        `_check_error_bound`.
     data_float : np.ndarray[S, np.dtype[F]]
         The original data array in floating point representation.
 
@@ -191,38 +191,16 @@ def _compute_finite_absolute_error_bound(
 
     match type:
         case ErrorBound.abs:
-            with np.errstate(
-                divide="ignore", over="ignore", under="ignore", invalid="ignore"
-            ):
-                eb_abs: np.ndarray[tuple[()] | S, np.dtype[F]] = to_finite_float(
-                    eb, data_float.dtype
-                )
-            assert np.all(eb_abs >= 0)
-
-            return eb_abs
+            return eb
         case ErrorBound.rel:
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
-                eb_rel_as_abs: np.ndarray[S, np.dtype[F]] = to_finite_float(
-                    eb,
-                    data_float.dtype,
-                    map=lambda eb_rel: np.abs(data_float) * eb_rel,
-                )
-                eb_rel_as_abs = _nan_to_zero(eb_rel_as_abs)
+                eb_rel_as_abs = _nan_to_zero_inf_to_finite(np.abs(data_float) * eb)
             assert np.all((eb_rel_as_abs >= 0) & _isfinite(eb_rel_as_abs))
-
             return eb_rel_as_abs
         case ErrorBound.ratio:
-            with np.errstate(
-                divide="ignore", over="ignore", under="ignore", invalid="ignore"
-            ):
-                eb_ratio: np.ndarray[tuple[()] | S, np.dtype[F]] = to_finite_float(
-                    eb, data_float.dtype
-                )
-            assert np.all(eb_ratio >= 1.0)
-
-            return eb_ratio
+            return eb
         case _:
             assert_never(type)
 
@@ -280,7 +258,7 @@ def _compute_finite_absolute_error(
 
 def _apply_finite_error_bound(
     type: ErrorBound,
-    eb: int | float | np.ndarray[S, np.dtype[F]],
+    eb: np.ndarray[tuple[()] | S, np.dtype[F]],
     data: np.ndarray[S, np.dtype[T]],
     data_float: np.ndarray[S, np.dtype[F]],
 ) -> tuple[np.ndarray[S, np.dtype[T]], np.ndarray[S, np.dtype[T]]]:
@@ -297,8 +275,9 @@ def _apply_finite_error_bound(
     ----------
     type : ErrorBound
         The error bound type.
-    eb : int | float | np.ndarray[S, np.dtype[F]]
-        The error bound value.
+    eb : np.ndarray[tuple[()] | S, np.dtype[F]]
+        The error bound value. It must have already been checked using
+        `_check_error_bound`.
     data : np.ndarray[S, np.dtype[T]]
         The original data array.
     data_float : np.ndarray[S, np.dtype[F]]
@@ -310,22 +289,22 @@ def _apply_finite_error_bound(
         The lower and upper bounds within which the error bound is satisfied.
     """
 
-    eb_float = _compute_finite_absolute_error_bound(type, eb, data_float)
+    eb_abs = _compute_finite_absolute_error_bound(type, eb, data_float)
 
     match type:
         case ErrorBound.abs | ErrorBound.rel:
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
-                lower = from_float(data_float - eb_float, data.dtype)
-                upper = from_float(data_float + eb_float, data.dtype)
+                lower = from_float(data_float - eb_abs, data.dtype)
+                upper = from_float(data_float + eb_abs, data.dtype)
 
             # correct rounding errors in the lower and upper bound
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
-                lower_outside_eb = (data_float - to_float(lower)) > eb_float
-                upper_outside_eb = (to_float(upper) - data_float) > eb_float
+                lower_outside_eb = (data_float - to_float(lower)) > eb_abs
+                upper_outside_eb = (to_float(upper) - data_float) > eb_abs
 
             lower = from_total_order(
                 to_total_order(lower) + lower_outside_eb,
@@ -345,8 +324,8 @@ def _apply_finite_error_bound(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
                 data_mul, data_div = (
-                    from_float(data_float * eb_float, data.dtype),
-                    from_float(data_float / eb_float, data.dtype),
+                    from_float(data_float * eb_abs, data.dtype),
+                    from_float(data_float / eb_abs, data.dtype),
                 )
             lower = np.where(data < 0, data_mul, data_div)
             upper = np.where(data < 0, data_div, data_mul)
@@ -363,7 +342,7 @@ def _apply_finite_error_bound(
                             data_float / to_float(lower),
                         )
                     )
-                    > eb_float
+                    > eb_abs
                 )
                 upper_outside_eb = (
                     np.abs(
@@ -373,7 +352,7 @@ def _apply_finite_error_bound(
                             to_float(upper) / data_float,
                         )
                     )
-                    > eb_float
+                    > eb_abs
                 )
 
             lower = from_total_order(
@@ -402,7 +381,7 @@ def _apply_finite_error_bound(
 
 def _apply_finite_qoi_error_bound(
     type: ErrorBound,
-    eb: int | float | np.ndarray[S, np.dtype[F]],
+    eb: np.ndarray[tuple[()] | S, np.dtype[F]],
     qoi_float: np.ndarray[S, np.dtype[F]],
 ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
     """
@@ -422,8 +401,9 @@ def _apply_finite_qoi_error_bound(
     ----------
     type : ErrorBound
         The error bound type.
-    eb : int | float | np.ndarray[S, np.dtype[F]]
-        The error bound value.
+    eb : np.ndarray[tuple[()] | S, np.dtype[F]]
+        The error bound value. It must have already been checked using
+        `_check_error_bound`.
     qoi_float : np.ndarray[S, np.dtype[F]]
         The floating point QoI array.
 
@@ -433,22 +413,22 @@ def _apply_finite_qoi_error_bound(
         The lower and upper bounds within which the error bound is satisfied.
     """
 
-    eb_float = _compute_finite_absolute_error_bound(type, eb, qoi_float)
+    eb_abs = _compute_finite_absolute_error_bound(type, eb, qoi_float)
 
     match type:
         case ErrorBound.abs | ErrorBound.rel:
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
-                lower: np.ndarray[S, np.dtype[F]] = qoi_float - eb_float
-                upper: np.ndarray[S, np.dtype[F]] = qoi_float + eb_float
+                lower: np.ndarray[S, np.dtype[F]] = qoi_float - eb_abs
+                upper: np.ndarray[S, np.dtype[F]] = qoi_float + eb_abs
 
             # correct rounding errors in the lower and upper bound
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
-                lower_outside_eb = (qoi_float - lower) > eb_float
-                upper_outside_eb = (upper - qoi_float) > eb_float
+                lower_outside_eb = (qoi_float - lower) > eb_abs
+                upper_outside_eb = (upper - qoi_float) > eb_abs
 
             # we can nudge with nextafter since the QoIs are floating point
             lower = np.where(  # type: ignore
@@ -471,8 +451,8 @@ def _apply_finite_qoi_error_bound(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
                 data_mul, data_div = (
-                    qoi_float * eb_float,
-                    qoi_float / eb_float,
+                    qoi_float * eb_abs,
+                    qoi_float / eb_abs,
                 )
             lower = np.where(qoi_float < 0, data_mul, data_div)  # type: ignore
             upper = np.where(qoi_float < 0, data_div, data_mul)  # type: ignore
@@ -489,7 +469,7 @@ def _apply_finite_qoi_error_bound(
                             qoi_float / lower,
                         )
                     )
-                    > eb_float
+                    > eb_abs
                 )
                 upper_outside_eb = (
                     np.abs(
@@ -499,7 +479,7 @@ def _apply_finite_qoi_error_bound(
                             upper / qoi_float,
                         )
                     )
-                    > eb_float
+                    > eb_abs
                 )
 
             # we can nudge with nextafter since the QoIs are floating point

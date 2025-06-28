@@ -4,6 +4,7 @@ Monotonicity-preserving safeguard.
 
 __all__ = ["Monotonicity", "MonotonicityPreservingSafeguard"]
 
+from collections.abc import Set
 from enum import Enum
 from operator import ge, gt, le, lt
 
@@ -11,8 +12,8 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 from typing_extensions import assert_never  # MSPV 3.11
 
-from ...utils.bindings import Bindings
-from ...utils.cast import _isnan, from_total_order, to_total_order
+from ...utils.bindings import Bindings, Parameter
+from ...utils.cast import _isnan, from_total_order, lossless_cast, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import S, T
 from . import BoundaryCondition, NeighbourhoodAxis, _pad_with_boundary
@@ -107,10 +108,10 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     boundary : str | BoundaryCondition
         Boundary condition for evaluating the monotonicity near the data array
         domain boundaries, e.g. by extending values.
-    constant_boundary : None | int | float
-        Optional constant value with which the data array domain is extended
-        for a constant boundary. The value must be safely convertible (without
-        over- or underflow or invalid values) to the data type.
+    constant_boundary : None | int | float | str | Parameter
+        The optional value of or the late-bound parameter name for the constant
+        value with which the data array domain is extended for a constant
+        boundary. The value must be losslessly convertible to the data dtype.
     axis : None | int
         The axis along which the monotonicity is preserved. The default,
         [`None`][None], is to preserve along all axes.
@@ -120,7 +121,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     _monotonicity: Monotonicity
     _window: int
     _boundary: BoundaryCondition
-    _constant_boundary: None | int | float
+    _constant_boundary: None | int | float | Parameter
     _axis: None | int
 
     kind = "monotonicity"
@@ -130,7 +131,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         monotonicity: str | Monotonicity,
         window: int,
         boundary: str | BoundaryCondition,
-        constant_boundary: None | int | float = None,
+        constant_boundary: None | int | float | str | Parameter = None,
         axis: None | int = None,
     ):
         self._monotonicity = (
@@ -152,9 +153,34 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         ), (
             "constant_boundary must be provided if and only if the constant boundary condition is used"
         )
-        self._constant_boundary = constant_boundary
+
+        if isinstance(constant_boundary, Parameter):
+            self._constant_boundary = constant_boundary
+        elif isinstance(constant_boundary, str):
+            self._constant_boundary = Parameter(constant_boundary)
+        else:
+            self._constant_boundary = constant_boundary
 
         self._axis = axis
+
+    @property
+    def late_bound(self) -> Set[Parameter]:
+        """
+        The set of late-bound parameters that this safeguard has.
+
+        Late-bound parameters are only bound when checking and applying the
+        safeguard, in contrast to the normal early-bound parameters that are
+        configured during safeguard initialisation.
+
+        Late-bound parameters can be used for parameters that depend on the
+        specific data that is to be safeguarded.
+        """
+
+        return (
+            frozenset([self._constant_boundary])
+            if isinstance(self._constant_boundary, Parameter)
+            else frozenset()
+        )
 
     def compute_check_neighbourhood_for_data_shape(
         self, data_shape: tuple[int, ...]
@@ -208,18 +234,32 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data to be encoded.
-        decoded : np.ndarray
+        decoded : np.ndarray[S, np.dtype[T]]
             Decoded data.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
-        ok : np.ndarray
+        ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
         """
+
+        constant_boundary = (
+            None
+            if self._constant_boundary is None
+            else late_bound.resolve_ndarray_with_lossless_cast(
+                self._constant_boundary, (), data.dtype
+            )
+            if isinstance(self._constant_boundary, Parameter)
+            else lossless_cast(
+                self._constant_boundary,
+                data.dtype,
+                "monotonicity safeguard constant boundary",
+            )
+        )
 
         ok = np.ones_like(data, dtype=np.bool)
 
@@ -244,7 +284,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 self._boundary,
                 self._window,
                 self._window,
-                self._constant_boundary,
+                constant_boundary,
                 axis,
             )
             decoded_boundary = _pad_with_boundary(
@@ -252,7 +292,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 self._boundary,
                 self._window,
                 self._window,
-                self._constant_boundary,
+                constant_boundary,
                 axis,
             )
 
@@ -290,7 +330,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
@@ -301,12 +341,26 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             Union of intervals in which the monotonicity is preserved.
         """
 
+        constant_boundary = (
+            None
+            if self._constant_boundary is None
+            else late_bound.resolve_ndarray_with_lossless_cast(
+                self._constant_boundary, (), data.dtype
+            )
+            if isinstance(self._constant_boundary, Parameter)
+            else lossless_cast(
+                self._constant_boundary,
+                data.dtype,
+                "monotonicity safeguard constant boundary",
+            )
+        )
+
         window = 1 + self._window * 2
 
         (_lt, _gt, _eq, is_weak) = self._monotonicity.value[1]
         nudge = 0 if is_weak else 1
 
-        valid = Interval.full_like(data)
+        valid: Interval[T, int] = Interval.full_like(data)
 
         # track which elements have any monotonicity-based restrictions
         #  imposed upon them
@@ -331,7 +385,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 self._boundary,
                 self._window,
                 self._window,
-                self._constant_boundary,
+                constant_boundary,
                 axis,
             )
             data_windows = sliding_window_view(data_boundary, window, axis=axis)
@@ -555,16 +609,22 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         # for strict monotonicity, the lower bound is nudged up to ensure its
         #  midpoint rounds up while the limiting element's corresponding upper
         #  bound will round down
-        lt: np.ndarray = to_total_order(valid._lower)
-        ut: np.ndarray = to_total_order(valid._upper)
-        dt: np.ndarray = to_total_order(data.flatten())
+        lt: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = to_total_order(
+            valid._lower
+        )
+        ut: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = to_total_order(
+            valid._upper
+        )
+        dt: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = to_total_order(
+            data.flatten()
+        )
         if not is_weak:
-            lt = np.where((lt + 1) > 0, lt + 1, lt)
+            lt = np.where((lt + 1) > 0, lt + 1, lt)  # type: ignore
 
         # Hacker's Delight's algorithm to compute (a + b) / 2:
         #  ((a ^ b) >> 1) + (a & b)
-        valid._lower = from_total_order(((lt ^ dt) >> 1) + (lt & dt), data.dtype)
-        valid._upper = from_total_order(((ut ^ dt) >> 1) + (ut & dt), data.dtype)
+        valid._lower = from_total_order(((lt ^ dt) >> 1) + (lt & dt), data.dtype)  # type: ignore
+        valid._upper = from_total_order(((ut ^ dt) >> 1) + (ut & dt), data.dtype)  # type: ignore
 
         # ensure that non-NaN values remain non-NaN since they can otherwise
         #  invalidate the monotonicity of their window
@@ -617,10 +677,10 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
     def _monotonic_sign(
         self,
-        x: np.ndarray,
+        x: np.ndarray[S, np.dtype[T]],
         *,
         is_decoded: bool,
-    ) -> np.ndarray:
+    ) -> np.ndarray[tuple[int, ...], np.dtype[np.float64]]:
         (lt, gt, eq, _is_weak) = self._monotonicity.value[int(is_decoded)]
 
         # default to NaN
@@ -651,17 +711,19 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         return monotonic[..., np.newaxis]
 
     def _monotonic_sign_not_equal(
-        self, data_monotonic: np.ndarray, decoded_monotonic: np.ndarray
-    ) -> np.ndarray:
+        self,
+        data_monotonic: np.ndarray[S, np.dtype[T]],
+        decoded_monotonic: np.ndarray[S, np.dtype[T]],
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
         match self._monotonicity:
             case Monotonicity.strict | Monotonicity.strict_with_consts:
-                return np.where(
+                return np.where(  # type: ignore
                     _isnan(data_monotonic),
                     False,
                     decoded_monotonic != data_monotonic,
                 )
             case Monotonicity.strict_to_weak | Monotonicity.weak:
-                return np.where(
+                return np.where(  # type: ignore
                     _isnan(data_monotonic),
                     False,
                     # having the opposite sign or no sign are both not equal

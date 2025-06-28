@@ -21,6 +21,8 @@ from ....utils.cast import (
     _nan_to_zero,
     _nextafter,
     as_bits,
+    lossless_cast,
+    saturating_finite_float_cast,
     to_float,
 )
 from ....utils.intervals import Interval, IntervalUnion
@@ -282,7 +284,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
           , "type", "=", (
                 "-1" | "0" | "1"             (* backwards | central | forward difference *)
             ), ","
-          , "dx", "=", ( int | float ), ","  (* uniform grid spacing *)
+          , "dx", "=", expr, ","             (* scalar uniform grid spacing *)
           , "axis", "=", int                 (* axis, relative to the neighbourhood *)
       , ")"
     ;
@@ -490,6 +492,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         if isinstance(self._eb, Parameter):
             parameters.append(self._eb)
 
+        for axis in self._neighbourhood:
+            if isinstance(axis.constant_boundary, Parameter):
+                parameters.append(axis.constant_boundary)
+
         return frozenset(parameters)
 
     def compute_check_neighbourhood_for_data_shape(
@@ -585,49 +591,74 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             ).dtype
             return np.zeros(empty_shape, dtype=float_dtype)
 
-        data_boundary = data
-        for axis in self._neighbourhood:
+        constant_boundaries = [
+            None
+            if axis.constant_boundary is None
+            else late_bound.resolve_ndarray_with_lossless_cast(
+                axis.constant_boundary, (), data.dtype
+            )
+            if isinstance(axis.constant_boundary, Parameter)
+            else lossless_cast(
+                axis.constant_boundary,
+                data.dtype,
+                "stencil QoI safeguard constant boundary",
+            )
+            for axis in self._neighbourhood
+        ]
+
+        data_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = data
+        for axis, axis_constant_boundary in zip(
+            self._neighbourhood, constant_boundaries
+        ):
             data_boundary = _pad_with_boundary(
                 data_boundary,
                 axis.boundary,
                 axis.before,
                 axis.after,
-                axis.constant_boundary,
+                axis_constant_boundary,
                 axis.axis,
             )
 
         window = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
 
-        data_windows_float: np.ndarray = to_float(
-            sliding_window_view(
-                data_boundary,
-                window,
-                axis=tuple(axis.axis for axis in self._neighbourhood),
-                writeable=False,
-            )  # type: ignore
+        data_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            to_float(
+                sliding_window_view(
+                    data_boundary,
+                    window,
+                    axis=tuple(axis.axis for axis in self._neighbourhood),
+                    writeable=False,
+                )  # type: ignore
+            )
         )
 
         late_bound_constants = dict()
         for c in self._late_bound_constants:
-            late_boundary = late_bound.resolve_ndarray(
-                c.parameter, data.shape, data.dtype
+            late_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = (
+                late_bound.resolve_ndarray_with_lossless_cast(
+                    c.parameter, data.shape, data.dtype
+                )
             )
-            for axis in self._neighbourhood:
+            for axis, axis_constant_boundary in zip(
+                self._neighbourhood, constant_boundaries
+            ):
                 late_boundary = _pad_with_boundary(
                     late_boundary,
                     axis.boundary,
                     axis.before,
                     axis.after,
-                    axis.constant_boundary,
+                    axis_constant_boundary,
                     axis.axis,
                 )
-            late_windows_float: np.ndarray = to_float(
-                sliding_window_view(
-                    late_boundary,
-                    window,
-                    axis=tuple(axis.axis for axis in self._neighbourhood),
-                    writeable=False,
-                )  # type: ignore
+            late_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+                to_float(
+                    sliding_window_view(
+                        late_boundary,
+                        window,
+                        axis=tuple(axis.axis for axis in self._neighbourhood),
+                        writeable=False,
+                    )  # type: ignore
+                )
             )
             late_bound_constants[c] = late_windows_float
 
@@ -656,16 +687,16 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data to be encoded.
-        decoded : np.ndarray
+        decoded : np.ndarray[S, np.dtype[T]]
             Decoded data.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
-        ok : np.ndarray
+        ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
         """
 
@@ -682,14 +713,32 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         if data.size == 0:
             return np.ones_like(data, dtype=np.bool)  # type: ignore
 
-        data_boundary, decoded_boundary = data, decoded
-        for axis in self._neighbourhood:
+        constant_boundaries = [
+            None
+            if axis.constant_boundary is None
+            else late_bound.resolve_ndarray_with_lossless_cast(
+                axis.constant_boundary, (), data.dtype
+            )
+            if isinstance(axis.constant_boundary, Parameter)
+            else lossless_cast(
+                axis.constant_boundary,
+                data.dtype,
+                "stencil QoI safeguard constant boundary",
+            )
+            for axis in self._neighbourhood
+        ]
+
+        data_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = data
+        decoded_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = decoded
+        for axis, axis_constant_boundary in zip(
+            self._neighbourhood, constant_boundaries
+        ):
             data_boundary = _pad_with_boundary(
                 data_boundary,
                 axis.boundary,
                 axis.before,
                 axis.after,
-                axis.constant_boundary,
+                axis_constant_boundary,
                 axis.axis,
             )
             decoded_boundary = _pad_with_boundary(
@@ -697,48 +746,58 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 axis.boundary,
                 axis.before,
                 axis.after,
-                axis.constant_boundary,
+                axis_constant_boundary,
                 axis.axis,
             )
 
-        data_windows_float: np.ndarray = to_float(
-            sliding_window_view(
-                data_boundary,
-                window,
-                axis=tuple(axis.axis for axis in self._neighbourhood),
-                writeable=False,
-            )  # type: ignore
+        data_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            to_float(
+                sliding_window_view(
+                    data_boundary,
+                    window,
+                    axis=tuple(axis.axis for axis in self._neighbourhood),
+                    writeable=False,
+                )  # type: ignore
+            )
         )
-        decoded_windows_float: np.ndarray = to_float(
-            sliding_window_view(
-                decoded_boundary,
-                window,
-                axis=tuple(axis.axis for axis in self._neighbourhood),
-                writeable=False,
-            )  # type: ignore
+        decoded_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            to_float(
+                sliding_window_view(
+                    decoded_boundary,
+                    window,
+                    axis=tuple(axis.axis for axis in self._neighbourhood),
+                    writeable=False,
+                )  # type: ignore
+            )
         )
 
         late_bound_constants = dict()
         for c in self._late_bound_constants:
-            late_boundary = late_bound.resolve_ndarray(
-                c.parameter, data.shape, data.dtype
+            late_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = (
+                late_bound.resolve_ndarray_with_lossless_cast(
+                    c.parameter, data.shape, data.dtype
+                )
             )
-            for axis in self._neighbourhood:
+            for axis, axis_constant_boundary in zip(
+                self._neighbourhood, constant_boundaries
+            ):
                 late_boundary = _pad_with_boundary(
                     late_boundary,
                     axis.boundary,
                     axis.before,
                     axis.after,
-                    axis.constant_boundary,
+                    axis_constant_boundary,
                     axis.axis,
                 )
-            late_windows_float: np.ndarray = to_float(
-                sliding_window_view(
-                    late_boundary,
-                    window,
-                    axis=tuple(axis.axis for axis in self._neighbourhood),
-                    writeable=False,
-                )  # type: ignore
+            late_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+                to_float(
+                    sliding_window_view(
+                        late_boundary,
+                        window,
+                        axis=tuple(axis.axis for axis in self._neighbourhood),
+                        writeable=False,
+                    )  # type: ignore
+                )
             )
             late_bound_constants[c] = late_windows_float
 
@@ -756,14 +815,16 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 decoded_windows_float, *late_bound_constants.values()
             )
 
-        eb = (
-            late_bound.resolve_ndarray(
+        eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
+            late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                 self._eb,
                 qoi_data.shape,
                 qoi_data.dtype,
             )
             if isinstance(self._eb, Parameter)
-            else self._eb
+            else saturating_finite_float_cast(
+                self._eb, qoi_data.dtype, "stencil QoI error bound safeguard eb"
+            )
         )
         _check_error_bound(self._type, eb)
 
@@ -810,7 +871,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
@@ -834,47 +895,72 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         if data.size == 0:
             return Interval.full_like(data).into_union()
 
-        data_boundary = data
-        for axis in self._neighbourhood:
+        constant_boundaries = [
+            None
+            if axis.constant_boundary is None
+            else late_bound.resolve_ndarray_with_lossless_cast(
+                axis.constant_boundary, (), data.dtype
+            )
+            if isinstance(axis.constant_boundary, Parameter)
+            else lossless_cast(
+                axis.constant_boundary,
+                data.dtype,
+                "stencil QoI safeguard constant boundary",
+            )
+            for axis in self._neighbourhood
+        ]
+
+        data_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = data
+        for axis, axis_constant_boundary in zip(
+            self._neighbourhood, constant_boundaries
+        ):
             data_boundary = _pad_with_boundary(
                 data_boundary,
                 axis.boundary,
                 axis.before,
                 axis.after,
-                axis.constant_boundary,
+                axis_constant_boundary,
                 axis.axis,
             )
 
-        data_windows_float: np.ndarray = to_float(
-            sliding_window_view(
-                data_boundary,
-                window,
-                axis=tuple(axis.axis for axis in self._neighbourhood),
-                writeable=False,
-            )  # type: ignore
+        data_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            to_float(
+                sliding_window_view(
+                    data_boundary,
+                    window,
+                    axis=tuple(axis.axis for axis in self._neighbourhood),
+                    writeable=False,
+                )  # type: ignore
+            )
         )
 
         late_bound_constants = dict()
         for c in self._late_bound_constants:
-            late_boundary = late_bound.resolve_ndarray(
-                c.parameter, data.shape, data.dtype
+            late_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = (
+                late_bound.resolve_ndarray_with_lossless_cast(
+                    c.parameter, data.shape, data.dtype
+                )
             )
-            for axis in self._neighbourhood:
+            for axis, axis_constant_boundary in zip(
+                self._neighbourhood, constant_boundaries
+            ):
                 late_boundary = _pad_with_boundary(
                     late_boundary,
                     axis.boundary,
                     axis.before,
                     axis.after,
-                    axis.constant_boundary,
+                    axis_constant_boundary,
                     axis.axis,
                 )
-            late_windows_float: np.ndarray = to_float(
-                sliding_window_view(
-                    late_boundary,
-                    window,
-                    axis=tuple(axis.axis for axis in self._neighbourhood),
-                    writeable=False,
-                )  # type: ignore
+            late_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+                to_float(
+                    sliding_window_view(
+                        late_boundary,
+                        window,
+                        axis=tuple(axis.axis for axis in self._neighbourhood),
+                        writeable=False,
+                    )  # type: ignore
+                )
             )
             late_bound_constants[c] = late_windows_float
 
@@ -889,18 +975,22 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         ):
             data_qoi = (qoi_lambda)(data_windows_float, *late_bound_constants.values())
 
-        eb = (
-            late_bound.resolve_ndarray(
+        eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
+            late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                 self._eb,
                 data_qoi.shape,
                 data_qoi.dtype,
             )
             if isinstance(self._eb, Parameter)
-            else self._eb
+            else saturating_finite_float_cast(
+                self._eb, data_qoi.dtype, "stencil QoI error bound safeguard eb"
+            )
         )
         _check_error_bound(self._type, eb)
 
-        qoi_lower_upper: tuple[np.ndarray, np.ndarray] = _apply_finite_qoi_error_bound(
+        qoi_lower_upper: tuple[
+            np.ndarray[S, np.dtype[np.floating]], np.ndarray[S, np.dtype[np.floating]]
+        ] = _apply_finite_qoi_error_bound(
             self._type,
             eb,
             data_qoi,
@@ -958,7 +1048,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 end = None if axis.after == 0 else -axis.after
                 s[axis.axis] = slice(start, end)
 
-        data_float: np.ndarray = to_float(data)
+        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
 
         # compute the error bound in data space
         with np.errstate(
@@ -986,7 +1076,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 axis.boundary,
                 axis.before,
                 axis.after,
-                None if axis.constant_boundary is None else data.size,
+                None if axis.constant_boundary is None else np.array(data.size),  # type: ignore
                 axis.axis,
             )
         indices_windows = sliding_window_view(  # type: ignore

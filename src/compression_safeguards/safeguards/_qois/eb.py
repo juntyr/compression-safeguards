@@ -10,10 +10,9 @@ from ...utils.cast import (
     _isfinite,
     _isinf,
     _isnan,
-    _nan_to_zero,
+    _nan_to_zero_inf_to_finite,
     _nextafter,
     _sign,
-    to_finite_float,
 )
 from ...utils.typing import F, S
 from .array import NumPyLikeArray
@@ -140,14 +139,14 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
             zero,
             np.minimum(np.exp(exprv + eb_expr_lower) - argv, 0),
         )
-        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
+        eal = _nan_to_zero_inf_to_finite(eal)
 
         eau = np.where(
             (eb_expr_upper == 0),
             zero,
             np.maximum(0, np.exp(exprv + eb_expr_upper) - argv),
         )
-        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
+        eau = _nan_to_zero_inf_to_finite(eau)
 
         # handle rounding errors in ln(e^(...)) early
         eal = ensure_bounded_derived_error(
@@ -190,14 +189,14 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
             zero,
             np.minimum(np.log(np.maximum(0, exprv + eb_expr_lower)) - argv, 0),
         )
-        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
+        eal = _nan_to_zero_inf_to_finite(eal)
 
         eau = np.where(
             (eb_expr_upper == 0),
             zero,
             np.maximum(0, np.log(np.maximum(0, exprv + eb_expr_upper)) - argv),
         )
-        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
+        eau = _nan_to_zero_inf_to_finite(eau)
 
         # handle rounding errors in e^(ln(...)) early
         eal = ensure_bounded_derived_error(
@@ -262,14 +261,14 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
             zero,
             np.minimum(argv_lower - argv, 0),
         )
-        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
+        eal = _nan_to_zero_inf_to_finite(eal)
 
         eau = np.where(
             (eb_expr_upper == 0),
             zero,
             np.maximum(0, argv_upper - argv),
         )
-        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
+        eau = _nan_to_zero_inf_to_finite(eau)
 
         # handle rounding errors in sign(...) early
         eal = ensure_bounded_derived_error(
@@ -317,10 +316,10 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         # rounding allows zero error bounds on the expression to expand into
         #  non-zero error bounds on the argument
         eal = np.minimum(argv_lower - argv, 0)
-        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
+        eal = _nan_to_zero_inf_to_finite(eal)
 
         eau = np.maximum(0, argv_upper - argv)
-        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
+        eau = _nan_to_zero_inf_to_finite(eau)
 
         # handle rounding errors in floor(...) early
         eal = ensure_bounded_derived_error(
@@ -368,10 +367,10 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         # rounding allows zero error bounds on the expression to expand into
         #  non-zero error bounds on the argument
         eal = np.minimum(argv_lower - argv, 0)
-        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
+        eal = _nan_to_zero_inf_to_finite(eal)
 
         eau = np.maximum(0, argv_upper - argv)
-        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
+        eau = _nan_to_zero_inf_to_finite(eau)
 
         # handle rounding errors in ceil(...) early
         eal = ensure_bounded_derived_error(
@@ -423,10 +422,10 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         # rounding allows zero error bounds on the expression to expand into
         #  non-zero error bounds on the argument
         eal = np.minimum(argv_lower - argv, 0)
-        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
+        eal = _nan_to_zero_inf_to_finite(eal)
 
         eau = np.maximum(0, argv_upper - argv)
-        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
+        eau = _nan_to_zero_inf_to_finite(eau)
 
         # handle rounding errors in trunc(...) early
         eal = ensure_bounded_derived_error(
@@ -474,10 +473,10 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         # rounding allows zero error bounds on the expression to expand into
         #  non-zero error bounds on the argument
         eal = np.minimum(argv_lower - argv, 0)
-        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
+        eal = _nan_to_zero_inf_to_finite(eal)
 
         eau = np.maximum(0, argv_upper - argv)
-        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
+        eau = _nan_to_zero_inf_to_finite(eau)
 
         # handle rounding errors in round_ties_even(...) early
         eal = ensure_bounded_derived_error(
@@ -523,7 +522,7 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
                 np.asin(np.maximum(-1, exprv + eb_expr_lower)) - np.asin(exprv), 0
             ),
         )
-        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
+        eal = _nan_to_zero_inf_to_finite(eal)
 
         eau = np.where(
             (eb_expr_upper == 0),
@@ -532,7 +531,7 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
                 0, np.asin(np.minimum(exprv + eb_expr_upper, 1)) - np.asin(exprv)
             ),
         )
-        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
+        eau = _nan_to_zero_inf_to_finite(eau)
 
         # np.asin maps to [-pi/2, +pi/2] where sin is monotonically increasing
         # flip the argument error bounds where sin is monotonically decreasing
@@ -583,7 +582,7 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
             #  bound lower bounds to be <= 0
             np.minimum(np.sin(np.maximum(-np.pi / 2, exprv + eb_expr_lower)) - argv, 0),
         )
-        eal = _nan_to_zero(to_finite_float(eal, xv.dtype))
+        eal = _nan_to_zero_inf_to_finite(eal)
 
         eau = np.where(
             (eb_expr_upper == 0),
@@ -592,7 +591,7 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
             #  bound upper bounds to be >= 0
             np.maximum(0, np.sin(np.minimum(exprv + eb_expr_upper, np.pi / 2)) - argv),
         )
-        eau = _nan_to_zero(to_finite_float(eau, xv.dtype))
+        eau = _nan_to_zero_inf_to_finite(eau)
 
         # handle rounding errors in asin(sin(...)) early
         eal = ensure_bounded_derived_error(
@@ -714,12 +713,8 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         for factor in factors[1:]:
             total_abs_factor += np.abs(factor)
 
-        etl: np.ndarray = _nan_to_zero(
-            to_finite_float(eb_expr_lower / total_abs_factor, xv.dtype)
-        )
-        etu: np.ndarray = _nan_to_zero(
-            to_finite_float(eb_expr_upper / total_abs_factor, xv.dtype)
-        )
+        etl = _nan_to_zero_inf_to_finite(eb_expr_lower / total_abs_factor)
+        etu = _nan_to_zero_inf_to_finite(eb_expr_upper / total_abs_factor)
 
         # handle rounding errors in the total absolute factor early
         etl = ensure_bounded_derived_error(
@@ -776,12 +771,8 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
             ),
         )
 
-        efl: np.ndarray = _nan_to_zero(
-            to_finite_float(eb_expr_lower / np.abs(factor), xv.dtype)
-        )
-        efu: np.ndarray = _nan_to_zero(
-            to_finite_float(eb_expr_upper / np.abs(factor), xv.dtype)
-        )
+        efl = _nan_to_zero_inf_to_finite(eb_expr_lower / np.abs(factor))
+        efu = _nan_to_zero_inf_to_finite(eb_expr_upper / np.abs(factor))
 
         # handle rounding errors in the factor early
         efl = ensure_bounded_derived_error(

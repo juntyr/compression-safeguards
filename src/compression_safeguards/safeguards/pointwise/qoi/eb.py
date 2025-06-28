@@ -18,6 +18,7 @@ from ....utils.cast import (
     _nan_to_zero,
     _nextafter,
     as_bits,
+    saturating_finite_float_cast,
     to_float,
 )
 from ....utils.intervals import IntervalUnion
@@ -374,10 +375,12 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             Evaluated quantity of interest, in floating point.
         """
 
-        data_float: np.ndarray = to_float(data)
+        data_float: np.ndarray[S, np.dtype[F]] = to_float(data)
 
         late_bound_constants = {
-            c: late_bound.resolve_ndarray(c.parameter, data.shape, data_float.dtype)
+            c: late_bound.resolve_ndarray_with_lossless_cast(
+                c.parameter, data.shape, data_float.dtype
+            )
             for c in self._late_bound_constants
         }
 
@@ -404,23 +407,25 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data to be encoded.
-        decoded : np.ndarray
+        decoded : np.ndarray[S, np.dtype[T]]
             Decoded data.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
-        ok : np.ndarray
+        ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        data_float: np.ndarray = to_float(data)
+        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
 
         late_bound_constants = {
-            c: late_bound.resolve_ndarray(c.parameter, data.shape, data_float.dtype)
+            c: late_bound.resolve_ndarray_with_lossless_cast(
+                c.parameter, data.shape, data_float.dtype
+            )
             for c in self._late_bound_constants
         }
 
@@ -436,14 +441,16 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                 to_float(decoded), *late_bound_constants.values()
             )
 
-        eb = (
-            late_bound.resolve_ndarray(
+        eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
+            late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                 self._eb,
                 qoi_data.shape,
                 qoi_data.dtype,
             )
             if isinstance(self._eb, Parameter)
-            else self._eb
+            else saturating_finite_float_cast(
+                self._eb, qoi_data.dtype, "pointwise QoI error bound safeguard eb"
+            )
         )
         _check_error_bound(self._type, eb)
 
@@ -478,7 +485,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
@@ -489,10 +496,12 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             Union of intervals in which the error bound is upheld.
         """
 
-        data_float: np.ndarray = to_float(data)
+        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
 
         late_bound_constants = {
-            c: late_bound.resolve_ndarray(c.parameter, data.shape, data_float.dtype)
+            c: late_bound.resolve_ndarray_with_lossless_cast(
+                c.parameter, data.shape, data_float.dtype
+            )
             for c in self._late_bound_constants
         }
 
@@ -503,20 +512,26 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            data_qoi = (qoi_lambda)(data_float, *late_bound_constants.values())
+            data_qoi: np.ndarray[S, np.dtype[np.floating]] = (qoi_lambda)(
+                data_float, *late_bound_constants.values()
+            )
 
-        eb = (
-            late_bound.resolve_ndarray(
+        eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
+            late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                 self._eb,
                 data_qoi.shape,
                 data_qoi.dtype,
             )
             if isinstance(self._eb, Parameter)
-            else self._eb
+            else saturating_finite_float_cast(
+                self._eb, data_qoi.dtype, "pointwise QoI error bound safeguard eb"
+            )
         )
         _check_error_bound(self._type, eb)
 
-        qoi_lower_upper: tuple[np.ndarray, np.ndarray] = _apply_finite_qoi_error_bound(
+        qoi_lower_upper: tuple[
+            np.ndarray[S, np.dtype[np.floating]], np.ndarray[S, np.dtype[np.floating]]
+        ] = _apply_finite_qoi_error_bound(
             self._type,
             eb,
             data_qoi,
@@ -528,8 +543,12 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
             # compute the adjusted error bound
-            eb_qoi_lower = _nan_to_zero(qoi_lower - data_qoi)
-            eb_qoi_upper = _nan_to_zero(qoi_upper - data_qoi)
+            eb_qoi_lower: np.ndarray[S, np.dtype[np.floating]] = _nan_to_zero(
+                qoi_lower - data_qoi
+            )
+            eb_qoi_upper: np.ndarray[S, np.dtype[np.floating]] = _nan_to_zero(
+                qoi_upper - data_qoi
+            )
 
             # check if they're representable within the error bound
             eb_qoi_lower_outside = (data_qoi + eb_qoi_lower) < qoi_lower
@@ -541,12 +560,12 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                 eb_qoi_lower_outside & _isfinite(qoi_lower),
                 _nextafter(eb_qoi_lower, 0),
                 eb_qoi_lower,
-            )
+            )  # type: ignore
             eb_qoi_upper = np.where(
                 eb_qoi_upper_outside & _isfinite(qoi_upper),
                 _nextafter(eb_qoi_upper, 0),
                 eb_qoi_upper,
-            )
+            )  # type: ignore
 
         # check that the adjusted error bounds fulfil all requirements
         assert eb_qoi_lower.shape == data.shape
@@ -568,7 +587,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             )
 
         late_bound_constants = {
-            c: late_bound.resolve_ndarray(c.parameter, data.shape, data_float.dtype)
+            c: late_bound.resolve_ndarray_with_lossless_cast(
+                c.parameter, data.shape, data_float.dtype
+            )
             for c in self._late_bound_constants
         }
 
@@ -576,7 +597,10 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            eb_x_lower, eb_x_upper = _compute_data_eb_for_qoi_eb(
+            eb_x_lower_upper: tuple[
+                np.ndarray[S, np.dtype[np.floating]],
+                np.ndarray[S, np.dtype[np.floating]],
+            ] = _compute_data_eb_for_qoi_eb(
                 self._qoi_expr,
                 self._x,
                 data_float,
@@ -584,6 +608,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                 eb_qoi_upper,
                 late_bound_constants,
             )
+            eb_x_lower, eb_x_upper = eb_x_lower_upper
 
         return compute_safe_eb_lower_upper_interval(
             data,
