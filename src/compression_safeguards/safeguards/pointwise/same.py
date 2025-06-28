@@ -97,16 +97,16 @@ class SameValueSafeguard(PointwiseSafeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data to be encoded.
-        decoded : np.ndarray
+        decoded : np.ndarray[S, np.dtype[T]]
             Decoded data.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
-        ok : np.ndarray
+        ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
         """
 
@@ -143,7 +143,7 @@ class SameValueSafeguard(PointwiseSafeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
@@ -176,7 +176,9 @@ class SameValueSafeguard(PointwiseSafeguard):
             Lower(valuef) <= valid[dataf_bits == valuef_bits] <= Upper(valuef)
             return valid.into_union()
 
-        valuef_total: np.ndarray = to_total_order(valuef)
+        valuef_total: np.ndarray[
+            tuple[()] | tuple[int], np.dtype[np.unsignedinteger]
+        ] = to_total_order(valuef)
 
         total_min = np.iinfo(valuef_total.dtype).min
         total_max = np.iinfo(valuef_total.dtype).max

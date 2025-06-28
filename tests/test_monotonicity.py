@@ -246,7 +246,7 @@ def test_fuzzer_padding_overflow():
     decoded = np.array([[-9.444733e21]], dtype=np.float32)
 
     with pytest.raises(
-        TypeError,
+        ValueError,
         match=r"cannot losslessly cast \(some\) monotonicity safeguard constant boundary values from float64 to float32",
     ):
         encode_decode_mock(
@@ -305,7 +305,7 @@ def test_late_bound_constant_boundary():
     safeguards.apply_correction(decoded, correction)
 
     with pytest.raises(
-        TypeError,
+        ValueError,
         match=r"cannot losslessly cast \(some\) late-bound parameter const values from int64 to uint8",
     ):
         correction = safeguards.compute_correction(

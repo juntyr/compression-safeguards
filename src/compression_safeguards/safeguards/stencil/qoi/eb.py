@@ -22,6 +22,7 @@ from ....utils.cast import (
     _nextafter,
     as_bits,
     lossless_cast,
+    saturating_finite_float_cast,
     to_float,
 )
 from ....utils.intervals import Interval, IntervalUnion
@@ -283,7 +284,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
           , "type", "=", (
                 "-1" | "0" | "1"             (* backwards | central | forward difference *)
             ), ","
-          , "dx", "=", ( int | float ), ","  (* uniform grid spacing *)
+          , "dx", "=", expr, ","             (* scalar uniform grid spacing *)
           , "axis", "=", int                 (* axis, relative to the neighbourhood *)
       , ")"
     ;
@@ -491,6 +492,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         if isinstance(self._eb, Parameter):
             parameters.append(self._eb)
 
+        for axis in self._neighbourhood:
+            if isinstance(axis.constant_boundary, Parameter):
+                parameters.append(axis.constant_boundary)
+
         return frozenset(parameters)
 
     def compute_check_neighbourhood_for_data_shape(
@@ -616,13 +621,15 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         window = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
 
-        data_windows_float: np.ndarray = to_float(
-            sliding_window_view(
-                data_boundary,
-                window,
-                axis=tuple(axis.axis for axis in self._neighbourhood),
-                writeable=False,
-            )  # type: ignore
+        data_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            to_float(
+                sliding_window_view(
+                    data_boundary,
+                    window,
+                    axis=tuple(axis.axis for axis in self._neighbourhood),
+                    writeable=False,
+                )  # type: ignore
+            )
         )
 
         late_bound_constants = dict()
@@ -643,13 +650,15 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     axis_constant_boundary,
                     axis.axis,
                 )
-            late_windows_float: np.ndarray = to_float(
-                sliding_window_view(
-                    late_boundary,
-                    window,
-                    axis=tuple(axis.axis for axis in self._neighbourhood),
-                    writeable=False,
-                )  # type: ignore
+            late_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+                to_float(
+                    sliding_window_view(
+                        late_boundary,
+                        window,
+                        axis=tuple(axis.axis for axis in self._neighbourhood),
+                        writeable=False,
+                    )  # type: ignore
+                )
             )
             late_bound_constants[c] = late_windows_float
 
@@ -678,16 +687,16 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data to be encoded.
-        decoded : np.ndarray
+        decoded : np.ndarray[S, np.dtype[T]]
             Decoded data.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
-        ok : np.ndarray
+        ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
         """
 
@@ -741,21 +750,25 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 axis.axis,
             )
 
-        data_windows_float: np.ndarray = to_float(
-            sliding_window_view(
-                data_boundary,
-                window,
-                axis=tuple(axis.axis for axis in self._neighbourhood),
-                writeable=False,
-            )  # type: ignore
+        data_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            to_float(
+                sliding_window_view(
+                    data_boundary,
+                    window,
+                    axis=tuple(axis.axis for axis in self._neighbourhood),
+                    writeable=False,
+                )  # type: ignore
+            )
         )
-        decoded_windows_float: np.ndarray = to_float(
-            sliding_window_view(
-                decoded_boundary,
-                window,
-                axis=tuple(axis.axis for axis in self._neighbourhood),
-                writeable=False,
-            )  # type: ignore
+        decoded_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            to_float(
+                sliding_window_view(
+                    decoded_boundary,
+                    window,
+                    axis=tuple(axis.axis for axis in self._neighbourhood),
+                    writeable=False,
+                )  # type: ignore
+            )
         )
 
         late_bound_constants = dict()
@@ -776,13 +789,15 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     axis_constant_boundary,
                     axis.axis,
                 )
-            late_windows_float: np.ndarray = to_float(
-                sliding_window_view(
-                    late_boundary,
-                    window,
-                    axis=tuple(axis.axis for axis in self._neighbourhood),
-                    writeable=False,
-                )  # type: ignore
+            late_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+                to_float(
+                    sliding_window_view(
+                        late_boundary,
+                        window,
+                        axis=tuple(axis.axis for axis in self._neighbourhood),
+                        writeable=False,
+                    )  # type: ignore
+                )
             )
             late_bound_constants[c] = late_windows_float
 
@@ -800,15 +815,16 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 decoded_windows_float, *late_bound_constants.values()
             )
 
-        eb = (
-            late_bound.resolve_ndarray_with_lossless_cast(
+        eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
+            late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                 self._eb,
                 qoi_data.shape,
                 qoi_data.dtype,
             )
             if isinstance(self._eb, Parameter)
-            # eb is converted to a finite floating bound below
-            else self._eb
+            else saturating_finite_float_cast(
+                self._eb, qoi_data.dtype, "stencil QoI error bound safeguard eb"
+            )
         )
         _check_error_bound(self._type, eb)
 
@@ -855,7 +871,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
@@ -907,13 +923,15 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 axis.axis,
             )
 
-        data_windows_float: np.ndarray = to_float(
-            sliding_window_view(
-                data_boundary,
-                window,
-                axis=tuple(axis.axis for axis in self._neighbourhood),
-                writeable=False,
-            )  # type: ignore
+        data_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            to_float(
+                sliding_window_view(
+                    data_boundary,
+                    window,
+                    axis=tuple(axis.axis for axis in self._neighbourhood),
+                    writeable=False,
+                )  # type: ignore
+            )
         )
 
         late_bound_constants = dict()
@@ -934,13 +952,15 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     axis_constant_boundary,
                     axis.axis,
                 )
-            late_windows_float: np.ndarray = to_float(
-                sliding_window_view(
-                    late_boundary,
-                    window,
-                    axis=tuple(axis.axis for axis in self._neighbourhood),
-                    writeable=False,
-                )  # type: ignore
+            late_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+                to_float(
+                    sliding_window_view(
+                        late_boundary,
+                        window,
+                        axis=tuple(axis.axis for axis in self._neighbourhood),
+                        writeable=False,
+                    )  # type: ignore
+                )
             )
             late_bound_constants[c] = late_windows_float
 
@@ -955,19 +975,22 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         ):
             data_qoi = (qoi_lambda)(data_windows_float, *late_bound_constants.values())
 
-        eb = (
-            late_bound.resolve_ndarray_with_lossless_cast(
+        eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
+            late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                 self._eb,
                 data_qoi.shape,
                 data_qoi.dtype,
             )
             if isinstance(self._eb, Parameter)
-            # eb is converted to a finite floating bound below
-            else self._eb
+            else saturating_finite_float_cast(
+                self._eb, data_qoi.dtype, "stencil QoI error bound safeguard eb"
+            )
         )
         _check_error_bound(self._type, eb)
 
-        qoi_lower_upper: tuple[np.ndarray, np.ndarray] = _apply_finite_qoi_error_bound(
+        qoi_lower_upper: tuple[
+            np.ndarray[S, np.dtype[np.floating]], np.ndarray[S, np.dtype[np.floating]]
+        ] = _apply_finite_qoi_error_bound(
             self._type,
             eb,
             data_qoi,
@@ -1025,7 +1048,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 end = None if axis.after == 0 else -axis.after
                 s[axis.axis] = slice(start, end)
 
-        data_float: np.ndarray = to_float(data)
+        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
 
         # compute the error bound in data space
         with np.errstate(

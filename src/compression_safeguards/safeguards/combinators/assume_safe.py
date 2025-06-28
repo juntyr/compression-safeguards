@@ -4,9 +4,11 @@ Always safe (logical truth) combinator safeguard.
 
 __all__ = ["AssumeAlwaysSafeguard"]
 
+from collections.abc import Set
+
 import numpy as np
 
-from ...utils.bindings import Bindings
+from ...utils.bindings import Bindings, Parameter
 from ...utils.intervals import Interval, IntervalUnion
 from ...utils.typing import S, T
 from ..pointwise.abc import PointwiseSafeguard
@@ -30,6 +32,21 @@ class AssumeAlwaysSafeguard(PointwiseSafeguard):
     def __init__(self):
         pass
 
+    @property
+    def late_bound(self) -> Set[Parameter]:
+        """
+        The set of late-bound parameters that this safeguard has.
+
+        Late-bound parameters are only bound when checking and applying the
+        safeguard, in contrast to the normal early-bound parameters that are
+        configured during safeguard initialisation.
+
+        Late-bound parameters can be used for parameters that depend on the
+        specific data that is to be safeguarded.
+        """
+
+        return frozenset()
+
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -42,16 +59,16 @@ class AssumeAlwaysSafeguard(PointwiseSafeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data to be encoded.
-        decoded : np.ndarray
+        decoded : np.ndarray[S, np.dtype[T]]
             Decoded data.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
-        ok : np.ndarray
+        ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` for every element.
         """
 
@@ -69,7 +86,7 @@ class AssumeAlwaysSafeguard(PointwiseSafeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.

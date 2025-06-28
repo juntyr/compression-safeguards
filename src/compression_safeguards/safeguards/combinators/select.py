@@ -130,16 +130,16 @@ class SelectSafeguard(Safeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data to be encoded.
-        decoded : np.ndarray
+        decoded : np.ndarray[S, np.dtype[T]]
             Decoded data.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
-        ok : np.ndarray
+        ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
         """
 
@@ -156,7 +156,7 @@ class SelectSafeguard(Safeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.

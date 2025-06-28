@@ -11,6 +11,7 @@ import numpy as np
 from typing_extensions import Self  # MSPV 3.11
 
 from ..utils.bindings import Bindings, Parameter
+from ..utils.typing import S, T
 
 
 class Safeguard(ABC):
@@ -23,6 +24,7 @@ class Safeguard(ABC):
     """Safeguard kind."""
 
     @property
+    @abstractmethod
     def late_bound(self) -> Set[Parameter]:
         """
         The set of late-bound parameters that this safeguard has.
@@ -40,8 +42,8 @@ class Safeguard(ABC):
     @abstractmethod
     def check(
         self,
-        data: np.ndarray,
-        decoded: np.ndarray,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
     ) -> bool:
@@ -51,9 +53,9 @@ class Safeguard(ABC):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data to be encoded.
-        decoded : np.ndarray
+        decoded : np.ndarray[S, np.dtype[T]]
             Decoded data.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.

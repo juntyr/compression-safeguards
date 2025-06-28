@@ -344,10 +344,12 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         # the codec always compresses the complete data ... at least chunking
         #  is not our concern
-        correction: np.ndarray = self._safeguards.compute_correction(
-            data,
-            decoded,
-            late_bound=late_bound,
+        correction: np.ndarray[tuple[int, ...], np.dtype[np.unsignedinteger]] = (
+            self._safeguards.compute_correction(
+                data,
+                decoded,
+                late_bound=late_bound,
+            )
         )
 
         if np.all(correction == 0):

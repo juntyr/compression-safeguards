@@ -14,6 +14,7 @@ from ...utils.cast import (
     _isinf,
     _isnan,
     as_bits,
+    saturating_finite_float_cast,
     to_float,
 )
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
@@ -108,31 +109,32 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data to be encoded.
-        decoded : np.ndarray
+        decoded : np.ndarray[S, np.dtype[T]]
             Decoded data.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
-        ok : np.ndarray
+        ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        data_float: np.ndarray = to_float(data)
-        decoded_float: np.ndarray = to_float(decoded)
+        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
+        decoded_float: np.ndarray[S, np.dtype[np.floating]] = to_float(decoded)
 
-        eb = (
-            late_bound.resolve_ndarray_with_lossless_cast(
+        eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
+            late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                 self._eb,
                 data_float.shape,
                 data_float.dtype,
             )
             if isinstance(self._eb, Parameter)
-            # eb is converted to a finite floating bound below
-            else self._eb
+            else saturating_finite_float_cast(
+                self._eb, data_float.dtype, "error bound safeguard eb"
+            )
         )
         _check_error_bound(self._type, eb)
 
@@ -168,7 +170,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
@@ -187,17 +189,18 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             .preserve_signed_nan(dataf, equal_nan=self._equal_nan)
         )
 
-        data_float: np.ndarray = to_float(data)
+        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
 
-        eb = (
-            late_bound.resolve_ndarray_with_lossless_cast(
+        eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
+            late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                 self._eb,
                 data_float.shape,
                 data_float.dtype,
             )
             if isinstance(self._eb, Parameter)
-            # eb is converted to a finite floating bound below
-            else self._eb
+            else saturating_finite_float_cast(
+                self._eb, data_float.dtype, "error bound safeguard eb"
+            )
         )
         _check_error_bound(self._type, eb)
 

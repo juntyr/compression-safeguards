@@ -234,16 +234,16 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data to be encoded.
-        decoded : np.ndarray
+        decoded : np.ndarray[S, np.dtype[T]]
             Decoded data.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
-        ok : np.ndarray
+        ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
         """
 
@@ -330,7 +330,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
@@ -360,7 +360,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         (_lt, _gt, _eq, is_weak) = self._monotonicity.value[1]
         nudge = 0 if is_weak else 1
 
-        valid = Interval.full_like(data)
+        valid: Interval[T, int] = Interval.full_like(data)
 
         # track which elements have any monotonicity-based restrictions
         #  imposed upon them
@@ -609,16 +609,22 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         # for strict monotonicity, the lower bound is nudged up to ensure its
         #  midpoint rounds up while the limiting element's corresponding upper
         #  bound will round down
-        lt: np.ndarray = to_total_order(valid._lower)
-        ut: np.ndarray = to_total_order(valid._upper)
-        dt: np.ndarray = to_total_order(data.flatten())
+        lt: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = to_total_order(
+            valid._lower
+        )
+        ut: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = to_total_order(
+            valid._upper
+        )
+        dt: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = to_total_order(
+            data.flatten()
+        )
         if not is_weak:
-            lt = np.where((lt + 1) > 0, lt + 1, lt)
+            lt = np.where((lt + 1) > 0, lt + 1, lt)  # type: ignore
 
         # Hacker's Delight's algorithm to compute (a + b) / 2:
         #  ((a ^ b) >> 1) + (a & b)
-        valid._lower = from_total_order(((lt ^ dt) >> 1) + (lt & dt), data.dtype)
-        valid._upper = from_total_order(((ut ^ dt) >> 1) + (ut & dt), data.dtype)
+        valid._lower = from_total_order(((lt ^ dt) >> 1) + (lt & dt), data.dtype)  # type: ignore
+        valid._upper = from_total_order(((ut ^ dt) >> 1) + (ut & dt), data.dtype)  # type: ignore
 
         # ensure that non-NaN values remain non-NaN since they can otherwise
         #  invalidate the monotonicity of their window
@@ -671,10 +677,10 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
     def _monotonic_sign(
         self,
-        x: np.ndarray,
+        x: np.ndarray[S, np.dtype[T]],
         *,
         is_decoded: bool,
-    ) -> np.ndarray:
+    ) -> np.ndarray[tuple[int, ...], np.dtype[np.float64]]:
         (lt, gt, eq, _is_weak) = self._monotonicity.value[int(is_decoded)]
 
         # default to NaN
@@ -705,17 +711,19 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         return monotonic[..., np.newaxis]
 
     def _monotonic_sign_not_equal(
-        self, data_monotonic: np.ndarray, decoded_monotonic: np.ndarray
-    ) -> np.ndarray:
+        self,
+        data_monotonic: np.ndarray[S, np.dtype[T]],
+        decoded_monotonic: np.ndarray[S, np.dtype[T]],
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
         match self._monotonicity:
             case Monotonicity.strict | Monotonicity.strict_with_consts:
-                return np.where(
+                return np.where(  # type: ignore
                     _isnan(data_monotonic),
                     False,
                     decoded_monotonic != data_monotonic,
                 )
             case Monotonicity.strict_to_weak | Monotonicity.weak:
-                return np.where(
+                return np.where(  # type: ignore
                     _isnan(data_monotonic),
                     False,
                     # having the opposite sign or no sign are both not equal

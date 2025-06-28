@@ -97,16 +97,16 @@ class SignPreservingSafeguard(PointwiseSafeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data to be encoded.
-        decoded : np.ndarray
+        decoded : np.ndarray[S, np.dtype[T]]
             Decoded data.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
         Returns
         -------
-        ok : np.ndarray
+        ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
         """
 
@@ -148,7 +148,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
 
         Parameters
         ----------
-        data : np.ndarray
+        data : np.ndarray[S, np.dtype[T]]
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
@@ -169,7 +169,9 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             else lossless_cast(self._offset, data.dtype, "sign safeguard offset")
         )
         assert np.all(~np.isnan(offsetf)), "offset must not contain NaNs"
-        offsetf_total: np.ndarray = to_total_order(offsetf)
+        offsetf_total: np.ndarray[
+            tuple[()] | tuple[int], np.dtype[np.unsignedinteger]
+        ] = to_total_order(offsetf)
 
         with np.errstate(over="ignore", under="ignore"):
             if np.issubdtype(data.dtype, np.floating):

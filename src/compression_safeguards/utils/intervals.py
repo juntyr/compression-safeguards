@@ -527,14 +527,14 @@ class Lower:
 
     Parameters
     ----------
-    lower : np.ndarray
+    lower : np.ndarray[tuple[int, ...], np.dtype[np.number]]
         The lower bound array
     """
 
     __slots__ = ("_lower",)
-    _lower: np.ndarray
+    _lower: np.ndarray[tuple[int, ...], np.dtype[np.number]]
 
-    def __init__(self, lower: np.ndarray) -> None:
+    def __init__(self, lower: np.ndarray[tuple[int, ...], np.dtype[np.number]]) -> None:
         self._lower = lower
 
     def __le__(self, interval: IndexedInterval[T, N]) -> IndexedInterval[T, N]:
@@ -544,8 +544,8 @@ class Lower:
         if not isinstance(interval, IndexedInterval):
             return NotImplemented
 
-        # if self._lower.dtype != interval._lower.dtype:
-        #     return NotImplemented
+        if self._lower.dtype != interval._lower.dtype:
+            return NotImplemented
 
         if self._lower.shape == ():
             lower = self._lower
@@ -571,14 +571,14 @@ class Upper:
 
     Parameters
     ----------
-    upper : np.ndarray
+    upper : np.ndarray[tuple[int, ...], np.dtype[np.number]]
         The upper bound array
     """
 
     __slots__ = ("_upper",)
-    _upper: np.ndarray
+    _upper: np.ndarray[tuple[int, ...], np.dtype[np.number]]
 
-    def __init__(self, upper: np.ndarray) -> None:
+    def __init__(self, upper: np.ndarray[tuple[int, ...], np.dtype[np.number]]) -> None:
         self._upper = upper
 
     def __ge__(self, interval: IndexedInterval[T, N]) -> IndexedInterval[T, N]:
@@ -588,8 +588,8 @@ class Upper:
         if not isinstance(interval, IndexedInterval):
             return NotImplemented
 
-        # if self._upper.dtype != interval._upper.dtype:
-        #     return NotImplemented
+        if self._upper.dtype != interval._upper.dtype:
+            return NotImplemented
 
         if self._upper.shape == ():
             upper = self._upper
@@ -776,37 +776,53 @@ class IntervalUnion(Generic[T, N, U]):
         j_s = np.zeros(n, dtype=int)
 
         while (np.amin(i_s) < u) or (np.amin(j_s) < v):
-            lower_i: np.ndarray = to_total_order(
-                np.take_along_axis(
-                    self._lower, np.minimum(i_s, u - 1).reshape(1, -1), axis=0
-                ).flatten()
+            lower_i: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
+                to_total_order(
+                    np.take_along_axis(
+                        self._lower, np.minimum(i_s, u - 1).reshape(1, -1), axis=0
+                    ).flatten()
+                )
             )
-            upper_i: np.ndarray = to_total_order(
-                np.take_along_axis(
-                    self._upper, np.minimum(i_s, u - 1).reshape(1, -1), axis=0
-                ).flatten()
-            )
-
-            lower_j: np.ndarray = to_total_order(
-                np.take_along_axis(
-                    otheru._lower, np.minimum(j_s, v - 1).reshape(1, -1), axis=0
-                ).flatten()
-            )
-            upper_j: np.ndarray = to_total_order(
-                np.take_along_axis(
-                    otheru._upper, np.minimum(j_s, v - 1).reshape(1, -1), axis=0
-                ).flatten()
+            upper_i: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
+                to_total_order(
+                    np.take_along_axis(
+                        self._upper, np.minimum(i_s, u - 1).reshape(1, -1), axis=0
+                    ).flatten()
+                )
             )
 
-            lower_o: np.ndarray = to_total_order(
-                np.take_along_axis(
-                    out._lower, np.maximum(n_intervals - 1, 0).reshape(1, -1), axis=0
-                ).flatten()
+            lower_j: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
+                to_total_order(
+                    np.take_along_axis(
+                        otheru._lower, np.minimum(j_s, v - 1).reshape(1, -1), axis=0
+                    ).flatten()
+                )
             )
-            upper_o: np.ndarray = to_total_order(
-                np.take_along_axis(
-                    out._upper, np.maximum(n_intervals - 1, 0).reshape(1, -1), axis=0
-                ).flatten()
+            upper_j: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
+                to_total_order(
+                    np.take_along_axis(
+                        otheru._upper, np.minimum(j_s, v - 1).reshape(1, -1), axis=0
+                    ).flatten()
+                )
+            )
+
+            lower_o: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
+                to_total_order(
+                    np.take_along_axis(
+                        out._lower,
+                        np.maximum(n_intervals - 1, 0).reshape(1, -1),
+                        axis=0,
+                    ).flatten()
+                )
+            )
+            upper_o: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
+                to_total_order(
+                    np.take_along_axis(
+                        out._upper,
+                        np.maximum(n_intervals - 1, 0).reshape(1, -1),
+                        axis=0,
+                    ).flatten()
+                )
             )
 
             # only valid if in-bounds and non-empty
@@ -888,7 +904,9 @@ class IntervalUnion(Generic[T, N, U]):
             The pointwise result of the contains check
         """
 
-        other_flat: np.ndarray = to_total_order(other).flatten()
+        other_flat: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
+            to_total_order(other).flatten()
+        )
 
         (u, n) = self._lower.shape
         is_contained = np.zeros((n,), dtype=np.dtype(bool))
@@ -923,12 +941,18 @@ class IntervalUnion(Generic[T, N, U]):
         contains_prediction = self.contains(prediction).flatten()
 
         # 1. convert everything to bits in total order
-        prediction_bits: np.ndarray = to_total_order(prediction).reshape(1, -1)
+        prediction_bits: np.ndarray[
+            tuple[Literal[1], int], np.dtype[np.unsignedinteger]
+        ] = to_total_order(prediction).reshape(1, -1)  # type: ignore
         todtype = prediction_bits.dtype
         prediction_bits = as_bits(prediction_bits)
 
-        lower: np.ndarray = to_total_order(self._lower)
-        upper: np.ndarray = to_total_order(self._upper)
+        lower: np.ndarray[tuple[U, N], np.dtype[np.unsignedinteger]] = to_total_order(
+            self._lower
+        )
+        upper: np.ndarray[tuple[U, N], np.dtype[np.unsignedinteger]] = to_total_order(
+            self._upper
+        )
         interval_nonempty = lower <= upper
         lower, upper = as_bits(lower), as_bits(upper)
 
@@ -940,12 +964,12 @@ class IntervalUnion(Generic[T, N, U]):
 
         # 3. only work with "positive" unsigned values
         negative = as_bits(lower, kind="i") < 0
-        lower = np.where(negative, ~lower + 1, lower)
-        upper = np.where(negative, ~upper + 1, upper)
+        lower = np.where(negative, ~lower + 1, lower)  # type: ignore
+        upper = np.where(negative, ~upper + 1, upper)  # type: ignore
 
         # 4. ensure that lower <= upper also in binary
         flip = (lower > upper) & interval_nonempty
-        lower, upper = np.where(flip, upper, lower), np.where(flip, lower, upper)
+        lower, upper = np.where(flip, upper, lower), np.where(flip, lower, upper)  # type: ignore
 
         # 5. 0b1111...1111
         allbits = np.array(-1, dtype=upper.dtype.str.replace("u", "i")).view(
@@ -978,7 +1002,7 @@ class IntervalUnion(Generic[T, N, U]):
             upper_lz < lower_lz,
             (allbits >> np.minimum(upper_lz + 2, lower_lz)) + 1,
             upper,
-        )
+        )  # type: ignore
 
         # 9. count the number of leading zero bits in (lower ^ upper) to find
         #    the most significant bit where lower and upper differ.
@@ -1034,7 +1058,9 @@ class IntervalUnion(Generic[T, N, U]):
         return f"IntervalUnion(lower={self._lower!r}, upper={self._upper!r})"
 
 
-def _count_leading_zeros(x: np.ndarray) -> np.ndarray:
+def _count_leading_zeros(
+    x: np.ndarray[S, np.dtype[np.unsignedinteger]],
+) -> np.ndarray[S, np.dtype[np.uint8]]:
     """
     https://stackoverflow.com/a/79189999
     """
@@ -1047,14 +1073,14 @@ def _count_leading_zeros(x: np.ndarray) -> np.ndarray:
     if nbits <= 16:
         # safe cast from integer type to a larger integer type,
         # then lossless truncation of the number of leading zeros
-        return (nbits - np.frexp(x_bits.astype(np.uint32, casting="safe"))[1]).astype(
+        return (nbits - np.frexp(x_bits.astype(np.uint32, casting="safe"))[1]).astype(  # type: ignore
             np.uint8, casting="unsafe"
         )
 
     if nbits <= 32:
         # safe cast from integer type to a larger integer type,
         # then lossless truncation of the number of leading zeros
-        return (nbits - np.frexp(x_bits.astype(np.uint64, casting="safe"))[1]).astype(
+        return (nbits - np.frexp(x_bits.astype(np.uint64, casting="safe"))[1]).astype(  # type: ignore
             np.uint8, casting="unsafe"
         )
 
@@ -1063,6 +1089,6 @@ def _count_leading_zeros(x: np.ndarray) -> np.ndarray:
     _, high_exp = np.frexp(x_bits.astype(np.uint64, casting="safe") >> 32)
     _, low_exp = np.frexp(x_bits.astype(np.uint64, casting="safe") & 0xFFFFFFFF)
     # then lossless truncation of the number of leading zeros
-    return (nbits - np.where(high_exp, high_exp + 32, low_exp)).astype(
+    return (nbits - np.where(high_exp, high_exp + 32, low_exp)).astype(  # type: ignore
         np.uint8, casting="unsafe"
     )

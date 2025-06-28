@@ -4,12 +4,12 @@ Utility functions to cast arrays to floating point, binary, and total-order repr
 
 __all__ = [
     "to_float",
-    "to_finite_float",
     "from_float",
     "as_bits",
     "to_total_order",
     "from_total_order",
     "lossless_cast",
+    "saturating_finite_float_cast",
 ]
 
 from typing import Any, Callable
@@ -54,55 +54,6 @@ def to_float(x: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[F]]:
     # lossless cast from integer to floating point with a sufficiently large
     #  mantissa
     return x.astype(ftype, casting="safe")  # type: ignore
-
-
-def to_finite_float(
-    x: int | float | np.ndarray[S, np.dtype[T]],
-    dtype: np.dtype[F],
-    *,
-    map: None
-    | Callable[[np.ndarray[S, np.dtype[F]]], np.ndarray[S, np.dtype[F]]] = None,
-) -> np.ndarray[S, np.dtype[F]]:
-    """
-    Convert `x` to the floating-point data type `F` and apply an optional `map`ping function.
-
-    The result is clamped between the minimum and maximum floating point values
-    to guarantee that it is finite.
-
-    The floating-point `dtype` should come from a prior use of the
-    [`to_float`][compression_safeguards.utils.cast.to_float] helper function.
-
-    Parameters
-    ----------
-    x : int | float | np.ndarray
-        The value or array to convert.
-    dtype : np.dtype
-        The floating-point dtype to convert `x` to.
-    map : None | Callable
-        The mapping function to apply to `x`.
-
-    Returns
-    -------
-    converted : np.ndarray[tuple[int, ...], np.dtype[F]]
-        The converted value or array with `dtype`.
-    """
-
-    # to_finite_float is meant to evaluate and cast to a given floating dtype,
-    #  even if the cast is lossy
-    xf: np.ndarray[S, np.dtype[F]] = np.array(x).astype(dtype, casting="unsafe")
-
-    if map is not None:
-        # to_finite_float is meant to evaluate and cast to a given floating
-        #  dtype, even if the cast is lossy
-        xf = np.array(map(xf)).astype(dtype, casting="unsafe")
-
-    if np.dtype(dtype) == _float128_dtype:
-        minv, maxv = _float128_min, _float128_max
-    else:
-        minv, maxv = np.finfo(dtype).min, np.finfo(dtype).max
-
-    # explicitly handle NaNs here for numpy_quaddtype
-    return np.where(_isnan(xf), xf, np.maximum(minv, np.minimum(xf, maxv)))  # type: ignore
 
 
 def from_float(
@@ -298,6 +249,11 @@ def lossless_cast(
     Raises
     ------
     TypeError
+        If floating point values are converted to integer values.
+
+    Raises
+    ------
+    ValueError
         If not all values could be losslessly converted.
     """
 
@@ -317,11 +273,58 @@ def lossless_cast(
     lossless_same = np.where(_isnan(xa), _isnan(xa_back), xa == xa_back)
 
     if not np.all(lossless_same):
-        raise TypeError(
+        raise ValueError(
             f"cannot losslessly cast (some) {context} values from {dtype_from} to {dtype}"
         )
 
     return xa_to
+
+
+def saturating_finite_float_cast(
+    x: int | float | np.ndarray[S, np.dtype[np.number]],
+    dtype: np.dtype[F],
+    context: str,
+) -> np.ndarray[tuple[()] | S, np.dtype[F]]:
+    """
+    Try to convert the finite `x` to the provided floating-point `dtype`.
+    Under- and overflows are clamped to finite values.
+
+    Parameters
+    ----------
+    x : int | float | np.ndarray[S, np.dtype[np.number]]
+        The value or array to convert.
+    dtype : np.dtype[F]
+        The floating-point dtype to which the value or array should be
+        converted.
+
+    Returns
+    -------
+    converted : np.narray[tuple[()] | S, np.dtype[F]]
+        The losslessly converted value or array with the given `dtype`.
+
+    Raises
+    ------
+    ValueError
+        If some values are non-finite, i.e. infinite or NaN.
+    """
+
+    assert np.issubdtype(dtype, np.floating) or (dtype == _float128_dtype)
+
+    xa = np.array(x)
+
+    if not isinstance(x, int) and not np.all(_isfinite(xa)):
+        raise ValueError(
+            f"cannot cast non-finite {context} values from {xa.dtype} to saturating finite {dtype}"
+        )
+
+    # we use unsafe casts here since but are safe since
+    # - we know that inputs are all finite
+    # - we cast to float, where under- and overflows saturate to np.inf
+    # - we later clamp the values to finite
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        xa_to = np.array(xa).astype(dtype, casting="unsafe")
+
+    return _nan_to_zero_inf_to_finite(xa_to)
 
 
 # wrapper around np.isnan that also works for numpy_quaddtype
@@ -360,6 +363,20 @@ def _nan_to_zero(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
     if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
         return np.nan_to_num(a, nan=0, posinf=np.inf, neginf=-np.inf)  # type: ignore
     return np.where(_isnan(a), _float128(0), a)  # type: ignore
+
+
+# wrapper around np.nan_to_num that also works for numpy_quaddtype
+@np.errstate(invalid="ignore")
+def _nan_to_zero_inf_to_finite(
+    a: np.ndarray[S, np.dtype[T]],
+) -> np.ndarray[S, np.dtype[T]]:
+    if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
+        return np.nan_to_num(a, nan=0, posinf=None, neginf=None)  # type: ignore
+    return np.where(
+        _isnan(a),
+        _float128(0),
+        np.where(a == -np.inf, _float128_min, np.where(a == np.inf, _float128_max, a)),
+    )  # type: ignore
 
 
 # wrapper around np.sign that also works for numpy_quaddtype

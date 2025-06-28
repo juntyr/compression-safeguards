@@ -1077,3 +1077,45 @@ def test_late_bound_constant():
 def test_pointwise_normalised_absolute_error(check):
     # pointwise normalised / range-relative absolute error bound
     check('(x - c["$x_min"]) / (c["$x_max"] - c["$x_min"])')
+
+
+def test_late_bound_constant_boundary():
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi="X[0,0] - X[2,0]",
+        neighbourhood=[
+            dict(
+                axis=0,
+                before=1,
+                after=1,
+                boundary="constant",
+                constant_boundary="const",
+            ),
+            dict(
+                axis=1,
+                before=0,
+                after=0,
+                boundary="constant",
+                constant_boundary="const2",
+            ),
+        ],
+        type="abs",
+        eb=1,
+    )
+    assert safeguard.late_bound == {"const", "const2"}
+
+    data = np.arange(6, dtype="uint8").reshape(2, 3)
+
+    with pytest.raises(
+        ValueError, match="cannot broadcast a non-scalar to a scalar array"
+    ):
+        safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(const=data, const2=4)
+        )
+
+    with pytest.raises(
+        ValueError,
+        match=r"cannot losslessly cast \(some\) late-bound parameter const2 values from int64 to uint8",
+    ):
+        safeguard.compute_safe_intervals(data, late_bound=Bindings(const=1, const2=256))
+
+    safeguard.compute_safe_intervals(data, late_bound=Bindings(const=1, const2=255))

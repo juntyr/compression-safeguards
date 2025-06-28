@@ -11,8 +11,8 @@ from typing import Any
 import numpy as np
 from typing_extensions import Self
 
-from .cast import lossless_cast
-from .typing import Si, T
+from .cast import lossless_cast, saturating_finite_float_cast
+from .typing import F, Si, T
 
 
 class Parameter(str):
@@ -161,6 +161,48 @@ class Bindings:
         #  to arrays of any shape
         view = np.broadcast_to(
             lossless_cast(
+                self._bindings[param], dtype, f"late-bound parameter {param}"
+            ),
+            shape,
+        ).view()
+        view.flags.writeable = False
+
+        return view  # type: ignore
+
+    def resolve_ndarray_with_saturating_finite_float_cast(
+        self, param: Parameter, shape: Si, dtype: np.dtype[F]
+    ) -> np.ndarray[Si, np.dtype[T]]:
+        """
+        Resolve the `param`eter to a numpy array with the given `shape` and
+        floating-point `dtype`.
+
+        The `param`eter must be contained in the bindings and refer to a finite
+        value that can be broadcast to the `shape`. It will be converted to the
+        floating-point `dtype`, with under- and overflows being clamped to
+        finite values.
+
+        Parameters
+        ----------
+        param : Parameter
+            The parameter that will be resolved.
+        shape : Si
+            The shape of the array to resolve to.
+        dtype : np.dtype[F]
+            The floating-point dtype of the array to resolve to.
+
+        Returns
+        -------
+        array : np.ndarray[Si, np.dtype[F]]
+            A read-only view to the resolved array of the given `shape` and
+            `dtype`.
+        """
+
+        assert param in self._bindings, f"LateBound is missing binding for {param}"
+
+        # cast first then broadcast to allow zero-copy broadcasts of scalars
+        #  to arrays of any shape
+        view = np.broadcast_to(
+            saturating_finite_float_cast(
                 self._bindings[param], dtype, f"late-bound parameter {param}"
             ),
             shape,
