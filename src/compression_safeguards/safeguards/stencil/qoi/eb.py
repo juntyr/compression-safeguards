@@ -89,8 +89,14 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     `x` using the index array `I`.
 
     The stencil QoI safeguard can also be used to bound the pointwise error of
-    the finite-difference-approximated derivative over the data by using the
+    the finite-difference-approximated derivative[^1] over the data by using the
     `finite_difference` function in the `qoi` expression.
+
+    [^1]: The finite difference coefficients for arbitrary orders, accuracies,
+    and grid spacings are derived using the algorithm from: Fornberg, B. (1988).
+    Generation of finite difference formulas on arbitrarily spaced grids.
+    *Mathematics of Computation*, 51(184), 699-706. Available from:
+    <https://doi.org/10.1090/s0025-5718-1988-0935077-0>.
 
     The shape of the data neighbourhood is specified as an ordered list of
     unique data axes and boundary conditions that are applied to these axes.
@@ -123,10 +129,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     type (keeps the same dtype for floating point data, chooses a dtype with a
     mantissa that has at least as many bits as / for the integer dtype).
 
-    The QoI expression is written using the following EBNF grammar[^1] for
+    The QoI expression is written using the following EBNF grammar[^2] for
     `expr`:
 
-    [^1]: You can visualise the EBNF grammar at <https://matthijsgroen.github.io/ebnf2railroad/try-yourself.html>.
+    [^2]: You can visualise the EBNF grammar at <https://matthijsgroen.github.io/ebnf2railroad/try-yourself.html>.
 
     ```ebnf
     expr    =

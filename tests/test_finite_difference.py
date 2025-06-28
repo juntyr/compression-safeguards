@@ -499,3 +499,134 @@ def test_backward_fourth_order():
         F(82, 3),
         F(-7, 2),
     )
+
+
+def test_central_half_way_zeroth_order():
+    assert _finite_difference_coefficients(0, F(0), (F(1, 2), F(-1, 2))) == (
+        F(1, 2),
+        F(1, 2),
+    )
+
+    assert _finite_difference_coefficients(
+        0, F(0), (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2))
+    ) == (F(9, 16), F(9, 16), F(-1, 16), F(-1, 16))
+
+    assert _finite_difference_coefficients(
+        0, F(0), (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2), F(5, 2), F(-5, 2))
+    ) == (F(75, 128), F(75, 128), F(-25, 256), F(-25, 256), F(3, 256), F(3, 256))
+
+    assert _finite_difference_coefficients(
+        0,
+        F(0),
+        (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2), F(5, 2), F(-5, 2), F(7, 2), F(-7, 2)),
+    ) == (
+        F(1225, 2048),
+        F(1225, 2048),
+        F(-245, 2048),
+        F(-245, 2048),
+        F(49, 2048),
+        F(49, 2048),
+        F(-5, 2048),
+        F(-5, 2048),
+    )
+
+
+def test_central_half_way_first_order():
+    assert _finite_difference_coefficients(1, F(0), (F(1, 2), F(-1, 2))) == (
+        1,
+        -1,
+    )
+
+    assert _finite_difference_coefficients(
+        1, F(0), (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2))
+    ) == (F(9, 8), F(-9, 8), F(-1, 24), F(1, 24))
+
+    assert _finite_difference_coefficients(
+        1, F(0), (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2), F(5, 2), F(-5, 2))
+    ) == (F(75, 64), F(-75, 64), F(-25, 384), F(25, 384), F(3, 640), F(-3, 640))
+
+    assert _finite_difference_coefficients(
+        1,
+        F(0),
+        (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2), F(5, 2), F(-5, 2), F(7, 2), F(-7, 2)),
+    ) == (
+        F(1225, 1024),
+        F(-1225, 1024),
+        F(-245, 3072),
+        F(245, 3072),
+        F(49, 5120),
+        F(-49, 5120),
+        F(-5, 7168),
+        F(5, 7168),
+    )
+
+
+def test_central_half_way_second_order():
+    assert _finite_difference_coefficients(
+        2, F(0), (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2))
+    ) == (F(-1, 2), F(-1, 2), F(1, 2), F(1, 2))
+
+    assert _finite_difference_coefficients(
+        2, F(0), (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2), F(5, 2), F(-5, 2))
+    ) == (F(-17, 24), F(-17, 24), F(13, 16), F(13, 16), F(-5, 48), F(-5, 48))
+
+    assert _finite_difference_coefficients(
+        2,
+        F(0),
+        (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2), F(5, 2), F(-5, 2), F(7, 2), F(-7, 2)),
+    ) == (
+        F(-1891, 2304),
+        F(-1891, 2304),
+        F(1299, 1280),
+        F(1299, 1280),
+        F(-499, 2304),
+        F(-499, 2304),
+        F(259, 11520),
+        F(259, 11520),
+    )
+
+
+def test_central_half_way_third_order():
+    assert _finite_difference_coefficients(
+        3, F(0), (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2))
+    ) == (-3, 3, 1, -1)
+
+    assert _finite_difference_coefficients(
+        3, F(0), (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2), F(5, 2), F(-5, 2))
+    ) == (F(-17, 4), F(17, 4), F(13, 8), F(-13, 8), F(-1, 8), F(1, 8))
+
+    assert _finite_difference_coefficients(
+        3,
+        F(0),
+        (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2), F(5, 2), F(-5, 2), F(7, 2), F(-7, 2)),
+    ) == (
+        F(-1891, 384),
+        F(1891, 384),
+        F(1299, 640),
+        F(-1299, 640),
+        F(-499, 1920),
+        F(499, 1920),
+        F(37, 1920),
+        F(-37, 1920),
+    )
+
+
+def test_central_half_way_fourth_order():
+    assert _finite_difference_coefficients(
+        4, F(0), (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2), F(5, 2), F(-5, 2))
+    ) == (1, 1, F(-3, 2), F(-3, 2), F(1, 2), F(1, 2))
+
+    assert _finite_difference_coefficients(
+        4,
+        F(0),
+        (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2), F(5, 2), F(-5, 2), F(7, 2), F(-7, 2)),
+    ) == (
+        F(83, 48),
+        F(83, 48),
+        F(-45, 16),
+        F(-45, 16),
+        F(59, 48),
+        F(59, 48),
+        F(-7, 48),
+        F(-7, 48),
+    )
