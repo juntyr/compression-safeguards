@@ -193,7 +193,10 @@ def _compute_finite_absolute_error_bound(
         case ErrorBound.abs:
             return eb
         case ErrorBound.rel:
-            eb_rel_as_abs = _nan_to_zero_inf_to_finite(np.abs(data_float) * eb)
+            with np.errstate(
+                divide="ignore", over="ignore", under="ignore", invalid="ignore"
+            ):
+                eb_rel_as_abs = _nan_to_zero_inf_to_finite(np.abs(data_float) * eb)
             assert np.all((eb_rel_as_abs >= 0) & _isfinite(eb_rel_as_abs))
             return eb_rel_as_abs
         case ErrorBound.ratio:
