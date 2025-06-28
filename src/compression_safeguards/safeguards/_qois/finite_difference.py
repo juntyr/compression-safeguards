@@ -66,7 +66,9 @@ def create_finite_difference_for_neighbourhood(
         )
 
         offsets = _finite_difference_offsets(type, order, accuracy)
-        coefficients = _finite_difference_coefficients(order, offsets)
+        coefficients = _finite_difference_coefficients(
+            order, sp.Integer(0), tuple(sp.Rational(o) for o in offsets)
+        )
 
         def apply_finite_difference(expr: sp.Basic, axis: int, offset: int):
             if expr.is_Number:
@@ -148,7 +150,8 @@ def _finite_difference_offsets(
 
 def _finite_difference_coefficients(
     order: int,
-    offsets: tuple[int, ...],
+    centre: sp.Rational,
+    offsets: tuple[sp.Rational, ...],
 ) -> tuple[sp.Rational, ...]:
     """
     Finite difference coefficient algorithm from:
@@ -158,9 +161,9 @@ def _finite_difference_coefficients(
     https://doi.org/10.1090/s0025-5718-1988-0935077-0.
     """
 
-    # x0 = 0
+    x0 = centre
     M = order
-    a = [sp.Integer(o) for o in offsets]
+    a = offsets
     N = len(a) - 1
 
     coeffs = {
@@ -179,18 +182,21 @@ def _finite_difference_coefficients(
             for m in range(0, min(n, M) + 1):
                 if m > 0:
                     coeffs[(m, n, v)] = (
-                        (a[n] * coeffs[(m, n - 1, v)]) - (m * coeffs[(m - 1, n - 1, v)])
+                        ((a[n] - x0) * coeffs[(m, n - 1, v)])
+                        - (m * coeffs[(m - 1, n - 1, v)])
                     ) / c3
                 else:
-                    coeffs[(m, n, v)] = (a[n] * coeffs[(m, n - 1, v)]) / c3
+                    coeffs[(m, n, v)] = ((a[n] - x0) * coeffs[(m, n - 1, v)]) / c3
         for m in range(0, min(n, M) + 1):
             if m > 0:
                 coeffs[(m, n, n)] = (c1 / c2) * (
                     (m * coeffs[(m - 1, n - 1, n - 1)])
-                    - (a[n - 1] * coeffs[(m, n - 1, n - 1)])
+                    - ((a[n - 1] - x0) * coeffs[(m, n - 1, n - 1)])
                 )
             else:
-                coeffs[(m, n, n)] = -(c1 / c2) * (a[n - 1] * coeffs[(m, n - 1, n - 1)])
+                coeffs[(m, n, n)] = -(c1 / c2) * (
+                    (a[n - 1] - x0) * coeffs[(m, n - 1, n - 1)]
+                )
         c1 = c2
 
     return tuple(coeffs[M, N, v] for v in range(0, N + 1))
