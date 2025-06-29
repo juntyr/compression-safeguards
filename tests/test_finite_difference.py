@@ -1070,3 +1070,97 @@ def test_forward_half_way_fourth_order():
         F(-1903, 120),
         F(1127, 640),
     )
+
+
+def test_central_second_order_with_offset():
+    # +3/4
+    assert _finite_difference_coefficients(
+        2, F(3, 4), (F(3, 4), F(7, 4), F(-1, 4))
+    ) == (-2, 1, 1)
+
+    # +1/27
+    assert _finite_difference_coefficients(
+        2, F(1, 27), (F(1, 27), F(28, 27), F(-26, 27), F(55, 27), F(-53, 27))
+    ) == (
+        F(-5, 2),
+        F(4, 3),
+        F(4, 3),
+        F(-1, 12),
+        F(-1, 12),
+    )
+
+    # -1
+    assert _finite_difference_coefficients(
+        2, F(-1), (F(-1), F(0), F(-2), F(1), F(-3), F(2), F(-4))
+    ) == (
+        F(-49, 18),
+        F(3, 2),
+        F(3, 2),
+        F(-3, 20),
+        F(-3, 20),
+        F(1, 90),
+        F(1, 90),
+    )
+
+    # +42
+    assert _finite_difference_coefficients(
+        2, F(42), (F(42), F(43), F(41), F(44), F(40), F(45), F(39), F(46), F(38))
+    ) == (
+        F(-205, 72),
+        F(8, 5),
+        F(8, 5),
+        F(-1, 5),
+        F(-1, 5),
+        F(8, 315),
+        F(8, 315),
+        F(-1, 560),
+        F(-1, 560),
+    )
+
+
+def test_central_second_order_with_spacing():
+    # /4
+    assert _finite_difference_coefficients(2, F(0), (F(0), F(1, 4), F(-1, 4))) == (
+        -32,
+        16,
+        16,
+    )
+
+    # *4
+    assert _finite_difference_coefficients(
+        2, F(0), (F(0), F(4), F(-4), F(8), F(-8))
+    ) == (
+        F(-5, 32),
+        F(4, 48),
+        F(4, 48),
+        F(-1, 192),
+        F(-1, 192),
+    )
+
+    # *-2
+    assert _finite_difference_coefficients(
+        2, F(0), (F(0), F(-2), F(2), F(-4), F(4), F(-6), F(6))
+    ) == (
+        F(-49, 72),
+        F(3, 8),
+        F(3, 8),
+        F(-3, 80),
+        F(-3, 80),
+        F(1, 360),
+        F(1, 360),
+    )
+
+    # +1, /2
+    assert _finite_difference_coefficients(
+        2, F(1), (F(1), F(3, 2), F(1, 2), F(2), F(0), F(5, 2), F(-1, 2), F(3), F(-1))
+    ) == (
+        F(-205, 18),
+        F(32, 5),
+        F(32, 5),
+        F(-4, 5),
+        F(-4, 5),
+        F(32, 315),
+        F(32, 315),
+        F(-4, 560),
+        F(-4, 560),
+    )
