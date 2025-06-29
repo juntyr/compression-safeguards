@@ -494,6 +494,64 @@ def test_finite_difference_constant_grid_spacing():
     )
 
 
+def test_finite_difference_arbitrary_grid():
+    data = np.arange(5, dtype=float)
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_centre=c["i"])',
+        neighbourhood=[
+            dict(
+                axis=0,
+                before=1,
+                after=1,
+                boundary="valid",
+            )
+        ],
+        type="abs",
+        eb=0.1,
+    )
+
+    safeguard.compute_safe_intervals(
+        data, late_bound=Bindings(i=np.array([0.1, 0.2, 0.4, 0.5, 0.8]))
+    )
+
+    with pytest.raises(
+        AssertionError,
+        match="grid_centre must be a constant scalar array element expression",
+    ):
+        safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+            qoi='finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_centre=C["i"])',
+            neighbourhood=[
+                dict(
+                    axis=0,
+                    before=1,
+                    after=1,
+                    boundary="valid",
+                )
+            ],
+            type="abs",
+            eb=0.1,
+        )
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_centre=sin(c["i"])**2)',
+        neighbourhood=[
+            dict(
+                axis=0,
+                before=1,
+                after=1,
+                boundary="valid",
+            )
+        ],
+        type="abs",
+        eb=0.1,
+    )
+
+    safeguard.compute_safe_intervals(
+        data, late_bound=Bindings(i=np.array([0.1, 0.2, 0.4, 0.5, 0.8]))
+    )
+
+
 def test_matmul():
     data = np.arange(16, dtype=float).reshape(4, 4)
     valid_3x3_neighbourhood = [

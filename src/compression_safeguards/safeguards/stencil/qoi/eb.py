@@ -291,7 +291,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 "-1" | "0" | "1"             (* backwards | central | forward difference *)
             ), ","
           , "axis", "=", int, ","            (* axis, relative to the neighbourhood *)
-          , "grid_spacing", "=", expr        (* scalar uniform grid spacing *)
+          , (
+                "grid_spacing", "=", expr    (* scalar uniform grid spacing *)
+              | "grid_centre", "=", expr     (* centre of an arbitrary grid *)
+          )
       , ")"
     ;
     ```
@@ -1297,7 +1300,15 @@ _QOI_KWARG_PATTERN = (
     r"(?:"
     + r"|".join(
         rf"(?:{k}[ ]?=[ ]?)"
-        for k in ("base", "order", "accuracy", "type", "dx", "axis")
+        for k in (
+            "base",
+            "order",
+            "accuracy",
+            "type",
+            "axis",
+            "grid_spacing",
+            "grid_centre",
+        )
     )
     + r")"
 )
