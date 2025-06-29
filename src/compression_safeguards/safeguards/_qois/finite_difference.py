@@ -45,7 +45,7 @@ def create_finite_difference_for_neighbourhood(
 
         if type == _FiniteDifference.central:
             assert accuracy % 2 == 0, (
-                "accuracy must be even for a central finite difference"
+                "finite_difference accuracy must be even for a central finite difference"
             )
 
         assert isinstance(dx, sp.Number) or (
@@ -54,7 +54,7 @@ def create_finite_difference_for_neighbourhood(
             and all(isinstance(s, LateBoundConstant) for s in dx.free_symbols)
         ), "finite_difference dx must be a number or a constant scalar expression"
         if isinstance(dx, sp.Number):
-            assert dx > 0, "dx must be positive"
+            assert dx != 0, "finite_difference dx must not be zero"
             assert isinstance(dx, (sp.Integer, sp.Rational)) or _isfinite(float(dx)), (
                 "finite_difference dx must be finite"
             )
@@ -67,7 +67,7 @@ def create_finite_difference_for_neighbourhood(
 
         offsets = _finite_difference_offsets(type, order, accuracy)
         coefficients = _finite_difference_coefficients(
-            order, sp.Integer(0), tuple(sp.Rational(o) for o in offsets)
+            order, sp.Integer(0), tuple(sp.Integer(o) * dx for o in offsets)
         )
 
         def apply_finite_difference(expr: sp.Basic, axis: int, offset: int):
@@ -103,7 +103,7 @@ def create_finite_difference_for_neighbourhood(
                 apply_finite_difference(expr, axis, o) * c
                 for o, c in zip(offsets, coefficients)
             ]
-        ) / (dx**order)
+        )
 
     return finite_difference
 
@@ -150,9 +150,9 @@ def _finite_difference_offsets(
 
 def _finite_difference_coefficients(
     order: int,
-    centre: sp.Rational,
-    offsets: tuple[sp.Rational, ...],
-) -> tuple[sp.Rational, ...]:
+    centre: sp.Number,
+    offsets: tuple[sp.Number, ...],
+) -> tuple[sp.Number, ...]:
     """
     Finite difference coefficient algorithm from:
 
