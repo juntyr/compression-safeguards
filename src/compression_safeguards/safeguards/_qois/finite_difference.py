@@ -14,7 +14,7 @@ def create_finite_difference_for_neighbourhood(
     shape: tuple[int, ...],
     I: tuple[int, ...],  # noqa: E741
 ):
-    def finite_difference(expr, /, *, order, accuracy, type, dx, axis):
+    def finite_difference(expr, /, *, order, accuracy, type, axis, grid_spacing):
         assert isinstance(expr, sp.Basic), (
             "finite_difference expr must be an expression"
         )
@@ -48,26 +48,28 @@ def create_finite_difference_for_neighbourhood(
                 "finite_difference accuracy must be even for a central finite difference"
             )
 
-        assert isinstance(dx, sp.Number) or (
-            isinstance(dx, sp.Basic)
-            and (not dx.has(NumPyLikeArray))
-            and all(isinstance(s, LateBoundConstant) for s in dx.free_symbols)
-        ), "finite_difference dx must be a number or a constant scalar expression"
-        if isinstance(dx, sp.Number):
-            assert dx != 0, "finite_difference dx must not be zero"
-            assert isinstance(dx, (sp.Integer, sp.Rational)) or _isfinite(float(dx)), (
-                "finite_difference dx must be finite"
-            )
-
         assert isinstance(axis, sp.Integer), "finite_difference axis must be an integer"
         axis = int(axis)
         assert axis >= -len(shape) and axis < len(shape), (
             "finite_difference axis must be in range of the dimension of the neighbourhood"
         )
 
+        assert isinstance(grid_spacing, sp.Number) or (
+            isinstance(grid_spacing, sp.Basic)
+            and (not grid_spacing.has(NumPyLikeArray))
+            and all(isinstance(s, LateBoundConstant) for s in grid_spacing.free_symbols)
+        ), (
+            "finite_difference grid_spacing must be a number or a constant scalar expression"
+        )
+        if isinstance(grid_spacing, sp.Number):
+            assert grid_spacing != 0, "finite_difference grid_spacing must not be zero"
+            assert isinstance(grid_spacing, (sp.Integer, sp.Rational)) or _isfinite(
+                float(grid_spacing)
+            ), "finite_difference grid_spacing must be finite"
+
         offsets = _finite_difference_offsets(type, order, accuracy)
         coefficients = _finite_difference_coefficients(
-            order, sp.Integer(0), tuple(sp.Integer(o) * dx for o in offsets)
+            order, sp.Integer(0), tuple(sp.Integer(o) * grid_spacing for o in offsets)
         )
 
         def apply_finite_difference(expr: sp.Basic, axis: int, offset: int):

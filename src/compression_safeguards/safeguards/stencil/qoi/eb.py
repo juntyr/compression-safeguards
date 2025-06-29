@@ -290,8 +290,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
           , "type", "=", (
                 "-1" | "0" | "1"             (* backwards | central | forward difference *)
             ), ","
-          , "dx", "=", expr, ","             (* scalar uniform grid spacing *)
-          , "axis", "=", int                 (* axis, relative to the neighbourhood *)
+          , "axis", "=", int, ","            (* axis, relative to the neighbourhood *)
+          , "grid_spacing", "=", expr        (* scalar uniform grid spacing *)
       , ")"
     ;
     ```

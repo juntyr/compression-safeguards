@@ -170,7 +170,7 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
                 )
             elif op == "finite_difference":
                 atoms.append(
-                    f"finite_difference({atom1}, order={data.ConsumeIntInRange(0, 3)}, accuracy={data.ConsumeIntInRange(1, 4)}, type={data.ConsumeIntInRange(-1, 1)}, dx={data.ConsumeRegularFloat()}, axis={data.ConsumeIntInRange(0, 1)})"
+                    f"finite_difference({atom1}, order={data.ConsumeIntInRange(0, 3)}, accuracy={data.ConsumeIntInRange(1, 4)}, type={data.ConsumeIntInRange(-1, 1)}, axis={data.ConsumeIntInRange(0, 1)}, grid_spacing={data.ConsumeRegularFloat()})"
                 )
             else:
                 atoms.append(f"({atom1}{op}{atom2})")
