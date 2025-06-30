@@ -17,7 +17,7 @@ def create_finite_difference_for_neighbourhood(
     def finite_difference(
         expr, /, *, order, accuracy, type, axis, grid_spacing=None, grid_centre=None
     ):
-        assert isinstance(expr, sp.Expr), (
+        assert isinstance(expr, sp.Basic), (
             "finite_difference expr must be a scalar array element expression"
         )
         assert expr.has(sp.tensor.array.expressions.ArrayElement) and (
