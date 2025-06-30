@@ -152,10 +152,12 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         The provided values must be of the correct shape and dtype for any
         data that will be encoded with this codec, otherwise
-        [`encode`](numcodecs_safeguards.SafeguardsCodec.encode) will fail.
+        [`encode`][numcodecs_safeguards.SafeguardsCodec.encode] will fail.
 
-        You can use the [`update_fixed_constants`] method inside a `with`
-        statement to temporarily update the late-bound parameters.
+        You can use the
+        [`update_fixed_constants`][numcodecs_safeguards.SafeguardsCodec.update_fixed_constants]
+        method inside a `with` statement to temporarily update the late-bound
+        parameters.
     lossless : None | dict | Lossless, optional
         The lossless encoding that is applied after the codec and the
         safeguards:
@@ -261,7 +263,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         The late-bound parameters must be provided as fixed constants. They
         must be of the correct shape and dtype for any data that will be
         encoded with this codec, otherwise
-        [`encode`](numcodecs_safeguards.SafeguardsCodec.encode) will fail.
+        [`encode`][numcodecs_safeguards.SafeguardsCodec.encode] will fail.
         """
 
         return self._safeguards.late_bound
@@ -288,7 +290,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         The provided values must be of the correct shape and dtype for any
         data that will be encoded with this codec, otherwise
-        [`encode`](numcodecs_safeguards.SafeguardsCodec.encode) will fail.
+        [`encode`][numcodecs_safeguards.SafeguardsCodec.encode] will fail.
 
         Parameters
         ----------
