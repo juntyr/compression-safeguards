@@ -132,6 +132,23 @@ class Safeguards:
 
         return _SUPPORTED_DTYPES
 
+    def correction_dtype_for_data(self, dtype: np.dtype[T]) -> np.dtype[C]:
+        """
+        Compute the dtype of the correction for data of the provided `dtype`.
+
+        Parameters
+        ----------
+        dtype : np.dtype[T]
+            The dtype of the data.
+
+        Returns
+        -------
+        correction : np.dtype[C]
+            The dtype of the correction.
+        """
+
+        return as_bits(np.array((), dtype=dtype)).dtype
+
     def compute_correction(
         self,
         data: np.ndarray[S, np.dtype[T]],
