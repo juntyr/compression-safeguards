@@ -458,7 +458,7 @@ def test_finite_difference_constant_grid_spacing():
 
     with pytest.raises(
         AssertionError,
-        match="grid_spacing must be a number or a constant scalar expression",
+        match="grid_spacing must be a non-zero finite number or a constant scalar expression",
     ):
         safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
             qoi='finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_spacing=C["dx"])',

@@ -96,7 +96,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     and grid spacings are derived using the algorithm from: Fornberg, B. (1988).
     Generation of finite difference formulas on arbitrarily spaced grids.
     *Mathematics of Computation*, 51(184), 699-706. Available from:
-    <https://doi.org/10.1090/s0025-5718-1988-0935077-0>.
+    [doi:10.1090/s0025-5718-1988-0935077-0](https://doi.org/10.1090/s0025-5718-1988-0935077-0).
 
     The shape of the data neighbourhood is specified as an ordered list of
     unique data axes and boundary conditions that are applied to these axes.
@@ -292,8 +292,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             ), ","
           , "axis", "=", int, ","            (* axis, relative to the neighbourhood *)
           , (
-                "grid_spacing", "=", expr    (* scalar uniform grid spacing *)
-              | "grid_centre", "=", expr     (* centre of an arbitrary grid *)
+                "grid_spacing", "=", expr    (* scalar uniform grid spacing along the axis *)
+              | "grid_centre", "=", expr     (* centre of an arbitrary grid along the axis *)
           )
       , ")"
     ;
@@ -309,7 +309,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
     Lossy Compression for Scientific Data. *Proceedings of the VLDB Endowment*.
     16, 4 (December 2022), 697-710. Available from:
-    <https://doi.org/10.14778/3574245.3574255>.
+    [doi:10.14778/3574245.3574255](https://doi.org/10.14778/3574245.3574255).
 
     Parameters
     ----------
@@ -1215,10 +1215,11 @@ def _compute_data_eb_for_stencil_qoi_eb(
 
     Inspired by:
 
-    Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
+    > Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
     Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
-    Lossy Compression for Scientific Data. Proc. VLDB Endow. 16, 4 (December
-    2022), 697-710. Available from: https://doi.org/10.14778/3574245.3574255.
+    Lossy Compression for Scientific Data. *Proceedings of the VLDB Endowment*.
+    16, 4 (December 2022), 697-710. Available from:
+    [doi:10.14778/3574245.3574255](https://doi.org/10.14778/3574245.3574255).
     """
 
     tl, tu = compute_data_eb_for_stencil_qoi_eb_unchecked(

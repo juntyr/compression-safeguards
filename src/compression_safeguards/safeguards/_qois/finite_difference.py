@@ -17,9 +17,14 @@ def create_finite_difference_for_neighbourhood(
     def finite_difference(
         expr, /, *, order, accuracy, type, axis, grid_spacing=None, grid_centre=None
     ):
-        assert isinstance(expr, sp.Expr) and expr.has(
-            sp.tensor.array.expressions.ArrayElement
-        ), "finite_difference expr must be a scalar array element expression"
+        assert isinstance(expr, sp.Expr), (
+            "finite_difference expr must be a scalar array element expression"
+        )
+        assert expr.has(sp.tensor.array.expressions.ArrayElement) and (
+            not expr.has(NumPyLikeArray)
+        ), (
+            "cannot compute the finite_difference with respect to an array expression, provide a scalar expression (e.g. the centre value) instead"
+        )
         assert any(not isinstance(s, LateBoundConstant) for s in expr.free_symbols), (
             "finite_difference expr must not be constant"
         )
@@ -66,7 +71,7 @@ def create_finite_difference_for_neighbourhood(
                     isinstance(s, LateBoundConstant) for s in grid_spacing.free_symbols
                 )
             ), (
-                "finite_difference grid_spacing must be a number or a constant scalar expression"
+                "finite_difference grid_spacing must be a non-zero finite number or a constant scalar expression"
             )
             if isinstance(grid_spacing, sp.Number):
                 assert grid_spacing != 0, (
@@ -85,6 +90,7 @@ def create_finite_difference_for_neighbourhood(
             assert (
                 isinstance(grid_centre, sp.Expr)
                 and grid_centre.has(sp.tensor.array.expressions.ArrayElement)
+                and (not grid_centre.has(NumPyLikeArray))
                 and all(
                     isinstance(s, LateBoundConstant) for s in grid_centre.free_symbols
                 )
@@ -123,11 +129,11 @@ def _apply_finite_difference_offset(
     shape: tuple[int, ...],
     I: tuple[int, ...],  # noqa: E741
 ):
+    assert expr.func is not NumPyLikeArray
+
     if expr.is_Number:
         return expr
-    assert expr.func is not NumPyLikeArray, (
-        "cannot compute the finite_difference with respect to an array expression, provide a scalar expression (e.g. the centre value) instead"
-    )
+
     if (
         expr.func is sp.tensor.array.expressions.ArrayElement
         and len(expr.args) == 2
@@ -145,6 +151,7 @@ def _apply_finite_difference_offset(
             f"cannot compute the finite_difference on axis {axis} since the neighbourhood for {name} is insufficiently large: after should be at least {indices[axis] - I[axis]}"
         )
         return sp.tensor.array.expressions.ArrayElement(name, indices)
+
     return expr.func(
         *[
             _apply_finite_difference_offset(a, axis, offset, X, shape, I)
@@ -202,8 +209,8 @@ def _finite_difference_coefficients(
     Finite difference coefficient algorithm from:
 
     Fornberg, B. (1988). Generation of finite difference formulas on arbitrarily
-    spaced grids. Mathematics of Computation, 51(184), 699-706. Available from:
-    https://doi.org/10.1090/s0025-5718-1988-0935077-0.
+    spaced grids. *Mathematics of Computation*, 51(184), 699-706. Available from:
+    [doi:10.1090/s0025-5718-1988-0935077-0](https://doi.org/10.1090/s0025-5718-1988-0935077-0).
     """
 
     x0 = centre
