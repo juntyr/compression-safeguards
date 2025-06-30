@@ -89,8 +89,14 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     `x` using the index array `I`.
 
     The stencil QoI safeguard can also be used to bound the pointwise error of
-    the finite-difference-approximated derivative over the data by using the
+    the finite-difference-approximated derivative[^1] over the data by using the
     `finite_difference` function in the `qoi` expression.
+
+    [^1]: The finite difference coefficients for arbitrary orders, accuracies,
+    and grid spacings are derived using the algorithm from: Fornberg, B. (1988).
+    Generation of finite difference formulas on arbitrarily spaced grids.
+    *Mathematics of Computation*, 51(184), 699-706. Available from:
+    [doi:10.1090/s0025-5718-1988-0935077-0](https://doi.org/10.1090/s0025-5718-1988-0935077-0).
 
     The shape of the data neighbourhood is specified as an ordered list of
     unique data axes and boundary conditions that are applied to these axes.
@@ -123,10 +129,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     type (keeps the same dtype for floating point data, chooses a dtype with a
     mantissa that has at least as many bits as / for the integer dtype).
 
-    The QoI expression is written using the following EBNF grammar[^1] for
+    The QoI expression is written using the following EBNF grammar[^2] for
     `expr`:
 
-    [^1]: You can visualise the EBNF grammar at <https://matthijsgroen.github.io/ebnf2railroad/try-yourself.html>.
+    [^2]: You can visualise the EBNF grammar at <https://matthijsgroen.github.io/ebnf2railroad/try-yourself.html>.
 
     ```ebnf
     expr    =
@@ -284,8 +290,11 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
           , "type", "=", (
                 "-1" | "0" | "1"             (* backwards | central | forward difference *)
             ), ","
-          , "dx", "=", expr, ","             (* scalar uniform grid spacing *)
-          , "axis", "=", int                 (* axis, relative to the neighbourhood *)
+          , "axis", "=", int, ","            (* axis, relative to the neighbourhood *)
+          , (
+                "grid_spacing", "=", expr    (* scalar uniform grid spacing along the axis *)
+              | "grid_centre", "=", expr     (* centre of an arbitrary grid along the axis *)
+          )
       , ")"
     ;
     ```
@@ -300,7 +309,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
     Lossy Compression for Scientific Data. *Proceedings of the VLDB Endowment*.
     16, 4 (December 2022), 697-710. Available from:
-    <https://doi.org/10.14778/3574245.3574255>.
+    [doi:10.14778/3574245.3574255](https://doi.org/10.14778/3574245.3574255).
 
     Parameters
     ----------
@@ -1206,10 +1215,11 @@ def _compute_data_eb_for_stencil_qoi_eb(
 
     Inspired by:
 
-    Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
+    > Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
     Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
-    Lossy Compression for Scientific Data. Proc. VLDB Endow. 16, 4 (December
-    2022), 697-710. Available from: https://doi.org/10.14778/3574245.3574255.
+    Lossy Compression for Scientific Data. *Proceedings of the VLDB Endowment*.
+    16, 4 (December 2022), 697-710. Available from:
+    [doi:10.14778/3574245.3574255](https://doi.org/10.14778/3574245.3574255).
     """
 
     tl, tu = compute_data_eb_for_stencil_qoi_eb_unchecked(
@@ -1291,7 +1301,15 @@ _QOI_KWARG_PATTERN = (
     r"(?:"
     + r"|".join(
         rf"(?:{k}[ ]?=[ ]?)"
-        for k in ("base", "order", "accuracy", "type", "dx", "axis")
+        for k in (
+            "base",
+            "order",
+            "accuracy",
+            "type",
+            "axis",
+            "grid_spacing",
+            "grid_centre",
+        )
     )
     + r")"
 )

@@ -303,7 +303,7 @@ def test_finite_difference():
     ]
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-        "finite_difference(x,order=0,accuracy=2,type=0,dx=1,axis=0)",
+        "finite_difference(x,order=0,accuracy=2,type=0,axis=0,grid_spacing=1)",
         valid_5x5_neighbourhood,
         "abs",
         0,
@@ -311,12 +311,12 @@ def test_finite_difference():
     assert f"{safeguard._qoi_expr}" == "X[4, 4]"
     check_all_codecs(
         data,
-        "finite_difference(x,order=0,accuracy=2,type=0,dx=1,axis=0)",
+        "finite_difference(x,order=0,accuracy=2,type=0,axis=0,grid_spacing=1)",
         [(4, 4), (4, 4)],
     )
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-        "finite_difference(x,order=1,accuracy=1,type=1,dx=1,axis=0)",
+        "finite_difference(x,order=1,accuracy=1,type=1,axis=0,grid_spacing=1)",
         valid_5x5_neighbourhood,
         "abs",
         0,
@@ -324,12 +324,12 @@ def test_finite_difference():
     assert f"{safeguard._qoi_expr}" == "-X[4, 4] + X[5, 4]"
     check_all_codecs(
         data,
-        "finite_difference(x,order=1,accuracy=1,type=1,dx=1,axis=0)",
+        "finite_difference(x,order=1,accuracy=1,type=1,axis=0,grid_spacing=1)",
         [(4, 4), (4, 4)],
     )
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-        "finite_difference(x,order=1,accuracy=1,type=-1,dx=1,axis=0)",
+        "finite_difference(x,order=1,accuracy=1,type=-1,axis=0,grid_spacing=1)",
         valid_5x5_neighbourhood,
         "abs",
         0,
@@ -337,12 +337,12 @@ def test_finite_difference():
     assert f"{safeguard._qoi_expr}" == "-X[3, 4] + X[4, 4]"
     check_all_codecs(
         data,
-        "finite_difference(x,order=1,accuracy=1,type=-1,dx=1,axis=0)",
+        "finite_difference(x,order=1,accuracy=1,type=-1,axis=0,grid_spacing=1)",
         [(4, 4), (4, 4)],
     )
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-        "finite_difference(x,order=1,accuracy=2,type=0,dx=1,axis=0)",
+        "finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1)",
         valid_5x5_neighbourhood,
         "abs",
         0,
@@ -350,12 +350,12 @@ def test_finite_difference():
     assert f"{safeguard._qoi_expr}" == "-X[3, 4]/2 + X[5, 4]/2"
     check_all_codecs(
         data,
-        "finite_difference(x,order=1,accuracy=2,type=0,dx=1,axis=0)",
+        "finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1)",
         [(4, 4), (4, 4)],
     )
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-        "finite_difference(x,order=1,accuracy=2,type=0,dx=1,axis=1)",
+        "finite_difference(x,order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
         valid_5x5_neighbourhood,
         "abs",
         0,
@@ -363,12 +363,12 @@ def test_finite_difference():
     assert f"{safeguard._qoi_expr}" == "-X[4, 3]/2 + X[4, 5]/2"
     check_all_codecs(
         data,
-        "finite_difference(x,order=1,accuracy=2,type=0,dx=1,axis=1)",
+        "finite_difference(x,order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
         [(4, 4), (4, 4)],
     )
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-        "finite_difference(x,order=2,accuracy=2,type=0,dx=1,axis=0)",
+        "finite_difference(x,order=2,accuracy=2,type=0,axis=0,grid_spacing=1)",
         valid_5x5_neighbourhood,
         "abs",
         0,
@@ -376,12 +376,12 @@ def test_finite_difference():
     assert f"{safeguard._qoi_expr}" == "X[3, 4] - 2*X[4, 4] + X[5, 4]"
     check_all_codecs(
         data,
-        "finite_difference(x,order=2,accuracy=2,type=0,dx=1,axis=0)",
+        "finite_difference(x,order=2,accuracy=2,type=0,axis=0,grid_spacing=1)",
         [(4, 4), (4, 4)],
     )
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-        "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,dx=1,axis=0),order=1,accuracy=2,type=0,dx=1,axis=0)",
+        "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=0,grid_spacing=1)",
         valid_5x5_neighbourhood,
         "abs",
         0,
@@ -389,12 +389,12 @@ def test_finite_difference():
     assert f"{safeguard._qoi_expr}" == "X[2, 4]/4 - X[4, 4]/2 + X[6, 4]/4"
     check_all_codecs(
         data,
-        "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,dx=1,axis=0),order=1,accuracy=2,type=0,dx=1,axis=0)",
+        "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=0,grid_spacing=1)",
         [(4, 4), (4, 4)],
     )
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-        "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,dx=1,axis=0),order=1,accuracy=2,type=0,dx=1,axis=1)",
+        "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
         valid_5x5_neighbourhood,
         "abs",
         0,
@@ -402,7 +402,7 @@ def test_finite_difference():
     assert f"{safeguard._qoi_expr}" == "X[3, 3]/4 - X[3, 5]/4 - X[5, 3]/4 + X[5, 5]/4"
     check_all_codecs(
         data,
-        "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,dx=1,axis=0),order=1,accuracy=2,type=0,dx=1,axis=1)",
+        "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
         [(4, 4), (4, 4)],
     )
 
@@ -418,7 +418,7 @@ def test_finite_difference_array():
             safeguards=[
                 dict(
                     kind="qoi_eb_stencil",
-                    qoi="finite_difference(X[1:-1], order=1, accuracy=2, type=0, dx=1, axis=0)",
+                    qoi="finite_difference(X[1:-1], order=1, accuracy=2, type=0, axis=0, grid_spacing=1)",
                     neighbourhood=[
                         dict(
                             axis=0,
@@ -434,11 +434,11 @@ def test_finite_difference_array():
         )
 
 
-def test_finite_difference_constant_dx():
+def test_finite_difference_constant_grid_spacing():
     data = np.arange(5, dtype=float)
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-        qoi='finite_difference(x, order=1, accuracy=2, type=0, dx=c["dx"], axis=0)',
+        qoi='finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_spacing=c["dx"])',
         neighbourhood=[
             dict(
                 axis=0,
@@ -457,10 +457,11 @@ def test_finite_difference_constant_dx():
     )
 
     with pytest.raises(
-        AssertionError, match="dx must be a number or a constant scalar expression"
+        AssertionError,
+        match="grid_spacing must be a non-zero finite number or a constant scalar expression",
     ):
         safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-            qoi='finite_difference(x, order=1, accuracy=2, type=0, dx=C["dx"], axis=0)',
+            qoi='finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_spacing=C["dx"])',
             neighbourhood=[
                 dict(
                     axis=0,
@@ -474,7 +475,7 @@ def test_finite_difference_constant_dx():
         )
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-        qoi='finite_difference(x, order=1, accuracy=2, type=0, dx=sin(c["dx"])**2, axis=0)',
+        qoi='finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_spacing=sin(c["dx"])**2)',
         neighbourhood=[
             dict(
                 axis=0,
@@ -490,6 +491,64 @@ def test_finite_difference_constant_dx():
     safeguard.compute_safe_intervals(data, late_bound=Bindings(dx=1.0))
     safeguard.compute_safe_intervals(
         data, late_bound=Bindings(dx=np.array([0.1, 0.2, 0.3, 0.2, 0.1]))
+    )
+
+
+def test_finite_difference_arbitrary_grid():
+    data = np.arange(5, dtype=float)
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_centre=c["i"])',
+        neighbourhood=[
+            dict(
+                axis=0,
+                before=1,
+                after=1,
+                boundary="valid",
+            )
+        ],
+        type="abs",
+        eb=0.1,
+    )
+
+    safeguard.compute_safe_intervals(
+        data, late_bound=Bindings(i=np.array([0.1, 0.2, 0.4, 0.5, 0.8]))
+    )
+
+    with pytest.raises(
+        AssertionError,
+        match="grid_centre must be a constant scalar array element expression",
+    ):
+        safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+            qoi='finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_centre=C["i"])',
+            neighbourhood=[
+                dict(
+                    axis=0,
+                    before=1,
+                    after=1,
+                    boundary="valid",
+                )
+            ],
+            type="abs",
+            eb=0.1,
+        )
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_centre=sin(c["i"])**2)',
+        neighbourhood=[
+            dict(
+                axis=0,
+                before=1,
+                after=1,
+                boundary="valid",
+            )
+        ],
+        type="abs",
+        eb=0.1,
+    )
+
+    safeguard.compute_safe_intervals(
+        data, late_bound=Bindings(i=np.array([0.1, 0.2, 0.4, 0.5, 0.8]))
     )
 
 
@@ -643,7 +702,7 @@ def test_fuzzer_finite_difference_int_iter():
             safeguards=[
                 dict(
                     kind="qoi_eb_stencil",
-                    qoi="finite_difference(x, order=0, accuracy=1, type=-1, dx=2.2250738585072014e-308, axis=0)",
+                    qoi="finite_difference(x, order=0, accuracy=1, type=-1, axis=0, grid_spacing=2.2250738585072014e-308)",
                     neighbourhood=[
                         dict(
                             axis=0,
@@ -673,7 +732,7 @@ def test_fuzzer_finite_difference_fraction_overflow():
             safeguards=[
                 dict(
                     kind="qoi_eb_stencil",
-                    qoi="finite_difference(x, order=7, accuracy=6, type=-1, dx=7.215110354450764e305, axis=0)",
+                    qoi="finite_difference(x, order=7, accuracy=6, type=-1, axis=0, grid_spacing=7.215110354450764e305)",
                     neighbourhood=[
                         dict(
                             axis=0,
@@ -702,7 +761,7 @@ def test_fuzzer_finite_difference_fraction_compare():
                 dict(kind="same", value=7),
                 dict(
                     kind="qoi_eb_stencil",
-                    qoi="finite_difference(x, order=7, accuracy=7, type=1, dx=2.2250738585072014e-308, axis=0)",
+                    qoi="finite_difference(x, order=7, accuracy=7, type=1, axis=0, grid_spacing=2.2250738585072014e-308)",
                     neighbourhood=[
                         dict(
                             axis=0,
@@ -733,7 +792,7 @@ def test_fuzzer_finite_difference_eb_abs():
             safeguards=[
                 dict(
                     kind="qoi_eb_stencil",
-                    qoi="finite_difference(x, order=4, accuracy=4, type=1, dx=4, axis=0)",
+                    qoi="finite_difference(x, order=4, accuracy=4, type=1, axis=0, grid_spacing=4)",
                     neighbourhood=[
                         dict(
                             axis=0,
@@ -766,7 +825,7 @@ def test_fuzzer_finite_difference_fraction_float_overflow():
             safeguards=[
                 dict(
                     kind="qoi_eb_stencil",
-                    qoi="finite_difference(x, order=1, accuracy=3, type=1, dx=59, axis=0)",
+                    qoi="finite_difference(x, order=1, accuracy=3, type=1, axis=0, grid_spacing=59)",
                     neighbourhood=[
                         dict(
                             axis=0,
@@ -1011,7 +1070,7 @@ def test_finite_difference_dx():
             safeguards=[
                 dict(
                     kind="qoi_eb_stencil",
-                    qoi="finite_difference(x, order=1, accuracy=2, type=0, dx=0.1, axis=0)",
+                    qoi="finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_spacing=0.1)",
                     neighbourhood=[
                         dict(
                             axis=0,

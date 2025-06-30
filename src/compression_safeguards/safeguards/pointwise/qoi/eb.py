@@ -211,7 +211,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
     Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
     Lossy Compression for Scientific Data. *Proceedings of the VLDB Endowment*.
     16, 4 (December 2022), 697-710. Available from:
-    <https://doi.org/10.14778/3574245.3574255>.
+    [doi:10.14778/3574245.3574255](https://doi.org/10.14778/3574245.3574255).
 
     Parameters
     ----------
@@ -670,10 +670,11 @@ def _compute_data_eb_for_qoi_eb(
 
     Inspired by:
 
-    Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
+    > Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
     Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
-    Lossy Compression for Scientific Data. Proc. VLDB Endow. 16, 4 (December
-    2022), 697-710. Available from: https://doi.org/10.14778/3574245.3574255.
+    Lossy Compression for Scientific Data. *Proceedings of the VLDB Endowment*.
+    16, 4 (December 2022), 697-710. Available from:
+    [doi:10.14778/3574245.3574255](https://doi.org/10.14778/3574245.3574255).
     """
 
     tl, tu = compute_data_eb_for_stencil_qoi_eb_unchecked(

@@ -14,9 +14,16 @@ def create_finite_difference_for_neighbourhood(
     shape: tuple[int, ...],
     I: tuple[int, ...],  # noqa: E741
 ):
-    def finite_difference(expr, /, *, order, accuracy, type, dx, axis):
+    def finite_difference(
+        expr, /, *, order, accuracy, type, axis, grid_spacing=None, grid_centre=None
+    ):
         assert isinstance(expr, sp.Basic), (
-            "finite_difference expr must be an expression"
+            "finite_difference expr must be a scalar array element expression"
+        )
+        assert expr.has(sp.tensor.array.expressions.ArrayElement) and (
+            not expr.has(NumPyLikeArray)
+        ), (
+            "cannot compute the finite_difference with respect to an array expression, provide a scalar expression (e.g. the centre value) instead"
         )
         assert any(not isinstance(s, LateBoundConstant) for s in expr.free_symbols), (
             "finite_difference expr must not be constant"
@@ -45,18 +52,7 @@ def create_finite_difference_for_neighbourhood(
 
         if type == _FiniteDifference.central:
             assert accuracy % 2 == 0, (
-                "accuracy must be even for a central finite difference"
-            )
-
-        assert isinstance(dx, sp.Number) or (
-            isinstance(dx, sp.Basic)
-            and (not dx.has(NumPyLikeArray))
-            and all(isinstance(s, LateBoundConstant) for s in dx.free_symbols)
-        ), "finite_difference dx must be a number or a constant scalar expression"
-        if isinstance(dx, sp.Number):
-            assert dx > 0, "dx must be positive"
-            assert isinstance(dx, (sp.Integer, sp.Rational)) or _isfinite(float(dx)), (
-                "finite_difference dx must be finite"
+                "finite_difference accuracy must be even for a central finite difference"
             )
 
         assert isinstance(axis, sp.Integer), "finite_difference axis must be an integer"
@@ -66,44 +62,102 @@ def create_finite_difference_for_neighbourhood(
         )
 
         offsets = _finite_difference_offsets(type, order, accuracy)
-        coefficients = _finite_difference_coefficients(order, offsets)
 
-        def apply_finite_difference(expr: sp.Basic, axis: int, offset: int):
-            if expr.is_Number:
-                return expr
-            assert expr.func is not NumPyLikeArray, (
-                "cannot compute the finite_difference with respect to an array expression, provide a scalar expression (e.g. the centre value) instead"
+        if (grid_spacing is not None) and (grid_centre is None):
+            assert isinstance(grid_spacing, sp.Number) or (
+                isinstance(grid_spacing, sp.Expr)
+                and (not grid_spacing.has(NumPyLikeArray))
+                and all(
+                    isinstance(s, LateBoundConstant) for s in grid_spacing.free_symbols
+                )
+            ), (
+                "finite_difference grid_spacing must be a non-zero finite number or a constant scalar expression"
             )
-            if (
-                expr.func is sp.tensor.array.expressions.ArrayElement
-                and len(expr.args) == 2
-                and (
-                    expr.args[0] == X
-                    or isinstance(expr.args[0].name, LateBoundConstant)  # type: ignore
+            if isinstance(grid_spacing, sp.Number):
+                assert grid_spacing != 0, (
+                    "finite_difference grid_spacing must not be zero"
                 )
-            ):
-                name, idxs = expr.args
-                indices = list(idxs)  # type: ignore
-                indices[axis] += offset
-                assert indices[axis] >= 0, (
-                    f"cannot compute the finite_difference on axis {axis} since the neighbourhood is insufficiently large: before should be at least {I[axis] - indices[axis]}"
+                assert isinstance(grid_spacing, (sp.Integer, sp.Rational)) or _isfinite(
+                    float(grid_spacing)
+                ), "finite_difference grid_spacing must be finite"
+
+            coefficients = _finite_difference_coefficients(
+                order,
+                sp.Integer(0),
+                tuple(sp.Integer(o) * grid_spacing for o in offsets),
+            )
+        elif (grid_centre is not None) and (grid_spacing is None):
+            assert (
+                isinstance(grid_centre, sp.Expr)
+                and grid_centre.has(sp.tensor.array.expressions.ArrayElement)
+                and (not grid_centre.has(NumPyLikeArray))
+                and all(
+                    isinstance(s, LateBoundConstant) for s in grid_centre.free_symbols
                 )
-                assert indices[axis] < shape[axis], (
-                    f"cannot compute the finite_difference on axis {axis} since the neighbourhood is insufficiently large: after should be at least {indices[axis] - I[axis]}"
-                )
-                return sp.tensor.array.expressions.ArrayElement(name, indices)
-            return expr.func(
-                *[apply_finite_difference(a, axis, offset) for a in expr.args]
+            ), (
+                "finite_difference grid_centre must be a constant scalar array element expression"
+            )
+
+            coefficients = _finite_difference_coefficients(
+                order,
+                grid_centre,
+                tuple(
+                    _apply_finite_difference_offset(grid_centre, axis, o, X, shape, I)
+                    for o in offsets
+                ),
+            )
+        else:
+            assert False, (
+                "finite_difference takes either the grid_spacing or the grid_centre parameter"
             )
 
         return sp.Add(
             *[
-                apply_finite_difference(expr, axis, o) * c
+                _apply_finite_difference_offset(expr, axis, o, X, shape, I) * c
                 for o, c in zip(offsets, coefficients)
             ]
-        ) / (dx**order)
+        )
 
     return finite_difference
+
+
+def _apply_finite_difference_offset(
+    expr: sp.Basic,
+    axis: int,
+    offset: int,
+    X: sp.tensor.array.expressions.ArraySymbol,
+    shape: tuple[int, ...],
+    I: tuple[int, ...],  # noqa: E741
+):
+    assert expr.func is not NumPyLikeArray
+
+    if expr.is_Number:
+        return expr
+
+    if (
+        expr.func is sp.tensor.array.expressions.ArrayElement
+        and len(expr.args) == 2
+        and (
+            expr.args[0] == X or isinstance(expr.args[0].name, LateBoundConstant)  # type: ignore
+        )
+    ):
+        name, idxs = expr.args
+        indices = list(idxs)  # type: ignore
+        indices[axis] += offset
+        assert indices[axis] >= 0, (
+            f"cannot compute the finite_difference on axis {axis} since the neighbourhood for {name} is insufficiently large: before should be at least {I[axis] - indices[axis]}"
+        )
+        assert indices[axis] < shape[axis], (
+            f"cannot compute the finite_difference on axis {axis} since the neighbourhood for {name} is insufficiently large: after should be at least {indices[axis] - I[axis]}"
+        )
+        return sp.tensor.array.expressions.ArrayElement(name, indices)
+
+    return expr.func(
+        *[
+            _apply_finite_difference_offset(a, axis, offset, X, shape, I)
+            for a in expr.args
+        ]
+    )
 
 
 class _FiniteDifference(Enum):
@@ -148,19 +202,20 @@ def _finite_difference_offsets(
 
 def _finite_difference_coefficients(
     order: int,
-    offsets: tuple[int, ...],
-) -> tuple[sp.Rational, ...]:
+    centre: sp.Expr,
+    offsets: tuple[sp.Expr, ...],
+) -> tuple[sp.Expr, ...]:
     """
     Finite difference coefficient algorithm from:
 
     Fornberg, B. (1988). Generation of finite difference formulas on arbitrarily
-    spaced grids. Mathematics of Computation, 51(184), 699-706. Available from:
-    https://doi.org/10.1090/s0025-5718-1988-0935077-0.
+    spaced grids. *Mathematics of Computation*, 51(184), 699-706. Available from:
+    [doi:10.1090/s0025-5718-1988-0935077-0](https://doi.org/10.1090/s0025-5718-1988-0935077-0).
     """
 
-    # x0 = 0
+    x0 = centre
     M = order
-    a = [sp.Integer(o) for o in offsets]
+    a = offsets
     N = len(a) - 1
 
     coeffs = {
@@ -179,18 +234,21 @@ def _finite_difference_coefficients(
             for m in range(0, min(n, M) + 1):
                 if m > 0:
                     coeffs[(m, n, v)] = (
-                        (a[n] * coeffs[(m, n - 1, v)]) - (m * coeffs[(m - 1, n - 1, v)])
+                        ((a[n] - x0) * coeffs[(m, n - 1, v)])
+                        - (m * coeffs[(m - 1, n - 1, v)])
                     ) / c3
                 else:
-                    coeffs[(m, n, v)] = (a[n] * coeffs[(m, n - 1, v)]) / c3
+                    coeffs[(m, n, v)] = ((a[n] - x0) * coeffs[(m, n - 1, v)]) / c3
         for m in range(0, min(n, M) + 1):
             if m > 0:
                 coeffs[(m, n, n)] = (c1 / c2) * (
                     (m * coeffs[(m - 1, n - 1, n - 1)])
-                    - (a[n - 1] * coeffs[(m, n - 1, n - 1)])
+                    - ((a[n - 1] - x0) * coeffs[(m, n - 1, n - 1)])
                 )
             else:
-                coeffs[(m, n, n)] = -(c1 / c2) * (a[n - 1] * coeffs[(m, n - 1, n - 1)])
+                coeffs[(m, n, n)] = -(c1 / c2) * (
+                    (a[n - 1] - x0) * coeffs[(m, n - 1, n - 1)]
+                )
         c1 = c2
 
     return tuple(coeffs[M, N, v] for v in range(0, N + 1))
