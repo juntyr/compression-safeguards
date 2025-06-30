@@ -7,7 +7,7 @@ __all__ = ["Safeguards"]
 from collections.abc import Collection, Set
 
 import numpy as np
-from typing_extensions import Self
+from typing_extensions import Self  # MSPV 3.11
 
 from .safeguards import SafeguardKind
 from .safeguards.abc import Safeguard

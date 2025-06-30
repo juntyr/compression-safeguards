@@ -127,7 +127,7 @@ def test_numcodecs_validation():
 
     with pytest.raises(
         AssertionError,
-        match=r"SafeguardsCodec does not \(yet\) support non-built-in late-bound parameters",
+        match=r"missing bindings for .+param",
     ):
         encode_decode_mock(
             data,
@@ -143,11 +143,26 @@ def test_numcodecs_validation():
                 ),
             ],
         )
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(
+                kind="select",
+                selector="param",
+                safeguards=[
+                    dict(kind="qoi_eb_pw", qoi="(-(-x))", type="abs", eb=0),
+                    dict(kind="same", value=0),
+                ],
+            ),
+        ],
+        fixed_constants=dict(param=0),
+    )
 
     for combinator in ["any", "all"]:
         with pytest.raises(
             AssertionError,
-            match=r"SafeguardsCodec does not \(yet\) support non-built-in late-bound parameters",
+            match=r"missing bindings for .+param",
         ):
             encode_decode_mock(
                 data,
@@ -174,3 +189,30 @@ def test_numcodecs_validation():
                     ),
                 ],
             )
+
+        encode_decode_mock(
+            data,
+            decoded,
+            safeguards=[
+                dict(
+                    kind=combinator,
+                    safeguards=[
+                        dict(
+                            kind="select",
+                            selector="param",
+                            safeguards=[
+                                dict(
+                                    kind="qoi_eb_pw",
+                                    qoi="(-(-x))",
+                                    type="abs",
+                                    eb=0,
+                                ),
+                                dict(kind="same", value=0),
+                            ],
+                        ),
+                        dict(kind="sign"),
+                    ],
+                ),
+            ],
+            fixed_constants=dict(param=-1),
+        )
