@@ -83,7 +83,13 @@ def create_finite_difference_for_neighbourhood(
             ), "finite_difference grid_period must be finite"
 
             def delta_transform(x: sp.Expr) -> sp.Expr:
-                return ((x + (grid_period / 2)) % grid_period) - (grid_period / 2)
+                grid_half_period = grid_period / 2
+
+                # map delta to [-period/2, +period/2]
+                # ((... % period) + period) % period is required for numpy_quaddtype
+                return (
+                    (((x + grid_half_period) % grid_period) + grid_period) % grid_period
+                ) - grid_half_period
         else:
 
             def delta_transform(x: sp.Expr) -> sp.Expr:

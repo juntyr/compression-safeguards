@@ -9,6 +9,7 @@ from compression_safeguards.safeguards.stencil.qoi.eb import (
     StencilQuantityOfInterestErrorBoundSafeguard,
 )
 from compression_safeguards.utils.bindings import Bindings
+from compression_safeguards.utils.cast import to_float
 
 from .codecs import (
     encode_decode_identity,
@@ -553,8 +554,6 @@ def test_finite_difference_arbitrary_grid():
 
 
 def test_finite_difference_periodic_grid():
-    data = np.arange(5, dtype=float)
-
     with pytest.raises(
         AssertionError,
         match="grid_period must be a positive finite number",
@@ -588,7 +587,8 @@ def test_finite_difference_periodic_grid():
     )
 
     safeguard.compute_safe_intervals(
-        data, late_bound=Bindings(i=np.array([0.1, 0.2, 0.4, 0.5, 0.8]))
+        np.arange(5, dtype=float),
+        late_bound=Bindings(i=np.array([0.1, 0.2, 0.4, 0.5, 0.8])),
     )
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
@@ -605,7 +605,65 @@ def test_finite_difference_periodic_grid():
         eb=0.1,
     )
 
-    safeguard.compute_safe_intervals(data, late_bound=Bindings.empty())
+    safeguard.compute_safe_intervals(
+        np.arange(5, dtype=np.uint64), late_bound=Bindings.empty()
+    )
+
+
+@pytest.mark.parametrize("dtype", sorted(d.name for d in Safeguards.supported_dtypes()))
+def test_periodic_delta_transform(dtype):
+    def delta_transform(x, period):
+        half_period = period / 2
+
+        # map delta to [-period/2, +period/2]
+        # ((... % period) + period) % period is required for numpy_quaddtype
+        return ((((x + half_period) % period) + period) % period) - half_period
+
+    float_dtype = to_float(np.array((), dtype=dtype)).dtype
+
+    assert (
+        delta_transform(
+            np.array(-0.75, dtype=float_dtype), np.array(1, dtype=float_dtype)
+        )
+        > 0
+    )
+    assert (
+        delta_transform(
+            np.array(-0.25, dtype=float_dtype), np.array(1, dtype=float_dtype)
+        )
+        < 0
+    )
+    assert (
+        delta_transform(
+            np.array(0.0, dtype=float_dtype), np.array(1, dtype=float_dtype)
+        )
+        == 0
+    )
+    assert (
+        delta_transform(
+            np.array(0.25, dtype=float_dtype), np.array(1, dtype=float_dtype)
+        )
+        > 0
+    )
+    assert (
+        delta_transform(
+            np.array(0.75, dtype=float_dtype), np.array(1, dtype=float_dtype)
+        )
+        < 0
+    )
+
+    for x, period in [
+        (np.linspace(-15, 15), 10),
+        (np.linspace(-np.pi * 25, np.pi * 25), np.pi * 10),
+        (np.linspace(-800, 800), 360),
+    ]:
+        periodic = delta_transform(x.astype(dtype), period)
+        assert np.all(periodic >= (-period / 2))
+        assert np.all(periodic <= (period / 2))
+
+        periodic = delta_transform(to_float(x.astype(dtype)), period)
+        assert np.all(periodic >= (-period / 2))
+        assert np.all(periodic <= (period / 2))
 
 
 def test_matmul():

@@ -1170,7 +1170,11 @@ def test_central_second_order_with_spacing():
 
 def test_central_second_order_with_periodic_transform():
     def delta_transform(x, period):
-        return ((x + (period / 2)) % period) - (period / 2)
+        half_period = period / 2
+
+        # map delta to [-period/2, +period/2]
+        # ((... % period) + period) % period is required for numpy_quaddtype
+        return ((((x + half_period) % period) + period) % period) - half_period
 
     # period must be >= 2*coefficient range to allow proper sampling (no aliasing)
     assert _finite_difference_coefficients(
