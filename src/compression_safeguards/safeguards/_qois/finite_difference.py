@@ -1,4 +1,5 @@
 from enum import Enum, auto
+from typing import Callable
 
 import sympy as sp
 import sympy.tensor.array.expressions  # noqa: F401
@@ -13,9 +14,18 @@ def create_finite_difference_for_neighbourhood(
     X: sp.tensor.array.expressions.ArraySymbol,
     shape: tuple[int, ...],
     I: tuple[int, ...],  # noqa: E741
-):
+) -> Callable:
     def finite_difference(
-        expr, /, *, order, accuracy, type, axis, grid_spacing=None, grid_centre=None
+        expr,
+        /,
+        *,
+        order,
+        accuracy,
+        type,
+        axis,
+        grid_spacing=None,
+        grid_centre=None,
+        grid_period=None,
     ):
         assert isinstance(expr, sp.Basic), (
             "finite_difference expr must be a scalar array element expression"
@@ -63,6 +73,22 @@ def create_finite_difference_for_neighbourhood(
 
         offsets = _finite_difference_offsets(type, order, accuracy)
 
+        if grid_period is not None:
+            assert isinstance(grid_period, sp.Number), (
+                "finite_difference grid_period must be a positive finite number"
+            )
+            assert grid_period > 0, "finite_difference grid_period must be positive"
+            assert isinstance(grid_period, (sp.Integer, sp.Rational)) or _isfinite(
+                float(grid_period)
+            ), "finite_difference grid_period must be finite"
+
+            def delta_transform(x: sp.Expr) -> sp.Expr:
+                return ((x + (grid_period / 2)) % grid_period) - (grid_period / 2)
+        else:
+
+            def delta_transform(x: sp.Expr) -> sp.Expr:
+                return x
+
         if (grid_spacing is not None) and (grid_centre is None):
             assert isinstance(grid_spacing, sp.Number) or (
                 isinstance(grid_spacing, sp.Expr)
@@ -85,6 +111,7 @@ def create_finite_difference_for_neighbourhood(
                 order,
                 sp.Integer(0),
                 tuple(sp.Integer(o) * grid_spacing for o in offsets),
+                delta_transform=delta_transform,
             )
         elif (grid_centre is not None) and (grid_spacing is None):
             assert (
@@ -105,6 +132,7 @@ def create_finite_difference_for_neighbourhood(
                     _apply_finite_difference_offset(grid_centre, axis, o, X, shape, I)
                     for o in offsets
                 ),
+                delta_transform=delta_transform,
             )
         else:
             assert False, (
@@ -128,7 +156,7 @@ def _apply_finite_difference_offset(
     X: sp.tensor.array.expressions.ArraySymbol,
     shape: tuple[int, ...],
     I: tuple[int, ...],  # noqa: E741
-):
+) -> sp.Basic:
     assert expr.func is not NumPyLikeArray
 
     if expr.is_Number:
@@ -204,6 +232,7 @@ def _finite_difference_coefficients(
     order: int,
     centre: sp.Expr,
     offsets: tuple[sp.Expr, ...],
+    delta_transform: Callable[[sp.Expr], sp.Expr] = lambda x: x,
 ) -> tuple[sp.Expr, ...]:
     """
     Finite difference coefficient algorithm from:
@@ -227,27 +256,29 @@ def _finite_difference_coefficients(
     for n in range(1, N + 1):
         c2 = sp.Integer(1)
         for v in range(0, n):
-            c3 = a[n] - a[v]
+            c3 = delta_transform(a[n] - a[v])
             c2 *= c3
             if n <= M:
                 coeffs[(n, n - 1, v)] = sp.Integer(0)
             for m in range(0, min(n, M) + 1):
                 if m > 0:
                     coeffs[(m, n, v)] = (
-                        ((a[n] - x0) * coeffs[(m, n - 1, v)])
+                        (delta_transform(a[n] - x0) * coeffs[(m, n - 1, v)])
                         - (m * coeffs[(m - 1, n - 1, v)])
                     ) / c3
                 else:
-                    coeffs[(m, n, v)] = ((a[n] - x0) * coeffs[(m, n - 1, v)]) / c3
+                    coeffs[(m, n, v)] = (
+                        delta_transform(a[n] - x0) * coeffs[(m, n - 1, v)]
+                    ) / c3
         for m in range(0, min(n, M) + 1):
             if m > 0:
                 coeffs[(m, n, n)] = (c1 / c2) * (
                     (m * coeffs[(m - 1, n - 1, n - 1)])
-                    - ((a[n - 1] - x0) * coeffs[(m, n - 1, n - 1)])
+                    - (delta_transform(a[n - 1] - x0) * coeffs[(m, n - 1, n - 1)])
                 )
             else:
                 coeffs[(m, n, n)] = -(c1 / c2) * (
-                    (a[n - 1] - x0) * coeffs[(m, n - 1, n - 1)]
+                    delta_transform(a[n - 1] - x0) * coeffs[(m, n - 1, n - 1)]
                 )
         c1 = c2
 

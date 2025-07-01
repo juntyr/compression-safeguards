@@ -133,7 +133,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         boundary: str | BoundaryCondition,
         constant_boundary: None | int | float | str | Parameter = None,
         axis: None | int = None,
-    ):
+    ) -> None:
         self._monotonicity = (
             monotonicity
             if isinstance(monotonicity, Monotonicity)

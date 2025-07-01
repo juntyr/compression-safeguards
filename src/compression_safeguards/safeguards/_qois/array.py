@@ -1,10 +1,11 @@
 import sympy as sp
+from typing_extensions import Self  # MSPV 3.11
 
 
 class NumPyLikeArray(sp.Array):
     __slots__ = ()
 
-    def __add__(self, other):
+    def __add__(self, other) -> Self:
         if isinstance(other, NumPyLikeArray):
             if self.shape != other.shape:
                 raise ValueError("array shape mismatch")
@@ -20,12 +21,12 @@ class NumPyLikeArray(sp.Array):
         result_list = [i + other for i in sp.tensor.array.arrayop.Flatten(self)]
         return type(self)(result_list, self.shape)
 
-    def __radd__(self, other):
+    def __radd__(self, other) -> Self:
         other = sp.sympify(other)
         result_list = [other + i for i in sp.tensor.array.arrayop.Flatten(self)]
         return type(self)(result_list, self.shape)
 
-    def __sub__(self, other):
+    def __sub__(self, other) -> Self:
         if isinstance(other, NumPyLikeArray):
             if self.shape != other.shape:
                 raise ValueError("array shape mismatch")
@@ -41,12 +42,12 @@ class NumPyLikeArray(sp.Array):
         result_list = [i - other for i in sp.tensor.array.arrayop.Flatten(self)]
         return type(self)(result_list, self.shape)
 
-    def __rsub__(self, other):
+    def __rsub__(self, other) -> Self:
         other = sp.sympify(other)
         result_list = [other - i for i in sp.tensor.array.arrayop.Flatten(self)]
         return type(self)(result_list, self.shape)
 
-    def __mul__(self, other):
+    def __mul__(self, other) -> Self:
         if isinstance(other, NumPyLikeArray):
             if self.shape != other.shape:
                 raise ValueError("array shape mismatch")
@@ -62,12 +63,12 @@ class NumPyLikeArray(sp.Array):
         result_list = [i * other for i in sp.tensor.array.arrayop.Flatten(self)]
         return type(self)(result_list, self.shape)
 
-    def __rmul__(self, other):
+    def __rmul__(self, other) -> Self:
         other = sp.sympify(other)
         result_list = [other * i for i in sp.tensor.array.arrayop.Flatten(self)]
         return type(self)(result_list, self.shape)
 
-    def __truediv__(self, other):
+    def __truediv__(self, other) -> Self:
         if isinstance(other, NumPyLikeArray):
             if self.shape != other.shape:
                 raise ValueError("array shape mismatch")
@@ -83,12 +84,12 @@ class NumPyLikeArray(sp.Array):
         result_list = [i / other for i in sp.tensor.array.arrayop.Flatten(self)]
         return type(self)(result_list, self.shape)
 
-    def __rtruediv__(self, other):
+    def __rtruediv__(self, other) -> Self:
         other = sp.sympify(other)
         result_list = [other / i for i in sp.tensor.array.arrayop.Flatten(self)]
         return type(self)(result_list, self.shape)
 
-    def __pow__(self, other):
+    def __pow__(self, other) -> Self:
         if isinstance(other, NumPyLikeArray):
             if self.shape != other.shape:
                 raise ValueError("array shape mismatch")
@@ -104,7 +105,7 @@ class NumPyLikeArray(sp.Array):
         result_list = [i**other for i in sp.tensor.array.arrayop.Flatten(self)]
         return type(self)(result_list, self.shape)
 
-    def __rpow__(self, other):
+    def __rpow__(self, other) -> Self:
         other = sp.sympify(other)
         result_list = [other**i for i in sp.tensor.array.arrayop.Flatten(self)]
         return type(self)(result_list, self.shape)

@@ -248,7 +248,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         qoi: PointwiseExpr,
         type: str | ErrorBound,
         eb: int | float | str | Parameter,
-    ):
+    ) -> None:
         self._type = type if isinstance(type, ErrorBound) else ErrorBound[type]
 
         if isinstance(eb, Parameter):

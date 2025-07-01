@@ -54,7 +54,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
 
     kind = "sign"
 
-    def __init__(self, *, offset: int | float | str | Parameter = 0):
+    def __init__(self, *, offset: int | float | str | Parameter = 0) -> None:
         if isinstance(offset, Parameter):
             self._offset = offset
         elif isinstance(offset, str):

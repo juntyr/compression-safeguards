@@ -29,10 +29,10 @@ class Parameter(str):
 
     __slots__ = ()
 
-    def __init__(self, param: str):
+    def __init__(self, param: str) -> None:
         pass
 
-    def __new__(cls, param: str):
+    def __new__(cls, param: str) -> "Parameter":
         if isinstance(param, Parameter):
             return param
         assert (param[1:] if param.startswith("$") else param).isidentifier(), (

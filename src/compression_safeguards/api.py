@@ -45,7 +45,7 @@ class Safeguards:
         *,
         safeguards: Collection[dict | Safeguard],
         _version: None | str = None,
-    ):
+    ) -> None:
         if _version is not None:
             assert _version == _FORMAT_VERSION
 

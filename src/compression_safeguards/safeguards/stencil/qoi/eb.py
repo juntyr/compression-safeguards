@@ -294,7 +294,11 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
           , (
                 "grid_spacing", "=", expr    (* scalar uniform grid spacing along the axis *)
               | "grid_centre", "=", expr     (* centre of an arbitrary grid along the axis *)
-          )
+            )
+          , [
+                ",",
+                "grid_period", "=", expr     (* optional grid period, e.g. 2*pi or 360 *)
+            ]
       , ")"
     ;
     ```
@@ -357,7 +361,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         neighbourhood: Sequence[dict | NeighbourhoodBoundaryAxis],
         type: str | ErrorBound,
         eb: int | float | str | Parameter,
-    ):
+    ) -> None:
         self._neighbourhood = tuple(
             axis
             if isinstance(axis, NeighbourhoodBoundaryAxis)
@@ -1309,6 +1313,7 @@ _QOI_KWARG_PATTERN = (
             "axis",
             "grid_spacing",
             "grid_centre",
+            "grid_period",
         )
     )
     + r")"

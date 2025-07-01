@@ -13,14 +13,15 @@ class trunc(sp.Function):
     is_integer = True
 
     @classmethod
-    def eval(cls, x):
+    def eval(cls, x) -> None | sp.Integer:
         if isinstance(x, sp.Number):
             return sp.Integer(x)
+        return None
 
-    def _eval_evalf(self, prec):
+    def _eval_evalf(self, prec) -> sp.Float:
         return self.doit(deep=False)._eval_evalf(prec)
 
-    def doit(self, deep=True, **hints):
+    def doit(self, deep=True, **hints) -> sp.Integer:
         (x,) = self.args
 
         if deep:
@@ -40,14 +41,15 @@ class sign(sp.Function):
     """
 
     @classmethod
-    def eval(cls, x):
+    def eval(cls, x) -> None | sp.Integer:
         if isinstance(x, sp.Number):
             return sp.sign(x)
+        return None
 
-    def _eval_evalf(self, prec):
+    def _eval_evalf(self, prec) -> sp.Float:
         return self.doit(deep=False)._eval_evalf(prec)
 
-    def doit(self, deep=True, **hints):
+    def doit(self, deep=True, **hints) -> sp.Integer:
         (x,) = self.args
 
         if deep:
@@ -69,17 +71,18 @@ class round_ties_even(sp.Function):
     is_integer = True
 
     @classmethod
-    def eval(cls, x):
+    def eval(cls, x) -> None | sp.Integer:
         if isinstance(x, sp.Number):
             return x.round()
+        return None
 
-    def _eval_evalf(self, prec):
+    def _eval_evalf(self, prec) -> sp.Float:
         return self.doit(deep=False)._eval_evalf(prec)
 
-    def doit(self, deep=True, **hints):
+    def doit(self, deep=True, **hints) -> sp.Integer:
         (x,) = self.args
 
         if deep:
             x = x.doit(deep=deep, **hints)
 
-        return x.round()
+        return x.round()  # type: ignore

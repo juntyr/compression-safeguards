@@ -6,6 +6,8 @@ spaced grids. Mathematics of Computation, 51(184), 699-706. Available from:
 [doi:10.1090/s0025-5718-1988-0935077-0](https://doi.org/10.1090/s0025-5718-1988-0935077-0).
 """
 
+from functools import partial
+
 from sympy import Rational as F
 
 from compression_safeguards.safeguards._qois.finite_difference import (
@@ -1163,4 +1165,62 @@ def test_central_second_order_with_spacing():
         F(32, 315),
         F(-4, 560),
         F(-4, 560),
+    )
+
+
+def test_central_second_order_with_periodic_transform():
+    def delta_transform(x, period):
+        return ((x + (period / 2)) % period) - (period / 2)
+
+    # period must be >= 2*coefficient range to allow proper sampling (no aliasing)
+    assert _finite_difference_coefficients(
+        2,
+        F(0),
+        (F(0), F(1), F(-1)),
+        delta_transform=partial(delta_transform, period=F(4)),
+    ) == (-2, 1, 1)
+
+    assert _finite_difference_coefficients(
+        2,
+        F(0),
+        (F(0), F(1), F(9), F(2), F(8)),
+        delta_transform=partial(delta_transform, period=F(10)),
+    ) == (
+        F(-5, 2),
+        F(4, 3),
+        F(4, 3),
+        F(-1, 12),
+        F(-1, 12),
+    )
+
+    assert _finite_difference_coefficients(
+        2,
+        F(0),
+        (F(0), F(1), F(11), F(2), F(10), F(3), F(9)),
+        delta_transform=partial(delta_transform, period=F(12)),
+    ) == (
+        F(-49, 18),
+        F(3, 2),
+        F(3, 2),
+        F(-3, 20),
+        F(-3, 20),
+        F(1, 90),
+        F(1, 90),
+    )
+
+    assert _finite_difference_coefficients(
+        2,
+        F(0),
+        (F(0), F(1), F(-1), F(2), F(-2), F(3), F(-3), F(4), F(-4)),
+        delta_transform=partial(delta_transform, period=F(16)),
+    ) == (
+        F(-205, 72),
+        F(8, 5),
+        F(8, 5),
+        F(-1, 5),
+        F(-1, 5),
+        F(8, 315),
+        F(8, 315),
+        F(-1, 560),
+        F(-1, 560),
     )

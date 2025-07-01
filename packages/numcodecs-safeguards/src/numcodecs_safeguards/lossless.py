@@ -14,7 +14,7 @@ from numcodecs_delta import BinaryDeltaCodec
 from numcodecs_huffman import HuffmanCodec
 
 
-def _default_lossless_for_safeguards():
+def _default_lossless_for_safeguards() -> Codec:
     return CodecStack(
         PickBestCodec(
             HuffmanCodec(),

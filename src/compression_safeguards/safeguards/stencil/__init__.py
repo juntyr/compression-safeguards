@@ -87,7 +87,7 @@ class NeighbourhoodAxis:
         self,
         before: int,
         after: int,
-    ):
+    ) -> None:
         assert type(before) is int, "before must be an integer"
         assert before >= 0, "before must be non-negative"
         self._before = before
@@ -160,7 +160,7 @@ class NeighbourhoodBoundaryAxis:
         after: int,
         boundary: str | BoundaryCondition,
         constant_boundary: None | int | float | str | Parameter = None,
-    ):
+    ) -> None:
         self._axis = axis
         self._shape = NeighbourhoodAxis(before, after)
 

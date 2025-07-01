@@ -55,7 +55,7 @@ class SameValueSafeguard(PointwiseSafeguard):
 
     def __init__(
         self, value: int | float | str | Parameter, *, exclusive: bool = False
-    ):
+    ) -> None:
         if isinstance(value, Parameter):
             self._value = value
         elif isinstance(value, str):

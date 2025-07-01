@@ -199,7 +199,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         fixed_constants: Mapping[str | Parameter, Value] | Bindings = Bindings.empty(),
         lossless: None | dict | Lossless = None,
         _version: None | str = None,
-    ):
+    ) -> None:
         self._codec = (
             codec if isinstance(codec, Codec) else numcodecs.registry.get_codec(codec)
         )

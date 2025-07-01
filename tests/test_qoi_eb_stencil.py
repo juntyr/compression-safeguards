@@ -552,6 +552,62 @@ def test_finite_difference_arbitrary_grid():
     )
 
 
+def test_finite_difference_periodic_grid():
+    data = np.arange(5, dtype=float)
+
+    with pytest.raises(
+        AssertionError,
+        match="grid_period must be a positive finite number",
+    ):
+        safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+            qoi='finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_centre=c["i"], grid_period=c["p"])',
+            neighbourhood=[
+                dict(
+                    axis=0,
+                    before=1,
+                    after=1,
+                    boundary="valid",
+                )
+            ],
+            type="abs",
+            eb=0.1,
+        )
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_centre=c["i"], grid_period=1)',
+        neighbourhood=[
+            dict(
+                axis=0,
+                before=1,
+                after=1,
+                boundary="valid",
+            )
+        ],
+        type="abs",
+        eb=0.1,
+    )
+
+    safeguard.compute_safe_intervals(
+        data, late_bound=Bindings(i=np.array([0.1, 0.2, 0.4, 0.5, 0.8]))
+    )
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi="finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_spacing=0.75, grid_period=1)",
+        neighbourhood=[
+            dict(
+                axis=0,
+                before=1,
+                after=1,
+                boundary="valid",
+            )
+        ],
+        type="abs",
+        eb=0.1,
+    )
+
+    safeguard.compute_safe_intervals(data, late_bound=Bindings.empty())
+
+
 def test_matmul():
     data = np.arange(16, dtype=float).reshape(4, 4)
     valid_3x3_neighbourhood = [

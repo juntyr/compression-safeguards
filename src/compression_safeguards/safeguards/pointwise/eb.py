@@ -68,7 +68,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         eb: int | float | str | Parameter,
         *,
         equal_nan: bool = False,
-    ):
+    ) -> None:
         self._type = type if isinstance(type, ErrorBound) else ErrorBound[type]
 
         if isinstance(eb, Parameter):
