@@ -73,6 +73,7 @@ def _create_sympy_numpy_printer_class(
             if settings is None:
                 settings = dict()
             settings["fully_qualified_modules"] = False
+            settings["order"] = "none"
             if dtype == _float128_dtype:
                 settings["precision"] = _float128_precision * 2
             else:
@@ -125,5 +126,23 @@ def _create_sympy_numpy_printer_class(
         def _print_round_ties_even(self, expr) -> str:
             (x,) = expr.args
             return f"rint({self._print(x)})"
+
+        def _print_NonAssociativeAdd(self, expr) -> str:
+            return " + ".join(f"({self._print(a)})" for a in expr.args)
+
+        def _print_NonAssociativeMul(self, expr) -> str:
+            return " * ".join(f"({self._print(a)})" for a in expr.args)
+
+        def _print_symmetric_modulo(self, expr) -> str:
+            (p, q) = expr.args
+            p = self._print(p)
+            q2 = self._print(q / 2)
+            q = self._print(q)
+            # map p%q to [-q/2, +q/2]
+            # ((... % q) + q) % q is required for numpy_quaddtype
+            if dtype == _float128_dtype:
+                return f"(mod(mod(({p}) + ({q2}), {q}) + ({q}), {q}) - ({q2}))"
+            else:
+                return f"(mod(({p}) + ({q2}), {q}) - ({q2}))"
 
     return NumPyDtypePrinter

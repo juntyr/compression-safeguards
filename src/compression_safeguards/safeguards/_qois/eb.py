@@ -16,6 +16,7 @@ from ...utils.cast import (
 )
 from ...utils.typing import F, S
 from .array import NumPyLikeArray
+from .associativity import NonAssociativeAdd, NonAssociativeMul
 from .symfunc import round_ties_even as sp_round_ties_even
 from .symfunc import sign as sp_sign
 from .symfunc import trunc as sp_trunc
@@ -677,11 +678,14 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
 
     # a_1 * e_1 + ... + a_n * e_n + c (weighted sum)
     # using Corollary 2 and Lemma 4 from Jiao et al.
-    if expr.is_Add:
+    if expr.is_Add or expr.func is NonAssociativeAdd:
         # find all non-constant terms
         terms = [
             arg for arg in expr.args if len(arg.free_symbols - late_bound_constants) > 0
         ]
+
+        # FIXME: we need to first compute the constant term sum and ensure
+        # the error bound works with it in practice
 
         factors = []
         for i, term in enumerate(terms):
@@ -760,7 +764,7 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
     # rewrite f * e_1 * ... * e_n (product) as f * e^(ln(abs(e_1) + ... + ln(abs(e_n)))
     # this is mathematically incorrect if the product is non-positive,
     #  but works for deriving error bounds
-    if expr.is_Mul:
+    if expr.is_Mul or expr.func is NonAssociativeMul:
         # extract the constant factor and reduce tauv
         factor = evaluate_sympy_expr_to_numpy(
             sp.Mul(

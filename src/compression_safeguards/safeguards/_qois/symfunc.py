@@ -5,7 +5,7 @@ class trunc(sp.Function):
     """
     trunc(x)
 
-    The trunc functions rounds x towards zero.
+    The trunc function rounds x towards zero.
 
     trunc can be evaluated by using the doit() method.
     """
@@ -35,7 +35,7 @@ class sign(sp.Function):
     """
     sign(x)
 
-    The sign functions computes the sign of x.
+    The sign function computes the sign of x.
 
     sign can be evaluated by using the doit() method.
     """
@@ -62,7 +62,7 @@ class round_ties_even(sp.Function):
     """
     round_ties_even(x)
 
-    The round_ties_even functions rounds x to the nearest integer,
+    The round_ties_even function rounds x to the nearest integer,
     rounding ties to the nearest even integer.
 
     round_ties_even can be evaluated by using the doit() method.
@@ -86,3 +86,33 @@ class round_ties_even(sp.Function):
             x = x.doit(deep=deep, **hints)
 
         return x.round()  # type: ignore
+
+
+class symmetric_modulo(sp.Function):
+    """
+    symmetric_modulo(p, q)
+
+    The symmetric_modulo function computes r = p % q and guarantees that
+    -q/2 <= r < q/2.
+
+    symmetric_modulo can be evaluated by using the doit() method.
+    """
+
+    @classmethod
+    def eval(cls, p, q) -> None | sp.Number:
+        m = sp.Mod(p + (q / 2), q) - (q / 2)
+        if isinstance(m, sp.Number):
+            return m
+        return None
+
+    def _eval_evalf(self, prec) -> sp.Float:
+        return self.doit(deep=False)._eval_evalf(prec)
+
+    def doit(self, deep=True, **hints) -> sp.Float:
+        (p, q) = self.args
+
+        if deep:
+            p = p.doit(deep=deep, **hints)
+            q = q.doit(deep=deep, **hints)
+
+        return sp.Mod(p + (q / 2), q) - (q / 2)  # type: ignore

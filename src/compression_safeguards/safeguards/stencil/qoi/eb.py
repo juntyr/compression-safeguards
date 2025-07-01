@@ -30,6 +30,7 @@ from ....utils.typing import F, S, T
 from ..._qois.amath import CONSTRUCTORS as AMATH_CONSTRUCTORS
 from ..._qois.amath import FUNCTIONS as AMATH_FUNCTIONS
 from ..._qois.array import NumPyLikeArray
+from ..._qois.associativity import rewrite_qoi_expr
 from ..._qois.compile import sympy_expr_to_numpy as compile_sympy_expr_to_numpy
 from ..._qois.eb import (
     compute_data_eb_for_stencil_qoi_eb_unchecked,
@@ -458,6 +459,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             assert isinstance(qoi_expr, sp.Basic), (
                 "QoI expression must evaluate to a numeric expression"
             )
+            qoi_expr = rewrite_qoi_expr(qoi_expr)
             self._late_bound_constants = frozenset(
                 s for s in qoi_expr.free_symbols if isinstance(s, LateBoundConstant)
             )
