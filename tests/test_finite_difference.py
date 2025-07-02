@@ -13,6 +13,7 @@ from sympy import Rational as F
 from compression_safeguards.safeguards._qois.finite_difference import (
     _finite_difference_coefficients,
 )
+from compression_safeguards.safeguards._qois.symfunc import symmetric_modulo
 
 
 def test_central_zeroth_order():
@@ -1170,11 +1171,7 @@ def test_central_second_order_with_spacing():
 
 def test_central_second_order_with_periodic_transform():
     def delta_transform(x, period):
-        half_period = period / 2
-
-        # map delta to [-period/2, +period/2]
-        # ((... % period) + period) % period is required for numpy_quaddtype
-        return ((((x + half_period) % period) + period) % period) - half_period
+        return symmetric_modulo(x, period)
 
     # period must be >= 2*coefficient range to allow proper sampling (no aliasing)
     assert _finite_difference_coefficients(
