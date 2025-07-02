@@ -98,8 +98,6 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
     [doi:10.14778/3574245.3574255](https://doi.org/10.14778/3574245.3574255).
     """
 
-    print(expr.func)
-
     assert len(expr.free_symbols - late_bound_constants) > 0, (
         "constants have no error bounds"
     )
@@ -760,11 +758,11 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         etu = _nan_to_zero_inf_to_finite(eb_expr_upper / total_abs_factor)
 
         # stack the lower and upper bounds for each term factor
-        # flip the lower/upper error bound if the factor is negative
-        etl_stack = np.stack([np.where(factor < 0, -etu, etl) for factor in factorvs])
-        etu_stack = np.stack([np.where(factor < 0, -etl, etu) for factor in factorvs])
-
-        # 3*x -4*x: is the flip wrong here??? since we're looking at the combined worst case???
+        # flip the lower/upper error bound sign if the factor is negative
+        # here we only flip the sign but not the bounds since we're combining
+        #  a worst case lower/upper bound over several terms
+        etl_stack = np.stack([np.where(factorv < 0, -etl, etl) for factorv in factorvs])
+        etu_stack = np.stack([np.where(factorv < 0, -etu, etu) for factorv in factorvs])
 
         # handle rounding errors in the total absolute factor early
         etl_stack = ensure_bounded_derived_error(
@@ -797,13 +795,15 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         )
 
         eb_x_lower, eb_x_upper = None, None
-        for i, term in enumerate(terms):
+        for i, (term, factorv) in enumerate(zip(terms, factorvs)):
             # recurse into the terms with a weighted error bound
             exl, exu = compute_data_eb_for_stencil_qoi_eb(
                 term,
                 xv,
-                etl_stack[i],
-                etu_stack[i],
+                # flip the lower/upper error bound if the factor is negative
+                # here we do *not* flip the sign since we already flipped it above
+                np.where(factorv < 0, etu_stack[i], etl_stack[i]),  # type: ignore
+                np.where(factorv < 0, etl_stack[i], etu_stack[i]),  # type: ignore
             )
             # combine the inner error bounds
             if eb_x_lower is None:
