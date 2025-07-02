@@ -766,7 +766,7 @@ def test_lambdify_indexing():
 
     assert (
         inspect.getsource(fn)
-        == "def _lambdifygenerated(X):\n    return float16('0.25')*X[..., 0, 0] + float16('0.5')*X[..., 0, 1] + float16('0.25')*X[..., 0, 2] + float16('0.5')*X[..., 1, 0] + float16('1.0')*X[..., 1, 1] + float16('0.5')*X[..., 1, 2] + float16('0.25')*X[..., 2, 0] + float16('0.5')*X[..., 2, 1] + float16('0.25')*X[..., 2, 2]\n"
+        == "def _lambdifygenerated(X):\n    return ((X[..., 0, 0]) * (float16('0.25'))) + ((X[..., 0, 1]) * (float16('0.5'))) + ((X[..., 0, 2]) * (float16('0.25'))) + ((X[..., 1, 0]) * (float16('0.5'))) + ((X[..., 1, 1]) * (float16('1.0'))) + ((X[..., 1, 2]) * (float16('0.5'))) + ((X[..., 2, 0]) * (float16('0.25'))) + ((X[..., 2, 1]) * (float16('0.5'))) + ((X[..., 2, 2]) * (float16('0.25')))\n"
     )
 
 

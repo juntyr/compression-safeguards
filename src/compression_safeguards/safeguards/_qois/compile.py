@@ -128,10 +128,10 @@ def _create_sympy_numpy_printer_class(
             return f"rint({self._print(x)})"
 
         def _print_NonAssociativeAdd(self, expr) -> str:
-            return " + ".join(f"({self._print(a)})" for a in expr.args)
+            return "(" + " + ".join(f"({self._print(a)})" for a in expr.args) + ")"
 
         def _print_NonAssociativeMul(self, expr) -> str:
-            return " * ".join(f"({self._print(a)})" for a in expr.args)
+            return "(" + " * ".join(f"({self._print(a)})" for a in expr.args) + ")"
 
         def _print_symmetric_modulo(self, expr) -> str:
             (p, q) = expr.args

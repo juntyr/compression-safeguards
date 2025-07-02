@@ -336,17 +336,20 @@ def test_lambdify_dtype():
 
     import sympy as sp
 
+    from compression_safeguards.safeguards._qois.associativity import rewrite_qoi_expr
     from compression_safeguards.safeguards._qois.compile import (
         sympy_expr_to_numpy,
     )
 
     x = sp.Symbol("x", extended_real=True)
 
-    fn = sympy_expr_to_numpy([x], x + sp.pi + sp.E, np.dtype(np.float16))
+    fn = sympy_expr_to_numpy(
+        [x], rewrite_qoi_expr(x + sp.pi + sp.E), np.dtype(np.float16)
+    )
 
     assert (
         inspect.getsource(fn)
-        == "def _lambdifygenerated(x):\n    return x + float16('2.71828') + float16('3.14159')\n"
+        == "def _lambdifygenerated(x):\n    return ((x) + (float16('2.71828') + float16('3.14159')))\n"
     )
 
     assert np.float16("2.71828") == np.float16(np.e)
