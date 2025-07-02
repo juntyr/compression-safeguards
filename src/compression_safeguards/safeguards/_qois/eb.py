@@ -98,6 +98,8 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
     [doi:10.14778/3574245.3574255](https://doi.org/10.14778/3574245.3574255).
     """
 
+    print(expr.func)
+
     assert len(expr.free_symbols - late_bound_constants) > 0, (
         "constants have no error bounds"
     )
@@ -726,7 +728,8 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         terms = list(expr.args[:])
 
         # peek-hole optimisation to extract weighting factors of the terms
-        factors = []
+        termvs = []
+        factorvs = []
         for i, term in enumerate(terms):
             # extract the weighting factor of the term
             if term.func is NonAssociativeMul:
@@ -734,47 +737,73 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
                 assert len(t.free_symbols - late_bound_constants) > 0
                 assert len(f.free_symbols - late_bound_constants) == 0
 
-                factors.append(evaluate_sympy_expr_to_numpy(f))
+                termvs.append(evaluate_sympy_expr_to_numpy(t))
+                factorvs.append(evaluate_sympy_expr_to_numpy(f))
                 terms[i] = t
             else:
-                factors.append(np.array(1, dtype=xv.dtype))
+                termvs.append(evaluate_sympy_expr_to_numpy(term))
+                factorvs.append(np.array(1, dtype=xv.dtype))
+
+        # evaluate the total expression sum
+        exprv = sum(
+            [termvs[i] * factorvs[i] for i in range(1, len(terms))],
+            start=(termvs[0] * factorvs[0]),
+        )
 
         # compute the sum of absolute factors
         # unrolled loop in case a factor is a late-bound constant array
-        total_abs_factor = np.abs(factors[0])
-        for factor in factors[1:]:
+        total_abs_factor = np.abs(factorvs[0])
+        for factor in factorvs[1:]:
             total_abs_factor += np.abs(factor)
 
         etl = _nan_to_zero_inf_to_finite(eb_expr_lower / total_abs_factor)
         etu = _nan_to_zero_inf_to_finite(eb_expr_upper / total_abs_factor)
 
+        # stack the lower and upper bounds for each term factor
+        # flip the lower/upper error bound if the factor is negative
+        etl_stack = np.stack([np.where(factor < 0, -etu, etl) for factor in factorvs])
+        etu_stack = np.stack([np.where(factor < 0, -etl, etu) for factor in factorvs])
+
+        # 3*x -4*x: is the flip wrong here??? since we're looking at the combined worst case???
+
         # handle rounding errors in the total absolute factor early
-        etl = ensure_bounded_derived_error(
-            lambda etl: etl * total_abs_factor,
-            np.zeros_like(xv),
-            None,
-            etl,
+        etl_stack = ensure_bounded_derived_error(
+            lambda etl_stack: sum(
+                [
+                    (termvs[i] + etl_stack[i]) * factorvs[i]
+                    for i in range(1, len(terms))
+                ],
+                start=((termvs[0] + etl_stack[0]) * factorvs[0]),
+            ),
+            exprv,
+            np.stack(termvs),
+            etl_stack,
             eb_expr_lower,
             eb_expr_upper,
         )
-        etu = ensure_bounded_derived_error(
-            lambda etu: etu * total_abs_factor,
-            np.zeros_like(xv),
-            None,
-            etu,
+        etu_stack = ensure_bounded_derived_error(
+            lambda etu_stack: sum(
+                [
+                    (termvs[i] + etu_stack[i]) * factorvs[i]
+                    for i in range(1, len(terms))
+                ],
+                start=((termvs[0] + etu_stack[0]) * factorvs[0]),
+            ),
+            exprv,
+            np.stack(termvs),
+            etu_stack,
             eb_expr_lower,
             eb_expr_upper,
         )
 
         eb_x_lower, eb_x_upper = None, None
-        for term, factor in zip(terms, factors):
+        for i, term in enumerate(terms):
             # recurse into the terms with a weighted error bound
             exl, exu = compute_data_eb_for_stencil_qoi_eb(
                 term,
                 xv,
-                # flip the lower/upper error bound if the factor is negative
-                np.where(factor < 0, -etu, etl),  # type: ignore
-                np.where(factor < 0, -etl, etu),  # type: ignore
+                etl_stack[i],
+                etu_stack[i],
             )
             # combine the inner error bounds
             if eb_x_lower is None:
