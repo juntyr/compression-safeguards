@@ -4,7 +4,7 @@ Implementation of the [`Safeguards`][compression_safeguards.api.Safeguards], whi
 
 __all__ = ["Safeguards"]
 
-from collections.abc import Collection, Set
+from collections.abc import Collection, Mapping, Set
 
 import numpy as np
 from typing_extensions import Self  # MSPV 3.11
@@ -13,7 +13,7 @@ from .safeguards import SafeguardKind
 from .safeguards.abc import Safeguard
 from .safeguards.pointwise.abc import PointwiseSafeguard
 from .safeguards.stencil.abc import StencilSafeguard
-from .utils.bindings import Bindings, Parameter
+from .utils.bindings import Bindings, Parameter, Value
 from .utils.cast import as_bits
 from .utils.typing import C, S, T
 
@@ -154,7 +154,7 @@ class Safeguards:
         data: np.ndarray[S, np.dtype[T]],
         prediction: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Bindings = Bindings.empty(),
+        late_bound: Mapping[str, Value] | Bindings = Bindings.empty(),
     ) -> np.ndarray[S, np.dtype[C]]:
         """
         Compute the correction required to make the `prediction` array satisfy the safeguards relative to the `data` array.
@@ -168,7 +168,7 @@ class Safeguards:
             The data array, relative to which the safeguards are enforced.
         prediction : np.ndarray[S, np.dtype[T]]
             The prediction array for which the correction is computed.
-        late_bound : Bindings
+        late_bound : Mapping[str, Value] | Bindings
             The bindings for all late-bound parameters of the safeguards.
 
             The bindings must resolve all late-bound parameters and include no
@@ -194,6 +194,10 @@ class Safeguards:
 
         assert data.dtype == prediction.dtype
         assert data.shape == prediction.shape
+
+        late_bound = (
+            late_bound if isinstance(late_bound, Bindings) else Bindings(**late_bound)
+        )
 
         late_bound_reqs = self.late_bound
         late_bound_builtin = {
