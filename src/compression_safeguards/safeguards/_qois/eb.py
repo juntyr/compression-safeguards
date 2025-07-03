@@ -245,21 +245,46 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         argv = evaluate_sympy_expr_to_numpy(arg)
         exprv = _sign(argv)
 
+        # evaluate the lower and upper sign bounds that satisfy the error bound
+        exprv_lower = np.maximum(-1, exprv + np.maximum(-2, np.ceil(eb_expr_lower)))
+        exprv_upper = np.minimum(exprv + np.minimum(np.floor(eb_expr_upper), +2), +1)
+
         if xv.dtype == _float128_dtype:
             smallest_subnormal = _float128_smallest_subnormal
         else:
             smallest_subnormal = np.finfo(xv.dtype).smallest_subnormal
 
+        # compute the lower and upper arg bounds that produce the sign bounds
         argv_lower = np.where(
-            argv < 0, np.array(-np.inf, dtype=xv.dtype), smallest_subnormal
+            _isnan(exprv),
+            exprv,
+            np.where(
+                exprv_lower == 0,
+                zero,
+                np.where(
+                    exprv_lower < 0,
+                    np.array(-np.inf, dtype=xv.dtype),
+                    smallest_subnormal,
+                ),
+            ),
         )
         argv_upper = np.where(
-            argv > 0, np.array(np.inf, dtype=xv.dtype), -smallest_subnormal
+            _isnan(exprv),
+            exprv,
+            np.where(
+                exprv_upper == 0,
+                zero,
+                np.where(
+                    exprv_upper < 0,
+                    -smallest_subnormal,
+                    np.array(np.inf, dtype=xv.dtype),
+                ),
+            ),
         )
 
         # update the error bounds
         eal = np.where(
-            (eb_expr_lower == 0) | (exprv == 0),
+            (eb_expr_lower == 0),
             zero,
             np.minimum(argv_lower - argv, 0),
         )
