@@ -29,7 +29,7 @@ from ..._qois.eb import (
     compute_data_eb_for_stencil_qoi_eb_unchecked,
     ensure_bounded_derived_error,
 )
-from ..._qois.interval import compute_safe_eb_lower_upper_interval
+from ..._qois.interval import compute_safe_eb_lower_upper_interval_union
 from ..._qois.math import CONSTANTS as MATH_CONSTANTS
 from ..._qois.math import FUNCTIONS as MATH_FUNCTIONS
 from ..._qois.re import (
@@ -612,12 +612,12 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             )
             eb_x_lower, eb_x_upper = eb_x_lower_upper
 
-        return compute_safe_eb_lower_upper_interval(
+        return compute_safe_eb_lower_upper_interval_union(
             data,
             data_float,
             eb_x_lower,
             eb_x_upper,
-        ).into_union()
+        )
 
     def get_config(self) -> dict:
         """

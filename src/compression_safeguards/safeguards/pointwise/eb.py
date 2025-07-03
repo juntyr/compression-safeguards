@@ -183,11 +183,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
 
         dataf = data.flatten()
 
-        valid = (
-            Interval.empty_like(dataf)
-            .preserve_inf(dataf)
-            .preserve_signed_nan(dataf, equal_nan=self._equal_nan)
-        )
+        valid = Interval.empty_like(dataf).preserve_inf(dataf)
 
         data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
 
@@ -208,7 +204,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
 
         Lower(lower.flatten()) <= valid[_isfinite(dataf)] <= Upper(upper.flatten())
 
-        return valid.into_union()
+        return valid.preserve_any_nan(dataf, equal_nan=self._equal_nan)
 
     def get_config(self) -> dict:
         """

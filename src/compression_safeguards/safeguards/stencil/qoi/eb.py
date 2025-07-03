@@ -37,7 +37,7 @@ from ..._qois.eb import (
     ensure_bounded_derived_error,
 )
 from ..._qois.finite_difference import create_finite_difference_for_neighbourhood
-from ..._qois.interval import compute_safe_eb_lower_upper_interval
+from ..._qois.interval import compute_safe_eb_lower_upper_interval_union
 from ..._qois.math import CONSTANTS as MATH_CONSTANTS
 from ..._qois.math import FUNCTIONS as MATH_FUNCTIONS
 from ..._qois.re import (
@@ -1146,12 +1146,12 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             eb_x_upper_flat[reverse_indices_windows], axis=1
         ).reshape(data.shape)
 
-        return compute_safe_eb_lower_upper_interval(
+        return compute_safe_eb_lower_upper_interval_union(
             data,
             data_float,
             eb_x_orig_lower,
             eb_x_orig_upper,
-        ).into_union()
+        )
 
     def get_config(self) -> dict:
         """
