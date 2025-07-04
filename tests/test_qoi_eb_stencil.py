@@ -1132,11 +1132,11 @@ def test_late_bound_eb_abs():
 
     late_bound = Bindings(eb=np.array([[2]]))
 
+    imin, imax = np.iinfo(data.dtype).min, np.iinfo(data.dtype).max
+
     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
-    # these bounds could be laxer but we're currently distributing across the
-    #  full neighbourhood
-    assert np.all(valid._lower == (data.flatten() - np.array([2, 2, 2, 2, 2, 2])))
-    assert np.all(valid._upper == (data.flatten() + np.array([2, 2, 2, 2, 2, 2])))
+    assert np.all(valid._lower == np.array([[imin, imin, imin, imin, 4 - 2, imin]]))
+    assert np.all(valid._upper == np.array([[imax, imax, imax, imax, 4 + 2, imax]]))
 
     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
     assert np.all(ok == np.array([True, True, True, True, False, True]).reshape(2, 3))
@@ -1158,11 +1158,11 @@ def test_late_bound_eb_rel():
 
     late_bound = Bindings(eb=np.array([[2]]))
 
+    imin, imax = np.iinfo(data.dtype).min, np.iinfo(data.dtype).max
+
     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
-    # these bounds could be laxer but we're currently distributing across the
-    #  full neighbourhood
-    assert np.all(valid._lower == (data.flatten() - np.array([8, 8, 8, 8, 8, 8])))
-    assert np.all(valid._upper == (data.flatten() + np.array([8, 8, 8, 8, 8, 8])))
+    assert np.all(valid._lower == np.array([[imin, imin, imin, imin, 4 - 8, imin]]))
+    assert np.all(valid._upper == np.array([[imax, imax, imax, imax, 4 + 8, imax]]))
 
     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
     assert np.all(ok == np.array([True, True, True, True, True, True]).reshape(2, 3))
@@ -1184,11 +1184,11 @@ def test_late_bound_eb_ratio():
 
     late_bound = Bindings(eb=np.array([[2]]))
 
+    imin, imax = np.iinfo(data.dtype).min, np.iinfo(data.dtype).max
+
     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
-    # these bounds could be laxer but we're currently distributing across the
-    #  full neighbourhood
-    assert np.all(valid._lower == (data.flatten() - np.array([2, 2, 2, 2, 2, 2])))
-    assert np.all(valid._upper == (data.flatten() + np.array([4, 4, 4, 4, 4, 4])))
+    assert np.all(valid._lower == np.array([[imin, imin, imin, imin, 4 - 2, imin]]))
+    assert np.all(valid._upper == np.array([[imax, imax, imax, imax, 4 + 4, imax]]))
 
     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
     assert np.all(ok == np.array([True, True, True, True, False, True]).reshape(2, 3))
