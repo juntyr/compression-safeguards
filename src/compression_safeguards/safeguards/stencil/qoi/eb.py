@@ -1150,6 +1150,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             eb_x_upper_flat[:-1] = eb_x_upper.flatten()
 
         # for each data element, reduce over the error bounds that affect it
+        # since some data elements may have no error bounds that affect them,
+        #  e.g. because of the valid boundary condition, they may have infinite
+        #  bounds that we need to map back to huge finite bounds
         eb_x_orig_lower: np.ndarray[S, np.dtype[np.floating]] = (
             _nan_to_zero_inf_to_finite(  # type: ignore
                 np.amax(eb_x_lower_flat[reverse_indices_windows], axis=1)

@@ -154,7 +154,7 @@ class Safeguards:
         data: np.ndarray[S, np.dtype[T]],
         prediction: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str, Value] | Bindings = Bindings.empty(),
+        late_bound: Mapping[str | Parameter, Value] | Bindings = Bindings.empty(),
     ) -> np.ndarray[S, np.dtype[C]]:
         """
         Compute the correction required to make the `prediction` array satisfy the safeguards relative to the `data` array.

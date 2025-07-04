@@ -913,7 +913,7 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
 def ensure_bounded_derived_error(
     expr: Callable[[np.ndarray[S, np.dtype[F]]], np.ndarray[S, np.dtype[F]]],
     exprv: np.ndarray[S, np.dtype[F]],
-    xv: None | np.ndarray[S, np.dtype[F]],
+    xv: np.ndarray[S, np.dtype[F]],
     eb_x_guess: np.ndarray[S, np.dtype[F]],
     eb_expr_lower: np.ndarray[S, np.dtype[F]],
     eb_expr_upper: np.ndarray[S, np.dtype[F]],
@@ -931,7 +931,7 @@ def ensure_bounded_derived_error(
         the expression for this error.
     exprv : np.ndarray[S, np.dtype[F]]
         Evaluation of the expression for the zero-error case.
-    xv : None | np.ndarray[S, np.dtype[F]]
+    xv : np.ndarray[S, np.dtype[F]]
         Actual values of the input data, which are only used for better
         refinement of the error bound guess.
     eb_x_guess : np.ndarray[S, np.dtype[F]]
@@ -979,17 +979,14 @@ def ensure_bounded_derived_error(
     if not np.any(eb_exceeded):
         return eb_x_guess
 
-    if xv is not None:
-        # second try to nudge it with respect to the data
-        eb_x_guess = np.where(
-            eb_exceeded, _nextafter(xv + eb_x_guess, xv) - xv, eb_x_guess
-        )  # type: ignore
+    # second try to nudge it with respect to the data
+    eb_x_guess = np.where(eb_exceeded, _nextafter(xv + eb_x_guess, xv) - xv, eb_x_guess)  # type: ignore
 
-        # check again
-        eb_exceeded = is_eb_exceeded(eb_x_guess)
+    # check again
+    eb_exceeded = is_eb_exceeded(eb_x_guess)
 
-        if not np.any(eb_exceeded):
-            return eb_x_guess
+    if not np.any(eb_exceeded):
+        return eb_x_guess
 
     while True:
         # finally fall back to repeatedly cutting it in half

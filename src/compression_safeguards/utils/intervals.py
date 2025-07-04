@@ -343,23 +343,23 @@ class Interval(Generic[T, N]):
         if not np.issubdtype(a.dtype, np.floating):
             return self.into_union()
 
+        (n,) = a.shape
+
+        lower: Interval[T, N] = Interval.empty(a.dtype, n)
+        # copy over the intervals for non-NaN elements
+        Lower(self._lower) <= lower[~_isnan(a)] <= Upper(self._upper)
+
         if not equal_nan:
             # bitwise preserve NaN values
-            Lower(a) <= self[_isnan(a)] <= Upper(a)
-            return self.into_union()
+            Lower(a) <= lower[_isnan(a)] <= Upper(a)
+            return lower.into_union()
 
         # smallest (positive) NaN bit pattern: 0b s 1..1 0..0
         nan_min = np.array(as_bits(np.array(np.inf, dtype=a.dtype)) + 1).view(a.dtype)
         # largest (negative) NaN bit pattern: 0b s 1..1 1..1
         nan_max = np.array(-1, dtype=a.dtype.str.replace("f", "i")).view(a.dtype)
 
-        (n,) = a.shape
-
-        lower: Interval[T, N] = Interval.empty(a.dtype, n)
         upper: Interval[T, N] = Interval.empty(a.dtype, n)
-
-        # copy over the intervals for non-NaN elements
-        Lower(self._lower) <= lower[~_isnan(a)] <= Upper(self._upper)
 
         # create lower interval of all negative NaNs
         Lower(np.array(np.copysign(nan_max, -1))) <= lower[_isnan(a)] <= Upper(
