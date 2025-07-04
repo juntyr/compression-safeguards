@@ -19,6 +19,7 @@ from ....utils.cast import (
     _isinf,
     _isnan,
     _nan_to_zero,
+    _nan_to_zero_inf_to_finite,
     _nextafter,
     as_bits,
     lossless_cast,
@@ -1101,14 +1102,24 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             writeable=False,
         ).reshape((-1, np.prod(window)))
 
+        # only contribute window elements that are used in the QoI
+        window_used = np.zeros(window, dtype=bool)
+        for x in self._qoi_expr.find(sp.tensor.array.expressions.ArrayElement):
+            name, idxs = x.args
+            if name == self._X:
+                window_used[tuple(idxs)] = True
+
         # compute the reverse: for each data element, which windows is it in
         # i.e. for each data element, which QoI elements does it contribute to
         #      and thus which error bounds affect it
         reverse_indices_windows = np.full(
-            (data.size, np.prod(window)), indices_windows.shape[0]
+            (data.size, np.sum(window_used)), indices_windows.shape[0]
         )
         reverse_indices_counter = np.zeros(data.size, dtype=int)
-        for i in range(np.prod(window)):
+        for i, u in enumerate(window_used.flat):
+            # skip window indices that are not used in the QoI
+            if not u:
+                continue
             # manual loop to account for potential aliasing:
             # with a wrapping boundary, more than one j for the same window
             # position j could refer back to the same data element
@@ -1139,12 +1150,16 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             eb_x_upper_flat[:-1] = eb_x_upper.flatten()
 
         # for each data element, reduce over the error bounds that affect it
-        eb_x_orig_lower = np.amax(
-            eb_x_lower_flat[reverse_indices_windows], axis=1
-        ).reshape(data.shape)
-        eb_x_orig_upper = np.amin(
-            eb_x_upper_flat[reverse_indices_windows], axis=1
-        ).reshape(data.shape)
+        eb_x_orig_lower: np.ndarray[S, np.dtype[np.floating]] = (
+            _nan_to_zero_inf_to_finite(  # type: ignore
+                np.amax(eb_x_lower_flat[reverse_indices_windows], axis=1)
+            ).reshape(data.shape)
+        )
+        eb_x_orig_upper: np.ndarray[S, np.dtype[np.floating]] = (
+            _nan_to_zero_inf_to_finite(  # type: ignore
+                np.amin(eb_x_upper_flat[reverse_indices_windows], axis=1)
+            ).reshape(data.shape)
+        )
 
         return compute_safe_eb_lower_upper_interval_union(
             data,
