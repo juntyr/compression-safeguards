@@ -174,6 +174,36 @@ def test_variables():
     check_all_codecs(np.array([]), 'c["$x"] * x')
 
 
+def test_late_bound_escape():
+    import inspect
+
+    from compression_safeguards.safeguards._qois.compile import (
+        sympy_expr_to_numpy,
+    )
+
+    safeguards = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi='sin(c["sin"] + x)', type="abs", eb=0
+    )
+    safeguards.compute_safe_intervals(np.linspace(0, 100), late_bound=Bindings(sin=42))
+
+    fn = sympy_expr_to_numpy(
+        [safeguards._x, *safeguards._late_bound_constants],
+        safeguards._qoi_expr,
+        dtype=np.dtype(np.float64),
+    )
+
+    src = inspect.getsource(fn)
+
+    dummy = src[src.index("Dummy_") :]
+    dummy = dummy[: dummy.index(")")]
+
+    # ensure that late-bound constants don't override functions in compile
+    assert (
+        inspect.getsource(fn)
+        == f"def _lambdifygenerated(x, {dummy}):\n    return sin(((x) + ({dummy})))\n"
+    )
+
+
 @pytest.mark.parametrize("check", CHECKS)
 def test_constant(check):
     with pytest.raises(AssertionError, match="constant"):
