@@ -256,8 +256,9 @@ _NPZ_DATA_URI_BASE64: str = "data:application/x-npz;base64,"
 
 
 def _encode_value(p: Parameter, v: Value) -> int | float | str:
-    if isinstance(v, (int, float)):
-        return v
+    # we cannot use isinstance here since np.float64 is a subclass of float
+    if type(v) in (int, float):
+        return v  # type: ignore
 
     io = BytesIO()
     np.savez_compressed(io, allow_pickle=False, **{str(p): v})
