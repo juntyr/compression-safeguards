@@ -1272,6 +1272,26 @@ def test_pointwise_normalised_absolute_error(check):
 
 
 def test_late_bound_constant_boundary():
+    for c in ["$x", "$X"]:
+        with pytest.raises(
+            AssertionError,
+            match="late-bound constant boundary must be a scalar",
+        ):
+            safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+                qoi="X[0,0] - X[2,0]",
+                neighbourhood=[
+                    dict(
+                        axis=0,
+                        before=1,
+                        after=1,
+                        boundary="constant",
+                        constant_boundary=c,
+                    ),
+                ],
+                type="abs",
+                eb=1,
+            )
+
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         qoi="X[0,0] - X[2,0]",
         neighbourhood=[

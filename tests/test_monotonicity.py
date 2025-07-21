@@ -285,6 +285,24 @@ def test_late_bound_constant_boundary():
         ],
     )
 
+    for c in ["$x", "$X"]:
+        with pytest.raises(
+            AssertionError,
+            match="late-bound constant boundary must be a scalar",
+        ):
+            safeguards = Safeguards(
+                safeguards=[
+                    dict(
+                        kind="monotonicity",
+                        monotonicity="strict_to_weak",
+                        window=1,
+                        boundary="constant",
+                        constant_boundary=c,
+                    ),
+                    dict(kind="sign"),
+                ],
+            )
+
     safeguards = Safeguards(
         safeguards=[
             dict(

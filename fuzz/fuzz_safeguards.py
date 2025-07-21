@@ -65,7 +65,9 @@ class FuzzCodec(Codec):
 numcodecs.registry.register_codec(FuzzCodec)
 
 
-def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
+def generate_parameter(
+    data: atheris.FuzzedDataProvider, ty: type, depth: int, late_bound: set[str]
+):
     if ty is types.NoneType:
         return None
     if ty is float:
@@ -78,7 +80,7 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
     if typing.get_origin(ty) in (Collection, Sequence):
         if len(typing.get_args(ty)) == 1:
             return [
-                generate_parameter(data, typing.get_args(ty)[0], depth)
+                generate_parameter(data, typing.get_args(ty)[0], depth, late_bound)
                 for _ in range(data.ConsumeIntInRange(0, 3 - depth))
             ]
 
@@ -90,30 +92,34 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
 
         if len(tys) == 2 and tys[0] is dict and tys[1] is NeighbourhoodBoundaryAxis:
             return {
-                p: generate_parameter(data, v.annotation, depth)
+                p: generate_parameter(data, v.annotation, depth, late_bound)
                 for p, v in signature(NeighbourhoodBoundaryAxis).parameters.items()
             }
 
         if len(tys) == 2 and tys[0] is str and tys[1] is Parameter:
-            # since numcodecs_safeguards doesn't yet support late-bound
-            #  parameters, we can just generate a constant name here
-            return "param"
-
-        if len(tys) > 2 and str in tys and Parameter in tys:
-            # since numcodecs_safeguards doesn't yet support late-bound
-            #  parameters, we can just generate from the other options here
-            tys = tuple(t for t in tys if t not in (str, Parameter))
+            i = data.ConsumeIntInRange(0, 3)
+            if i == 0:
+                p = data.ConsumeString(2)
+                late_bound.add(p)
+                return p
+            return ["$x", "$x_min", "$x_max"][i - 1]
 
         if (
             len(tys) > 1
             and tys[0] is dict
             and all(issubclass(t, Safeguard) for t in tys[1:])
         ):
-            return generate_safeguard_config(data, depth + 1)
+            return generate_safeguard_config(data, depth + 1, late_bound)
+
+        if len(tys) > 2 and str in tys and Parameter in tys:
+            # ensure that str | Parameter stay together during the union pick
+            tys = tuple(t for t in tys if t not in (str, Parameter)) + (
+                str | Parameter,
+            )
 
         ty = tys[data.ConsumeIntInRange(0, len(tys) - 1)]
 
-        return generate_parameter(data, ty, depth)
+        return generate_parameter(data, ty, depth, late_bound)
 
     if ty in (PointwiseExpr, StencilExpr):
         ATOMS = ["x", int, float] + list(MATH_CONSTANTS) + ["V"]
@@ -180,13 +186,15 @@ def generate_parameter(data: atheris.FuzzedDataProvider, ty: type, depth: int):
     assert False, f"unknown parameter type {ty!r}"
 
 
-def generate_safeguard_config(data: atheris.FuzzedDataProvider, depth: int):
+def generate_safeguard_config(
+    data: atheris.FuzzedDataProvider, depth: int, late_bound: set[str]
+):
     kind = list(SafeguardKind)[data.ConsumeIntInRange(0, len(SafeguardKind) - 1)]
 
     return {
         "kind": kind.name,
         **{
-            p: generate_parameter(data, v.annotation, depth)
+            p: generate_parameter(data, v.annotation, depth, late_bound)
             for p, v in signature(kind.value).parameters.items()
         },
     }
@@ -195,8 +203,11 @@ def generate_safeguard_config(data: atheris.FuzzedDataProvider, depth: int):
 def check_one_input(data) -> None:
     data = atheris.FuzzedDataProvider(data)
 
+    late_bound: set[str] = set()
+
     safeguards = [
-        generate_safeguard_config(data, 0) for _ in range(data.ConsumeIntInRange(0, 8))
+        generate_safeguard_config(data, 0, late_bound)
+        for _ in range(data.ConsumeIntInRange(0, 8))
     ]
 
     dtype: np.dtype = list(Safeguards.supported_dtypes())[
@@ -223,11 +234,35 @@ def check_one_input(data) -> None:
         raw = raw.reshape((sizea, sizeb))
         decoded = decoded.reshape((sizea, sizeb))
 
+    fixed_constants = dict()
+    for p in late_bound:
+        c = data.ConsumeIntInRange(0, 4)
+        if c == 0:
+            fixed_constants[p] = data.ConsumeInt(1)
+        elif c == 1:
+            fixed_constants[p] = data.ConsumeFloat()
+        elif c == 2:
+            b = data.ConsumeBytes(size * np.dtype(int).itemsize)
+            if len(b) != size * np.dtype(int).itemsize:
+                return
+            fixed_constants[p] = np.frombuffer(b, dtype=int).reshape(raw.shape)
+        elif c == 3:
+            b = data.ConsumeBytes(size * np.dtype(float).itemsize)
+            if len(b) != size * np.dtype(float).itemsize:
+                return
+            fixed_constants[p] = np.frombuffer(b, dtype=float).reshape(raw.shape)
+        else:
+            b = data.ConsumeBytes(size * dtype.itemsize)
+            if len(b) != size * dtype.itemsize:
+                return
+            fixed_constants[p] = np.frombuffer(b, dtype=dtype).reshape(raw.shape)
+
     try:
         with timeout(1):
             safeguard = SafeguardsCodec(
                 codec=FuzzCodec(raw, decoded),
                 safeguards=safeguards,
+                fixed_constants=fixed_constants,
             )
     except (AssertionError, Warning, TimeoutError):
         return
@@ -261,6 +296,11 @@ def check_one_input(data) -> None:
                 isinstance(err, (TypeError, ValueError))
                 and ("cannot losslessly cast" in str(err))
             )
+            or (
+                isinstance(err, ValueError)
+                and ("cannot cast non-finite" in str(err))
+                and ("to saturating finite" in str(err))
+            )
         ):
             return
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")
@@ -270,6 +310,7 @@ def check_one_input(data) -> None:
     safeguard = SafeguardsCodec(
         codec=dict(id="zero"),
         safeguards=safeguards,
+        fixed_constants=fixed_constants,
     )
 
     grepr = repr(safeguard)

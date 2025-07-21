@@ -564,7 +564,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         return cls(**config)
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(codec={self._codec!r}, safeguards={list(self._safeguards.safeguards)!r}, lossless={Lossless(for_codec=self._lossless_for_codec, for_safeguards=self._lossless_for_safeguards)!r})"
+        return f"{type(self).__name__}(codec={self._codec!r}, safeguards={list(self._safeguards.safeguards)!r}, fixed_constants={dict(**self._late_bound._bindings)!r}, lossless={Lossless(for_codec=self._lossless_for_codec, for_safeguards=self._lossless_for_safeguards)!r})"
 
     def map(self, mapper: Callable[[Codec], Codec]) -> "SafeguardsCodec":
         """
