@@ -6,7 +6,7 @@ import sympy as sp
 import sympy.tensor.array.expressions  # noqa: F401
 from typing_extensions import Never  # MSPV 3.11
 
-from ...utils.cast import _float128, _float128_dtype, _float128_precision, _sign
+from ...utils.cast import _float128_dtype, _float128_precision, _sign
 
 
 def sympy_expr_to_numpy(
@@ -25,28 +25,49 @@ def sympy_expr_to_numpy(
     return sp.lambdify(
         symbols,
         expr,
-        modules=(
-            (
-                # polyfill operations that numpy_quaddtype does not yet support
-                #  but that numpy supports (otherwise sympy polyfills)
-                [
-                    dict(
-                        # special functions
-                        sign=_sign,
-                        # hyperbolic functions
-                        sinh=lambda x: (np.exp(x) - np.exp(-x)) / 2,
-                        cosh=lambda x: (np.exp(x) + np.exp(-x)) / 2,
-                        tanh=lambda x: (np.exp(x * 2) - 1) / (np.exp(x * 2) + 1),
-                        arcsinh=lambda x: np.log(x + np.sqrt(x**2 + 1)),
-                        arccosh=lambda x: np.log(x + np.sqrt(x**2 - 1)),
-                        arctanh=lambda x: np.log((1 + x) / (1 - x)) / 2,
-                    )
-                ]
+        modules=dict(
+            # literal constant
+            **{dtype.name: dtype.type},
+            # elementary functions
+            sqrt=np.sqrt,
+            exp=np.exp,
+            log=np.log,
+            # special functions
+            sign=_sign if dtype == _float128_dtype else np.sign,
+            # rounding functions
+            floor=np.floor,
+            ceil=np.ceil,
+            trunc=np.trunc,
+            rint=np.rint,
+            # trigonometric functions
+            # sympy polyfills cot, sec, csc, acot, asec, acsc
+            sin=np.sin,
+            cos=np.cos,
+            tan=np.tan,
+            arcsin=np.arcsin,
+            arccos=np.arccos,
+            arctan=np.arctan,
+            # hyperbolic functions
+            # sympy polyfills coth, sech, csch, acoth, asech, acsch
+            **(
+                dict(
+                    sinh=np.sinh,
+                    cosh=np.cosh,
+                    tanh=np.tanh,
+                    arcsinh=np.arcsinh,
+                    arccosh=np.arccosh,
+                    arctanh=np.arctanh,
+                )
                 if dtype == _float128_dtype
-                else []
-            )
-            + ["numpy"]
-            + ([{_float128_dtype.name: _float128}] if dtype == _float128_dtype else [])
+                else dict(
+                    sinh=lambda x: (np.exp(x) - np.exp(-x)) / 2,  # type: ignore
+                    cosh=lambda x: (np.exp(x) + np.exp(-x)) / 2,  # type: ignore
+                    tanh=lambda x: (np.exp(x * 2) - 1) / (np.exp(x * 2) + 1),  # type: ignore
+                    arcsinh=lambda x: np.log(x + np.sqrt(x**2 + 1)),  # type: ignore
+                    arccosh=lambda x: np.log(x + np.sqrt(x**2 - 1)),  # type: ignore
+                    arctanh=lambda x: np.log((1 + x) / (1 - x)) / 2,  # type: ignore
+                )
+            ),
         ),
         printer=_create_sympy_numpy_printer_class(dtype),
         docstring_limit=0,
