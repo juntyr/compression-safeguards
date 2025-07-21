@@ -301,6 +301,11 @@ def check_one_input(data) -> None:
                 and ("cannot cast non-finite" in str(err))
                 and ("to saturating finite" in str(err))
             )
+            or (
+                isinstance(err, ValueError)
+                # late-bound select safeguard with invalid selector index
+                and ("invalid entry in choice array" in str(err))
+            )
         ):
             return
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")
