@@ -22,6 +22,8 @@ def sympy_expr_to_numpy(
     variable inputs are numpy arrays of the same `dtype`.
     """
 
+    print(expr, symbols, dtype, dtype == _float128_dtype)
+
     return sp.lambdify(
         symbols,
         expr,
@@ -34,6 +36,10 @@ def sympy_expr_to_numpy(
             log=np.log,
             # special functions
             sign=_sign if dtype == _float128_dtype else np.sign,
+            # FIXME: https://github.com/numpy/numpy-user-dtypes/issues/113
+            mod=(lambda p, q: np.mod(np.mod(p, q) + q, q))
+            if dtype == _float128_dtype
+            else np.mod,
             # rounding functions
             floor=np.floor,
             ceil=np.ceil,
@@ -51,21 +57,21 @@ def sympy_expr_to_numpy(
             # sympy polyfills coth, sech, csch, acoth, asech, acsch
             **(
                 dict(
-                    sinh=np.sinh,
-                    cosh=np.cosh,
-                    tanh=np.tanh,
-                    arcsinh=np.arcsinh,
-                    arccosh=np.arccosh,
-                    arctanh=np.arctanh,
-                )
-                if dtype == _float128_dtype
-                else dict(
                     sinh=lambda x: (np.exp(x) - np.exp(-x)) / 2,  # type: ignore
                     cosh=lambda x: (np.exp(x) + np.exp(-x)) / 2,  # type: ignore
                     tanh=lambda x: (np.exp(x * 2) - 1) / (np.exp(x * 2) + 1),  # type: ignore
                     arcsinh=lambda x: np.log(x + np.sqrt(x**2 + 1)),  # type: ignore
                     arccosh=lambda x: np.log(x + np.sqrt(x**2 - 1)),  # type: ignore
                     arctanh=lambda x: np.log((1 + x) / (1 - x)) / 2,  # type: ignore
+                )
+                if dtype == _float128_dtype
+                else dict(
+                    sinh=np.sinh,
+                    cosh=np.cosh,
+                    tanh=np.tanh,
+                    arcsinh=np.arcsinh,
+                    arccosh=np.arccosh,
+                    arctanh=np.arctanh,
                 )
             ),
         ),
@@ -160,10 +166,6 @@ def _create_sympy_numpy_printer_class(
             q2 = self._print(q / 2)
             q = self._print(q)
             # map p%q to [-q/2, +q/2]
-            # ((... % q) + q) % q is required for numpy_quaddtype
-            if dtype == _float128_dtype:
-                return f"(mod(mod(({p}) + ({q2}), {q}) + ({q}), {q}) - ({q2}))"
-            else:
-                return f"(mod(({p}) + ({q2}), {q}) - ({q2}))"
+            return f"(mod(({p}) + ({q2}), {q}) - ({q2}))"
 
     return NumPyDtypePrinter
