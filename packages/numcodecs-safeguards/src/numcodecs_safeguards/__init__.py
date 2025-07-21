@@ -154,7 +154,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         The mapping must resolve all late-bound parameters of the safeguards
         and include no extraneous parameters.
 
-        The provided values must have a compatible shape and dtype for *any*
+        The provided values must have a compatible shape and values for *any*
         data that will be encoded with this codec, otherwise
         [`encode`][numcodecs_safeguards.SafeguardsCodec.encode] will fail.
 
@@ -273,7 +273,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         The set of late-bound parameters that the safeguards have.
 
         The late-bound parameters must be provided as fixed constants. They
-        must have a compatible shape and dtype for any data that will be
+        must have a compatible shape and values for any data that will be
         encoded with this codec, otherwise
         [`encode`][numcodecs_safeguards.SafeguardsCodec.encode] will fail.
         """
@@ -300,9 +300,12 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         Only existing late-bound constants may be overridden and no new ones
         may be added.
 
-        The provided values must have a compatible shape and dtype for *any*
+        The provided values must have a compatible shape and values for *any*
         data that will be encoded with this codec, otherwise
         [`encode`][numcodecs_safeguards.SafeguardsCodec.encode] will fail.
+
+        This method can be used inside a `with` statement to temporarily update
+        the late-bound parameters.
 
         Parameters
         ----------

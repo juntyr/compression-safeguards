@@ -163,7 +163,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         if isinstance(self._constant_boundary, Parameter):
             assert self._constant_boundary not in ["$x", "$X"], (
-                "late-bound constant boundary must be a scalar but constant data {self._constant_boundary} may not be"
+                f"late-bound constant boundary must be a scalar but constant data {self._constant_boundary} may not be"
             )
 
         self._axis = axis
