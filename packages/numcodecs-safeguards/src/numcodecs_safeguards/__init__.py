@@ -140,24 +140,36 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         [`SafeguardKind`][compression_safeguards.safeguards.SafeguardKind]
         for an enumeration of all supported safeguards.
 
-        The `SafeguardsCodec` does not (yet) support safeguards with late-
-        bound parameters, e.g. the
-        [`SelectSafeguard`][compression_safeguards.safeguards.combinators.select.SelectSafeguard].
+        The `SafeguardsCodec` supports safeguards with late-bound parameters,
+        e.g. the
+        [`SelectSafeguard`][compression_safeguards.safeguards.combinators.select.SelectSafeguard],
+        but they must be provided as `fixed_constants` that are *fixed* and
+        must be compatible with *any* data that will be encoded with this
+        codec. Therefore, fixed constants should only be used for late-bound
+        parameters that can be fixed across all uses of the codec.
     fixed_constants : Mapping[str | Parameter, Value] | Bindings
-        Mapping of parameter names to fixed constant scalars or arrays
-        that will be provided as late-bound parameters to the safeguards.
+        Mapping of parameter names to *fixed* constant scalars or arrays that
+        will be provided as late-bound parameters to the safeguards.
 
         The mapping must resolve all late-bound parameters of the safeguards
         and include no extraneous parameters.
 
-        The provided values must have a compatible shape and dtype for any data
-        that will be encoded with this codec, otherwise
+        The provided values must have a compatible shape and dtype for *any*
+        data that will be encoded with this codec, otherwise
         [`encode`][numcodecs_safeguards.SafeguardsCodec.encode] will fail.
 
         You can use the
         [`update_fixed_constants`][numcodecs_safeguards.SafeguardsCodec.update_fixed_constants]
         method inside a `with` statement to temporarily update the late-bound
         parameters.
+
+        The fixed constants are included in the
+        [config][numcodecs_safeguards.SafeguardsCodec.get_config] of the codec.
+        While [`int`][int] and [`float`][float] scalars are included as-is,
+        numpy scalars and arrays are encoded to the losslessly compressed
+        [`.npz`][numpy.savez_compressed] format and stored in a
+        `data:application/x-npz;base64,<data>`
+        [data URI](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Schemes/data).
     lossless : None | dict | Lossless, optional
         The lossless encoding that is applied after the codec and the
         safeguards:
@@ -288,8 +300,8 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         Only existing late-bound constants may be overridden and no new ones
         may be added.
 
-        The provided values must have a compatible shape and dtype for any data
-        that will be encoded with this codec, otherwise
+        The provided values must have a compatible shape and dtype for *any*
+        data that will be encoded with this codec, otherwise
         [`encode`][numcodecs_safeguards.SafeguardsCodec.encode] will fail.
 
         Parameters
