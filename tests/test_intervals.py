@@ -275,3 +275,135 @@ def test_union_adjacent():
 
     np.testing.assert_array_equal(ab._lower, np.array([[1]]))
     np.testing.assert_array_equal(ab._upper, np.array([[5]]))
+
+
+def test_preserve_inf():
+    data = np.array([-np.nan, -np.inf, -42, -0.0, 0.0, 42, np.inf, np.nan])
+
+    empty = Interval.empty_like(data)
+    preserved = Interval.empty_like(data).preserve_inf(data)
+
+    assert np.all(
+        as_bits(preserved._lower)
+        == as_bits(np.where(np.isinf(data), data, empty._lower))
+    )
+    assert np.all(
+        as_bits(preserved._upper)
+        == as_bits(np.where(np.isinf(data), data, empty._upper))
+    )
+
+
+def test_preserve_signed_nan():
+    data = np.array(
+        [-np.nan, -np.inf, -42, -0.0, 0.0, 42, np.inf, np.nan], dtype=np.float64
+    )
+
+    empty = Interval.empty_like(data)
+    preserved = Interval.empty_like(data).preserve_signed_nan(data, equal_nan=False)
+
+    assert np.all(
+        as_bits(preserved._lower)
+        == as_bits(np.where(np.isnan(data), data, empty._lower))
+    )
+    assert np.all(
+        as_bits(preserved._upper)
+        == as_bits(np.where(np.isnan(data), data, empty._upper))
+    )
+
+    preserved = Interval.empty_like(data).preserve_signed_nan(data, equal_nan=True)
+
+    assert (
+        as_bits(preserved._lower[0]) == 0xFFFFFFFFFFFFFFFF
+    )  # negative NaN with largest mantissa
+    assert (
+        as_bits(preserved._upper[0]) == 0xFFF0000000000001
+    )  # negative NaN with smallest mantissa
+    assert np.all(as_bits(preserved._lower[1:-1]) == as_bits(empty._lower[1:-1]))
+    assert np.all(as_bits(preserved._upper[1:-1]) == as_bits(empty._upper[1:-1]))
+    assert (
+        as_bits(preserved._lower[-1]) == 0x7FF0000000000001
+    )  # positive NaN with smallest mantissa
+    assert (
+        as_bits(preserved._upper[-1]) == 0x7FFFFFFFFFFFFFFF
+    )  # positive NaN with largest mantissa
+
+
+def test_preserve_any_nan():
+    data = np.array(
+        [-np.nan, -np.inf, -42, -0.0, 0.0, 42, np.inf, np.nan], dtype=np.float64
+    )
+
+    empty = Interval.empty_like(data)
+    preserved = Interval.empty_like(data).preserve_any_nan(data, equal_nan=False)
+
+    assert np.all(
+        as_bits(preserved._lower)
+        == as_bits(np.where(np.isnan(data), data, empty._lower))
+    )
+    assert np.all(
+        as_bits(preserved._upper)
+        == as_bits(np.where(np.isnan(data), data, empty._upper))
+    )
+
+    preserved = Interval.empty_like(data).preserve_any_nan(data, equal_nan=True)
+
+    assert (
+        as_bits(preserved._lower[0, 0]) == 0xFFFFFFFFFFFFFFFF
+    )  # negative NaN with largest mantissa
+    assert (
+        as_bits(preserved._upper[0, 0]) == 0xFFF0000000000001
+    )  # negative NaN with smallest mantissa
+    assert (
+        as_bits(preserved._lower[1, 0]) == 0x7FF0000000000001
+    )  # positive NaN with smallest mantissa
+    assert (
+        as_bits(preserved._upper[1, 0]) == 0x7FFFFFFFFFFFFFFF
+    )  # positive NaN with largest mantissa
+    assert np.all(as_bits(preserved._lower[:, 1:-1]) == as_bits(empty._lower[1:-1]))
+    assert np.all(as_bits(preserved._upper[:, 1:-1]) == as_bits(empty._upper[1:-1]))
+    assert (
+        as_bits(preserved._lower[0, -1]) == 0xFFFFFFFFFFFFFFFF
+    )  # negative NaN with largest mantissa
+    assert (
+        as_bits(preserved._upper[0, -1]) == 0xFFF0000000000001
+    )  # negative NaN with smallest mantissa
+    assert (
+        as_bits(preserved._lower[1, -1]) == 0x7FF0000000000001
+    )  # positive NaN with smallest mantissa
+    assert (
+        as_bits(preserved._upper[1, -1]) == 0x7FFFFFFFFFFFFFFF
+    )  # positive NaN with largest mantissa
+
+
+def test_preserve_finite():
+    data = np.array([-np.nan, -np.inf, -42, -0.0, 0.0, 42, np.inf, np.nan])
+
+    empty = Interval.empty_like(data)
+    preserved = Interval.empty_like(data).preserve_finite(data)
+
+    fin = np.finfo(data.dtype).max
+
+    assert np.all(
+        as_bits(preserved._lower)
+        == as_bits(np.where(np.isfinite(data), -fin, empty._lower))
+    )
+    assert np.all(
+        as_bits(preserved._upper)
+        == as_bits(np.where(np.isfinite(data), fin, empty._upper))
+    )
+
+
+def test_preserve_non_nan():
+    data = np.array([-np.nan, -np.inf, -42, -0.0, 0.0, 42, np.inf, np.nan])
+
+    empty = Interval.empty_like(data)
+    preserved = Interval.empty_like(data).preserve_non_nan(data)
+
+    assert np.all(
+        as_bits(preserved._lower)
+        == as_bits(np.where(np.isnan(data), empty._lower, -np.inf))
+    )
+    assert np.all(
+        as_bits(preserved._upper)
+        == as_bits(np.where(np.isnan(data), empty._upper, np.inf))
+    )

@@ -23,12 +23,13 @@ from ....utils.cast import (
 )
 from ....utils.intervals import IntervalUnion
 from ....utils.typing import F, S, T
+from ..._qois.associativity import rewrite_qoi_expr
 from ..._qois.compile import sympy_expr_to_numpy as compile_sympy_expr_to_numpy
 from ..._qois.eb import (
     compute_data_eb_for_stencil_qoi_eb_unchecked,
     ensure_bounded_derived_error,
 )
-from ..._qois.interval import compute_safe_eb_lower_upper_interval
+from ..._qois.interval import compute_safe_eb_lower_upper_interval_union
 from ..._qois.math import CONSTANTS as MATH_CONSTANTS
 from ..._qois.math import FUNCTIONS as MATH_FUNCTIONS
 from ..._qois.re import (
@@ -248,7 +249,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         qoi: PointwiseExpr,
         type: str | ErrorBound,
         eb: int | float | str | Parameter,
-    ):
+    ) -> None:
         self._type = type if isinstance(type, ErrorBound) else ErrorBound[type]
 
         if isinstance(eb, Parameter):
@@ -302,6 +303,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             assert isinstance(qoi_expr, sp.Basic), (
                 "QoI expression must evaluate to a numeric expression"
             )
+            qoi_expr = rewrite_qoi_expr(qoi_expr)
             self._late_bound_constants = frozenset(
                 s for s in qoi_expr.free_symbols if isinstance(s, LateBoundConstant)
             )
@@ -610,12 +612,12 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             )
             eb_x_lower, eb_x_upper = eb_x_lower_upper
 
-        return compute_safe_eb_lower_upper_interval(
+        return compute_safe_eb_lower_upper_interval_union(
             data,
             data_float,
             eb_x_lower,
             eb_x_upper,
-        ).into_union()
+        )
 
     def get_config(self) -> dict:
         """

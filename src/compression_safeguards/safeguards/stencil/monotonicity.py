@@ -133,7 +133,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         boundary: str | BoundaryCondition,
         constant_boundary: None | int | float | str | Parameter = None,
         axis: None | int = None,
-    ):
+    ) -> None:
         self._monotonicity = (
             monotonicity
             if isinstance(monotonicity, Monotonicity)
@@ -160,6 +160,11 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             self._constant_boundary = Parameter(constant_boundary)
         else:
             self._constant_boundary = constant_boundary
+
+        if isinstance(self._constant_boundary, Parameter):
+            assert self._constant_boundary not in ["$x", "$X"], (
+                f"late-bound constant boundary must be a scalar but constant data {self._constant_boundary} may not be"
+            )
 
         self._axis = axis
 

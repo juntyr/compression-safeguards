@@ -19,6 +19,7 @@ from ....utils.cast import (
     _isinf,
     _isnan,
     _nan_to_zero,
+    _nan_to_zero_inf_to_finite,
     _nextafter,
     as_bits,
     lossless_cast,
@@ -30,13 +31,14 @@ from ....utils.typing import F, S, T
 from ..._qois.amath import CONSTRUCTORS as AMATH_CONSTRUCTORS
 from ..._qois.amath import FUNCTIONS as AMATH_FUNCTIONS
 from ..._qois.array import NumPyLikeArray
+from ..._qois.associativity import rewrite_qoi_expr
 from ..._qois.compile import sympy_expr_to_numpy as compile_sympy_expr_to_numpy
 from ..._qois.eb import (
     compute_data_eb_for_stencil_qoi_eb_unchecked,
     ensure_bounded_derived_error,
 )
 from ..._qois.finite_difference import create_finite_difference_for_neighbourhood
-from ..._qois.interval import compute_safe_eb_lower_upper_interval
+from ..._qois.interval import compute_safe_eb_lower_upper_interval_union
 from ..._qois.math import CONSTANTS as MATH_CONSTANTS
 from ..._qois.math import FUNCTIONS as MATH_FUNCTIONS
 from ..._qois.re import (
@@ -294,7 +296,11 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
           , (
                 "grid_spacing", "=", expr    (* scalar uniform grid spacing along the axis *)
               | "grid_centre", "=", expr     (* centre of an arbitrary grid along the axis *)
-          )
+            )
+          , [
+                ",",
+                "grid_period", "=", expr     (* optional grid period, e.g. 2*pi or 360 *)
+            ]
       , ")"
     ;
     ```
@@ -357,7 +363,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         neighbourhood: Sequence[dict | NeighbourhoodBoundaryAxis],
         type: str | ErrorBound,
         eb: int | float | str | Parameter,
-    ):
+    ) -> None:
         self._neighbourhood = tuple(
             axis
             if isinstance(axis, NeighbourhoodBoundaryAxis)
@@ -454,6 +460,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             assert isinstance(qoi_expr, sp.Basic), (
                 "QoI expression must evaluate to a numeric expression"
             )
+            qoi_expr = rewrite_qoi_expr(qoi_expr)
             self._late_bound_constants = frozenset(
                 s for s in qoi_expr.free_symbols if isinstance(s, LateBoundConstant)
             )
@@ -1095,14 +1102,24 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             writeable=False,
         ).reshape((-1, np.prod(window)))
 
+        # only contribute window elements that are used in the QoI
+        window_used = np.zeros(window, dtype=bool)
+        for x in self._qoi_expr.find(sp.tensor.array.expressions.ArrayElement):
+            name, idxs = x.args
+            if name == self._X:
+                window_used[tuple(idxs)] = True
+
         # compute the reverse: for each data element, which windows is it in
         # i.e. for each data element, which QoI elements does it contribute to
         #      and thus which error bounds affect it
         reverse_indices_windows = np.full(
-            (data.size, np.prod(window)), indices_windows.shape[0]
+            (data.size, np.sum(window_used)), indices_windows.shape[0]
         )
         reverse_indices_counter = np.zeros(data.size, dtype=int)
-        for i in range(np.prod(window)):
+        for i, u in enumerate(window_used.flat):
+            # skip window indices that are not used in the QoI
+            if not u:
+                continue
             # manual loop to account for potential aliasing:
             # with a wrapping boundary, more than one j for the same window
             # position j could refer back to the same data element
@@ -1133,19 +1150,26 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             eb_x_upper_flat[:-1] = eb_x_upper.flatten()
 
         # for each data element, reduce over the error bounds that affect it
-        eb_x_orig_lower = np.amax(
-            eb_x_lower_flat[reverse_indices_windows], axis=1
-        ).reshape(data.shape)
-        eb_x_orig_upper = np.amin(
-            eb_x_upper_flat[reverse_indices_windows], axis=1
-        ).reshape(data.shape)
+        # since some data elements may have no error bounds that affect them,
+        #  e.g. because of the valid boundary condition, they may have infinite
+        #  bounds that we need to map back to huge finite bounds
+        eb_x_orig_lower: np.ndarray[S, np.dtype[np.floating]] = (
+            _nan_to_zero_inf_to_finite(  # type: ignore
+                np.amax(eb_x_lower_flat[reverse_indices_windows], axis=1)
+            ).reshape(data.shape)
+        )
+        eb_x_orig_upper: np.ndarray[S, np.dtype[np.floating]] = (
+            _nan_to_zero_inf_to_finite(  # type: ignore
+                np.amin(eb_x_upper_flat[reverse_indices_windows], axis=1)
+            ).reshape(data.shape)
+        )
 
-        return compute_safe_eb_lower_upper_interval(
+        return compute_safe_eb_lower_upper_interval_union(
             data,
             data_float,
             eb_x_orig_lower,
             eb_x_orig_upper,
-        ).into_union()
+        )
 
     def get_config(self) -> dict:
         """
@@ -1309,6 +1333,7 @@ _QOI_KWARG_PATTERN = (
             "axis",
             "grid_spacing",
             "grid_centre",
+            "grid_period",
         )
     )
     + r")"

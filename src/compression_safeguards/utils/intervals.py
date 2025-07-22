@@ -89,6 +89,7 @@ class Interval(Generic[T, N]):
 
     - [`Interval.preserve_inf`][compression_safeguards.utils.intervals.Interval.preserve_inf]
     - [`Interval.preserve_signed_nan`][compression_safeguards.utils.intervals.Interval.preserve_signed_nan]
+    - [`Interval.preserve_any_nan`][compression_safeguards.utils.intervals.Interval.preserve_any_nan]
     - [`Interval.preserve_finite`][compression_safeguards.utils.intervals.Interval.preserve_finite]
     - [`Interval.preserve_non_nan`][compression_safeguards.utils.intervals.Interval.preserve_non_nan]
 
@@ -308,6 +309,68 @@ class Interval(Generic[T, N]):
         )
 
         return self
+
+    def preserve_any_nan(
+        self, a: np.ndarray[tuple[N], np.dtype[T]], *, equal_nan: bool
+    ) -> "IntervalUnion[T, N, int]":
+        """
+        Preserve all NaN values in `a`, ignoring their sign bit.
+
+        - If `equal_nan` is [`True`][True], the intervals corresponding to
+          the NaN values will include all possible NaN values, irrespective of
+          their sign bit.
+        - If `equal_nan` is [`False`][False], all NaN values are preserved
+          exactly.
+
+        Since there are two disjoint value regions of NaNs (positive and
+        negative), this method returns a union of intervals.
+
+        Parameters
+        ----------
+        a : np.ndarray[tuple[N], np.dtype[T]]
+            The arrays whose NaN values this interval should preserve
+        equal_nan : bool
+            Whether any NaN values matches another NaN value or if NaN values
+            should be preserved exactly
+
+        Returns
+        -------
+        union : IntervalUnion[T, N, int]
+            Returns the union of the existing intervals for non-NaN values and
+            the NaN-preserving intervals for NaN values.
+        """
+
+        if not np.issubdtype(a.dtype, np.floating):
+            return self.into_union()
+
+        (n,) = a.shape
+
+        lower: Interval[T, N] = Interval.empty(a.dtype, n)
+        # copy over the intervals for non-NaN elements
+        Lower(self._lower) <= lower[~_isnan(a)] <= Upper(self._upper)
+
+        if not equal_nan:
+            # bitwise preserve NaN values
+            Lower(a) <= lower[_isnan(a)] <= Upper(a)
+            return lower.into_union()
+
+        # smallest (positive) NaN bit pattern: 0b s 1..1 0..0
+        nan_min = np.array(as_bits(np.array(np.inf, dtype=a.dtype)) + 1).view(a.dtype)
+        # largest (negative) NaN bit pattern: 0b s 1..1 1..1
+        nan_max = np.array(-1, dtype=a.dtype.str.replace("f", "i")).view(a.dtype)
+
+        upper: Interval[T, N] = Interval.empty(a.dtype, n)
+
+        # create lower interval of all negative NaNs
+        Lower(np.array(np.copysign(nan_max, -1))) <= lower[_isnan(a)] <= Upper(
+            np.array(np.copysign(nan_min, -1))
+        )
+        # create upper interval of all positive NaNs
+        Lower(np.array(np.copysign(nan_min, +1))) <= upper[_isnan(a)] <= Upper(
+            np.array(np.copysign(nan_max, +1))
+        )
+
+        return lower.union(upper)
 
     def preserve_finite(self, a: np.ndarray[tuple[N], np.dtype[T]]) -> Self:
         """

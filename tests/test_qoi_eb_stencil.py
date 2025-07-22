@@ -9,6 +9,7 @@ from compression_safeguards.safeguards.stencil.qoi.eb import (
     StencilQuantityOfInterestErrorBoundSafeguard,
 )
 from compression_safeguards.utils.bindings import Bindings
+from compression_safeguards.utils.cast import _float128_dtype, to_float
 
 from .codecs import (
     encode_decode_identity,
@@ -321,7 +322,7 @@ def test_finite_difference():
         "abs",
         0,
     )
-    assert f"{safeguard._qoi_expr}" == "-X[4, 4] + X[5, 4]"
+    assert f"{safeguard._qoi_expr}" == "NonAssociativeMul(X[4, 4], -1) + X[5, 4]"
     check_all_codecs(
         data,
         "finite_difference(x,order=1,accuracy=1,type=1,axis=0,grid_spacing=1)",
@@ -334,7 +335,7 @@ def test_finite_difference():
         "abs",
         0,
     )
-    assert f"{safeguard._qoi_expr}" == "-X[3, 4] + X[4, 4]"
+    assert f"{safeguard._qoi_expr}" == "NonAssociativeMul(X[3, 4], -1) + X[4, 4]"
     check_all_codecs(
         data,
         "finite_difference(x,order=1,accuracy=1,type=-1,axis=0,grid_spacing=1)",
@@ -347,7 +348,10 @@ def test_finite_difference():
         "abs",
         0,
     )
-    assert f"{safeguard._qoi_expr}" == "-X[3, 4]/2 + X[5, 4]/2"
+    assert (
+        f"{safeguard._qoi_expr}"
+        == "NonAssociativeMul(X[3, 4], -1/2) + NonAssociativeMul(X[5, 4], 1/2)"
+    )
     check_all_codecs(
         data,
         "finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1)",
@@ -360,7 +364,10 @@ def test_finite_difference():
         "abs",
         0,
     )
-    assert f"{safeguard._qoi_expr}" == "-X[4, 3]/2 + X[4, 5]/2"
+    assert (
+        f"{safeguard._qoi_expr}"
+        == "NonAssociativeMul(X[4, 3], -1/2) + NonAssociativeMul(X[4, 5], 1/2)"
+    )
     check_all_codecs(
         data,
         "finite_difference(x,order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
@@ -373,7 +380,9 @@ def test_finite_difference():
         "abs",
         0,
     )
-    assert f"{safeguard._qoi_expr}" == "X[3, 4] - 2*X[4, 4] + X[5, 4]"
+    assert (
+        f"{safeguard._qoi_expr}" == "NonAssociativeMul(X[4, 4], -2) + X[3, 4] + X[5, 4]"
+    )
     check_all_codecs(
         data,
         "finite_difference(x,order=2,accuracy=2,type=0,axis=0,grid_spacing=1)",
@@ -386,7 +395,10 @@ def test_finite_difference():
         "abs",
         0,
     )
-    assert f"{safeguard._qoi_expr}" == "X[2, 4]/4 - X[4, 4]/2 + X[6, 4]/4"
+    assert (
+        f"{safeguard._qoi_expr}"
+        == "NonAssociativeMul(X[2, 4], 1/4) + NonAssociativeMul(X[4, 4], -1/2) + NonAssociativeMul(X[6, 4], 1/4)"
+    )
     check_all_codecs(
         data,
         "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=0,grid_spacing=1)",
@@ -399,7 +411,10 @@ def test_finite_difference():
         "abs",
         0,
     )
-    assert f"{safeguard._qoi_expr}" == "X[3, 3]/4 - X[3, 5]/4 - X[5, 3]/4 + X[5, 5]/4"
+    assert (
+        f"{safeguard._qoi_expr}"
+        == "NonAssociativeMul(X[3, 3], 1/4) + NonAssociativeMul(X[3, 5], -1/4) + NonAssociativeMul(X[5, 3], -1/4) + NonAssociativeMul(X[5, 5], 1/4)"
+    )
     check_all_codecs(
         data,
         "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
@@ -552,6 +567,121 @@ def test_finite_difference_arbitrary_grid():
     )
 
 
+def test_finite_difference_periodic_grid():
+    with pytest.raises(
+        AssertionError,
+        match="grid_period must be a positive finite number",
+    ):
+        safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+            qoi='finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_centre=c["i"], grid_period=c["p"])',
+            neighbourhood=[
+                dict(
+                    axis=0,
+                    before=1,
+                    after=1,
+                    boundary="valid",
+                )
+            ],
+            type="abs",
+            eb=0.1,
+        )
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_centre=c["i"], grid_period=1)',
+        neighbourhood=[
+            dict(
+                axis=0,
+                before=1,
+                after=1,
+                boundary="valid",
+            )
+        ],
+        type="abs",
+        eb=0.1,
+    )
+
+    safeguard.compute_safe_intervals(
+        np.arange(5, dtype=float),
+        late_bound=Bindings(i=np.array([0.1, 0.2, 0.4, 0.5, 0.8])),
+    )
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi="finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_spacing=0.75, grid_period=1)",
+        neighbourhood=[
+            dict(
+                axis=0,
+                before=1,
+                after=1,
+                boundary="valid",
+            )
+        ],
+        type="abs",
+        eb=0.1,
+    )
+
+    safeguard.compute_safe_intervals(
+        np.arange(5, dtype=np.uint64), late_bound=Bindings.empty()
+    )
+
+
+@pytest.mark.parametrize("dtype", sorted(d.name for d in Safeguards.supported_dtypes()))
+def test_periodic_delta_transform(dtype):
+    def delta_transform(x, period):
+        p, q = x, period
+        q2 = q / 2
+
+        if x.dtype == _float128_dtype:
+            return np.mod(np.mod(p + q2, q) + q, q) - q2
+        else:
+            return np.mod(p + q2, q) - q2
+
+    float_dtype = to_float(np.array((), dtype=dtype)).dtype
+
+    assert (
+        delta_transform(
+            np.array(-0.75, dtype=float_dtype), np.array(1, dtype=float_dtype)
+        )
+        > 0
+    )
+    assert (
+        delta_transform(
+            np.array(-0.25, dtype=float_dtype), np.array(1, dtype=float_dtype)
+        )
+        < 0
+    )
+    assert (
+        delta_transform(
+            np.array(0.0, dtype=float_dtype), np.array(1, dtype=float_dtype)
+        )
+        == 0
+    )
+    assert (
+        delta_transform(
+            np.array(0.25, dtype=float_dtype), np.array(1, dtype=float_dtype)
+        )
+        > 0
+    )
+    assert (
+        delta_transform(
+            np.array(0.75, dtype=float_dtype), np.array(1, dtype=float_dtype)
+        )
+        < 0
+    )
+
+    for x, period in [
+        (np.linspace(-15, 15), 10),
+        (np.linspace(-np.pi * 25, np.pi * 25), np.pi * 10),
+        (np.linspace(-800, 800), 360),
+    ]:
+        periodic = delta_transform(x.astype(dtype), period)
+        assert np.all(periodic >= (-period / 2))
+        assert np.all(periodic <= (period / 2))
+
+        periodic = delta_transform(to_float(x.astype(dtype)), period)
+        assert np.all(periodic >= (-period / 2))
+        assert np.all(periodic <= (period / 2))
+
+
 def test_matmul():
     data = np.arange(16, dtype=float).reshape(4, 4)
     valid_3x3_neighbourhood = [
@@ -567,7 +697,7 @@ def test_matmul():
     )
     assert (
         f"{safeguard._qoi_expr}"
-        == "-X[0, 0] - 2*X[0, 1] - 3*X[0, 2] - 2*X[1, 0] - 4*X[1, 1] - 6*X[1, 2] - 3*X[2, 0] - 6*X[2, 1] - 9*X[2, 2]"
+        == "NonAssociativeMul(X[0, 0], -1) + NonAssociativeMul(X[0, 1], -2) + NonAssociativeMul(X[0, 2], -3) + NonAssociativeMul(X[1, 0], -2) + NonAssociativeMul(X[1, 1], -4) + NonAssociativeMul(X[1, 2], -6) + NonAssociativeMul(X[2, 0], -3) + NonAssociativeMul(X[2, 1], -6) + NonAssociativeMul(X[2, 2], -9)"
     )
     check_all_codecs(
         data,
@@ -616,7 +746,10 @@ def test_indexing():
         "abs",
         0,
     )
-    assert f"{safeguard._qoi_expr}" == "X[0, 1]/4 + X[1, 0]/4 + X[1, 2]/4 + X[2, 1]/4"
+    assert (
+        f"{safeguard._qoi_expr}"
+        == "NonAssociativeMul(X[0, 1], 1/4) + NonAssociativeMul(X[1, 0], 1/4) + NonAssociativeMul(X[1, 2], 1/4) + NonAssociativeMul(X[2, 1], 1/4)"
+    )
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "asum(X * A[[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])",
@@ -629,7 +762,7 @@ def test_indexing():
     )
     assert (
         f"{safeguard._qoi_expr}"
-        == "0.25*X[0, 0] + 0.5*X[0, 1] + 0.25*X[0, 2] + 0.5*X[1, 0] + 1.0*X[1, 1] + 0.5*X[1, 2] + 0.25*X[2, 0] + 0.5*X[2, 1] + 0.25*X[2, 2]"
+        == "NonAssociativeMul(X[0, 0], 0.25) + NonAssociativeMul(X[0, 1], 0.5) + NonAssociativeMul(X[0, 2], 0.25) + NonAssociativeMul(X[1, 0], 0.5) + NonAssociativeMul(X[1, 1], 1.0) + NonAssociativeMul(X[1, 2], 0.5) + NonAssociativeMul(X[2, 0], 0.25) + NonAssociativeMul(X[2, 1], 0.5) + NonAssociativeMul(X[2, 2], 0.25)"
     )
 
 
@@ -652,7 +785,7 @@ def test_lambdify_indexing():
 
     assert (
         inspect.getsource(fn)
-        == "def _lambdifygenerated(X):\n    return float16('0.25')*X[..., 0, 0] + float16('0.5')*X[..., 0, 1] + float16('0.25')*X[..., 0, 2] + float16('0.5')*X[..., 1, 0] + float16('1.0')*X[..., 1, 1] + float16('0.5')*X[..., 1, 2] + float16('0.25')*X[..., 2, 0] + float16('0.5')*X[..., 2, 1] + float16('0.25')*X[..., 2, 2]\n"
+        == "def _lambdifygenerated(X):\n    return ((X[..., 0, 0]) * (float16('0.25'))) + ((X[..., 0, 1]) * (float16('0.5'))) + ((X[..., 0, 2]) * (float16('0.25'))) + ((X[..., 1, 0]) * (float16('0.5'))) + ((X[..., 1, 1]) * (float16('1.0'))) + ((X[..., 1, 2]) * (float16('0.5'))) + ((X[..., 2, 0]) * (float16('0.25'))) + ((X[..., 2, 1]) * (float16('0.5'))) + ((X[..., 2, 2]) * (float16('0.25')))\n"
     )
 
 
@@ -999,11 +1132,11 @@ def test_late_bound_eb_abs():
 
     late_bound = Bindings(eb=np.array([[2]]))
 
+    imin, imax = np.iinfo(data.dtype).min, np.iinfo(data.dtype).max
+
     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
-    # these bounds could be laxer but we're currently distributing across the
-    #  full neighbourhood
-    assert np.all(valid._lower == (data.flatten() - np.array([2, 2, 2, 2, 2, 2])))
-    assert np.all(valid._upper == (data.flatten() + np.array([2, 2, 2, 2, 2, 2])))
+    assert np.all(valid._lower == np.array([[imin, imin, imin, imin, 4 - 2, imin]]))
+    assert np.all(valid._upper == np.array([[imax, imax, imax, imax, 4 + 2, imax]]))
 
     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
     assert np.all(ok == np.array([True, True, True, True, False, True]).reshape(2, 3))
@@ -1025,11 +1158,11 @@ def test_late_bound_eb_rel():
 
     late_bound = Bindings(eb=np.array([[2]]))
 
+    imin, imax = np.iinfo(data.dtype).min, np.iinfo(data.dtype).max
+
     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
-    # these bounds could be laxer but we're currently distributing across the
-    #  full neighbourhood
-    assert np.all(valid._lower == (data.flatten() - np.array([8, 8, 8, 8, 8, 8])))
-    assert np.all(valid._upper == (data.flatten() + np.array([8, 8, 8, 8, 8, 8])))
+    assert np.all(valid._lower == np.array([[imin, imin, imin, imin, 4 - 8, imin]]))
+    assert np.all(valid._upper == np.array([[imax, imax, imax, imax, 4 + 8, imax]]))
 
     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
     assert np.all(ok == np.array([True, True, True, True, True, True]).reshape(2, 3))
@@ -1051,11 +1184,11 @@ def test_late_bound_eb_ratio():
 
     late_bound = Bindings(eb=np.array([[2]]))
 
+    imin, imax = np.iinfo(data.dtype).min, np.iinfo(data.dtype).max
+
     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
-    # these bounds could be laxer but we're currently distributing across the
-    #  full neighbourhood
-    assert np.all(valid._lower == (data.flatten() - np.array([2, 2, 2, 2, 2, 2])))
-    assert np.all(valid._upper == (data.flatten() + np.array([4, 4, 4, 4, 4, 4])))
+    assert np.all(valid._lower == np.array([[imin, imin, imin, imin, 4 - 2, imin]]))
+    assert np.all(valid._upper == np.array([[imax, imax, imax, imax, 4 + 4, imax]]))
 
     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
     assert np.all(ok == np.array([True, True, True, True, False, True]).reshape(2, 3))
@@ -1139,6 +1272,26 @@ def test_pointwise_normalised_absolute_error(check):
 
 
 def test_late_bound_constant_boundary():
+    for c in ["$x", "$X"]:
+        with pytest.raises(
+            AssertionError,
+            match="late-bound constant boundary must be a scalar",
+        ):
+            safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+                qoi="X[0,0] - X[2,0]",
+                neighbourhood=[
+                    dict(
+                        axis=0,
+                        before=1,
+                        after=1,
+                        boundary="constant",
+                        constant_boundary=c,
+                    ),
+                ],
+                type="abs",
+                eb=1,
+            )
+
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         qoi="X[0,0] - X[2,0]",
         neighbourhood=[

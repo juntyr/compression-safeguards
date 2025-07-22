@@ -7,16 +7,16 @@ from ...utils.cast import (
     to_float,
     to_total_order,
 )
-from ...utils.intervals import Interval, Lower, Upper
+from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import F, S, T
 
 
-def compute_safe_eb_lower_upper_interval(
+def compute_safe_eb_lower_upper_interval_union(
     data: np.ndarray[S, np.dtype[T]],
     data_float: np.ndarray[S, np.dtype[F]],
     eb_lower: np.ndarray[S, np.dtype[F]],
     eb_upper: np.ndarray[S, np.dtype[F]],
-) -> Interval[T, int]:
+) -> IntervalUnion[T, int, int]:
     """
     Compute the safe interval for the `data` that upholds the provided
     `eb_upper` and `eb_lower` error bounds and preserves finite values and
@@ -50,11 +50,7 @@ def compute_safe_eb_lower_upper_interval(
     assert np.all(_isfinite(eb_lowerf) & (eb_lowerf <= 0))
     assert np.all(_isfinite(eb_upperf) & (eb_upperf >= 0))
 
-    valid = (
-        Interval.empty_like(dataf)
-        .preserve_inf(dataf)
-        .preserve_signed_nan(dataf, equal_nan=True)
-    )
+    valid = Interval.empty_like(dataf).preserve_inf(dataf)
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         Lower(from_float(dataf_float + eb_lowerf, dataf.dtype)) <= valid[
@@ -82,4 +78,4 @@ def compute_safe_eb_lower_upper_interval(
     if np.any(eb_upperf == 0):
         valid[_isfinite(dataf) & (eb_upperf == 0)] <= Upper(dataf)
 
-    return valid
+    return valid.preserve_any_nan(dataf, equal_nan=True)

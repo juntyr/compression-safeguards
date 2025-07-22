@@ -29,7 +29,7 @@ class AssumeAlwaysSafeguard(PointwiseSafeguard):
 
     kind = "assume_safe"
 
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
     @property

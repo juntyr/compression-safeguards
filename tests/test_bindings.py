@@ -1,3 +1,6 @@
+import json
+
+import numcodecs.registry
 import numpy as np
 import pytest
 from numcodecs_safeguards import SafeguardsCodec
@@ -43,3 +46,40 @@ def test_numcodecs_missing_extraneous_bindings():
     )
 
     codec.decode(codec.encode(data))
+
+
+@pytest.mark.parametrize(
+    "eb",
+    [
+        1,
+        1.0,
+        np.float32(1.0),
+        np.float64(1.0),
+        np.linspace(0.0, 1.0),
+        np.array([[1], [2]]),
+    ],
+)
+def test_numcodecs_config(eb):
+    codec = SafeguardsCodec(
+        codec=dict(id="zero"),
+        safeguards=[
+            dict(
+                kind="eb",
+                type="abs",
+                eb="eb",
+            )
+        ],
+        fixed_constants=dict(eb=eb),
+    )
+
+    config = json.loads(json.dumps(codec.get_config()))
+
+    assert type(config["fixed_constants"]["eb"]) in (int, float, str)
+
+    codec2 = numcodecs.registry.get_codec(config)
+
+    assert isinstance(codec2, SafeguardsCodec)
+    assert codec2.late_bound == codec.late_bound
+    np.testing.assert_array_equal(codec2._late_bound._bindings["eb"], eb)
+
+    assert codec2.get_config() == codec.get_config()

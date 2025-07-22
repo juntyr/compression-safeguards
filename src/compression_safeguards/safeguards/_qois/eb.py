@@ -16,6 +16,7 @@ from ...utils.cast import (
 )
 from ...utils.typing import F, S
 from .array import NumPyLikeArray
+from .associativity import NonAssociativeAdd, NonAssociativeMul, rewrite_qoi_expr
 from .symfunc import round_ties_even as sp_round_ties_even
 from .symfunc import sign as sp_sign
 from .symfunc import trunc as sp_trunc
@@ -231,7 +232,7 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
     if expr.is_Pow and len(expr.args) == 2:
         a, b = expr.args
         return compute_data_eb_for_stencil_qoi_eb(
-            sp.exp(b * sp.ln(sp.Abs(a)), evaluate=False),
+            sp.exp(rewrite_qoi_expr(b * sp.ln(sp.Abs(a))), evaluate=False),
             xv,
             eb_expr_lower,
             eb_expr_upper,
@@ -244,21 +245,46 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         argv = evaluate_sympy_expr_to_numpy(arg)
         exprv = _sign(argv)
 
+        # evaluate the lower and upper sign bounds that satisfy the error bound
+        exprv_lower = np.maximum(-1, exprv + np.maximum(-2, np.ceil(eb_expr_lower)))
+        exprv_upper = np.minimum(exprv + np.minimum(np.floor(eb_expr_upper), +2), +1)
+
         if xv.dtype == _float128_dtype:
             smallest_subnormal = _float128_smallest_subnormal
         else:
             smallest_subnormal = np.finfo(xv.dtype).smallest_subnormal
 
+        # compute the lower and upper arg bounds that produce the sign bounds
         argv_lower = np.where(
-            argv < 0, np.array(-np.inf, dtype=xv.dtype), smallest_subnormal
+            _isnan(exprv),
+            exprv,
+            np.where(
+                exprv_lower == 0,
+                zero,
+                np.where(
+                    exprv_lower < 0,
+                    np.array(-np.inf, dtype=xv.dtype),
+                    smallest_subnormal,
+                ),
+            ),
         )
         argv_upper = np.where(
-            argv > 0, np.array(np.inf, dtype=xv.dtype), -smallest_subnormal
+            _isnan(exprv),
+            exprv,
+            np.where(
+                exprv_upper == 0,
+                zero,
+                np.where(
+                    exprv_upper < 0,
+                    -smallest_subnormal,
+                    np.array(np.inf, dtype=xv.dtype),
+                ),
+            ),
         )
 
         # update the error bounds
         eal = np.where(
-            (eb_expr_lower == 0) | (exprv == 0),
+            (eb_expr_lower == 0),
             zero,
             np.minimum(argv_lower - argv, 0),
         )
@@ -623,18 +649,19 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
 
     TRIGONOMETRIC = {
         # derived trigonometric functions
-        sp.cos: lambda x: sp.sin(x + (sp.pi / 2), evaluate=False),
-        sp.tan: lambda x: sp.sin(x) / sp.cos(x),
-        sp.csc: lambda x: 1 / sp.sin(x),
-        sp.sec: lambda x: 1 / sp.cos(x),
-        sp.cot: lambda x: sp.cos(x) / sp.sin(x),
+        sp.cos: lambda x: sp.sin(rewrite_qoi_expr(x + (sp.pi / 2)), evaluate=False),
+        sp.tan: lambda x: rewrite_qoi_expr(sp.sin(x) / sp.cos(x)),
+        sp.csc: lambda x: rewrite_qoi_expr(1 / sp.sin(x)),
+        sp.sec: lambda x: rewrite_qoi_expr(1 / sp.cos(x)),
+        sp.cot: lambda x: rewrite_qoi_expr(sp.cos(x) / sp.sin(x)),
         # inverse trigonometric functions
-        sp.acos: lambda x: (sp.pi / 2) - sp.asin(x),
-        sp.atan: lambda x: ((sp.pi / 2) - sp.asin(1 / sp.sqrt(x**2 + 1)))
-        * (sp.Abs(x) / x),
-        sp.acsc: lambda x: sp.asin(1 / x),
-        sp.asec: lambda x: sp.acos(1 / x),
-        sp.acot: lambda x: sp.atan(1 / x),
+        sp.acos: lambda x: rewrite_qoi_expr((sp.pi / 2) - sp.asin(x)),
+        sp.atan: lambda x: rewrite_qoi_expr(
+            ((sp.pi / 2) - sp.asin(1 / sp.sqrt(x**2 + 1))) * (sp.Abs(x) / x)
+        ),
+        sp.acsc: lambda x: rewrite_qoi_expr(sp.asin(1 / x)),
+        sp.asec: lambda x: rewrite_qoi_expr(sp.acos(1 / x)),
+        sp.acot: lambda x: rewrite_qoi_expr(sp.atan(1 / x)),
     }
 
     # rewrite derived trigonometric functions using sin
@@ -649,20 +676,20 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
 
     HYPERBOLIC = {
         # basic hyperbolic functions
-        sp.sinh: lambda x: (sp.exp(x) - sp.exp(-x)) / 2,
-        sp.cosh: lambda x: (sp.exp(x) + sp.exp(-x)) / 2,
+        sp.sinh: lambda x: rewrite_qoi_expr((sp.exp(x) - sp.exp(-x)) / 2),
+        sp.cosh: lambda x: rewrite_qoi_expr((sp.exp(x) + sp.exp(-x)) / 2),
         # derived hyperbolic functions
-        sp.tanh: lambda x: (sp.exp(x * 2) - 1) / (sp.exp(x * 2) + 1),
-        sp.csch: lambda x: 2 / (sp.exp(x) - sp.exp(-x)),
-        sp.sech: lambda x: 2 / (sp.exp(x) + sp.exp(-x)),
-        sp.coth: lambda x: (sp.exp(x * 2) + 1) / (sp.exp(x * 2) - 1),
+        sp.tanh: lambda x: rewrite_qoi_expr((sp.exp(x * 2) - 1) / (sp.exp(x * 2) + 1)),
+        sp.csch: lambda x: rewrite_qoi_expr(2 / (sp.exp(x) - sp.exp(-x))),
+        sp.sech: lambda x: rewrite_qoi_expr(2 / (sp.exp(x) + sp.exp(-x))),
+        sp.coth: lambda x: rewrite_qoi_expr((sp.exp(x * 2) + 1) / (sp.exp(x * 2) - 1)),
         # inverse hyperbolic functions
-        sp.asinh: lambda x: sp.ln(x + sp.sqrt(x**2 + 1)),
-        sp.acosh: lambda x: sp.ln(x + sp.sqrt(x**2 - 1)),
-        sp.atanh: lambda x: sp.ln((1 + x) / (1 - x)) / 2,
-        sp.acsch: lambda x: sp.ln((1 / x) + sp.sqrt(x ** (-2) + 1)),
-        sp.asech: lambda x: sp.ln((1 + sp.sqrt(1 - x**2)) / x),
-        sp.acoth: lambda x: sp.ln((x + 1) / (x - 1)) / 2,
+        sp.asinh: lambda x: rewrite_qoi_expr(sp.ln(x + sp.sqrt(x**2 + 1))),
+        sp.acosh: lambda x: rewrite_qoi_expr(sp.ln(x + sp.sqrt(x**2 - 1))),
+        sp.atanh: lambda x: rewrite_qoi_expr(sp.ln((1 + x) / (1 - x)) / 2),
+        sp.acsch: lambda x: rewrite_qoi_expr(sp.ln((1 / x) + sp.sqrt(x ** (-2) + 1))),
+        sp.asech: lambda x: rewrite_qoi_expr(sp.ln((1 + sp.sqrt(1 - x**2)) / x)),
+        sp.acoth: lambda x: rewrite_qoi_expr(sp.ln((x + 1) / (x - 1)) / 2),
     }
 
     # rewrite hyperbolic functions using their exponential definitions
@@ -675,75 +702,133 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
             eb_expr_upper,
         )
 
-    # a_1 * e_1 + ... + a_n * e_n + c (weighted sum)
+    # handle the constant term c of a sum (t..) + c
+    if expr.func is NonAssociativeAdd and len(expr.args) == 2:
+        # ensure the post-conditions provided by rewrite_qoi_expr are met
+        (term, const) = expr.args
+        assert len(term.free_symbols - late_bound_constants) > 0
+        assert len(const.free_symbols - late_bound_constants) == 0
+
+        # evaluate the non-constant and constant term and their sum
+        termv = evaluate_sympy_expr_to_numpy(term)
+        constv = evaluate_sympy_expr_to_numpy(const)
+        exprv = termv + constv
+
+        # handle rounding errors in the addition
+        eb_term_lower = ensure_bounded_derived_error(
+            lambda etl: (termv + etl) + constv,
+            exprv,
+            termv,
+            eb_expr_lower,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eb_term_upper = ensure_bounded_derived_error(
+            lambda etu: (termv + etu) + constv,
+            exprv,
+            termv,
+            eb_expr_upper,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+
+        # composition using Lemma 3 from Jiao et al.
+        return compute_data_eb_for_stencil_qoi_eb(
+            term,
+            xv,
+            eb_term_lower,
+            eb_term_upper,
+        )
+
+    # a_1 * e_1 + ... + a_n * e_n (weighted sum of non-constant terms)
     # using Corollary 2 and Lemma 4 from Jiao et al.
     if expr.is_Add:
-        # find all non-constant terms
-        terms = [
-            arg for arg in expr.args if len(arg.free_symbols - late_bound_constants) > 0
-        ]
+        # ensure the post-conditions provided by rewrite_qoi_expr are met
+        assert all(
+            len(arg.free_symbols - late_bound_constants) > 0 for arg in expr.args
+        )
 
-        factors = []
+        terms = list(expr.args[:])
+
+        # peek-hole optimisation to extract weighting factors of the terms
+        termvs = []
+        factorvs = []
         for i, term in enumerate(terms):
             # extract the weighting factor of the term
-            if term.is_Mul:
-                factors.append(
-                    evaluate_sympy_expr_to_numpy(
-                        sp.Mul(
-                            *[
-                                arg
-                                for arg in term.args
-                                if len(arg.free_symbols - late_bound_constants) == 0
-                            ]  # type: ignore
-                        ),
-                    )
-                )
-                terms[i] = sp.Mul(
-                    *[
-                        arg
-                        for arg in term.args
-                        if len(arg.free_symbols - late_bound_constants) > 0
-                    ]  # type: ignore
-                )
+            if term.func is NonAssociativeMul:
+                (t, f) = term.args
+                assert len(t.free_symbols - late_bound_constants) > 0
+                assert len(f.free_symbols - late_bound_constants) == 0
+
+                termvs.append(evaluate_sympy_expr_to_numpy(t))
+                factorvs.append(evaluate_sympy_expr_to_numpy(f))
+                terms[i] = t
             else:
-                factors.append(np.array(1, dtype=xv.dtype))
+                termvs.append(evaluate_sympy_expr_to_numpy(term))
+                factorvs.append(np.array(1, dtype=xv.dtype))
+
+        # evaluate the total expression sum
+        exprv = sum(
+            [termvs[i] * factorvs[i] for i in range(1, len(terms))],
+            start=(termvs[0] * factorvs[0]),
+        )
 
         # compute the sum of absolute factors
         # unrolled loop in case a factor is a late-bound constant array
-        total_abs_factor = np.abs(factors[0])
-        for factor in factors[1:]:
+        total_abs_factor = np.abs(factorvs[0])
+        for factor in factorvs[1:]:
             total_abs_factor += np.abs(factor)
 
         etl = _nan_to_zero_inf_to_finite(eb_expr_lower / total_abs_factor)
         etu = _nan_to_zero_inf_to_finite(eb_expr_upper / total_abs_factor)
 
+        # stack the lower and upper bounds for each term factor
+        # flip the lower/upper error bound sign if the factor is negative
+        # here we only flip the sign but not the bounds since we're combining
+        #  a worst case lower/upper bound over several terms
+        etl_stack = np.stack([np.where(factorv < 0, -etl, etl) for factorv in factorvs])
+        etu_stack = np.stack([np.where(factorv < 0, -etu, etu) for factorv in factorvs])
+
         # handle rounding errors in the total absolute factor early
-        etl = ensure_bounded_derived_error(
-            lambda etl: etl * total_abs_factor,
-            np.zeros_like(xv),
-            None,
-            etl,
+        etl_stack = ensure_bounded_derived_error(
+            lambda etl_stack: sum(
+                [
+                    (termvs[i] + etl_stack[i]) * factorvs[i]
+                    for i in range(1, len(terms))
+                ],
+                start=((termvs[0] + etl_stack[0]) * factorvs[0]),
+            ),
+            exprv,
+            np.stack(termvs),
+            etl_stack,
             eb_expr_lower,
             eb_expr_upper,
         )
-        etu = ensure_bounded_derived_error(
-            lambda etu: etu * total_abs_factor,
-            np.zeros_like(xv),
-            None,
-            etu,
+        etu_stack = ensure_bounded_derived_error(
+            lambda etu_stack: sum(
+                [
+                    (termvs[i] + etu_stack[i]) * factorvs[i]
+                    for i in range(1, len(terms))
+                ],
+                start=((termvs[0] + etu_stack[0]) * factorvs[0]),
+            ),
+            exprv,
+            np.stack(termvs),
+            etu_stack,
             eb_expr_lower,
             eb_expr_upper,
         )
 
         eb_x_lower, eb_x_upper = None, None
-        for term, factor in zip(terms, factors):
+        for i, (term, factorv) in enumerate(zip(terms, factorvs)):
             # recurse into the terms with a weighted error bound
             exl, exu = compute_data_eb_for_stencil_qoi_eb(
                 term,
                 xv,
                 # flip the lower/upper error bound if the factor is negative
-                np.where(factor < 0, -etu, etl),  # type: ignore
-                np.where(factor < 0, -etl, etu),  # type: ignore
+                # here we do *not* flip the sign since we already flipped it above
+                np.where(factorv < 0, etu_stack[i], etl_stack[i]),  # type: ignore
+                np.where(factorv < 0, etl_stack[i], etu_stack[i]),  # type: ignore
             )
             # combine the inner error bounds
             if eb_x_lower is None:
@@ -757,64 +842,69 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
 
         return eb_x_lower, eb_x_upper  # type: ignore
 
-    # rewrite f * e_1 * ... * e_n (product) as f * e^(ln(abs(e_1) + ... + ln(abs(e_n)))
+    # handle the constant factor f of a product (t..) * f
+    if expr.func is NonAssociativeMul and len(expr.args) == 2:
+        # ensure the post-conditions provided by rewrite_qoi_expr are met
+        (term, const) = expr.args
+        assert len(term.free_symbols - late_bound_constants) > 0
+        assert len(const.free_symbols - late_bound_constants) == 0
+
+        # evaluate the non-constant and constant term and their sum
+        termv = evaluate_sympy_expr_to_numpy(term)
+        factorv = evaluate_sympy_expr_to_numpy(const)
+        exprv = termv * factorv
+
+        efl = _nan_to_zero_inf_to_finite(eb_expr_lower / np.abs(factorv))
+        efu = _nan_to_zero_inf_to_finite(eb_expr_upper / np.abs(factorv))
+
+        # flip the lower/upper error bound if the factor is negative
+        etl = np.where(factorv < 0, -efu, efl)
+        etu = np.where(factorv < 0, -efl, efu)
+
+        # handle rounding errors in the multiplication
+        eb_term_lower = ensure_bounded_derived_error(
+            lambda etl: (termv + etl) * factorv,
+            exprv,
+            termv,
+            etl,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eb_term_upper = ensure_bounded_derived_error(
+            lambda etu: (termv + etu) * factorv,
+            exprv,
+            termv,
+            etu,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+
+        # composition using Lemma 3 from Jiao et al.
+        return compute_data_eb_for_stencil_qoi_eb(
+            term,
+            xv,
+            eb_term_lower,
+            eb_term_upper,
+        )
+
+    # rewrite e_1 * ... * e_n (product of non-constant terms) as
+    #  e^(ln(abs(e_1) + ... + ln(abs(e_n)))
     # this is mathematically incorrect if the product is non-positive,
     #  but works for deriving error bounds
     if expr.is_Mul:
-        # extract the constant factor and reduce tauv
-        factor = evaluate_sympy_expr_to_numpy(
-            sp.Mul(
-                *[
-                    arg
-                    for arg in expr.args
-                    if len(arg.free_symbols - late_bound_constants) == 0
-                ]  # type: ignore
-            ),
+        # ensure the post-conditions provided by rewrite_qoi_expr are met
+        assert all(
+            len(arg.free_symbols - late_bound_constants) > 0 for arg in expr.args
         )
-
-        efl = _nan_to_zero_inf_to_finite(eb_expr_lower / np.abs(factor))
-        efu = _nan_to_zero_inf_to_finite(eb_expr_upper / np.abs(factor))
-
-        # handle rounding errors in the factor early
-        efl = ensure_bounded_derived_error(
-            lambda efl: efl * np.abs(factor),
-            np.zeros_like(xv),
-            None,
-            efl,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        efu = ensure_bounded_derived_error(
-            lambda efu: efu * np.abs(factor),
-            np.zeros_like(xv),
-            None,
-            efu,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-
-        # flip the lower/upper error bound if the factor is negative
-        eb_factor_lower = np.where(factor < 0, -efu, efl)
-        eb_factor_upper = np.where(factor < 0, -efl, efu)
-
-        # find all non-constant terms
-        terms = [
-            arg for arg in expr.args if len(arg.free_symbols - late_bound_constants) > 0
-        ]
-
-        if len(terms) == 1:
-            return compute_data_eb_for_stencil_qoi_eb(
-                terms[0],
-                xv,
-                eb_factor_lower,  # type: ignore
-                eb_factor_upper,  # type: ignore
-            )
 
         return compute_data_eb_for_stencil_qoi_eb(
-            sp.exp(sp.Add(*[sp.log(sp.Abs(term)) for term in terms]), evaluate=False),
+            sp.exp(
+                rewrite_qoi_expr(sp.Add(*[sp.log(sp.Abs(arg)) for arg in expr.args])),
+                evaluate=False,
+            ),
             xv,
-            eb_factor_lower,  # type: ignore
-            eb_factor_upper,  # type: ignore
+            eb_expr_lower,
+            eb_expr_upper,
         )
 
     raise ValueError(f"unsupported expression kind {expr} (= {sp.srepr(expr)} =)")
@@ -823,7 +913,7 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
 def ensure_bounded_derived_error(
     expr: Callable[[np.ndarray[S, np.dtype[F]]], np.ndarray[S, np.dtype[F]]],
     exprv: np.ndarray[S, np.dtype[F]],
-    xv: None | np.ndarray[S, np.dtype[F]],
+    xv: np.ndarray[S, np.dtype[F]],
     eb_x_guess: np.ndarray[S, np.dtype[F]],
     eb_expr_lower: np.ndarray[S, np.dtype[F]],
     eb_expr_upper: np.ndarray[S, np.dtype[F]],
@@ -841,7 +931,7 @@ def ensure_bounded_derived_error(
         the expression for this error.
     exprv : np.ndarray[S, np.dtype[F]]
         Evaluation of the expression for the zero-error case.
-    xv : None | np.ndarray[S, np.dtype[F]]
+    xv : np.ndarray[S, np.dtype[F]]
         Actual values of the input data, which are only used for better
         refinement of the error bound guess.
     eb_x_guess : np.ndarray[S, np.dtype[F]]
@@ -889,17 +979,14 @@ def ensure_bounded_derived_error(
     if not np.any(eb_exceeded):
         return eb_x_guess
 
-    if xv is not None:
-        # second try to nudge it with respect to the data
-        eb_x_guess = np.where(
-            eb_exceeded, _nextafter(xv + eb_x_guess, xv) - xv, eb_x_guess
-        )  # type: ignore
+    # second try to nudge it with respect to the data
+    eb_x_guess = np.where(eb_exceeded, _nextafter(xv + eb_x_guess, xv) - xv, eb_x_guess)  # type: ignore
 
-        # check again
-        eb_exceeded = is_eb_exceeded(eb_x_guess)
+    # check again
+    eb_exceeded = is_eb_exceeded(eb_x_guess)
 
-        if not np.any(eb_exceeded):
-            return eb_x_guess
+    if not np.any(eb_exceeded):
+        return eb_x_guess
 
     while True:
         # finally fall back to repeatedly cutting it in half

@@ -2,14 +2,16 @@
 Types and helpers for late-bound safeguard parameters.
 """
 
-__all__ = ["Parameter", "Bindings"]
+__all__ = ["Parameter", "Value", "Bindings"]
 
+from base64 import standard_b64decode, standard_b64encode
 from collections.abc import Set
+from io import BytesIO
 from types import MappingProxyType
-from typing import Any
+from typing import TypeAlias
 
 import numpy as np
-from typing_extensions import Self
+from typing_extensions import Self  # MSPV 3.11
 
 from .cast import lossless_cast, saturating_finite_float_cast
 from .typing import F, Si, T
@@ -27,10 +29,10 @@ class Parameter(str):
 
     __slots__ = ()
 
-    def __init__(self, param: str):
+    def __init__(self, param: str) -> None:
         pass
 
-    def __new__(cls, param: str):
+    def __new__(cls, param: str) -> "Parameter":
         if isinstance(param, Parameter):
             return param
         assert (param[1:] if param.startswith("$") else param).isidentifier(), (
@@ -50,20 +52,28 @@ class Parameter(str):
         return f"{type(self).__name__}({self})"
 
 
+Value: TypeAlias = (
+    int | float | np.number | np.ndarray[tuple[int, ...], np.dtype[np.number]]
+)
+"""
+Parameter value type that includes scalar numbers and arrays thereof.
+"""
+
+
 class Bindings:
     """
     Bindings from parameter names to values.
 
     Parameters
     ----------
-    kwargs : Any
+    **kwargs : Value
         Mapping from parameters to values as keyword arguments.
     """
 
     __slots__ = ("_bindings",)
-    _bindings: MappingProxyType[Parameter, Any]
+    _bindings: MappingProxyType[Parameter, Value]
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Value) -> None:
         self._bindings = MappingProxyType(
             {Parameter(name): value for name, value in kwargs.items()}
         )
@@ -81,14 +91,14 @@ class Bindings:
 
         return Bindings()
 
-    def update(self, **kwargs) -> Self:
+    def update(self, **kwargs: Value) -> Self:
         """
         Create new bindings that contain the old and the new parameters, where
         new parameters may override old ones.
 
         Parameters
         ----------
-        kwargs : Any
+        **kwargs : Value
             Mapping from new parameters to values as keyword arguments.
 
         Returns
@@ -210,3 +220,63 @@ class Bindings:
         view.flags.writeable = False
 
         return view  # type: ignore
+
+    def get_config(self) -> dict:
+        """
+        Returns the configuration of the bindings in a JSON compatible format.
+
+        Returns
+        -------
+        config : dict
+            Configuration of the bindings.
+        """
+
+        return {str(p): _encode_value(p, v) for p, v in self._bindings.items()}
+
+    @classmethod
+    def from_config(cls, config: dict) -> Self:
+        """
+        Instantiate the bindings from a configuration [`dict`][dict].
+
+        Parameters
+        ----------
+        config : dict
+            Configuration of the bindings.
+
+        Returns
+        -------
+        bindings : Self
+            Instantiated bindings.
+        """
+
+        return cls(**{p: _decode_value(p, v) for p, v in config.items()})
+
+
+_NPZ_DATA_URI_BASE64: str = "data:application/x-npz;base64,"
+
+
+def _encode_value(p: Parameter, v: Value) -> int | float | str:
+    # we cannot use isinstance here since np.float64 is a subclass of float
+    if type(v) in (int, float):
+        return v  # type: ignore
+
+    io = BytesIO()
+    np.savez_compressed(io, allow_pickle=False, **{str(p): v})
+
+    return f"{_NPZ_DATA_URI_BASE64}{standard_b64encode(io.getvalue()).decode(encoding='ascii')}"
+
+
+def _decode_value(p: Parameter, v: int | float | str) -> Value:
+    if isinstance(v, (int, float)):
+        return v
+
+    assert v.startswith(_NPZ_DATA_URI_BASE64), (
+        "value must be encoded as a .npz data URI in base64 format"
+    )
+
+    io = BytesIO(
+        standard_b64decode(v[len(_NPZ_DATA_URI_BASE64) :].encode(encoding="ascii"))
+    )
+
+    with np.load(io, allow_pickle=False) as f:
+        return f[str(p)]

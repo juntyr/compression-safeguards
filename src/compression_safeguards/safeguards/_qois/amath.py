@@ -1,4 +1,5 @@
 import sympy as sp
+from typing_extensions import Never  # MSPV 3.11
 
 from .array import NumPyLikeArray
 
@@ -36,10 +37,10 @@ FUNCTIONS = dict(asum=asum, tr=tr, matmul=matmul)
 class ArrayLiteral:
     __slots__ = ()
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args, **kwargs) -> Never:
         raise TypeError("cannot call array constructor")
 
-    def __class_getitem__(cls, index):
+    def __class_getitem__(cls, index) -> NumPyLikeArray:
         return NumPyLikeArray(index if isinstance(index, tuple) else (index,))
 
 

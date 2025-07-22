@@ -222,7 +222,7 @@ def from_total_order(
 
 
 def lossless_cast(
-    x: int | float | np.ndarray[S, np.dtype[np.number]],
+    x: int | float | np.number | np.ndarray[S, np.dtype[np.number]],
     dtype: np.dtype[T],
     context: str,
 ) -> np.ndarray[tuple[()] | S, np.dtype[T]]:
@@ -281,7 +281,7 @@ def lossless_cast(
 
 
 def saturating_finite_float_cast(
-    x: int | float | np.ndarray[S, np.dtype[np.number]],
+    x: int | float | np.number | np.ndarray[S, np.dtype[np.number]],
     dtype: np.dtype[F],
     context: str,
 ) -> np.ndarray[tuple[()] | S, np.dtype[F]]:

@@ -54,7 +54,7 @@ class SelectSafeguard(Safeguard):
         *,
         selector: str | Parameter,
         safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard],
-    ):
+    ) -> None:
         pass
 
     def __new__(  # type: ignore
@@ -285,7 +285,7 @@ class _SelectPointwiseSafeguard(_SelectSafeguardBase, PointwiseSafeguard):
     _selector: Parameter
     _safeguards: tuple[PointwiseSafeguard, ...]
 
-    def __init__(self, selector: Parameter, *safeguards: PointwiseSafeguard):
+    def __init__(self, selector: Parameter, *safeguards: PointwiseSafeguard) -> None:
         self._selector = selector
 
         for safeguard in safeguards:
@@ -305,7 +305,7 @@ class _SelectStencilSafeguard(_SelectSafeguardBase, StencilSafeguard):
 
     def __init__(
         self, selector: Parameter, *safeguards: PointwiseSafeguard | StencilSafeguard
-    ):
+    ) -> None:
         self._selector = selector
 
         for safeguard in safeguards:

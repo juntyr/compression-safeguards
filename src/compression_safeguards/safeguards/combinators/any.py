@@ -43,7 +43,7 @@ class AnySafeguard(Safeguard):
 
     def __init__(
         self, *, safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard]
-    ):
+    ) -> None:
         pass
 
     def __new__(  # type: ignore
@@ -222,7 +222,7 @@ class _AnyPointwiseSafeguard(_AnySafeguardBase, PointwiseSafeguard):
     __slots__ = ("_safeguards",)
     _safeguards: tuple[PointwiseSafeguard, ...]
 
-    def __init__(self, *safeguards: PointwiseSafeguard):
+    def __init__(self, *safeguards: PointwiseSafeguard) -> None:
         for safeguard in safeguards:
             assert isinstance(safeguard, PointwiseSafeguard), (
                 f"{safeguard!r} is not a pointwise safeguard"
@@ -234,7 +234,7 @@ class _AnyStencilSafeguard(_AnySafeguardBase, StencilSafeguard):
     __slots__ = ("_safeguards",)
     _safeguards: tuple[PointwiseSafeguard | StencilSafeguard, ...]
 
-    def __init__(self, *safeguards: PointwiseSafeguard | StencilSafeguard):
+    def __init__(self, *safeguards: PointwiseSafeguard | StencilSafeguard) -> None:
         for safeguard in safeguards:
             assert isinstance(safeguard, (PointwiseSafeguard, StencilSafeguard)), (
                 f"{safeguard!r} is not a pointwise or stencil safeguard"

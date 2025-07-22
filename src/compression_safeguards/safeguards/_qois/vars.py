@@ -1,6 +1,7 @@
 from typing import Callable
 
 import sympy as sp
+from typing_extensions import Never  # MSPV 3.11
 
 from ...utils.bindings import Parameter
 
@@ -9,11 +10,11 @@ class VariableEnvironment:
     __slots__ = ("_symbol", "_variables")
     _variables: dict[str, sp.Basic]
 
-    def __init__(self, symbol: str):
+    def __init__(self, symbol: str) -> None:
         self._symbol = symbol
         self._variables = dict()
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs) -> Never:
         raise TypeError(f"cannot call variable environment `{self._symbol}`")
 
     def __getitem__(self, name: str) -> "UnresolvedVariable | sp.Basic":
@@ -32,11 +33,11 @@ class UnresolvedVariable:
     _name: str
     _env: VariableEnvironment
 
-    def __init__(self, name: str, env: VariableEnvironment):
+    def __init__(self, name: str, env: VariableEnvironment) -> None:
         self._name = name
         self._env = env
 
-    def _sympy_(self):
+    def _sympy_(self) -> Never:
         raise TypeError(
             f'unresolved variable {self._env._symbol}["{self._name}"], perhaps you forgot to define it within a let expression'
         )
@@ -55,11 +56,13 @@ class LateBoundConstantEnvironment:
     _symbol: str
     _create_symbol: Callable[[str], LateBoundConstant]
 
-    def __init__(self, symbol: str, create_symbol: Callable[[str], LateBoundConstant]):
+    def __init__(
+        self, symbol: str, create_symbol: Callable[[str], LateBoundConstant]
+    ) -> None:
         self._symbol = symbol
         self._create_symbol = create_symbol
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs) -> Never:
         raise TypeError(f"cannot call constant environment `{self._symbol}`")
 
     def __getitem__(self, name: str) -> LateBoundConstant:

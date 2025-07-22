@@ -71,7 +71,7 @@ for an enumeration of all supported safeguards.
 
 __all__ = ["SafeguardsCodec"]
 
-from collections.abc import Collection, Set
+from collections.abc import Collection, Mapping, Set
 from io import BytesIO
 from typing import Callable
 
@@ -82,11 +82,14 @@ import numpy as np
 import varint
 from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.abc import Safeguard
-from compression_safeguards.utils.bindings import Bindings, Parameter
+from compression_safeguards.utils.bindings import Bindings, Parameter, Value
 from compression_safeguards.utils.cast import as_bits
 from numcodecs.abc import Codec
 from numcodecs_combinators.abc import CodecCombinatorMixin
-from typing_extensions import Buffer  # MSPV 3.12
+from typing_extensions import (
+    Buffer,  # MSPV 3.12
+    Self,  # MSPV 3.11
+)
 
 from .lossless import Lossless
 
@@ -137,9 +140,36 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         [`SafeguardKind`][compression_safeguards.safeguards.SafeguardKind]
         for an enumeration of all supported safeguards.
 
-        The `SafeguardsCodec` does not (yet) support safeguards with late-
-        bound parameters, e.g. the
-        [`SelectSafeguard`][compression_safeguards.safeguards.combinators.select.SelectSafeguard].
+        The `SafeguardsCodec` supports safeguards with late-bound parameters,
+        e.g. the
+        [`SelectSafeguard`][compression_safeguards.safeguards.combinators.select.SelectSafeguard],
+        but they must be provided as `fixed_constants` that are *fixed* and
+        must be compatible with *any* data that will be encoded with this
+        codec. Therefore, fixed constants should only be used for late-bound
+        parameters that can be fixed across all uses of the codec.
+    fixed_constants : Mapping[str | Parameter, Value] | Bindings
+        Mapping of parameter names to *fixed* constant scalars or arrays that
+        will be provided as late-bound parameters to the safeguards.
+
+        The mapping must resolve all late-bound parameters of the safeguards
+        and include no extraneous parameters.
+
+        The provided values must have a compatible shape and values for *any*
+        data that will be encoded with this codec, otherwise
+        [`encode`][numcodecs_safeguards.SafeguardsCodec.encode] will fail.
+
+        You can use the
+        [`update_fixed_constants`][numcodecs_safeguards.SafeguardsCodec.update_fixed_constants]
+        method inside a `with` statement to temporarily update the late-bound
+        parameters.
+
+        The fixed constants are included in the
+        [config][numcodecs_safeguards.SafeguardsCodec.get_config] of the codec.
+        While [`int`][int] and [`float`][float] scalars are included as-is,
+        numpy scalars and arrays are encoded to the losslessly compressed
+        [`.npz`][numpy.savez_compressed] format and stored in a
+        `data:application/x-npz;base64,<data>`
+        [data URI](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Schemes/data).
     lossless : None | dict | Lossless, optional
         The lossless encoding that is applied after the codec and the
         safeguards:
@@ -161,11 +191,13 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
     __slots__ = (
         "_codec",
         "_safeguards",
+        "_late_bound",
         "_lossless_for_codec",
         "_lossless_for_safeguards",
     )
     _codec: Codec
     _safeguards: Safeguards
+    _late_bound: Bindings
     _lossless_for_codec: None | Codec
     _lossless_for_safeguards: Codec
 
@@ -176,17 +208,27 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         *,
         codec: dict | Codec,
         safeguards: Collection[dict | Safeguard],
+        fixed_constants: Mapping[str | Parameter, Value] | Bindings = Bindings.empty(),
         lossless: None | dict | Lossless = None,
         _version: None | str = None,
-    ):
-        self._safeguards = Safeguards(safeguards=safeguards, _version=_version)
-
-        assert len(self._safeguards.late_bound - self.builtin_late_bound) == 0, (
-            "SafeguardsCodec does not (yet) support non-built-in late-bound parameters"
-        )
-
+    ) -> None:
         self._codec = (
             codec if isinstance(codec, Codec) else numcodecs.registry.get_codec(codec)
+        )
+
+        self._safeguards = Safeguards(safeguards=safeguards, _version=_version)
+
+        self._late_bound = (
+            fixed_constants
+            if isinstance(fixed_constants, Bindings)
+            else Bindings(**fixed_constants)
+        )
+
+        late_bound_reqs = self.late_bound - self.builtin_late_bound
+        late_bound_keys = frozenset(self._late_bound.parameters())
+
+        assert late_bound_reqs == late_bound_keys, (
+            f"fixed_constants is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} / has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
         )
 
         lossless = (
@@ -210,12 +252,33 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         )
 
     @property
+    def codec(self) -> Codec:
+        """
+        The codec that is wrapped with safeguards.
+        """
+
+        return self._codec
+
+    @property
     def safeguards(self) -> Collection[Safeguard]:
         """
         The collection of safeguards that will be applied.
         """
 
         return self._safeguards.safeguards
+
+    @property
+    def late_bound(self) -> Set[Parameter]:
+        """
+        The set of late-bound parameters that the safeguards have.
+
+        The late-bound parameters must be provided as fixed constants. They
+        must have a compatible shape and values for any data that will be
+        encoded with this codec, otherwise
+        [`encode`][numcodecs_safeguards.SafeguardsCodec.encode] will fail.
+        """
+
+        return self._safeguards.late_bound
 
     @property
     def builtin_late_bound(self) -> Set[Parameter]:
@@ -227,6 +290,45 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         return frozenset(self._safeguards.builtin_late_bound) | frozenset(
             [Parameter("$x_min"), Parameter("$x_max")]
+        )
+
+    def update_fixed_constants(self, **kwargs: Value) -> "SafeguardsCodec":
+        """
+        Create a new codec with safeguards, where the old fixed constants have
+        been overridden by new ones from `**kwargs`.
+
+        Only existing late-bound constants may be overridden and no new ones
+        may be added.
+
+        The provided values must have a compatible shape and values for *any*
+        data that will be encoded with this codec, otherwise
+        [`encode`][numcodecs_safeguards.SafeguardsCodec.encode] will fail.
+
+        This method can be used inside a `with` statement to temporarily update
+        the late-bound parameters.
+
+        Parameters
+        ----------
+        **kwargs : Value
+            Mapping from new parameters to values as keyword arguments.
+
+        Returns
+        -------
+        safeguards : SafeguardsCodec
+            The codec with safeguards, with the updated fixed constants.
+        """
+
+        return SafeguardsCodec(
+            codec=self._codec,
+            safeguards=self._safeguards.safeguards,
+            fixed_constants=self._late_bound.update(**kwargs),
+            lossless=Lossless(
+                for_codec=None
+                if self._lossless_for_codec is None
+                else self._lossless_for_codec,
+                for_safeguards=self._lossless_for_safeguards,
+            ),
+            _version=self._safeguards.version,
         )
 
     def encode(self, buf: Buffer) -> bytes:
@@ -322,7 +424,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             else:
                 raise ValueError(message) from err
 
-        late_bound = Bindings.empty()
+        late_bound = self._late_bound
         late_bound_reqs = self._safeguards.late_bound
 
         if "$x_min" in late_bound_reqs:
@@ -427,7 +529,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         Returns the configuration of the codec with safeguards.
 
         [`numcodecs.registry.get_codec(config)`][numcodecs.registry.get_codec]
-        can be used to reconstruct this stack from the returned config.
+        can be used to reconstruct this adapter from the returned config.
 
         Returns
         -------
@@ -441,6 +543,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             safeguards=[
                 safeguard.get_config() for safeguard in self._safeguards.safeguards
             ],
+            fixed_constants=self._late_bound.get_config(),
             lossless=dict(
                 for_codec=None
                 if self._lossless_for_codec is None
@@ -450,8 +553,33 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             _version=self._safeguards.version,
         )
 
+    @classmethod
+    def from_config(cls, config: dict) -> Self:
+        """
+        Instantiate the codec with safeguards from a configuration [`dict`][dict].
+
+        Parameters
+        ----------
+        config : dict
+            Configuration of the codec with safeguards.
+
+        Returns
+        -------
+        safeguards : Self
+            Instantiated codec with safeguards.
+        """
+
+        # Bindings.from_config handles the encoding and decoding of late-bound
+        #  constants, which may be in a JSON-compatible serialised form
+        config = {
+            k: (Bindings.from_config(v) if k == "fixed_constants" else v)
+            for k, v in config.items()
+        }
+
+        return cls(**config)
+
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(codec={self._codec!r}, safeguards={list(self._safeguards.safeguards)!r}, lossless={Lossless(for_codec=self._lossless_for_codec, for_safeguards=self._lossless_for_safeguards)!r})"
+        return f"{type(self).__name__}(codec={self._codec!r}, safeguards={list(self._safeguards.safeguards)!r}, fixed_constants={dict(**self._late_bound._bindings)!r}, lossless={Lossless(for_codec=self._lossless_for_codec, for_safeguards=self._lossless_for_safeguards)!r})"
 
     def map(self, mapper: Callable[[Codec], Codec]) -> "SafeguardsCodec":
         """
@@ -487,6 +615,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         return SafeguardsCodec(
             codec=mapper(self._codec),
             safeguards=self._safeguards.safeguards,
+            fixed_constants=self._late_bound,
             lossless=Lossless(
                 for_codec=None
                 if self._lossless_for_codec is None
