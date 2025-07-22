@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "xarray-safeguards"
+version = "0.0.1"
+description = "Fearless lossy compression using safeguards"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "compression-safeguards==0.0.1",
+    "numpy~=2.0",
+    "typing-extensions~=4.6",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"xarray_safeguards" = ["py.typed"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.pytest.ini_options]
+addopts = ["--import-mode=importlib"]
+xfail_strict = true
+
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/CITATION.cff", "/LICENSE", "/pyproject.toml", "/README.md"]
+
+[tool.uv.sources]
+compression-safeguards = { workspace = true }

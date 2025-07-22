@@ -44,8 +44,9 @@ nav:
   - Links:
       - GitHub: https://github.com/juntyr/compression-safeguards
       - PyPI:
-          - compression-safeguards: https://pypi.org/project/compression-safeguards/
-          - numcodecs-safeguards: https://pypi.org/project/numcodecs-safeguards/
+        - compression-safeguards: https://pypi.org/project/compression-safeguards/
+        - numcodecs-safeguards: https://pypi.org/project/numcodecs-safeguards/
+        - xarray-safeguards: https://pypi.org/project/xarray-safeguards/
 
 plugins:
   - exclude:
@@ -62,6 +63,8 @@ plugins:
           ignore: ["_compat.py", "_float128.py", "_qois"]
         - nav_heading: [API Reference]
           base: packages/numcodecs-safeguards/src
+        - nav_heading: [API Reference]
+          base: packages/xarray-safeguards/src
   - mkdocs-jupyter:
       ignore_h1_titles: True
   - mkdocstrings:

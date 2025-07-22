@@ -81,4 +81,4 @@ follow_untyped_imports = true
 include = ["/src", "/CITATION.cff", "/LICENSE", "/pyproject.toml", "/README.md"]
 
 [tool.uv.workspace]
-members = ["packages/numcodecs-safeguards"]
+members = ["packages/numcodecs-safeguards", "packages/xarray-safeguards"]

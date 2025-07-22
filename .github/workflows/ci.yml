@@ -81,6 +81,9 @@ jobs:
       - name: Typecheck numcodecs-safeguards
         run: cd packages/numcodecs-safeguards && uv run mypy -p numcodecs_safeguards
 
+      - name: Typecheck xarray-safeguards
+        run: cd packages/xarray-safeguards && uv run mypy -p xarray_safeguards
+
   fuzz:
     name: Fuzz
     runs-on: ubuntu-latest
@@ -166,6 +169,7 @@ jobs:
           cp README.md docs/
           uv run griffe2md src/compression_safeguards/ -o docs/compression_safeguards.md
           uv run griffe2md packages/numcodecs-safeguards/src/numcodecs_safeguards/ -o docs/numcodecs_safeguards.md
+          uv run griffe2md packages/xarray-safeguards/src/xarray_safeguards/ -o docs/xarray_safeguards.md
           find docs -type f -name "*.md" | xargs sed -i -e 's/```py/```python/g'
 
       - name: Run doctests
