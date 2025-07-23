@@ -120,7 +120,9 @@ def produce_data_array_correction(
     """
 
     # small safeguard against the printer problem
-    assert "safeguards" not in data.attrs, "computing the safeguards correction relative to a `data` array that has *already* been safeguards-corrected before is unsafe as compression errors can accumulate when the original uncompressed data is not known"
+    assert "safeguards" not in data.attrs, (
+        "computing the safeguards correction relative to a `data` array that has *already* been safeguards-corrected before is unsafe as compression errors can accumulate when the original uncompressed data is not known"
+    )
 
     assert data.dims == prediction.dims
     assert data.shape == prediction.shape
