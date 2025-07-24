@@ -32,11 +32,11 @@ from ..._qois.amath import CONSTRUCTORS as AMATH_CONSTRUCTORS
 from ..._qois.amath import FUNCTIONS as AMATH_FUNCTIONS
 from ..._qois.array import NumPyLikeArray
 from ..._qois.associativity import rewrite_qoi_expr
-from ..._qois.compile import sympy_expr_to_numpy as compile_sympy_expr_to_numpy
 from ..._qois.eb import (
     compute_data_eb_for_stencil_qoi_eb_unchecked,
     ensure_bounded_derived_error,
 )
+from ..._qois.eval import evaluate_sympy_expr_to_numpy
 from ..._qois.finite_difference import create_finite_difference_for_neighbourhood
 from ..._qois.interval import compute_safe_eb_lower_upper_interval_union
 from ..._qois.math import CONSTANTS as MATH_CONSTANTS
@@ -678,16 +678,11 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
             late_bound_constants[c] = late_windows_float
 
-        qoi_lambda = compile_sympy_expr_to_numpy(
-            [self._X, *late_bound_constants.keys()],
+        return evaluate_sympy_expr_to_numpy(
             self._qoi_expr,
+            {self._X: data_windows_float, **late_bound_constants},
             data_windows_float.dtype,
         )
-
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            return (qoi_lambda)(data_windows_float, *late_bound_constants.values())
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
@@ -817,19 +812,16 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
             late_bound_constants[c] = late_windows_float
 
-        qoi_lambda = compile_sympy_expr_to_numpy(
-            [self._X, *late_bound_constants.keys()],
+        qoi_data = evaluate_sympy_expr_to_numpy(
             self._qoi_expr,
+            {self._X: data_windows_float, **late_bound_constants},
             data_windows_float.dtype,
         )
-
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            qoi_data = (qoi_lambda)(data_windows_float, *late_bound_constants.values())
-            qoi_decoded = (qoi_lambda)(
-                decoded_windows_float, *late_bound_constants.values()
-            )
+        qoi_decoded = evaluate_sympy_expr_to_numpy(
+            self._qoi_expr,
+            {self._X: decoded_windows_float, **late_bound_constants},
+            data_windows_float.dtype,
+        )
 
         eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
@@ -980,16 +972,11 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
             late_bound_constants[c] = late_windows_float
 
-        qoi_lambda = compile_sympy_expr_to_numpy(
-            [self._X, *late_bound_constants.keys()],
+        data_qoi = evaluate_sympy_expr_to_numpy(
             self._qoi_expr,
+            {self._X: data_windows_float, **late_bound_constants},
             data_windows_float.dtype,
         )
-
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            data_qoi = (qoi_lambda)(data_windows_float, *late_bound_constants.values())
 
         eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
@@ -1256,9 +1243,11 @@ def _compute_data_eb_for_stencil_qoi_eb(
             and len(expr.args) == 2
             and expr.args[0] == X
         ),
-        evaluate_sympy_expr_to_numpy=lambda expr: compile_sympy_expr_to_numpy(
-            [X, *late_bound_constants.keys()], expr, Xv.dtype
-        )(XvN, *late_bound_constants.values()),
+        evaluate_sympy_expr_to_numpy=lambda expr: evaluate_sympy_expr_to_numpy(
+            expr,
+            {X: XvN, **late_bound_constants},
+            Xv.dtype,
+        ),
         late_bound_constants=frozenset(late_bound_constants.keys()),
         compute_data_eb_for_stencil_qoi_eb=lambda expr,
         Xv,
@@ -1274,10 +1263,11 @@ def _compute_data_eb_for_stencil_qoi_eb(
         ),
     )
 
-    exprl = compile_sympy_expr_to_numpy(
-        [X, *late_bound_constants.keys()], expr, Xv.dtype
+    exprv = evaluate_sympy_expr_to_numpy(
+        expr,
+        {X: XvN, **late_bound_constants},
+        Xv.dtype,
     )
-    exprv = (exprl)(XvN, *late_bound_constants.values())
 
     # handle rounding errors in the lower error bound computation
     tl = ensure_bounded_derived_error(
@@ -1286,9 +1276,13 @@ def _compute_data_eb_for_stencil_qoi_eb(
         lambda tl: np.where(  # type: ignore
             tl == 0,
             exprv,
-            (exprl)(
-                XvN + tl.reshape(list(tl.shape) + [1] * (XvN.ndim - tl.ndim)),
-                *late_bound_constants.values(),
+            evaluate_sympy_expr_to_numpy(
+                expr,
+                {
+                    X: XvN + tl.reshape(list(tl.shape) + [1] * (XvN.ndim - tl.ndim)),
+                    **late_bound_constants,
+                },
+                Xv.dtype,
             ),
         ),
         exprv,
@@ -1303,9 +1297,13 @@ def _compute_data_eb_for_stencil_qoi_eb(
         lambda tu: np.where(  # type: ignore
             tu == 0,
             exprv,
-            (exprl)(
-                XvN + tu.reshape(list(tu.shape) + [1] * (XvN.ndim - tu.ndim)),
-                *late_bound_constants.values(),
+            evaluate_sympy_expr_to_numpy(
+                expr,
+                {
+                    X: XvN + tu.reshape(list(tu.shape) + [1] * (XvN.ndim - tu.ndim)),
+                    **late_bound_constants,
+                },
+                Xv.dtype,
             ),
         ),
         exprv,

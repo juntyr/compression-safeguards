@@ -664,7 +664,7 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         sp.acot: lambda x: rewrite_qoi_expr(sp.atan(1 / x)),
     }
 
-    # rewrite derived trigonometric functions using sin
+    # rewrite derived trigonometric functions using sin and asin
     if expr.func in TRIGONOMETRIC and len(expr.args) == 1:
         (arg,) = expr.args
         return compute_data_eb_for_stencil_qoi_eb(
@@ -769,7 +769,7 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
 
         # evaluate the total expression sum
         exprv = sum(
-            [termvs[i] * factorvs[i] for i in range(1, len(terms))],
+            (termvs[i] * factorvs[i] for i in range(1, len(terms))),
             start=(termvs[0] * factorvs[0]),
         )
 
@@ -792,10 +792,10 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         # handle rounding errors in the total absolute factor early
         etl_stack = ensure_bounded_derived_error(
             lambda etl_stack: sum(
-                [
+                (
                     (termvs[i] + etl_stack[i]) * factorvs[i]
                     for i in range(1, len(terms))
-                ],
+                ),
                 start=((termvs[0] + etl_stack[0]) * factorvs[0]),
             ),
             exprv,
@@ -806,10 +806,10 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
         )
         etu_stack = ensure_bounded_derived_error(
             lambda etu_stack: sum(
-                [
+                (
                     (termvs[i] + etu_stack[i]) * factorvs[i]
                     for i in range(1, len(terms))
-                ],
+                ),
                 start=((termvs[0] + etu_stack[0]) * factorvs[0]),
             ),
             exprv,

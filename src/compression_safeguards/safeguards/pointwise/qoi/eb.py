@@ -24,11 +24,11 @@ from ....utils.cast import (
 from ....utils.intervals import IntervalUnion
 from ....utils.typing import F, S, T
 from ..._qois.associativity import rewrite_qoi_expr
-from ..._qois.compile import sympy_expr_to_numpy as compile_sympy_expr_to_numpy
 from ..._qois.eb import (
     compute_data_eb_for_stencil_qoi_eb_unchecked,
     ensure_bounded_derived_error,
 )
+from ..._qois.eval import evaluate_sympy_expr_to_numpy
 from ..._qois.interval import compute_safe_eb_lower_upper_interval_union
 from ..._qois.math import CONSTANTS as MATH_CONSTANTS
 from ..._qois.math import FUNCTIONS as MATH_FUNCTIONS
@@ -386,14 +386,11 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             for c in self._late_bound_constants
         }
 
-        qoi_lambda = compile_sympy_expr_to_numpy(
-            [self._x, *late_bound_constants.keys()], self._qoi_expr, data_float.dtype
+        return evaluate_sympy_expr_to_numpy(
+            self._qoi_expr,
+            {self._x: data_float, **late_bound_constants},
+            data_float.dtype,
         )
-
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            return (qoi_lambda)(data_float, *late_bound_constants.values())
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
@@ -431,17 +428,16 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             for c in self._late_bound_constants
         }
 
-        qoi_lambda = compile_sympy_expr_to_numpy(
-            [self._x, *late_bound_constants.keys()], self._qoi_expr, data_float.dtype
+        qoi_data = evaluate_sympy_expr_to_numpy(
+            self._qoi_expr,
+            {self._x: data_float, **late_bound_constants},
+            data_float.dtype,
         )
-
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            qoi_data = (qoi_lambda)(data_float, *late_bound_constants.values())
-            qoi_decoded = (qoi_lambda)(
-                to_float(decoded), *late_bound_constants.values()
-            )
+        qoi_decoded = evaluate_sympy_expr_to_numpy(
+            self._qoi_expr,
+            {self._x: to_float(decoded), **late_bound_constants},
+            data_float.dtype,
+        )
 
         eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
@@ -507,16 +503,11 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             for c in self._late_bound_constants
         }
 
-        qoi_lambda = compile_sympy_expr_to_numpy(
-            [self._x, *late_bound_constants.keys()], self._qoi_expr, data_float.dtype
+        data_qoi = evaluate_sympy_expr_to_numpy(
+            self._qoi_expr,
+            {self._x: data_float, **late_bound_constants},
+            data_float.dtype,
         )
-
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            data_qoi: np.ndarray[S, np.dtype[np.floating]] = (qoi_lambda)(
-                data_float, *late_bound_constants.values()
-            )
 
         eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
@@ -685,9 +676,11 @@ def _compute_data_eb_for_qoi_eb(
         tauv_lower,
         tauv_upper,
         check_is_x=lambda expr: expr == x,
-        evaluate_sympy_expr_to_numpy=lambda expr: compile_sympy_expr_to_numpy(
-            [x, *late_bound_constants.keys()], expr, xv.dtype
-        )(xv, *late_bound_constants.values()),
+        evaluate_sympy_expr_to_numpy=lambda expr: evaluate_sympy_expr_to_numpy(
+            expr,
+            {x: xv, **late_bound_constants},
+            xv.dtype,
+        ),
         late_bound_constants=frozenset(late_bound_constants.keys()),
         compute_data_eb_for_stencil_qoi_eb=lambda expr,
         xv,
@@ -702,15 +695,18 @@ def _compute_data_eb_for_qoi_eb(
         ),
     )
 
-    exprl = compile_sympy_expr_to_numpy(
-        [x, *late_bound_constants.keys()], expr, xv.dtype
+    exprv = evaluate_sympy_expr_to_numpy(
+        expr, {x: xv, **late_bound_constants}, xv.dtype
     )
-    exprv = (exprl)(xv, *late_bound_constants.values())
 
     # handle rounding errors in the lower error bound computation
     tl = ensure_bounded_derived_error(
         lambda tl: np.where(  # type: ignore
-            tl == 0, exprv, (exprl)(xv + tl, *late_bound_constants.values())
+            tl == 0,
+            exprv,
+            evaluate_sympy_expr_to_numpy(
+                expr, {x: xv + tl, **late_bound_constants}, xv.dtype
+            ),
         ),
         exprv,
         xv,
@@ -720,7 +716,11 @@ def _compute_data_eb_for_qoi_eb(
     )
     tu = ensure_bounded_derived_error(
         lambda tu: np.where(  # type: ignore
-            tu == 0, exprv, (exprl)(xv + tu, *late_bound_constants.values())
+            tu == 0,
+            exprv,
+            evaluate_sympy_expr_to_numpy(
+                expr, {x: xv + tu, **late_bound_constants}, xv.dtype
+            ),
         ),
         exprv,
         xv,
