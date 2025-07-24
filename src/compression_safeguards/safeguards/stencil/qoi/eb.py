@@ -215,11 +215,14 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     def compute_check_neighbourhood_for_data_shape(
         self,
         data_shape: tuple[int, ...],
-    ) -> tuple[None | NeighbourhoodAxis, ...]:
+    ) -> tuple[dict[BoundaryCondition, NeighbourhoodAxis], ...]:
         """
         Compute the shape of the data neighbourhood for data of a given shape.
-        [`None`][None] is returned along dimensions for which the stencil QoI
-        safeguard does not need to look at adjacent data points.
+        Boundary conditions of the same kind are combined, but separate kinds
+        are tracked separately.
+
+        An empty [`dict`][dict] is returned along dimensions for which the
+        stencil QoI safeguard does not need to look at adjacent data points.
 
         This method also checks that the data shape is compatible with the
         stencil QoI safeguard.
@@ -231,11 +234,13 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         Returns
         -------
-        neighbourhood_shape : tuple[None | NeighbourhoodAxis, ...]
+        neighbourhood_shape : tuple[dict[BoundaryCondition, NeighbourhoodAxis], ...]
             The shape of the data neighbourhood.
         """
 
-        neighbourhood: list[None | NeighbourhoodAxis] = [None] * len(data_shape)
+        neighbourhood: list[dict[BoundaryCondition, NeighbourhoodAxis]] = [
+            dict() for _ in data_shape
+        ]
 
         all_axes = []
         for axis in self._neighbourhood:
@@ -250,10 +255,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 )
             all_axes.append(naxis)
 
-            neighbourhood[naxis] = axis.shape
+            neighbourhood[naxis][axis.boundary] = axis.shape
 
         if np.prod(data_shape) == 0:
-            return (None,) * len(data_shape)
+            return tuple(dict() for _ in data_shape)
 
         return tuple(neighbourhood)
 

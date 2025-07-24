@@ -54,9 +54,13 @@ import xarray as xr
 from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.abc import Safeguard
 from compression_safeguards.safeguards.pointwise.abc import PointwiseSafeguard
-from compression_safeguards.safeguards.stencil import NeighbourhoodAxis
+from compression_safeguards.safeguards.stencil import (
+    BoundaryCondition,
+    NeighbourhoodAxis,
+)
 from compression_safeguards.safeguards.stencil.abc import StencilSafeguard
 from compression_safeguards.utils.bindings import Parameter, Value
+from typing_extensions import assert_never  # MSPV 3.11
 
 DataValue: TypeAlias = int | float | np.number | xr.DataArray
 """
@@ -200,17 +204,61 @@ def produce_data_array_correction(
 
     # compute the required stencil / neighbourhood for the safeguards
     stencil = [NeighbourhoodAxis(0, 0) for _ in range(len(data.dims))]
+    boundary = "none"
     for safeguard in safeguards_.safeguards:
         if isinstance(safeguard, StencilSafeguard):
-            for i, s in enumerate(
+            for i, bs in enumerate(
                 safeguard.compute_check_neighbourhood_for_data_shape(data.shape)
             ):
-                if s is None:
-                    continue
-                stencil[i] = NeighbourhoodAxis(
-                    before=max(stencil[i].before, s.before),
-                    after=max(stencil[i].after, s.after),
-                )
+                for b, s in bs.items():
+                    match b:
+                        case (
+                            BoundaryCondition.valid
+                            | BoundaryCondition.constant
+                            | BoundaryCondition.edge
+                        ):
+                            # nothing special, but we do need to extend the stencil
+                            stencil[i] = NeighbourhoodAxis(
+                                before=max(stencil[i].before, s.before),
+                                after=max(stencil[i].after, s.after),
+                            )
+                        case BoundaryCondition.reflect:
+                            # reflect:           [ 1, 2, 3 ]
+                            #       -> [..., 3, 2, 1, 2, 3, 2, 1, ...]
+                            # worst case, the reflection on the left exits the
+                            #  chunk on the right, and same for on the right
+                            # so we need to extend with max(before, after) at
+                            #  both ends
+                            stencil[i] = NeighbourhoodAxis(
+                                before=max(stencil[i].before, max(s.before, s.after)),
+                                after=max(stencil[i].after, max(s.before, s.after)),
+                            )
+                        case BoundaryCondition.symmetric:
+                            # symmetric:         [ 1, 2, 3 ]
+                            #       -> [..., 2, 1, 1, 2, 3, 3, 2, ...]
+                            # similar to reflect, but the edge is repeated
+                            stencil[i] = NeighbourhoodAxis(
+                                before=max(
+                                    stencil[i].before, max(s.before, s.after - 1)
+                                ),
+                                after=max(stencil[i].after, max(s.before - 1, s.after)),
+                            )
+                        case BoundaryCondition.wrap:
+                            # we need to extend the stencil and tell xarray and
+                            #  remember that we will need a wrapping / periodic
+                            #  boundary
+                            stencil[i] = NeighbourhoodAxis(
+                                before=max(stencil[i].before, s.before),
+                                after=max(stencil[i].after, s.after),
+                            )
+                            boundary = "periodic"
+                        case _:
+                            assert_never(boundary)
+
+                    stencil[i] = NeighbourhoodAxis(
+                        before=max(stencil[i].before, s.before),
+                        after=max(stencil[i].after, s.after),
+                    )
         else:
             assert isinstance(safeguard, PointwiseSafeguard), "unknown safeguard kind"
 
@@ -292,7 +340,7 @@ def produce_data_array_correction(
         NeighbourhoodAxis(before=s.before * 2, after=s.after * 2) for s in stencil
     ]
 
-    def _compute_stencil_chunk_correction(
+    def _compute_overlapping_stencil_chunk_correction(
         data_chunk: np.ndarray,
         prediction_chunk: np.ndarray,
         *late_bound_chunks: np.ndarray,
@@ -301,6 +349,10 @@ def produce_data_array_correction(
         safeguards: Safeguards,
     ) -> np.ndarray:
         assert len(late_bound_chunks) == len(late_bound_names)
+
+        # TODO: figure out where in the global array we are
+        # TODO: do we need to do any adjustments?
+        # TODO: or is cropping everything out just good enough?
 
         late_bound_chunk: dict[str, Value] = dict(
             **late_bound_global,
@@ -317,7 +369,7 @@ def produce_data_array_correction(
     return (
         data.copy(
             data=dask.array.map_overlap(
-                _compute_stencil_chunk_correction,
+                _compute_overlapping_stencil_chunk_correction,
                 data.data,
                 prediction.data,
                 *chunked_late_bound.values(),
@@ -326,7 +378,7 @@ def produce_data_array_correction(
                 enforce_ndim=True,
                 meta=np.array((), dtype=correction_dtype),
                 depth=tuple((s.before, s.after) for s in stencil),
-                boundary="none",
+                boundary=boundary,
                 trim=True,
                 align_arrays=False,
                 # if the stencil is larger than the smallest chunk, temporary rechunking may be necessary

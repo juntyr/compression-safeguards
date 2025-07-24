@@ -190,11 +190,12 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
     def compute_check_neighbourhood_for_data_shape(
         self, data_shape: tuple[int, ...]
-    ) -> tuple[None | NeighbourhoodAxis, ...]:
+    ) -> tuple[dict[BoundaryCondition, NeighbourhoodAxis], ...]:
         """
         Compute the shape of the data neighbourhood for data of a given shape.
-        [`None`][None] is returned along the dimensions where the monotonicity
-        safeguard is not applied.
+
+        An empty [`dict`][dict] is returned along dimensions where the
+        monotonicity safeguard is not applied.
 
         Parameters
         ----------
@@ -203,11 +204,13 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         Returns
         -------
-        neighbourhood_shape : tuple[None | NeighbourhoodAxis, ...]
+        neighbourhood_shape : tuple[dict[BoundaryCondition, NeighbourhoodAxis], ...]
             The shape of the data neighbourhood.
         """
 
-        neighbourhood: list[None | NeighbourhoodAxis] = [None] * len(data_shape)
+        neighbourhood: list[dict[BoundaryCondition, NeighbourhoodAxis]] = [
+            dict() for _ in data_shape
+        ]
 
         for axis, alen in enumerate(data_shape):
             if (
@@ -220,7 +223,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             if alen == 0:
                 continue
 
-            neighbourhood[axis] = NeighbourhoodAxis(
+            neighbourhood[axis][self._boundary] = NeighbourhoodAxis(
                 self._window,
                 self._window,
             )
