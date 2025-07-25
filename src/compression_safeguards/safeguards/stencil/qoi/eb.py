@@ -472,11 +472,11 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             _canary_data_eb = _compute_data_eb_for_stencil_qoi_eb(
                 qoi_expr,
                 self._X,
-                np.zeros(shape),
-                np.zeros(shape),
-                np.zeros(shape),
-                np.zeros(shape),
-                {c: np.zeros(shape) for c in self._late_bound_constants},
+                np.zeros((1,) + shape),
+                np.zeros((1,)),
+                np.zeros((1,)),
+                np.zeros((1,)),
+                {c: np.zeros((1,) + shape) for c in self._late_bound_constants},
             )
         except Exception as err:
             raise AssertionError(
