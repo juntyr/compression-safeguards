@@ -766,10 +766,10 @@ def test_indexing():
     )
 
 
-def test_lambdify_indexing():
-    import inspect
-
-    from compression_safeguards.safeguards._qois.compile import sympy_expr_to_numpy
+def test_evaluate_sympy_expr_to_numpy_with_indexing():
+    from compression_safeguards.safeguards._qois.eval import (
+        evaluate_sympy_expr_to_numpy,
+    )
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "asum(X * A[[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])",
@@ -781,12 +781,13 @@ def test_lambdify_indexing():
         0,
     )
 
-    fn = sympy_expr_to_numpy([safeguard._X], safeguard._qoi_expr, np.dtype(np.float16))
+    X = np.round(np.pi * np.arange(9)).reshape(3, 3)
 
-    assert (
-        inspect.getsource(fn)
-        == "def _lambdifygenerated(X):\n    return ((X[..., 0, 0]) * (float16('0.25'))) + ((X[..., 0, 1]) * (float16('0.5'))) + ((X[..., 0, 2]) * (float16('0.25'))) + ((X[..., 1, 0]) * (float16('0.5'))) + ((X[..., 1, 1]) * (float16('1.0'))) + ((X[..., 1, 2]) * (float16('0.5'))) + ((X[..., 2, 0]) * (float16('0.25'))) + ((X[..., 2, 1]) * (float16('0.5'))) + ((X[..., 2, 2]) * (float16('0.25')))\n"
-    )
+    assert evaluate_sympy_expr_to_numpy(
+        safeguard._qoi_expr,
+        {safeguard._X: X},
+        X.dtype,
+    ) == np.sum(X * np.array([[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]]))
 
 
 @pytest.mark.parametrize("dtype", sorted(d.name for d in Safeguards.supported_dtypes()))

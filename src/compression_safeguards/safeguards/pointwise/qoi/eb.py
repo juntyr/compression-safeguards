@@ -105,7 +105,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         [ sign ], digit, { digit }
     ;
     float   =                             (* floating point literal *)
-        [ sign ], digit, { digit }, ".", digit, { digit }, [
+        [ sign ], digit, { digit }, [
+            ".", digit, { digit }
+        ], [
             "e", [ sign ], digit, { digit }
         ]
     ;
@@ -379,18 +381,22 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         data_float: np.ndarray[S, np.dtype[F]] = to_float(data)
 
-        late_bound_constants = {
+        late_bound_constants: dict[LateBoundConstant, np.ndarray[S, np.dtype[F]]] = {
             c: late_bound.resolve_ndarray_with_lossless_cast(
                 c.parameter, data.shape, data_float.dtype
             )
             for c in self._late_bound_constants
         }
 
-        return evaluate_sympy_expr_to_numpy(
-            self._qoi_expr,
-            {self._x: data_float, **late_bound_constants},
-            data_float.dtype,
+        qoi_data: np.ndarray[tuple[int, ...], np.dtype[F]] = (
+            evaluate_sympy_expr_to_numpy(
+                self._qoi_expr,
+                {self._x: data_float, **late_bound_constants},  # type: ignore
+                data_float.dtype,
+            )
         )
+        assert qoi_data.shape == data.shape
+        return qoi_data  # type: ignore
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
@@ -421,23 +427,32 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
 
-        late_bound_constants = {
+        late_bound_constants: dict[
+            LateBoundConstant, np.ndarray[S, np.dtype[np.floating]]
+        ] = {
             c: late_bound.resolve_ndarray_with_lossless_cast(
                 c.parameter, data.shape, data_float.dtype
             )
             for c in self._late_bound_constants
         }
 
-        qoi_data = evaluate_sympy_expr_to_numpy(
-            self._qoi_expr,
-            {self._x: data_float, **late_bound_constants},
-            data_float.dtype,
+        qoi_data_: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            evaluate_sympy_expr_to_numpy(
+                self._qoi_expr,
+                {self._x: data_float, **late_bound_constants},  # type: ignore
+                data_float.dtype,
+            )
         )
-        qoi_decoded = evaluate_sympy_expr_to_numpy(
-            self._qoi_expr,
-            {self._x: to_float(decoded), **late_bound_constants},
-            data_float.dtype,
+        qoi_decoded_: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            evaluate_sympy_expr_to_numpy(
+                self._qoi_expr,
+                {self._x: to_float(decoded), **late_bound_constants},  # type: ignore
+                data_float.dtype,
+            )
         )
+        assert qoi_data_.shape == data.shape and qoi_decoded_.shape == data.shape
+        qoi_data: np.ndarray[S, np.dtype[np.floating]] = qoi_data_  # type: ignore
+        qoi_decoded: np.ndarray[S, np.dtype[np.floating]] = qoi_decoded_  # type: ignore
 
         eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
@@ -496,18 +511,24 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
 
-        late_bound_constants = {
+        late_bound_constants: dict[
+            LateBoundConstant, np.ndarray[S, np.dtype[np.floating]]
+        ] = {
             c: late_bound.resolve_ndarray_with_lossless_cast(
                 c.parameter, data.shape, data_float.dtype
             )
             for c in self._late_bound_constants
         }
 
-        data_qoi = evaluate_sympy_expr_to_numpy(
-            self._qoi_expr,
-            {self._x: data_float, **late_bound_constants},
-            data_float.dtype,
+        data_qoi_: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            evaluate_sympy_expr_to_numpy(
+                self._qoi_expr,
+                {self._x: data_float, **late_bound_constants},  # type: ignore
+                data_float.dtype,
+            )
         )
+        assert data_qoi_.shape == data.shape
+        data_qoi: np.ndarray[S, np.dtype[np.floating]] = data_qoi_  # type: ignore
 
         eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
@@ -578,13 +599,6 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                 & (((data_qoi + eb_qoi_upper) <= qoi_upper) | ~_isfinite(data_qoi))
                 & _isfinite(eb_qoi_upper)
             )
-
-        late_bound_constants = {
-            c: late_bound.resolve_ndarray_with_lossless_cast(
-                c.parameter, data.shape, data_float.dtype
-            )
-            for c in self._late_bound_constants
-        }
 
         # compute the error bound in data space
         with np.errstate(
@@ -678,7 +692,7 @@ def _compute_data_eb_for_qoi_eb(
         check_is_x=lambda expr: expr == x,
         evaluate_sympy_expr_to_numpy=lambda expr: evaluate_sympy_expr_to_numpy(
             expr,
-            {x: xv, **late_bound_constants},
+            {x: xv, **late_bound_constants},  # type: ignore
             xv.dtype,
         ),
         late_bound_constants=frozenset(late_bound_constants.keys()),
@@ -695,9 +709,13 @@ def _compute_data_eb_for_qoi_eb(
         ),
     )
 
-    exprv = evaluate_sympy_expr_to_numpy(
-        expr, {x: xv, **late_bound_constants}, xv.dtype
+    exprv_: np.ndarray[tuple[int, ...], np.dtype[F]] = evaluate_sympy_expr_to_numpy(
+        expr,
+        {x: xv, **late_bound_constants},  # type: ignore
+        xv.dtype,
     )
+    assert exprv_.shape == xv.shape
+    exprv: np.ndarray[S, np.dtype[F]] = exprv_  # type: ignore
 
     # handle rounding errors in the lower error bound computation
     tl = ensure_bounded_derived_error(
@@ -705,7 +723,9 @@ def _compute_data_eb_for_qoi_eb(
             tl == 0,
             exprv,
             evaluate_sympy_expr_to_numpy(
-                expr, {x: xv + tl, **late_bound_constants}, xv.dtype
+                expr,
+                {x: xv + tl, **late_bound_constants},  # type: ignore
+                xv.dtype,
             ),
         ),
         exprv,
@@ -719,7 +739,9 @@ def _compute_data_eb_for_qoi_eb(
             tu == 0,
             exprv,
             evaluate_sympy_expr_to_numpy(
-                expr, {x: xv + tu, **late_bound_constants}, xv.dtype
+                expr,
+                {x: xv + tu, **late_bound_constants},  # type: ignore
+                xv.dtype,
             ),
         ),
         exprv,

@@ -159,7 +159,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         [ sign ], digit, { digit }
     ;
     float   =                             (* floating point literal *)
-        [ sign ], digit, { digit }, ".", digit, { digit }, [
+        [ sign ], digit, { digit }, [
+            ".", digit, { digit }
+        ], [
             "e", [ sign ], digit, { digit }
         ]
     ;
@@ -637,18 +639,18 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         window = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
 
-        data_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
-            to_float(
-                sliding_window_view(
-                    data_boundary,
-                    window,
-                    axis=tuple(axis.axis for axis in self._neighbourhood),
-                    writeable=False,
-                )  # type: ignore
-            )
+        data_windows_float: np.ndarray[tuple[int, ...], np.dtype[F]] = to_float(
+            sliding_window_view(
+                data_boundary,
+                window,
+                axis=tuple(axis.axis for axis in self._neighbourhood),
+                writeable=False,
+            )  # type: ignore
         )
 
-        late_bound_constants = dict()
+        late_bound_constants: dict[
+            LateBoundConstant, np.ndarray[tuple[int, ...], np.dtype[F]]
+        ] = dict()
         for c in self._late_bound_constants:
             late_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = (
                 late_bound.resolve_ndarray_with_lossless_cast(
@@ -666,21 +668,19 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     axis_constant_boundary,
                     axis.axis,
                 )
-            late_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
-                to_float(
-                    sliding_window_view(
-                        late_boundary,
-                        window,
-                        axis=tuple(axis.axis for axis in self._neighbourhood),
-                        writeable=False,
-                    )  # type: ignore
-                )
+            late_windows_float: np.ndarray[tuple[int, ...], np.dtype[F]] = to_float(
+                sliding_window_view(
+                    late_boundary,
+                    window,
+                    axis=tuple(axis.axis for axis in self._neighbourhood),
+                    writeable=False,
+                )  # type: ignore
             )
             late_bound_constants[c] = late_windows_float
 
         return evaluate_sympy_expr_to_numpy(
             self._qoi_expr,
-            {self._X: data_windows_float, **late_bound_constants},
+            {self._X: data_windows_float, **late_bound_constants},  # type: ignore
             data_windows_float.dtype,
         )
 
@@ -782,7 +782,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
         )
 
-        late_bound_constants = dict()
+        late_bound_constants: dict[
+            LateBoundConstant, np.ndarray[tuple[int, ...], np.dtype[np.floating]]
+        ] = dict()
         for c in self._late_bound_constants:
             late_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = (
                 late_bound.resolve_ndarray_with_lossless_cast(
@@ -812,18 +814,22 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
             late_bound_constants[c] = late_windows_float
 
-        qoi_data = evaluate_sympy_expr_to_numpy(
-            self._qoi_expr,
-            {self._X: data_windows_float, **late_bound_constants},
-            data_windows_float.dtype,
+        qoi_data: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            evaluate_sympy_expr_to_numpy(
+                self._qoi_expr,
+                {self._X: data_windows_float, **late_bound_constants},  # type: ignore
+                data_windows_float.dtype,
+            )
         )
-        qoi_decoded = evaluate_sympy_expr_to_numpy(
-            self._qoi_expr,
-            {self._X: decoded_windows_float, **late_bound_constants},
-            data_windows_float.dtype,
+        qoi_decoded: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            evaluate_sympy_expr_to_numpy(
+                self._qoi_expr,
+                {self._X: decoded_windows_float, **late_bound_constants},  # type: ignore
+                data_windows_float.dtype,
+            )
         )
 
-        eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
+        eb: np.ndarray[tuple[()] | tuple[int, ...], np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                 self._eb,
                 qoi_data.shape,
@@ -942,7 +948,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
         )
 
-        late_bound_constants = dict()
+        late_bound_constants: dict[
+            LateBoundConstant, np.ndarray[tuple[int, ...], np.dtype[np.floating]]
+        ] = dict()
         for c in self._late_bound_constants:
             late_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = (
                 late_bound.resolve_ndarray_with_lossless_cast(
@@ -972,13 +980,15 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
             late_bound_constants[c] = late_windows_float
 
-        data_qoi = evaluate_sympy_expr_to_numpy(
-            self._qoi_expr,
-            {self._X: data_windows_float, **late_bound_constants},
-            data_windows_float.dtype,
+        data_qoi: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            evaluate_sympy_expr_to_numpy(
+                self._qoi_expr,
+                {self._X: data_windows_float, **late_bound_constants},  # type: ignore
+                data_windows_float.dtype,
+            )
         )
 
-        eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
+        eb: np.ndarray[tuple[()] | tuple[int, ...], np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                 self._eb,
                 data_qoi.shape,
@@ -992,7 +1002,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         _check_error_bound(self._type, eb)
 
         qoi_lower_upper: tuple[
-            np.ndarray[S, np.dtype[np.floating]], np.ndarray[S, np.dtype[np.floating]]
+            np.ndarray[tuple[int, ...], np.dtype[np.floating]],
+            np.ndarray[tuple[int, ...], np.dtype[np.floating]],
         ] = _apply_finite_qoi_error_bound(
             self._type,
             eb,
@@ -1245,7 +1256,7 @@ def _compute_data_eb_for_stencil_qoi_eb(
         ),
         evaluate_sympy_expr_to_numpy=lambda expr: evaluate_sympy_expr_to_numpy(
             expr,
-            {X: XvN, **late_bound_constants},
+            {X: XvN, **late_bound_constants},  # type: ignore
             Xv.dtype,
         ),
         late_bound_constants=frozenset(late_bound_constants.keys()),
@@ -1263,11 +1274,13 @@ def _compute_data_eb_for_stencil_qoi_eb(
         ),
     )
 
-    exprv = evaluate_sympy_expr_to_numpy(
+    exprv_: np.ndarray[tuple[int, ...], np.dtype[F]] = evaluate_sympy_expr_to_numpy(
         expr,
-        {X: XvN, **late_bound_constants},
+        {X: XvN, **late_bound_constants},  # type: ignore
         Xv.dtype,
     )
+    assert exprv_.shape == Xv.shape
+    exprv: np.ndarray[Qs, np.dtype[F]] = exprv_  # type: ignore
 
     # handle rounding errors in the lower error bound computation
     tl = ensure_bounded_derived_error(
@@ -1280,7 +1293,7 @@ def _compute_data_eb_for_stencil_qoi_eb(
                 expr,
                 {
                     X: XvN + tl.reshape(list(tl.shape) + [1] * (XvN.ndim - tl.ndim)),
-                    **late_bound_constants,
+                    **late_bound_constants,  # type: ignore
                 },
                 Xv.dtype,
             ),
@@ -1301,7 +1314,7 @@ def _compute_data_eb_for_stencil_qoi_eb(
                 expr,
                 {
                     X: XvN + tu.reshape(list(tu.shape) + [1] * (XvN.ndim - tu.ndim)),
-                    **late_bound_constants,
+                    **late_bound_constants,  # type: ignore
                 },
                 Xv.dtype,
             ),

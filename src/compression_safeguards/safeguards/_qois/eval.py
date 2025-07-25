@@ -30,14 +30,16 @@ def evaluate_sympy_expr_to_numpy(
         raise ValueError("cannot evaluate an expression containing an imaginary number")
 
     if expr.is_Integer:
-        return dtype.type(f"{expr.p}")
+        return np.array(dtype.type(f"{expr.p}"))  # type: ignore
 
     if expr.is_Rational:
-        return dtype.type(f"{expr.p}") / dtype.type(f"{expr.q}")
+        return np.array(  # type: ignore
+            dtype.type(f"{expr.p}") / dtype.type(f"{expr.q}")  # type: ignore
+        )
 
     if expr.is_Float:
         # TODO: check if this is the correct way to print at full precision
-        return dtype.type(f"{expr}")
+        return np.array(dtype.type(f"{expr}"))
 
     if expr.is_NumberSymbol:
         precision = (
@@ -45,23 +47,22 @@ def evaluate_sympy_expr_to_numpy(
             if dtype == _float128_dtype
             else np.finfo(dtype).precision
         ) * 2
-        return dtype.type(f"{sp.N(expr, precision)}")
+        return np.array(dtype.type(f"{sp.N(expr, precision)}"))
 
     if expr is sp.S.Infinity:
-        return dtype.type("inf")
+        return np.array(dtype.type("inf"))
 
     if expr is sp.S.NaN:
-        return dtype.type("nan")
+        return np.array(dtype.type("nan"))
 
     if expr.is_Symbol:
-        return vals[expr]
+        return vals[expr]  # type: ignore
 
     if expr.func is sp.tensor.array.expressions.ArrayElement and len(expr.args) == 2:
-        if expr.args[0] in vals:
-            # data symbols are keyed directly
-            return vals[expr.args[0]][tuple([...] + [int(i) for i in expr.indices])]
-        # late-bound constants are keyed by the symbol
-        return vals[expr.args[0].args[0]][tuple([...] + [int(i) for i in expr.indices])]
+        array_symbol = expr.name  # type: ignore
+        # data symbols are keyed directly, late-bound constants by the symbol
+        symbol = array_symbol if array_symbol in vals else array_symbol.name
+        return vals[symbol][tuple([...] + [int(i) for i in expr.indices])]  # type: ignore
 
     if expr.func is sp.Abs and len(expr.args) == 1:
         (arg,) = expr.args
@@ -87,7 +88,7 @@ def evaluate_sympy_expr_to_numpy(
     if expr.func is sp_sign and len(expr.args) == 1:
         (arg,) = expr.args
         argv = evaluate_sympy_expr_to_numpy(arg, vals, dtype)
-        return _sign(argv)
+        return _sign(np.array(argv))
 
     if expr.func is sp.floor and len(expr.args) == 1:
         (arg,) = expr.args
@@ -117,7 +118,7 @@ def evaluate_sympy_expr_to_numpy(
         res = np.mod(pv + q2v, qv)
         if dtype == _float128_dtype:
             res = np.mod(res + qv, qv)
-        return res - q2v
+        return res - q2v  # type: ignore
 
     if expr.func is sp.sin and len(expr.args) == 1:
         (arg,) = expr.args
@@ -180,7 +181,7 @@ def evaluate_sympy_expr_to_numpy(
         (a, b) = expr.args
         av = evaluate_sympy_expr_to_numpy(a, vals, dtype)
         bv = evaluate_sympy_expr_to_numpy(b, vals, dtype)
-        return av + bv
+        return av + bv  # type: ignore
 
     if expr.is_Add:
         arg, *args = expr.args
@@ -193,13 +194,13 @@ def evaluate_sympy_expr_to_numpy(
         (a, b) = expr.args
         av = evaluate_sympy_expr_to_numpy(a, vals, dtype)
         bv = evaluate_sympy_expr_to_numpy(b, vals, dtype)
-        return av * bv
+        return av * bv  # type: ignore
 
     if expr.is_Mul:
         arg, *args = expr.args
         return prod(
             (evaluate_sympy_expr_to_numpy(a, vals, dtype) for a in args),
             start=evaluate_sympy_expr_to_numpy(arg, vals, dtype),
-        )
+        )  # type: ignore
 
     raise ValueError(f"unsupported expression kind {expr} (= {sp.srepr(expr)} =)")

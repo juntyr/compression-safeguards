@@ -381,7 +381,7 @@ def _nan_to_zero_inf_to_finite(
 
 # wrapper around np.sign that also works for numpy_quaddtype
 @np.errstate(invalid="ignore")
-def _sign(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[np.int_ | T]]:
+def _sign(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
     if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
         return np.sign(a)
     return np.where(_isnan(a), a, np.where(a == 0, 0, np.where(a < 0, -1, +1)))  # type: ignore
