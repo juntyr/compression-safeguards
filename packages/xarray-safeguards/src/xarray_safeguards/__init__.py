@@ -53,7 +53,10 @@ import numpy as np
 import xarray as xr
 from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.abc import Safeguard
-from compression_safeguards.safeguards.stencil import BoundaryCondition
+from compression_safeguards.safeguards.stencil import (
+    BoundaryCondition,
+    NeighbourhoodAxis,
+)
 from compression_safeguards.utils.bindings import Parameter, Value
 from typing_extensions import assert_never  # MSPV 3.11
 
@@ -269,25 +272,31 @@ def produce_data_array_correction(
         )
 
     boundary: Literal["none", "periodic"] = "none"
-    for b, s in required_stencil:
-        match b:
-            case BoundaryCondition.valid:
-                pass
-            case BoundaryCondition.wrap:
-                boundary = "periodic"
-            case _:
-                assert_never(b)
-
-    # TODO: dask does not support depths larger than the axis, so handle these
+    depth_: list[tuple[int, int]] = []
+    for a, (b, s) in zip(data.shape, required_stencil):
+        # dask doesn't support depths larger than the axes,
+        # so clip that axis and prefer no boundary condition
+        #  as it will anyways be rechunked to just a single chunk
+        if s.before >= a or s.after >= a:
+            depth_.append((a, a))
+        else:
+            depth_.append((s.before, s.after))
+            match b:
+                case BoundaryCondition.valid:
+                    pass
+                case BoundaryCondition.wrap:
+                    boundary = "periodic"
+                case _:
+                    assert_never(b)
 
     match boundary:
         case "none":
-            depth: tuple[tuple[int, int], ...] | tuple[int, ...] = tuple(
-                (s.before, s.after) for b, s in required_stencil
+            depth: tuple[int | tuple[int, int], ...] = tuple(
+                b if b == a else (a, b) for a, b in depth_
             )
         case "periodic":
             # dask only supports asymmetric depths for the none boundary
-            depth = tuple(max(s.before, s.after) for b, s in required_stencil)
+            depth = tuple(max(a, b) for a, b in depth_)
         case _:
             assert_never(boundary)
 
@@ -298,10 +307,13 @@ def produce_data_array_correction(
         late_bound_names: tuple[str],
         late_bound_global: dict[str, int | float | np.number],
         safeguards: Safeguards,
+        depth_: tuple[int | tuple[int, int], ...],
+        boundary_: Literal["none", "periodic"],
         block_info=None,
     ) -> np.ndarray:
         assert block_info is not None
         assert len(late_bound_chunks) == len(late_bound_names)
+        assert len(depth_) == data_chunk.ndim
 
         data_shape: tuple[int, ...] = tuple(block_info[None]["shape"])
         chunk_location: tuple[tuple[int, int], ...] = tuple(
@@ -313,6 +325,39 @@ def produce_data_array_correction(
             **{p: v for p, v in zip(late_bound_names, late_bound_chunks)},
         )
 
+        depth: tuple[tuple[int, int], ...] = tuple(
+            (d, d) if isinstance(d, int) else d for d in depth_
+        )
+
+        match boundary_:
+            case "none":
+                # the none boundary does not extend beyond the data boundary,
+                #  so we need to check by how much the stencil was cut off
+                chunk_stencil: tuple[
+                    tuple[
+                        Literal[BoundaryCondition.valid, BoundaryCondition.wrap],
+                        NeighbourhoodAxis,
+                    ],
+                    ...,
+                ] = tuple(
+                    (
+                        BoundaryCondition.valid,
+                        NeighbourhoodAxis(
+                            before=s - max(0, s - b), after=min(e + a, d) - e
+                        ),
+                    )
+                    for (b, a), (s, e), d in zip(depth, chunk_location, data_shape)
+                )
+            case "periodic":
+                # the periodic boundary guarantees that we always have the
+                #  stencil we asked for
+                chunk_stencil = tuple(
+                    (BoundaryCondition.wrap, NeighbourhoodAxis(before=b, after=a))
+                    for b, a in depth
+                )
+            case _:
+                assert_never(boundary_)
+
         # this is safe because
         # - map_overlap ensures we get chunks including their required stencil
         # - compute_chunked_correction only returns the correction for the non-
@@ -322,7 +367,7 @@ def produce_data_array_correction(
             prediction_chunk,
             data_shape=data_shape,
             chunk_offset=tuple(f for f, t in chunk_location),
-            chunk_stencil=...,  # TODO
+            chunk_stencil=chunk_stencil,
             late_bound_chunk=late_bound_chunk,
         )
 
@@ -346,6 +391,8 @@ def produce_data_array_correction(
                 late_bound_names=tuple(chunked_late_bound.keys()),
                 late_bound_global=late_bound_global,
                 safeguards=safeguards_,
+                depth_=depth,
+                boundary_=boundary,
             ).rechunk(data.chunks)  # undo temporary rechunking
         )
         .rename(correction_name)
