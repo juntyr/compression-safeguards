@@ -203,6 +203,7 @@ def produce_data_array_correction(
         )
 
     # compute the required stencil / neighbourhood for the safeguards
+    # FIXME: dask also only supports stencils that are <= the data size
     stencil = [NeighbourhoodAxis(0, 0) for _ in range(len(data.dims))]
     boundary = "none"
     for safeguard in safeguards_.safeguards:
@@ -251,14 +252,10 @@ def produce_data_array_correction(
                                 before=max(stencil[i].before, s.before),
                                 after=max(stencil[i].after, s.after),
                             )
+                            # FIXME: periodic boundary is only supported by dask for symmetric stencils
                             boundary = "periodic"
                         case _:
-                            assert_never(boundary)
-
-                    stencil[i] = NeighbourhoodAxis(
-                        before=max(stencil[i].before, s.before),
-                        after=max(stencil[i].after, s.after),
-                    )
+                            assert_never(b)
         else:
             assert isinstance(safeguard, PointwiseSafeguard), "unknown safeguard kind"
 
@@ -347,8 +344,21 @@ def produce_data_array_correction(
         late_bound_names: tuple[str],
         late_bound_global: dict[str, int | float | np.number],
         safeguards: Safeguards,
+        block_info=None,
     ) -> np.ndarray:
+        assert block_info is not None
         assert len(late_bound_chunks) == len(late_bound_names)
+
+        shape: tuple[int, ...] = tuple(block_info[None]["shape"])
+        array_location: tuple[tuple[int, int], ...] = tuple(
+            block_info[None]["array-location"]
+        )
+
+        # TODO: figure out how much to cut off the data to just have the non-extended chunk itself
+        # TODO: figure out if periodic boundary conditions can be satisfied from the non-extended chunk, cut that off immediately
+        # TODO: perform the same extraction for all chunked arrays
+        # TODO: compute the correction
+        # TODO: extract just the non-extended correction and return it
 
         # TODO: figure out where in the global array we are
         # TODO: do we need to do any adjustments?
@@ -379,7 +389,7 @@ def produce_data_array_correction(
                 meta=np.array((), dtype=correction_dtype),
                 depth=tuple((s.before, s.after) for s in stencil),
                 boundary=boundary,
-                trim=True,
+                trim=False,
                 align_arrays=False,
                 # if the stencil is larger than the smallest chunk, temporary rechunking may be necessary
                 allow_rechunk=True,
