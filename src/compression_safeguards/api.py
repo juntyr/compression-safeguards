@@ -151,103 +151,6 @@ class Safeguards:
 
         return as_bits(np.array((), dtype=dtype)).dtype
 
-    def compute_required_stencil_for_chunked_correction(
-        self, data_shape: tuple[int, ...]
-    ) -> tuple[
-        tuple[
-            Literal[BoundaryCondition.valid, BoundaryCondition.wrap], NeighbourhoodAxis
-        ],
-        ...,
-    ]:
-        """
-        Compute the shape of the stencil neighbourhood around chunks of the
-        complete data that is required to compute the chunked corrections.
-
-        For each data dimension, the stencil might require either a
-        [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
-        or
-        [wrapping][compression_safeguards.safeguards.stencil.BoundaryCondition.wrap]
-        boundary condition.
-
-        This method also checks that the data shape is compatible with the
-        safeguards.
-
-        Parameters
-        ----------
-        data_shape : tuple[int, ...]
-            The shape of the complete data.
-
-        Returns
-        -------
-        stencil_shape : tuple[tuple[BoundaryCondition.valid | BoundaryCondition.wrap, NeighbourhoodAxis], ...]
-            The shape of the required stencil neighbourhood.
-        """
-
-        neighbourhood = [
-            [BoundaryCondition.valid, NeighbourhoodAxis(0, 0)] for _ in data_shape
-        ]
-
-        # ensure we don't accidentally forget to handle new kinds of safeguards here
-        assert len(self.safeguards) == len(self._pointwise_safeguards) + len(
-            self._stencil_safeguards
-        )
-
-        # pointwise safeguards don't impose any neighbourhood requirements
-
-        for safeguard in self._stencil_safeguards:
-            for i, bs in enumerate(
-                safeguard.compute_check_neighbourhood_for_data_shape(data_shape)
-            ):
-                for b, s in bs.items():
-                    n_before, n_after = (
-                        neighbourhood[i][1].before,
-                        neighbourhood[i][1].after,
-                    )
-
-                    match b:
-                        case (
-                            BoundaryCondition.valid
-                            | BoundaryCondition.constant
-                            | BoundaryCondition.edge
-                        ):
-                            # nothing special, but we do need to extend the stencil
-                            neighbourhood[i][1] = NeighbourhoodAxis(
-                                before=max(n_before, s.before),
-                                after=max(n_after, s.after),
-                            )
-                        case BoundaryCondition.reflect:
-                            # reflect:           [ 1, 2, 3 ]
-                            #       -> [..., 3, 2, 1, 2, 3, 2, 1, ...]
-                            # worst case, the reflection on the left exits the
-                            #  chunk on the right, and same for on the right
-                            # so we need to extend with max(before, after) at
-                            #  both ends
-                            neighbourhood[i][1] = NeighbourhoodAxis(
-                                before=max(n_before, max(s.before, s.after)),
-                                after=max(n_after, max(s.before, s.after)),
-                            )
-                        case BoundaryCondition.symmetric:
-                            # symmetric:         [ 1, 2, 3 ]
-                            #       -> [..., 2, 1, 1, 2, 3, 3, 2, ...]
-                            # similar to reflect, but the edge is repeated
-                            neighbourhood[i][1] = NeighbourhoodAxis(
-                                before=max(n_before, max(s.before, s.after - 1)),
-                                after=max(n_after, max(s.before - 1, s.after)),
-                            )
-                        case BoundaryCondition.wrap:
-                            # we need to extend the stencil and tell xarray and
-                            #  remember that we will need a wrapping / periodic
-                            #  boundary
-                            neighbourhood[i][0] = BoundaryCondition.wrap
-                            neighbourhood[i][1] = NeighbourhoodAxis(
-                                before=max(n_before, s.before),
-                                after=max(n_after, s.after),
-                            )
-                        case _:
-                            assert_never(b)
-
-        return tuple(tuple(n) for n in neighbourhood)
-
     def compute_correction(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -288,7 +191,7 @@ class Safeguards:
 
         if len(self._stencil_safeguards) > 0:
             assert not getattr(data, "chunked", False), (
-                "computing the safeguards correction for an individual chunk in a chunked array is unsafe when using stencil safeguards since their safety requirements cannot be guaranteed across chunk boundaries"
+                "computing the safeguards correction for an individual chunk in a chunked array is unsafe when using stencil safeguards since their safety requirements cannot be guaranteed across chunk boundaries; use compute_chunked_correction instead"
             )
 
         assert data.dtype == prediction.dtype
@@ -380,6 +283,179 @@ class Safeguards:
         corrected = prediction_bits - correction_bits
 
         return corrected.view(prediction.dtype)
+
+    def compute_required_stencil_for_chunked_correction(
+        self, data_shape: tuple[int, ...]
+    ) -> tuple[
+        tuple[
+            Literal[BoundaryCondition.valid, BoundaryCondition.wrap], NeighbourhoodAxis
+        ],
+        ...,
+    ]:
+        """
+        Compute the shape of the stencil neighbourhood around chunks of the
+        complete data that is required to compute the chunked corrections.
+
+        For each data dimension, the stencil might require either a
+        [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
+        or
+        [wrapping][compression_safeguards.safeguards.stencil.BoundaryCondition.wrap]
+        boundary condition.
+
+        This method also checks that the data shape is compatible with the
+        safeguards.
+
+        Parameters
+        ----------
+        data_shape : tuple[int, ...]
+            The shape of the complete data.
+
+        Returns
+        -------
+        stencil_shape : tuple[tuple[Literal[BoundaryCondition.valid, BoundaryCondition.wrap], NeighbourhoodAxis], ...]
+            The shape of the required stencil neighbourhood.
+        """
+
+        neighbourhood: list[
+            tuple[
+                Literal[BoundaryCondition.valid, BoundaryCondition.wrap],
+                NeighbourhoodAxis,
+            ]
+        ] = [(BoundaryCondition.valid, NeighbourhoodAxis(0, 0)) for _ in data_shape]
+
+        # ensure we don't accidentally forget to handle new kinds of safeguards here
+        assert len(self.safeguards) == len(self._pointwise_safeguards) + len(
+            self._stencil_safeguards
+        )
+
+        # pointwise safeguards don't impose any stencil neighbourhood
+        #  requirements
+
+        for safeguard in self._stencil_safeguards:
+            for i, bs in enumerate(
+                safeguard.compute_check_neighbourhood_for_data_shape(data_shape)
+            ):
+                for b, s in bs.items():
+                    n_before, n_after = (
+                        neighbourhood[i][1].before,
+                        neighbourhood[i][1].after,
+                    )
+
+                    match b:
+                        case (
+                            BoundaryCondition.valid
+                            | BoundaryCondition.constant
+                            | BoundaryCondition.edge
+                        ):
+                            # nothing special, but we do need to extend the stencil
+                            neighbourhood[i] = (
+                                neighbourhood[i][0],
+                                NeighbourhoodAxis(
+                                    before=max(n_before, s.before),
+                                    after=max(n_after, s.after),
+                                ),
+                            )
+                        case BoundaryCondition.reflect:
+                            # reflect:           [ 1, 2, 3 ]
+                            #       -> [..., 3, 2, 1, 2, 3, 2, 1, ...]
+                            # worst case, the reflection on the left exits the
+                            #  chunk on the right, and same for on the right
+                            # so we need to extend with max(before, after) at
+                            #  both ends
+                            neighbourhood[i] = (
+                                neighbourhood[i][0],
+                                NeighbourhoodAxis(
+                                    before=max(n_before, max(s.before, s.after)),
+                                    after=max(n_after, max(s.before, s.after)),
+                                ),
+                            )
+                        case BoundaryCondition.symmetric:
+                            # symmetric:         [ 1, 2, 3 ]
+                            #       -> [..., 2, 1, 1, 2, 3, 3, 2, ...]
+                            # similar to reflect, but the edge is repeated
+                            neighbourhood[i] = (
+                                neighbourhood[i][0],
+                                NeighbourhoodAxis(
+                                    before=max(n_before, max(s.before, s.after - 1)),
+                                    after=max(n_after, max(s.before - 1, s.after)),
+                                ),
+                            )
+                        case BoundaryCondition.wrap:
+                            # we need to extend the stencil and tell xarray and
+                            #  remember that we will need a wrapping / periodic
+                            #  boundary
+                            neighbourhood[i] = (
+                                BoundaryCondition.wrap,
+                                NeighbourhoodAxis(
+                                    before=max(n_before, s.before),
+                                    after=max(n_after, s.after),
+                                ),
+                            )
+                        case _:
+                            assert_never(b)
+
+        # we now know that the safeguards have a stencil of
+        #  [before, ..., x, ..., after]
+        # this stencil is sufficient to compute the safeguards for x,
+        #
+        # BUT the elements in before and after can also back-contribute to the
+        #  safe intervals of x,
+        # so we need to ensure that all elements in the stencil can also apply
+        #  the safeguards, i.e. they also need their stencil supplied
+        #
+        # therefore we actually need to double the stencil to
+        # [before-before, ..., before, ..., x, ..., after, ..., after+after]
+
+        # TODO: do we need to double everywhere, especially with reflective
+        #       boundaries?
+        return tuple(
+            (b, NeighbourhoodAxis(before=s.before * 2, after=s.after * 2))
+            for b, s in neighbourhood
+        )
+
+    def compute_chunked_correction(
+        self,
+        data_chunk: np.ndarray[S, np.dtype[T]],
+        prediction_chunk: np.ndarray[S, np.dtype[T]],
+        *,
+        data_shape: tuple[int, ...],
+        chunk_offset: tuple[int, ...],
+        chunk_stencil: tuple[
+            tuple[
+                Literal[BoundaryCondition.valid, BoundaryCondition.wrap],
+                NeighbourhoodAxis,
+            ],
+            ...,
+        ],
+        late_bound_chunk: Mapping[str | Parameter, Value] | Bindings = Bindings.empty(),
+    ) -> np.ndarray[tuple[int, ...], np.dtype[C]]:
+        assert data_chunk.dtype in _SUPPORTED_DTYPES, (
+            f"can only safeguard arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
+        )
+
+        assert data_chunk.dtype == prediction_chunk.dtype
+        assert data_chunk.shape == prediction_chunk.shape
+        assert len(data_shape) == data_chunk.ndim
+        assert len(chunk_offset) == data_chunk.ndim
+        assert len(chunk_stencil) == data_chunk.ndim
+
+        # TODO: check that the chunk stencil is compatible with the required stencil
+        #       this is not trivial since we need to account for huge chunks where
+        #       downgrading the stencil can work out
+
+        # TODO: compute indices to extract just the needed data and data+stencil
+        #       again taking wrapping boundaries into account
+        #       also sometimes stencil needs to be removed near the data boundaries
+        #       so that the per-safeguard stencil correctly sees how points wrap
+
+        # TODO: somehow also apply this extraction to the bindings ...
+
+        # TODO: compute the correction - here we need to duplicate some code from
+        #       the unchunked compute_correction
+
+        # TODO: extract just the correction for the non-stencil subset
+
+        raise NotImplementedError
 
     def get_config(self) -> dict:
         """

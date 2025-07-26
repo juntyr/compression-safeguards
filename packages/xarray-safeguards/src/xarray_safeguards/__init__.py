@@ -45,7 +45,7 @@ __all__ = [
 
 import json
 from collections.abc import Collection, Mapping
-from typing import TypeAlias
+from typing import Literal, TypeAlias
 
 import dask
 import dask.array
@@ -53,12 +53,7 @@ import numpy as np
 import xarray as xr
 from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.abc import Safeguard
-from compression_safeguards.safeguards.pointwise.abc import PointwiseSafeguard
-from compression_safeguards.safeguards.stencil import (
-    BoundaryCondition,
-    NeighbourhoodAxis,
-)
-from compression_safeguards.safeguards.stencil.abc import StencilSafeguard
+from compression_safeguards.safeguards.stencil import BoundaryCondition
 from compression_safeguards.utils.bindings import Parameter, Value
 from typing_extensions import assert_never  # MSPV 3.11
 
@@ -202,65 +197,6 @@ def produce_data_array_correction(
             .assign_attrs(**correction_attrs)
         )
 
-    # compute the required stencil / neighbourhood for the safeguards
-    # FIXME: dask also only supports stencils that are <= the data size
-    stencil = [NeighbourhoodAxis(0, 0) for _ in range(len(data.dims))]
-    boundary = "none"
-    for safeguard in safeguards_.safeguards:
-        if isinstance(safeguard, StencilSafeguard):
-            for i, bs in enumerate(
-                safeguard.compute_check_neighbourhood_for_data_shape(data.shape)
-            ):
-                for b, s in bs.items():
-                    match b:
-                        case (
-                            BoundaryCondition.valid
-                            | BoundaryCondition.constant
-                            | BoundaryCondition.edge
-                        ):
-                            # nothing special, but we do need to extend the stencil
-                            stencil[i] = NeighbourhoodAxis(
-                                before=max(stencil[i].before, s.before),
-                                after=max(stencil[i].after, s.after),
-                            )
-                        case BoundaryCondition.reflect:
-                            # reflect:           [ 1, 2, 3 ]
-                            #       -> [..., 3, 2, 1, 2, 3, 2, 1, ...]
-                            # worst case, the reflection on the left exits the
-                            #  chunk on the right, and same for on the right
-                            # so we need to extend with max(before, after) at
-                            #  both ends
-                            stencil[i] = NeighbourhoodAxis(
-                                before=max(stencil[i].before, max(s.before, s.after)),
-                                after=max(stencil[i].after, max(s.before, s.after)),
-                            )
-                        case BoundaryCondition.symmetric:
-                            # symmetric:         [ 1, 2, 3 ]
-                            #       -> [..., 2, 1, 1, 2, 3, 3, 2, ...]
-                            # similar to reflect, but the edge is repeated
-                            stencil[i] = NeighbourhoodAxis(
-                                before=max(
-                                    stencil[i].before, max(s.before, s.after - 1)
-                                ),
-                                after=max(stencil[i].after, max(s.before - 1, s.after)),
-                            )
-                        case BoundaryCondition.wrap:
-                            # we need to extend the stencil and tell xarray and
-                            #  remember that we will need a wrapping / periodic
-                            #  boundary
-                            stencil[i] = NeighbourhoodAxis(
-                                before=max(stencil[i].before, s.before),
-                                after=max(stencil[i].after, s.after),
-                            )
-                            # FIXME: periodic boundary is only supported by dask for symmetric stencils
-                            boundary = "periodic"
-                        case _:
-                            assert_never(b)
-        else:
-            assert isinstance(safeguard, PointwiseSafeguard), "unknown safeguard kind"
-
-    correction_dtype: np.dtype = safeguards_.correction_dtype_for_data(data.dtype)
-
     # provide built-in late-bound bindings $d for the data dimensions
     chunked_late_bound: dict[str, dask.array.Array] = dict()
     for i, d in enumerate(data.dims):
@@ -286,8 +222,13 @@ def produce_data_array_correction(
             meta=np.array((), dtype=v.dtype),
         )
 
+    required_stencil = safeguards_.compute_required_stencil_for_chunked_correction(
+        data.shape
+    )
+    correction_dtype: np.dtype = safeguards_.correction_dtype_for_data(data.dtype)
+
     # special case for no stencil: just apply independently to each chunk
-    if all(s.before == 0 and s.after == 0 for s in stencil):
+    if all(s.before == 0 and s.after == 0 for b, s in required_stencil):
 
         def _compute_independent_chunk_correction(
             data_chunk: np.ndarray,
@@ -327,15 +268,28 @@ def produce_data_array_correction(
             .assign_attrs(**correction_attrs)
         )
 
-    # we now know that the safeguards have a stencil of [before, ..., x, ..., after]
-    # this stencil is sufficient to compute the safeguard to x,
-    # BUT the elements from before to after also contribute to the safe intervals of x
-    # so we need to ensure that they have all of their stencil available as well
-    # therefore we actually need to double the stencil to
-    # [before-before, ..., before, ..., x, ..., after, ..., after+after]
-    stencil = [
-        NeighbourhoodAxis(before=s.before * 2, after=s.after * 2) for s in stencil
-    ]
+    boundary: Literal["none", "periodic"] = "none"
+    for b, s in required_stencil:
+        match b:
+            case BoundaryCondition.valid:
+                pass
+            case BoundaryCondition.wrap:
+                boundary = "periodic"
+            case _:
+                assert_never(b)
+
+    # TODO: dask does not support depths larger than the axis, so handle these
+
+    match boundary:
+        case "none":
+            depth: tuple[tuple[int, int], ...] | tuple[int, ...] = tuple(
+                (s.before, s.after) for b, s in required_stencil
+            )
+        case "periodic":
+            # dask only supports asymmetric depths for the none boundary
+            depth = tuple(max(s.before, s.after) for b, s in required_stencil)
+        case _:
+            assert_never(boundary)
 
     def _compute_overlapping_stencil_chunk_correction(
         data_chunk: np.ndarray,
@@ -349,20 +303,10 @@ def produce_data_array_correction(
         assert block_info is not None
         assert len(late_bound_chunks) == len(late_bound_names)
 
-        shape: tuple[int, ...] = tuple(block_info[None]["shape"])
-        array_location: tuple[tuple[int, int], ...] = tuple(
+        data_shape: tuple[int, ...] = tuple(block_info[None]["shape"])
+        chunk_location: tuple[tuple[int, int], ...] = tuple(
             block_info[None]["array-location"]
         )
-
-        # TODO: figure out how much to cut off the data to just have the non-extended chunk itself
-        # TODO: figure out if periodic boundary conditions can be satisfied from the non-extended chunk, cut that off immediately
-        # TODO: perform the same extraction for all chunked arrays
-        # TODO: compute the correction
-        # TODO: extract just the non-extended correction and return it
-
-        # TODO: figure out where in the global array we are
-        # TODO: do we need to do any adjustments?
-        # TODO: or is cropping everything out just good enough?
 
         late_bound_chunk: dict[str, Value] = dict(
             **late_bound_global,
@@ -371,9 +315,15 @@ def produce_data_array_correction(
 
         # this is safe because
         # - map_overlap ensures we get chunks including their required stencil
-        # - map_overlap with trim=True throws away the stencil corrections
-        return safeguards.compute_correction(
-            data_chunk, prediction_chunk, late_bound=late_bound_chunk
+        # - compute_chunked_correction only returns the correction for the non-
+        #   overlapping non-stencil parts of the chunk
+        return safeguards.compute_chunked_correction(
+            data_chunk,
+            prediction_chunk,
+            data_shape=data_shape,
+            chunk_offset=tuple(f for f, t in chunk_location),
+            chunk_stencil=...,  # TODO
+            late_bound_chunk=late_bound_chunk,
         )
 
     return (
@@ -387,7 +337,7 @@ def produce_data_array_correction(
                 chunks=None,
                 enforce_ndim=True,
                 meta=np.array((), dtype=correction_dtype),
-                depth=tuple((s.before, s.after) for s in stencil),
+                depth=depth,
                 boundary=boundary,
                 trim=False,
                 align_arrays=False,
