@@ -4,6 +4,7 @@ Implementation of the [`Safeguards`][compression_safeguards.api.Safeguards], whi
 
 __all__ = ["Safeguards"]
 
+import functools
 from collections.abc import Collection, Mapping, Set
 from typing import Literal
 
@@ -232,7 +233,7 @@ class Safeguards:
         for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
             intervals = safeguard.compute_safe_intervals(data, late_bound=late_bound)
             assert np.all(intervals.contains(data)), (
-                f"pointwise safeguard {safeguard!r}'s intervals must contain the original data"
+                f"safeguard {safeguard!r}'s intervals must contain the original data"
             )
             all_intervals.append(intervals)
 
@@ -243,10 +244,10 @@ class Safeguards:
 
         for safeguard, intervals in zip(self.safeguards, all_intervals):
             assert np.all(intervals.contains(correction)), (
-                f"{safeguard!r} interval does not contain the correction {correction!r}"
+                f"safeguard {safeguard!r} interval does not contain the correction {correction!r}"
             )
             assert safeguard.check(data, correction, late_bound=late_bound), (
-                f"{safeguard!r} check fails after correction {correction!r} on data {data!r}"
+                f"safeguard {safeguard!r} check fails after correction {correction!r} on data {data!r}"
             )
 
         prediction_bits = as_bits(prediction)
@@ -284,6 +285,7 @@ class Safeguards:
 
         return corrected.view(prediction.dtype)
 
+    @functools.lru_cache
     def compute_required_stencil_for_chunked_correction(
         self, data_shape: tuple[int, ...]
     ) -> tuple[
@@ -439,6 +441,10 @@ class Safeguards:
         assert len(chunk_offset) == data_chunk.ndim
         assert len(chunk_stencil) == data_chunk.ndim
 
+        required_stencil = self.compute_required_stencil_for_chunked_correction(
+            data_shape
+        )
+
         # TODO: check that the chunk stencil is compatible with the required stencil
         #       this is not trivial since we need to account for huge chunks where
         #       downgrading the stencil can work out
@@ -448,14 +454,118 @@ class Safeguards:
         #       also sometimes stencil needs to be removed near the data boundaries
         #       so that the per-safeguard stencil correctly sees how points wrap
 
+        stencil_indices = []
+        non_stencil_indices = []
+
+        for i, (c, r) in enumerate(zip(chunk_stencil, required_stencil)):
+            # complete chunks that span the entire data along the axis are
+            #  always allowed
+            if (
+                c[0] == BoundaryCondition.valid
+                and c[1].before == 0
+                and c[1].after == 0
+                and data_chunk.shape[1] == data_shape[i]
+            ):
+                stencil_indices.append(slice(None))
+                non_stencil_indices.append(slice(None))
+                continue
+
+            match c[0]:
+                case BoundaryCondition.valid:
+                    # we need to check that we requested a valid boundary,
+                    #  which is only compatible with itself
+                    # and that the stencil is large enough
+                    assert r[0] == BoundaryCondition.valid
+                    # what is the required stencil after adjusting for near-
+                    #  boundary stencil truncation?
+                    rs = NeighbourhoodAxis(
+                        before=min(chunk_offset[i], r[1].before),
+                        after=min(
+                            r[1].after,
+                            data_shape[i] - data_chunk.shape[i] - chunk_offset[i],
+                        ),
+                    )
+                    assert c[1].before >= rs.before
+                    assert c[1].after >= rs.after
+
+                    stencil_indices.append(
+                        slice(
+                            c[1].before - rs.before,
+                            None if c[1].after == rs.after else rs.after - c[1].after,
+                        )
+                    )
+                    non_stencil_indices.append(
+                        slice(rs.before, None if rs.after == 0 else -rs.after)
+                    )
+                case BoundaryCondition.wrap:
+                    # a wrapping boundary is compatible with any other boundary
+                    # TODO
+                    raise NotImplementedError
+                case _:
+                    assert_never(c[0])
+
+        data_chunk_ = data_chunk[slice(stencil_indices)]
+        prediction_chunk_ = prediction_chunk[slice(stencil_indices)]
+
         # TODO: somehow also apply this extraction to the bindings ...
 
-        # TODO: compute the correction - here we need to duplicate some code from
-        #       the unchunked compute_correction
+        late_bound_chunk = (
+            late_bound_chunk
+            if isinstance(late_bound_chunk, Bindings)
+            else Bindings(**late_bound_chunk)
+        )
 
-        # TODO: extract just the correction for the non-stencil subset
+        late_bound_reqs = self.late_bound
+        late_bound_builtin = {
+            p: data_chunk_ for p in late_bound_reqs if p in self.builtin_late_bound
+        }
+        late_bound_reqs = late_bound_reqs - late_bound_builtin.keys()
+        late_bound_keys = frozenset(late_bound_chunk.parameters())
+        assert late_bound_reqs == late_bound_keys, (
+            f"late_bound_chunk is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} / has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
+        )
 
-        raise NotImplementedError
+        if len(late_bound_builtin) > 0:
+            late_bound_chunk = late_bound_chunk.update(**late_bound_builtin)  # type: ignore
+
+        # TODO: handle the chunked check beforehand and pass in its global result
+
+        # ensure we don't accidentally forget to handle new kinds of safeguards here
+        assert len(self.safeguards) == len(self._pointwise_safeguards) + len(
+            self._stencil_safeguards
+        )
+
+        safeguard: Safeguard
+
+        all_intervals = []
+        for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
+            intervals = safeguard.compute_safe_intervals(
+                data_chunk_, late_bound=late_bound_chunk
+            )
+            assert np.all(intervals.contains(data_chunk_)), (
+                f"safeguard {safeguard!r}'s intervals must contain the original data"
+            )
+            all_intervals.append(intervals)
+
+        combined_intervals = all_intervals[0]
+        for intervals in all_intervals[1:]:
+            combined_intervals = combined_intervals.intersect(intervals)
+        correction_chunk = combined_intervals.pick(prediction_chunk_)
+
+        for safeguard, intervals in zip(self.safeguards, all_intervals):
+            assert np.all(intervals.contains(correction_chunk)), (
+                f"safeguard {safeguard!r} interval does not contain the correction {correction_chunk!r}"
+            )
+            assert safeguard.check(
+                data_chunk_, correction_chunk, late_bound=late_bound_chunk
+            ), (
+                f"safeguard {safeguard!r} check fails after correction {correction_chunk!r} on data {data_chunk_!r}"
+            )
+
+        prediction_chunk_bits = as_bits(prediction_chunk_)
+        correction_chunk_bits = as_bits(correction_chunk)
+
+        return (prediction_chunk_bits - correction_chunk_bits)[non_stencil_indices]
 
     def get_config(self) -> dict:
         """

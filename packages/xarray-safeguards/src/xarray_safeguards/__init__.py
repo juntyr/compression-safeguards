@@ -300,6 +300,8 @@ def produce_data_array_correction(
         case _:
             assert_never(boundary)
 
+    # TODO: first check each chunk to optimise the no-correction case
+
     def _compute_overlapping_stencil_chunk_correction(
         data_chunk: np.ndarray,
         prediction_chunk: np.ndarray,
