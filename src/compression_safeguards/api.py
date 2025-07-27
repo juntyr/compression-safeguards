@@ -152,6 +152,73 @@ class Safeguards:
 
         return as_bits(np.array((), dtype=dtype)).dtype
 
+    def check(
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        prediction: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Mapping[str | Parameter, Value] | Bindings = Bindings.empty(),
+    ) -> bool:
+        """
+        Check if the `prediction` array upholds the properties enforced by the
+        safeguards with respect to the `data` array.
+
+        Parameters
+        ----------
+        data : np.ndarray[S, np.dtype[T]]
+            The data array, relative to which the safeguards are enforced.
+        prediction : np.ndarray[S, np.dtype[T]]
+            The prediction array for which the safeguards are checked.
+        late_bound : Mapping[str, Value] | Bindings
+            The bindings for all late-bound parameters of the safeguards.
+
+            The bindings must resolve all late-bound parameters and include no
+            extraneous parameters.
+
+            The safeguards automatically provide the `$x` and `$X` built-in
+            constants, which must not be included.
+
+        Returns
+        -------
+        ok : bool
+            `True` if the check succeeded.
+        """
+
+        assert data.dtype in _SUPPORTED_DTYPES, (
+            f"can only safeguard arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
+        )
+
+        if len(self._stencil_safeguards) > 0:
+            assert not getattr(data, "chunked", False), (
+                "checking the safeguards for an individual chunk in a chunked array is unsafe when using stencil safeguards since their safety requirements cannot be guaranteed across chunk boundaries"
+            )
+
+        assert data.dtype == prediction.dtype
+        assert data.shape == prediction.shape
+
+        late_bound = (
+            late_bound if isinstance(late_bound, Bindings) else Bindings(**late_bound)
+        )
+
+        late_bound_reqs = self.late_bound
+        late_bound_builtin = {
+            p: data for p in late_bound_reqs if p in self.builtin_late_bound
+        }
+        late_bound_reqs = late_bound_reqs - late_bound_builtin.keys()
+        late_bound_keys = frozenset(late_bound.parameters())
+        assert late_bound_reqs == late_bound_keys, (
+            f"late_bound is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} / has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
+        )
+
+        if len(late_bound_builtin) > 0:
+            late_bound = late_bound.update(**late_bound_builtin)  # type: ignore
+
+        for safeguard in self.safeguards:
+            if not safeguard.check(data, prediction, late_bound=late_bound):
+                return False
+
+        return True
+
     def compute_correction(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -415,6 +482,138 @@ class Safeguards:
             for b, s in neighbourhood
         )
 
+    def check_chunk(
+        self,
+        data_chunk: np.ndarray[S, np.dtype[T]],
+        prediction_chunk: np.ndarray[S, np.dtype[T]],
+        *,
+        data_shape: tuple[int, ...],
+        chunk_offset: tuple[int, ...],
+        chunk_stencil: tuple[
+            tuple[
+                Literal[BoundaryCondition.valid, BoundaryCondition.wrap],
+                NeighbourhoodAxis,
+            ],
+            ...,
+        ],
+        late_bound_chunk: Mapping[str | Parameter, Value] | Bindings = Bindings.empty(),
+    ) -> bool:
+        assert data_chunk.dtype in _SUPPORTED_DTYPES, (
+            f"can only safeguard arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
+        )
+
+        assert data_chunk.dtype == prediction_chunk.dtype
+        assert data_chunk.shape == prediction_chunk.shape
+        assert len(data_shape) == data_chunk.ndim
+        assert len(chunk_offset) == data_chunk.ndim
+        assert len(chunk_stencil) == data_chunk.ndim
+
+        required_stencil = self.compute_required_stencil_for_chunked_correction(
+            data_shape
+        )
+
+        # TODO: check that the chunk stencil is compatible with the required stencil
+        #       this is not trivial since we need to account for huge chunks where
+        #       downgrading the stencil can work out
+
+        # TODO: compute indices to extract just the needed data and data+stencil
+        #       again taking wrapping boundaries into account
+        #       also sometimes stencil needs to be removed near the data boundaries
+        #       so that the per-safeguard stencil correctly sees how points wrap
+
+        stencil_indices = []
+        non_stencil_indices = []
+
+        for i, (c, r) in enumerate(zip(chunk_stencil, required_stencil)):
+            # complete chunks that span the entire data along the axis are
+            #  always allowed
+            if (
+                c[0] == BoundaryCondition.valid
+                and c[1].before == 0
+                and c[1].after == 0
+                and data_chunk.shape[1] == data_shape[i]
+            ):
+                stencil_indices.append(slice(None))
+                non_stencil_indices.append(slice(None))
+                continue
+
+            match c[0]:
+                case BoundaryCondition.valid:
+                    # we need to check that we requested a valid boundary,
+                    #  which is only compatible with itself
+                    # and that the stencil is large enough
+                    assert r[0] == BoundaryCondition.valid
+                    # what is the required stencil after adjusting for near-
+                    #  boundary stencil truncation?
+                    rs = NeighbourhoodAxis(
+                        before=min(chunk_offset[i], r[1].before),
+                        after=min(
+                            r[1].after,
+                            data_shape[i] - data_chunk.shape[i] - chunk_offset[i],
+                        ),
+                    )
+                    assert c[1].before >= rs.before
+                    assert c[1].after >= rs.after
+
+                    stencil_indices.append(
+                        slice(
+                            c[1].before - rs.before,
+                            None if c[1].after == rs.after else rs.after - c[1].after,
+                        )
+                    )
+                    non_stencil_indices.append(
+                        slice(rs.before, None if rs.after == 0 else -rs.after)
+                    )
+                case BoundaryCondition.wrap:
+                    # a wrapping boundary is compatible with any other boundary
+                    # TODO
+                    raise NotImplementedError
+                case _:
+                    assert_never(c[0])
+
+        data_chunk_ = data_chunk[tuple(stencil_indices)]
+        prediction_chunk_ = prediction_chunk[tuple(stencil_indices)]
+
+        # TODO: somehow also apply this extraction to the bindings ...
+
+        late_bound_chunk = (
+            late_bound_chunk
+            if isinstance(late_bound_chunk, Bindings)
+            else Bindings(**late_bound_chunk)
+        )
+
+        late_bound_reqs = self.late_bound
+        late_bound_builtin = {
+            p: data_chunk_ for p in late_bound_reqs if p in self.builtin_late_bound
+        }
+        late_bound_reqs = late_bound_reqs - late_bound_builtin.keys()
+        late_bound_keys = frozenset(late_bound_chunk.parameters())
+        assert late_bound_reqs == late_bound_keys, (
+            f"late_bound_chunk is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} / has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
+        )
+
+        if len(late_bound_builtin) > 0:
+            late_bound_chunk = late_bound_chunk.update(**late_bound_builtin)  # type: ignore
+
+        # ensure we don't accidentally forget to handle new kinds of safeguards here
+        assert len(self.safeguards) == len(self._pointwise_safeguards) + len(
+            self._stencil_safeguards
+        )
+
+        all_ok = np.ones_like(data_chunk_[tuple(non_stencil_indices)], dtype=np.bool)
+
+        # we need to use pointwise checks here so that we can only look at the
+        #  non-stencil check results
+        for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
+            all_ok &= safeguard.check_pointwise(
+                data_chunk_, prediction_chunk_, late_bound=late_bound_chunk
+            )[tuple(non_stencil_indices)]
+
+            if not np.all(all_ok):
+                return False
+
+        return True
+
     def compute_chunked_correction(
         self,
         data_chunk: np.ndarray[S, np.dtype[T]],
@@ -429,6 +628,7 @@ class Safeguards:
             ],
             ...,
         ],
+        any_chunk_check_failed: bool,
         late_bound_chunk: Mapping[str | Parameter, Value] | Bindings = Bindings.empty(),
     ) -> np.ndarray[tuple[int, ...], np.dtype[C]]:
         assert data_chunk.dtype in _SUPPORTED_DTYPES, (
@@ -504,8 +704,8 @@ class Safeguards:
                 case _:
                     assert_never(c[0])
 
-        data_chunk_ = data_chunk[slice(stencil_indices)]
-        prediction_chunk_ = prediction_chunk[slice(stencil_indices)]
+        data_chunk_ = data_chunk[tuple(stencil_indices)]
+        prediction_chunk_ = prediction_chunk[tuple(stencil_indices)]
 
         # TODO: somehow also apply this extraction to the bindings ...
 
@@ -528,14 +728,40 @@ class Safeguards:
         if len(late_bound_builtin) > 0:
             late_bound_chunk = late_bound_chunk.update(**late_bound_builtin)  # type: ignore
 
-        # TODO: handle the chunked check beforehand and pass in its global result
+        # if no chunk requires a correction, this one doesn't either
+        if not any_chunk_check_failed:
+            return np.zeros_like(as_bits(data_chunk_)[tuple(non_stencil_indices)])
+
+        safeguard: Safeguard
+
+        # if only pointwise safeguards are used, check if we need to correct
+        #  this chunk
+        if len(self._pointwise_safeguards) == len(self.safeguards):
+            all_ok = np.ones_like(
+                data_chunk_[tuple(non_stencil_indices)], dtype=np.bool
+            )
+
+            # we need to use pointwise checks here so that we can only look at the
+            #  non-stencil check results
+            for safeguard in self._pointwise_safeguards:
+                all_ok &= safeguard.check_pointwise(
+                    data_chunk_, prediction_chunk_, late_bound=late_bound_chunk
+                )[tuple(non_stencil_indices)]
+
+                if not np.all(all_ok):
+                    break
+
+            if np.all(all_ok):
+                return np.zeros_like(as_bits(data_chunk_)[tuple(non_stencil_indices)])
+
+        # otherwise, correct the chunk
+        # if stencil safeguards are used, then any chunk needing a correction
+        #  requires all chunks to be corrected
 
         # ensure we don't accidentally forget to handle new kinds of safeguards here
         assert len(self.safeguards) == len(self._pointwise_safeguards) + len(
             self._stencil_safeguards
         )
-
-        safeguard: Safeguard
 
         all_intervals = []
         for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
@@ -565,7 +791,9 @@ class Safeguards:
         prediction_chunk_bits = as_bits(prediction_chunk_)
         correction_chunk_bits = as_bits(correction_chunk)
 
-        return (prediction_chunk_bits - correction_chunk_bits)[non_stencil_indices]
+        return (prediction_chunk_bits - correction_chunk_bits)[
+            tuple(non_stencil_indices)
+        ]
 
     def get_config(self) -> dict:
         """
