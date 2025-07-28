@@ -20,6 +20,8 @@ from .associativity import NonAssociativeAdd, NonAssociativeMul, rewrite_qoi_exp
 from .symfunc import round_ties_even as sp_round_ties_even
 from .symfunc import sign as sp_sign
 from .symfunc import trunc as sp_trunc
+from .symfunc import identity as sp_identity
+from .symfunc import ordered_sum as sp_ordered_sum
 from .vars import LateBoundConstant
 
 
@@ -111,6 +113,16 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
     # array
     if expr.func in (sp.Array, NumPyLikeArray):
         raise ValueError("expression must evaluate to a scalar not an array")
+        
+    # identity(...)
+    if expr.func is sp_identity and len(expr.args) == 1:
+        (arg,) = expr.args
+        return compute_data_eb_for_stencil_qoi_eb(
+            arg,
+            xv,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
 
     # abs(...) is only used internally in exp(ln(abs(...)))
     if expr.func is sp.Abs and len(expr.args) == 1:
@@ -742,7 +754,7 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
 
     # a_1 * e_1 + ... + a_n * e_n (weighted sum of non-constant terms)
     # using Corollary 2 and Lemma 4 from Jiao et al.
-    if expr.is_Add:
+    if expr.is_Add or expr.func is sp_ordered_sum:
         # ensure the post-conditions provided by rewrite_qoi_expr are met
         assert all(
             len(arg.free_symbols - late_bound_constants) > 0 for arg in expr.args

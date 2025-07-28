@@ -4,6 +4,13 @@ from .array import NumPyLikeArray
 from .symfunc import round_ties_even as sp_round_ties_even
 from .symfunc import sign as sp_sign
 from .symfunc import trunc as sp_trunc
+from .symfunc import identity as sp_identity
+
+
+def identity(x, /):
+    if isinstance(x, NumPyLikeArray):
+        return x.applyfunc(sp_identity)
+    return sp_identity(x)
 
 
 def sqrt(x, /):
@@ -212,6 +219,8 @@ CONSTANTS = dict(
 )
 
 FUNCTIONS = dict(
+    # identity function
+    identity=identity,
     # elementary functions
     sqrt=sqrt,
     exp=exp,

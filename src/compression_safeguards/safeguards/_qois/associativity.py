@@ -1,6 +1,7 @@
 import sympy as sp
 
 from .vars import LateBoundConstant
+from .symfunc import ordered_sum as sp_ordered_sum
 
 
 def rewrite_qoi_expr(expr: sp.Basic) -> sp.Basic:
@@ -38,7 +39,7 @@ def rewrite_qoi_expr(expr: sp.Basic) -> sp.Basic:
     if all(isinstance(s, LateBoundConstant) for s in expr.free_symbols):
         return expr
 
-    if expr.is_Add or expr.is_Mul:
+    if expr.is_Add or expr.is_Mul or expr.func is sp_ordered_sum:
         args = expr.args
 
         # separate constant and non-constant terms
@@ -55,7 +56,7 @@ def rewrite_qoi_expr(expr: sp.Basic) -> sp.Basic:
 
         # only rewrite if both constant and non-constant terms exist
         if len(const_args) > 0 and len(non_const_args) > 0:
-            return ({sp.Add: NonAssociativeAdd, sp.Mul: NonAssociativeMul}[expr.func])(
+            return ({sp.Add: NonAssociativeAdd, sp.Mul: NonAssociativeMul, sp_ordered_sum: NonAssociativeAdd}[expr.func])(
                 (expr.func)(*[rewrite_qoi_expr(a) for a in non_const_args]),
                 (expr.func)(*[rewrite_qoi_expr(a) for a in const_args]),
             )

@@ -2,10 +2,18 @@ import sympy as sp
 from typing_extensions import Never  # MSPV 3.11
 
 from .array import NumPyLikeArray
+from .symfunc import ordered_sum as sp_ordered_sum
 
 
 def asum(x, /):
     assert isinstance(x, NumPyLikeArray), "can only compute the sum over an array"
+    # print("========")
+    # print("asum")
+    # print(list(sp.tensor.array.arrayop.Flatten(x)))
+    # print("========")
+    if len(x) == 0:
+        return sp.Integer(0)
+    return sp_ordered_sum(*sp.tensor.array.arrayop.Flatten(x))
     return sum(sp.tensor.array.arrayop.Flatten(x), sp.Integer(0))
 
 

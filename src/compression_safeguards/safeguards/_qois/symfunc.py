@@ -116,3 +116,26 @@ class symmetric_modulo(sp.Function):
             q = q.doit(deep=deep, **hints)
 
         return sp.Mod(p + (q / 2), q) - (q / 2)  # type: ignore
+
+
+class identity(sp.Function):
+    pass
+
+
+class ordered_sum(sp.Function):
+    @classmethod
+    def eval(cls, *xs):
+        if all(len(x.free_symbols) == 0 for x in xs):
+            return sp.Add(*xs)
+        return None
+
+    def _eval_evalf(self, prec) -> sp.Float:
+        return self.doit(deep=False)._eval_evalf(prec)
+
+    def doit(self, deep=True, **hints):
+        xs = self.args
+
+        if deep:
+            xs = (x.doit(deep=deep, **hints) for x in xs)
+
+        return sp.Add(*xs)
