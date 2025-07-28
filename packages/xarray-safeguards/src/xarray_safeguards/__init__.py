@@ -300,9 +300,7 @@ def produce_data_array_correction(
         case _:
             assert_never(boundary)
 
-    # TODO: first check each chunk to optimise the no-correction case
-
-    def _compute_overlapping_stencil_chunk_correction(
+    def _check_overlapping_stencil_chunk(
         data_chunk: np.ndarray,
         prediction_chunk: np.ndarray,
         *late_bound_chunks: np.ndarray,
@@ -362,6 +360,106 @@ def produce_data_array_correction(
 
         # this is safe because
         # - map_overlap ensures we get chunks including their required stencil
+        chunk_is_ok = safeguards.check_chunk(
+            data_chunk,
+            prediction_chunk,
+            data_shape=data_shape,
+            chunk_offset=tuple(f for f, t in chunk_location),
+            chunk_stencil=chunk_stencil,
+            late_bound_chunk=late_bound_chunk,
+        )
+
+        return np.array(chunk_is_ok).reshape(tuple(1 for _ in data_chunk.shape))
+
+    any_chunk_check_failed = (
+        not dask.array.map_overlap(
+            _check_overlapping_stencil_chunk,
+            data.data,
+            prediction.data,
+            *chunked_late_bound.values(),
+            dtype=np.bool,
+            chunks=tuple(1 for _ in data.shape),
+            enforce_ndim=True,
+            meta=np.array((), dtype=np.bool),
+            depth=depth,
+            boundary=boundary,
+            trim=False,
+            align_arrays=False,
+            # if the stencil is larger than the smallest chunk, temporary rechunking may be necessary
+            allow_rechunk=True,
+            late_bound_names=tuple(chunked_late_bound.keys()),
+            late_bound_global=late_bound_global,
+            safeguards=safeguards_,
+            depth_=depth,
+            boundary_=boundary,
+        )
+        .all()
+        .compute()
+    )
+
+    # TODO: first check each chunk to optimise the no-correction case
+
+    def _compute_overlapping_stencil_chunk_correction(
+        data_chunk: np.ndarray,
+        prediction_chunk: np.ndarray,
+        *late_bound_chunks: np.ndarray,
+        late_bound_names: tuple[str],
+        late_bound_global: dict[str, int | float | np.number],
+        safeguards: Safeguards,
+        depth_: tuple[int | tuple[int, int], ...],
+        boundary_: Literal["none", "periodic"],
+        any_chunk_check_failed: bool,
+        block_info=None,
+    ) -> np.ndarray:
+        assert block_info is not None
+        assert len(late_bound_chunks) == len(late_bound_names)
+        assert len(depth_) == data_chunk.ndim
+
+        data_shape: tuple[int, ...] = tuple(block_info[None]["shape"])
+        chunk_location: tuple[tuple[int, int], ...] = tuple(
+            block_info[None]["array-location"]
+        )
+
+        late_bound_chunk: dict[str, Value] = dict(
+            **late_bound_global,
+            **{p: v for p, v in zip(late_bound_names, late_bound_chunks)},
+        )
+
+        depth: tuple[tuple[int, int], ...] = tuple(
+            (d, d) if isinstance(d, int) else d for d in depth_
+        )
+
+        match boundary_:
+            case "none":
+                # the none boundary does not extend beyond the data boundary,
+                #  so we need to check by how much the stencil was cut off
+                chunk_stencil: tuple[
+                    tuple[
+                        Literal[BoundaryCondition.valid, BoundaryCondition.wrap],
+                        NeighbourhoodAxis,
+                    ],
+                    ...,
+                ] = tuple(
+                    (
+                        BoundaryCondition.valid,
+                        NeighbourhoodAxis(
+                            before=s - max(0, s - b), after=min(e + a, d) - e
+                        ),
+                    )
+                    for (b, a), (s, e), d in zip(depth, chunk_location, data_shape)
+                )
+            case "periodic":
+                # the periodic boundary guarantees that we always have the
+                #  stencil we asked for
+                chunk_stencil = tuple(
+                    (BoundaryCondition.wrap, NeighbourhoodAxis(before=b, after=a))
+                    for b, a in depth
+                )
+            case _:
+                assert_never(boundary_)
+
+        # this is safe because
+        # - map_overlap ensures we get chunks including their required stencil
         # - compute_chunked_correction only returns the correction for the non-
         #   overlapping non-stencil parts of the chunk
         return safeguards.compute_chunked_correction(
@@ -370,6 +468,7 @@ def produce_data_array_correction(
             data_shape=data_shape,
             chunk_offset=tuple(f for f, t in chunk_location),
             chunk_stencil=chunk_stencil,
+            any_chunk_check_failed=any_chunk_check_failed,
             late_bound_chunk=late_bound_chunk,
         )
 
@@ -395,6 +494,7 @@ def produce_data_array_correction(
                 safeguards=safeguards_,
                 depth_=depth,
                 boundary_=boundary,
+                any_chunk_check_failed=any_chunk_check_failed,
             ).rechunk(data.chunks)  # undo temporary rechunking
         )
         .rename(correction_name)
