@@ -11,12 +11,12 @@ from ...utils.cast import (
 )
 from ...utils.typing import F
 from .associativity import NonAssociativeAdd, NonAssociativeMul, rewrite_qoi_expr
+from .symfunc import identity as sp_identity
+from .symfunc import ordered_sum as sp_ordered_sum
 from .symfunc import round_ties_even as sp_round_ties_even
 from .symfunc import sign as sp_sign
 from .symfunc import symmetric_modulo as sp_symmetric_modulo
 from .symfunc import trunc as sp_trunc
-from .symfunc import identity as sp_identity
-from .symfunc import ordered_sum as sp_ordered_sum
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")

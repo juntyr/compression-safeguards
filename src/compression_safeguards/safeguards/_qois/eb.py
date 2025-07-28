@@ -17,11 +17,11 @@ from ...utils.cast import (
 from ...utils.typing import F, S
 from .array import NumPyLikeArray
 from .associativity import NonAssociativeAdd, NonAssociativeMul, rewrite_qoi_expr
+from .symfunc import identity as sp_identity
+from .symfunc import ordered_sum as sp_ordered_sum
 from .symfunc import round_ties_even as sp_round_ties_even
 from .symfunc import sign as sp_sign
 from .symfunc import trunc as sp_trunc
-from .symfunc import identity as sp_identity
-from .symfunc import ordered_sum as sp_ordered_sum
 from .vars import LateBoundConstant
 
 
@@ -113,7 +113,7 @@ def compute_data_eb_for_stencil_qoi_eb_unchecked(
     # array
     if expr.func in (sp.Array, NumPyLikeArray):
         raise ValueError("expression must evaluate to a scalar not an array")
-        
+
     # identity(...)
     if expr.func is sp_identity and len(expr.args) == 1:
         (arg,) = expr.args

@@ -1,10 +1,10 @@
 import sympy as sp
 
 from .array import NumPyLikeArray
+from .symfunc import identity as sp_identity
 from .symfunc import round_ties_even as sp_round_ties_even
 from .symfunc import sign as sp_sign
 from .symfunc import trunc as sp_trunc
-from .symfunc import identity as sp_identity
 
 
 def identity(x, /):
