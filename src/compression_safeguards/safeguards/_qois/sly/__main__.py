@@ -21,9 +21,9 @@ if __name__ == "__main__":
             expr = parser.parse(lexer.tokenize(text))
             if expr is None:
                 continue
-            dtype = np.dtype(np.float64)
-            expr = expr.constant_fold(dtype)
-            expr = FoldedScalarConst(expr) if isinstance(expr, dtype.type) else expr
-            print(expr.eval(dtype, np.array([1.0, 2.0, 3.0], dtype=dtype)))
+            X = np.array([1.0, 2.0, 3.0])
+            expr = expr.constant_fold(X.dtype)
+            expr = FoldedScalarConst(expr) if isinstance(expr, X.dtype.type) else expr
+            print(expr.eval(X))
         except AssertionError as err:
             print(err)

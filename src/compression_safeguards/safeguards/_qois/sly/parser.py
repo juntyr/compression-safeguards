@@ -1,9 +1,7 @@
-import numpy as np
 from sly import Parser
 
 from .lexer import QoILexer
 from .expr import (
-    Expr,
     Array,
     ScalarAdd,
     ScalarMultiply,
@@ -12,15 +10,17 @@ from .expr import (
     ScalarLn,
     ScalarExponentiation,
     ScalarNegate,
-    FoldedScalarConst,
     Number,
     Pi,
     Euler,
+    Group,
+    DataArrayElement,
+    DataScalar,
 )
 
 
 class QoIParser(Parser):
-    def __init__(self, *, x: Expr, X: None | Expr):
+    def __init__(self, *, x: DataScalar | DataArrayElement, X: None | Array):
         self.x = x
         self.X = X
 
@@ -31,7 +31,8 @@ class QoIParser(Parser):
         ("left", TIMES, DIVIDE),
         ("right", UPLUS, UMINUS),
         ("right", POWER),
-        ("left", INDEX),
+        # FIXME: index has wrong precedence
+        ("left", INDEX, TRANSPOSE),
     )
 
     @_("expr")
@@ -39,6 +40,7 @@ class QoIParser(Parser):
         assert not isinstance(p.expr, Array), (
             f"QoI expr must be scalar but is an array expression of shape {p.expr.shape}"
         )
+        assert p.expr.has_data, "QoI expr must not be constant"
         return p.expr
 
     @_("expr PLUS expr")
@@ -73,7 +75,7 @@ class QoIParser(Parser):
 
     @_("LPAREN expr RPAREN")
     def expr(self, p):
-        return p.expr
+        return Array.map_unary(p.expr, Group)
 
     @_("")
     def empty(self, p):
@@ -164,4 +166,9 @@ class QoIParser(Parser):
         for e in p.expr._array.flat:
             acc = e if acc is None else ScalarAdd(acc, e)
         assert acc is not None
-        return acc
+        return Group(acc)
+
+    @_("expr TRANSPOSE %prec TRANSPOSE")
+    def expr(self, p):
+        assert isinstance(p.expr, Array), "can only transpose an array expression"
+        return p.expr.transpose()

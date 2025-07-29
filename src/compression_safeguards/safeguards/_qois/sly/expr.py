@@ -3,7 +3,8 @@ from typing import Callable
 
 import numpy as np
 
-from ....utils.typing import T
+from ..eb import ensure_bounded_derived_error
+from ....utils.typing import S, F
 
 
 class Expr:
@@ -15,18 +16,111 @@ class Expr:
         pass
 
     @abstractmethod
-    def constant_fold(self, dtype: np.dtype[T]) -> T | "Expr":
+    def constant_fold(self, dtype: np.dtype[F]) -> F | "Expr":
         pass
 
     @abstractmethod
     def eval(
-        self, dtype: np.dtype[T], X: np.ndarray[tuple[int, ...], np.dtype[T]]
-    ) -> T | np.ndarray[tuple[int, ...], np.dtype[T]]:
+        self, X: np.ndarray[tuple[int, ...], np.dtype[F]]
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
         pass
+
+    @abstractmethod
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        pass
+
+    def compute_data_error_bound(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        tl, tu = self.compute_data_error_bound_unchecked(
+            eb_expr_lower, eb_expr_upper, X
+        )
+
+        exprv_: F | np.ndarray[tuple[int, ...], np.dtype[F]] = self.eval(X)
+        assert isinstance(exprv_, np.ndarray)
+        assert exprv_.shape == X.shape
+        exprv: np.ndarray[S, np.dtype[F]] = exprv_  # type: ignore
+
+        # handle rounding errors in the lower error bound computation
+        tl = ensure_bounded_derived_error(
+            lambda tl: np.where(  # type: ignore
+                tl == 0,
+                exprv,
+                self.eval(X + tl),
+            ),
+            exprv,
+            X,
+            tl,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        tu = ensure_bounded_derived_error(
+            lambda tu: np.where(  # type: ignore
+                tu == 0,
+                exprv,
+                self.eval(X + tu),
+            ),
+            exprv,
+            X,
+            tu,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+
+        return tl, tu
+
+
+class Group(Expr):
+    __slots__ = ("_expr",)
+    _expr: Expr
+
+    def __init__(self, expr: Expr):
+        self._expr = expr._expr if isinstance(expr, Group) else expr
+
+    @property
+    def has_data(self) -> bool:
+        return self._expr.has_data
+
+    def constant_fold(self, dtype: np.dtype[F]) -> F | "Expr":
+        fexpr = self._expr.constant_fold(dtype)
+        # fully constant folded -> allow further folding
+        if isinstance(fexpr, dtype.type):
+            return fexpr
+        # partially / not constant folded -> stop further folding
+        return Group(fexpr)  # type: ignore
+
+    def eval(
+        self, X: np.ndarray[tuple[int, ...], np.dtype[F]]
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        return self._expr.eval(X)
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        return self._expr.compute_data_error_bound(eb_expr_lower, eb_expr_upper, X)
+
+    def compute_data_error_bound(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        return self.compute_data_error_bound_unchecked(eb_expr_lower, eb_expr_upper, X)
 
 
 class FoldedScalarConst(Expr):
-    __slots__ = "_const"
+    __slots__ = ("_const",)
     _const: np.number
 
     def __init__(self, const: np.number):
@@ -36,20 +130,28 @@ class FoldedScalarConst(Expr):
     def has_data(self) -> bool:
         return False
 
-    def constant_fold(self, dtype: np.dtype[T]) -> T | Expr:
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         assert dtype == np.dtype(self._const)
         return self._const  # type: ignore
 
     def eval(
-        self, dtype: np.dtype[T], X: np.ndarray[tuple[int, ...], np.dtype[T]]
-    ) -> T | np.ndarray[tuple[int, ...], np.dtype[T]]:
-        assert dtype == np.dtype(self._const)
+        self, X: np.ndarray[tuple[int, ...], np.dtype[F]]
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        assert X.dtype == np.dtype(self._const)
         return self._const  # type: ignore
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        assert False, "constants have no error bounds"
 
     @staticmethod
     def constant_fold_unary(
-        expr: Expr, dtype: np.dtype[T], m: Callable[[T], T]
-    ) -> T | Expr:
+        expr: Expr, dtype: np.dtype[F], m: Callable[[F], F]
+    ) -> F | Expr:
         fexpr = expr.constant_fold(dtype)
         if isinstance(fexpr, dtype.type):
             return m(fexpr)
@@ -59,10 +161,10 @@ class FoldedScalarConst(Expr):
     def constant_fold_binary(
         left: Expr,
         right: Expr,
-        dtype: np.dtype[T],
-        m: Callable[[T, T], T],
+        dtype: np.dtype[F],
+        m: Callable[[F, F], F],
         rm: Callable[[Expr, Expr], Expr],
-    ) -> T | Expr:
+    ) -> F | Expr:
         fleft = left.constant_fold(dtype)
         fright = right.constant_fold(dtype)
         if isinstance(fleft, dtype.type):
@@ -81,18 +183,25 @@ class DataScalar(Expr):
     def has_data(self) -> bool:
         return True
 
-    def constant_fold(self, dtype: np.dtype[T]) -> T | Expr:
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return self
 
-    @abstractmethod
     def eval(
-        self, dtype: np.dtype[T], X: np.ndarray[tuple[int, ...], np.dtype[T]]
-    ) -> T | np.ndarray[tuple[int, ...], np.dtype[T]]:
+        self, X: np.ndarray[tuple[int, ...], np.dtype[F]]
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
         return X
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        return (eb_expr_lower, eb_expr_upper)
 
 
 class DataArrayElement(Expr):
-    __slots__ = "_index"
+    __slots__ = ("_index",)
     _index: tuple[int, ...]
 
     def __init__(self, index: tuple[int, ...]):
@@ -102,18 +211,25 @@ class DataArrayElement(Expr):
     def has_data(self) -> bool:
         return True
 
-    def constant_fold(self, dtype: np.dtype[T]) -> T | Expr:
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return self
 
-    @abstractmethod
     def eval(
-        self, dtype: np.dtype[T], X: np.ndarray[tuple[int, ...], np.dtype[T]]
-    ) -> T | np.ndarray[tuple[int, ...], np.dtype[T]]:
+        self, X: np.ndarray[tuple[int, ...], np.dtype[F]]
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
         return X[(...,) + self._index]
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        return (eb_expr_lower, eb_expr_upper)
 
 
 class Number(Expr):
-    __slots__ = "_n"
+    __slots__ = ("_n",)
     _n: str
 
     def __init__(self, n: str):
@@ -123,13 +239,21 @@ class Number(Expr):
     def has_data(self) -> bool:
         return False
 
-    def constant_fold(self, dtype: np.dtype[T]) -> T | Expr:
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return dtype.type(self._n)  # type: ignore
 
     def eval(
-        self, dtype: np.dtype[T], X: np.ndarray[tuple[int, ...], np.dtype[T]]
-    ) -> T | np.ndarray[tuple[int, ...], np.dtype[T]]:
-        return dtype.type(self._n)  # type: ignore
+        self, X: np.ndarray[tuple[int, ...], np.dtype[F]]
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        return X.dtype.type(self._n)  # type: ignore
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        assert False, "constants have no error bounds"
 
 
 class Pi(Expr):
@@ -139,13 +263,21 @@ class Pi(Expr):
     def has_data(self) -> bool:
         return False
 
-    def constant_fold(self, dtype: np.dtype[T]) -> T | Expr:
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return dtype.type(np.pi)
 
     def eval(
-        self, dtype: np.dtype[T], X: np.ndarray[tuple[int, ...], np.dtype[T]]
-    ) -> T | np.ndarray[tuple[int, ...], np.dtype[T]]:
-        return dtype.type(np.pi)
+        self, X: np.ndarray[tuple[int, ...], np.dtype[F]]
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        return X.dtype.type(np.pi)
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        assert False, "constants have no error bounds"
 
 
 class Euler(Expr):
@@ -155,13 +287,21 @@ class Euler(Expr):
     def has_data(self) -> bool:
         return False
 
-    def constant_fold(self, dtype: np.dtype[T]) -> T | Expr:
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return dtype.type(np.e)
 
     def eval(
-        self, dtype: np.dtype[T], X: np.ndarray[tuple[int, ...], np.dtype[T]]
-    ) -> T | np.ndarray[tuple[int, ...], np.dtype[T]]:
-        return dtype.type(np.e)
+        self, X: np.ndarray[tuple[int, ...], np.dtype[F]]
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        return X.dtype.type(np.e)
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        assert False, "constants have no error bounds"
 
 
 class ScalarNegate(Expr):
@@ -175,13 +315,29 @@ class ScalarNegate(Expr):
     def has_data(self) -> bool:
         return self._a.has_data
 
-    def constant_fold(self, dtype: np.dtype[T]) -> T | Expr:
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.negative)
 
     def eval(
-        self, dtype: np.dtype[T], X: np.ndarray[tuple[int, ...], np.dtype[T]]
-    ) -> T | np.ndarray[tuple[int, ...], np.dtype[T]]:
-        return np.negative(self._a.eval(dtype, X))
+        self, X: np.ndarray[tuple[int, ...], np.dtype[F]]
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        return np.negative(self._a.eval(X))
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        return self._a.compute_data_error_bound(-eb_expr_upper, -eb_expr_lower, X)
+
+    def compute_data_error_bound(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        return self.compute_data_error_bound_unchecked(eb_expr_lower, eb_expr_upper, X)
 
 
 class ScalarAdd(Expr):
@@ -197,15 +353,23 @@ class ScalarAdd(Expr):
     def has_data(self) -> bool:
         return self._a.has_data or self._b.has_data
 
-    def constant_fold(self, dtype: np.dtype[T]) -> T | Expr:
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return FoldedScalarConst.constant_fold_binary(
             self._a, self._b, dtype, np.add, ScalarAdd
         )
 
     def eval(
-        self, dtype: np.dtype[T], X: np.ndarray[tuple[int, ...], np.dtype[T]]
-    ) -> T | np.ndarray[tuple[int, ...], np.dtype[T]]:
-        return np.add(self._a.eval(dtype, X), self._b.eval(dtype, X))
+        self, X: np.ndarray[tuple[int, ...], np.dtype[F]]
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        return np.add(self._a.eval(X), self._b.eval(X))
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        raise NotImplementedError
 
 
 class ScalarMultiply(Expr):
@@ -221,15 +385,23 @@ class ScalarMultiply(Expr):
     def has_data(self) -> bool:
         return self._a.has_data or self._b.has_data
 
-    def constant_fold(self, dtype: np.dtype[T]) -> T | Expr:
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return FoldedScalarConst.constant_fold_binary(
             self._a, self._b, dtype, np.multiply, ScalarMultiply
         )
 
     def eval(
-        self, dtype: np.dtype[T], X: np.ndarray[tuple[int, ...], np.dtype[T]]
-    ) -> T | np.ndarray[tuple[int, ...], np.dtype[T]]:
-        return np.multiply(self._a.eval(dtype, X), self._b.eval(dtype, X))
+        self, X: np.ndarray[tuple[int, ...], np.dtype[F]]
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        return np.multiply(self._a.eval(X), self._b.eval(X))
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        raise NotImplementedError
 
 
 class ScalarDivide(Expr):
@@ -245,15 +417,23 @@ class ScalarDivide(Expr):
     def has_data(self) -> bool:
         return self._a.has_data or self._b.has_data
 
-    def constant_fold(self, dtype: np.dtype[T]) -> T | Expr:
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return FoldedScalarConst.constant_fold_binary(
             self._a, self._b, dtype, np.divide, ScalarDivide
         )
 
     def eval(
-        self, dtype: np.dtype[T], X: np.ndarray[tuple[int, ...], np.dtype[T]]
-    ) -> T | np.ndarray[tuple[int, ...], np.dtype[T]]:
-        return np.divide(self._a.eval(dtype, X), self._b.eval(dtype, X))
+        self, X: np.ndarray[tuple[int, ...], np.dtype[F]]
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        return np.divide(self._a.eval(X), self._b.eval(X))
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        raise NotImplementedError
 
 
 class ScalarExponentiation(Expr):
@@ -269,15 +449,23 @@ class ScalarExponentiation(Expr):
     def has_data(self) -> bool:
         return self._a.has_data or self._b.has_data
 
-    def constant_fold(self, dtype: np.dtype[T]) -> T | Expr:
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return FoldedScalarConst.constant_fold_binary(
             self._a, self._b, dtype, np.power, ScalarExponentiation
         )
 
     def eval(
-        self, dtype: np.dtype[T], X: np.ndarray[tuple[int, ...], np.dtype[T]]
-    ) -> T | np.ndarray[tuple[int, ...], np.dtype[T]]:
-        return np.power(self._a.eval(dtype, X), self._b.eval(dtype, X))
+        self, X: np.ndarray[tuple[int, ...], np.dtype[F]]
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        return np.power(self._a.eval(X), self._b.eval(X))
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        raise NotImplementedError
 
 
 class ScalarLn(Expr):
@@ -291,13 +479,21 @@ class ScalarLn(Expr):
     def has_data(self) -> bool:
         return self._a.has_data
 
-    def constant_fold(self, dtype: np.dtype[T]) -> T | Expr:
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.log)
 
     def eval(
-        self, dtype: np.dtype[T], X: np.ndarray[tuple[int, ...], np.dtype[T]]
-    ) -> T | np.ndarray[tuple[int, ...], np.dtype[T]]:
-        return np.log(self._a.eval(dtype, X))
+        self, X: np.ndarray[tuple[int, ...], np.dtype[F]]
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        return np.log(self._a.eval(X))
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        raise NotImplementedError
 
 
 class ScalarExp(Expr):
@@ -311,17 +507,25 @@ class ScalarExp(Expr):
     def has_data(self) -> bool:
         return self._a.has_data
 
-    def constant_fold(self, dtype: np.dtype[T]) -> T | Expr:
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.exp)
 
     def eval(
-        self, dtype: np.dtype[T], X: np.ndarray[tuple[int, ...], np.dtype[T]]
-    ) -> T | np.ndarray[tuple[int, ...], np.dtype[T]]:
-        return np.exp(self._a.eval(dtype, X))
+        self, X: np.ndarray[tuple[int, ...], np.dtype[F]]
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        return np.exp(self._a.eval(X))
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        raise NotImplementedError
 
 
 class Array(Expr):
-    __slots__ = "_array"
+    __slots__ = ("_array",)
     _array: np.ndarray
 
     def __init__(self, el: Expr, *els: Expr):
@@ -340,7 +544,7 @@ class Array(Expr):
     def has_data(self) -> bool:
         return any(e.has_data for e in self._array.flat)
 
-    def constant_fold(self, dtype: np.dtype[T]) -> T | Expr:
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         def fold_array_element(e: Expr) -> Expr:
             fe = e.constant_fold(dtype)
             if isinstance(fe, dtype.type):
@@ -350,13 +554,21 @@ class Array(Expr):
         return Array.map_unary(self, fold_array_element)
 
     def eval(
-        self, dtype: np.dtype[T], X: np.ndarray[tuple[int, ...], np.dtype[T]]
-    ) -> T | np.ndarray[tuple[int, ...], np.dtype[T]]:
+        self, X: np.ndarray[tuple[int, ...], np.dtype[F]]
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
         return np.fromiter(
-            (e.eval(dtype, X) for e in self._array.flat),
-            dtype=dtype,
+            (e.eval(X) for e in self._array.flat),
+            dtype=X.dtype,
             count=self._array.size,
         ).reshape(self._array.shape)
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        assert False, "cannot derive error bounds over an array expression"
 
     @property
     def shape(self) -> tuple[int, ...]:
@@ -411,3 +623,8 @@ class Array(Expr):
             out._array = a
             return out
         return a
+
+    def transpose(self) -> "Array":
+        out = Array.__new__(Array)
+        out._array = self._array.T
+        return out

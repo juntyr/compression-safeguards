@@ -24,6 +24,7 @@ class QoILexer(Lexer):
         EXP,
         ID,
         SUM,
+        TRANSPOSE,
     }
     ignore = " \t"
 
@@ -41,6 +42,7 @@ class QoILexer(Lexer):
     LBRACK = r"\["
     RBRACK = r"\]"
     COMMA = r","
+    TRANSPOSE = r"\.T"
 
     # Identifiers
     ID = r"[a-zA-Z_][a-zA-Z0-9_]*"
@@ -54,6 +56,7 @@ class QoILexer(Lexer):
 
     # Ignored pattern
     ignore_newline = r"\n+"
+    ignore_comment = r"#[^\n]*"
 
     # Extra action for newlines
     def ignore_newline(self, t):
