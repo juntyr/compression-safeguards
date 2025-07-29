@@ -152,7 +152,6 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     literal =
         int
       | float
-      | array
     ;
 
     int     =                             (* integer literal *)
