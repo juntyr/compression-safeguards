@@ -1,14 +1,14 @@
 import numpy as np
 
-from .expr import Array, DataArrayElement, FoldedScalarConst
+from .expr import Array, Data, FoldedScalarConst
 from .lexer import QoILexer
 from .parser import QoIParser
 
 if __name__ == "__main__":
     lexer = QoILexer()
     parser = QoIParser(
-        x=DataArrayElement((1,)),
-        X=Array(DataArrayElement((0,)), DataArrayElement((1,)), DataArrayElement((2,))),
+        x=Data(index=(1,)),
+        X=Array(Data(index=(0,)), Data(index=(1,)), Data(index=(2,))),
     )
     while True:
         try:

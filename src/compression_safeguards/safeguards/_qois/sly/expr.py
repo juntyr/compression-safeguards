@@ -3,6 +3,7 @@ from typing import Callable
 
 import numpy as np
 
+from ....utils.bindings import Parameter
 from ....utils.typing import F, S
 from ..eb import ensure_bounded_derived_error
 
@@ -13,6 +14,11 @@ class Expr:
     @property
     @abstractmethod
     def has_data(self) -> bool:
+        pass
+
+    @property
+    @abstractmethod
+    def late_bound_constants(self) -> frozenset[Parameter]:
         pass
 
     @abstractmethod
@@ -89,6 +95,10 @@ class Group(Expr):
     def has_data(self) -> bool:
         return self._expr.has_data
 
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return self._expr.late_bound_constants
+
     def constant_fold(self, dtype: np.dtype[F]) -> F | "Expr":
         fexpr = self._expr.constant_fold(dtype)
         # fully constant folded -> allow further folding
@@ -130,6 +140,10 @@ class FoldedScalarConst(Expr):
     def has_data(self) -> bool:
         return False
 
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return frozenset()
+
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         assert dtype == np.dtype(self._const)
         return self._const  # type: ignore
@@ -146,7 +160,7 @@ class FoldedScalarConst(Expr):
         eb_expr_upper: np.ndarray[S, np.dtype[F]],
         X: np.ndarray[tuple[int, ...], np.dtype[F]],
     ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
-        assert False, "constants have no error bounds"
+        assert False, "folded constants have no error bounds"
 
     @staticmethod
     def constant_fold_unary(
@@ -176,31 +190,7 @@ class FoldedScalarConst(Expr):
         return rm(fleft, fright)  # type: ignore
 
 
-class DataScalar(Expr):
-    __slots__ = ()
-
-    @property
-    def has_data(self) -> bool:
-        return True
-
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return self
-
-    def eval(
-        self, X: np.ndarray[tuple[int, ...], np.dtype[F]]
-    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
-        return X
-
-    def compute_data_error_bound_unchecked(
-        self,
-        eb_expr_lower: np.ndarray[S, np.dtype[F]],
-        eb_expr_upper: np.ndarray[S, np.dtype[F]],
-        X: np.ndarray[tuple[int, ...], np.dtype[F]],
-    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
-        return (eb_expr_lower, eb_expr_upper)
-
-
-class DataArrayElement(Expr):
+class Data(Expr):
     __slots__ = ("_index",)
     _index: tuple[int, ...]
 
@@ -210,6 +200,10 @@ class DataArrayElement(Expr):
     @property
     def has_data(self) -> bool:
         return True
+
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return frozenset()
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return self
@@ -228,6 +222,48 @@ class DataArrayElement(Expr):
         return (eb_expr_lower, eb_expr_upper)
 
 
+class LateBoundConstant(Expr):
+    __slots__ = ("_name", "_index")
+    _name: Parameter
+    _index: tuple[int, ...]
+
+    def __init__(self, name: Parameter, index: tuple[int, ...]):
+        self._name = name
+        self._index = index
+
+    @staticmethod
+    def like(name: Parameter, data: Data) -> "LateBoundConstant":
+        return LateBoundConstant(name, data._index)
+
+    @property
+    def name(self) -> Parameter:
+        return self._name
+
+    @property
+    def has_data(self) -> bool:
+        return False
+
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return frozenset([self.name])
+
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+        return self
+
+    def eval(
+        self, X: np.ndarray[tuple[int, ...], np.dtype[F]]
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        return X[(...,) + self._index]
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        assert False, "late-bound constants have no error bounds"
+
+
 class Number(Expr):
     __slots__ = ("_n",)
     _n: str
@@ -238,6 +274,10 @@ class Number(Expr):
     @property
     def has_data(self) -> bool:
         return False
+
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return frozenset()
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return dtype.type(self._n)  # type: ignore
@@ -253,7 +293,7 @@ class Number(Expr):
         eb_expr_upper: np.ndarray[S, np.dtype[F]],
         X: np.ndarray[tuple[int, ...], np.dtype[F]],
     ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
-        assert False, "constants have no error bounds"
+        assert False, "number literals have no error bounds"
 
 
 class Pi(Expr):
@@ -262,6 +302,10 @@ class Pi(Expr):
     @property
     def has_data(self) -> bool:
         return False
+
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return frozenset()
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return dtype.type(np.pi)
@@ -277,7 +321,7 @@ class Pi(Expr):
         eb_expr_upper: np.ndarray[S, np.dtype[F]],
         X: np.ndarray[tuple[int, ...], np.dtype[F]],
     ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
-        assert False, "constants have no error bounds"
+        assert False, "pi has no error bounds"
 
 
 class Euler(Expr):
@@ -286,6 +330,10 @@ class Euler(Expr):
     @property
     def has_data(self) -> bool:
         return False
+
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return frozenset()
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return dtype.type(np.e)
@@ -301,7 +349,7 @@ class Euler(Expr):
         eb_expr_upper: np.ndarray[S, np.dtype[F]],
         X: np.ndarray[tuple[int, ...], np.dtype[F]],
     ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
-        assert False, "constants have no error bounds"
+        assert False, "Euler's e has no error bounds"
 
 
 class ScalarNegate(Expr):
@@ -314,6 +362,10 @@ class ScalarNegate(Expr):
     @property
     def has_data(self) -> bool:
         return self._a.has_data
+
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.negative)
@@ -353,6 +405,10 @@ class ScalarAdd(Expr):
     def has_data(self) -> bool:
         return self._a.has_data or self._b.has_data
 
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return self._a.late_bound_constants | self._b.late_bound_constants
+
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return FoldedScalarConst.constant_fold_binary(
             self._a, self._b, dtype, np.add, ScalarAdd
@@ -384,6 +440,10 @@ class ScalarMultiply(Expr):
     @property
     def has_data(self) -> bool:
         return self._a.has_data or self._b.has_data
+
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return self._a.late_bound_constants | self._b.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return FoldedScalarConst.constant_fold_binary(
@@ -417,6 +477,10 @@ class ScalarDivide(Expr):
     def has_data(self) -> bool:
         return self._a.has_data or self._b.has_data
 
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return self._a.late_bound_constants | self._b.late_bound_constants
+
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return FoldedScalarConst.constant_fold_binary(
             self._a, self._b, dtype, np.divide, ScalarDivide
@@ -449,6 +513,10 @@ class ScalarExponentiation(Expr):
     def has_data(self) -> bool:
         return self._a.has_data or self._b.has_data
 
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return self._a.late_bound_constants | self._b.late_bound_constants
+
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return FoldedScalarConst.constant_fold_binary(
             self._a, self._b, dtype, np.power, ScalarExponentiation
@@ -479,6 +547,10 @@ class ScalarLn(Expr):
     def has_data(self) -> bool:
         return self._a.has_data
 
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return self._a.late_bound_constants
+
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.log)
 
@@ -506,6 +578,10 @@ class ScalarExp(Expr):
     @property
     def has_data(self) -> bool:
         return self._a.has_data
+
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.exp)
@@ -543,6 +619,13 @@ class Array(Expr):
     @property
     def has_data(self) -> bool:
         return any(e.has_data for e in self._array.flat)
+
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        late_bound = set()
+        for e in self._array.flat:
+            late_bound.update(e.late_bound_constants)
+        return frozenset(late_bound)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         def fold_array_element(e: Expr) -> Expr:

@@ -22,7 +22,7 @@ from ....utils.cast import (
 from ....utils.intervals import IntervalUnion
 from ....utils.typing import F, S, T
 from ..._qois.interval import compute_safe_eb_lower_upper_interval_union
-from ..._qois.sly.expr import DataScalar, Expr
+from ..._qois.sly.expr import Data, Expr
 from ..._qois.sly.lexer import QoILexer
 from ..._qois.sly.parser import QoIParser
 from ...eb import (
@@ -238,7 +238,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             self._eb = eb
 
         lexer = QoILexer()
-        parser = QoIParser(x=DataScalar(), X=None)
+        parser = QoIParser(x=Data(index=()), X=None)
 
         try:
             qoi_expr = parser.parse(lexer.tokenize(qoi))

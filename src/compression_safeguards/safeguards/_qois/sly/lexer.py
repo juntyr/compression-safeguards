@@ -25,6 +25,10 @@ class QoILexer(Lexer):
         ID,  # type: ignore[name-defined]  # noqa: F821
         SUM,  # type: ignore[name-defined]  # noqa: F821
         TRANSPOSE,  # type: ignore[name-defined]  # noqa: F821
+        CS,  # type: ignore[name-defined]  # noqa: F821
+        CA,  # type: ignore[name-defined]  # noqa: F821
+        QUOTE,  # type: ignore[name-defined]  # noqa: F821
+        DOLLAR,  # type: ignore[name-defined]  # noqa: F821
     }
     ignore = " \t"
 
@@ -43,6 +47,8 @@ class QoILexer(Lexer):
     RBRACK = r"\]"
     COMMA = r","
     TRANSPOSE = r"\.T"
+    QUOTE = r'"'
+    DOLLAR = r"\$"
 
     # Identifiers
     ID = r"[a-zA-Z_][a-zA-Z0-9_]*"
@@ -53,6 +59,8 @@ class QoILexer(Lexer):
     ID["ln"] = LN  # type: ignore[index, name-defined]  # noqa: F821
     ID["exp"] = EXP  # type: ignore[index, name-defined]  # noqa: F821
     ID["sum"] = SUM  # type: ignore[index, name-defined]  # noqa: F821
+    ID["c"] = CS  # type: ignore[index, name-defined]  # noqa: F821
+    ID["C"] = CA  # type: ignore[index, name-defined]  # noqa: F821
 
     # Ignored pattern
     ignore_newline = r"\n+"

@@ -1,11 +1,12 @@
 from sly import Parser
 
+from ....utils.bindings import Parameter
 from .expr import (
     Array,
-    DataArrayElement,
-    DataScalar,
+    Data,
     Euler,
     Group,
+    LateBoundConstant,
     Number,
     Pi,
     ScalarAdd,
@@ -20,7 +21,7 @@ from .lexer import QoILexer
 
 
 class QoIParser(Parser):
-    def __init__(self, *, x: DataScalar | DataArrayElement, X: None | Array):
+    def __init__(self, *, x: Data, X: None | Array):
         self.x = x
         self.X = X
 
@@ -172,3 +173,14 @@ class QoIParser(Parser):
     def expr(self, p):  # noqa: F811
         assert isinstance(p.expr, Array), "can only transpose an array expression"
         return p.expr.transpose()
+
+    @_("CS LBRACK QUOTE ID QUOTE RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return LateBoundConstant.like(Parameter(p.ID), self.x)
+
+    @_("CA LBRACK QUOTE ID QUOTE RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        assert self.X is not None
+        return Array.map_unary(
+            self.X, lambda e: LateBoundConstant.like(Parameter(p.ID), e)
+        )
