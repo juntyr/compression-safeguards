@@ -1,12 +1,11 @@
 import numpy as np
 import pytest
 
-from compression_safeguards import Safeguards
-from compression_safeguards.safeguards.pointwise.qoi.eb import (
-    PointwiseQuantityOfInterestErrorBoundSafeguard,
-)
-from compression_safeguards.utils.bindings import Bindings
-
+# from compression_safeguards import Safeguards
+# from compression_safeguards.safeguards.pointwise.qoi.eb import (
+#     PointwiseQuantityOfInterestErrorBoundSafeguard,
+# )
+# from compression_safeguards.utils.bindings import Bindings
 from .codecs import (
     encode_decode_identity,
     encode_decode_neg,

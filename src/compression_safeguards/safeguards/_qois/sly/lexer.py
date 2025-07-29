@@ -5,26 +5,26 @@ from sly import Lexer
 
 class QoILexer(Lexer):
     tokens = {
-        NUMBER,
-        PLUS,
-        TIMES,
-        MINUS,
-        DIVIDE,
-        LPAREN,
-        RPAREN,
-        POWER,
-        LBRACK,
-        RBRACK,
-        COMMA,
-        EULER,
-        PI,
-        XS,
-        XA,
-        LN,
-        EXP,
-        ID,
-        SUM,
-        TRANSPOSE,
+        NUMBER,  # type: ignore[name-defined]  # noqa: F821
+        PLUS,  # type: ignore[name-defined]  # noqa: F821
+        TIMES,  # type: ignore[name-defined]  # noqa: F821
+        MINUS,  # type: ignore[name-defined]  # noqa: F821
+        DIVIDE,  # type: ignore[name-defined]  # noqa: F821
+        LPAREN,  # type: ignore[name-defined]  # noqa: F821
+        RPAREN,  # type: ignore[name-defined]  # noqa: F821
+        POWER,  # type: ignore[name-defined]  # noqa: F821
+        LBRACK,  # type: ignore[name-defined]  # noqa: F821
+        RBRACK,  # type: ignore[name-defined]  # noqa: F821
+        COMMA,  # type: ignore[name-defined]  # noqa: F821
+        EULER,  # type: ignore[name-defined]  # noqa: F821
+        PI,  # type: ignore[name-defined]  # noqa: F821
+        XS,  # type: ignore[name-defined]  # noqa: F821
+        XA,  # type: ignore[name-defined]  # noqa: F821
+        LN,  # type: ignore[name-defined]  # noqa: F821
+        EXP,  # type: ignore[name-defined]  # noqa: F821
+        ID,  # type: ignore[name-defined]  # noqa: F821
+        SUM,  # type: ignore[name-defined]  # noqa: F821
+        TRANSPOSE,  # type: ignore[name-defined]  # noqa: F821
     }
     ignore = " \t"
 
@@ -46,20 +46,20 @@ class QoILexer(Lexer):
 
     # Identifiers
     ID = r"[a-zA-Z_][a-zA-Z0-9_]*"
-    ID["e"] = EULER
-    ID["pi"] = PI
-    ID["x"] = XS
-    ID["X"] = XA
-    ID["ln"] = LN
-    ID["exp"] = EXP
-    ID["sum"] = SUM
+    ID["e"] = EULER  # type: ignore[index, name-defined]  # noqa: F821
+    ID["pi"] = PI  # type: ignore[index, name-defined]  # noqa: F821
+    ID["x"] = XS  # type: ignore[index, name-defined]  # noqa: F821
+    ID["X"] = XA  # type: ignore[index, name-defined]  # noqa: F821
+    ID["ln"] = LN  # type: ignore[index, name-defined]  # noqa: F821
+    ID["exp"] = EXP  # type: ignore[index, name-defined]  # noqa: F821
+    ID["sum"] = SUM  # type: ignore[index, name-defined]  # noqa: F821
 
     # Ignored pattern
     ignore_newline = r"\n+"
     ignore_comment = r"#[^\n]*"
 
     # Extra action for newlines
-    def ignore_newline(self, t):
+    def ignore_newline(self, t):  # type: ignore[no-redef]  # noqa: F811
         self.lineno += t.value.count("\n")
 
     def error(self, t):

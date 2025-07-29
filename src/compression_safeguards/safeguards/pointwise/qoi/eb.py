@@ -22,7 +22,7 @@ from ....utils.cast import (
 from ....utils.intervals import IntervalUnion
 from ....utils.typing import F, S, T
 from ..._qois.interval import compute_safe_eb_lower_upper_interval_union
-from ..._qois.sly.expr import Expr, DataScalar
+from ..._qois.sly.expr import DataScalar, Expr
 from ..._qois.sly.lexer import QoILexer
 from ..._qois.sly.parser import QoIParser
 from ...eb import (

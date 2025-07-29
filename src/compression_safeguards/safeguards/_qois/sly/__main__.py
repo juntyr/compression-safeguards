@@ -1,8 +1,8 @@
 import numpy as np
 
+from .expr import Array, DataArrayElement, FoldedScalarConst
 from .lexer import QoILexer
 from .parser import QoIParser
-from .expr import DataArrayElement, Array, FoldedScalarConst
 
 if __name__ == "__main__":
     lexer = QoILexer()

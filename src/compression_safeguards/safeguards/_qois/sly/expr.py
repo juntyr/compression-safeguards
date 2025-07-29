@@ -3,8 +3,8 @@ from typing import Callable
 
 import numpy as np
 
+from ....utils.typing import F, S
 from ..eb import ensure_bounded_derived_error
-from ....utils.typing import S, F
 
 
 class Expr:
@@ -57,7 +57,7 @@ class Expr:
                 self.eval(X + tl),
             ),
             exprv,
-            X,
+            X,  # type: ignore
             tl,
             eb_expr_lower,
             eb_expr_upper,
@@ -69,7 +69,7 @@ class Expr:
                 self.eval(X + tu),
             ),
             exprv,
-            X,
+            X,  # type: ignore
             tu,
             eb_expr_lower,
             eb_expr_upper,
@@ -591,7 +591,7 @@ class Array(Expr):
                 assert left.shape == right.shape
                 out = Array.__new__(Array)
                 out._array = np.fromiter(
-                    (m(l, r) for l, r in zip(left._array.flat, right._array.flat)),
+                    (m(le, ri) for le, ri in zip(left._array.flat, right._array.flat)),
                     dtype=object,
                     count=left._array.size,
                 ).reshape(left._array.shape)
@@ -599,7 +599,7 @@ class Array(Expr):
 
             out = Array.__new__(Array)
             out._array = np.fromiter(
-                (m(l, right) for l in left._array.flat),
+                (m(le, right) for le in left._array.flat),
                 dtype=object,
                 count=left._array.size,
             ).reshape(left._array.shape)
@@ -608,7 +608,7 @@ class Array(Expr):
         if isinstance(right, Array):
             out = Array.__new__(Array)
             out._array = np.fromiter(
-                (m(left, r) for r in right._array.flat),
+                (m(left, ri) for ri in right._array.flat),
                 dtype=object,
                 count=right._array.size,
             ).reshape(right._array.shape)
