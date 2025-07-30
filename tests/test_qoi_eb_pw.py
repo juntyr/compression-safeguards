@@ -293,21 +293,21 @@ def test_rounding(check):
 #     check("acsc(x)")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_hyperbolic(check):
-#     check("sinh(x)")
-#     check("cosh(x)")
-#     check("tanh(x)")
-#     check("coth(x)")
-#     check("sech(x)")
-#     check("csch(x)")
+@pytest.mark.parametrize("check", CHECKS)
+def test_hyperbolic(check):
+    check("sinh(x)")
+    check("cosh(x)")
+    check("tanh(x)")
+    # check("coth(x)")
+    # check("sech(x)")
+    # check("csch(x)")
 
-#     check("asinh(x)")
-#     check("acosh(x)")
-#     check("atanh(x)")
-#     check("acoth(x)")
-#     check("asech(x)")
-#     check("acsch(x)")
+    # check("asinh(x)")
+    # check("acosh(x)")
+    # check("atanh(x)")
+    # check("acoth(x)")
+    # check("asech(x)")
+    # check("acsch(x)")
 
 
 # @pytest.mark.parametrize("check", CHECKS)

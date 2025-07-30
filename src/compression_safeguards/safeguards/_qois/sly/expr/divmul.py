@@ -94,7 +94,21 @@ class ScalarMultiply(Expr):
                 late_bound,
             )
 
-        raise NotImplementedError
+        # FIXME: this is just a short-term fix
+        from .addsub import ScalarAdd
+        from .logexp import ScalarExp, ScalarLn
+        from .power import ScalarFakeAbs
+
+        return ScalarExp(
+            ScalarAdd(
+                ScalarLn(ScalarFakeAbs(self._a)), ScalarLn(ScalarFakeAbs(self._b))
+            )
+        ).compute_data_error_bound(
+            eb_expr_lower,
+            eb_expr_upper,
+            X,
+            late_bound,
+        )
 
     def __repr__(self) -> str:
         return f"{self._a!r} * {self._b!r}"
@@ -136,7 +150,13 @@ class ScalarDivide(Expr):
         X: np.ndarray[tuple[int, ...], np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
     ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
-        raise NotImplementedError
+        # TODO: implement separately
+        from .literal import Number
+        from .power import ScalarExponentiation
+
+        return ScalarMultiply(
+            self._a, ScalarExponentiation(self._b, Number("-1"))
+        ).compute_data_error_bound(eb_expr_lower, eb_expr_upper, X, late_bound)
 
     def __repr__(self) -> str:
         return f"{self._a!r} / {self._b!r}"

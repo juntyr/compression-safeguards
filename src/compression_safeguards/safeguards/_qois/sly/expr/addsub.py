@@ -7,8 +7,7 @@ from .....utils.typing import F, S
 from ...eb import ensure_bounded_derived_error
 from .abc import Expr
 from .constfold import FoldedScalarConst
-
-# TODO: implement subtract separately
+from .neg import ScalarNegate
 
 
 class ScalarAdd(Expr):
@@ -104,3 +103,60 @@ class ScalarAdd(Expr):
 
     def __repr__(self) -> str:
         return f"{self._a!r} + {self._b!r}"
+
+
+class ScalarSubtract(Expr):
+    __slots__ = ("_a", "_b")
+    _a: Expr
+    _b: Expr
+
+    def __init__(self, a: Expr, b: Expr):
+        self._a = a
+        self._b = b
+
+    @property
+    def has_data(self) -> bool:
+        return self._a.has_data or self._b.has_data
+
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return self._a.late_bound_constants | self._b.late_bound_constants
+
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+        return FoldedScalarConst.constant_fold_binary(
+            self._a, self._b, dtype, np.subtract, ScalarSubtract
+        )
+
+    def eval(
+        self,
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        return np.subtract(self._a.eval(X, late_bound), self._b.eval(X, late_bound))
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        # TODO: implement subtract separately
+        return ScalarAdd(self._a, ScalarNegate(self._b)).compute_data_error_bound(
+            eb_expr_lower, eb_expr_upper, X, late_bound
+        )
+
+    def compute_data_error_bound(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        # the unchecked method already handles rounding errors for subtract
+        return self.compute_data_error_bound_unchecked(
+            eb_expr_lower, eb_expr_upper, X, late_bound
+        )
+
+    def __repr__(self) -> str:
+        return f"{self._a!r} - {self._b!r}"

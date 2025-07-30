@@ -4,11 +4,12 @@ from sly import Parser
 
 from ....utils.bindings import Parameter
 from .expr.abc import Expr
-from .expr.add import ScalarAdd
+from .expr.addsub import ScalarAdd, ScalarSubtract
 from .expr.array import Array
 from .expr.data import Data, LateBoundConstant
 from .expr.divmul import ScalarDivide, ScalarMultiply
 from .expr.group import Group
+from .expr.hyperbolic import Hyperbolic, ScalarHyperbolic
 from .expr.literal import Euler, Number, Pi
 from .expr.logexp import ScalarExp, ScalarLn
 from .expr.neg import ScalarNegate
@@ -101,9 +102,7 @@ class QoIParser(Parser):
 
     @_("expr MINUS expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_binary(
-            p.expr0, Array.map_unary(p.expr1, ScalarNegate), ScalarAdd
-        )
+        return Array.map_binary(p.expr0, p.expr1, ScalarSubtract)
 
     @_("expr TIMES expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -226,6 +225,18 @@ class QoIParser(Parser):
     @_("ROUND_TIES_EVEN LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, ScalarRoundTiesEven)
+
+    @_("SINH LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.sinh, e))
+
+    @_("COSH LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.cosh, e))
+
+    @_("TANH LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.tanh, e))
 
     # @_("ID LPAREN expr many_comma_expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     # def expr(self, p):  # noqa: F811
