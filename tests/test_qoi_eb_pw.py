@@ -126,21 +126,21 @@ CHECKS = [
 #         check_all_codecs(np.empty(0), "e x p")
 
 
-# def test_whitespace():
-#     check_all_codecs(np.array([]), "  \n \t x   \t\n  ")
-#     check_all_codecs(np.array([]), "  \n \t x \t \n  - \t \n 3  \t\n  ")
-#     check_all_codecs(np.array([]), "x    -    3")
-#     check_all_codecs(np.array([]), "sqrt   \n (x)")
-#     check_all_codecs(np.array([]), "log ( x , base \t = \n 2 )")
+def test_whitespace():
+    check_all_codecs(np.array([]), "  \n \t x   \t\n  ")
+    check_all_codecs(np.array([]), "  \n \t x \t \n  - \t \n 3  \t\n  ")
+    check_all_codecs(np.array([]), "x    -    3")
+    # check_all_codecs(np.array([]), "sqrt   \n (x)")
+    # check_all_codecs(np.array([]), "log ( x , base \t = \n 2 )")
 
 
-# def test_comment():
-#     check_all_codecs(np.array([]), "x # great variable")
-#     check_all_codecs(np.array([]), "# great variable\nx")
-#     check_all_codecs(np.array([]), "x # nothing 3+4 really matters 1/0")
-#     check_all_codecs(
-#         np.array([]), "log #1\n ( #2\n x #3\n , #4\n base #5\n = #6\n 2 #7\n )"
-#     )
+def test_comment():
+    check_all_codecs(np.array([]), "x # great variable")
+    check_all_codecs(np.array([]), "# great variable\nx")
+    check_all_codecs(np.array([]), "x # nothing 3+4 really matters 1/0")
+    # check_all_codecs(
+    #     np.array([]), "log #1\n ( #2\n x #3\n , #4\n base #5\n = #6\n 2 #7\n )"
+    # )
 
 
 # def test_variables():
@@ -232,11 +232,11 @@ def test_logarithm(check):
     # check("log(2, base=x)")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_sign(check):
-#     check("sign(x)")
-#     check("sign(x * 2)")
-#     check("sign(e**x)")
+@pytest.mark.parametrize("check", CHECKS)
+def test_sign(check):
+    check("sign(x)")
+    check("sign(x * 2)")
+    check("sign(e**x)")
 
 
 # @pytest.mark.parametrize("check", CHECKS)

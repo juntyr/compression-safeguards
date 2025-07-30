@@ -28,5 +28,5 @@ if __name__ == "__main__":
             expr = FoldedScalarConst.constant_fold_expr(expr, X.dtype)
             print(f"folded: {expr!r}")
             print(f"eval: {expr.eval(X, dict())}")
-        except AssertionError as err:
-            print(f"error: {err}")
+        except Exception as err:
+            print(f"{type(err).__name__}: {err}")

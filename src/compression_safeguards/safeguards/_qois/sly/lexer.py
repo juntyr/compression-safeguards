@@ -16,6 +16,8 @@ class QoILexer(Lexer):
         LBRACK,  # type: ignore[name-defined]  # noqa: F821
         RBRACK,  # type: ignore[name-defined]  # noqa: F821
         COMMA,  # type: ignore[name-defined]  # noqa: F821
+        EQUAL,  # type: ignore[name-defined]  # noqa: F821
+        SEMI,  # type: ignore[name-defined]  # noqa: F821
         EULER,  # type: ignore[name-defined]  # noqa: F821
         PI,  # type: ignore[name-defined]  # noqa: F821
         XS,  # type: ignore[name-defined]  # noqa: F821
@@ -29,6 +31,10 @@ class QoILexer(Lexer):
         CA,  # type: ignore[name-defined]  # noqa: F821
         QUOTE,  # type: ignore[name-defined]  # noqa: F821
         DOLLAR,  # type: ignore[name-defined]  # noqa: F821
+        VS,  # type: ignore[name-defined]  # noqa: F821
+        VA,  # type: ignore[name-defined]  # noqa: F821
+        RETURN,  # type: ignore[index, name-defined]  # noqa: F821
+        SIGN,  # type: ignore[index, name-defined]  # noqa: F821
     }
     ignore = " \t"
 
@@ -49,6 +55,8 @@ class QoILexer(Lexer):
     TRANSPOSE = r"\.T"
     QUOTE = r'"'
     DOLLAR = r"\$"
+    EQUAL = r"="
+    SEMI = r";"
 
     # Identifiers
     ID = r"[a-zA-Z_][a-zA-Z0-9_]*"
@@ -61,6 +69,10 @@ class QoILexer(Lexer):
     ID["sum"] = SUM  # type: ignore[index, name-defined]  # noqa: F821
     ID["c"] = CS  # type: ignore[index, name-defined]  # noqa: F821
     ID["C"] = CA  # type: ignore[index, name-defined]  # noqa: F821
+    ID["v"] = VS  # type: ignore[index, name-defined]  # noqa: F821
+    ID["V"] = VA  # type: ignore[index, name-defined]  # noqa: F821
+    ID["return"] = RETURN  # type: ignore[index, name-defined]  # noqa: F821
+    ID["sign"] = SIGN  # type: ignore[index, name-defined]  # noqa: F821
 
     # Ignored pattern
     ignore_newline = r"\n+"
@@ -71,5 +83,14 @@ class QoILexer(Lexer):
         self.lineno += t.value.count("\n")
 
     def error(self, t):
-        print("Illegal character '%s'" % t.value[0])
-        self.index += 1
+        raise SyntaxError(
+            f"Illegal character '{t.value[0]}', line {self.lineno}, column {find_column(self.text, t)}"
+        )
+
+
+def find_column(text, token):
+    last_cr = text.rfind("\n", 0, token.index)
+    if last_cr < 0:
+        last_cr = 0
+    column = (token.index - last_cr) + 1
+    return column

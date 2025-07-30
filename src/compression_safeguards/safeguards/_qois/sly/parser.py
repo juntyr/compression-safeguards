@@ -1,6 +1,7 @@
 from sly import Parser
 
 from ....utils.bindings import Parameter
+from .expr.abc import Expr
 from .expr.add import ScalarAdd
 from .expr.array import Array
 from .expr.data import Data, LateBoundConstant
@@ -10,13 +11,20 @@ from .expr.literal import Euler, Number, Pi
 from .expr.logexp import ScalarExp, ScalarLn
 from .expr.neg import ScalarNegate
 from .expr.power import ScalarExponentiation
+from .expr.sign import ScalarSign
 from .lexer import QoILexer
 
 
 class QoIParser(Parser):
+    __slots__ = ("_x", "_X", "_vars")
+    _x: Data
+    _X: None | Array
+    _vars: dict[Parameter, Expr]
+
     def __init__(self, *, x: Data, X: None | Array):
-        self.x = x
-        self.X = X
+        self._x = x
+        self._X = X
+        self._vars = dict()
 
     tokens = QoILexer.tokens
 
@@ -25,20 +33,57 @@ class QoIParser(Parser):
         ("left", TIMES, DIVIDE),  # type: ignore[name-defined]  # noqa: F821
         ("right", UPLUS, UMINUS),  # type: ignore[name-defined]  # noqa: F821
         ("right", POWER),  # type: ignore[name-defined]  # noqa: F821
-        # FIXME: index has wrong precedence
         ("left", INDEX, TRANSPOSE),  # type: ignore[name-defined]  # noqa: F821
     )
 
-    @_("expr")  # type: ignore[name-defined]  # noqa: F821
-    def qoi(self, p):
+    @_("expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def qoi(self, p):  # noqa: F811
         assert not isinstance(p.expr, Array), (
             f"QoI expr must be scalar but is an array expression of shape {p.expr.shape}"
         )
         assert p.expr.has_data, "QoI expr must not be constant"
         return p.expr
 
+    @_("many_assign RETURN expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def qoi(self, p):  # noqa: F811
+        assert not isinstance(p.expr, Array), (
+            f"QoI expr must be scalar but is an array expression of shape {p.expr.shape}"
+        )
+        assert p.expr.has_data, "QoI expr must not be constant"
+        return p.expr
+
+    @_("assign many_assign")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def many_assign(self, p):  # noqa: F811
+        pass
+
+    @_("empty")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def many_assign(self, p):  # noqa: F811
+        pass
+
+    @_("VS LBRACK QUOTE ID QUOTE RBRACK EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def assign(self, p):  # noqa: F811
+        assert self._X is None
+        assert p.ID not in self._vars
+        self._vars[Parameter(p.ID)] = Group(p.expr)
+
+    @_("VA LBRACK QUOTE ID QUOTE RBRACK EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def assign(self, p):  # noqa: F811
+        assert self._X is not None
+        assert p.ID not in self._vars
+        self._vars[Parameter(p.ID)] = Group(p.expr)
+
+    @_("VS LBRACK QUOTE ID QUOTE RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        assert self._X is None
+        return self._vars[Parameter(p.ID)]
+
+    @_("VA LBRACK QUOTE ID QUOTE RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        assert self._X is not None
+        return self._vars[Parameter(p.ID)]
+
     @_("expr PLUS expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):
+    def expr(self, p):  # noqa: F811
         return Array.map_binary(p.expr0, p.expr1, ScalarAdd)
 
     @_("expr MINUS expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
@@ -134,12 +179,12 @@ class QoIParser(Parser):
 
     @_("XS")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return self.x
+        return self._x
 
     @_("XA")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        assert self.X is not None
-        return self.X
+        assert self._X is not None
+        return self._X
 
     @_("LN LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -148,6 +193,10 @@ class QoIParser(Parser):
     @_("EXP LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, ScalarExp)
+
+    @_("SIGN LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, ScalarSign)
 
     @_("ID")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -169,13 +218,13 @@ class QoIParser(Parser):
 
     @_("CS LBRACK QUOTE maybe_dollar ID QUOTE RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return LateBoundConstant.like(Parameter(p.maybe_dollar + p.ID), self.x)
+        return LateBoundConstant.like(Parameter(p.maybe_dollar + p.ID), self._x)
 
     @_("CA LBRACK QUOTE maybe_dollar ID QUOTE RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        assert self.X is not None
+        assert self._X is not None
         return Array.map_unary(
-            self.X,
+            self._X,
             lambda e: LateBoundConstant.like(Parameter(p.maybe_dollar + p.ID), e),
         )
 
