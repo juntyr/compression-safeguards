@@ -470,6 +470,8 @@ try:
     _float128_smallest_normal = np.finfo(np.float128).smallest_normal
     _float128_smallest_subnormal = np.finfo(np.float128).smallest_subnormal
     _float128_precision = np.finfo(np.float128).precision
+    _float128_pi = np.float128("3.14159265358979323846264338327950288")
+    _float128_e = np.float128("2.71828182845904523536028747135266249")
 except (AttributeError, AssertionError):
     try:
         import numpy_quaddtype
@@ -483,6 +485,8 @@ except (AttributeError, AssertionError):
         # taken from https://sleef.org/quad.xhtml
         _float128_smallest_subnormal = _float128(2) ** (-16494)
         _float128_precision = 33
+        _float128_pi = numpy_quaddtype.pi
+        _float128_e = numpy_quaddtype.e
     except ImportError:
         raise TypeError("""
 compression_safeguards requires float128 support:

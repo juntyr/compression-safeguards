@@ -21,8 +21,10 @@ if __name__ == "__main__":
             expr = parser.parse(lexer.tokenize(text))
             if expr is None:
                 continue
+            print(f"parsed: {expr!r}")
             X = np.array([1.0, 2.0, 3.0])
             expr = expr.constant_fold_expr(X.dtype)
-            print(expr.eval(X, dict()))
+            print(f"folded: {expr!r}")
+            print(f"eval: {expr.eval(X, dict())}")
         except AssertionError as err:
-            print(err)
+            print(f"error: {err}")

@@ -5,6 +5,12 @@ from typing import Callable
 import numpy as np
 
 from ....utils.bindings import Parameter
+from ....utils.cast import (
+    _float128_dtype,
+    _float128_e,
+    _float128_pi,
+    _nan_to_zero_inf_to_finite,
+)
 from ....utils.typing import F, S
 from ..eb import ensure_bounded_derived_error
 
@@ -28,9 +34,9 @@ class Expr:
 
     def constant_fold_expr(self, dtype: np.dtype[F]) -> "Expr":
         fexpr = self.constant_fold(dtype)
-        if isinstance(fexpr, dtype.type):
-            return FoldedScalarConst(fexpr)
-        return fexpr  # type: ignore
+        if isinstance(fexpr, Expr):
+            return fexpr
+        return FoldedScalarConst(fexpr)
 
     @abstractmethod
     def eval(
@@ -112,11 +118,11 @@ class Group(Expr):
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | "Expr":
         fexpr = self._expr.constant_fold(dtype)
-        # fully constant folded -> allow further folding
-        if isinstance(fexpr, dtype.type):
-            return fexpr
         # partially / not constant folded -> stop further folding
-        return Group(fexpr)  # type: ignore
+        if isinstance(fexpr, Expr):
+            return Group(fexpr)
+        # fully constant folded -> allow further folding
+        return fexpr
 
     def eval(
         self,
@@ -143,9 +149,13 @@ class Group(Expr):
         X: np.ndarray[tuple[int, ...], np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
     ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        # group just passes on the arguments
         return self.compute_data_error_bound_unchecked(
             eb_expr_lower, eb_expr_upper, X, late_bound
         )
+
+    def __repr__(self) -> str:
+        return f"({self._expr!r})"
 
 
 class FoldedScalarConst(Expr):
@@ -164,7 +174,7 @@ class FoldedScalarConst(Expr):
         return frozenset()
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        assert dtype == np.dtype(self._const)
+        assert isinstance(self._const, dtype.type)
         return self._const  # type: ignore
 
     def eval(
@@ -172,7 +182,7 @@ class FoldedScalarConst(Expr):
         X: np.ndarray[tuple[int, ...], np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
     ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
-        assert X.dtype == np.dtype(self._const)
+        assert isinstance(self._const, X.dtype.type)
         return self._const  # type: ignore
 
     def compute_data_error_bound_unchecked(
@@ -189,9 +199,9 @@ class FoldedScalarConst(Expr):
         expr: Expr, dtype: np.dtype[F], m: Callable[[F], F]
     ) -> F | Expr:
         fexpr = expr.constant_fold(dtype)
-        if isinstance(fexpr, dtype.type):
-            return m(fexpr)
-        return fexpr
+        if isinstance(fexpr, Expr):
+            return fexpr
+        return m(fexpr)
 
     @staticmethod
     def constant_fold_binary(
@@ -203,13 +213,16 @@ class FoldedScalarConst(Expr):
     ) -> F | Expr:
         fleft = left.constant_fold(dtype)
         fright = right.constant_fold(dtype)
-        if isinstance(fleft, dtype.type):
-            if isinstance(fright, dtype.type):
-                return m(fleft, fright)
-            return rm(FoldedScalarConst(fleft), fright)  # type: ignore
-        if isinstance(fright, dtype.type):
-            return rm(fleft, FoldedScalarConst(fright))  # type: ignore
-        return rm(fleft, fright)  # type: ignore
+        if isinstance(fleft, Expr):
+            if isinstance(fright, Expr):
+                return rm(fleft, fright)
+            return rm(fleft, FoldedScalarConst(fright))
+        if isinstance(fright, Expr):
+            return rm(FoldedScalarConst(fleft), fright)
+        return m(fleft, fright)
+
+    def __repr__(self) -> str:
+        return f"({self._const!r})"
 
 
 class Data(Expr):
@@ -245,6 +258,21 @@ class Data(Expr):
         late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
     ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
         return (eb_expr_lower, eb_expr_upper)
+
+    def compute_data_error_bound(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        # data just returns the computed error bounds
+        return self.compute_data_error_bound_unchecked(
+            eb_expr_lower, eb_expr_upper, X, late_bound
+        )
+
+    def __repr__(self) -> str:
+        return f"X[{','.join(str(i) for i in self._index)}]"
 
 
 class LateBoundConstant(Expr):
@@ -291,6 +319,9 @@ class LateBoundConstant(Expr):
     ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
         assert False, "late-bound constants have no error bounds"
 
+    def __repr__(self) -> str:
+        return f'C["{self._name}"][{",".join(str(i) for i in self._index)}]'
+
 
 class Number(Expr):
     __slots__ = ("_n",)
@@ -308,6 +339,7 @@ class Number(Expr):
         return frozenset()
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+        # FIXME: what about folding integers?
         return dtype.type(self._n)  # type: ignore
 
     def eval(
@@ -326,6 +358,9 @@ class Number(Expr):
     ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
         assert False, "number literals have no error bounds"
 
+    def __repr__(self) -> str:
+        return self._n
+
 
 class Pi(Expr):
     __slots__ = ()
@@ -339,6 +374,8 @@ class Pi(Expr):
         return frozenset()
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+        if dtype == _float128_dtype:
+            return _float128_pi  # type: ignore
         return dtype.type(np.pi)
 
     def eval(
@@ -346,6 +383,8 @@ class Pi(Expr):
         X: np.ndarray[tuple[int, ...], np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
     ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        if X.dtype == _float128_dtype:
+            return _float128_pi  # type: ignore
         return X.dtype.type(np.pi)
 
     def compute_data_error_bound_unchecked(
@@ -356,6 +395,9 @@ class Pi(Expr):
         late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
     ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
         assert False, "pi has no error bounds"
+
+    def __repr__(self) -> str:
+        return "pi"
 
 
 class Euler(Expr):
@@ -370,6 +412,8 @@ class Euler(Expr):
         return frozenset()
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+        if dtype == _float128_dtype:
+            return _float128_e  # type: ignore
         return dtype.type(np.e)
 
     def eval(
@@ -377,6 +421,8 @@ class Euler(Expr):
         X: np.ndarray[tuple[int, ...], np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
     ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        if X.dtype == _float128_dtype:
+            return _float128_pi  # type: ignore
         return X.dtype.type(np.e)
 
     def compute_data_error_bound_unchecked(
@@ -387,6 +433,9 @@ class Euler(Expr):
         late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
     ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
         assert False, "Euler's e has no error bounds"
+
+    def __repr__(self) -> str:
+        return "e"
 
 
 class ScalarNegate(Expr):
@@ -432,9 +481,77 @@ class ScalarNegate(Expr):
         X: np.ndarray[tuple[int, ...], np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
     ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        # negation cannot cause any rounding errors
         return self.compute_data_error_bound_unchecked(
             eb_expr_lower, eb_expr_upper, X, late_bound
         )
+
+    def __repr__(self) -> str:
+        return f"-{self._a!r}"
+
+
+class ScalarFakeAbs(Expr):
+    __slots__ = ("_a",)
+    _a: Expr
+
+    def __init__(self, a: Expr):
+        self._a = a
+
+    @property
+    def has_data(self) -> bool:
+        return self._a.has_data
+
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return self._a.late_bound_constants
+
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.abs)
+
+    def eval(
+        self,
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        return np.abs(self._a.eval(X, late_bound))
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        # evaluate arg
+        arg = self._a
+        argv = arg.eval(X, late_bound)
+
+        # flip the lower/upper error bound if the arg is negative
+        eal = np.where(argv < 0, -eb_expr_upper, eb_expr_lower)
+        eau = np.where(argv < 0, -eb_expr_lower, eb_expr_upper)
+
+        # composition using Lemma 3 from Jiao et al.
+        return arg.compute_data_error_bound(
+            eal,  # type: ignore
+            eau,  # type: ignore
+            X,
+            late_bound,
+        )
+
+    def compute_data_error_bound(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        # abs cannot cause any rounding errors
+        return self.compute_data_error_bound_unchecked(
+            eb_expr_lower, eb_expr_upper, X, late_bound
+        )
+
+    def __repr__(self) -> str:
+        return f"-{self._a!r}"
 
 
 class ScalarAdd(Expr):
@@ -473,7 +590,63 @@ class ScalarAdd(Expr):
         X: np.ndarray[tuple[int, ...], np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
     ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        a_const = not self._a.has_data
+        b_const = not self._b.has_data
+        assert not (a_const and b_const), "constant sum has no error bounds"
+
+        # TODO: handle weighted sums
+
+        if a_const or b_const:
+            term, const = (self._b, self._a) if a_const else (self._a, self._b)
+
+            # evaluate the non-constant and constant term and their sum
+            termv = term.eval(X, late_bound)
+            constv = const.eval(X, late_bound)
+            # add of two terms is commutative
+            exprv = np.add(termv, constv)  # type: ignore
+
+            # handle rounding errors in the addition
+            eb_term_lower = ensure_bounded_derived_error(
+                lambda etl: (termv + etl) + constv,
+                exprv,
+                termv,  # type: ignore
+                eb_expr_lower,  # type: ignore
+                eb_expr_lower,  # type: ignore
+                eb_expr_upper,  # type: ignore
+            )
+            eb_term_upper = ensure_bounded_derived_error(
+                lambda etu: (termv + etu) + constv,
+                exprv,
+                termv,  # type: ignore
+                eb_expr_upper,  # type: ignore
+                eb_expr_lower,  # type: ignore
+                eb_expr_upper,  # type: ignore
+            )
+
+            # composition using Lemma 3 from Jiao et al.
+            return term.compute_data_error_bound(
+                eb_term_lower,  # type: ignore
+                eb_term_upper,  # type: ignore
+                X,
+                late_bound,
+            )
+
         raise NotImplementedError
+
+    def compute_data_error_bound(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        # the unchecked method already handles rounding errors for add
+        return self.compute_data_error_bound_unchecked(
+            eb_expr_lower, eb_expr_upper, X, late_bound
+        )
+
+    def __repr__(self) -> str:
+        return f"{self._a!r} + {self._b!r}"
 
 
 class ScalarMultiply(Expr):
@@ -512,7 +685,58 @@ class ScalarMultiply(Expr):
         X: np.ndarray[tuple[int, ...], np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
     ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        a_const = not self._a.has_data
+        b_const = not self._b.has_data
+        assert not (a_const and b_const), "constant product has no error bounds"
+
+        # TODO: handle larger products
+
+        if a_const or b_const:
+            term, const = (self._b, self._a) if a_const else (self._a, self._b)
+
+            # evaluate the non-constant and constant term and their product
+            termv = term.eval(X, late_bound)
+            constv = const.eval(X, late_bound)
+            # mul of two terms is commutative
+            exprv = np.multiply(termv, constv)  # type: ignore
+
+            efl = _nan_to_zero_inf_to_finite(eb_expr_lower / np.abs(constv))
+            efu = _nan_to_zero_inf_to_finite(eb_expr_upper / np.abs(constv))
+
+            # flip the lower/upper error bound if the factor is negative
+            etl = np.where(constv < 0, -efu, efl)
+            etu = np.where(constv < 0, -efl, efu)
+
+            # handle rounding errors in the multiplication
+            eb_term_lower = ensure_bounded_derived_error(
+                lambda etl: (termv + etl) * constv,
+                exprv,
+                termv,  # type: ignore
+                etl,
+                eb_expr_lower,  # type: ignore
+                eb_expr_upper,  # type: ignore
+            )
+            eb_term_upper = ensure_bounded_derived_error(
+                lambda etu: (termv + etu) * constv,
+                exprv,
+                termv,  # type: ignore
+                etu,
+                eb_expr_lower,  # type: ignore
+                eb_expr_upper,  # type: ignore
+            )
+
+            # composition using Lemma 3 from Jiao et al.
+            return term.compute_data_error_bound(
+                eb_term_lower,  # type: ignore
+                eb_term_upper,  # type: ignore
+                X,
+                late_bound,
+            )
+
         raise NotImplementedError
+
+    def __repr__(self) -> str:
+        return f"{self._a!r} * {self._b!r}"
 
 
 class ScalarDivide(Expr):
@@ -553,6 +777,9 @@ class ScalarDivide(Expr):
     ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
         raise NotImplementedError
 
+    def __repr__(self) -> str:
+        return f"{self._a!r} / {self._b!r}"
+
 
 class ScalarExponentiation(Expr):
     __slots__ = ("_a", "_b")
@@ -590,7 +817,14 @@ class ScalarExponentiation(Expr):
         X: np.ndarray[tuple[int, ...], np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
     ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
-        raise NotImplementedError
+        # rewrite a ** b as e^(b*ln(abs(a)))
+        # this is mathematically incorrect for a <= 0 but works for deriving error bounds
+        return ScalarExp(
+            ScalarMultiply(self._b, ScalarLn(ScalarFakeAbs(self._a)))
+        ).compute_data_error_bound(eb_expr_lower, eb_expr_upper, X, late_bound)
+
+    def __repr__(self) -> str:
+        return f"{self._a!r} ** {self._b!r}"
 
 
 class ScalarLn(Expr):
@@ -625,7 +859,70 @@ class ScalarLn(Expr):
         X: np.ndarray[tuple[int, ...], np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
     ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
-        raise NotImplementedError
+        zero = X.dtype.type(0)
+
+        # evaluate arg and ln(arg)
+        arg = self._a
+        argv = arg.eval(X, late_bound)
+        exprv = np.log(argv)
+
+        # update the error bounds
+        eal = np.where(
+            (eb_expr_lower == 0),
+            zero,
+            np.minimum(np.exp(exprv + eb_expr_lower) - argv, 0),
+        )
+        eal = _nan_to_zero_inf_to_finite(eal)
+
+        eau = np.where(
+            (eb_expr_upper == 0),
+            zero,
+            np.maximum(0, np.exp(exprv + eb_expr_upper) - argv),
+        )
+        eau = _nan_to_zero_inf_to_finite(eau)
+
+        # handle rounding errors in ln(e^(...)) early
+        eal = ensure_bounded_derived_error(
+            lambda eal: np.log(argv + eal),
+            exprv,
+            argv,  # type: ignore
+            eal,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eau = ensure_bounded_derived_error(
+            lambda eau: np.log(argv + eau),
+            exprv,
+            argv,  # type: ignore
+            eau,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eb_arg_lower, eb_arg_upper = eal, eau
+
+        # composition using Lemma 3 from Jiao et al.
+        return arg.compute_data_error_bound(
+            eb_arg_lower,  # type: ignore
+            eb_arg_upper,  # type: ignore
+            X,
+            late_bound,
+        )
+
+    def compute_data_error_bound(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        # the unchecked method already handles rounding errors for ln,
+        #  which is stricly monotonic
+        return self.compute_data_error_bound_unchecked(
+            eb_expr_lower, eb_expr_upper, X, late_bound
+        )
+
+    def __repr__(self) -> str:
+        return f"ln({self._a!r})"
 
 
 class ScalarExp(Expr):
@@ -660,7 +957,71 @@ class ScalarExp(Expr):
         X: np.ndarray[tuple[int, ...], np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
     ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
-        raise NotImplementedError
+        zero = X.dtype.type(0)
+
+        # evaluate arg and e^arg
+        arg = self._a
+        argv = arg.eval(X, late_bound)
+        exprv = np.exp(argv)
+
+        # update the error bounds
+        # ensure that ln is not passed a negative argument
+        eal = np.where(
+            (eb_expr_lower == 0),
+            zero,
+            np.minimum(np.log(np.maximum(0, exprv + eb_expr_lower)) - argv, 0),
+        )
+        eal = _nan_to_zero_inf_to_finite(eal)
+
+        eau = np.where(
+            (eb_expr_upper == 0),
+            zero,
+            np.maximum(0, np.log(np.maximum(0, exprv + eb_expr_upper)) - argv),
+        )
+        eau = _nan_to_zero_inf_to_finite(eau)
+
+        # handle rounding errors in e^(ln(...)) early
+        eal = ensure_bounded_derived_error(
+            lambda eal: np.exp(argv + eal),
+            exprv,
+            argv,  # type: ignore
+            eal,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eau = ensure_bounded_derived_error(
+            lambda eau: np.exp(argv + eau),
+            exprv,
+            argv,  # type: ignore
+            eau,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eb_arg_lower, eb_arg_upper = eal, eau
+
+        # composition using Lemma 3 from Jiao et al.
+        return arg.compute_data_error_bound(
+            eb_arg_lower,  # type: ignore
+            eb_arg_upper,  # type: ignore
+            X,
+            late_bound,
+        )
+
+    def compute_data_error_bound(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        # the unchecked method already handles rounding errors for exp,
+        #  which is stricly monotonic
+        return self.compute_data_error_bound_unchecked(
+            eb_expr_lower, eb_expr_upper, X, late_bound
+        )
+
+    def __repr__(self) -> str:
+        return f"exp({self._a!r})"
 
 
 class Array(Expr):
@@ -771,3 +1132,6 @@ class Array(Expr):
         out = Array.__new__(Array)
         out._array = self._array.T
         return out
+
+    def __repr__(self) -> str:
+        return f"{self._array!r}"

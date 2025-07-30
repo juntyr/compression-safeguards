@@ -281,6 +281,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         return parameters
 
+    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def evaluate_qoi(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -406,6 +407,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         return ok  # type: ignore
 
+    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def compute_safe_intervals(
         self,
         data: np.ndarray[S, np.dtype[T]],

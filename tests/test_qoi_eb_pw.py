@@ -211,25 +211,25 @@ def test_negate(check):
 #     check("x**2 + x + 1")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_exponential(check):
-#     check("0.5**x")
-#     check("2**x")
-#     check("3**x")
-#     check("e**(x)")
-#     check("exp(x)")
-#     check("2 ** (x + 1)")
+@pytest.mark.parametrize("check", CHECKS)
+def test_exponential(check):
+    check("0.5**x")
+    check("2**x")
+    check("3**x")
+    check("e**(x)")
+    check("exp(x)")
+    check("2 ** (x + 1)")
 
-#     check_all_codecs(np.array([51.0]), "2**x")
-#     check_all_codecs(np.array([31.0]), "exp(x)")
+    check_all_codecs(np.array([51.0]), "2**x")
+    check_all_codecs(np.array([31.0]), "exp(x)")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_logarithm(check):
-#     check("log(x, base=2)")
-#     check("ln(x)")
-#     check("ln(x + 1)")
-#     check("log(2, base=x)")
+@pytest.mark.parametrize("check", CHECKS)
+def test_logarithm(check):
+    # check("log(x, base=2)")
+    check("ln(x)")
+    check("ln(x + 1)")
+    # check("log(2, base=x)")
 
 
 # @pytest.mark.parametrize("check", CHECKS)
