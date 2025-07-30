@@ -99,31 +99,31 @@ CHECKS = [
 ]
 
 
-# def test_sandbox():
-#     with pytest.raises(AssertionError, match="invalid QoI expression"):
-#         # sandbox escape based on https://stackoverflow.com/q/35804961 and
-#         #  https://stackoverflow.com/a/35806044
-#         check_all_codecs(
-#             np.empty(0),
-#             "f\"{[c for c in ().__class__.__base__.__subclasses__() if c.__name__ == 'catch_warnings'][0]()._module.__builtins__['quit']()}\"",
-#         )
+def test_sandbox():
+    with pytest.raises(AssertionError, match="illegal token `f`"):
+        # sandbox escape based on https://stackoverflow.com/q/35804961 and
+        #  https://stackoverflow.com/a/35806044
+        check_all_codecs(
+            np.empty(0),
+            "f\"{[c for c in ().__class__.__base__.__subclasses__() if c.__name__ == 'catch_warnings'][0]()._module.__builtins__['quit']()}\"",
+        )
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_empty(check):
-#     with pytest.raises(AssertionError, match="empty"):
-#         check("")
-#     with pytest.raises(AssertionError, match="empty"):
-#         check("  \t   \n   ")
-#     with pytest.raises(AssertionError, match="empty"):
-#         check(" # just a comment ")
+@pytest.mark.parametrize("check", CHECKS)
+def test_empty(check):
+    with pytest.raises(AssertionError, match="empty"):
+        check("")
+    with pytest.raises(AssertionError, match="empty"):
+        check("  \t   \n   ")
+    with pytest.raises(AssertionError, match="empty"):
+        check(" # just a comment ")
 
 
-# def test_non_expression():
-#     with pytest.raises(AssertionError, match="numeric expression"):
-#         check_all_codecs(np.empty(0), "exp")
-#     with pytest.raises(AssertionError, match="invalid QoI expression"):
-#         check_all_codecs(np.empty(0), "e x p")
+def test_non_expression():
+    with pytest.raises(AssertionError, match="EOF"):
+        check_all_codecs(np.empty(0), "exp")
+    with pytest.raises(AssertionError, match="illegal token `x`"):
+        check_all_codecs(np.empty(0), "e x p")
 
 
 def test_whitespace():
@@ -201,14 +201,14 @@ def test_negate(check):
     check("--(-x)")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_polynomial(check):
-#     check("x")
-#     check("2*x")
-#     check("3*x + pi")
-#     check("x**2")
-#     check("x**3")
-#     check("x**2 + x + 1")
+@pytest.mark.parametrize("check", CHECKS)
+def test_polynomial(check):
+    check("x")
+    check("2*x")
+    check("3*x + pi")
+    check("x**2")
+    check("x**3")
+    # check("x**2 + x + 1")
 
 
 @pytest.mark.parametrize("check", CHECKS)

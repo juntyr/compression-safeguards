@@ -1,3 +1,5 @@
+import itertools
+
 from sly import Parser
 
 from ....utils.bindings import Parameter
@@ -30,6 +32,11 @@ class QoIParser(Parser):
 
     def parse(self, text: str, tokens):  # type: ignore
         self._text = text
+        tokens, tokens2 = itertools.tee(tokens)
+
+        if next(tokens2, None) is None:
+            raise SyntaxError("expression must not be empty")
+
         return super().parse(tokens)
 
     tokens = QoILexer.tokens
@@ -269,7 +276,7 @@ class QoIParser(Parser):
             )
 
         raise SyntaxError(
-            f"illegal token '{t.value}' at line {t.lineno}, column {find_column(self._text, t)}\nexpected{oneof} {options}"
+            f"illegal token `{t.value}` at line {t.lineno}, column {find_column(self._text, t)}\nexpected{oneof} {options}"
         )
 
 
