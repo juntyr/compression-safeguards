@@ -1,6 +1,8 @@
 import numpy as np
 
-from .expr import Array, Data
+from .expr.array import Array
+from .expr.constfold import FoldedScalarConst
+from .expr.data import Data
 from .lexer import QoILexer
 from .parser import QoIParser
 
@@ -23,7 +25,7 @@ if __name__ == "__main__":
                 continue
             print(f"parsed: {expr!r}")
             X = np.array([1.0, 2.0, 3.0])
-            expr = expr.constant_fold_expr(X.dtype)
+            expr = FoldedScalarConst.constant_fold_expr(expr, X.dtype)
             print(f"folded: {expr!r}")
             print(f"eval: {expr.eval(X, dict())}")
         except AssertionError as err:

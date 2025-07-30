@@ -1,22 +1,15 @@
 from sly import Parser
 
 from ....utils.bindings import Parameter
-from .expr import (
-    Array,
-    Data,
-    Euler,
-    Group,
-    LateBoundConstant,
-    Number,
-    Pi,
-    ScalarAdd,
-    ScalarDivide,
-    ScalarExp,
-    ScalarExponentiation,
-    ScalarLn,
-    ScalarMultiply,
-    ScalarNegate,
-)
+from .expr.add import ScalarAdd
+from .expr.array import Array
+from .expr.data import Data, LateBoundConstant
+from .expr.divmul import ScalarDivide, ScalarMultiply
+from .expr.group import Group
+from .expr.literal import Euler, Number, Pi
+from .expr.logexp import ScalarExp, ScalarLn
+from .expr.neg import ScalarNegate
+from .expr.power import ScalarExponentiation
 from .lexer import QoILexer
 
 

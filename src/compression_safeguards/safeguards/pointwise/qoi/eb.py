@@ -22,7 +22,9 @@ from ....utils.cast import (
 from ....utils.intervals import IntervalUnion
 from ....utils.typing import F, S, T
 from ..._qois.interval import compute_safe_eb_lower_upper_interval_union
-from ..._qois.sly.expr import Data, Expr
+from ..._qois.sly.expr.abc import Expr
+from ..._qois.sly.expr.constfold import FoldedScalarConst
+from ..._qois.sly.expr.data import Data
 from ..._qois.sly.lexer import QoILexer
 from ..._qois.sly.parser import QoIParser
 from ...eb import (
@@ -360,7 +362,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             for c in self._qoi_expr_late_bound_constants
         }
 
-        qoi_expr = self._qoi_expr.constant_fold_expr(data_float.dtype)
+        qoi_expr = FoldedScalarConst.constant_fold_expr(
+            self._qoi_expr, data_float.dtype
+        )
 
         qoi_data_: np.floating | np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
             qoi_expr.eval(data_float, late_bound_constants)
@@ -440,7 +444,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             for c in self._qoi_expr_late_bound_constants
         }
 
-        qoi_expr = self._qoi_expr.constant_fold_expr(data_float.dtype)
+        qoi_expr = FoldedScalarConst.constant_fold_expr(
+            self._qoi_expr, data_float.dtype
+        )
 
         data_qoi_: np.floating | np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
             qoi_expr.eval(data_float, late_bound_constants)
