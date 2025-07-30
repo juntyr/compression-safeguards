@@ -174,13 +174,22 @@ class QoIParser(Parser):
         assert isinstance(p.expr, Array), "can only transpose an array expression"
         return p.expr.transpose()
 
-    @_("CS LBRACK QUOTE ID QUOTE RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("CS LBRACK QUOTE maybe_dollar ID QUOTE RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return LateBoundConstant.like(Parameter(p.ID), self.x)
+        return LateBoundConstant.like(Parameter(p.maybe_dollar + p.ID), self.x)
 
-    @_("CA LBRACK QUOTE ID QUOTE RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("CA LBRACK QUOTE maybe_dollar ID QUOTE RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         assert self.X is not None
         return Array.map_unary(
-            self.X, lambda e: LateBoundConstant.like(Parameter(p.ID), e)
+            self.X,
+            lambda e: LateBoundConstant.like(Parameter(p.maybe_dollar + p.ID), e),
         )
+
+    @_("DOLLAR")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def maybe_dollar(self, p):  # noqa: F811
+        return "$"
+
+    @_("empty")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def maybe_dollar(self, p):  # noqa: F811
+        return ""

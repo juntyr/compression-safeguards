@@ -1,6 +1,6 @@
 import numpy as np
 
-from .expr import Array, Data, FoldedScalarConst
+from .expr import Array, Data
 from .lexer import QoILexer
 from .parser import QoIParser
 
@@ -22,8 +22,7 @@ if __name__ == "__main__":
             if expr is None:
                 continue
             X = np.array([1.0, 2.0, 3.0])
-            expr = expr.constant_fold(X.dtype)
-            expr = FoldedScalarConst(expr) if isinstance(expr, X.dtype.type) else expr
-            print(expr.eval(X))
+            expr = expr.constant_fold_expr(X.dtype)
+            print(expr.eval(X, dict()))
         except AssertionError as err:
             print(err)
