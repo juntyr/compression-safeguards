@@ -35,6 +35,10 @@ class QoILexer(Lexer):
         VA,  # type: ignore[name-defined]  # noqa: F821
         RETURN,  # type: ignore[index, name-defined]  # noqa: F821
         SIGN,  # type: ignore[index, name-defined]  # noqa: F821
+        FLOOR,  # type: ignore[index, name-defined]  # noqa: F821
+        CEIL,  # type: ignore[index, name-defined]  # noqa: F821
+        TRUNC,  # type: ignore[index, name-defined]  # noqa: F821
+        ROUND_TIES_EVEN,  # type: ignore[index, name-defined]  # noqa: F821
     }
     ignore = " \t"
 
@@ -73,6 +77,10 @@ class QoILexer(Lexer):
     ID["V"] = VA  # type: ignore[index, name-defined]  # noqa: F821
     ID["return"] = RETURN  # type: ignore[index, name-defined]  # noqa: F821
     ID["sign"] = SIGN  # type: ignore[index, name-defined]  # noqa: F821
+    ID["floor"] = FLOOR  # type: ignore[index, name-defined]  # noqa: F821
+    ID["ceil"] = CEIL  # type: ignore[index, name-defined]  # noqa: F821
+    ID["trunc"] = TRUNC  # type: ignore[index, name-defined]  # noqa: F821
+    ID["round_ties_even"] = ROUND_TIES_EVEN  # type: ignore[index, name-defined]  # noqa: F821
 
     # Ignored pattern
     ignore_newline = r"\n+"
