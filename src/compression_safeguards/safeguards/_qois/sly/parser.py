@@ -17,15 +17,20 @@ from .lexer import QoILexer
 
 
 class QoIParser(Parser):
-    __slots__ = ("_x", "_X", "_vars")
+    __slots__ = ("_x", "_X", "_vars", "_text")
     _x: Data
     _X: None | Array
     _vars: dict[Parameter, Expr]
+    _text: str
 
     def __init__(self, *, x: Data, X: None | Array):
         self._x = x
         self._X = X
         self._vars = dict()
+
+    def parse(self, text: str, tokens):  # type: ignore
+        self._text = text
+        return super().parse(tokens)
 
     tokens = QoILexer.tokens
 
@@ -215,9 +220,9 @@ class QoIParser(Parser):
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, ScalarRoundTiesEven)
 
-    @_("ID")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        assert False, f"unknown id {p.ID}"
+    # @_("ID LPAREN expr many_comma_expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    # def expr(self, p):  # noqa: F811
+    #     assert False, f"unknown function `{p.ID}`"
 
     @_("SUM LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -252,3 +257,64 @@ class QoIParser(Parser):
     @_("empty")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def maybe_dollar(self, p):  # noqa: F811
         return ""
+
+    def error(self, t):
+        actions = self._lrtable.lr_action[self.state]
+        options = ", ".join(token_to_name(t) for t in actions)
+        oneof = " one of" if len(actions) > 1 else ""
+
+        if t is None:
+            raise SyntaxError(
+                f"expected more input but found EOF\nexpected{oneof} {options}"
+            )
+
+        raise SyntaxError(
+            f"illegal token '{t.value}' at line {t.lineno}, column {find_column(self._text, t)}\nexpected{oneof} {options}"
+        )
+
+
+def find_column(text, token):
+    last_cr = text.rfind("\n", 0, token.index)
+    if last_cr < 0:
+        last_cr = 0
+    column = (token.index - last_cr) + 1
+    return column
+
+
+def token_to_name(token: str) -> str:
+    return {
+        "NUMBER": "number",
+        "PLUS": "`+`",
+        "TIMES": "`*`",
+        "MINUS": "`-`",
+        "DIVIDE": "`/`",
+        "LPAREN": "`(`",
+        "RPAREN": "`)`",
+        "POWER": "`**`",
+        "LBRACK": "`[`",
+        "RBRACK": "`]`",
+        "COMMA": "`,`",
+        "EQUAL": "`=`",
+        "SEMI": "`;`",
+        "EULER": "`e`",
+        "PI": "`pi`",
+        "XS": "`x`",
+        "XA": "`X`",
+        "LN": "`ln`",
+        "EXP": "`exp`",
+        "ID": "identifier",
+        "SUM": "`sum`",
+        "TRANSPOSE": "`.T`",
+        "CS": "`c`",
+        "CA": "`C`",
+        "QUOTE": '`"`',
+        "DOLLAR": "`$`",
+        "VS": "`v`",
+        "VA": "`V`",
+        "RETURN": "`return`",
+        "SIGN": "`sign`",
+        "FLOOR": "`floor`",
+        "CEIL": "`ceil`",
+        "TRUNC": "`trunc`",
+        "ROUND_TIES_EVEN": "`round_ties_even`",
+    }.get(token, f"<{token}>")

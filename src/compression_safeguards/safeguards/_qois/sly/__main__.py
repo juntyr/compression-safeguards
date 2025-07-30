@@ -20,7 +20,7 @@ if __name__ == "__main__":
         if len(text) == 0:
             break
         try:
-            expr = parser.parse(lexer.tokenize(text))
+            expr = parser.parse(text, lexer.tokenize(text))
             if expr is None:
                 continue
             print(f"parsed: {expr!r}")

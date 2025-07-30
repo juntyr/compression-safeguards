@@ -245,7 +245,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         parser = QoIParser(x=Data(index=()), X=None)
 
         try:
-            qoi_expr = parser.parse(lexer.tokenize(qoi))
+            qoi_expr = parser.parse(qoi, lexer.tokenize(qoi))
             assert isinstance(qoi_expr, Expr)
 
             self._qoi_expr_late_bound_constants = qoi_expr.late_bound_constants

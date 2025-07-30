@@ -33,12 +33,12 @@ class QoILexer(Lexer):
         DOLLAR,  # type: ignore[name-defined]  # noqa: F821
         VS,  # type: ignore[name-defined]  # noqa: F821
         VA,  # type: ignore[name-defined]  # noqa: F821
-        RETURN,  # type: ignore[index, name-defined]  # noqa: F821
-        SIGN,  # type: ignore[index, name-defined]  # noqa: F821
-        FLOOR,  # type: ignore[index, name-defined]  # noqa: F821
-        CEIL,  # type: ignore[index, name-defined]  # noqa: F821
-        TRUNC,  # type: ignore[index, name-defined]  # noqa: F821
-        ROUND_TIES_EVEN,  # type: ignore[index, name-defined]  # noqa: F821
+        RETURN,  # type: ignore[name-defined]  # noqa: F821
+        SIGN,  # type: ignore[name-defined]  # noqa: F821
+        FLOOR,  # type: ignore[name-defined]  # noqa: F821
+        CEIL,  # type: ignore[name-defined]  # noqa: F821
+        TRUNC,  # type: ignore[name-defined]  # noqa: F821
+        ROUND_TIES_EVEN,  # type: ignore[name-defined]  # noqa: F821
     }
     ignore = " \t"
 
@@ -92,7 +92,7 @@ class QoILexer(Lexer):
 
     def error(self, t):
         raise SyntaxError(
-            f"Illegal character '{t.value[0]}', line {self.lineno}, column {find_column(self.text, t)}"
+            f"illegal character '{t.value[0]}' at line {self.lineno}, column {find_column(self.text, t)}"
         )
 
 
