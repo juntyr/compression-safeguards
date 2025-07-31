@@ -14,7 +14,7 @@ from .divmul import ScalarDivide, ScalarMultiply
 from .literal import Number
 from .logexp import Exponential, Logarithm, ScalarExp, ScalarLog
 from .neg import ScalarNegate
-from .power import ScalarSqrt, ScalarSquare
+from .square import ScalarSqrt, ScalarSquare
 
 
 class Hyperbolic(Enum):

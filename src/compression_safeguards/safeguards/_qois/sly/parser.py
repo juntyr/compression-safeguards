@@ -13,9 +13,10 @@ from .expr.hyperbolic import Hyperbolic, ScalarHyperbolic
 from .expr.literal import Euler, Number, Pi
 from .expr.logexp import Exponential, Logarithm, ScalarExp, ScalarLog, ScalarLogWithBase
 from .expr.neg import ScalarNegate
-from .expr.power import ScalarExponentiation, ScalarSqrt, ScalarSquare
+from .expr.power import ScalarPower
 from .expr.round import ScalarCeil, ScalarFloor, ScalarRoundTiesEven, ScalarTrunc
 from .expr.sign import ScalarSign
+from .expr.square import ScalarSqrt, ScalarSquare
 from .lexer import QoILexer
 
 
@@ -133,7 +134,7 @@ class QoIParser(Parser):
 
     @_("expr POWER expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_binary(p.expr0, p.expr1, ScalarExponentiation)
+        return Array.map_binary(p.expr0, p.expr1, ScalarPower)
 
     @_("expr DIVIDE expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811

@@ -154,10 +154,10 @@ class ScalarDivide(Expr):
     ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
         # TODO: implement separately
         from .literal import Number
-        from .power import ScalarExponentiation
+        from .power import ScalarPower
 
         return ScalarMultiply(
-            self._a, ScalarExponentiation(self._b, Number("-1"))
+            self._a, ScalarPower(self._b, Number("-1"))
         ).compute_data_error_bound(eb_expr_lower, eb_expr_upper, X, late_bound)
 
     def __repr__(self) -> str:
