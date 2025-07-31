@@ -14,7 +14,7 @@ from .divmul import ScalarDivide, ScalarMultiply
 from .literal import Number
 from .logexp import Exponential, Logarithm, ScalarExp, ScalarLog
 from .neg import ScalarNegate
-from .power import ScalarExponentiation, ScalarSqrt
+from .power import ScalarSqrt, ScalarSquare
 
 
 class Hyperbolic(Enum):
@@ -126,14 +126,14 @@ HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
         ScalarAdd(
             ScalarExp(
                 Exponential.exp,
-                ScalarMultiply(x, Number("2")),
+                ScalarMultiply(Number("2"), x),
             ),
             Number("1"),
         ),
         ScalarSubtract(
             ScalarExp(
                 Exponential.exp,
-                ScalarMultiply(x, Number("2")),
+                ScalarMultiply(Number("2"), x),
             ),
             Number("1"),
         ),
@@ -176,7 +176,7 @@ HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
             x,
             ScalarSqrt(
                 ScalarAdd(
-                    ScalarExponentiation(x, Number("2")),
+                    ScalarSquare(x),
                     Number("1"),
                 )
             ),
@@ -189,7 +189,7 @@ HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
             x,
             ScalarSqrt(
                 ScalarSubtract(
-                    ScalarExponentiation(x, Number("2")),
+                    ScalarSquare(x),
                     Number("1"),
                 )
             ),
@@ -237,8 +237,52 @@ HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
         ),
         Number("2"),
     ),
-    # Hyperbolic.asech: lambda x: (sp.ln((1 + sp.sqrt(1 - x**2)) / x)),
-    # Hyperbolic.acsch: lambda x: (sp.ln((1 / x) + sp.sqrt(x ** (-2) + 1))),
+    # asech(x) = ln( 1/x + sqrt( 1/(x^2) - 1 ) )
+    #          = ln( 1/x + sqrt( 1/(x^2) - (x^2)/(x^2) ) )
+    #          = ln( 1/x + sqrt(1 - x^2)/x )
+    #          = ln( (1 + sqrt(1 - x^2)) / x )
+    #          = ln(1 + sqrt(1 - x^2)) - ln(x)
+    Hyperbolic.asech: lambda x: ScalarSubtract(
+        ScalarLog(
+            Logarithm.ln,
+            ScalarAdd(
+                Number("1"),
+                ScalarSqrt(
+                    ScalarSubtract(
+                        Number("1"),
+                        ScalarSquare(x),
+                    )
+                ),
+            ),
+        ),
+        ScalarLog(
+            Logarithm.ln,
+            x,
+        ),
+    ),
+    # acsch(x) = ln( 1/x + sqrt( 1/(x^2) + 1 ) )
+    #          = ln( 1/x + sqrt( 1/(x^2) + (x^2)/(x^2) ) )
+    #          = ln( 1/x + sqrt(1 + x^2)/x )
+    #          = ln( (1 + sqrt(1 + x^2)) / x )
+    #          = ln(1 + sqrt(1 + x^2)) - ln(x)
+    Hyperbolic.acsch: lambda x: ScalarSubtract(
+        ScalarLog(
+            Logarithm.ln,
+            ScalarAdd(
+                Number("1"),
+                ScalarSqrt(
+                    ScalarAdd(
+                        Number("1"),
+                        ScalarSquare(x),
+                    )
+                ),
+            ),
+        ),
+        ScalarLog(
+            Logarithm.ln,
+            x,
+        ),
+    ),
 }
 
 HYPERBOLIC_UFUNC: dict[Hyperbolic, Callable[[np.ndarray], np.ndarray]] = {

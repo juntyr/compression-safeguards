@@ -44,6 +44,7 @@ class QoILexer(Lexer):
         TRUNC,  # type: ignore[name-defined]  # noqa: F821
         ROUND_TIES_EVEN,  # type: ignore[name-defined]  # noqa: F821
         SQRT,  # type: ignore[name-defined]  # noqa: F821
+        SQUARE,  # type: ignore[name-defined]  # noqa: F821
         SINH,  # type: ignore[name-defined]  # noqa: F821
         COSH,  # type: ignore[name-defined]  # noqa: F821
         TANH,  # type: ignore[name-defined]  # noqa: F821
@@ -54,6 +55,8 @@ class QoILexer(Lexer):
         ACOSH,  # type: ignore[name-defined]  # noqa: F821
         ATANH,  # type: ignore[name-defined]  # noqa: F821
         ACOTH,  # type: ignore[name-defined]  # noqa: F821
+        ASECH,  # type: ignore[name-defined]  # noqa: F821
+        ACSCH,  # type: ignore[name-defined]  # noqa: F821
     }
     ignore = " \t"
 
@@ -106,6 +109,7 @@ class QoILexer(Lexer):
     ID["trunc"] = TRUNC  # type: ignore[index, name-defined]  # noqa: F821
     ID["round_ties_even"] = ROUND_TIES_EVEN  # type: ignore[index, name-defined]  # noqa: F821
     ID["sqrt"] = SQRT  # type: ignore[index, name-defined]  # noqa: F821
+    ID["square"] = SQRT  # type: ignore[index, name-defined]  # noqa: F821
     ID["sinh"] = SINH  # type: ignore[index, name-defined]  # noqa: F821
     ID["cosh"] = COSH  # type: ignore[index, name-defined]  # noqa: F821
     ID["tanh"] = TANH  # type: ignore[index, name-defined]  # noqa: F821
@@ -116,6 +120,8 @@ class QoILexer(Lexer):
     ID["acosh"] = ACOSH  # type: ignore[index, name-defined]  # noqa: F821
     ID["atanh"] = ATANH  # type: ignore[index, name-defined]  # noqa: F821
     ID["acoth"] = ACOTH  # type: ignore[index, name-defined]  # noqa: F821
+    ID["asech"] = ASECH  # type: ignore[index, name-defined]  # noqa: F821
+    ID["acsch"] = ACSCH  # type: ignore[index, name-defined]  # noqa: F821
 
     # Ignored pattern
     ignore_newline = r"\n+"

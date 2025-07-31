@@ -13,7 +13,7 @@ from .expr.hyperbolic import Hyperbolic, ScalarHyperbolic
 from .expr.literal import Euler, Number, Pi
 from .expr.logexp import Exponential, Logarithm, ScalarExp, ScalarLog, ScalarLogWithBase
 from .expr.neg import ScalarNegate
-from .expr.power import ScalarExponentiation, ScalarSqrt
+from .expr.power import ScalarExponentiation, ScalarSqrt, ScalarSquare
 from .expr.round import ScalarCeil, ScalarFloor, ScalarRoundTiesEven, ScalarTrunc
 from .expr.sign import ScalarSign
 from .lexer import QoILexer
@@ -273,6 +273,10 @@ class QoIParser(Parser):
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, ScalarSqrt)
 
+    @_("SQUARE LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, ScalarSquare)
+
     @_("SINH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.sinh, e))
@@ -312,6 +316,14 @@ class QoIParser(Parser):
     @_("ACOTH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.acoth, e))
+
+    @_("ASECH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.asech, e))
+
+    @_("ACSCH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.acsch, e))
 
     # @_("ID LPAREN expr many_comma_expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     # def expr(self, p):  # noqa: F811
@@ -407,6 +419,7 @@ def token_to_name(token: str) -> str:
         "TRUNC": "`trunc`",
         "ROUND_TIES_EVEN": "`round_ties_even`",
         "SQRT": "`sqrt`",
+        "SQUARE": "`square`",
         "SINH": "`sinh`",
         "COSH": "`cosh`",
         "TANH": "`tanh`",
@@ -417,4 +430,6 @@ def token_to_name(token: str) -> str:
         "ACOSH": "`acosh`",
         "ATANH": "`atanh`",
         "ACOTH": "`acoth`",
+        "ASECH": "`asech`",
+        "ACSCH": "`acsch`",
     }.get(token, f"<{token}>")

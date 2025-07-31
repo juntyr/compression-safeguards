@@ -54,7 +54,7 @@ def check_empty(qoi: str):
 
 
 def check_unit(qoi: str):
-    check_all_codecs(np.linspace(-1.0, 1.0, 100), qoi)
+    check_all_codecs(np.linspace(-1.0, 1.0, 100, dtype=np.float16), qoi)
 
 
 def check_circle(qoi: str):
@@ -66,7 +66,7 @@ def check_arange(qoi: str):
 
 
 def check_linspace(qoi: str):
-    check_all_codecs(np.linspace(-1024, 1024, 2831), qoi)
+    check_all_codecs(np.linspace(-1024, 1024, 2831, dtype=np.float32), qoi)
 
 
 def check_edge_cases(qoi: str):
@@ -186,14 +186,6 @@ def test_constant(check):
         check("-(-(-e))")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_imaginary(check):
-#     with pytest.raises(AssertionError, match="imaginary"):
-#         check_all_codecs(np.array([2], dtype=np.uint64), "(-log(-20417, base=ln(x)))")
-#     with pytest.raises(AssertionError, match="imaginary"):
-#         check("(-log(-20417, base=ln(x)))")
-
-
 @pytest.mark.parametrize("check", CHECKS)
 def test_negate(check):
     check("-x")
@@ -271,6 +263,13 @@ def test_sqrt(check):
 
 
 @pytest.mark.parametrize("check", CHECKS)
+def test_square(check):
+    check("square(x)")
+    check("1 / square(x)")
+    check("square(square(x))")
+
+
+@pytest.mark.parametrize("check", CHECKS)
 def test_sigmoid(check):
     check("1 / (1 + exp(-x))")
 
@@ -310,8 +309,8 @@ def test_hyperbolic(check):
     check("acosh(x)")
     check("atanh(x)")
     check("acoth(x)")
-    # check("asech(x)")
-    # check("acsch(x)")
+    check("asech(x)")
+    check("acsch(x)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -329,8 +328,8 @@ def test_dtypes(dtype):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_fuzzer_found(check):
-    with pytest.raises(AssertionError, match="failed to parse"):
-        check("(((-8054**5852)-x)-1)")
+    check_all_codecs(np.array([42.0], np.float16), "(((-8054**5852)-x)-1)")
+    check("(((-8054**5852)-x)-1)")
 
     check_all_codecs(
         np.array([[18312761160228738559]], dtype=np.uint64), "((pi**(x**(x+x)))**1)"
@@ -342,21 +341,16 @@ def test_fuzzer_found(check):
     check("(-((e/(22020**-37))**x))")
 
 
-# def test_evaluate_sympy_expr_to_numpy_with_dtype():
-#     import sympy as sp
+def test_evaluate_expr_with_dtype():
+    from compression_safeguards.safeguards._qois.sly.expr.addsub import ScalarAdd
+    from compression_safeguards.safeguards._qois.sly.expr.data import Data
+    from compression_safeguards.safeguards._qois.sly.expr.literal import Euler, Pi
 
-#     from compression_safeguards.safeguards._qois.associativity import rewrite_qoi_expr
-#     from compression_safeguards.safeguards._qois.eval import (
-#         evaluate_sympy_expr_to_numpy,
-#     )
+    expr = ScalarAdd(ScalarAdd(Data(()), Pi()), Euler())
 
-#     x = sp.Symbol("x", extended_real=True)
-
-#     assert evaluate_sympy_expr_to_numpy(
-#         rewrite_qoi_expr(x + sp.pi + sp.E),
-#         {x: np.float16("4.2")},
-#         np.dtype(np.float16),
-#     ) == np.float16("4.2") + np.float16(np.e) + np.float16(np.pi)
+    assert expr.eval(np.float16("4.2"), dict()) == np.float16("4.2") + np.float16(
+        np.e
+    ) + np.float16(np.pi)
 
 
 def test_late_bound_eb_abs():

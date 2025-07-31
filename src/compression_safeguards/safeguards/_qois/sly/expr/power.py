@@ -99,6 +99,47 @@ class ScalarSqrt(Expr):
         return f"sqrt({self._a!r})"
 
 
+class ScalarSquare(Expr):
+    __slots__ = ("_a",)
+    _a: Expr
+
+    def __init__(self, a: Expr):
+        self._a = a
+
+    @property
+    def has_data(self) -> bool:
+        return self._a.has_data
+
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return self._a.late_bound_constants
+
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.square)
+
+    def eval(
+        self,
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        return np.square(self._a.eval(X, late_bound))
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        # rewrite square(a) as a ** 2
+        return ScalarExponentiation(self._a, Number("2")).compute_data_error_bound(
+            eb_expr_lower, eb_expr_upper, X, late_bound
+        )
+
+    def __repr__(self) -> str:
+        return f"square({self._a!r})"
+
+
 class ScalarFakeAbs(Expr):
     __slots__ = ("_a",)
     _a: Expr

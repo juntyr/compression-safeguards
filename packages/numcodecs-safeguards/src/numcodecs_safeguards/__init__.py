@@ -371,7 +371,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         )
 
         assert data.dtype in Safeguards.supported_dtypes(), (
-            f"can only encode arrays of dtype {', '.join(d.str for d in Safeguards.supported_dtypes())}"
+            f"can only encode arrays of dtype {', '.join(d.name for d in Safeguards.supported_dtypes())}"
         )
 
         encoded = self._codec.encode(np.copy(data))
