@@ -30,6 +30,7 @@ class QoILexer(Lexer):
         EXP2,  # type: ignore[name-defined]  # noqa: F821
         ID,  # type: ignore[name-defined]  # noqa: F821
         SUM,  # type: ignore[name-defined]  # noqa: F821
+        MATMUL,  # type: ignore[name-defined]  # noqa: F821
         TRANSPOSE,  # type: ignore[name-defined]  # noqa: F821
         CS,  # type: ignore[name-defined]  # noqa: F821
         CA,  # type: ignore[name-defined]  # noqa: F821
@@ -110,6 +111,7 @@ class QoILexer(Lexer):
     ID["exp"] = EXP  # type: ignore[index, name-defined]  # noqa: F821
     ID["exp2"] = EXP2  # type: ignore[index, name-defined]  # noqa: F821
     ID["sum"] = SUM  # type: ignore[index, name-defined]  # noqa: F821
+    ID["matmul"] = MATMUL  # type: ignore[index, name-defined]  # noqa: F821
     ID["c"] = CS  # type: ignore[index, name-defined]  # noqa: F821
     ID["C"] = CA  # type: ignore[index, name-defined]  # noqa: F821
     ID["v"] = VS  # type: ignore[index, name-defined]  # noqa: F821

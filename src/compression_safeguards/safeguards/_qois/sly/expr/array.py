@@ -6,7 +6,10 @@ import numpy as np
 from .....utils.bindings import Parameter
 from .....utils.typing import F, S
 from .abc import Expr
+from .addsub import ScalarAdd
 from .constfold import FoldedScalarConst
+from .divmul import ScalarMultiply
+from .group import Group
 
 
 class Array(Expr):
@@ -118,6 +121,32 @@ class Array(Expr):
     def transpose(self) -> "Array":
         out = Array.__new__(Array)
         out._array = self._array.T
+        return out
+
+    def sum(self) -> Expr:
+        acc = None
+        for e in self._array.flat:
+            acc = e if acc is None else ScalarAdd(acc, e)  # type: ignore
+        assert acc is not None
+        return Group(acc)
+
+    @staticmethod
+    def matmul(left: "Array", right: "Array") -> "Array":
+        assert len(left.shape) == 2, "can only matmul(a, b) a 2D array a"
+        assert len(right.shape) == 2, "can only matmul(a, b) a 2D array b"
+        assert left.shape[1] == right.shape[0], (
+            "can only matmul(a, b) with shapes (n, k) x (k, m) -> (n, m)"
+        )
+        out = Array.__new__(Array)
+        out._array = np.empty((left.shape[0], right.shape[1]), dtype=object)
+        for n in range(left.shape[0]):
+            for m in range(right.shape[1]):
+                acc = None
+                for k in range(left.shape[1]):
+                    kk = ScalarMultiply(left._array[n, k], right._array[k, m])
+                    acc = kk if acc is None else ScalarAdd(acc, kk)  # type: ignore
+                assert acc is not None
+                out._array[n, m] = Group(acc)
         return out
 
     def __repr__(self) -> str:

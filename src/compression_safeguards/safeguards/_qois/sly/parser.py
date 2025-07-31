@@ -286,7 +286,7 @@ class QoIParser(Parser):
 
     @_("SIN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, lambda e: ScalarSin(e))
+        return Array.map_unary(p.expr, ScalarSin)
 
     @_("COS LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -320,7 +320,7 @@ class QoIParser(Parser):
 
     @_("ASIN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, lambda e: ScalarAsin(e))
+        return Array.map_unary(p.expr, ScalarAsin)
 
     @_("ACOS LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -407,11 +407,14 @@ class QoIParser(Parser):
     @_("SUM LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         assert isinstance(p.expr, Array), "can only sum over an array expression"
-        acc = None
-        for e in p.expr._array.flat:
-            acc = e if acc is None else ScalarAdd(acc, e)
-        assert acc is not None
-        return Group(acc)
+        return p.expr.sum()
+
+    @_("MATMUL LPAREN expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        assert isinstance(p.expr0, Array) and isinstance(p.expr1, Array), (
+            "can only matmul(a, b) with arrays a and b"
+        )
+        return Array.matmul(p.expr0, p.expr1)
 
     @_("expr TRANSPOSE %prec TRANSPOSE")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -480,6 +483,7 @@ def token_to_name(token: str) -> str:
         "EXP2": "`exp2`",
         "ID": "identifier",
         "SUM": "`sum`",
+        "MATMUL": "`matmul`",
         "TRANSPOSE": "`.T`",
         "CS": "`c`",
         "CA": "`C`",
