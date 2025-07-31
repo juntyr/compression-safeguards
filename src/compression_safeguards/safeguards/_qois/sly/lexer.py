@@ -45,6 +45,18 @@ class QoILexer(Lexer):
         ROUND_TIES_EVEN,  # type: ignore[name-defined]  # noqa: F821
         SQRT,  # type: ignore[name-defined]  # noqa: F821
         SQUARE,  # type: ignore[name-defined]  # noqa: F821
+        SIN,  # type: ignore[name-defined]  # noqa: F821
+        COS,  # type: ignore[name-defined]  # noqa: F821
+        TAN,  # type: ignore[name-defined]  # noqa: F821
+        COT,  # type: ignore[name-defined]  # noqa: F821
+        SEC,  # type: ignore[name-defined]  # noqa: F821
+        CSC,  # type: ignore[name-defined]  # noqa: F821
+        ASIN,  # type: ignore[name-defined]  # noqa: F821
+        ACOS,  # type: ignore[name-defined]  # noqa: F821
+        ATAN,  # type: ignore[name-defined]  # noqa: F821
+        ACOT,  # type: ignore[name-defined]  # noqa: F821
+        ASEC,  # type: ignore[name-defined]  # noqa: F821
+        ACSC,  # type: ignore[name-defined]  # noqa: F821
         SINH,  # type: ignore[name-defined]  # noqa: F821
         COSH,  # type: ignore[name-defined]  # noqa: F821
         TANH,  # type: ignore[name-defined]  # noqa: F821
@@ -110,6 +122,18 @@ class QoILexer(Lexer):
     ID["round_ties_even"] = ROUND_TIES_EVEN  # type: ignore[index, name-defined]  # noqa: F821
     ID["sqrt"] = SQRT  # type: ignore[index, name-defined]  # noqa: F821
     ID["square"] = SQRT  # type: ignore[index, name-defined]  # noqa: F821
+    ID["sin"] = SIN  # type: ignore[index, name-defined]  # noqa: F821
+    ID["cos"] = COS  # type: ignore[index, name-defined]  # noqa: F821
+    ID["tan"] = TAN  # type: ignore[index, name-defined]  # noqa: F821
+    ID["cot"] = COT  # type: ignore[index, name-defined]  # noqa: F821
+    ID["sec"] = SEC  # type: ignore[index, name-defined]  # noqa: F821
+    ID["csc"] = CSC  # type: ignore[index, name-defined]  # noqa: F821
+    ID["asin"] = ASIN  # type: ignore[index, name-defined]  # noqa: F821
+    ID["acos"] = ACOS  # type: ignore[index, name-defined]  # noqa: F821
+    ID["atan"] = ATAN  # type: ignore[index, name-defined]  # noqa: F821
+    ID["acot"] = ACOT  # type: ignore[index, name-defined]  # noqa: F821
+    ID["asec"] = ASEC  # type: ignore[index, name-defined]  # noqa: F821
+    ID["acsc"] = ACSC  # type: ignore[index, name-defined]  # noqa: F821
     ID["sinh"] = SINH  # type: ignore[index, name-defined]  # noqa: F821
     ID["cosh"] = COSH  # type: ignore[index, name-defined]  # noqa: F821
     ID["tanh"] = TANH  # type: ignore[index, name-defined]  # noqa: F821

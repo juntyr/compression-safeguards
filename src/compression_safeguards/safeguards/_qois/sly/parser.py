@@ -17,6 +17,12 @@ from .expr.power import ScalarPower
 from .expr.round import ScalarCeil, ScalarFloor, ScalarRoundTiesEven, ScalarTrunc
 from .expr.sign import ScalarSign
 from .expr.square import ScalarSqrt, ScalarSquare
+from .expr.trigonometric import (
+    ScalarAsin,
+    ScalarSin,
+    ScalarTrigonometric,
+    Trigonometric,
+)
 from .lexer import QoILexer
 
 
@@ -278,6 +284,74 @@ class QoIParser(Parser):
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, ScalarSquare)
 
+    @_("SIN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, lambda e: ScalarSin(e))
+
+    @_("COS LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(
+            p.expr, lambda e: ScalarTrigonometric(Trigonometric.cos, e)
+        )
+
+    @_("TAN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(
+            p.expr, lambda e: ScalarTrigonometric(Trigonometric.tan, e)
+        )
+
+    @_("COT LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(
+            p.expr, lambda e: ScalarTrigonometric(Trigonometric.cot, e)
+        )
+
+    @_("SEC LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(
+            p.expr, lambda e: ScalarTrigonometric(Trigonometric.sec, e)
+        )
+
+    @_("CSC LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(
+            p.expr, lambda e: ScalarTrigonometric(Trigonometric.csc, e)
+        )
+
+    @_("ASIN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, lambda e: ScalarAsin(e))
+
+    @_("ACOS LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(
+            p.expr, lambda e: ScalarTrigonometric(Trigonometric.acos, e)
+        )
+
+    @_("ATAN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(
+            p.expr, lambda e: ScalarTrigonometric(Trigonometric.atan, e)
+        )
+
+    @_("ACOT LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(
+            p.expr, lambda e: ScalarTrigonometric(Trigonometric.acot, e)
+        )
+
+    @_("ASEC LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(
+            p.expr, lambda e: ScalarTrigonometric(Trigonometric.asec, e)
+        )
+
+    @_("ACSC LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(
+            p.expr, lambda e: ScalarTrigonometric(Trigonometric.acsc, e)
+        )
+
     @_("SINH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.sinh, e))
@@ -421,6 +495,18 @@ def token_to_name(token: str) -> str:
         "ROUND_TIES_EVEN": "`round_ties_even`",
         "SQRT": "`sqrt`",
         "SQUARE": "`square`",
+        "SIN": "`sin`",
+        "COS": "`cos`",
+        "TAN": "`tan`",
+        "COT": "`cot`",
+        "SEC": "`sec`",
+        "CSC": "`csc`",
+        "ASIN": "`asin`",
+        "ACOS": "`acos`",
+        "ATAN": "`atan`",
+        "ACOT": "`acot`",
+        "ASEC": "`asec`",
+        "ACSC": "`acsc`",
         "SINH": "`sinh`",
         "COSH": "`cosh`",
         "TANH": "`tanh`",

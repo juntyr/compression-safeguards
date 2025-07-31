@@ -1,0 +1,378 @@
+from collections.abc import Mapping
+from enum import Enum, auto
+from typing import Callable
+
+import numpy as np
+
+from .....utils.bindings import Parameter
+from .....utils.cast import (
+    _float128_dtype,
+    _float128_pi,
+    _nan_to_zero_inf_to_finite,
+    _reciprocal,
+)
+from .....utils.typing import F, S
+from ...eb import ensure_bounded_derived_error
+from .abc import Expr
+from .addsub import ScalarAdd, ScalarSubtract
+from .constfold import FoldedScalarConst
+from .divmul import ScalarDivide
+from .literal import Number, Pi
+from .square import ScalarSqrt, ScalarSquare
+
+
+class ScalarSin(Expr):
+    __slots__ = ("_a",)
+    _a: Expr
+
+    def __init__(self, a: Expr):
+        self._a = a
+
+    @property
+    def has_data(self) -> bool:
+        return self._a.has_data
+
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return self._a.late_bound_constants
+
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.sin)
+
+    def eval(
+        self,
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        return np.sin(self._a.eval(X, late_bound))
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        zero = X.dtype.type(0)
+
+        # evaluate arg and sin(arg)
+        arg = self._a
+        argv = arg.eval(X, late_bound)
+        exprv = np.sin(argv)
+
+        # update the error bounds
+        eal = np.where(
+            (eb_expr_lower == 0),
+            zero,
+            # we need to compare to asin(sin(...)) instead of ... to account
+            #  for asin's output domain
+            np.minimum(
+                np.asin(np.maximum(-1, exprv + eb_expr_lower)) - np.asin(exprv), 0
+            ),
+        )
+        eal = _nan_to_zero_inf_to_finite(eal)
+
+        eau = np.where(
+            (eb_expr_upper == 0),
+            zero,
+            np.maximum(
+                0, np.asin(np.minimum(exprv + eb_expr_upper, 1)) - np.asin(exprv)
+            ),
+        )
+        eau = _nan_to_zero_inf_to_finite(eau)
+
+        # np.asin maps to [-pi/2, +pi/2] where sin is monotonically increasing
+        # flip the argument error bounds where sin is monotonically decreasing
+        eal, eau = (
+            np.where(np.sin(argv + eal) > exprv, -eau, eal),
+            np.where(np.sin(argv + eau) < exprv, -eal, eau),
+        )
+
+        # handle rounding errors in sin(asin(...)) early
+        eal = ensure_bounded_derived_error(
+            lambda eal: np.sin(argv + eal),
+            exprv,
+            argv,  # type: ignore
+            eal,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eau = ensure_bounded_derived_error(
+            lambda eau: np.sin(argv + eau),
+            exprv,
+            argv,  # type: ignore
+            eau,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eb_arg_lower, eb_arg_upper = eal, eau
+
+        # composition using Lemma 3 from Jiao et al.
+        return arg.compute_data_error_bound(
+            eb_arg_lower,  # type: ignore
+            eb_arg_upper,  # type: ignore
+            X,
+            late_bound,
+        )
+
+    def compute_data_error_bound(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        # the unchecked method already handles rounding errors for sin,
+        #  even though it is periodic
+        return self.compute_data_error_bound_unchecked(
+            eb_expr_lower, eb_expr_upper, X, late_bound
+        )
+
+    def __repr__(self) -> str:
+        return f"sin({self._a!r})"
+
+
+class ScalarAsin(Expr):
+    __slots__ = ("_a",)
+    _a: Expr
+
+    def __init__(self, a: Expr):
+        self._a = a
+
+    @property
+    def has_data(self) -> bool:
+        return self._a.has_data
+
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return self._a.late_bound_constants
+
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.asin)
+
+    def eval(
+        self,
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        return np.asin(self._a.eval(X, late_bound))
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        zero = X.dtype.type(0)
+
+        # evaluate arg and asin(arg)
+        arg = self._a
+        argv = arg.eval(X, late_bound)
+        exprv = np.asin(argv)
+
+        pi = _float128_pi if X.dtype == _float128_dtype else X.dtype.type(np.pi)
+
+        # update the error bounds
+        eal = np.where(
+            (eb_expr_lower == 0),
+            zero,
+            # np.sin(max(-pi/2, ...)) might not be precise, so explicitly
+            #  bound lower bounds to be <= 0
+            np.minimum(np.sin(np.maximum(-pi / 2, exprv + eb_expr_lower)) - argv, 0),
+        )
+        eal = _nan_to_zero_inf_to_finite(eal)
+
+        eau = np.where(
+            (eb_expr_upper == 0),
+            zero,
+            # np.sin(min(..., pi/2)) might not be precise, so explicitly
+            #  bound upper bounds to be >= 0
+            np.maximum(0, np.sin(np.minimum(exprv + eb_expr_upper, pi / 2)) - argv),
+        )
+        eau = _nan_to_zero_inf_to_finite(eau)
+
+        # handle rounding errors in asin(sin(...)) early
+        eal = ensure_bounded_derived_error(
+            lambda eal: np.asin(argv + eal),
+            exprv,
+            argv,  # type: ignore
+            eal,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eau = ensure_bounded_derived_error(
+            lambda eau: np.asin(argv + eau),
+            exprv,
+            argv,  # type: ignore
+            eau,
+            eb_expr_lower,
+            eb_expr_upper,
+        )
+        eb_arg_lower, eb_arg_upper = eal, eau
+
+        # composition using Lemma 3 from Jiao et al.
+        return arg.compute_data_error_bound(
+            eb_arg_lower,  # type: ignore
+            eb_arg_upper,  # type: ignore
+            X,
+            late_bound,
+        )
+
+    def compute_data_error_bound(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        # the unchecked method already handles rounding errors for asin,
+        #  which is monotonic
+        return self.compute_data_error_bound_unchecked(
+            eb_expr_lower, eb_expr_upper, X, late_bound
+        )
+
+    def __repr__(self) -> str:
+        return f"asin({self._a!r})"
+
+
+class Trigonometric(Enum):
+    cos = auto()
+    tan = auto()
+    cot = auto()
+    sec = auto()
+    csc = auto()
+    acos = auto()
+    atan = auto()
+    acot = auto()
+    asec = auto()
+    acsc = auto()
+
+
+class ScalarTrigonometric(Expr):
+    __slots__ = ("_func", "_a")
+    _func: Trigonometric
+    _a: Expr
+
+    def __init__(self, func: Trigonometric, a: Expr):
+        self._func = func
+        self._a = a
+
+    @property
+    def has_data(self) -> bool:
+        return self._a.has_data
+
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return self._a.late_bound_constants
+
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+        return FoldedScalarConst.constant_fold_unary(
+            self._a,
+            dtype,
+            TRIGONOMETRIC_UFUNC[self._func],  # type: ignore
+        )
+
+    def eval(
+        self,
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
+        return (TRIGONOMETRIC_UFUNC[self._func])(self._a.eval(X, late_bound))  # type: ignore
+
+    def compute_data_error_bound_unchecked(
+        self,
+        eb_expr_lower: np.ndarray[S, np.dtype[F]],
+        eb_expr_upper: np.ndarray[S, np.dtype[F]],
+        X: np.ndarray[tuple[int, ...], np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
+    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        # rewrite trigonometric functions with base cases for sin and asin
+        return (TRIGONOMETRIC_REWRITE[self._func])(self._a).compute_data_error_bound(
+            eb_expr_lower, eb_expr_upper, X, late_bound
+        )
+
+    def __repr__(self) -> str:
+        return f"{self._func.name}({self._a!r})"
+
+
+TRIGONOMETRIC_REWRITE: dict[Trigonometric, Callable[[Expr], Expr]] = {
+    # derived trigonometric functions
+    # cos(x) = sin(pi/2 - x)
+    #        = sin(x + pi/2)
+    Trigonometric.cos: lambda x: ScalarSin(
+        ScalarAdd(
+            x,
+            ScalarDivide(
+                Pi(),
+                Number("2"),
+            ),
+        ),
+    ),
+    # tan(x) = sin(x) / cos(x)
+    Trigonometric.tan: lambda x: ScalarDivide(
+        ScalarSin(x),
+        ScalarTrigonometric(Trigonometric.cos, x),
+    ),
+    # cot(x) = 1 / tan(x)
+    #        = cos(x) / sin(x)
+    Trigonometric.cot: lambda x: ScalarDivide(
+        ScalarTrigonometric(Trigonometric.cos, x),
+        ScalarSin(x),
+    ),
+    # sec(x) = 1 / cos(x)
+    Trigonometric.sec: lambda x: ScalarDivide(
+        Number("1"),
+        ScalarTrigonometric(Trigonometric.cos, x),
+    ),
+    # csc(x) = 1 / sin(x)
+    Trigonometric.csc: lambda x: ScalarDivide(
+        Number("1"),
+        ScalarSin(x),
+    ),
+    # inverse trigonometric functions
+    # acos(x) = pi/2 - asin(x)
+    Trigonometric.acos: lambda x: ScalarSubtract(
+        ScalarDivide(Pi(), Number("2")),
+        ScalarAsin(x),
+    ),
+    # atan(x) = asin(x / sqrt(1 + x^2))
+    Trigonometric.atan: lambda x: ScalarAsin(
+        ScalarDivide(
+            x,
+            ScalarSqrt(
+                ScalarAdd(
+                    Number("1"),
+                    ScalarSquare(x),
+                ),
+            ),
+        ),
+    ),
+    # acot(x) = atan(1/x)
+    Trigonometric.acot: lambda x: ScalarTrigonometric(
+        Trigonometric.atan,
+        ScalarDivide(Number("1"), x),
+    ),
+    # asec(x) = acos(1/x)
+    Trigonometric.asec: lambda x: ScalarTrigonometric(
+        Trigonometric.acos,
+        ScalarDivide(Number("1"), x),
+    ),
+    # acsc(x) = asin(1/x)
+    Trigonometric.acsc: lambda x: ScalarAsin(
+        ScalarDivide(Number("1"), x),
+    ),
+}
+
+TRIGONOMETRIC_UFUNC: dict[Trigonometric, Callable[[np.ndarray], np.ndarray]] = {
+    Trigonometric.cos: np.cos,
+    Trigonometric.tan: np.tan,
+    Trigonometric.cot: lambda x: _reciprocal(np.tan(x)),
+    Trigonometric.sec: lambda x: _reciprocal(np.cos(x)),
+    Trigonometric.csc: lambda x: _reciprocal(np.sin(x)),
+    Trigonometric.acos: np.acos,
+    Trigonometric.atan: np.atan,
+    Trigonometric.acot: lambda x: _reciprocal(np.atan(x)),
+    Trigonometric.asec: lambda x: _reciprocal(np.acos(x)),
+    Trigonometric.acsc: lambda x: _reciprocal(np.asin(x)),
+}
