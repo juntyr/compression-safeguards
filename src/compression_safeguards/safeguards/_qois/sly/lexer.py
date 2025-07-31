@@ -23,14 +23,18 @@ class QoILexer(Lexer):
         XS,  # type: ignore[name-defined]  # noqa: F821
         XA,  # type: ignore[name-defined]  # noqa: F821
         LN,  # type: ignore[name-defined]  # noqa: F821
+        LOG2,  # type: ignore[name-defined]  # noqa: F821
+        LOG,  # type: ignore[name-defined]  # noqa: F821
+        BASE,  # type: ignore[name-defined]  # noqa: F821
         EXP,  # type: ignore[name-defined]  # noqa: F821
+        EXP2,  # type: ignore[name-defined]  # noqa: F821
         ID,  # type: ignore[name-defined]  # noqa: F821
         SUM,  # type: ignore[name-defined]  # noqa: F821
         TRANSPOSE,  # type: ignore[name-defined]  # noqa: F821
         CS,  # type: ignore[name-defined]  # noqa: F821
         CA,  # type: ignore[name-defined]  # noqa: F821
+        QUOTEDID,  # type: ignore[name-defined]  # noqa: F821
         QUOTE,  # type: ignore[name-defined]  # noqa: F821
-        DOLLAR,  # type: ignore[name-defined]  # noqa: F821
         VS,  # type: ignore[name-defined]  # noqa: F821
         VA,  # type: ignore[name-defined]  # noqa: F821
         RETURN,  # type: ignore[name-defined]  # noqa: F821
@@ -39,9 +43,17 @@ class QoILexer(Lexer):
         CEIL,  # type: ignore[name-defined]  # noqa: F821
         TRUNC,  # type: ignore[name-defined]  # noqa: F821
         ROUND_TIES_EVEN,  # type: ignore[name-defined]  # noqa: F821
+        SQRT,  # type: ignore[name-defined]  # noqa: F821
         SINH,  # type: ignore[name-defined]  # noqa: F821
         COSH,  # type: ignore[name-defined]  # noqa: F821
         TANH,  # type: ignore[name-defined]  # noqa: F821
+        COTH,  # type: ignore[name-defined]  # noqa: F821
+        SECH,  # type: ignore[name-defined]  # noqa: F821
+        CSCH,  # type: ignore[name-defined]  # noqa: F821
+        ASINH,  # type: ignore[name-defined]  # noqa: F821
+        ACOSH,  # type: ignore[name-defined]  # noqa: F821
+        ATANH,  # type: ignore[name-defined]  # noqa: F821
+        ACOTH,  # type: ignore[name-defined]  # noqa: F821
     }
     ignore = " \t"
 
@@ -60,10 +72,15 @@ class QoILexer(Lexer):
     RBRACK = r"\]"
     COMMA = r","
     TRANSPOSE = r"\.T"
-    QUOTE = r'"'
-    DOLLAR = r"\$"
     EQUAL = r"="
     SEMI = r";"
+
+    @_(r'"(\$)?[a-zA-Z_][a-zA-Z0-9_]*"')  # type: ignore[name-defined]  # noqa: F821
+    def QUOTEDID(self, t):
+        t.value = t.value[1:-1]
+        return t
+
+    QUOTE = r'"'
 
     # Identifiers
     ID = r"[a-zA-Z_][a-zA-Z0-9_]*"
@@ -72,7 +89,11 @@ class QoILexer(Lexer):
     ID["x"] = XS  # type: ignore[index, name-defined]  # noqa: F821
     ID["X"] = XA  # type: ignore[index, name-defined]  # noqa: F821
     ID["ln"] = LN  # type: ignore[index, name-defined]  # noqa: F821
+    ID["log2"] = LOG2  # type: ignore[index, name-defined]  # noqa: F821
+    ID["log"] = LOG  # type: ignore[index, name-defined]  # noqa: F821
+    ID["base"] = BASE  # type: ignore[index, name-defined]  # noqa: F821
     ID["exp"] = EXP  # type: ignore[index, name-defined]  # noqa: F821
+    ID["exp2"] = EXP2  # type: ignore[index, name-defined]  # noqa: F821
     ID["sum"] = SUM  # type: ignore[index, name-defined]  # noqa: F821
     ID["c"] = CS  # type: ignore[index, name-defined]  # noqa: F821
     ID["C"] = CA  # type: ignore[index, name-defined]  # noqa: F821
@@ -84,9 +105,17 @@ class QoILexer(Lexer):
     ID["ceil"] = CEIL  # type: ignore[index, name-defined]  # noqa: F821
     ID["trunc"] = TRUNC  # type: ignore[index, name-defined]  # noqa: F821
     ID["round_ties_even"] = ROUND_TIES_EVEN  # type: ignore[index, name-defined]  # noqa: F821
+    ID["sqrt"] = SQRT  # type: ignore[index, name-defined]  # noqa: F821
     ID["sinh"] = SINH  # type: ignore[index, name-defined]  # noqa: F821
     ID["cosh"] = COSH  # type: ignore[index, name-defined]  # noqa: F821
     ID["tanh"] = TANH  # type: ignore[index, name-defined]  # noqa: F821
+    ID["coth"] = COTH  # type: ignore[index, name-defined]  # noqa: F821
+    ID["sech"] = SECH  # type: ignore[index, name-defined]  # noqa: F821
+    ID["csch"] = CSCH  # type: ignore[index, name-defined]  # noqa: F821
+    ID["asinh"] = ASINH  # type: ignore[index, name-defined]  # noqa: F821
+    ID["acosh"] = ACOSH  # type: ignore[index, name-defined]  # noqa: F821
+    ID["atanh"] = ATANH  # type: ignore[index, name-defined]  # noqa: F821
+    ID["acoth"] = ACOTH  # type: ignore[index, name-defined]  # noqa: F821
 
     # Ignored pattern
     ignore_newline = r"\n+"

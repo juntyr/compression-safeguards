@@ -460,6 +460,14 @@ def _nextafter(
     return r  # type: ignore
 
 
+# wrapper around np.reciprocal that also works for numpy_quaddtype
+@np.errstate(invalid="ignore")
+def _reciprocal(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
+    if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
+        return np.reciprocal(a)
+    return 1 / a  # type: ignore
+
+
 try:
     _float128: Callable = np.float128
     _float128_dtype: np.dtype = np.dtype(np.float128)

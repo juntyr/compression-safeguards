@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-# from compression_safeguards import Safeguards
+from compression_safeguards import Safeguards
 from compression_safeguards.safeguards.pointwise.qoi.eb import (
     PointwiseQuantityOfInterestErrorBoundSafeguard,
 )
@@ -130,17 +130,17 @@ def test_whitespace():
     check_all_codecs(np.array([]), "  \n \t x   \t\n  ")
     check_all_codecs(np.array([]), "  \n \t x \t \n  - \t \n 3  \t\n  ")
     check_all_codecs(np.array([]), "x    -    3")
-    # check_all_codecs(np.array([]), "sqrt   \n (x)")
-    # check_all_codecs(np.array([]), "log ( x , base \t = \n 2 )")
+    check_all_codecs(np.array([]), "sqrt   \n (x)")
+    check_all_codecs(np.array([]), "log ( x , base \t = \n 2 )")
 
 
 def test_comment():
     check_all_codecs(np.array([]), "x # great variable")
     check_all_codecs(np.array([]), "# great variable\nx")
     check_all_codecs(np.array([]), "x # nothing 3+4 really matters 1/0")
-    # check_all_codecs(
-    #     np.array([]), "log #1\n ( #2\n x #3\n , #4\n base #5\n = #6\n 2 #7\n )"
-    # )
+    check_all_codecs(
+        np.array([]), "log #1\n ( #2\n x #3\n , #4\n base #5\n = #6\n 2 #7\n )"
+    )
 
 
 # def test_variables():
@@ -208,7 +208,7 @@ def test_polynomial(check):
     check("3*x + pi")
     check("x**2")
     check("x**3")
-    # check("x**2 + x + 1")
+    check("x**2 + x + 1")
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -218,18 +218,22 @@ def test_exponential(check):
     check("3**x")
     check("e**(x)")
     check("exp(x)")
+    check("exp2(x)")
     check("2 ** (x + 1)")
 
     check_all_codecs(np.array([51.0]), "2**x")
     check_all_codecs(np.array([31.0]), "exp(x)")
+    check_all_codecs(np.array([42.0]), "exp2(x)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_logarithm(check):
-    # check("log(x, base=2)")
+    check("log(x, base=2)")
     check("ln(x)")
     check("ln(x + 1)")
-    # check("log(2, base=x)")
+    check("log2(x)")
+    check("log2(x + 1)")
+    check("log(2, base=x)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -247,33 +251,33 @@ def test_rounding(check):
     check("round_ties_even(x) * round_ties_even(1.5)")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_inverse(check):
-#     check("1 / x")
-#     check("1 / x**2")
-#     check("1 / x**3")
+@pytest.mark.parametrize("check", CHECKS)
+def test_inverse(check):
+    check("1 / x")
+    check("1 / x**2")
+    check("1 / x**3")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_power_function(check):
-#     check("1 / (x + 3)")
+@pytest.mark.parametrize("check", CHECKS)
+def test_power_function(check):
+    check("1 / (x + 3)")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_sqrt(check):
-#     check("sqrt(x)")
-#     check("1 / sqrt(x)")
-#     check("sqrt(sqrt(x))")
+@pytest.mark.parametrize("check", CHECKS)
+def test_sqrt(check):
+    check("sqrt(x)")
+    check("1 / sqrt(x)")
+    check("sqrt(sqrt(x))")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_sigmoid(check):
-#     check("1 / (1 + exp(-x))")
+@pytest.mark.parametrize("check", CHECKS)
+def test_sigmoid(check):
+    check("1 / (1 + exp(-x))")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_tanh(check):
-#     check("(exp(x) - exp(-x)) / (exp(x) + exp(-x))")
+@pytest.mark.parametrize("check", CHECKS)
+def test_tanh(check):
+    check("(exp(x) - exp(-x)) / (exp(x) + exp(-x))")
 
 
 # @pytest.mark.parametrize("check", CHECKS)
@@ -298,44 +302,44 @@ def test_hyperbolic(check):
     check("sinh(x)")
     check("cosh(x)")
     check("tanh(x)")
-    # check("coth(x)")
-    # check("sech(x)")
-    # check("csch(x)")
+    check("coth(x)")
+    check("sech(x)")
+    check("csch(x)")
 
-    # check("asinh(x)")
-    # check("acosh(x)")
-    # check("atanh(x)")
-    # check("acoth(x)")
+    check("asinh(x)")
+    check("acosh(x)")
+    check("atanh(x)")
+    check("acoth(x)")
     # check("asech(x)")
     # check("acsch(x)")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_composed(check):
-#     check("2 / (ln(x) + sqrt(x))")
+@pytest.mark.parametrize("check", CHECKS)
+def test_composed(check):
+    check("2 / (ln(x) + sqrt(x))")
 
-#     check_all_codecs(np.array([-1, 0, 1]), "exp(ln(x)+x)")
-#     check("exp(ln(x)+x)")
-
-
-# @pytest.mark.parametrize("dtype", sorted(d.name for d in Safeguards.supported_dtypes()))
-# def test_dtypes(dtype):
-#     check_all_codecs(np.array([[1]], dtype=dtype), "x/sqrt(pi)")
+    check_all_codecs(np.array([-1, 0, 1]), "exp(ln(x)+x)")
+    check("exp(ln(x)+x)")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_fuzzer_found(check):
-#     with pytest.raises(AssertionError, match="failed to parse"):
-#         check("(((-8054**5852)-x)-1)")
+@pytest.mark.parametrize("dtype", sorted(d.name for d in Safeguards.supported_dtypes()))
+def test_dtypes(dtype):
+    check_all_codecs(np.array([[1]], dtype=dtype), "x/sqrt(pi)")
 
-#     check_all_codecs(
-#         np.array([[18312761160228738559]], dtype=np.uint64), "((pi**(x**(x+x)))**1)"
-#     )
-#     check_all_codecs(np.array([-1024.0]), "((pi**(x**(x+x)))**1)")
-#     check("((pi**(x**(x+x)))**1)")
 
-#     check_all_codecs(np.array([], np.uint64), "(-((e/(22020**-37))**x))")
-#     check("(-((e/(22020**-37))**x))")
+@pytest.mark.parametrize("check", CHECKS)
+def test_fuzzer_found(check):
+    with pytest.raises(AssertionError, match="failed to parse"):
+        check("(((-8054**5852)-x)-1)")
+
+    check_all_codecs(
+        np.array([[18312761160228738559]], dtype=np.uint64), "((pi**(x**(x+x)))**1)"
+    )
+    check_all_codecs(np.array([-1024.0]), "((pi**(x**(x+x)))**1)")
+    check("((pi**(x**(x+x)))**1)")
+
+    check_all_codecs(np.array([], np.uint64), "(-((e/(22020**-37))**x))")
+    check("(-((e/(22020**-37))**x))")
 
 
 # def test_evaluate_sympy_expr_to_numpy_with_dtype():
@@ -419,32 +423,32 @@ def test_late_bound_eb_ratio():
     )
 
 
-# def test_late_bound_constant():
-#     safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
-#         qoi='x / c["f"]', type="abs", eb=1
-#     )
-#     assert safeguard.late_bound == {"f"}
+def test_late_bound_constant():
+    safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi='x / c["f"]', type="abs", eb=1
+    )
+    assert safeguard.late_bound == {"f"}
 
-#     data = np.arange(6).reshape(2, 3)
+    data = np.arange(6).reshape(2, 3)
 
-#     late_bound = Bindings(
-#         f=np.array([16, 8, 4, 2, 1, 0]).reshape(2, 3),
-#     )
+    late_bound = Bindings(
+        f=np.array([16, 8, 4, 2, 1, 0]).reshape(2, 3),
+    )
 
-#     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
-#     assert np.all(valid._lower == (data.flatten() - np.array([16, 8, 4, 2, 1, 0])))
-#     assert np.all(valid._upper == (data.flatten() + np.array([16, 8, 4, 2, 1, 0])))
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == (data.flatten() - np.array([16, 8, 4, 2, 1, 0])))
+    assert np.all(valid._upper == (data.flatten() + np.array([16, 8, 4, 2, 1, 0])))
 
-#     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
-#     assert np.all(ok == np.array([True, True, True, False, False, False]).reshape(2, 3))
-
-
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_pointwise_normalised_absolute_error(check):
-#     # pointwise normalised / range-relative absolute error bound
-#     check('(x - c["$x_min"]) / (c["$x_max"] - c["$x_min"])')
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(ok == np.array([True, True, True, False, False, False]).reshape(2, 3))
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_pointwise_histogram_index(check):
-#     check('round_ties_even(100 * (x - c["$x_min"]) / (c["$x_max"] - c["$x_min"]))')
+@pytest.mark.parametrize("check", CHECKS)
+def test_pointwise_normalised_absolute_error(check):
+    # pointwise normalised / range-relative absolute error bound
+    check('(x - c["$x_min"]) / (c["$x_max"] - c["$x_min"])')
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_pointwise_histogram_index(check):
+    check('round_ties_even(100 * (x - c["$x_min"]) / (c["$x_max"] - c["$x_min"]))')

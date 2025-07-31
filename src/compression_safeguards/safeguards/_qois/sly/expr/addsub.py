@@ -3,6 +3,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from .....utils.bindings import Parameter
+from .....utils.cast import _nextafter
 from .....utils.typing import F, S
 from ...eb import ensure_bounded_derived_error
 from .abc import Expr
@@ -87,7 +88,35 @@ class ScalarAdd(Expr):
                 late_bound,
             )
 
-        raise NotImplementedError
+        # TODO: this is a temporary fix
+        eb_expr_lower_half = eb_expr_lower * 0.5
+        eb_expr_upper_half = eb_expr_upper * 0.5
+
+        el = np.where(
+            (eb_expr_lower_half + eb_expr_lower_half) < eb_expr_lower,
+            _nextafter(eb_expr_lower_half, 0),
+            eb_expr_lower_half,
+        )
+        eu = np.where(
+            (eb_expr_upper_half + eb_expr_upper_half) > eb_expr_upper,
+            _nextafter(eb_expr_upper_half, 0),
+            eb_expr_upper_half,
+        )
+
+        al, au = self._a.compute_data_error_bound(
+            el,  # type: ignore
+            eu,  # type: ignore
+            X,
+            late_bound,
+        )
+        bl, bu = self._b.compute_data_error_bound(
+            el,  # type: ignore
+            eu,  # type: ignore
+            X,
+            late_bound,
+        )
+
+        return np.maximum(al, bl), np.minimum(au, bu)
 
     def compute_data_error_bound(
         self,

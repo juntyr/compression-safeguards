@@ -96,13 +96,15 @@ class ScalarMultiply(Expr):
 
         # FIXME: this is just a short-term fix
         from .addsub import ScalarAdd
-        from .logexp import ScalarExp, ScalarLn
+        from .logexp import Exponential, Logarithm, ScalarExp, ScalarLog
         from .power import ScalarFakeAbs
 
         return ScalarExp(
+            Exponential.exp,
             ScalarAdd(
-                ScalarLn(ScalarFakeAbs(self._a)), ScalarLn(ScalarFakeAbs(self._b))
-            )
+                ScalarLog(Logarithm.ln, ScalarFakeAbs(self._a)),
+                ScalarLog(Logarithm.ln, ScalarFakeAbs(self._b)),
+            ),
         ).compute_data_error_bound(
             eb_expr_lower,
             eb_expr_upper,

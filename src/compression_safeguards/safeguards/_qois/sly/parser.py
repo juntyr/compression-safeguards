@@ -1,6 +1,6 @@
 import itertools
 
-from sly import Parser
+from sly import Parser  # from sly.yacc import SlyLogger
 
 from ....utils.bindings import Parameter
 from .expr.abc import Expr
@@ -11,12 +11,17 @@ from .expr.divmul import ScalarDivide, ScalarMultiply
 from .expr.group import Group
 from .expr.hyperbolic import Hyperbolic, ScalarHyperbolic
 from .expr.literal import Euler, Number, Pi
-from .expr.logexp import ScalarExp, ScalarLn
+from .expr.logexp import Exponential, Logarithm, ScalarExp, ScalarLog, ScalarLogWithBase
 from .expr.neg import ScalarNegate
-from .expr.power import ScalarExponentiation
+from .expr.power import ScalarExponentiation, ScalarSqrt
 from .expr.round import ScalarCeil, ScalarFloor, ScalarRoundTiesEven, ScalarTrunc
 from .expr.sign import ScalarSign
 from .lexer import QoILexer
+
+
+class NullWriter:
+    def write(self, s):
+        pass
 
 
 class QoIParser(Parser):
@@ -25,6 +30,8 @@ class QoIParser(Parser):
     _X: None | Array
     _vars: dict[Parameter, Expr]
     _text: str
+
+    # log = SlyLogger(NullWriter())
 
     def __init__(self, *, x: Data, X: None | Array):
         self._x = x
@@ -58,7 +65,7 @@ class QoIParser(Parser):
         assert p.expr.has_data, "QoI expr must not be constant"
         return p.expr
 
-    @_("many_assign RETURN expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("many_assign RETURN expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def qoi(self, p):  # noqa: F811
         assert not isinstance(p.expr, Array), (
             f"QoI expr must be scalar but is an array expression of shape {p.expr.shape}"
@@ -74,27 +81,43 @@ class QoIParser(Parser):
     def many_assign(self, p):  # noqa: F811
         pass
 
-    @_("VS LBRACK QUOTE ID QUOTE RBRACK EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("QUOTEDID")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def quotedid(self, p):  # noqa: F811
+        return p.QUOTEDID
+
+    @_("QUOTE ID QUOTE")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def quotedid(self, p):  # noqa: F811
+        assert False, "quoted identifier cannot contain whitespace or comments"
+
+    @_("QUOTE ID")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def quotedid(self, p):  # noqa: F811
+        assert False, "missing closing quote for quoted identifier"
+
+    @_("VS LBRACK quotedid RBRACK EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def assign(self, p):  # noqa: F811
         assert self._X is None
-        assert p.ID not in self._vars
-        self._vars[Parameter(p.ID)] = Group(p.expr)
+        assert not p.quotedid.startswith("$")
+        assert p.quotedid not in self._vars
+        self._vars[Parameter(p.quotedid)] = Group(p.expr)
 
-    @_("VA LBRACK QUOTE ID QUOTE RBRACK EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("VA LBRACK quotedid RBRACK EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def assign(self, p):  # noqa: F811
         assert self._X is not None
-        assert p.ID not in self._vars
-        self._vars[Parameter(p.ID)] = Group(p.expr)
+        assert not p.quotedid.startswith("$")
+        assert p.quotedid not in self._vars
+        self._vars[Parameter(p.quotedid)] = Group(p.expr)
 
-    @_("VS LBRACK QUOTE ID QUOTE RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("VS LBRACK quotedid RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         assert self._X is None
-        return self._vars[Parameter(p.ID)]
+        assert not p.quotedid.startswith("$")
+        return self._vars[Parameter(p.quotedid)]
 
-    @_("VA LBRACK QUOTE ID QUOTE RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("VA LBRACK quotedid RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         assert self._X is not None
-        return self._vars[Parameter(p.ID)]
+        assert not p.quotedid.startswith("$")
+        return self._vars[Parameter(p.quotedid)]
 
     @_("expr PLUS expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -177,6 +200,14 @@ class QoIParser(Parser):
     def comma_expr(self, p):
         return p.expr
 
+    @_("COMMA")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def maybe_comma(self, p):  # noqa: F811
+        pass
+
+    @_("empty")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def maybe_comma(self, p):  # noqa: F811
+        pass
+
     @_("NUMBER")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Number(p.NUMBER)
@@ -198,51 +229,95 @@ class QoIParser(Parser):
         assert self._X is not None
         return self._X
 
-    @_("LN LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("LN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarLn)
+        return Array.map_unary(p.expr, lambda e: ScalarLog(Logarithm.ln, e))
 
-    @_("EXP LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("LOG2 LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarExp)
+        return Array.map_unary(p.expr, lambda e: ScalarLog(Logarithm.log2, e))
 
-    @_("SIGN LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("LOG LPAREN expr COMMA BASE EQUAL expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_binary(p.expr0, p.expr1, lambda a, b: ScalarLogWithBase(a, b))
+
+    @_("EXP LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, lambda e: ScalarExp(Exponential.exp, e))
+
+    @_("EXP2 LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, lambda e: ScalarExp(Exponential.exp2, e))
+
+    @_("SIGN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, ScalarSign)
 
-    @_("FLOOR LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("FLOOR LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, ScalarFloor)
 
-    @_("CEIL LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("CEIL LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, ScalarCeil)
 
-    @_("TRUNC LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("TRUNC LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, ScalarTrunc)
 
-    @_("ROUND_TIES_EVEN LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("ROUND_TIES_EVEN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, ScalarRoundTiesEven)
 
-    @_("SINH LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("SQRT LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, ScalarSqrt)
+
+    @_("SINH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.sinh, e))
 
-    @_("COSH LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("COSH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.cosh, e))
 
-    @_("TANH LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("TANH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.tanh, e))
+
+    @_("COTH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.coth, e))
+
+    @_("SECH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.sech, e))
+
+    @_("CSCH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.csch, e))
+
+    @_("ASINH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.asinh, e))
+
+    @_("ACOSH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.acosh, e))
+
+    @_("ATANH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.atanh, e))
+
+    @_("ACOTH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.acoth, e))
 
     # @_("ID LPAREN expr many_comma_expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     # def expr(self, p):  # noqa: F811
     #     assert False, f"unknown function `{p.ID}`"
 
-    @_("SUM LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("SUM LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         assert isinstance(p.expr, Array), "can only sum over an array expression"
         acc = None
@@ -256,25 +331,17 @@ class QoIParser(Parser):
         assert isinstance(p.expr, Array), "can only transpose an array expression"
         return p.expr.transpose()
 
-    @_("CS LBRACK QUOTE maybe_dollar ID QUOTE RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("CS LBRACK quotedid RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return LateBoundConstant.like(Parameter(p.maybe_dollar + p.ID), self._x)
+        return LateBoundConstant.like(Parameter(p.quotedid), self._x)
 
-    @_("CA LBRACK QUOTE maybe_dollar ID QUOTE RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("CA LBRACK quotedid RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         assert self._X is not None
         return Array.map_unary(
             self._X,
-            lambda e: LateBoundConstant.like(Parameter(p.maybe_dollar + p.ID), e),
+            lambda e: LateBoundConstant.like(Parameter(p.quotedid), e),
         )
-
-    @_("DOLLAR")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def maybe_dollar(self, p):  # noqa: F811
-        return "$"
-
-    @_("empty")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def maybe_dollar(self, p):  # noqa: F811
-        return ""
 
     def error(self, t):
         actions = self._lrtable.lr_action[self.state]
@@ -319,14 +386,18 @@ def token_to_name(token: str) -> str:
         "XS": "`x`",
         "XA": "`X`",
         "LN": "`ln`",
+        "LOG2": "`log2`",
+        "LOG": "`log`",
+        "BASE": "`base`",
         "EXP": "`exp`",
+        "EXP2": "`exp2`",
         "ID": "identifier",
         "SUM": "`sum`",
         "TRANSPOSE": "`.T`",
         "CS": "`c`",
         "CA": "`C`",
+        "QUOTEDID": "quoted identifier",
         "QUOTE": '`"`',
-        "DOLLAR": "`$`",
         "VS": "`v`",
         "VA": "`V`",
         "RETURN": "`return`",
@@ -335,4 +406,15 @@ def token_to_name(token: str) -> str:
         "CEIL": "`ceil`",
         "TRUNC": "`trunc`",
         "ROUND_TIES_EVEN": "`round_ties_even`",
+        "SQRT": "`sqrt`",
+        "SINH": "`sinh`",
+        "COSH": "`cosh`",
+        "TANH": "`tanh`",
+        "COTH": "`coth`",
+        "SECH": "`sech`",
+        "CSCH": "`csch`",
+        "ASINH": "`asinh`",
+        "ACOSH": "`acosh`",
+        "ATANH": "`atanh`",
+        "ACOTH": "`acoth`",
     }.get(token, f"<{token}>")
