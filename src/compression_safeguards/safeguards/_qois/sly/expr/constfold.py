@@ -4,8 +4,8 @@ from typing import Callable
 import numpy as np
 
 from .....utils.bindings import Parameter
-from .....utils.typing import F, S
 from .abc import Expr
+from .typing import F, Ns, Ps, PsI
 
 
 class FoldedScalarConst(Expr):
@@ -29,19 +29,21 @@ class FoldedScalarConst(Expr):
 
     def eval(
         self,
-        X: np.ndarray[tuple[int, ...], np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
-    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
-        assert isinstance(self._const, X.dtype.type)
+        x: PsI,
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> np.ndarray[PsI, np.dtype[F]]:
+        assert isinstance(self._const, Xs.dtype.type)
         return self._const  # type: ignore
 
     def compute_data_error_bound_unchecked(
         self,
-        eb_expr_lower: np.ndarray[S, np.dtype[F]],
-        eb_expr_upper: np.ndarray[S, np.dtype[F]],
-        X: np.ndarray[tuple[int, ...], np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
-    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
+        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
         assert False, "folded constants have no error bounds"
 
     @staticmethod

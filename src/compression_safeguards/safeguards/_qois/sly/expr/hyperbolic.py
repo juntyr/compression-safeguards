@@ -6,7 +6,6 @@ import numpy as np
 
 from .....utils.bindings import Parameter
 from .....utils.cast import _float128_dtype, _reciprocal
-from .....utils.typing import F, S
 from .abc import Expr
 from .addsub import ScalarAdd, ScalarSubtract
 from .constfold import FoldedScalarConst
@@ -15,6 +14,7 @@ from .literal import Number
 from .logexp import Exponential, Logarithm, ScalarExp, ScalarLog
 from .neg import ScalarNegate
 from .square import ScalarSqrt, ScalarSquare
+from .typing import F, Ns, Ps, PsI
 
 
 class Hyperbolic(Enum):
@@ -60,23 +60,25 @@ class ScalarHyperbolic(Expr):
 
     def eval(
         self,
-        X: np.ndarray[tuple[int, ...], np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
-    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
-        if X.dtype == _float128_dtype:
-            return (HYPERBOLIC_REWRITE[self._func])(self._a).eval(X, late_bound)
-        return (HYPERBOLIC_UFUNC[self._func])(self._a.eval(X, late_bound))  # type: ignore
+        x: PsI,
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> np.ndarray[PsI, np.dtype[F]]:
+        if Xs.dtype == _float128_dtype:
+            return (HYPERBOLIC_REWRITE[self._func])(self._a).eval(x, Xs, late_bound)
+        return (HYPERBOLIC_UFUNC[self._func])(self._a.eval(x, Xs, late_bound))
 
     def compute_data_error_bound_unchecked(
         self,
-        eb_expr_lower: np.ndarray[S, np.dtype[F]],
-        eb_expr_upper: np.ndarray[S, np.dtype[F]],
-        X: np.ndarray[tuple[int, ...], np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
-    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
+        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
         # rewrite hyperbolic functions using their exponential definitions
         return (HYPERBOLIC_REWRITE[self._func])(self._a).compute_data_error_bound(
-            eb_expr_lower, eb_expr_upper, X, late_bound
+            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:

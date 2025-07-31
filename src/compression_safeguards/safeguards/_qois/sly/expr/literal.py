@@ -8,8 +8,8 @@ from .....utils.cast import (
     _float128_e,
     _float128_pi,
 )
-from .....utils.typing import F, S
 from .abc import Expr
+from .typing import F, Ns, Ps, PsI
 
 
 class Number(Expr):
@@ -33,18 +33,20 @@ class Number(Expr):
 
     def eval(
         self,
-        X: np.ndarray[tuple[int, ...], np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
-    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
-        return X.dtype.type(self._n)  # type: ignore
+        x: PsI,
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> np.ndarray[PsI, np.dtype[F]]:
+        return Xs.dtype.type(self._n)  # type: ignore
 
     def compute_data_error_bound_unchecked(
         self,
-        eb_expr_lower: np.ndarray[S, np.dtype[F]],
-        eb_expr_upper: np.ndarray[S, np.dtype[F]],
-        X: np.ndarray[tuple[int, ...], np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
-    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
+        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
         assert False, "number literals have no error bounds"
 
     def __repr__(self) -> str:
@@ -69,20 +71,22 @@ class Pi(Expr):
 
     def eval(
         self,
-        X: np.ndarray[tuple[int, ...], np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
-    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
-        if X.dtype == _float128_dtype:
+        x: PsI,
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> np.ndarray[PsI, np.dtype[F]]:
+        if Xs.dtype == _float128_dtype:
             return _float128_pi  # type: ignore
-        return X.dtype.type(np.pi)
+        return Xs.dtype.type(np.pi)  # type: ignore
 
     def compute_data_error_bound_unchecked(
         self,
-        eb_expr_lower: np.ndarray[S, np.dtype[F]],
-        eb_expr_upper: np.ndarray[S, np.dtype[F]],
-        X: np.ndarray[tuple[int, ...], np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
-    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
+        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
         assert False, "pi has no error bounds"
 
     def __repr__(self) -> str:
@@ -107,20 +111,22 @@ class Euler(Expr):
 
     def eval(
         self,
-        X: np.ndarray[tuple[int, ...], np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
-    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
-        if X.dtype == _float128_dtype:
+        x: PsI,
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> np.ndarray[PsI, np.dtype[F]]:
+        if Xs.dtype == _float128_dtype:
             return _float128_pi  # type: ignore
-        return X.dtype.type(np.e)
+        return Xs.dtype.type(np.e)  # type: ignore
 
     def compute_data_error_bound_unchecked(
         self,
-        eb_expr_lower: np.ndarray[S, np.dtype[F]],
-        eb_expr_upper: np.ndarray[S, np.dtype[F]],
-        X: np.ndarray[tuple[int, ...], np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
-    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
+        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
         assert False, "Euler's e has no error bounds"
 
     def __repr__(self) -> str:

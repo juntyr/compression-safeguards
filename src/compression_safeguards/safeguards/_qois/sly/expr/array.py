@@ -4,12 +4,12 @@ from typing import Callable
 import numpy as np
 
 from .....utils.bindings import Parameter
-from .....utils.typing import F, S
 from .abc import Expr
 from .addsub import ScalarAdd
 from .constfold import FoldedScalarConst
 from .divmul import ScalarMultiply
 from .group import Group
+from .typing import F, Ns, Ps, PsI
 
 
 class Array(Expr):
@@ -46,22 +46,20 @@ class Array(Expr):
 
     def eval(
         self,
-        X: np.ndarray[tuple[int, ...], np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
-    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
-        return np.fromiter(
-            (e.eval(X, late_bound) for e in self._array.flat),
-            dtype=X.dtype,
-            count=self._array.size,
-        ).reshape(self._array.shape)
+        x: PsI,
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> np.ndarray[PsI, np.dtype[F]]:
+        assert False, "cannot evaluate an array expression"
 
     def compute_data_error_bound_unchecked(
         self,
-        eb_expr_lower: np.ndarray[S, np.dtype[F]],
-        eb_expr_upper: np.ndarray[S, np.dtype[F]],
-        X: np.ndarray[tuple[int, ...], np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
-    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
+        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
         assert False, "cannot derive error bounds over an array expression"
 
     @property
