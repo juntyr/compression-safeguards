@@ -125,7 +125,7 @@ class QoILexer(Lexer):
     ID["trunc"] = TRUNC  # type: ignore[index, name-defined]  # noqa: F821
     ID["round_ties_even"] = ROUND_TIES_EVEN  # type: ignore[index, name-defined]  # noqa: F821
     ID["sqrt"] = SQRT  # type: ignore[index, name-defined]  # noqa: F821
-    ID["square"] = SQRT  # type: ignore[index, name-defined]  # noqa: F821
+    ID["square"] = SQUARE  # type: ignore[index, name-defined]  # noqa: F821
     ID["sin"] = SIN  # type: ignore[index, name-defined]  # noqa: F821
     ID["cos"] = COS  # type: ignore[index, name-defined]  # noqa: F821
     ID["tan"] = TAN  # type: ignore[index, name-defined]  # noqa: F821

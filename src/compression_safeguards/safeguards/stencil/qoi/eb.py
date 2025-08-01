@@ -375,12 +375,12 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             # check if the expression is well-formed and if an error bound can
             #  be computed
             _canary_data_eb = qoi_expr.compute_data_error_bound(
-                np.zeros((1,)),
-                np.zeros((1,)),
-                np.zeros((1,)),
-                np.zeros((1,) + shape),
+                np.empty((0,)),
+                np.empty((0,)),
+                np.empty((0,)),
+                np.empty((0,) + shape),
                 {
-                    c: np.zeros((1,) + shape)
+                    c: np.empty((0,) + shape)
                     for c in self._qoi_expr_late_bound_constants
                 },
             )

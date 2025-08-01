@@ -448,3 +448,32 @@ def test_pointwise_normalised_absolute_error(check):
 @pytest.mark.parametrize("check", CHECKS)
 def test_pointwise_histogram_index(check):
     check('round_ties_even(100 * (x - c["$x_min"]) / (c["$x_max"] - c["$x_min"]))')
+
+
+def test_gaussian_kernel():
+    safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi="""
+        v["sigma"] = 1.5;
+        v["i"] = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5];
+        v["k"] = 1/(sqrt(2*pi)*v["sigma"]) * exp((-square(v["i"])) / (2*square(v["sigma"])));
+        v["kern"] = matmul([v["k"]].T, [v["k"]]);
+        v["kernel"] = v["kern"] / sum(v["kern"]);
+        return x * v["kernel"][5,5];
+        """,
+        type="abs",
+        eb=1,
+    )
+
+    # alternative implementation for a 2D Gaussian kernel from
+    #  https://stackoverflow.com/a/43346070
+    i = np.arange(11).astype(np.float64) - 5
+    k = np.exp(-0.5 * np.square(i) / np.square(1.5))
+    kern = np.outer(k, k)
+    kernel = kern / np.sum(kern)
+
+    assert (
+        safeguard.evaluate_qoi(
+            np.array(1.0, dtype=np.float64), late_bound=Bindings.empty()
+        )
+        == kernel[5, 5]
+    )

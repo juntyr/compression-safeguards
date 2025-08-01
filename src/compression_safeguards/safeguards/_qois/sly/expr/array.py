@@ -145,6 +145,8 @@ class Array(Expr):
         for e in self._array.flat:
             acc = e if acc is None else ScalarAdd(acc, e)  # type: ignore
         assert acc is not None
+        # we can return a group here since acc is not an array
+        assert not isinstance(acc, Array)
         return Group(acc)
 
     @staticmethod
@@ -163,8 +165,10 @@ class Array(Expr):
                     kk = ScalarMultiply(left._array[n, k], right._array[k, m])
                     acc = kk if acc is None else ScalarAdd(acc, kk)  # type: ignore
                 assert acc is not None
+                # we can return a group here since acc is not an array
+                assert not isinstance(acc, Array)
                 out._array[n, m] = Group(acc)
         return out
 
     def __repr__(self) -> str:
-        return f"{self._array!r}"
+        return f"{self._array!r}".removeprefix("array(").removesuffix(", dtype=object)")

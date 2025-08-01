@@ -107,14 +107,14 @@ class QoIParser(Parser):
         assert self._X is None
         assert not p.quotedid.startswith("$")
         assert p.quotedid not in self._vars
-        self._vars[Parameter(p.quotedid)] = Group(p.expr)
+        self._vars[Parameter(p.quotedid)] = Array.map_unary(p.expr, Group)
 
     @_("VA LBRACK quotedid RBRACK EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def assign(self, p):  # noqa: F811
         assert self._X is not None
         assert not p.quotedid.startswith("$")
         assert p.quotedid not in self._vars
-        self._vars[Parameter(p.quotedid)] = Group(p.expr)
+        self._vars[Parameter(p.quotedid)] = Array.map_unary(p.expr, Group)
 
     @_("VS LBRACK quotedid RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
