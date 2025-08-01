@@ -85,7 +85,9 @@ class ScalarFakeAbs(Expr):
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.abs)
+        return FoldedScalarConst.constant_fold_unary(
+            self._a, dtype, np.abs, ScalarFakeAbs
+        )
 
     def eval(
         self,

@@ -36,7 +36,12 @@ class ScalarSign(Expr):
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(self._a, dtype, _sign)  # type: ignore
+        return FoldedScalarConst.constant_fold_unary(
+            self._a,
+            dtype,
+            _sign,  # type: ignore
+            ScalarSign,
+        )
 
     def eval(
         self,

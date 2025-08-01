@@ -41,7 +41,7 @@ class ScalarSin(Expr):
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.sin)
+        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.sin, ScalarSin)
 
     def eval(
         self,
@@ -160,7 +160,9 @@ class ScalarAsin(Expr):
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.asin)
+        return FoldedScalarConst.constant_fold_unary(
+            self._a, dtype, np.asin, ScalarAsin
+        )
 
     def eval(
         self,
@@ -291,6 +293,7 @@ class ScalarTrigonometric(Expr):
             self._a,
             dtype,
             TRIGONOMETRIC_UFUNC[self._func],  # type: ignore
+            lambda e: ScalarTrigonometric(self._func, e),
         )
 
     def eval(

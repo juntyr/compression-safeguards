@@ -43,6 +43,7 @@ class ScalarLog(Expr):
             self._a,
             dtype,
             LOGARITHM_UFUNC[self._log],  # type: ignore
+            lambda e: ScalarLog(self._log, e),
         )
 
     def eval(
@@ -172,6 +173,7 @@ class ScalarExp(Expr):
             self._a,
             dtype,
             EXPONENTIAL_UFUNC[self._exp],  # type: ignore
+            lambda e: ScalarExp(self._exp, e),
         )
 
     def eval(
@@ -361,3 +363,6 @@ class ScalarLogWithBase(Expr):
                 self._b,
             ),
         ).compute_data_error_bound(eb_expr_lower, eb_expr_upper, X, Xs, late_bound)
+
+    def __repr__(self) -> str:
+        return f"log({self._a!r}, base={self._b!r})"

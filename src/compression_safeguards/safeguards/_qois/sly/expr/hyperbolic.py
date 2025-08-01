@@ -60,6 +60,7 @@ class ScalarHyperbolic(Expr):
             self._a,
             dtype,
             HYPERBOLIC_UFUNC[self._func],  # type: ignore
+            lambda e: ScalarHyperbolic(self._func, e),
         )
 
     def eval(

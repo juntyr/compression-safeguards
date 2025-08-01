@@ -30,7 +30,9 @@ class ScalarFloor(Expr):
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.floor)
+        return FoldedScalarConst.constant_fold_unary(
+            self._a, dtype, np.floor, ScalarFloor
+        )
 
     def eval(
         self,
@@ -136,7 +138,9 @@ class ScalarCeil(Expr):
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.ceil)
+        return FoldedScalarConst.constant_fold_unary(
+            self._a, dtype, np.ceil, ScalarCeil
+        )
 
     def eval(
         self,
@@ -242,7 +246,9 @@ class ScalarTrunc(Expr):
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.trunc)
+        return FoldedScalarConst.constant_fold_unary(
+            self._a, dtype, np.trunc, ScalarTrunc
+        )
 
     def eval(
         self,
@@ -352,7 +358,9 @@ class ScalarRoundTiesEven(Expr):
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.rint)
+        return FoldedScalarConst.constant_fold_unary(
+            self._a, dtype, np.rint, ScalarRoundTiesEven
+        )
 
     def eval(
         self,

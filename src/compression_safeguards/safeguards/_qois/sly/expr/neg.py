@@ -28,7 +28,9 @@ class ScalarNegate(Expr):
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.negative)
+        return FoldedScalarConst.constant_fold_unary(
+            self._a, dtype, np.negative, ScalarNegate
+        )
 
     def eval(
         self,

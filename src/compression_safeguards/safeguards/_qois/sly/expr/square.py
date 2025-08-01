@@ -30,7 +30,9 @@ class ScalarSqrt(Expr):
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.sqrt)
+        return FoldedScalarConst.constant_fold_unary(
+            self._a, dtype, np.sqrt, ScalarSqrt
+        )
 
     def eval(
         self,
@@ -143,7 +145,9 @@ class ScalarSquare(Expr):
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.square)
+        return FoldedScalarConst.constant_fold_unary(
+            self._a, dtype, np.square, ScalarSquare
+        )
 
     def eval(
         self,

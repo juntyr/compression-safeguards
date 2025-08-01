@@ -477,3 +477,25 @@ def test_gaussian_kernel():
         )
         == kernel[5, 5]
     )
+
+
+def test_constant_fold():
+    from compression_safeguards.safeguards._qois.sly.expr.data import Data
+    from compression_safeguards.safeguards._qois.sly.expr.literal import Number
+    from compression_safeguards.safeguards._qois.sly.expr.logexp import (
+        ScalarLogWithBase,
+    )
+
+    expr = ScalarLogWithBase(Number("100"), Number("10"))
+    assert f"{expr!r}" == "log(100, base=10)"
+    assert expr.eval((), np.empty(0, dtype=np.float64), {}) == 2
+
+    assert expr.constant_fold(np.dtype(np.float64)) == 2
+
+    expr = ScalarLogWithBase(Data(index=()), Number("10"))
+    assert f"{expr!r}" == "log(x, base=10)"
+    assert expr.eval((), np.array(100, dtype=np.float64), {}) == 2
+
+    expr = expr.constant_fold(np.dtype(np.float64))
+    assert f"{expr!r}" == f"ln(x) / ({np.log(np.float64(10))!r})"
+    assert expr.eval((), np.array(100, dtype=np.float64), {}) == 2

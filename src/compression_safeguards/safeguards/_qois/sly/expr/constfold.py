@@ -52,11 +52,11 @@ class FoldedScalarConst(Expr):
 
     @staticmethod
     def constant_fold_unary(
-        expr: Expr, dtype: np.dtype[F], m: Callable[[F], F]
+        expr: Expr, dtype: np.dtype[F], m: Callable[[F], F], rm: Callable[[Expr], Expr]
     ) -> F | Expr:
         fexpr = expr.constant_fold(dtype)
         if isinstance(fexpr, Expr):
-            return fexpr
+            return rm(fexpr)
         return m(fexpr)
 
     @staticmethod
