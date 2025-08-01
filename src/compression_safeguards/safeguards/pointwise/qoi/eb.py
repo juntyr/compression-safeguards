@@ -225,6 +225,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
     kind = "qoi_eb_pw"
 
+    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def __init__(
         self,
         qoi: PointwiseExpr,
@@ -241,15 +242,19 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             _check_error_bound(self._type, eb)
             self._eb = eb
 
-        lexer = QoILexer()
-        parser = QoIParser(x=Data(index=()), X=None)
+        qoi_lexer = QoILexer()
+        qoi_parser = QoIParser(x=Data(index=()), X=None)
 
         try:
-            qoi_expr = parser.parse(qoi, lexer.tokenize(qoi))
+            qoi_expr = qoi_parser.parse(qoi, qoi_lexer.tokenize(qoi))
             assert isinstance(qoi_expr, Expr)
 
             self._qoi_expr_late_bound_constants = qoi_expr.late_bound_constants
+
+            # check if the expression is well-formed and if an error bound can
+            #  be computed
             _canary_data_eb = qoi_expr.compute_data_error_bound(
+                np.empty(0),
                 np.empty(0),
                 np.empty(0),
                 np.empty(0),
@@ -318,13 +323,11 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             for c in self._qoi_expr_late_bound_constants
         }
 
-        qoi_data: F | np.ndarray[tuple[int, ...], np.dtype[F]] = self._qoi_expr.eval(
+        return self._qoi_expr.eval(
+            data_float.shape,
             data_float,
             late_bound_constants,
         )
-        assert isinstance(qoi_data, np.ndarray)
-        assert qoi_data.shape == data.shape
-        return qoi_data  # type: ignore
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
@@ -366,18 +369,10 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             self._qoi_expr, data_float.dtype
         )
 
-        qoi_data_: np.floating | np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
-            qoi_expr.eval(data_float, late_bound_constants)
+        qoi_data = qoi_expr.eval(data_float.shape, data_float, late_bound_constants)
+        qoi_decoded = qoi_expr.eval(
+            data_float.shape, to_float(decoded), late_bound_constants
         )
-        qoi_decoded_: (
-            np.floating | np.ndarray[tuple[int, ...], np.dtype[np.floating]]
-        ) = qoi_expr.eval(to_float(decoded), late_bound_constants)
-        assert isinstance(qoi_data_, np.ndarray) and isinstance(
-            qoi_decoded_, np.ndarray
-        )
-        assert qoi_data_.shape == data.shape and qoi_decoded_.shape == data.shape
-        qoi_data: np.ndarray[S, np.dtype[np.floating]] = qoi_data_  # type: ignore
-        qoi_decoded: np.ndarray[S, np.dtype[np.floating]] = qoi_decoded_  # type: ignore
 
         eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
@@ -448,12 +443,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             self._qoi_expr, data_float.dtype
         )
 
-        data_qoi_: np.floating | np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
-            qoi_expr.eval(data_float, late_bound_constants)
-        )
-        assert isinstance(data_qoi_, np.ndarray)
-        assert data_qoi_.shape == data.shape
-        data_qoi: np.ndarray[S, np.dtype[np.floating]] = data_qoi_  # type: ignore
+        data_qoi = qoi_expr.eval(data_float.shape, data_float, late_bound_constants)
 
         eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
@@ -535,6 +525,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             ] = qoi_expr.compute_data_error_bound(
                 eb_qoi_lower,
                 eb_qoi_upper,
+                data_float,
                 data_float,
                 late_bound_constants,
             )

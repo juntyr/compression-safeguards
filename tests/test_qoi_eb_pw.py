@@ -348,9 +348,11 @@ def test_evaluate_expr_with_dtype():
 
     expr = ScalarAdd(ScalarAdd(Data(()), Pi()), Euler())
 
-    assert expr.eval(np.float16("4.2"), dict()) == np.float16("4.2") + np.float16(
-        np.e
-    ) + np.float16(np.pi)
+    assert f"{expr!r}" == "x + pi + e"
+
+    assert expr.eval(np.float16("4.2"), np.float16("4.2"), dict()) == np.float16(
+        "4.2"
+    ) + np.float16(np.e) + np.float16(np.pi)
 
 
 def test_late_bound_eb_abs():

@@ -20,6 +20,10 @@ class FoldedScalarConst(Expr):
         return False
 
     @property
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        return frozenset()
+
+    @property
     def late_bound_constants(self) -> frozenset[Parameter]:
         return frozenset()
 

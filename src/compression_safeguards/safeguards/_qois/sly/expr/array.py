@@ -1,3 +1,4 @@
+import itertools
 from collections.abc import Mapping
 from typing import Callable
 
@@ -7,6 +8,7 @@ from .....utils.bindings import Parameter
 from .abc import Expr
 from .addsub import ScalarAdd
 from .constfold import FoldedScalarConst
+from .data import Data
 from .divmul import ScalarMultiply
 from .group import Group
 from .typing import F, Ns, Ps, PsI
@@ -28,9 +30,26 @@ class Array(Expr):
                 assert not isinstance(e, Array)
             self._array = np.array((el,) + els)
 
+    @staticmethod
+    def from_data_shape(shape: tuple[int, ...]) -> "Array":
+        out = Array.__new__(Array)
+        out._array = np.empty(shape, dtype=object)
+
+        for i in itertools.product(*[range(a) for a in shape]):
+            out._array[i] = Data(index=i)
+
+        return out
+
     @property
     def has_data(self) -> bool:
         return any(e.has_data for e in self._array.flat)
+
+    @property
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        indices = set()
+        for e in self._array.flat:
+            indices.update(e.data_indices)
+        return frozenset(indices)
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:

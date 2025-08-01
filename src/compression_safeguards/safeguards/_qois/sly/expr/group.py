@@ -19,6 +19,10 @@ class Group(Expr):
         return self._expr.has_data
 
     @property
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        return self._expr.data_indices
+
+    @property
     def late_bound_constants(self) -> frozenset[Parameter]:
         return self._expr.late_bound_constants
 

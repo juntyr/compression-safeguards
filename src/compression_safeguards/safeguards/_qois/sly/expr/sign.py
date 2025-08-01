@@ -10,10 +10,10 @@ from .....utils.cast import (
     _nan_to_zero_inf_to_finite,
     _sign,
 )
-from .....utils.typing import F, S
 from ...eb import ensure_bounded_derived_error
 from .abc import Expr
 from .constfold import FoldedScalarConst
+from .typing import F, Ns, Ps, PsI
 
 
 class ScalarSign(Expr):
@@ -28,6 +28,10 @@ class ScalarSign(Expr):
         return self._a.has_data
 
     @property
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        return self._a.data_indices
+
+    @property
     def late_bound_constants(self) -> frozenset[Parameter]:
         return self._a.late_bound_constants
 
@@ -36,24 +40,26 @@ class ScalarSign(Expr):
 
     def eval(
         self,
-        X: np.ndarray[tuple[int, ...], np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
-    ) -> F | np.ndarray[tuple[int, ...], np.dtype[F]]:
-        return _sign(self._a.eval(X, late_bound))  # type: ignore
+        x: PsI,
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> np.ndarray[PsI, np.dtype[F]]:
+        return _sign(self._a.eval(x, Xs, late_bound))
 
     def compute_data_error_bound_unchecked(
         self,
-        eb_expr_lower: np.ndarray[S, np.dtype[F]],
-        eb_expr_upper: np.ndarray[S, np.dtype[F]],
-        X: np.ndarray[tuple[int, ...], np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
-    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
+        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
         zero = X.dtype.type(0)
 
         # evaluate arg and sign(arg)
         arg = self._a
-        argv = arg.eval(X, late_bound)
-        exprv = _sign(argv)  # type: ignore
+        argv = arg.eval(X.shape, Xs, late_bound)
+        exprv: np.ndarray[Ps, np.dtype[F]] = _sign(argv)
 
         # evaluate the lower and upper sign bounds that satisfy the error bound
         exprv_lower = np.maximum(-1, exprv + np.maximum(-2, np.ceil(eb_expr_lower)))
@@ -65,7 +71,7 @@ class ScalarSign(Expr):
             smallest_subnormal = np.finfo(X.dtype).smallest_subnormal
 
         # compute the lower and upper arg bounds that produce the sign bounds
-        argv_lower = np.where(
+        argv_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             _isnan(exprv),
             exprv,
             np.where(
@@ -78,7 +84,7 @@ class ScalarSign(Expr):
                 ),
             ),
         )
-        argv_upper = np.where(
+        argv_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             _isnan(exprv),
             exprv,
             np.where(
@@ -93,14 +99,14 @@ class ScalarSign(Expr):
         )
 
         # update the error bounds
-        eal = np.where(
+        eal: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             (eb_expr_lower == 0),
             zero,
             np.minimum(argv_lower - argv, 0),
         )
         eal = _nan_to_zero_inf_to_finite(eal)
 
-        eau = np.where(
+        eau: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             (eb_expr_upper == 0),
             zero,
             np.maximum(0, argv_upper - argv),
@@ -111,40 +117,42 @@ class ScalarSign(Expr):
         eal = ensure_bounded_derived_error(
             lambda eal: _sign(argv + eal),
             exprv,
-            argv,  # type: ignore
+            argv,
             eal,
-            eb_expr_lower,  # type: ignore
-            eb_expr_upper,  # type: ignore
+            eb_expr_lower,
+            eb_expr_upper,
         )
         eau = ensure_bounded_derived_error(
             lambda eau: _sign(argv + eau),
             exprv,
-            argv,  # type: ignore
+            argv,
             eau,
-            eb_expr_lower,  # type: ignore
-            eb_expr_upper,  # type: ignore
+            eb_expr_lower,
+            eb_expr_upper,
         )
         eb_arg_lower, eb_arg_upper = eal, eau
 
         # composition using Lemma 3 from Jiao et al.
         return arg.compute_data_error_bound(
-            eb_arg_lower,  # type: ignore
-            eb_arg_upper,  # type: ignore
+            eb_arg_lower,
+            eb_arg_upper,
             X,
+            Xs,
             late_bound,
         )
 
     def compute_data_error_bound(
         self,
-        eb_expr_lower: np.ndarray[S, np.dtype[F]],
-        eb_expr_upper: np.ndarray[S, np.dtype[F]],
-        X: np.ndarray[tuple[int, ...], np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]],
-    ) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[F]]]:
+        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
+        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
         # the unchecked method already handles rounding errors for sign,
         #  which is weakly monotonic
         return self.compute_data_error_bound_unchecked(
-            eb_expr_lower, eb_expr_upper, X, late_bound
+            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:

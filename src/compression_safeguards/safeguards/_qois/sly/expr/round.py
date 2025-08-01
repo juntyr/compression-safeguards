@@ -22,11 +22,15 @@ class ScalarFloor(Expr):
         return self._a.has_data
 
     @property
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        return self._a.data_indices
+
+    @property
     def late_bound_constants(self) -> frozenset[Parameter]:
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.floor)  # type: ignore
+        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.floor)
 
     def eval(
         self,
@@ -124,11 +128,15 @@ class ScalarCeil(Expr):
         return self._a.has_data
 
     @property
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        return self._a.data_indices
+
+    @property
     def late_bound_constants(self) -> frozenset[Parameter]:
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.ceil)  # type: ignore
+        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.ceil)
 
     def eval(
         self,
@@ -226,11 +234,15 @@ class ScalarTrunc(Expr):
         return self._a.has_data
 
     @property
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        return self._a.data_indices
+
+    @property
     def late_bound_constants(self) -> frozenset[Parameter]:
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.trunc)  # type: ignore
+        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.trunc)
 
     def eval(
         self,
@@ -251,7 +263,7 @@ class ScalarTrunc(Expr):
         # evaluate arg and trunc(arg)
         arg = self._a
         argv = arg.eval(X.shape, Xs, late_bound)
-        exprv: np.ndarray[Ps, np.dtype[F]] = np.trunc(argv)  # type: ignore
+        exprv = np.trunc(argv)
 
         # compute the truncated result that meets the error bounds
         exprv_lower = np.trunc(exprv + eb_expr_lower)
@@ -268,15 +280,15 @@ class ScalarTrunc(Expr):
         # update the error bounds
         # rounding allows zero error bounds on the expression to expand into
         #  non-zero error bounds on the argument
-        eal: np.ndarray[Ps, np.dtype[F]] = np.minimum(argv_lower - argv, 0)  # type: ignore
+        eal: np.ndarray[Ps, np.dtype[F]] = np.minimum(np.subtract(argv_lower, argv), 0)
         eal = _nan_to_zero_inf_to_finite(eal)
 
-        eau: np.ndarray[Ps, np.dtype[F]] = np.maximum(0, argv_upper - argv)  # type: ignore
+        eau: np.ndarray[Ps, np.dtype[F]] = np.maximum(0, np.subtract(argv_upper, argv))
         eau = _nan_to_zero_inf_to_finite(eau)
 
         # handle rounding errors in trunc(...) early
         eal = ensure_bounded_derived_error(
-            lambda eal: np.trunc(argv + eal),  # type: ignore
+            lambda eal: np.trunc(np.add(argv, eal)),
             exprv,
             argv,
             eal,
@@ -284,7 +296,7 @@ class ScalarTrunc(Expr):
             eb_expr_upper,
         )
         eau = ensure_bounded_derived_error(
-            lambda eau: np.trunc(argv + eau),  # type: ignore
+            lambda eau: np.trunc(np.add(argv, eau)),
             exprv,
             argv,
             eau,
@@ -332,11 +344,15 @@ class ScalarRoundTiesEven(Expr):
         return self._a.has_data
 
     @property
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        return self._a.data_indices
+
+    @property
     def late_bound_constants(self) -> frozenset[Parameter]:
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.rint)  # type: ignore
+        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.rint)
 
     def eval(
         self,

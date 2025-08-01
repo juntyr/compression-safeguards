@@ -24,9 +24,9 @@ if __name__ == "__main__":
             if expr is None:
                 continue
             print(f"parsed: {expr!r}")
-            X = np.array([1.0, 2.0, 3.0])
-            expr = FoldedScalarConst.constant_fold_expr(expr, X.dtype)
+            Xs = np.array([[1.0, 2.0, 3.0]])
+            expr = FoldedScalarConst.constant_fold_expr(expr, Xs.dtype)
             print(f"folded: {expr!r}")
-            print(f"eval: {expr.eval(X, dict())}")
+            print(f"eval: {expr.eval(Xs[:, 1], Xs, dict())}")
         except Exception as err:
             print(f"{type(err).__name__}: {err}")

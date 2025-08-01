@@ -166,6 +166,10 @@ class QoIParser(Parser):
     def expr(self, p):  # noqa: F811
         return Array(*([p.expr] + p.many_comma_expr))
 
+    @_("LBRACK RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        assert False, "illegal empty array literal"
+
     @_("expr LBRACK index_ many_comma_index RBRACK %prec INDEX")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         assert isinstance(p.expr, Array), "only array expressions can be indexed"

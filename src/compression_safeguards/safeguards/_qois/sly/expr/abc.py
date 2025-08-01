@@ -18,6 +18,11 @@ class Expr:
 
     @property
     @abstractmethod
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        pass
+
+    @property
+    @abstractmethod
     def late_bound_constants(self) -> frozenset[Parameter]:
         pass
 

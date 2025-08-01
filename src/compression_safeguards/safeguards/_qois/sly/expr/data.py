@@ -19,6 +19,10 @@ class Data(Expr):
         return True
 
     @property
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        return frozenset([self._index])
+
+    @property
     def late_bound_constants(self) -> frozenset[Parameter]:
         return frozenset()
 
@@ -59,7 +63,9 @@ class Data(Expr):
         )
 
     def __repr__(self) -> str:
-        return f"X[{','.join(str(i) for i in self._index)}]"
+        if self._index == ():
+            return "x"
+        return f"X[..., {','.join(str(i) for i in self._index)}]"
 
 
 class LateBoundConstant(Expr):
@@ -82,6 +88,10 @@ class LateBoundConstant(Expr):
     @property
     def has_data(self) -> bool:
         return False
+
+    @property
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        return frozenset()
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:

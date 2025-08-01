@@ -24,6 +24,10 @@ class Number(Expr):
         return False
 
     @property
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        return frozenset()
+
+    @property
     def late_bound_constants(self) -> frozenset[Parameter]:
         return frozenset()
 
@@ -59,6 +63,10 @@ class Pi(Expr):
     @property
     def has_data(self) -> bool:
         return False
+
+    @property
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        return frozenset()
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:
@@ -99,6 +107,10 @@ class Euler(Expr):
     @property
     def has_data(self) -> bool:
         return False
+
+    @property
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        return frozenset()
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:

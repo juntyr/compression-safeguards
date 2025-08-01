@@ -46,6 +46,10 @@ class ScalarHyperbolic(Expr):
         return self._a.has_data
 
     @property
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        return self._a.data_indices
+
+    @property
     def late_bound_constants(self) -> frozenset[Parameter]:
         return self._a.late_bound_constants
 
