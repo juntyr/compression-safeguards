@@ -140,7 +140,10 @@ def finite_difference_coefficients(
     a: tuple[Expr, ...] = offsets
     N: int = len(a) - 1
 
-    coeffs: dict[tuple[int, int, int], Expr] = {
+    coeffs_num: dict[tuple[int, int, int], Expr] = {
+        (0, 0, 0): Number("1"),
+    }
+    coeffs_denom: dict[tuple[int, int, int], Expr] = {
         (0, 0, 0): Number("1"),
     }
 
@@ -152,69 +155,100 @@ def finite_difference_coefficients(
             c3: Expr = delta_transform(Group(ScalarSubtract(a[n], a[v])))
             c2 = Group(ScalarMultiply(c2, c3))
             if n <= M:
-                coeffs[(n, n - 1, v)] = Number("0")
+                coeffs_num[(n, n - 1, v)] = Number("0")
+                coeffs_denom[(n, n - 1, v)] = Number("1")
             for m in range(0, min(n, M) + 1):
                 if m > 0:
-                    coeffs[(m, n, v)] = Group(
-                        ScalarDivide(
+                    coeffs_num[(m, n, v)] = Group(
+                        ScalarSubtract(
                             Group(
-                                ScalarSubtract(
-                                    Group(
-                                        ScalarMultiply(
-                                            delta_transform(dx0(a[n])),
-                                            coeffs[(m, n - 1, v)],
-                                        )
+                                ScalarMultiply(
+                                    ScalarMultiply(
+                                        delta_transform(dx0(a[n])),
+                                        coeffs_num[(m, n - 1, v)],
                                     ),
-                                    Group(
-                                        ScalarMultiply(
-                                            Number(f"{m}"), coeffs[(m - 1, n - 1, v)]
-                                        )
-                                    ),
+                                    coeffs_denom[(m - 1, n - 1, v)],
                                 )
                             ),
-                            c3,
+                            Group(
+                                ScalarMultiply(
+                                    ScalarMultiply(
+                                        Number(f"{m}"),
+                                        coeffs_num[(m - 1, n - 1, v)],
+                                    ),
+                                    coeffs_denom[(m, n - 1, v)],
+                                ),
+                            ),
                         )
                     )
+                    coeffs_denom[(m, n, v)] = ScalarMultiply(
+                        ScalarMultiply(
+                            coeffs_denom[(m, n - 1, v)],
+                            coeffs_denom[(m - 1, n - 1, v)],
+                        ),
+                        c3,
+                    )
                 else:
-                    coeffs[(m, n, v)] = Group(
-                        ScalarDivide(
-                            ScalarMultiply(
-                                delta_transform(dx0(a[n])), coeffs[(m, n - 1, v)]
-                            ),
-                            c3,
+                    coeffs_num[(m, n, v)] = Group(
+                        ScalarMultiply(
+                            delta_transform(dx0(a[n])), coeffs_num[(m, n - 1, v)]
                         )
+                    )
+                    coeffs_denom[(m, n, v)] = Group(
+                        ScalarMultiply(coeffs_denom[(m, n - 1, v)], c3)
                     )
         for m in range(0, min(n, M) + 1):
             if m > 0:
-                coeffs[(m, n, n)] = Group(
+                coeffs_num[(m, n, n)] = Group(
                     ScalarMultiply(
-                        Group(ScalarDivide(c1, c2)),
+                        c1,
                         Group(
                             ScalarSubtract(
                                 Group(
                                     ScalarMultiply(
-                                        Number(f"{m}"), coeffs[(m - 1, n - 1, n - 1)]
+                                        ScalarMultiply(
+                                            Number(f"{m}"),
+                                            coeffs_num[(m - 1, n - 1, n - 1)],
+                                        ),
+                                        coeffs_denom[(m, n - 1, n - 1)],
                                     )
                                 ),
                                 Group(
                                     ScalarMultiply(
-                                        delta_transform(dx0(a[n - 1])),
-                                        coeffs[(m, n - 1, n - 1)],
+                                        ScalarMultiply(
+                                            delta_transform(dx0(a[n - 1])),
+                                            coeffs_num[(m, n - 1, n - 1)],
+                                        ),
+                                        coeffs_denom[(m - 1, n - 1, n - 1)],
                                     )
                                 ),
                             )
                         ),
                     )
                 )
-            else:
-                coeffs[(m, n, n)] = Group(
+                coeffs_denom[(m, n, n)] = ScalarMultiply(
                     ScalarMultiply(
-                        ScalarNegate(ScalarDivide(c1, c2)),
+                        coeffs_denom[(m - 1, n - 1, n - 1)],
+                        coeffs_denom[(m, n - 1, n - 1)],
+                    ),
+                    c2,
+                )
+            else:
+                coeffs_num[(m, n, n)] = Group(
+                    ScalarMultiply(
+                        ScalarNegate(c1),
                         ScalarMultiply(
-                            delta_transform(dx0(a[n - 1])), coeffs[(m, n - 1, n - 1)]
+                            delta_transform(dx0(a[n - 1])),
+                            coeffs_num[(m, n - 1, n - 1)],
                         ),
                     )
                 )
+                coeffs_denom[(m, n, n)] = Group(
+                    ScalarMultiply(c2, coeffs_denom[(m, n - 1, n - 1)])
+                )
         c1 = c2
 
-    return tuple(coeffs[M, N, v] for v in range(0, N + 1))
+    return tuple(
+        Group(ScalarDivide(coeffs_num[M, N, v], coeffs_denom[M, N, v]))
+        for v in range(0, N + 1)
+    )
