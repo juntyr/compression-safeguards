@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from .....utils.bindings import Parameter
+from ....utils.bindings import Parameter
 from .abc import Expr
 from .constfold import FoldedScalarConst
 from .divmul import ScalarMultiply
@@ -26,6 +26,16 @@ class ScalarPower(Expr):
     @property
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return self._a.data_indices | self._b.data_indices
+
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        return ScalarPower(
+            self._a.apply_array_element_offset(axis, offset),
+            self._b.apply_array_element_offset(axis, offset),
+        )
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:
@@ -79,6 +89,15 @@ class ScalarFakeAbs(Expr):
     @property
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return self._a.data_indices
+
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        return ScalarFakeAbs(
+            self._a.apply_array_element_offset(axis, offset),
+        )
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:

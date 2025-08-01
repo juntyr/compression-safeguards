@@ -5,7 +5,6 @@ with atheris.instrument_imports():
     import numcodecs.compat
     import numpy as np
 
-import sympy as sympy
 from timeoutcontext import timeout
 
 with atheris.instrument_imports():
@@ -23,11 +22,6 @@ with atheris.instrument_imports():
     from numcodecs_safeguards import SafeguardsCodec
 
     from compression_safeguards import SafeguardKind, Safeguards
-    from compression_safeguards.safeguards._qois.amath import (
-        FUNCTIONS as AMATH_FUNCTIONS,
-    )
-    from compression_safeguards.safeguards._qois.math import CONSTANTS as MATH_CONSTANTS
-    from compression_safeguards.safeguards._qois.math import FUNCTIONS as MATH_FUNCTIONS
     from compression_safeguards.safeguards.abc import Safeguard
     from compression_safeguards.safeguards.pointwise.qoi import PointwiseExpr
     from compression_safeguards.safeguards.stencil import NeighbourhoodBoundaryAxis
@@ -122,66 +116,67 @@ def generate_parameter(
         return generate_parameter(data, ty, depth, late_bound)
 
     if ty in (PointwiseExpr, StencilExpr):
-        ATOMS = ["x", int, float] + list(MATH_CONSTANTS) + ["V"]
-        OPS = [
-            "let",
-            "neg",
-            "+",
-            "-",
-            "*",
-            "/",
-            "**",
-        ] + list(MATH_FUNCTIONS)
+        raise NotImplementedError("fuzz QoIs")
+        # ATOMS = ["x", int, float] + list(MATH_CONSTANTS) + ["V"]
+        # OPS = [
+        #     "let",
+        #     "neg",
+        #     "+",
+        #     "-",
+        #     "*",
+        #     "/",
+        #     "**",
+        # ] + list(MATH_FUNCTIONS)
 
-        if ty is StencilExpr:
-            ATOMS += ["X", "I"]
-            OPS += ["index", "finite_difference"] + list(AMATH_FUNCTIONS)
+        # if ty is StencilExpr:
+        #     ATOMS += ["X", "I"]
+        #     OPS += ["index", "finite_difference"] + list(AMATH_FUNCTIONS)
 
-        atoms = []
-        for _ in range(data.ConsumeIntInRange(2, 4)):
-            atom = ATOMS[data.ConsumeIntInRange(0, len(ATOMS) - 1)]
-            if atom is int:
-                atom = str(data.ConsumeInt(2))
-            elif atom is float:
-                atom = str(data.ConsumeRegularFloat())
-            elif atom == "V":
-                atom = (
-                    f'{"v" if ty is PointwiseExpr else "V"}["{data.ConsumeString(2)}"]'
-                )
-            atoms.append(atom)
+        # atoms = []
+        # for _ in range(data.ConsumeIntInRange(2, 4)):
+        #     atom = ATOMS[data.ConsumeIntInRange(0, len(ATOMS) - 1)]
+        #     if atom is int:
+        #         atom = str(data.ConsumeInt(2))
+        #     elif atom is float:
+        #         atom = str(data.ConsumeRegularFloat())
+        #     elif atom == "V":
+        #         atom = (
+        #             f'{"v" if ty is PointwiseExpr else "V"}["{data.ConsumeString(2)}"]'
+        #         )
+        #     atoms.append(atom)
 
-        done = False
-        while not done:
-            done = len(atoms) == 1
-            atom1 = atoms.pop(data.ConsumeIntInRange(0, len(atoms) - 1))
-            atom2 = (
-                atoms.pop(data.ConsumeIntInRange(0, len(atoms) - 1))
-                if len(atoms) > 0
-                else "1"
-            )
-            op = OPS[data.ConsumeIntInRange(0, len(OPS) - 1)]
-            if op == "let":
-                atoms.append(
-                    f'let({"v" if ty is PointwiseExpr else "V"}["{data.ConsumeString(2)}"],{atom1})({atom2})'
-                )
-            elif op == "neg":
-                atoms.append(f"(-{atom1})")
-            elif op in ("log", "matmul"):
-                atoms.append(f"log({atom1},{atom2})")
-            elif op in tuple(MATH_FUNCTIONS) + tuple(AMATH_FUNCTIONS):
-                atoms.append(f"{op}({atom1})")
-            elif op == "index":
-                atoms.append(
-                    f"{atom1}[{data.ConsumeIntInRange(0, 20)}, {data.ConsumeIntInRange(0, 20)}]"
-                )
-            elif op == "finite_difference":
-                atoms.append(
-                    f"finite_difference({atom1}, order={data.ConsumeIntInRange(0, 3)}, accuracy={data.ConsumeIntInRange(1, 4)}, type={data.ConsumeIntInRange(-1, 1)}, axis={data.ConsumeIntInRange(0, 1)}, grid_spacing={data.ConsumeRegularFloat()})"
-                )
-            else:
-                atoms.append(f"({atom1}{op}{atom2})")
-        [atom] = atoms
-        return atom
+        # done = False
+        # while not done:
+        #     done = len(atoms) == 1
+        #     atom1 = atoms.pop(data.ConsumeIntInRange(0, len(atoms) - 1))
+        #     atom2 = (
+        #         atoms.pop(data.ConsumeIntInRange(0, len(atoms) - 1))
+        #         if len(atoms) > 0
+        #         else "1"
+        #     )
+        #     op = OPS[data.ConsumeIntInRange(0, len(OPS) - 1)]
+        #     if op == "let":
+        #         atoms.append(
+        #             f'let({"v" if ty is PointwiseExpr else "V"}["{data.ConsumeString(2)}"],{atom1})({atom2})'
+        #         )
+        #     elif op == "neg":
+        #         atoms.append(f"(-{atom1})")
+        #     elif op in ("log", "matmul"):
+        #         atoms.append(f"log({atom1},{atom2})")
+        #     elif op in tuple(MATH_FUNCTIONS) + tuple(AMATH_FUNCTIONS):
+        #         atoms.append(f"{op}({atom1})")
+        #     elif op == "index":
+        #         atoms.append(
+        #             f"{atom1}[{data.ConsumeIntInRange(0, 20)}, {data.ConsumeIntInRange(0, 20)}]"
+        #         )
+        #     elif op == "finite_difference":
+        #         atoms.append(
+        #             f"finite_difference({atom1}, order={data.ConsumeIntInRange(0, 3)}, accuracy={data.ConsumeIntInRange(1, 4)}, type={data.ConsumeIntInRange(-1, 1)}, axis={data.ConsumeIntInRange(0, 1)}, grid_spacing={data.ConsumeRegularFloat()})"
+        #         )
+        #     else:
+        #         atoms.append(f"({atom1}{op}{atom2})")
+        # [atom] = atoms
+        # return atom
 
     assert False, f"unknown parameter type {ty!r}"
 

@@ -4,14 +4,14 @@ from typing import Callable
 
 import numpy as np
 
-from .....utils.bindings import Parameter
-from .....utils.cast import (
+from ....utils.bindings import Parameter
+from ....utils.cast import (
     _float128_dtype,
     _float128_pi,
     _nan_to_zero_inf_to_finite,
     _reciprocal,
 )
-from ...eb import ensure_bounded_derived_error
+from ..eb import ensure_bounded_derived_error
 from .abc import Expr
 from .addsub import ScalarAdd, ScalarSubtract
 from .constfold import FoldedScalarConst
@@ -35,6 +35,15 @@ class ScalarSin(Expr):
     @property
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return self._a.data_indices
+
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        return ScalarSin(
+            self._a.apply_array_element_offset(axis, offset),
+        )
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:
@@ -154,6 +163,15 @@ class ScalarAsin(Expr):
     @property
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return self._a.data_indices
+
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        return ScalarAsin(
+            self._a.apply_array_element_offset(axis, offset),
+        )
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:
@@ -283,6 +301,16 @@ class ScalarTrigonometric(Expr):
     @property
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return self._a.data_indices
+
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        return ScalarTrigonometric(
+            self._func,
+            self._a.apply_array_element_offset(axis, offset),
+        )
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:

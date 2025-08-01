@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from .....utils.bindings import Parameter
+from ....utils.bindings import Parameter
 from .abc import Expr
 from .typing import F, Ns, Ps, PsI
 
@@ -21,6 +21,15 @@ class Data(Expr):
     @property
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return frozenset([self._index])
+
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        index = list(self._index)
+        index[axis] += offset
+        return Data(index=tuple(index))
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:
@@ -92,6 +101,15 @@ class LateBoundConstant(Expr):
     @property
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return frozenset()
+
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        index = list(self._index)
+        index[axis] += offset
+        return LateBoundConstant(self._name, index=tuple(index))
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:

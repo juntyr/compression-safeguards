@@ -468,8 +468,20 @@ def _reciprocal(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
     return 1 / a  # type: ignore
 
 
+# wrapper around np.mod(p, q) that guarantees that the result is in [-q/2, q/2]
+def _symmetric_modulo(
+    p: np.ndarray[S, np.dtype[F]], q: np.ndarray[S, np.dtype[F]]
+) -> np.ndarray[S, np.dtype[F]]:
+    q2: np.ndarray[S, np.dtype[F]] = np.divide(q, 2)
+    res: np.ndarray[S, np.dtype[F]] = np.mod(p + q2, q)
+    if (type(p) is _float128_type) or (p.dtype == _float128_dtype):
+        res = np.mod(res + q, q)
+    return np.subtract(res, q2)
+
+
 try:
     _float128: Callable = np.float128
+    _float128_type: Callable = np.float128
     _float128_dtype: np.dtype = np.dtype(np.float128)
     assert (np.finfo(np.float128).nmant + np.finfo(np.float128).nexp + 1) == 128
     _float128_min = np.finfo(np.float128).min
@@ -485,6 +497,7 @@ except (AttributeError, AssertionError):
         import numpy_quaddtype
 
         _float128 = numpy_quaddtype.SleefQuadPrecision
+        _float128_type = numpy_quaddtype.QuadPrecision
         _float128_dtype = numpy_quaddtype.SleefQuadPrecDType()
         _float128_min = -numpy_quaddtype.max_value
         _float128_max = numpy_quaddtype.max_value

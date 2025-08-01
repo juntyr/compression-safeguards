@@ -2,8 +2,8 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from .....utils.bindings import Parameter
-from .....utils.cast import (
+from ....utils.bindings import Parameter
+from ....utils.cast import (
     _float128_dtype,
     _float128_e,
     _float128_pi,
@@ -26,6 +26,13 @@ class Number(Expr):
     @property
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return frozenset()
+
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        return self
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:
@@ -67,6 +74,13 @@ class Pi(Expr):
     @property
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return frozenset()
+
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        return self
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:
@@ -111,6 +125,13 @@ class Euler(Expr):
     @property
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return frozenset()
+
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        return self
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:

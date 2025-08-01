@@ -24,13 +24,13 @@ from ....utils.cast import (
 )
 from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import F, S, T
+from ..._qois.expr.abc import Expr
+from ..._qois.expr.array import Array
+from ..._qois.expr.constfold import FoldedScalarConst
+from ..._qois.expr.data import Data
 from ..._qois.interval import compute_safe_eb_lower_upper_interval_union
-from ..._qois.sly.expr.abc import Expr
-from ..._qois.sly.expr.array import Array
-from ..._qois.sly.expr.constfold import FoldedScalarConst
-from ..._qois.sly.expr.data import Data
-from ..._qois.sly.lexer import QoILexer
-from ..._qois.sly.parser import QoIParser
+from ..._qois.lexer import QoILexer
+from ..._qois.parser import QoIParser
 from ...eb import (
     ErrorBound,
     _apply_finite_qoi_error_bound,
@@ -374,13 +374,15 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
             # check if the expression is well-formed and if an error bound can
             #  be computed
-            _canary_data_eb = qoi_expr.compute_data_error_bound(
-                np.empty((0,)),
-                np.empty((0,)),
-                np.empty((0,)),
-                np.empty((0,) + shape),
+            _canary_data_eb = FoldedScalarConst.constant_fold_expr(
+                qoi_expr, np.dtype(np.float64)
+            ).compute_data_error_bound(
+                np.empty((0,), dtype=np.float64),
+                np.empty((0,), dtype=np.float64),
+                np.empty((0,), dtype=np.float64),
+                np.empty((0,) + shape, dtype=np.float64),
                 {
-                    c: np.empty((0,) + shape)
+                    c: np.empty((0,) + shape, dtype=np.float64)
                     for c in self._qoi_expr_late_bound_constants
                 },
             )

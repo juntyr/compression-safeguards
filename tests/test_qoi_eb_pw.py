@@ -342,9 +342,9 @@ def test_fuzzer_found(check):
 
 
 def test_evaluate_expr_with_dtype():
-    from compression_safeguards.safeguards._qois.sly.expr.addsub import ScalarAdd
-    from compression_safeguards.safeguards._qois.sly.expr.data import Data
-    from compression_safeguards.safeguards._qois.sly.expr.literal import Euler, Pi
+    from compression_safeguards.safeguards._qois.expr.addsub import ScalarAdd
+    from compression_safeguards.safeguards._qois.expr.data import Data
+    from compression_safeguards.safeguards._qois.expr.literal import Euler, Pi
 
     expr = ScalarAdd(ScalarAdd(Data(()), Pi()), Euler())
 
@@ -480,9 +480,9 @@ def test_gaussian_kernel():
 
 
 def test_constant_fold():
-    from compression_safeguards.safeguards._qois.sly.expr.data import Data
-    from compression_safeguards.safeguards._qois.sly.expr.literal import Number
-    from compression_safeguards.safeguards._qois.sly.expr.logexp import (
+    from compression_safeguards.safeguards._qois.expr.data import Data
+    from compression_safeguards.safeguards._qois.expr.literal import Number
+    from compression_safeguards.safeguards._qois.expr.logexp import (
         ScalarLogWithBase,
     )
 

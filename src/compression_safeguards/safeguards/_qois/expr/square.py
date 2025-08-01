@@ -2,9 +2,9 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from .....utils.bindings import Parameter
-from .....utils.cast import _nan_to_zero_inf_to_finite
-from ...eb import ensure_bounded_derived_error
+from ....utils.bindings import Parameter
+from ....utils.cast import _nan_to_zero_inf_to_finite
+from ..eb import ensure_bounded_derived_error
 from .abc import Expr
 from .constfold import FoldedScalarConst
 from .typing import F, Ns, Ps, PsI
@@ -24,6 +24,15 @@ class ScalarSqrt(Expr):
     @property
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return self._a.data_indices
+
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        return ScalarSqrt(
+            self._a.apply_array_element_offset(axis, offset),
+        )
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:
@@ -139,6 +148,15 @@ class ScalarSquare(Expr):
     @property
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return self._a.data_indices
+
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        return ScalarSquare(
+            self._a.apply_array_element_offset(axis, offset),
+        )
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:

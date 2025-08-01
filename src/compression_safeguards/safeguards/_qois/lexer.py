@@ -71,6 +71,14 @@ class QoILexer(Lexer):
         ACOTH,  # type: ignore[name-defined]  # noqa: F821
         ASECH,  # type: ignore[name-defined]  # noqa: F821
         ACSCH,  # type: ignore[name-defined]  # noqa: F821
+        FINITE_DIFFERENCE,  # type: ignore[name-defined]  # noqa: F821
+        ORDER,  # type: ignore[name-defined]  # noqa: F821
+        ACCURACY,  # type: ignore[name-defined]  # noqa: F821
+        TYPE,  # type: ignore[name-defined]  # noqa: F821
+        AXIS,  # type: ignore[name-defined]  # noqa: F821
+        GRID_SPACING,  # type: ignore[name-defined]  # noqa: F821
+        GRID_CENTRE,  # type: ignore[name-defined]  # noqa: F821
+        GRID_PERIOD,  # type: ignore[name-defined]  # noqa: F821
     }
     ignore = " \t"
 
@@ -150,6 +158,14 @@ class QoILexer(Lexer):
     ID["acoth"] = ACOTH  # type: ignore[index, name-defined]  # noqa: F821
     ID["asech"] = ASECH  # type: ignore[index, name-defined]  # noqa: F821
     ID["acsch"] = ACSCH  # type: ignore[index, name-defined]  # noqa: F821
+    ID["finite_difference"] = FINITE_DIFFERENCE  # type: ignore[index, name-defined]  # noqa: F821
+    ID["order"] = ORDER  # type: ignore[index, name-defined]  # noqa: F821
+    ID["accuracy"] = ACCURACY  # type: ignore[index, name-defined]  # noqa: F821
+    ID["type"] = TYPE  # type: ignore[index, name-defined]  # noqa: F821
+    ID["axis"] = AXIS  # type: ignore[index, name-defined]  # noqa: F821
+    ID["grid_spacing"] = GRID_SPACING  # type: ignore[index, name-defined]  # noqa: F821
+    ID["grid_centre"] = GRID_CENTRE  # type: ignore[index, name-defined]  # noqa: F821
+    ID["grid_period"] = GRID_PERIOD  # type: ignore[index, name-defined]  # noqa: F821
 
     # Ignored pattern
     ignore_newline = r"\n+"

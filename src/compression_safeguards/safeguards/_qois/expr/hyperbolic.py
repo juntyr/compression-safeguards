@@ -4,8 +4,8 @@ from typing import Callable
 
 import numpy as np
 
-from .....utils.bindings import Parameter
-from .....utils.cast import _float128_dtype, _reciprocal
+from ....utils.bindings import Parameter
+from ....utils.cast import _float128_dtype, _reciprocal
 from .abc import Expr
 from .addsub import ScalarAdd, ScalarSubtract
 from .constfold import FoldedScalarConst
@@ -48,6 +48,16 @@ class ScalarHyperbolic(Expr):
     @property
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return self._a.data_indices
+
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        return ScalarHyperbolic(
+            self._func,
+            self._a.apply_array_element_offset(axis, offset),
+        )
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:

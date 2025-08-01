@@ -2,7 +2,7 @@ import itertools
 
 from sly import Parser  # from sly.yacc import SlyLogger
 
-from ....utils.bindings import Parameter
+from ...utils.bindings import Parameter
 from .expr.abc import Expr
 from .expr.addsub import ScalarAdd, ScalarSubtract
 from .expr.array import Array
@@ -209,15 +209,10 @@ class QoIParser(Parser):
         )
         return int(expr)
 
-    @_("IDX LBRACK NUMBER RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("IDX LBRACK integer RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         assert self._I is not None
-        return Number(f"{self._I[int(p.NUMBER)]}")
-
-    @_("IDX LBRACK MINUS NUMBER RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        assert self._I is not None
-        return Number(f"{self._I[-int(p.NUMBER)]}")
+        return Number(f"{self._I[p.integer]}")
 
     @_("comma_expr many_comma_expr")  # type: ignore[name-defined]  # noqa: F821
     def many_comma_expr(self, p):
@@ -461,6 +456,160 @@ class QoIParser(Parser):
             lambda e: LateBoundConstant.like(Parameter(p.quotedid), e),
         )
 
+    @_(  # type: ignore[name-defined, no-redef]  # noqa: F821
+        "FINITE_DIFFERENCE LPAREN expr COMMA ORDER EQUAL integer COMMA ACCURACY EQUAL integer COMMA TYPE EQUAL integer COMMA AXIS EQUAL integer finite_difference_grid_spacing finite_difference_grid_period RPAREN"
+    )
+    def expr(self, p):  # noqa: F811
+        from .expr.finite_difference import (
+            FiniteDifference,
+            ScalarSymmetricModulo,
+            finite_difference_coefficients,
+            finite_difference_offsets,
+        )
+
+        assert self._X is not None
+        assert self._I is not None
+
+        expr = p.expr
+        assert p.expr.has_data, (
+            f"finite_difference expr must reference the data {'x' if self._X is None else 'X'}"
+        )
+        assert not isinstance(p.expr, Array), (
+            "finite_difference expr must be a scalar array element expression, e.g. the centre value, not an array"
+        )
+
+        order = p.integer0
+        assert order >= 0, "finite_difference order must be non-negative"
+
+        accuracy = p.integer1
+        assert accuracy > 0, "finite_difference accuracy must be positive"
+
+        type = p.integer2
+        assert type in (-1, 0, +1), (
+            "finite_difference type must be 1 (forward), 0 (central), or -1 (backward)"
+        )
+        type = [
+            FiniteDifference.central,
+            FiniteDifference.forward,
+            FiniteDifference.backwards,
+        ][type]
+        if type == FiniteDifference.central:
+            assert accuracy % 2 == 0, (
+                "finite_difference accuracy must be even for a central finite difference"
+            )
+
+        axis = p.integer3
+        assert axis >= -len(self._X.shape) and axis < len(self._X.shape), (
+            "finite_difference axis must be in range of the dimension of the neighbourhood"
+        )
+
+        offsets = finite_difference_offsets(type, order, accuracy)
+
+        grid_period = p.finite_difference_grid_period
+        delta_transform = (
+            (lambda e: e)
+            if grid_period is None
+            else (
+                lambda e: Array.map_unary(
+                    e, lambda f: ScalarSymmetricModulo(f, grid_period)
+                )
+            )
+        )
+
+        if "spacing" in p.finite_difference_grid_spacing:
+            grid_spacing = Group(p.finite_difference_grid_spacing["spacing"])
+
+            coefficients = finite_difference_coefficients(
+                order,
+                tuple(ScalarMultiply(Number(f"{o}"), grid_spacing) for o in offsets),
+                lambda a: a,
+                delta_transform=delta_transform,
+            )
+        else:
+            grid_centre = Group(p.finite_difference_grid_spacing["centre"])
+
+            coefficients = finite_difference_coefficients(
+                order,
+                tuple(grid_centre.apply_array_element_offset(axis, o) for o in offsets),
+                lambda a: Group(ScalarSubtract(a, grid_centre)),
+                delta_transform=delta_transform,
+            )
+
+        terms = [
+            ScalarMultiply(expr.apply_array_element_offset(axis, o), c)
+            for o, c in zip(offsets, coefficients)
+        ]
+        assert len(terms) > 0
+        acc = terms[0]
+        for t in terms[1:]:
+            acc = ScalarAdd(acc, t)
+
+        for idx in acc.data_indices:
+            for i, a, c in zip(idx, self._X.shape, self._I):
+                assert i >= 0, (
+                    f"cannot compute the finite_difference on axis {axis} since the neighbourhood is insufficiently large: before should be at least {c - i}"
+                )
+                assert i < a, (
+                    f"cannot compute the finite_difference on axis {axis} since the neighbourhood is insufficiently large: after should be at least {i - c}"
+                )
+
+        return acc
+
+    @_("NUMBER")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def integer(self, p):  # noqa: F811
+        return int(p.NUMBER)
+
+    @_("PLUS NUMBER")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def integer(self, p):  # noqa: F811
+        return int(p.NUMBER)
+
+    @_("MINUS NUMBER")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def integer(self, p):  # noqa: F811
+        return -int(p.NUMBER)
+
+    @_("COMMA GRID_SPACING EQUAL expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def finite_difference_grid_spacing(self, p):  # noqa: F811
+        assert not p.expr.has_data, (
+            f"finite_difference grid_spacing must not reference the data {'x' if self._X is None else 'X'}"
+        )
+        assert not isinstance(p.expr, Array), (
+            "finite_difference grid_spacing must be a constant scalar expression, not an array"
+        )
+        return dict(spacing=p.expr)
+
+    @_("COMMA GRID_CENTRE EQUAL expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def finite_difference_grid_spacing(self, p):  # noqa: F811
+        assert not p.expr.has_data, (
+            f"finite_difference grid_centre must not reference the data {'x' if self._X is None else 'X'}"
+        )
+        assert not isinstance(p.expr, Array), (
+            "finite_difference grid_centre must be a constant scalar array element expression, not an array"
+        )
+        assert len(p.expr.late_bound_constants) > 0, (
+            "finite_difference grid_centre must reference a late-bound constant"
+        )
+        return dict(centre=p.expr)
+
+    @_("COMMA GRID_PERIOD EQUAL expr maybe_comma")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def finite_difference_grid_period(self, p):  # noqa: F811
+        import numpy as np
+
+        assert not p.expr.has_data, (
+            f"finite_difference grid_period must not reference the data {'x' if self._X is None else 'X'}"
+        )
+        assert len(p.expr.late_bound_constants) == 0, (
+            "finite_difference grid_period must not reference late-bound constants"
+        )
+        period = p.expr.constant_fold(np.dtype(np.float64))
+        assert isinstance(period, np.float64), (
+            "finite_difference grid_period must be a constant scalar number"
+        )
+        return p.expr
+
+    @_("maybe_comma")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def finite_difference_grid_period(self, p):  # noqa: F811
+        pass
+
     def error(self, t):
         actions = self._lrtable.lr_action[self.state]
         options = ", ".join(token_to_name(t) for t in actions)
@@ -552,4 +701,12 @@ def token_to_name(token: str) -> str:
         "ACOTH": "`acoth`",
         "ASECH": "`asech`",
         "ACSCH": "`acsch`",
+        "FINITE_DIFFERENCE": "`finite_difference`",
+        "ORDER": "`order`",
+        "ACCURACY": "`accuracy`",
+        "TYPE": "`type`",
+        "AXIS": "`axis`",
+        "GRID_SPACING": "`grid_spacing`",
+        "GRID_CENTRE": "`grid_centre`",
+        "GRID_PERIOD": "`grid_period`",
     }.get(token, f"<{token}>")

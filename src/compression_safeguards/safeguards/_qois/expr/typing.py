@@ -2,7 +2,7 @@ __all__ = ["F", "Ps", "PsI", "Ns"]
 
 from typing import TypeVar
 
-from .....utils.typing import F
+from ....utils.typing import F
 
 Ps = TypeVar("Ps", bound=tuple[int, ...], covariant=True)
 """ Any pointwise array shape [...X] (covariant). """

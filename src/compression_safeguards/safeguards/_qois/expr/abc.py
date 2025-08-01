@@ -3,8 +3,8 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from .....utils.bindings import Parameter
-from ...eb import ensure_bounded_derived_error
+from ....utils.bindings import Parameter
+from ..eb import ensure_bounded_derived_error
 from .typing import F, Ns, Ps, PsI
 
 
@@ -19,6 +19,14 @@ class Expr:
     @property
     @abstractmethod
     def data_indices(self) -> frozenset[tuple[int, ...]]:
+        pass
+
+    @abstractmethod
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> "Expr":
         pass
 
     @property

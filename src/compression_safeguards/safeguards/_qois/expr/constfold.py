@@ -3,7 +3,7 @@ from typing import Callable
 
 import numpy as np
 
-from .....utils.bindings import Parameter
+from ....utils.bindings import Parameter
 from .abc import Expr
 from .typing import F, Ns, Ps, PsI
 
@@ -22,6 +22,13 @@ class FoldedScalarConst(Expr):
     @property
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return frozenset()
+
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        return self
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:

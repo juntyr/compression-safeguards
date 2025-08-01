@@ -4,7 +4,7 @@ from typing import Callable
 
 import numpy as np
 
-from .....utils.bindings import Parameter
+from ....utils.bindings import Parameter
 from .abc import Expr
 from .addsub import ScalarAdd
 from .constfold import FoldedScalarConst
@@ -50,6 +50,15 @@ class Array(Expr):
         for e in self._array.flat:
             indices.update(e.data_indices)
         return frozenset(indices)
+
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        return Array.map_unary(
+            self, lambda e: e.apply_array_element_offset(axis, offset)
+        )
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:

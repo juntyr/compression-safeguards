@@ -2,16 +2,18 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from .....utils.bindings import Parameter
-from .....utils.cast import _nextafter
-from ...eb import ensure_bounded_derived_error
+from ....utils.bindings import Parameter
+from ....utils.cast import _nan_to_zero_inf_to_finite
+from ..eb import ensure_bounded_derived_error
 from .abc import Expr
+from .addsub import ScalarAdd
 from .constfold import FoldedScalarConst
-from .neg import ScalarNegate
+from .literal import Number
+from .logexp import Exponential, Logarithm, ScalarExp, ScalarLog
 from .typing import F, Ns, Ps, PsI
 
 
-class ScalarAdd(Expr):
+class ScalarMultiply(Expr):
     __slots__ = ("_a", "_b")
     _a: Expr
     _b: Expr
@@ -28,13 +30,23 @@ class ScalarAdd(Expr):
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return self._a.data_indices | self._b.data_indices
 
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        return ScalarMultiply(
+            self._a.apply_array_element_offset(axis, offset),
+            self._b.apply_array_element_offset(axis, offset),
+        )
+
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:
         return self._a.late_bound_constants | self._b.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return FoldedScalarConst.constant_fold_binary(
-            self._a, self._b, dtype, np.add, ScalarAdd
+            self._a, self._b, dtype, np.multiply, ScalarMultiply
         )
 
     def eval(
@@ -43,7 +55,9 @@ class ScalarAdd(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.add(self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound))
+        return np.multiply(
+            self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound)
+        )
 
     def compute_data_error_bound_unchecked(
         self,
@@ -55,33 +69,40 @@ class ScalarAdd(Expr):
     ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
         a_const = not self._a.has_data
         b_const = not self._b.has_data
-        assert not (a_const and b_const), "constant sum has no error bounds"
+        assert not (a_const and b_const), "constant product has no error bounds"
 
-        # TODO: handle weighted sums
+        # TODO: handle larger products
 
         if a_const or b_const:
             term, const = (self._b, self._a) if a_const else (self._a, self._b)
 
-            # evaluate the non-constant and constant term and their sum
+            # evaluate the non-constant and constant term and their product
             termv = term.eval(X.shape, Xs, late_bound)
             constv = const.eval(X.shape, Xs, late_bound)
-            # add of two terms is commutative
-            exprv = np.add(termv, constv)
+            # mul of two terms is commutative
+            exprv = np.multiply(termv, constv)
 
-            # handle rounding errors in the addition
+            efl = _nan_to_zero_inf_to_finite(eb_expr_lower / np.abs(constv))
+            efu = _nan_to_zero_inf_to_finite(eb_expr_upper / np.abs(constv))
+
+            # flip the lower/upper error bound if the factor is negative
+            etl: np.ndarray[Ps, np.dtype[F]] = np.where(constv < 0, -efu, efl)  # type: ignore
+            etu: np.ndarray[Ps, np.dtype[F]] = np.where(constv < 0, -efl, efu)  # type: ignore
+
+            # handle rounding errors in the multiplication
             eb_term_lower = ensure_bounded_derived_error(
-                lambda etl: (termv + etl) + constv,
+                lambda etl: (termv + etl) * constv,
                 exprv,
                 termv,
-                eb_expr_lower,
+                etl,
                 eb_expr_lower,
                 eb_expr_upper,
             )
             eb_term_upper = ensure_bounded_derived_error(
-                lambda etu: (termv + etu) + constv,
+                lambda etu: (termv + etu) * constv,
                 exprv,
                 termv,
-                eb_expr_upper,
+                etu,
                 eb_expr_lower,
                 eb_expr_upper,
             )
@@ -95,56 +116,28 @@ class ScalarAdd(Expr):
                 late_bound,
             )
 
-        # TODO: this is a temporary fix
-        eb_expr_lower_half = eb_expr_lower * 0.5
-        eb_expr_upper_half = eb_expr_upper * 0.5
+        # FIXME: this is just a short-term fix
+        from .power import ScalarFakeAbs
 
-        el: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            (eb_expr_lower_half + eb_expr_lower_half) < eb_expr_lower,
-            _nextafter(eb_expr_lower_half, 0),
-            eb_expr_lower_half,
-        )
-        eu: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            (eb_expr_upper_half + eb_expr_upper_half) > eb_expr_upper,
-            _nextafter(eb_expr_upper_half, 0),
-            eb_expr_upper_half,
-        )
-
-        al, au = self._a.compute_data_error_bound(
-            el,
-            eu,
+        return ScalarExp(
+            Exponential.exp,
+            ScalarAdd(
+                ScalarLog(Logarithm.ln, ScalarFakeAbs(self._a)),
+                ScalarLog(Logarithm.ln, ScalarFakeAbs(self._b)),
+            ),
+        ).compute_data_error_bound(
+            eb_expr_lower,
+            eb_expr_upper,
             X,
             Xs,
             late_bound,
-        )
-        bl, bu = self._b.compute_data_error_bound(
-            el,
-            eu,
-            X,
-            Xs,
-            late_bound,
-        )
-
-        return np.maximum(al, bl), np.minimum(au, bu)
-
-    def compute_data_error_bound(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # the unchecked method already handles rounding errors for add
-        return self.compute_data_error_bound_unchecked(
-            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:
-        return f"{self._a!r} + {self._b!r}"
+        return f"{self._a!r} * {self._b!r}"
 
 
-class ScalarSubtract(Expr):
+class ScalarDivide(Expr):
     __slots__ = ("_a", "_b")
     _a: Expr
     _b: Expr
@@ -161,13 +154,23 @@ class ScalarSubtract(Expr):
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return self._a.data_indices | self._b.data_indices
 
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        return ScalarDivide(
+            self._a.apply_array_element_offset(axis, offset),
+            self._b.apply_array_element_offset(axis, offset),
+        )
+
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:
         return self._a.late_bound_constants | self._b.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return FoldedScalarConst.constant_fold_binary(
-            self._a, self._b, dtype, np.subtract, ScalarSubtract
+            self._a, self._b, dtype, np.divide, ScalarDivide
         )
 
     def eval(
@@ -176,7 +179,7 @@ class ScalarSubtract(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.subtract(
+        return np.divide(
             self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound)
         )
 
@@ -188,23 +191,12 @@ class ScalarSubtract(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # TODO: implement subtract separately
-        return ScalarAdd(self._a, ScalarNegate(self._b)).compute_data_error_bound(
-            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
-        )
+        # TODO: implement separately
+        from .power import ScalarPower
 
-    def compute_data_error_bound(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # the unchecked method already handles rounding errors for subtract
-        return self.compute_data_error_bound_unchecked(
-            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
-        )
+        return ScalarMultiply(
+            self._a, ScalarPower(self._b, Number("-1"))
+        ).compute_data_error_bound(eb_expr_lower, eb_expr_upper, X, Xs, late_bound)
 
     def __repr__(self) -> str:
-        return f"{self._a!r} - {self._b!r}"
+        return f"{self._a!r} / {self._b!r}"

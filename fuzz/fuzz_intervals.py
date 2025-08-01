@@ -5,8 +5,6 @@ with atheris.instrument_imports():
 
     import numpy as np
 
-import sympy as sympy
-
 with atheris.instrument_imports():
     import sys
     import warnings
