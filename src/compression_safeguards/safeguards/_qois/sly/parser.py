@@ -32,17 +32,19 @@ class NullWriter:
 
 
 class QoIParser(Parser):
-    __slots__ = ("_x", "_X", "_vars", "_text")
+    __slots__ = ("_x", "_X", "_I", "_vars", "_text")
     _x: Data
     _X: None | Array
+    _I: None | tuple[int, ...]
     _vars: dict[Parameter, Expr]
     _text: str
 
     # log = SlyLogger(NullWriter())
 
-    def __init__(self, *, x: Data, X: None | Array):
+    def __init__(self, *, x: Data, X: None | Array, I: None | tuple[int, ...]):  # noqa: E741
         self._x = x
         self._X = X
+        self._I = I
         self._vars = dict()
 
     def parse(self, text: str, tokens):  # type: ignore
@@ -175,6 +177,12 @@ class QoIParser(Parser):
         assert isinstance(p.expr, Array), "only array expressions can be indexed"
         return p.expr.index(tuple([p.index_] + p.many_comma_index))
 
+    @_("expr LBRACK IDX RBRACK %prec INDEX")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        assert self._I is not None
+        assert isinstance(p.expr, Array), "only array expressions can be indexed"
+        return p.expr.index(self._I)
+
     @_("comma_index many_comma_index")  # type: ignore[name-defined]  # noqa: F821
     def many_comma_index(self, p):
         return [p.comma_index] + p.many_comma_index
@@ -191,9 +199,25 @@ class QoIParser(Parser):
     def comma_index(self, p):
         return p.index_
 
-    @_("NUMBER")  # type: ignore[name-defined]  # noqa: F821
+    @_("expr")  # type: ignore[name-defined]  # noqa: F821
     def index_(self, p):
-        return int(p.NUMBER)
+        import numpy as np
+
+        expr = p.expr.constant_fold(np.dtype(int))
+        assert isinstance(expr, np.dtype(int).type), (
+            "cannot index by non-integer expression"
+        )
+        return int(expr)
+
+    @_("IDX LBRACK NUMBER RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        assert self._I is not None
+        return Number(f"{self._I[int(p.NUMBER)]}")
+
+    @_("IDX LBRACK MINUS NUMBER RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        assert self._I is not None
+        return Number(f"{self._I[-int(p.NUMBER)]}")
 
     @_("comma_expr many_comma_expr")  # type: ignore[name-defined]  # noqa: F821
     def many_comma_expr(self, p):
@@ -479,6 +503,7 @@ def token_to_name(token: str) -> str:
         "PI": "`pi`",
         "XS": "`x`",
         "XA": "`X`",
+        "IDX": "`I`",
         "LN": "`ln`",
         "LOG2": "`log2`",
         "LOG": "`log`",

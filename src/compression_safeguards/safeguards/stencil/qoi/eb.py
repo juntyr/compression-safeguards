@@ -364,7 +364,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         X = Array.from_data_shape(shape)
 
         qoi_lexer = QoILexer()
-        qoi_parser = QoIParser(x=Data(index=I), X=X)
+        qoi_parser = QoIParser(x=Data(index=I), X=X, I=I)
 
         try:
             qoi_expr = qoi_parser.parse(qoi, qoi_lexer.tokenize(qoi))

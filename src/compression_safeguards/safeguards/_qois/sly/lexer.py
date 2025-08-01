@@ -22,6 +22,7 @@ class QoILexer(Lexer):
         PI,  # type: ignore[name-defined]  # noqa: F821
         XS,  # type: ignore[name-defined]  # noqa: F821
         XA,  # type: ignore[name-defined]  # noqa: F821
+        IDX,  # type: ignore[name-defined]  # noqa: F821
         LN,  # type: ignore[name-defined]  # noqa: F821
         LOG2,  # type: ignore[name-defined]  # noqa: F821
         LOG,  # type: ignore[name-defined]  # noqa: F821
@@ -104,6 +105,7 @@ class QoILexer(Lexer):
     ID["pi"] = PI  # type: ignore[index, name-defined]  # noqa: F821
     ID["x"] = XS  # type: ignore[index, name-defined]  # noqa: F821
     ID["X"] = XA  # type: ignore[index, name-defined]  # noqa: F821
+    ID["I"] = IDX  # type: ignore[index, name-defined]  # noqa: F821
     ID["ln"] = LN  # type: ignore[index, name-defined]  # noqa: F821
     ID["log2"] = LOG2  # type: ignore[index, name-defined]  # noqa: F821
     ID["log"] = LOG  # type: ignore[index, name-defined]  # noqa: F821

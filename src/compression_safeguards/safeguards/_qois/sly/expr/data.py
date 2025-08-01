@@ -65,7 +65,7 @@ class Data(Expr):
     def __repr__(self) -> str:
         if self._index == ():
             return "x"
-        return f"X[..., {','.join(str(i) for i in self._index)}]"
+        return f"X[{','.join(str(i) for i in self._index)}]"
 
 
 class LateBoundConstant(Expr):
@@ -123,4 +123,6 @@ class LateBoundConstant(Expr):
         assert False, "late-bound constants have no error bounds"
 
     def __repr__(self) -> str:
+        if self._index == ():
+            return f'c["{self._name}"]'
         return f'C["{self._name}"][{",".join(str(i) for i in self._index)}]'

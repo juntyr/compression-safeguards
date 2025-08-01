@@ -264,12 +264,12 @@ def test_invalid_array():
 
 
 def test_mean():
-    # # arithmetic mean
-    # check_all_codecs(
-    #     np.arange(64, dtype=float).reshape(4, 4, 4),
-    #     "(X[I+A[-1,0]]+X[I+A[+1,0]]+X[I+A[0,-1]]+X[I+A[0,+1]])/4",
-    #     [(1, 1), (1, 1)],
-    # )
+    # arithmetic mean
+    check_all_codecs(
+        np.arange(64, dtype=float).reshape(4, 4, 4),
+        "(X[I[0]-1,I[1]]+X[I[0]+1,I[1]]+X[I[0],I[1]-1]+X[I[0],I[1]+1])/4",
+        [(1, 1), (1, 1)],
+    )
 
     # arithmetic mean using a convolution
     check_all_codecs(
@@ -278,12 +278,12 @@ def test_mean():
         [(1, 1), (1, 1)],
     )
 
-    # # geometric mean
-    # check_all_codecs(
-    #     np.arange(64, dtype=float).reshape(4, 4, 4),
-    #     "(X[I+A[-1,0]]*X[I+A[+1,0]]*X[I+A[0,-1]]*X[I+A[0,+1]])**(1/4)",
-    #     [(1, 1), (1, 1)],
-    # )
+    # geometric mean
+    check_all_codecs(
+        np.arange(64, dtype=float).reshape(4, 4, 4),
+        "(X[I[0]-1,I[1]]*X[I[0]+1,I[1]]*X[I[0],I[1]-1]*X[I[0],I[1]+1])**(1/4)",
+        [(1, 1), (1, 1)],
+    )
 
 
 # def test_finite_difference():
@@ -687,7 +687,7 @@ def test_matmul():
     )
     assert (
         f"{safeguard._qoi_expr!r}"
-        == "(-1 * (X[..., 0,0] * 1 + X[..., 0,1] * 2 + X[..., 0,2] * 3) + -2 * (X[..., 1,0] * 1 + X[..., 1,1] * 2 + X[..., 1,2] * 3) + -3 * (X[..., 2,0] * 1 + X[..., 2,1] * 2 + X[..., 2,2] * 3))"
+        == "(-1 * (X[0,0] * 1 + X[0,1] * 2 + X[0,2] * 3) + -2 * (X[1,0] * 1 + X[1,1] * 2 + X[1,2] * 3) + -3 * (X[2,0] * 1 + X[2,1] * 2 + X[2,2] * 3))"
     )
     check_all_codecs(
         data,
@@ -696,64 +696,61 @@ def test_matmul():
     )
 
 
-# def test_indexing():
-#     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-#         "X[I-1] + X[I+2]",
-#         [dict(axis=0, before=1, after=4, boundary="valid")],
-#         "abs",
-#         0,
-#     )
-#     assert f"{safeguard._qoi_expr}" == "X[0] + X[3]"
+def test_indexing():
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "X[I[0]-1] + X[I[0]+2]",
+        [dict(axis=0, before=1, after=4, boundary="valid")],
+        "abs",
+        0,
+    )
+    assert f"{safeguard._qoi_expr!r}" == "X[0] + X[3]"
 
-#     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-#         "X[I[0]][I[1]]",
-#         [
-#             dict(axis=0, before=1, after=1, boundary="valid"),
-#             dict(axis=1, before=1, after=1, boundary="valid"),
-#         ],
-#         "abs",
-#         0,
-#     )
-#     assert f"{safeguard._qoi_expr}" == "X[1, 1]"
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "X[I[0]][I[1]]",
+        [
+            dict(axis=0, before=1, after=1, boundary="valid"),
+            dict(axis=1, before=1, after=1, boundary="valid"),
+        ],
+        "abs",
+        0,
+    )
+    assert f"{safeguard._qoi_expr!r}" == "X[1,1]"
 
-#     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-#         "X[0][0]",
-#         [
-#             dict(axis=0, before=1, after=1, boundary="valid"),
-#             dict(axis=1, before=1, after=1, boundary="valid"),
-#         ],
-#         "abs",
-#         0,
-#     )
-#     assert f"{safeguard._qoi_expr}" == "X[0, 0]"
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "X[0][0]",
+        [
+            dict(axis=0, before=1, after=1, boundary="valid"),
+            dict(axis=1, before=1, after=1, boundary="valid"),
+        ],
+        "abs",
+        0,
+    )
+    assert f"{safeguard._qoi_expr!r}" == "X[0,0]"
 
-#     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-#         "(X[I+A[-1,0]]+X[I+A[+1,0]]+X[I+A[0,-1]]+X[I+A[0,+1]])/4",
-#         [
-#             dict(axis=0, before=1, after=1, boundary="valid"),
-#             dict(axis=1, before=1, after=1, boundary="valid"),
-#         ],
-#         "abs",
-#         0,
-#     )
-#     assert (
-#         f"{safeguard._qoi_expr}"
-#         == "NonAssociativeMul(X[0, 1], 1/4) + NonAssociativeMul(X[1, 0], 1/4) + NonAssociativeMul(X[1, 2], 1/4) + NonAssociativeMul(X[2, 1], 1/4)"
-#     )
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "(X[I[0]-1,I[1]]+X[I[0]+1,I[1]]+X[I[0],I[1]-1]+X[I[0],I[1]+1])/4",
+        [
+            dict(axis=0, before=1, after=1, boundary="valid"),
+            dict(axis=1, before=1, after=1, boundary="valid"),
+        ],
+        "abs",
+        0,
+    )
+    assert f"{safeguard._qoi_expr}" == "(X[0,1] + X[2,1] + X[1,0] + X[1,2]) / 4"
 
-#     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-#         "asum(X * A[[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])",
-#         [
-#             dict(axis=0, before=1, after=1, boundary="valid"),
-#             dict(axis=1, before=1, after=1, boundary="valid"),
-#         ],
-#         "abs",
-#         0,
-#     )
-#     assert (
-#         f"{safeguard._qoi_expr}"
-#         == "NonAssociativeMul(X[0, 0], 0.25) + NonAssociativeMul(X[0, 1], 0.5) + NonAssociativeMul(X[0, 2], 0.25) + NonAssociativeMul(X[1, 0], 0.5) + NonAssociativeMul(X[1, 1], 1.0) + NonAssociativeMul(X[1, 2], 0.5) + NonAssociativeMul(X[2, 0], 0.25) + NonAssociativeMul(X[2, 1], 0.5) + NonAssociativeMul(X[2, 2], 0.25)"
-#     )
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "sum(X * [[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])",
+        [
+            dict(axis=0, before=1, after=1, boundary="valid"),
+            dict(axis=1, before=1, after=1, boundary="valid"),
+        ],
+        "abs",
+        0,
+    )
+    assert (
+        f"{safeguard._qoi_expr}"
+        == "(X[0,0] * 0.25 + X[0,1] * 0.5 + X[0,2] * 0.25 + X[1,0] * 0.5 + X[1,1] * 1.0 + X[1,2] * 0.5 + X[2,0] * 0.25 + X[2,1] * 0.5 + X[2,2] * 0.25)"
+    )
 
 
 def test_evaluate_expr_with_indexing():
@@ -1234,6 +1231,7 @@ def test_late_bound_eb_ratio():
 #         eb=1,
 #     )
 #     assert safeguard.late_bound == {"f", "zero"}
+#     assert f"{safeguard._qoi_expr!r}" == 'X[0,0] * C["zero"][1,0] + X[1,0] / C["f"][1,0]'
 
 #     data = np.arange(6).reshape(2, 3)
 

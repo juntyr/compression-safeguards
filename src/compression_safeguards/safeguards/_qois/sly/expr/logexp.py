@@ -126,7 +126,7 @@ class ScalarLog(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
         # the unchecked method already handles rounding errors for ln / log2,
-        #  which are stricly monotonic
+        #  which are strictly monotonic
         return self.compute_data_error_bound_unchecked(
             eb_expr_lower, eb_expr_upper, X, Xs, late_bound
         )
@@ -262,7 +262,7 @@ class ScalarExp(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
         # the unchecked method already handles rounding errors for exp / exp2,
-        #  which is stricly monotonic
+        #  which is strictly monotonic
         return self.compute_data_error_bound_unchecked(
             eb_expr_lower, eb_expr_upper, X, Xs, late_bound
         )

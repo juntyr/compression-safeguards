@@ -243,7 +243,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             self._eb = eb
 
         qoi_lexer = QoILexer()
-        qoi_parser = QoIParser(x=Data(index=()), X=None)
+        qoi_parser = QoIParser(x=Data(index=()), X=None, I=None)
 
         try:
             qoi_expr = qoi_parser.parse(qoi, qoi_lexer.tokenize(qoi))

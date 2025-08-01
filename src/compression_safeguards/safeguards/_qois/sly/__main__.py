@@ -11,6 +11,7 @@ if __name__ == "__main__":
     parser = QoIParser(
         x=Data(index=(1,)),
         X=Array(Data(index=(0,)), Data(index=(1,)), Data(index=(2,))),
+        I=(1,),
     )
     while True:
         try:
@@ -27,6 +28,6 @@ if __name__ == "__main__":
             Xs = np.array([[1.0, 2.0, 3.0]])
             expr = FoldedScalarConst.constant_fold_expr(expr, Xs.dtype)
             print(f"folded: {expr!r}")
-            print(f"eval: {expr.eval(Xs[:, 1], Xs, dict())}")
+            print(f"eval: {expr.eval((1,), Xs, dict())}")
         except Exception as err:
             print(f"{type(err).__name__}: {err}")
