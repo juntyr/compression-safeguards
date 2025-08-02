@@ -151,7 +151,7 @@ CHECKS = [
 
 
 def test_sandbox():
-    with pytest.raises(AssertionError, match="illegal token `f`"):
+    with pytest.raises(AssertionError, match="unexpected token `f`"):
         # sandbox escape based on https://stackoverflow.com/q/35804961 and
         #  https://stackoverflow.com/a/35806044
         check_all_codecs(
@@ -174,7 +174,7 @@ def test_empty(check):
 def test_non_expression():
     with pytest.raises(AssertionError, match="EOF"):
         check_all_codecs(np.empty(0), "exp", [(0, 0)])
-    with pytest.raises(AssertionError, match="illegal token `x`"):
+    with pytest.raises(AssertionError, match="unexpected token `x`"):
         check_all_codecs(np.empty(0), "e x p", [(0, 0)])
 
 
@@ -212,7 +212,7 @@ def test_variables():
         check_all_codecs(np.array([]), 'V["a"]', [(0, 0)])
     with pytest.raises(AssertionError, match=r'undefined variable V\["b"\]'):
         check_all_codecs(np.array([]), 'V["a"] = 3; return x + V["b"];', [(0, 0)])
-    with pytest.raises(AssertionError, match="illegal token `=`"):
+    with pytest.raises(AssertionError, match="unexpected token `=`"):
         check_all_codecs(np.array([]), "1 = x", [(0, 0)])
     with pytest.raises(AssertionError, match=r"expected `\(`"):
         check_all_codecs(np.array([]), 'V["a"] = log; return x + V["a"];', [(0, 0)])
@@ -377,10 +377,7 @@ def test_finite_difference():
         "abs",
         0,
     )
-    assert (
-        f"{safeguard._qoi_expr}"
-        == "(X[4,4] * -2.0 + X[5,4] * (-2 / -2) + X[3,4] * (2 / 2))"
-    )
+    assert f"{safeguard._qoi_expr}" == "(X[4,4] * -2.0 + X[5,4] * 1.0 + X[3,4] * 1.0)"
     check_all_codecs(
         data,
         "finite_difference(x,order=2,accuracy=2,type=0,axis=0,grid_spacing=1)",

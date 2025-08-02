@@ -174,23 +174,38 @@ class QoIParser(Parser):
 
     @_("expr PLUS expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_binary(p.expr0, p.expr1, ScalarAdd)
+        try:
+            return Array.map_binary(p.expr0, p.expr1, ScalarAdd)
+        except ValueError as err:
+            self.raise_error(p, f"{err}")
 
     @_("expr MINUS expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_binary(p.expr0, p.expr1, ScalarSubtract)
+        try:
+            return Array.map_binary(p.expr0, p.expr1, ScalarSubtract)
+        except ValueError as err:
+            self.raise_error(p, f"{err}")
 
     @_("expr TIMES expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_binary(p.expr0, p.expr1, ScalarMultiply)
+        try:
+            return Array.map_binary(p.expr0, p.expr1, ScalarMultiply)
+        except ValueError as err:
+            self.raise_error(p, f"{err}")
 
     @_("expr POWER expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_binary(p.expr0, p.expr1, ScalarPower)
+        try:
+            return Array.map_binary(p.expr0, p.expr1, ScalarPower)
+        except ValueError as err:
+            self.raise_error(p, f"{err}")
 
     @_("expr DIVIDE expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_binary(p.expr0, p.expr1, ScalarDivide)
+        try:
+            return Array.map_binary(p.expr0, p.expr1, ScalarDivide)
+        except ValueError as err:
+            self.raise_error(p, f"{err}")
 
     @_("PLUS expr %prec UPLUS")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -210,11 +225,14 @@ class QoIParser(Parser):
 
     @_("LBRACK expr many_comma_expr RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array(*([p.expr] + p.many_comma_expr))
+        try:
+            return Array(*([p.expr] + p.many_comma_expr))
+        except ValueError as err:
+            self.raise_error(p, f"invalid array literal: {err}")
 
     @_("LBRACK RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        self.raise_error(p, "illegal empty array literal")
+        self.raise_error(p, "invalid empty array literal")
 
     @_("expr LBRACK index_ many_comma_index RBRACK %prec INDEX")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -257,15 +275,12 @@ class QoIParser(Parser):
 
     @_("expr")  # type: ignore[name-defined]  # noqa: F821
     def index_(self, p):
-        import numpy as np
-
-        expr = p.expr.constant_fold(np.dtype(int))
         self.assert_or_error(
-            isinstance(expr, np.dtype(int).type),
+            isinstance(p.expr, Number) and p.expr.int() is not None,
             p,
             "cannot index by non-integer expression",
         )
-        return int(expr)
+        return p.expr.int()
 
     @_("IDX LBRACK integer RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -337,7 +352,12 @@ class QoIParser(Parser):
 
     @_("LOG LPAREN expr COMMA BASE EQUAL expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_binary(p.expr0, p.expr1, lambda a, b: ScalarLogWithBase(a, b))
+        try:
+            return Array.map_binary(
+                p.expr0, p.expr1, lambda a, b: ScalarLogWithBase(a, b)
+            )
+        except ValueError as err:
+            self.raise_error(p, f"{err}")
 
     @_("EXP LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -514,7 +534,10 @@ class QoIParser(Parser):
             p,
             "cannot matmul(a, b) with scalar non-array parameter b",
         )
-        return Array.matmul(p.expr0, p.expr1)
+        try:
+            return Array.matmul(p.expr0, p.expr1)
+        except ValueError as err:
+            self.raise_error(p, f"{err}")
 
     @_("expr TRANSPOSE %prec TRANSPOSE")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -707,8 +730,6 @@ class QoIParser(Parser):
 
     @_("COMMA GRID_PERIOD EQUAL expr maybe_comma")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def finite_difference_grid_period(self, p):  # noqa: F811
-        import numpy as np
-
         self.assert_or_error(
             not p.expr.has_data,
             p,
@@ -719,11 +740,10 @@ class QoIParser(Parser):
             p,
             "finite_difference grid_period must not reference late-bound constants",
         )
-        period = p.expr.constant_fold(np.dtype(np.float64))
         self.assert_or_error(
-            isinstance(period, np.float64),
+            not isinstance(p.expr, Array),
             p,
-            "finite_difference grid_period must be a constant scalar number",
+            "`finite_difference` grid_period must be a constant scalar number, not an array",
         )
         return p.expr
 
@@ -742,7 +762,7 @@ class QoIParser(Parser):
             )
 
         raise SyntaxError(
-            f"illegal token `{t.value}` at line {t.lineno}, column {find_column(self._text, t)}\nexpected{oneof} {options}"
+            f"unexpected token `{t.value}` at line {t.lineno}, column {find_column(self._text, t)}\nexpected{oneof} {options}"
         )
 
     def raise_error(self, t, message):

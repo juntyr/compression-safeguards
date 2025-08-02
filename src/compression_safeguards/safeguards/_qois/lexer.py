@@ -191,7 +191,7 @@ class QoILexer(Lexer):
 
     def error(self, t):
         raise SyntaxError(
-            f"illegal character `{t.value[0]}` at line {self.lineno}, column {find_column(self.text, t)}"
+            f"unexpected character `{t.value[0]}` at line {self.lineno}, column {find_column(self.text, t)}"
         )
 
 

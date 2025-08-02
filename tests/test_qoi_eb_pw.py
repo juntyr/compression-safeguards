@@ -100,7 +100,7 @@ CHECKS = [
 
 
 def test_sandbox():
-    with pytest.raises(AssertionError, match="illegal token `f`"):
+    with pytest.raises(AssertionError, match="unexpected token `f`"):
         # sandbox escape based on https://stackoverflow.com/q/35804961 and
         #  https://stackoverflow.com/a/35806044
         check_all_codecs(
@@ -122,7 +122,7 @@ def test_empty(check):
 def test_non_expression():
     with pytest.raises(AssertionError, match="EOF"):
         check_all_codecs(np.empty(0), "exp")
-    with pytest.raises(AssertionError, match="illegal token `x`"):
+    with pytest.raises(AssertionError, match="unexpected token `x`"):
         check_all_codecs(np.empty(0), "e x p")
 
 
@@ -158,7 +158,7 @@ def test_variables():
         check_all_codecs(np.array([]), 'v["a"]')
     with pytest.raises(AssertionError, match=r'undefined variable v\["b"\]'):
         check_all_codecs(np.array([]), 'v["a"] = 3; return x + v["b"];')
-    with pytest.raises(AssertionError, match="illegal token `=`"):
+    with pytest.raises(AssertionError, match="unexpected token `=`"):
         check_all_codecs(np.array([]), "1 = x")
     with pytest.raises(AssertionError, match=r"expected `\(`"):
         check_all_codecs(np.array([]), 'v["a"] = log; return x + v["a"];')

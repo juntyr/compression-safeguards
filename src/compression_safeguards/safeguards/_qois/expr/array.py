@@ -22,14 +22,16 @@ class Array(Expr):
         if isinstance(el, Array):
             aels = [el._array]
             for e in els:
-                # FIXME: better error
-                assert isinstance(e, Array) and e.shape == el.shape
+                if not (isinstance(e, Array) and e.shape == el.shape):
+                    raise ValueError(
+                        f"elements must all have the consistent shape {el.shape}"
+                    )
                 aels.append(e._array)
             self._array = np.array(aels)
         else:
             for e in els:
-                # FIXME: better error
-                assert not isinstance(e, Array)
+                if isinstance(e, Array):
+                    raise ValueError("elements must all be scalar")
             self._array = np.array((el,) + els)
 
     @staticmethod
@@ -110,7 +112,10 @@ class Array(Expr):
     def map_binary(left: Expr, right: Expr, m: Callable[[Expr, Expr], Expr]) -> Expr:
         if isinstance(left, Array):
             if isinstance(right, Array):
-                # FIXME: better error
+                if left.shape != right.shape:
+                    raise ValueError(
+                        f"shape mismatch between operands {left.shape} and {right.shape}"
+                    )
                 assert left.shape == right.shape
                 out = Array.__new__(Array)
                 out._array = np.fromiter(
@@ -163,12 +168,14 @@ class Array(Expr):
 
     @staticmethod
     def matmul(left: "Array", right: "Array") -> "Array":
-        # FIXME: better errors
-        assert len(left.shape) == 2, "can only matmul(a, b) a 2D array a"
-        assert len(right.shape) == 2, "can only matmul(a, b) a 2D array b"
-        assert left.shape[1] == right.shape[0], (
-            "can only matmul(a, b) with shapes (n, k) x (k, m) -> (n, m)"
-        )
+        if len(left.shape) != 2:
+            raise ValueError("can only matmul(a, b) a 2D array a")
+        if len(right.shape) != 2:
+            raise ValueError("can only matmul(a, b) a 2D array b")
+        if left.shape[1] != right.shape[0]:
+            raise ValueError(
+                f"can only matmul(a, b) with shapes (n, k) x (k, m) -> (n, m) but got {left.shape} x {right.shape}"
+            )
         out = Array.__new__(Array)
         out._array = np.empty((left.shape[0], right.shape[1]), dtype=object)
         for n in range(left.shape[0]):
