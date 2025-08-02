@@ -197,51 +197,53 @@ def test_comment():
     )
 
 
-# def test_variables():
-#     with pytest.raises(AssertionError, match="invalid QoI expression"):
-#         check_all_codecs(np.array([]), 'V["123"]', [(0, 0)])
-#     with pytest.raises(AssertionError, match="invalid QoI expression"):
-#         check_all_codecs(np.array([]), 'V["a 123"]', [(0, 0)])
-#     with pytest.raises(AssertionError, match="identifier"):
-#         check_all_codecs(np.array([]), 'V["$a"]', [(0, 0)])
-#     with pytest.raises(AssertionError, match=r'unresolved variable V\["a"\]'):
-#         check_all_codecs(np.array([]), 'V["a"]', [(0, 0)])
-#     with pytest.raises(AssertionError, match=r'unresolved variable V\["b"\]'):
-#         check_all_codecs(np.array([]), 'let(V["a"], 3)(x + V["b"])', [(0, 0)])
-#     with pytest.raises(AssertionError, match="let name"):
-#         check_all_codecs(np.array([]), "let(1, 2)(x)", [(0, 0)])
-#     with pytest.raises(AssertionError, match="let value"):
-#         check_all_codecs(np.array([]), 'let(V["a"], log)(x + V["a"])', [(0, 0)])
-#     with pytest.raises(AssertionError, match="let within"):
-#         check_all_codecs(np.array([]), 'let(V["a"], x + 1)(log)', [(0, 0)])
-#     with pytest.raises(AssertionError, match=r"fresh \(not overridden\)"):
-#         check_all_codecs(
-#             np.array([]), 'let(V["a"], x + 1)(let(V["a"], V["a"])(V["a"]))', [(0, 0)]
-#         )
-#     with pytest.raises(AssertionError, match="pairs of names and values"):
-#         check_all_codecs(
-#             np.array([]), 'let(V["a"], x + 1, V["b"])(V["a"] + V["b"])', [(0, 0)]
-#         )
-#     check_all_codecs(np.array([]), 'let(V["a"], 3)(x + V["a"])', [(0, 0)])
-#     check_all_codecs(
-#         np.array([]),
-#         'let(V["a"], 3)(x + let(V["b"], V["a"] - 1)(V["b"] * 2))',
-#         [(0, 0)],
-#     )
-#     check_all_codecs(
-#         np.array([]), 'let(V["a"], x + 1, V["b"], x - 1)(V["a"] + V["b"])', [(0, 0)]
-#     )
-#     check_all_codecs(np.array([]), 'c["$x"] * x', [(0, 0)])
+def test_variables():
+    with pytest.raises(
+        AssertionError, match="stencil QoI variables use upper-case `V`"
+    ):
+        check_all_codecs(np.array([]), 'v["a"]', [(0, 0)])
+    with pytest.raises(AssertionError, match="expected identifier"):
+        check_all_codecs(np.array([]), 'V["123"]', [(0, 0)])
+    # with pytest.raises(AssertionError, match="invalid QoI expression"):
+    #     check_all_codecs(np.array([]), 'V["a 123"]', [(0, 0)])
+    with pytest.raises(AssertionError, match=r"variable name must not start with `\$`"):
+        check_all_codecs(np.array([]), 'V["$a"]', [(0, 0)])
+    with pytest.raises(AssertionError, match=r'undefined variable V\["a"\]'):
+        check_all_codecs(np.array([]), 'V["a"]', [(0, 0)])
+    with pytest.raises(AssertionError, match=r'undefined variable V\["b"\]'):
+        check_all_codecs(np.array([]), 'V["a"] = 3; return x + V["b"];', [(0, 0)])
+    with pytest.raises(AssertionError, match="illegal token `=`"):
+        check_all_codecs(np.array([]), "1 = x", [(0, 0)])
+    with pytest.raises(AssertionError, match=r"expected `\(`"):
+        check_all_codecs(np.array([]), 'V["a"] = log; return x + V["a"];', [(0, 0)])
+    with pytest.raises(
+        AssertionError, match=r'cannot override already-defined variable V\["a"\]'
+    ):
+        check_all_codecs(
+            np.array([]), 'V["a"] = x + 1; V["a"] = V["a"]; return V["a"];', [(0, 0)]
+        )
+    check_all_codecs(np.array([]), 'V["a"] = 3; return x + V["a"];', [(0, 0)])
+    check_all_codecs(
+        np.array([]),
+        'V["a"] = 3; V["b"] = V["a"] - 1; return x + (V["b"] * 2);',
+        [(0, 0)],
+    )
+    check_all_codecs(
+        np.array([]),
+        'V["a"] = x + 1; V["b"] = x - 1; return V["a"] + V["b"];',
+        [(0, 0)],
+    )
+    check_all_codecs(np.array([]), 'c["$x"] * x', [(0, 0)])
 
-#     with pytest.raises(AssertionError, match="out of border"):
-#         check_all_codecs(np.array([]), 'let(V["a"], X + 1)(V["a"][1])', [(0, 0)])
-#     with pytest.raises(AssertionError, match="index greater"):
-#         check_all_codecs(np.array([]), 'let(V["a"], X + 1)(V["a"][0,1])', [(0, 0)])
-#     check_all_codecs(np.array([]), 'let(V["a"], 3)(X + V["a"])[0]', [(0, 0)])
-#     check_all_codecs(np.array([]), 'let(V["a"], X)(V["a"][0])', [(0, 0)])
-#     check_all_codecs(np.array([]), 'let(V["a"], X)(V["a"][0,0])', [(0, 0), (0, 0)])
-#     check_all_codecs(np.array([]), 'let(V["a"], X)(V["a"][I])', [(0, 0), (0, 0)])
-#     check_all_codecs(np.array([]), 'asum(C["$X"] * X)', [(1, 1)])
+    # with pytest.raises(AssertionError, match="out of border"):
+    #     check_all_codecs(np.array([]), 'V["a"] = X + 1; return V["a"][1];', [(0, 0)])
+    # with pytest.raises(AssertionError, match="index greater"):
+    #     check_all_codecs(np.array([]), 'V["a"] = X + 1; return V["a"][0,1];', [(0, 0)])
+    check_all_codecs(np.array([]), 'V["a"] = 3; return (X + V["a"])[0];', [(0, 0)])
+    check_all_codecs(np.array([]), 'V["a"] = X; return V["a"][0];', [(0, 0)])
+    check_all_codecs(np.array([]), 'V["a"] = X; return V["a"][0,0];', [(0, 0), (0, 0)])
+    check_all_codecs(np.array([]), 'V["a"] = X; return V["a"][I];', [(0, 0), (0, 0)])
+    check_all_codecs(np.array([]), 'sum(C["$X"] * X)', [(1, 1)])
 
 
 @pytest.mark.parametrize("check", CHECKS)

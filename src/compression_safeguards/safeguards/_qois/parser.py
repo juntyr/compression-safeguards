@@ -68,18 +68,28 @@ class QoIParser(Parser):
 
     @_("expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def qoi(self, p):  # noqa: F811
-        assert not isinstance(p.expr, Array), (
-            f"QoI expr must be scalar but is an array expression of shape {p.expr.shape}"
+        self.assert_or_with_error(
+            not isinstance(p.expr, Array),
+            p,
+            lambda: f"QoI expression must be a scalar but is an array expression of shape {p.expr.shape}",
         )
-        assert p.expr.has_data, "QoI expr must not be constant"
+        self.assert_or_error(p.expr.has_data, p, "QoI expression must not be constant")
         return p.expr
 
-    @_("many_assign RETURN expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("many_assign return_expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def qoi(self, p):  # noqa: F811
-        assert not isinstance(p.expr, Array), (
-            f"QoI expr must be scalar but is an array expression of shape {p.expr.shape}"
+        return p.return_expr
+
+    @_("RETURN expr SEMI")  # type: ignore[name-defined]  # noqa: F821
+    def return_expr(self, p):
+        self.assert_or_with_error(
+            not isinstance(p.expr, Array),
+            p,
+            lambda: f"QoI return expression must be a scalar but is an array expression of shape {p.expr.shape}",
         )
-        assert p.expr.has_data, "QoI expr must not be constant"
+        self.assert_or_error(
+            p.expr.has_data, p, "QoI return expression must not be constant"
+        )
         return p.expr
 
     @_("assign many_assign")  # type: ignore[name-defined, no-redef]  # noqa: F821
@@ -96,36 +106,70 @@ class QoIParser(Parser):
 
     @_("QUOTE ID QUOTE")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def quotedid(self, p):  # noqa: F811
-        assert False, "quoted identifier cannot contain whitespace or comments"
+        self.raise_error(p, "quoted identifier cannot contain whitespace or comments")
 
     @_("QUOTE ID")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def quotedid(self, p):  # noqa: F811
-        assert False, "missing closing quote for quoted identifier"
+        self.raise_error(p, "missing closing quote for quoted identifier")
 
     @_("VS LBRACK quotedid RBRACK EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def assign(self, p):  # noqa: F811
-        assert self._X is None
-        assert not p.quotedid.startswith("$")
-        assert p.quotedid not in self._vars
+        self.assert_or_error(
+            self._X is None, p, "stencil QoI variables use upper-case `V`"
+        )
+        self.assert_or_error(
+            not p.quotedid.startswith("$"), p, "variable name must not start with `$`"
+        )
+        self.assert_or_error(
+            p.quotedid not in self._vars,
+            p,
+            f'cannot override already-defined variable v["{p.quotedid}"]',
+        )
         self._vars[Parameter(p.quotedid)] = Array.map_unary(p.expr, Group)
 
     @_("VA LBRACK quotedid RBRACK EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def assign(self, p):  # noqa: F811
-        assert self._X is not None
-        assert not p.quotedid.startswith("$")
-        assert p.quotedid not in self._vars
+        self.assert_or_error(
+            self._X is not None, p, "pointwise QoI variables use lower-case `v`"
+        )
+        self.assert_or_error(
+            not p.quotedid.startswith("$"), p, "variable name must not start with `$`"
+        )
+        self.assert_or_error(
+            p.quotedid not in self._vars,
+            p,
+            f'cannot override already-defined variable V["{p.quotedid}"]',
+        )
         self._vars[Parameter(p.quotedid)] = Array.map_unary(p.expr, Group)
 
     @_("VS LBRACK quotedid RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        assert self._X is None
-        assert not p.quotedid.startswith("$")
+        self.assert_or_error(
+            self._X is None, p, "stencil QoI variables use upper-case `V`"
+        )
+        self.assert_or_error(
+            not p.quotedid.startswith("$"), p, "variable name must not start with `$`"
+        )
+        self.assert_or_error(
+            Parameter(p.quotedid) in self._vars,
+            p,
+            f'undefined variable v["{p.quotedid}"]',
+        )
         return self._vars[Parameter(p.quotedid)]
 
     @_("VA LBRACK quotedid RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        assert self._X is not None
-        assert not p.quotedid.startswith("$")
+        self.assert_or_error(
+            self._X is not None, p, "pointwise QoI variables use lower-case `v`"
+        )
+        self.assert_or_error(
+            not p.quotedid.startswith("$"), p, "variable name must not start with `$`"
+        )
+        self.assert_or_error(
+            Parameter(p.quotedid) in self._vars,
+            p,
+            f'undefined variable V["{p.quotedid}"]',
+        )
         return self._vars[Parameter(p.quotedid)]
 
     @_("expr PLUS expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
@@ -170,17 +214,23 @@ class QoIParser(Parser):
 
     @_("LBRACK RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        assert False, "illegal empty array literal"
+        self.raise_error(p, "illegal empty array literal")
 
     @_("expr LBRACK index_ many_comma_index RBRACK %prec INDEX")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        assert isinstance(p.expr, Array), "only array expressions can be indexed"
+        self.assert_or_error(
+            isinstance(p.expr, Array), p, "cannot index scalar non-array expression"
+        )
         return p.expr.index(tuple([p.index_] + p.many_comma_index))
 
     @_("expr LBRACK IDX RBRACK %prec INDEX")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        assert self._I is not None
-        assert isinstance(p.expr, Array), "only array expressions can be indexed"
+        self.assert_or_error(
+            self._I is not None, p, "index `I` is not available in pointwise QoIs"
+        )
+        self.assert_or_error(
+            isinstance(p.expr, Array), p, "cannot index scalar non-array expression"
+        )
         return p.expr.index(self._I)
 
     @_("comma_index many_comma_index")  # type: ignore[name-defined]  # noqa: F821
@@ -204,14 +254,18 @@ class QoIParser(Parser):
         import numpy as np
 
         expr = p.expr.constant_fold(np.dtype(int))
-        assert isinstance(expr, np.dtype(int).type), (
-            "cannot index by non-integer expression"
+        self.assert_or_error(
+            isinstance(expr, np.dtype(int).type),
+            p,
+            "cannot index by non-integer expression",
         )
         return int(expr)
 
     @_("IDX LBRACK integer RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        assert self._I is not None
+        self.assert_or_error(
+            self._I is not None, p, "index `I` is not available in pointwise QoIs"
+        )
         return Number(f"{self._I[p.integer]}")
 
     @_("comma_expr many_comma_expr")  # type: ignore[name-defined]  # noqa: F821
@@ -260,7 +314,11 @@ class QoIParser(Parser):
 
     @_("XA")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        assert self._X is not None
+        self.assert_or_error(
+            self._X is not None,
+            p,
+            "data neighbourhood `X` is not available in pointwise QoIs, use pointwise `x` instead",
+        )
         return self._X
 
     @_("LN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
@@ -429,23 +487,34 @@ class QoIParser(Parser):
 
     # @_("ID LPAREN expr many_comma_expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     # def expr(self, p):  # noqa: F811
-    #     assert False, f"unknown function `{p.ID}`"
+    #     self.raise_error(p, f"unknown function `{p.ID}`")
 
     @_("SUM LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        assert isinstance(p.expr, Array), "can only sum over an array expression"
+        self.assert_or_error(
+            isinstance(p.expr, Array), p, "cannot sum over scalar non-array expression"
+        )
         return p.expr.sum()
 
     @_("MATMUL LPAREN expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        assert isinstance(p.expr0, Array) and isinstance(p.expr1, Array), (
-            "can only matmul(a, b) with arrays a and b"
+        self.assert_or_error(
+            isinstance(p.expr0, Array),
+            p,
+            "cannot matmul(a, b) with scalar non-array parameter a",
+        )
+        self.assert_or_error(
+            isinstance(p.expr1, Array),
+            p,
+            "cannot matmul(a, b) with scalar non-array parameter b",
         )
         return Array.matmul(p.expr0, p.expr1)
 
     @_("expr TRANSPOSE %prec TRANSPOSE")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        assert isinstance(p.expr, Array), "can only transpose an array expression"
+        self.assert_or_error(
+            isinstance(p.expr, Array), p, "cannot transpose scalar non-array expression"
+        )
         return p.expr.transpose()
 
     @_("CS LBRACK quotedid RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
@@ -454,7 +523,11 @@ class QoIParser(Parser):
 
     @_("CA LBRACK quotedid RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        assert self._X is not None
+        self.assert_or_error(
+            self._X is not None,
+            p,
+            "late-bound constant neighbourhood `C` is not available in pointwise QoIs, use pointwise `c` instead",
+        )
         return Array.map_unary(
             self._X,
             lambda e: LateBoundConstant.like(Parameter(p.quotedid), e),
@@ -471,26 +544,39 @@ class QoIParser(Parser):
             finite_difference_offsets,
         )
 
-        assert self._X is not None
-        assert self._I is not None
+        self.assert_or_error(
+            self._X is not None,
+            p,
+            "`finite_difference` is not available in pointwise QoIs",
+        )
 
         expr = p.expr
-        assert p.expr.has_data, (
-            f"finite_difference expr must reference the data {'x' if self._X is None else 'X'}"
+        self.assert_or_error(
+            p.expr.has_data,
+            p,
+            f"`finite_difference` expr must reference the data `{'x' if self._X is None else 'X'}`",
         )
-        assert not isinstance(p.expr, Array), (
-            "finite_difference expr must be a scalar array element expression, e.g. the centre value, not an array"
+        self.assert_or_error(
+            not isinstance(p.expr, Array),
+            p,
+            "`finite_difference` expr must be a scalar array element expression, e.g. the centre value, not an array",
         )
 
         order = p.integer0
-        assert order >= 0, "finite_difference order must be non-negative"
+        self.assert_or_error(
+            order >= 0, p, "`finite_difference` order must be non-negative"
+        )
 
         accuracy = p.integer1
-        assert accuracy > 0, "finite_difference accuracy must be positive"
+        self.assert_or_error(
+            accuracy > 0, p, "`finite_difference` accuracy must be positive"
+        )
 
         type = p.integer2
-        assert type in (-1, 0, +1), (
-            "finite_difference type must be 1 (forward), 0 (central), or -1 (backward)"
+        self.assert_or_error(
+            type in (-1, 0, +1),
+            p,
+            "`finite_difference` type must be 1 (forward), 0 (central), or -1 (backward)",
         )
         type = [
             FiniteDifference.central,
@@ -498,13 +584,17 @@ class QoIParser(Parser):
             FiniteDifference.backwards,
         ][type]
         if type == FiniteDifference.central:
-            assert accuracy % 2 == 0, (
-                "finite_difference accuracy must be even for a central finite difference"
+            self.assert_or_error(
+                accuracy % 2 == 0,
+                p,
+                "`finite_difference` accuracy must be even for a central finite difference",
             )
 
         axis = p.integer3
-        assert axis >= -len(self._X.shape) and axis < len(self._X.shape), (
-            "finite_difference axis must be in range of the dimension of the neighbourhood"
+        self.assert_or_error(
+            axis >= -len(self._X.shape) and axis < len(self._X.shape),
+            p,
+            f"`finite_difference` axis must be in range of the dimension {len(self._X.shape)} of the neighbourhood",
         )
 
         offsets = finite_difference_offsets(type, order, accuracy)
@@ -550,11 +640,15 @@ class QoIParser(Parser):
 
         for idx in acc.data_indices:
             for i, a, c in zip(idx, self._X.shape, self._I):
-                assert i >= 0, (
-                    f"cannot compute the finite_difference on axis {axis} since the neighbourhood is insufficiently large: before should be at least {c - i}"
+                self.assert_or_error(
+                    i >= 0,
+                    p,
+                    f"cannot compute the `finite_difference` on axis {axis} since the neighbourhood is insufficiently large: before should be at least {c - i}",
                 )
-                assert i < a, (
-                    f"cannot compute the finite_difference on axis {axis} since the neighbourhood is insufficiently large: after should be at least {i - c}"
+                self.assert_or_error(
+                    i < a,
+                    p,
+                    f"cannot compute the `finite_difference` on axis {axis} since the neighbourhood is insufficiently large: after should be at least {i - c}",
                 )
 
         assert not isinstance(acc, Array)
@@ -574,24 +668,34 @@ class QoIParser(Parser):
 
     @_("COMMA GRID_SPACING EQUAL expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def finite_difference_grid_spacing(self, p):  # noqa: F811
-        assert not p.expr.has_data, (
-            f"finite_difference grid_spacing must not reference the data {'x' if self._X is None else 'X'}"
+        self.assert_or_error(
+            not p.expr.has_data,
+            p,
+            f"`finite_difference` grid_spacing must not reference the data `{'x' if self._X is None else 'X'}`",
         )
-        assert not isinstance(p.expr, Array), (
-            "finite_difference grid_spacing must be a constant scalar expression, not an array"
+        self.assert_or_error(
+            not isinstance(p.expr, Array),
+            p,
+            "`finite_difference` grid_spacing must be a constant scalar expression, not an array",
         )
         return dict(spacing=p.expr)
 
     @_("COMMA GRID_CENTRE EQUAL expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def finite_difference_grid_spacing(self, p):  # noqa: F811
-        assert not p.expr.has_data, (
-            f"finite_difference grid_centre must not reference the data {'x' if self._X is None else 'X'}"
+        self.assert_or_error(
+            not p.expr.has_data,
+            p,
+            f"`finite_difference` grid_centre must not reference the data `{'x' if self._X is None else 'X'}`",
         )
-        assert not isinstance(p.expr, Array), (
-            "finite_difference grid_centre must be a constant scalar array element expression, not an array"
+        self.assert_or_error(
+            not isinstance(p.expr, Array),
+            p,
+            "`finite_difference` grid_centre must be a constant scalar array element expression, not an array",
         )
-        assert len(p.expr.late_bound_constants) > 0, (
-            "finite_difference grid_centre must reference a late-bound constant"
+        self.assert_or_error(
+            len(p.expr.late_bound_constants) > 0,
+            p,
+            "`finite_difference` grid_centre must reference a late-bound constant",
         )
         return dict(centre=p.expr)
 
@@ -599,15 +703,21 @@ class QoIParser(Parser):
     def finite_difference_grid_period(self, p):  # noqa: F811
         import numpy as np
 
-        assert not p.expr.has_data, (
-            f"finite_difference grid_period must not reference the data {'x' if self._X is None else 'X'}"
+        self.assert_or_error(
+            not p.expr.has_data,
+            p,
+            f"`finite_difference` grid_period must not reference the data `{'x' if self._X is None else 'X'}`",
         )
-        assert len(p.expr.late_bound_constants) == 0, (
-            "finite_difference grid_period must not reference late-bound constants"
+        self.assert_or_error(
+            len(p.expr.late_bound_constants) == 0,
+            p,
+            "finite_difference grid_period must not reference late-bound constants",
         )
         period = p.expr.constant_fold(np.dtype(np.float64))
-        assert isinstance(period, np.float64), (
-            "finite_difference grid_period must be a constant scalar number"
+        self.assert_or_error(
+            isinstance(period, np.float64),
+            p,
+            "finite_difference grid_period must be a constant scalar number",
         )
         return p.expr
 
@@ -628,6 +738,19 @@ class QoIParser(Parser):
         raise SyntaxError(
             f"illegal token `{t.value}` at line {t.lineno}, column {find_column(self._text, t)}\nexpected{oneof} {options}"
         )
+
+    def raise_error(self, t, message):
+        raise SyntaxError(
+            f"{message} at line {t.lineno}, column {find_column(self._text, t)}"
+        )
+
+    def assert_or_error(self, check, t, message):
+        if not check:
+            self.raise_error(t, message)
+
+    def assert_or_with_error(self, check, t, message):
+        if not check:
+            self.raise_error(t, message())
 
 
 def find_column(text, token):
