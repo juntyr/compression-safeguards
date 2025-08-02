@@ -4,6 +4,7 @@ import numpy as np
 
 from ....utils.bindings import Parameter
 from .abc import Expr
+from .literal import Number
 from .typing import F, Ns, Ps, PsI
 
 
@@ -11,8 +12,12 @@ class Group(Expr):
     __slots__ = ("_expr",)
     _expr: Expr
 
-    def __init__(self, expr: Expr):
-        self._expr = expr._expr if isinstance(expr, Group) else expr
+    def __new__(cls, expr: Expr):
+        if isinstance(expr, (Number, Group)):
+            return expr
+        this = super(Group, cls).__new__(cls)
+        this._expr = expr
+        return this
 
     @property
     def has_data(self) -> bool:

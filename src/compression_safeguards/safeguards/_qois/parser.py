@@ -238,9 +238,13 @@ class QoIParser(Parser):
     def maybe_comma(self, p):  # noqa: F811
         pass
 
-    @_("NUMBER")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("FLOAT")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Number(p.NUMBER)
+        return Number(p.FLOAT)
+
+    @_("INTEGER")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Number(f"{p.INTEGER}")
 
     @_("EULER")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -553,19 +557,20 @@ class QoIParser(Parser):
                     f"cannot compute the finite_difference on axis {axis} since the neighbourhood is insufficiently large: after should be at least {i - c}"
                 )
 
-        return acc
+        assert not isinstance(acc, Array)
+        return Group(acc)
 
-    @_("NUMBER")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("INTEGER")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def integer(self, p):  # noqa: F811
-        return int(p.NUMBER)
+        return p.INTEGER
 
-    @_("PLUS NUMBER")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("PLUS INTEGER")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def integer(self, p):  # noqa: F811
-        return int(p.NUMBER)
+        return p.INTEGER
 
-    @_("MINUS NUMBER")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("MINUS INTEGER")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def integer(self, p):  # noqa: F811
-        return -int(p.NUMBER)
+        return -p.INTEGER
 
     @_("COMMA GRID_SPACING EQUAL expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def finite_difference_grid_spacing(self, p):  # noqa: F811
@@ -635,7 +640,8 @@ def find_column(text, token):
 
 def token_to_name(token: str) -> str:
     return {
-        "NUMBER": "number",
+        "INTEGER": "integer",
+        "FLOAT": "floating-point number",
         "PLUS": "`+`",
         "TIMES": "`*`",
         "MINUS": "`-`",

@@ -18,9 +18,16 @@ class ScalarMultiply(Expr):
     _a: Expr
     _b: Expr
 
-    def __init__(self, a: Expr, b: Expr):
-        self._a = a
-        self._b = b
+    def __new__(cls, a: Expr, b: Expr):
+        if isinstance(a, Number) and isinstance(b, Number):
+            # symbolical constant propagation of int * int
+            ai, bi = a.int(), b.int()
+            if (ai is not None) and (bi is not None):
+                return Number(f"{ai * bi}")
+        this = super(ScalarMultiply, cls).__new__(cls)
+        this._a = a
+        this._b = b
+        return this
 
     @property
     def has_data(self) -> bool:
@@ -142,9 +149,22 @@ class ScalarDivide(Expr):
     _a: Expr
     _b: Expr
 
-    def __init__(self, a: Expr, b: Expr):
-        self._a = a
-        self._b = b
+    def __new__(cls, a: Expr, b: Expr):
+        if isinstance(a, Number) and isinstance(b, Number):
+            # symbolical constant propagation of int / int(+-1)
+            # division always produces a floating point number,
+            #  but we know the exact result for /1 and /-1
+            ai, bi = a.int(), b.int()
+            if (ai is not None) and (bi is not None):
+                if bi == 1:
+                    return Number(f"{ai}.0")
+                if bi == -1:
+                    # ensure that 0/1 = 0.0 and 0/-1 = -0.0
+                    return Number(f"{abs(ai)}.0") if ai < 0 else Number(f"-{ai}.0")
+        this = super(ScalarDivide, cls).__new__(cls)
+        this._a = a
+        this._b = b
+        return this
 
     @property
     def has_data(self) -> bool:

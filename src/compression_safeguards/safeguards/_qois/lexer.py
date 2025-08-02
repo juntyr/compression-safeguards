@@ -5,7 +5,8 @@ from sly import Lexer
 
 class QoILexer(Lexer):
     tokens = {
-        NUMBER,  # type: ignore[name-defined]  # noqa: F821
+        INTEGER,  # type: ignore[name-defined]  # noqa: F821
+        FLOAT,  # type: ignore[name-defined]  # noqa: F821
         PLUS,  # type: ignore[name-defined]  # noqa: F821
         TIMES,  # type: ignore[name-defined]  # noqa: F821
         MINUS,  # type: ignore[name-defined]  # noqa: F821
@@ -83,7 +84,20 @@ class QoILexer(Lexer):
     ignore = " \t"
 
     # Tokens
-    NUMBER = r"[0-9]+(\.[0-9]+)?(e(\+|-)?[0-9]+)?"
+    @_(r"[0-9]+(\.[0-9]*)?(e(\+|-)?[0-9]*)?")  # type: ignore[name-defined]  # noqa: F821
+    def FLOAT(self, t):
+        if ("." in t.value) or ("e" in t.value):
+            # a floating-point literal
+            if t.value[-1] not in "0123456789":
+                raise SyntaxError(
+                    f"invalid floating point literal `{t.value}` requires at least one digit after '.' and 'e' at line {self.lineno}, column {find_column(self.text, t)}"
+                )
+            return t
+        else:
+            # an integer literal
+            t.value = int(t.value)
+            t.type = "INTEGER"
+            return t
 
     # Special symbols
     PLUS = r"\+"

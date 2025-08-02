@@ -5,6 +5,7 @@ import numpy as np
 from ....utils.bindings import Parameter
 from .abc import Expr
 from .constfold import FoldedScalarConst
+from .literal import Number
 from .typing import F, Ns, Ps, PsI
 
 
@@ -12,8 +13,15 @@ class ScalarNegate(Expr):
     __slots__ = ("_a",)
     _a: Expr
 
-    def __init__(self, a: Expr):
-        self._a = a
+    def __new__(cls, a: Expr):
+        if isinstance(a, Number):
+            # symbolical constant propagation of -int
+            ai = a.int()
+            if ai is not None:
+                return Number(f"{-ai}")
+        this = super(ScalarNegate, cls).__new__(cls)
+        this._a = a
+        return this
 
     @property
     def has_data(self) -> bool:

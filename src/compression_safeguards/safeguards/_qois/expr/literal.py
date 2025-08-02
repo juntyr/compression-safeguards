@@ -60,6 +60,11 @@ class Number(Expr):
     ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
         assert False, "number literals have no error bounds"
 
+    def int(self) -> None | int:
+        if ("." in self._n) or ("e" in self._n):
+            return None
+        return int(self._n)
+
     def __repr__(self) -> str:
         return self._n
 

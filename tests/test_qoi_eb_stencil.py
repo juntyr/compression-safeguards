@@ -299,10 +299,7 @@ def test_finite_difference():
         "abs",
         0,
     )
-    assert (
-        f"{safeguard._qoi_expr.constant_fold(np.dtype(np.float64))!r}"
-        == "X[4,4] * (np.float64(1.0))"
-    )
+    assert f"{safeguard._qoi_expr!r}" == "(X[4,4] * 1.0)"
     check_all_codecs(
         data,
         "finite_difference(x,order=0,accuracy=2,type=0,axis=0,grid_spacing=1)",
@@ -315,10 +312,7 @@ def test_finite_difference():
         "abs",
         0,
     )
-    assert (
-        f"{safeguard._qoi_expr.constant_fold(np.dtype(np.float64))!r}"
-        == "X[4,4] * (np.float64(-1.0)) + X[5,4] * (np.float64(1.0))"
-    )
+    assert f"{safeguard._qoi_expr!r}" == "(X[4,4] * -1.0 + X[5,4] * 1.0)"
     check_all_codecs(
         data,
         "finite_difference(x,order=1,accuracy=1,type=1,axis=0,grid_spacing=1)",
@@ -331,10 +325,7 @@ def test_finite_difference():
         "abs",
         0,
     )
-    assert (
-        f"{safeguard._qoi_expr.constant_fold(np.dtype(np.float64))!r}"
-        == "X[4,4] * (np.float64(1.0)) + X[3,4] * (np.float64(-1.0))"
-    )
+    assert f"{safeguard._qoi_expr!r}" == "(X[4,4] * 1.0 + X[3,4] * -1.0)"
     check_all_codecs(
         data,
         "finite_difference(x,order=1,accuracy=1,type=-1,axis=0,grid_spacing=1)",
@@ -348,8 +339,8 @@ def test_finite_difference():
         0,
     )
     assert (
-        f"{safeguard._qoi_expr.constant_fold(np.dtype(np.float64))!r}"
-        == "X[4,4] * (np.float64(-0.0)) + X[5,4] * (np.float64(0.5)) + X[3,4] * (np.float64(-0.5))"
+        f"{safeguard._qoi_expr!r}"
+        == "(X[4,4] * -0.0 + X[5,4] * (-1 / -2) + X[3,4] * (-1 / 2))"
     )
     check_all_codecs(
         data,
@@ -357,68 +348,71 @@ def test_finite_difference():
         [(4, 4), (4, 4)],
     )
 
-    # safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-    #     "finite_difference(x,order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
-    #     valid_5x5_neighbourhood,
-    #     "abs",
-    #     0,
-    # )
-    # assert (
-    #     f"{safeguard._qoi_expr}"
-    #     == "NonAssociativeMul(X[4, 3], -1/2) + NonAssociativeMul(X[4, 5], 1/2)"
-    # )
-    # check_all_codecs(
-    #     data,
-    #     "finite_difference(x,order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
-    #     [(4, 4), (4, 4)],
-    # )
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "finite_difference(x,order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
+        valid_5x5_neighbourhood,
+        "abs",
+        0,
+    )
+    assert (
+        f"{safeguard._qoi_expr!r}"
+        == "(X[4,4] * -0.0 + X[4,5] * (-1 / -2) + X[4,3] * (-1 / 2))"
+    )
+    check_all_codecs(
+        data,
+        "finite_difference(x,order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
+        [(4, 4), (4, 4)],
+    )
 
-    # safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-    #     "finite_difference(x,order=2,accuracy=2,type=0,axis=0,grid_spacing=1)",
-    #     valid_5x5_neighbourhood,
-    #     "abs",
-    #     0,
-    # )
-    # assert (
-    #     f"{safeguard._qoi_expr}" == "NonAssociativeMul(X[4, 4], -2) + X[3, 4] + X[5, 4]"
-    # )
-    # check_all_codecs(
-    #     data,
-    #     "finite_difference(x,order=2,accuracy=2,type=0,axis=0,grid_spacing=1)",
-    #     [(4, 4), (4, 4)],
-    # )
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "finite_difference(x,order=2,accuracy=2,type=0,axis=0,grid_spacing=1)",
+        valid_5x5_neighbourhood,
+        "abs",
+        0,
+    )
+    assert (
+        f"{safeguard._qoi_expr}"
+        == "(X[4,4] * -2.0 + X[5,4] * (-2 / -2) + X[3,4] * (2 / 2))"
+    )
+    check_all_codecs(
+        data,
+        "finite_difference(x,order=2,accuracy=2,type=0,axis=0,grid_spacing=1)",
+        [(4, 4), (4, 4)],
+    )
 
-    # safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-    #     "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=0,grid_spacing=1)",
-    #     valid_5x5_neighbourhood,
-    #     "abs",
-    #     0,
-    # )
-    # assert (
-    #     f"{safeguard._qoi_expr}"
-    #     == "NonAssociativeMul(X[2, 4], 1/4) + NonAssociativeMul(X[4, 4], -1/2) + NonAssociativeMul(X[6, 4], 1/4)"
-    # )
-    # check_all_codecs(
-    #     data,
-    #     "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=0,grid_spacing=1)",
-    #     [(4, 4), (4, 4)],
-    # )
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=0,grid_spacing=1)",
+        valid_5x5_neighbourhood,
+        "abs",
+        0,
+    )
+    assert (
+        f"{safeguard._qoi_expr!r}"
+        # X[2,4] * (1/4) + X[4,4] * (-1/2) + X[6,4] * (1/4)
+        == "((X[4,4] * -0.0 + X[5,4] * (-1 / -2) + X[3,4] * (-1 / 2)) * -0.0 + (X[5,4] * -0.0 + X[6,4] * (-1 / -2) + X[4,4] * (-1 / 2)) * (-1 / -2) + (X[3,4] * -0.0 + X[4,4] * (-1 / -2) + X[2,4] * (-1 / 2)) * (-1 / 2))"
+    )
+    check_all_codecs(
+        data,
+        "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=0,grid_spacing=1)",
+        [(4, 4), (4, 4)],
+    )
 
-    # safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-    #     "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
-    #     valid_5x5_neighbourhood,
-    #     "abs",
-    #     0,
-    # )
-    # assert (
-    #     f"{safeguard._qoi_expr}"
-    #     == "NonAssociativeMul(X[3, 3], 1/4) + NonAssociativeMul(X[3, 5], -1/4) + NonAssociativeMul(X[5, 3], -1/4) + NonAssociativeMul(X[5, 5], 1/4)"
-    # )
-    # check_all_codecs(
-    #     data,
-    #     "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
-    #     [(4, 4), (4, 4)],
-    # )
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
+        valid_5x5_neighbourhood,
+        "abs",
+        0,
+    )
+    assert (
+        f"{safeguard._qoi_expr!r}"
+        # X[3,3] * (1/4) + X[3,5] * (-1/4) + X[5,3] * (-1/4) + X[5,5] * (1/4)
+        == "((X[4,4] * -0.0 + X[5,4] * (-1 / -2) + X[3,4] * (-1 / 2)) * -0.0 + (X[4,5] * -0.0 + X[5,5] * (-1 / -2) + X[3,5] * (-1 / 2)) * (-1 / -2) + (X[4,3] * -0.0 + X[5,3] * (-1 / -2) + X[3,3] * (-1 / 2)) * (-1 / 2))"
+    )
+    check_all_codecs(
+        data,
+        "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
+        [(4, 4), (4, 4)],
+    )
 
 
 def test_finite_difference_array():

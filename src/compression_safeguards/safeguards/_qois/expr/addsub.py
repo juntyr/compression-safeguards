@@ -7,6 +7,7 @@ from ....utils.cast import _nextafter
 from ..eb import ensure_bounded_derived_error
 from .abc import Expr
 from .constfold import FoldedScalarConst
+from .literal import Number
 from .neg import ScalarNegate
 from .typing import F, Ns, Ps, PsI
 
@@ -16,9 +17,16 @@ class ScalarAdd(Expr):
     _a: Expr
     _b: Expr
 
-    def __init__(self, a: Expr, b: Expr):
-        self._a = a
-        self._b = b
+    def __new__(cls, a: Expr, b: Expr):
+        if isinstance(a, Number) and isinstance(b, Number):
+            # symbolical constant propagation of int + int
+            ai, bi = a.int(), b.int()
+            if (ai is not None) and (bi is not None):
+                return Number(f"{ai + bi}")
+        this = super(ScalarAdd, cls).__new__(cls)
+        this._a = a
+        this._b = b
+        return this
 
     @property
     def has_data(self) -> bool:
@@ -159,9 +167,16 @@ class ScalarSubtract(Expr):
     _a: Expr
     _b: Expr
 
-    def __init__(self, a: Expr, b: Expr):
-        self._a = a
-        self._b = b
+    def __new__(cls, a: Expr, b: Expr):
+        if isinstance(a, Number) and isinstance(b, Number):
+            # symbolical constant propagation of int - int
+            ai, bi = a.int(), b.int()
+            if (ai is not None) and (bi is not None):
+                return Number(f"{ai - bi}")
+        this = super(ScalarSubtract, cls).__new__(cls)
+        this._a = a
+        this._b = b
+        return this
 
     @property
     def has_data(self) -> bool:
