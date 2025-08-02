@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from math import gcd
 
 import numpy as np
 
@@ -151,16 +152,27 @@ class ScalarDivide(Expr):
 
     def __new__(cls, a: Expr, b: Expr):
         if isinstance(a, Number) and isinstance(b, Number):
-            # symbolical constant propagation of int / int(+-1)
-            # division always produces a floating point number,
-            #  but we know the exact result for /1 and /-1
+            # symbolical constant propagation for some cases of int / int
+            # division always produces a floating point number
             ai, bi = a.int(), b.int()
             if (ai is not None) and (bi is not None):
+                d = gcd(ai, bi)
+                if d > 1:
+                    # symbolic reduction of (a*d) / (b*d) to a / b
+                    assert (ai % d == 0) and (bi % d == 0)
+                    ai //= d
+                    bi //= d
+                # int / 1 has an exact floating point result
                 if bi == 1:
                     return Number(f"{ai}.0")
+                # int / -1 has an exact floating point result
                 if bi == -1:
                     # ensure that 0/1 = 0.0 and 0/-1 = -0.0
                     return Number(f"{abs(ai)}.0") if ai < 0 else Number(f"-{ai}.0")
+                # keep a / b after reduction
+                if d > 1:
+                    a = Number(f"{ai}")
+                    b = Number(f"{bi}")
         this = super(ScalarDivide, cls).__new__(cls)
         this._a = a
         this._b = b
