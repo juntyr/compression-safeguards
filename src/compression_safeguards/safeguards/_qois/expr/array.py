@@ -22,11 +22,13 @@ class Array(Expr):
         if isinstance(el, Array):
             aels = [el._array]
             for e in els:
+                # FIXME: better error
                 assert isinstance(e, Array) and e.shape == el.shape
                 aels.append(e._array)
             self._array = np.array(aels)
         else:
             for e in els:
+                # FIXME: better error
                 assert not isinstance(e, Array)
             self._array = np.array((el,) + els)
 
@@ -108,6 +110,7 @@ class Array(Expr):
     def map_binary(left: Expr, right: Expr, m: Callable[[Expr, Expr], Expr]) -> Expr:
         if isinstance(left, Array):
             if isinstance(right, Array):
+                # FIXME: better error
                 assert left.shape == right.shape
                 out = Array.__new__(Array)
                 out._array = np.fromiter(
@@ -160,6 +163,7 @@ class Array(Expr):
 
     @staticmethod
     def matmul(left: "Array", right: "Array") -> "Array":
+        # FIXME: better errors
         assert len(left.shape) == 2, "can only matmul(a, b) a 2D array a"
         assert len(right.shape) == 2, "can only matmul(a, b) a 2D array b"
         assert left.shape[1] == right.shape[0], (

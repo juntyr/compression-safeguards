@@ -235,10 +235,15 @@ def test_variables():
     )
     check_all_codecs(np.array([]), 'c["$x"] * x', [(0, 0)])
 
-    # with pytest.raises(AssertionError, match="out of border"):
-    #     check_all_codecs(np.array([]), 'V["a"] = X + 1; return V["a"][1];', [(0, 0)])
-    # with pytest.raises(AssertionError, match="index greater"):
-    #     check_all_codecs(np.array([]), 'V["a"] = X + 1; return V["a"][0,1];', [(0, 0)])
+    with pytest.raises(
+        AssertionError, match="index 1 is out of bounds for axis 0 with size 1"
+    ):
+        check_all_codecs(np.array([]), 'V["a"] = X + 1; return V["a"][1];', [(0, 0)])
+    with pytest.raises(
+        AssertionError,
+        match="too many indices for array: array is 1-dimensional, but 2 were indexed",
+    ):
+        check_all_codecs(np.array([]), 'V["a"] = X + 1; return V["a"][0,1];', [(0, 0)])
     check_all_codecs(np.array([]), 'V["a"] = 3; return (X + V["a"])[0];', [(0, 0)])
     check_all_codecs(np.array([]), 'V["a"] = X; return V["a"][0];', [(0, 0)])
     check_all_codecs(np.array([]), 'V["a"] = X; return V["a"][0,0];', [(0, 0), (0, 0)])

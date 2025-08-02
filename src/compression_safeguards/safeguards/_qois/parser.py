@@ -221,7 +221,10 @@ class QoIParser(Parser):
         self.assert_or_error(
             isinstance(p.expr, Array), p, "cannot index scalar non-array expression"
         )
-        return p.expr.index(tuple([p.index_] + p.many_comma_index))
+        try:
+            return p.expr.index(tuple([p.index_] + p.many_comma_index))
+        except IndexError as err:
+            self.raise_error(p, f"{err}")
 
     @_("expr LBRACK IDX RBRACK %prec INDEX")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -231,7 +234,10 @@ class QoIParser(Parser):
         self.assert_or_error(
             isinstance(p.expr, Array), p, "cannot index scalar non-array expression"
         )
-        return p.expr.index(self._I)
+        try:
+            return p.expr.index(self._I)
+        except IndexError as err:
+            self.raise_error(p, f"{err}")
 
     @_("comma_index many_comma_index")  # type: ignore[name-defined]  # noqa: F821
     def many_comma_index(self, p):
