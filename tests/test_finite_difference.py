@@ -18,6 +18,7 @@ from compression_safeguards.safeguards._qois.expr.finite_difference import (
     finite_difference_coefficients,
 )
 from compression_safeguards.safeguards._qois.expr.literal import Number
+from compression_safeguards.utils.cast import _float128_dtype
 
 
 def F(p: int, q: int = 1) -> int | float:
@@ -29,6 +30,7 @@ def finite_difference_coefficients_float(
     centre: int | float,
     offsets: tuple[int | float, ...],
     delta_transform: Callable[[Expr], Expr] = lambda x: x,
+    dtype: np.dtype = np.dtype(float),
 ) -> tuple[float, ...]:
     res = finite_difference_coefficients(
         order,
@@ -38,7 +40,7 @@ def finite_difference_coefficients_float(
         else (lambda e: ScalarSubtract(e, Number(f"{centre}"))),
         delta_transform,
     )
-    return tuple(float(r.constant_fold(np.dtype(float))) for r in res)  # type: ignore
+    return tuple(float(r.constant_fold(dtype)) for r in res)  # type: ignore
 
 
 def test_central_zeroth_order():
@@ -626,20 +628,21 @@ def test_central_half_way_second_order():
         2, F(0), (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2), F(5, 2), F(-5, 2))
     ) == (F(-17, 24), F(-17, 24), F(13, 16), F(13, 16), F(-5, 48), F(-5, 48))
 
-    # assert finite_difference_coefficients_float(
-    #     2,
-    #     F(0),
-    #     (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2), F(5, 2), F(-5, 2), F(7, 2), F(-7, 2)),
-    # ) == (
-    #     F(-1891, 2304),
-    #     F(-1891, 2304),
-    #     F(1299, 1280),
-    #     F(1299, 1280),
-    #     F(-499, 2304),
-    #     F(-499, 2304),
-    #     F(259, 11520),
-    #     F(259, 11520),
-    # )
+    assert finite_difference_coefficients_float(
+        2,
+        F(0),
+        (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2), F(5, 2), F(-5, 2), F(7, 2), F(-7, 2)),
+        dtype=_float128_dtype,
+    ) == (
+        F(-1891, 2304),
+        F(-1891, 2304),
+        F(1299, 1280),
+        F(1299, 1280),
+        F(-499, 2304),
+        F(-499, 2304),
+        F(259, 11520),
+        F(259, 11520),
+    )
 
 
 def test_central_half_way_third_order():
@@ -651,20 +654,21 @@ def test_central_half_way_third_order():
         3, F(0), (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2), F(5, 2), F(-5, 2))
     ) == (F(-17, 4), F(17, 4), F(13, 8), F(-13, 8), F(-1, 8), F(1, 8))
 
-    # assert finite_difference_coefficients_float(
-    #     3,
-    #     F(0),
-    #     (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2), F(5, 2), F(-5, 2), F(7, 2), F(-7, 2)),
-    # ) == (
-    #     F(-1891, 384),
-    #     F(1891, 384),
-    #     F(1299, 640),
-    #     F(-1299, 640),
-    #     F(-499, 1920),
-    #     F(499, 1920),
-    #     F(37, 1920),
-    #     F(-37, 1920),
-    # )
+    assert finite_difference_coefficients_float(
+        3,
+        F(0),
+        (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2), F(5, 2), F(-5, 2), F(7, 2), F(-7, 2)),
+        dtype=_float128_dtype,
+    ) == (
+        F(-1891, 384),
+        F(1891, 384),
+        F(1299, 640),
+        F(-1299, 640),
+        F(-499, 1920),
+        F(499, 1920),
+        F(37, 1920),
+        F(-37, 1920),
+    )
 
 
 def test_central_half_way_fourth_order():
@@ -672,20 +676,21 @@ def test_central_half_way_fourth_order():
         4, F(0), (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2), F(5, 2), F(-5, 2))
     ) == (1, 1, F(-3, 2), F(-3, 2), F(1, 2), F(1, 2))
 
-    # assert finite_difference_coefficients_float(
-    #     4,
-    #     F(0),
-    #     (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2), F(5, 2), F(-5, 2), F(7, 2), F(-7, 2)),
-    # ) == (
-    #     F(83, 48),
-    #     F(83, 48),
-    #     F(-45, 16),
-    #     F(-45, 16),
-    #     F(59, 48),
-    #     F(59, 48),
-    #     F(-7, 48),
-    #     F(-7, 48),
-    # )
+    assert finite_difference_coefficients_float(
+        4,
+        F(0),
+        (F(1, 2), F(-1, 2), F(3, 2), F(-3, 2), F(5, 2), F(-5, 2), F(7, 2), F(-7, 2)),
+        dtype=_float128_dtype,
+    ) == (
+        F(83, 48),
+        F(83, 48),
+        F(-45, 16),
+        F(-45, 16),
+        F(59, 48),
+        F(59, 48),
+        F(-7, 48),
+        F(-7, 48),
+    )
 
 
 def test_forward_half_way_zeroth_order():
@@ -859,31 +864,32 @@ def test_forward_half_way_first_order():
         F(-3043, 107520),
     )
 
-    # assert finite_difference_coefficients_float(
-    #     1,
-    #     F(0),
-    #     (
-    #         F(-1, 2),
-    #         F(1, 2),
-    #         F(3, 2),
-    #         F(5, 2),
-    #         F(7, 2),
-    #         F(9, 2),
-    #         F(11, 2),
-    #         F(13, 2),
-    #         F(15, 2),
-    #     ),
-    # ) == (
-    #     F(-1423, 1792),
-    #     F(-491, 7168),
-    #     F(7753, 3072),
-    #     F(-18509, 5120),
-    #     F(3535, 1024),
-    #     F(-2279, 1024),
-    #     F(953, 1024),
-    #     F(-1637, 7168),
-    #     F(2689, 107520),
-    # )
+    assert finite_difference_coefficients_float(
+        1,
+        F(0),
+        (
+            F(-1, 2),
+            F(1, 2),
+            F(3, 2),
+            F(5, 2),
+            F(7, 2),
+            F(9, 2),
+            F(11, 2),
+            F(13, 2),
+            F(15, 2),
+        ),
+        dtype=_float128_dtype,
+    ) == (
+        F(-1423, 1792),
+        F(-491, 7168),
+        F(7753, 3072),
+        F(-18509, 5120),
+        F(3535, 1024),
+        F(-2279, 1024),
+        F(953, 1024),
+        F(-1637, 7168),
+        F(2689, 107520),
+    )
 
 
 def test_forward_half_way_second_order():
@@ -937,46 +943,48 @@ def test_forward_half_way_second_order():
         F(739, 5760),
     )
 
-    # assert finite_difference_coefficients_float(
-    #     2,
-    #     F(0),
-    #     (F(-1, 2), F(1, 2), F(3, 2), F(5, 2), F(7, 2), F(9, 2), F(11, 2), F(13, 2)),
-    # ) == (
-    #     F(25333, 11520),
-    #     F(-80813, 11520),
-    #     F(2553, 256),
-    #     F(-21457, 2304),
-    #     F(14651, 2304),
-    #     F(-3687, 1280),
-    #     F(8863, 11520),
-    #     F(-211, 2304),
-    # )
+    assert finite_difference_coefficients_float(
+        2,
+        F(0),
+        (F(-1, 2), F(1, 2), F(3, 2), F(5, 2), F(7, 2), F(9, 2), F(11, 2), F(13, 2)),
+        dtype=_float128_dtype,
+    ) == (
+        F(25333, 11520),
+        F(-80813, 11520),
+        F(2553, 256),
+        F(-21457, 2304),
+        F(14651, 2304),
+        F(-3687, 1280),
+        F(8863, 11520),
+        F(-211, 2304),
+    )
 
-    # assert finite_difference_coefficients_float(
-    #     2,
-    #     F(0),
-    #     (
-    #         F(-1, 2),
-    #         F(1, 2),
-    #         F(3, 2),
-    #         F(5, 2),
-    #         F(7, 2),
-    #         F(9, 2),
-    #         F(11, 2),
-    #         F(13, 2),
-    #         F(15, 2),
-    #     ),
-    # ) == (
-    #     F(81227, 35840),
-    #     F(-67681, 8960),
-    #     F(34151, 2880),
-    #     F(-16747, 1280),
-    #     F(5669, 512),
-    #     F(-76621, 11520),
-    #     F(1699, 640),
-    #     F(-5647, 8960),
-    #     F(21719, 322560),
-    # )
+    assert finite_difference_coefficients_float(
+        2,
+        F(0),
+        (
+            F(-1, 2),
+            F(1, 2),
+            F(3, 2),
+            F(5, 2),
+            F(7, 2),
+            F(9, 2),
+            F(11, 2),
+            F(13, 2),
+            F(15, 2),
+        ),
+        dtype=_float128_dtype,
+    ) == (
+        F(81227, 35840),
+        F(-67681, 8960),
+        F(34151, 2880),
+        F(-16747, 1280),
+        F(5669, 512),
+        F(-76621, 11520),
+        F(1699, 640),
+        F(-5647, 8960),
+        F(21719, 322560),
+    )
 
 
 def test_forward_half_way_third_order():
@@ -1037,31 +1045,32 @@ def test_forward_half_way_third_order():
         F(1237, 1920),
     )
 
-    # assert finite_difference_coefficients_float(
-    #     3,
-    #     F(0),
-    #     (
-    #         F(-1, 2),
-    #         F(1, 2),
-    #         F(3, 2),
-    #         F(5, 2),
-    #         F(7, 2),
-    #         F(9, 2),
-    #         F(11, 2),
-    #         F(13, 2),
-    #         F(15, 2),
-    #     ),
-    # ) == (
-    #     F(-2317, 480),
-    #     F(47707, 1920),
-    #     F(-7443, 128),
-    #     F(158471, 1920),
-    #     F(-30037, 384),
-    #     F(32091, 640),
-    #     F(-40087, 1920),
-    #     F(1961, 384),
-    #     F(-357, 640),
-    # )
+    assert finite_difference_coefficients_float(
+        3,
+        F(0),
+        (
+            F(-1, 2),
+            F(1, 2),
+            F(3, 2),
+            F(5, 2),
+            F(7, 2),
+            F(9, 2),
+            F(11, 2),
+            F(13, 2),
+            F(15, 2),
+        ),
+        dtype=_float128_dtype,
+    ) == (
+        F(-2317, 480),
+        F(47707, 1920),
+        F(-7443, 128),
+        F(158471, 1920),
+        F(-30037, 384),
+        F(32091, 640),
+        F(-40087, 1920),
+        F(1961, 384),
+        F(-357, 640),
+    )
 
 
 def test_forward_half_way_fourth_order():
@@ -1092,46 +1101,48 @@ def test_forward_half_way_fourth_order():
         F(41, 24),
     )
 
-    # assert finite_difference_coefficients_float(
-    #     4,
-    #     F(0),
-    #     (F(-1, 2), F(1, 2), F(3, 2), F(5, 2), F(7, 2), F(9, 2), F(11, 2), F(13, 2)),
-    # ) == (
-    #     F(287, 48),
-    #     F(-1639, 48),
-    #     F(1341, 16),
-    #     F(-5527, 48),
-    #     F(4613, 48),
-    #     F(-783, 16),
-    #     F(677, 48),
-    #     F(-85, 48),
-    # )
+    assert finite_difference_coefficients_float(
+        4,
+        F(0),
+        (F(-1, 2), F(1, 2), F(3, 2), F(5, 2), F(7, 2), F(9, 2), F(11, 2), F(13, 2)),
+        dtype=_float128_dtype,
+    ) == (
+        F(287, 48),
+        F(-1639, 48),
+        F(1341, 16),
+        F(-5527, 48),
+        F(4613, 48),
+        F(-783, 16),
+        F(677, 48),
+        F(-85, 48),
+    )
 
-    # assert finite_difference_coefficients_float(
-    #     4,
-    #     F(0),
-    #     (
-    #         F(-1, 2),
-    #         F(1, 2),
-    #         F(3, 2),
-    #         F(5, 2),
-    #         F(7, 2),
-    #         F(9, 2),
-    #         F(11, 2),
-    #         F(13, 2),
-    #         F(15, 2),
-    #     ),
-    # ) == (
-    #     F(14861, 1920),
-    #     F(-1447, 30),
-    #     F(21299, 160),
-    #     F(-25651, 120),
-    #     F(42119, 192),
-    #     F(-2951, 20),
-    #     F(30437, 480),
-    #     F(-1903, 120),
-    #     F(1127, 640),
-    # )
+    assert finite_difference_coefficients_float(
+        4,
+        F(0),
+        (
+            F(-1, 2),
+            F(1, 2),
+            F(3, 2),
+            F(5, 2),
+            F(7, 2),
+            F(9, 2),
+            F(11, 2),
+            F(13, 2),
+            F(15, 2),
+        ),
+        dtype=_float128_dtype,
+    ) == (
+        F(14861, 1920),
+        F(-1447, 30),
+        F(21299, 160),
+        F(-25651, 120),
+        F(42119, 192),
+        F(-2951, 20),
+        F(30437, 480),
+        F(-1903, 120),
+        F(1127, 640),
+    )
 
 
 def test_central_second_order_with_offset():
@@ -1213,19 +1224,22 @@ def test_central_second_order_with_spacing():
     )
 
     # +1, /2
-    # assert finite_difference_coefficients_float(
-    #     2, F(1), (F(1), F(3, 2), F(1, 2), F(2), F(0), F(5, 2), F(-1, 2), F(3), F(-1))
-    # ) == (
-    #     F(-205, 18),
-    #     F(32, 5),
-    #     F(32, 5),
-    #     F(-4, 5),
-    #     F(-4, 5),
-    #     F(32, 315),
-    #     F(32, 315),
-    #     F(-4, 560),
-    #     F(-4, 560),
-    # )
+    assert finite_difference_coefficients_float(
+        2,
+        F(1),
+        (F(1), F(3, 2), F(1, 2), F(2), F(0), F(5, 2), F(-1, 2), F(3), F(-1)),
+        dtype=_float128_dtype,
+    ) == (
+        F(-205, 18),
+        F(32, 5),
+        F(32, 5),
+        F(-4, 5),
+        F(-4, 5),
+        F(32, 315),
+        F(32, 315),
+        F(-4, 560),
+        F(-4, 560),
+    )
 
 
 def test_central_second_order_with_periodic_transform():
@@ -1268,19 +1282,20 @@ def test_central_second_order_with_periodic_transform():
         F(1, 90),
     )
 
-    # assert finite_difference_coefficients_float(
-    #     2,
-    #     F(0),
-    #     (F(0), F(1), F(-1), F(2), F(-2), F(3), F(-3), F(4), F(-4)),
-    #     delta_transform=partial(delta_transform, period=F(16)),
-    # ) == (
-    #     F(-205, 72),
-    #     F(8, 5),
-    #     F(8, 5),
-    #     F(-1, 5),
-    #     F(-1, 5),
-    #     F(8, 315),
-    #     F(8, 315),
-    #     F(-1, 560),
-    #     F(-1, 560),
-    # )
+    assert finite_difference_coefficients_float(
+        2,
+        F(0),
+        (F(0), F(1), F(-1), F(2), F(-2), F(3), F(-3), F(4), F(-4)),
+        delta_transform=partial(delta_transform, period=F(16)),
+        dtype=_float128_dtype,
+    ) == (
+        F(-205, 72),
+        F(8, 5),
+        F(8, 5),
+        F(-1, 5),
+        F(-1, 5),
+        F(8, 315),
+        F(8, 315),
+        F(-1, 560),
+        F(-1, 560),
+    )
