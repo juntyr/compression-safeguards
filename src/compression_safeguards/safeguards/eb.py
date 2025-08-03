@@ -205,6 +205,7 @@ def _compute_finite_absolute_error_bound(
             assert_never(type)
 
 
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 def _compute_finite_absolute_error(
     type: ErrorBound,
     data_float: np.ndarray[S, np.dtype[F]],

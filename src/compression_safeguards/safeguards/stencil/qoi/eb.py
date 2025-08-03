@@ -24,13 +24,8 @@ from ....utils.cast import (
 )
 from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import F, S, T
-from ..._qois.expr.abc import Expr
-from ..._qois.expr.array import Array
-from ..._qois.expr.constfold import FoldedScalarConst
-from ..._qois.expr.data import Data
+from ..._qois import StencilQuantityOfInterest
 from ..._qois.interval import compute_safe_eb_lower_upper_interval_union
-from ..._qois.lexer import QoILexer
-from ..._qois.parser import QoIParser
 from ...eb import (
     ErrorBound,
     _apply_finite_qoi_error_bound,
@@ -318,18 +313,15 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         "_type",
         "_eb",
         "_qoi_expr",
-        "_qoi_expr_late_bound_constants",
     )
     _qoi: StencilExpr
     _neighbourhood: tuple[NeighbourhoodBoundaryAxis, ...]
     _type: ErrorBound
     _eb: int | float | Parameter
-    _qoi_expr: Expr
-    _qoi_expr_late_bound_constants: frozenset[Parameter]
+    _qoi_expr: StencilQuantityOfInterest
 
     kind = "qoi_eb_stencil"
 
-    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def __init__(
         self,
         qoi: StencilExpr,
@@ -361,34 +353,11 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         shape = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
         I = tuple(axis.before for axis in self._neighbourhood)  # noqa: E741
 
-        X = Array.from_data_shape(shape)
-
-        qoi_lexer = QoILexer()
-        qoi_parser = QoIParser(x=Data(index=I), X=X, I=I)
-
         try:
-            qoi_expr = qoi_parser.parse(qoi, qoi_lexer.tokenize(qoi))
-            assert isinstance(qoi_expr, Expr)
-
-            self._qoi_expr_late_bound_constants = qoi_expr.late_bound_constants
-
-            # check if the expression is well-formed and if an error bound can
-            #  be computed
-            _canary_data_eb = FoldedScalarConst.constant_fold_expr(
-                qoi_expr, np.dtype(np.float64)
-            ).compute_data_error_bound(
-                np.empty((0,), dtype=np.float64),
-                np.empty((0,), dtype=np.float64),
-                np.empty((0,), dtype=np.float64),
-                np.empty((0,) + shape, dtype=np.float64),
-                {
-                    c: np.empty((0,) + shape, dtype=np.float64)
-                    for c in self._qoi_expr_late_bound_constants
-                },
-            )
+            qoi_expr = StencilQuantityOfInterest(qoi, stencil_shape=shape, stencil_I=I)
         except Exception as err:
             raise AssertionError(
-                f"failed to parse QoI expression {qoi!r}: {err}"
+                f"failed to parse stencil QoI expression {qoi!r}: {err}"
             ) from err
 
         self._qoi = qoi
@@ -407,7 +376,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         specific data that is to be safeguarded.
         """
 
-        parameters = set(self._qoi_expr_late_bound_constants)
+        parameters = set(self._qoi_expr.late_bound_constants)
 
         if isinstance(self._eb, Parameter):
             parameters.add(self._eb)
@@ -463,7 +432,6 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         return tuple(neighbourhood)
 
-    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def evaluate_qoi(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -554,7 +522,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         late_bound_constants: dict[
             Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]
         ] = dict()
-        for c in self._qoi_expr_late_bound_constants:
+        for c in self._qoi_expr.late_bound_constants:
             late_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = (
                 late_bound.resolve_ndarray_with_lossless_cast(c, data.shape, data.dtype)
             )
@@ -579,13 +547,19 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
             late_bound_constants[c] = late_windows_float
 
+        s = [slice(None)] * data.ndim
+        for axis in self._neighbourhood:
+            if axis.boundary == BoundaryCondition.valid:
+                start = None if axis.before == 0 else axis.before
+                end = None if axis.after == 0 else -axis.after
+                s[axis.axis] = slice(start, end)
+
         return self._qoi_expr.eval(
-            data_windows_float.shape[: len(data.shape)],
+            to_float(data)[tuple(s)],
             data_windows_float,
             late_bound_constants,
         )
 
-    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -686,7 +660,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         late_bound_constants: dict[
             Parameter, np.ndarray[tuple[int, ...], np.dtype[np.floating]]
         ] = dict()
-        for c in self._qoi_expr_late_bound_constants:
+        for c in self._qoi_expr.late_bound_constants:
             late_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = (
                 late_bound.resolve_ndarray_with_lossless_cast(c, data.shape, data.dtype)
             )
@@ -713,19 +687,26 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
             late_bound_constants[c] = late_windows_float
 
-        qoi_expr = FoldedScalarConst.constant_fold_expr(
-            self._qoi_expr, data_windows_float.dtype
-        )
+        s = [slice(None)] * data.ndim
+        for axis in self._neighbourhood:
+            if axis.boundary == BoundaryCondition.valid:
+                start = None if axis.before == 0 else axis.before
+                end = None if axis.after == 0 else -axis.after
+                s[axis.axis] = slice(start, end)
 
-        qoi_data: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = qoi_expr.eval(
-            data_windows_float.shape[: len(data.shape)],
-            data_windows_float,
-            late_bound_constants,
+        qoi_data: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            self._qoi_expr.eval(
+                to_float(data)[tuple(s)],
+                data_windows_float,
+                late_bound_constants,
+            )
         )
-        qoi_decoded: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = qoi_expr.eval(
-            data_windows_float.shape[: len(data.shape)],
-            decoded_windows_float,
-            late_bound_constants,
+        qoi_decoded: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            self._qoi_expr.eval(
+                to_float(decoded)[tuple(s)],
+                decoded_windows_float,
+                late_bound_constants,
+            )
         )
 
         eb: np.ndarray[tuple[()] | tuple[int, ...], np.dtype[np.floating]] = (
@@ -772,7 +753,6 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         return ok  # type: ignore
 
-    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def compute_safe_intervals(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -851,7 +831,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         late_bound_constants: dict[
             Parameter, np.ndarray[tuple[int, ...], np.dtype[np.floating]]
         ] = dict()
-        for c in self._qoi_expr_late_bound_constants:
+        for c in self._qoi_expr.late_bound_constants:
             late_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = (
                 late_bound.resolve_ndarray_with_lossless_cast(c, data.shape, data.dtype)
             )
@@ -878,13 +858,21 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
             late_bound_constants[c] = late_windows_float
 
-        qoi_expr = FoldedScalarConst.constant_fold_expr(
-            self._qoi_expr, data_windows_float.dtype
-        )
-        data_qoi: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = qoi_expr.eval(
-            data_windows_float.shape[: len(data.shape)],
-            data_windows_float,
-            late_bound_constants,
+        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
+
+        s = [slice(None)] * data.ndim
+        for axis in self._neighbourhood:
+            if axis.boundary == BoundaryCondition.valid:
+                start = None if axis.before == 0 else axis.before
+                end = None if axis.after == 0 else -axis.after
+                s[axis.axis] = slice(start, end)
+
+        data_qoi: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            self._qoi_expr.eval(
+                data_float[tuple(s)],
+                data_windows_float,
+                late_bound_constants,
+            )
         )
 
         eb: np.ndarray[tuple[()] | tuple[int, ...], np.dtype[np.floating]] = (
@@ -954,27 +942,15 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 & _isfinite(eb_qoi_upper)
             )
 
-        s = [slice(None)] * data.ndim
-        for axis in self._neighbourhood:
-            if axis.boundary == BoundaryCondition.valid:
-                start = None if axis.before == 0 else axis.before
-                end = None if axis.after == 0 else -axis.after
-                s[axis.axis] = slice(start, end)
-
-        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
-
         # compute the error bound in data space
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            eb_x_lower, eb_x_upper = qoi_expr.compute_data_error_bound(
-                eb_qoi_lower,
-                eb_qoi_upper,
-                # not all data points are (valid) data neighbourhood centres
-                data_float[tuple(s)],
-                data_windows_float,
-                late_bound_constants,
-            )
+        eb_x_lower, eb_x_upper = self._qoi_expr.compute_data_error_bound(
+            eb_qoi_lower,
+            eb_qoi_upper,
+            # not all data points are (valid) data neighbourhood centres
+            data_float[tuple(s)],
+            data_windows_float,
+            late_bound_constants,
+        )
         assert np.all((eb_x_lower <= 0) & _isfinite(eb_x_lower))
         assert np.all((eb_x_upper >= 0) & _isfinite(eb_x_upper))
 

@@ -54,9 +54,11 @@ class Number(Expr):
                 sys.set_int_max_str_digits(int_max_str_digits)
 
     @staticmethod
-    def from_symbolic_int_as_float(n: int) -> "Number":
+    def from_symbolic_int_as_float(n: int, force_negative: bool = False) -> "Number":
         expr = Number.from_symbolic_int(n)
-        expr._n += ".0"
+        if force_negative and not expr._n.startswith("-"):
+            expr._n = f"-{expr._n}"
+        expr._n = f"{expr._n}.0"
         return expr
 
     @property

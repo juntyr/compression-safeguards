@@ -170,7 +170,7 @@ class ScalarDivide(Expr):
                     return (
                         Number.from_symbolic_int_as_float(abs(ai))
                         if ai < 0
-                        else Number.from_symbolic_int_as_float(-ai)
+                        else Number.from_symbolic_int_as_float(ai, force_negative=True)
                     )
                 # keep a / b after reduction
                 if d > 1:

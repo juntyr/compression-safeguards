@@ -21,12 +21,8 @@ from ....utils.cast import (
 )
 from ....utils.intervals import IntervalUnion
 from ....utils.typing import F, S, T
-from ..._qois.expr.abc import Expr
-from ..._qois.expr.constfold import FoldedScalarConst
-from ..._qois.expr.data import Data
+from ..._qois import PointwiseQuantityOfInterest
 from ..._qois.interval import compute_safe_eb_lower_upper_interval_union
-from ..._qois.lexer import QoILexer
-from ..._qois.parser import QoIParser
 from ...eb import (
     ErrorBound,
     _apply_finite_qoi_error_bound,
@@ -215,17 +211,14 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         "_type",
         "_eb",
         "_qoi_expr",
-        "_qoi_expr_late_bound_constants",
     )
     _qoi: PointwiseExpr
     _type: ErrorBound
     _eb: int | float | Parameter
-    _qoi_expr: Expr
-    _qoi_expr_late_bound_constants: frozenset[Parameter]
+    _qoi_expr: PointwiseQuantityOfInterest
 
     kind = "qoi_eb_pw"
 
-    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def __init__(
         self,
         qoi: PointwiseExpr,
@@ -242,32 +235,11 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             _check_error_bound(self._type, eb)
             self._eb = eb
 
-        qoi_lexer = QoILexer()
-        qoi_parser = QoIParser(x=Data(index=()), X=None, I=None)
-
         try:
-            qoi_expr = qoi_parser.parse(qoi, qoi_lexer.tokenize(qoi))
-            assert isinstance(qoi_expr, Expr)
-
-            self._qoi_expr_late_bound_constants = qoi_expr.late_bound_constants
-
-            # check if the expression is well-formed and if an error bound can
-            #  be computed
-            _canary_data_eb = FoldedScalarConst.constant_fold_expr(
-                qoi_expr, np.dtype(np.float64)
-            ).compute_data_error_bound(
-                np.empty(0, dtype=np.float64),
-                np.empty(0, dtype=np.float64),
-                np.empty(0, dtype=np.float64),
-                np.empty(0, dtype=np.float64),
-                {
-                    c: np.empty(0, dtype=np.float64)
-                    for c in self._qoi_expr_late_bound_constants
-                },
-            )
+            qoi_expr = PointwiseQuantityOfInterest(qoi)
         except Exception as err:
             raise AssertionError(
-                f"failed to parse QoI expression {qoi!r}: {err}"
+                f"failed to parse pointwise QoI expression {qoi!r}: {err}"
             ) from err
 
         self._qoi = qoi
@@ -286,14 +258,13 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         specific data that is to be safeguarded.
         """
 
-        parameters = self._qoi_expr_late_bound_constants
+        parameters = frozenset(self._qoi_expr.late_bound_constants)
 
         if isinstance(self._eb, Parameter):
             parameters = parameters.union([self._eb])
 
         return parameters
 
-    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def evaluate_qoi(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -325,16 +296,14 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             c: late_bound.resolve_ndarray_with_lossless_cast(
                 c, data.shape, data_float.dtype
             )
-            for c in self._qoi_expr_late_bound_constants
+            for c in self._qoi_expr.late_bound_constants
         }
 
         return self._qoi_expr.eval(
-            data_float.shape,
             data_float,
             late_bound_constants,
         )
 
-    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -367,17 +336,11 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             c: late_bound.resolve_ndarray_with_lossless_cast(
                 c, data.shape, data_float.dtype
             )
-            for c in self._qoi_expr_late_bound_constants
+            for c in self._qoi_expr.late_bound_constants
         }
 
-        qoi_expr = FoldedScalarConst.constant_fold_expr(
-            self._qoi_expr, data_float.dtype
-        )
-
-        qoi_data = qoi_expr.eval(data_float.shape, data_float, late_bound_constants)
-        qoi_decoded = qoi_expr.eval(
-            data_float.shape, to_float(decoded), late_bound_constants
-        )
+        qoi_data = self._qoi_expr.eval(data_float, late_bound_constants)
+        qoi_decoded = self._qoi_expr.eval(to_float(decoded), late_bound_constants)
 
         eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
@@ -411,7 +374,6 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         return ok  # type: ignore
 
-    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def compute_safe_intervals(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -441,14 +403,10 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             c: late_bound.resolve_ndarray_with_lossless_cast(
                 c, data.shape, data_float.dtype
             )
-            for c in self._qoi_expr_late_bound_constants
+            for c in self._qoi_expr.late_bound_constants
         }
 
-        qoi_expr = FoldedScalarConst.constant_fold_expr(
-            self._qoi_expr, data_float.dtype
-        )
-
-        data_qoi = qoi_expr.eval(data_float.shape, data_float, late_bound_constants)
+        data_qoi = self._qoi_expr.eval(data_float, late_bound_constants)
 
         eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
@@ -521,20 +479,16 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             )
 
         # compute the error bound in data space
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            eb_x_lower_upper: tuple[
-                np.ndarray[S, np.dtype[np.floating]],
-                np.ndarray[S, np.dtype[np.floating]],
-            ] = qoi_expr.compute_data_error_bound(
-                eb_qoi_lower,
-                eb_qoi_upper,
-                data_float,
-                data_float,
-                late_bound_constants,
-            )
-            eb_x_lower, eb_x_upper = eb_x_lower_upper
+        eb_x_lower_upper: tuple[
+            np.ndarray[S, np.dtype[np.floating]],
+            np.ndarray[S, np.dtype[np.floating]],
+        ] = self._qoi_expr.compute_data_error_bound(
+            eb_qoi_lower,
+            eb_qoi_upper,
+            data_float,
+            late_bound_constants,
+        )
+        eb_x_lower, eb_x_upper = eb_x_lower_upper
 
         return compute_safe_eb_lower_upper_interval_union(
             data,

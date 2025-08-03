@@ -631,6 +631,7 @@ def test_finite_difference_periodic_grid():
 
 
 @pytest.mark.parametrize("dtype", sorted(d.name for d in Safeguards.supported_dtypes()))
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 def test_periodic_delta_transform(dtype):
     def delta_transform(x, period):
         p, q = x, period
@@ -782,7 +783,7 @@ def test_evaluate_expr_with_indexing():
 
     Xs = np.round(np.pi * np.arange(9)).reshape(1, 3, 3)
 
-    assert safeguard._qoi_expr.eval((1,), Xs, dict()) == np.sum(
+    assert safeguard._qoi_expr.eval(Xs[:, 1, 1], Xs, dict()) == np.sum(
         Xs * np.array([[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])
     )
 
