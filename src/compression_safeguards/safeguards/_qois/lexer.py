@@ -1,52 +1,67 @@
 __all__ = ["QoILexer"]
 
+from contextlib import contextmanager
+
 from sly import Lexer
 
 
 class QoILexer(Lexer):
+    # === token declarations ===
     tokens = {
+        # literals
         INTEGER,  # type: ignore[name-defined]  # noqa: F821
         FLOAT,  # type: ignore[name-defined]  # noqa: F821
+        STRING,  # type: ignore[name-defined]  # noqa: F821
+        # operators
         PLUS,  # type: ignore[name-defined]  # noqa: F821
-        TIMES,  # type: ignore[name-defined]  # noqa: F821
         MINUS,  # type: ignore[name-defined]  # noqa: F821
+        POWER,  # type: ignore[name-defined]  # noqa: F821
+        TIMES,  # type: ignore[name-defined]  # noqa: F821
         DIVIDE,  # type: ignore[name-defined]  # noqa: F821
+        EQUAL,  # type: ignore[name-defined]  # noqa: F821
+        # array transpose
+        TRANSPOSE,  # type: ignore[name-defined]  # noqa: F821
+        # groups
         LPAREN,  # type: ignore[name-defined]  # noqa: F821
         RPAREN,  # type: ignore[name-defined]  # noqa: F821
-        POWER,  # type: ignore[name-defined]  # noqa: F821
         LBRACK,  # type: ignore[name-defined]  # noqa: F821
         RBRACK,  # type: ignore[name-defined]  # noqa: F821
+        # separators
         COMMA,  # type: ignore[name-defined]  # noqa: F821
-        EQUAL,  # type: ignore[name-defined]  # noqa: F821
         SEMI,  # type: ignore[name-defined]  # noqa: F821
+        # identifiers
+        ID,  # type: ignore[name-defined]  # noqa: F821
+        # statements
+        RETURN,  # type: ignore[name-defined]  # noqa: F821
+        # constants
         EULER,  # type: ignore[name-defined]  # noqa: F821
         PI,  # type: ignore[name-defined]  # noqa: F821
+        # data, late-bound constants, variables
         XS,  # type: ignore[name-defined]  # noqa: F821
         XA,  # type: ignore[name-defined]  # noqa: F821
+        CS,  # type: ignore[name-defined]  # noqa: F821
+        CA,  # type: ignore[name-defined]  # noqa: F821
+        VS,  # type: ignore[name-defined]  # noqa: F821
+        VA,  # type: ignore[name-defined]  # noqa: F821
+        # array indexing
         IDX,  # type: ignore[name-defined]  # noqa: F821
+        # functions
+        # logarithms and exponentials
         LN,  # type: ignore[name-defined]  # noqa: F821
         LOG2,  # type: ignore[name-defined]  # noqa: F821
         LOG,  # type: ignore[name-defined]  # noqa: F821
-        BASE,  # type: ignore[name-defined]  # noqa: F821
         EXP,  # type: ignore[name-defined]  # noqa: F821
         EXP2,  # type: ignore[name-defined]  # noqa: F821
-        ID,  # type: ignore[name-defined]  # noqa: F821
-        SUM,  # type: ignore[name-defined]  # noqa: F821
-        MATMUL,  # type: ignore[name-defined]  # noqa: F821
-        TRANSPOSE,  # type: ignore[name-defined]  # noqa: F821
-        CS,  # type: ignore[name-defined]  # noqa: F821
-        CA,  # type: ignore[name-defined]  # noqa: F821
-        STRING,  # type: ignore[name-defined]  # noqa: F821
-        VS,  # type: ignore[name-defined]  # noqa: F821
-        VA,  # type: ignore[name-defined]  # noqa: F821
-        RETURN,  # type: ignore[name-defined]  # noqa: F821
+        # exponentiation
+        SQRT,  # type: ignore[name-defined]  # noqa: F821
+        SQUARE,  # type: ignore[name-defined]  # noqa: F821
+        # sign and rounding
         SIGN,  # type: ignore[name-defined]  # noqa: F821
         FLOOR,  # type: ignore[name-defined]  # noqa: F821
         CEIL,  # type: ignore[name-defined]  # noqa: F821
         TRUNC,  # type: ignore[name-defined]  # noqa: F821
         ROUND_TIES_EVEN,  # type: ignore[name-defined]  # noqa: F821
-        SQRT,  # type: ignore[name-defined]  # noqa: F821
-        SQUARE,  # type: ignore[name-defined]  # noqa: F821
+        # trigonometric
         SIN,  # type: ignore[name-defined]  # noqa: F821
         COS,  # type: ignore[name-defined]  # noqa: F821
         TAN,  # type: ignore[name-defined]  # noqa: F821
@@ -59,6 +74,7 @@ class QoILexer(Lexer):
         ACOT,  # type: ignore[name-defined]  # noqa: F821
         ASEC,  # type: ignore[name-defined]  # noqa: F821
         ACSC,  # type: ignore[name-defined]  # noqa: F821
+        # hyperbolic
         SINH,  # type: ignore[name-defined]  # noqa: F821
         COSH,  # type: ignore[name-defined]  # noqa: F821
         TANH,  # type: ignore[name-defined]  # noqa: F821
@@ -71,7 +87,13 @@ class QoILexer(Lexer):
         ACOTH,  # type: ignore[name-defined]  # noqa: F821
         ASECH,  # type: ignore[name-defined]  # noqa: F821
         ACSCH,  # type: ignore[name-defined]  # noqa: F821
+        # array operations
+        SUM,  # type: ignore[name-defined]  # noqa: F821
+        MATMUL,  # type: ignore[name-defined]  # noqa: F821
+        # finite difference
         FINITE_DIFFERENCE,  # type: ignore[name-defined]  # noqa: F821
+        # keyword arguments
+        BASE,  # type: ignore[name-defined]  # noqa: F821
         ORDER,  # type: ignore[name-defined]  # noqa: F821
         ACCURACY,  # type: ignore[name-defined]  # noqa: F821
         TYPE,  # type: ignore[name-defined]  # noqa: F821
@@ -80,75 +102,102 @@ class QoILexer(Lexer):
         GRID_CENTRE,  # type: ignore[name-defined]  # noqa: F821
         GRID_PERIOD,  # type: ignore[name-defined]  # noqa: F821
     }
-    ignore = " \t"
 
-    # Tokens
+    # === ignored whitespace patterns ===
+    ignore = " \t"
+    ignore_comment = r"#[^\n]*"
+
+    @_(r"\n+")  # type: ignore[name-defined]  # noqa: F821
+    def ignore_newline(self, t):  # type: ignore[no-redef]  # noqa: F811
+        self.lineno += t.value.count("\n")
+
+    # === token definitions ===
+
+    # literals
     @_(r"[0-9]+(\.[0-9]*)?(e(\+|-)?[0-9]*)?")  # type: ignore[name-defined]  # noqa: F821
     def FLOAT(self, t):
         if ("." in t.value) or ("e" in t.value):
-            # a floating-point literal
-            if t.value[-1] not in "0123456789":
-                raise SyntaxError(
-                    f"invalid floating point literal `{t.value}` requires at least one digit after '.' and 'e' at line {self.lineno}, column {find_column(self.text, t)}"
-                )
+            # floating-point literal
+            self.assert_or_error(
+                t.value[-1] in "0123456789",
+                t,
+                f"invalid floating point literal `{t.value}` requires at least one digit after '.' and 'e'",
+            )
             return t
         else:
-            # an integer literal
-            t.value = int(t.value)
+            # integer literal, pre-parsed
+            with self.with_error_context(t, "excessive integer literal"):
+                t.value = int(t.value)
             t.type = "INTEGER"
             return t
 
-    # Special symbols
+    @_(r'"[^"]*["]?')  # type: ignore[name-defined]  # noqa: F821
+    def STRING(self, t):
+        self.assert_or_error(
+            t.value[-1] == '"', t, 'invalid string literal with missing closing `"`'
+        )
+        t.value = t.value[1:-1]
+        return t
+
+    # operators
     PLUS = r"\+"
     MINUS = r"-"
     POWER = r"\*\*"
     TIMES = r"\*"
     DIVIDE = r"/"
+    EQUAL = r"="
+
+    # array transpose
+    TRANSPOSE = r"\.T"
+
+    # groups
     LPAREN = r"\("
     RPAREN = r"\)"
     LBRACK = r"\["
     RBRACK = r"\]"
+
+    # separators
     COMMA = r","
-    TRANSPOSE = r"\.T"
-    EQUAL = r"="
     SEMI = r";"
 
-    @_(r'"[^"]*["]?')  # type: ignore[name-defined]  # noqa: F821
-    def STRING(self, t):
-        if t.value[-1] != '"':
-            raise SyntaxError(
-                f'invalid string literal with missing closing `"` at line {self.lineno}, column {find_column(self.text, t)}'
-            )
-        t.value = t.value[1:-1]
-        return t
-
-    # Identifiers
+    # identifiers
     ID = r"[a-zA-Z_][a-zA-Z0-9_]*"
+
+    # statements
+    ID["return"] = RETURN  # type: ignore[index, name-defined]  # noqa: F821
+
+    # constants
     ID["e"] = EULER  # type: ignore[index, name-defined]  # noqa: F821
     ID["pi"] = PI  # type: ignore[index, name-defined]  # noqa: F821
+
+    # data, late-bound constants, variables
     ID["x"] = XS  # type: ignore[index, name-defined]  # noqa: F821
     ID["X"] = XA  # type: ignore[index, name-defined]  # noqa: F821
-    ID["I"] = IDX  # type: ignore[index, name-defined]  # noqa: F821
-    ID["ln"] = LN  # type: ignore[index, name-defined]  # noqa: F821
-    ID["log2"] = LOG2  # type: ignore[index, name-defined]  # noqa: F821
-    ID["log"] = LOG  # type: ignore[index, name-defined]  # noqa: F821
-    ID["base"] = BASE  # type: ignore[index, name-defined]  # noqa: F821
-    ID["exp"] = EXP  # type: ignore[index, name-defined]  # noqa: F821
-    ID["exp2"] = EXP2  # type: ignore[index, name-defined]  # noqa: F821
-    ID["sum"] = SUM  # type: ignore[index, name-defined]  # noqa: F821
-    ID["matmul"] = MATMUL  # type: ignore[index, name-defined]  # noqa: F821
     ID["c"] = CS  # type: ignore[index, name-defined]  # noqa: F821
     ID["C"] = CA  # type: ignore[index, name-defined]  # noqa: F821
     ID["v"] = VS  # type: ignore[index, name-defined]  # noqa: F821
     ID["V"] = VA  # type: ignore[index, name-defined]  # noqa: F821
-    ID["return"] = RETURN  # type: ignore[index, name-defined]  # noqa: F821
+
+    # array indexing
+    ID["I"] = IDX  # type: ignore[index, name-defined]  # noqa: F821
+
+    # functions
+    # logarithms and exponentials
+    ID["ln"] = LN  # type: ignore[index, name-defined]  # noqa: F821
+    ID["log2"] = LOG2  # type: ignore[index, name-defined]  # noqa: F821
+    ID["log"] = LOG  # type: ignore[index, name-defined]  # noqa: F821
+    ID["exp"] = EXP  # type: ignore[index, name-defined]  # noqa: F821
+    ID["exp2"] = EXP2  # type: ignore[index, name-defined]  # noqa: F821
+    # exponentiation
+    ID["sqrt"] = SQRT  # type: ignore[index, name-defined]  # noqa: F821
+    ID["square"] = SQUARE  # type: ignore[index, name-defined]  # noqa: F821
+    # sign and rounding
     ID["sign"] = SIGN  # type: ignore[index, name-defined]  # noqa: F821
     ID["floor"] = FLOOR  # type: ignore[index, name-defined]  # noqa: F821
     ID["ceil"] = CEIL  # type: ignore[index, name-defined]  # noqa: F821
     ID["trunc"] = TRUNC  # type: ignore[index, name-defined]  # noqa: F821
     ID["round_ties_even"] = ROUND_TIES_EVEN  # type: ignore[index, name-defined]  # noqa: F821
-    ID["sqrt"] = SQRT  # type: ignore[index, name-defined]  # noqa: F821
-    ID["square"] = SQUARE  # type: ignore[index, name-defined]  # noqa: F821
+    # trigonometric
     ID["sin"] = SIN  # type: ignore[index, name-defined]  # noqa: F821
     ID["cos"] = COS  # type: ignore[index, name-defined]  # noqa: F821
     ID["tan"] = TAN  # type: ignore[index, name-defined]  # noqa: F821
@@ -161,6 +210,7 @@ class QoILexer(Lexer):
     ID["acot"] = ACOT  # type: ignore[index, name-defined]  # noqa: F821
     ID["asec"] = ASEC  # type: ignore[index, name-defined]  # noqa: F821
     ID["acsc"] = ACSC  # type: ignore[index, name-defined]  # noqa: F821
+    # hypergeometric
     ID["sinh"] = SINH  # type: ignore[index, name-defined]  # noqa: F821
     ID["cosh"] = COSH  # type: ignore[index, name-defined]  # noqa: F821
     ID["tanh"] = TANH  # type: ignore[index, name-defined]  # noqa: F821
@@ -173,7 +223,14 @@ class QoILexer(Lexer):
     ID["acoth"] = ACOTH  # type: ignore[index, name-defined]  # noqa: F821
     ID["asech"] = ASECH  # type: ignore[index, name-defined]  # noqa: F821
     ID["acsch"] = ACSCH  # type: ignore[index, name-defined]  # noqa: F821
+    # array operations
+    ID["sum"] = SUM  # type: ignore[index, name-defined]  # noqa: F821
+    ID["matmul"] = MATMUL  # type: ignore[index, name-defined]  # noqa: F821
+    # finite difference
     ID["finite_difference"] = FINITE_DIFFERENCE  # type: ignore[index, name-defined]  # noqa: F821
+
+    # keyword arguments
+    ID["base"] = BASE  # type: ignore[index, name-defined]  # noqa: F821
     ID["order"] = ORDER  # type: ignore[index, name-defined]  # noqa: F821
     ID["accuracy"] = ACCURACY  # type: ignore[index, name-defined]  # noqa: F821
     ID["type"] = TYPE  # type: ignore[index, name-defined]  # noqa: F821
@@ -182,23 +239,30 @@ class QoILexer(Lexer):
     ID["grid_centre"] = GRID_CENTRE  # type: ignore[index, name-defined]  # noqa: F821
     ID["grid_period"] = GRID_PERIOD  # type: ignore[index, name-defined]  # noqa: F821
 
-    # Ignored pattern
-    ignore_newline = r"\n+"
-    ignore_comment = r"#[^\n]*"
-
-    # Extra action for newlines
-    def ignore_newline(self, t):  # type: ignore[no-redef]  # noqa: F811
-        self.lineno += t.value.count("\n")
-
+    # === lexer error handling ===
     def error(self, t):
-        raise SyntaxError(
-            f"unexpected character `{t.value[0]}` at line {self.lineno}, column {find_column(self.text, t)}"
-        )
+        self.raise_error(t, f"unexpected character `{t.value[0]}`")
 
+    def raise_error(self, t, message):
+        raise SyntaxError(f"{message} at line {t.lineno}, column {self.find_column(t)}")
 
-def find_column(text, token):
-    last_cr = text.rfind("\n", 0, token.index)
-    if last_cr < 0:
-        last_cr = 0
-    column = (token.index - last_cr) + 1
-    return column
+    def assert_or_error(self, check, t, message):
+        if not check:
+            self.raise_error(t, message)
+
+    @contextmanager
+    def with_error_context(self, t, message, exception=Exception):
+        try:
+            yield
+        except exception as err:
+            if callable(message):
+                self.raise_error(t, message(err))
+            else:
+                self.raise_error(t, message)
+
+    def find_column(self, token):
+        last_cr = self.text.rfind("\n", 0, token.index)
+        if last_cr < 0:
+            last_cr = 0
+        column = (token.index - last_cr) + 1
+        return column
