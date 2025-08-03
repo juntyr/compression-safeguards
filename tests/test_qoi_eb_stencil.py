@@ -202,11 +202,17 @@ def test_variables():
         AssertionError, match="stencil QoI variables use upper-case `V`"
     ):
         check_all_codecs(np.array([]), 'v["a"]', [(0, 0)])
-    with pytest.raises(AssertionError, match="expected identifier"):
+    with pytest.raises(
+        AssertionError, match='invalid string literal with missing closing `"`'
+    ):
+        check_all_codecs(np.array([]), 'V["a]', [(0, 0)])
+    with pytest.raises(AssertionError, match="invalid quoted parameter"):
         check_all_codecs(np.array([]), 'V["123"]', [(0, 0)])
-    # with pytest.raises(AssertionError, match="invalid QoI expression"):
-    #     check_all_codecs(np.array([]), 'V["a 123"]', [(0, 0)])
-    with pytest.raises(AssertionError, match=r"variable name must not start with `\$`"):
+    with pytest.raises(AssertionError, match="invalid quoted parameter"):
+        check_all_codecs(np.array([]), 'V["a 123"]', [(0, 0)])
+    with pytest.raises(
+        AssertionError, match=r"variable name must not be built-in \(start with `\$`\)"
+    ):
         check_all_codecs(np.array([]), 'V["$a"]', [(0, 0)])
     with pytest.raises(AssertionError, match=r'undefined variable V\["a"\]'):
         check_all_codecs(np.array([]), 'V["a"]', [(0, 0)])
@@ -1080,17 +1086,29 @@ def test_late_bound_lossless_cast():
 
     with pytest.raises(ValueError, match="cannot losslessly cast"):
         safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(c=np.iinfo(np.int32).max - 1)
+        )
+        safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.int32).max)
         )
     with pytest.raises(ValueError, match="cannot losslessly cast"):
+        safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(c=np.iinfo(np.uint32).max - 1)
+        )
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.uint32).max)
         )
     with pytest.raises(ValueError, match="cannot losslessly cast"):
         safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(c=np.iinfo(np.int64).max - 1)
+        )
+        safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.int64).max)
         )
     with pytest.raises(ValueError, match="cannot losslessly cast"):
+        safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(c=np.iinfo(np.uint64).max - 1)
+        )
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.uint64).max)
         )

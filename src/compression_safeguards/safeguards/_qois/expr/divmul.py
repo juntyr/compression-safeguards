@@ -24,7 +24,11 @@ class ScalarMultiply(Expr):
             # symbolical constant propagation of int * int
             ai, bi = a.int(), b.int()
             if (ai is not None) and (bi is not None):
-                return Number(f"{ai * bi}")
+                # only propagate if str(ai * bi) is representable
+                try:
+                    return Number(f"{ai * bi}")
+                except ValueError:
+                    pass
         this = super(ScalarMultiply, cls).__new__(cls)
         this._a = a
         this._b = b

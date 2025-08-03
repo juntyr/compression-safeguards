@@ -100,77 +100,82 @@ class QoIParser(Parser):
     def many_assign(self, p):  # noqa: F811
         pass
 
-    @_("QUOTEDID")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def quotedid(self, p):  # noqa: F811
-        return p.QUOTEDID
+    @_("STRING")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def quotedparameter(self, p):  # noqa: F811
+        try:
+            return Parameter(p.STRING)
+        except Exception:
+            self.raise_error(
+                p, f'invalid quoted parameter "{p.STRING}": must be a valid identifier'
+            )
 
-    @_("QUOTE ID QUOTE")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def quotedid(self, p):  # noqa: F811
-        self.raise_error(p, "quoted identifier cannot contain whitespace or comments")
-
-    @_("QUOTE ID")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def quotedid(self, p):  # noqa: F811
-        self.raise_error(p, "missing closing quote for quoted identifier")
-
-    @_("VS LBRACK quotedid RBRACK EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("VS LBRACK quotedparameter RBRACK EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def assign(self, p):  # noqa: F811
         self.assert_or_error(
             self._X is None, p, "stencil QoI variables use upper-case `V`"
         )
         self.assert_or_error(
-            not p.quotedid.startswith("$"), p, "variable name must not start with `$`"
+            not p.quotedparameter.is_builtin,
+            p,
+            "variable name must be built-in (start with `$`)",
         )
         self.assert_or_error(
-            p.quotedid not in self._vars,
+            p.quotedparameter not in self._vars,
             p,
-            f'cannot override already-defined variable v["{p.quotedid}"]',
+            f'cannot override already-defined variable v["{p.quotedparameter}"]',
         )
-        self._vars[Parameter(p.quotedid)] = Array.map_unary(p.expr, Group)
+        self._vars[p.quotedparameter] = Array.map_unary(p.expr, Group)
 
-    @_("VA LBRACK quotedid RBRACK EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("VA LBRACK quotedparameter RBRACK EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def assign(self, p):  # noqa: F811
         self.assert_or_error(
             self._X is not None, p, "pointwise QoI variables use lower-case `v`"
         )
         self.assert_or_error(
-            not p.quotedid.startswith("$"), p, "variable name must not start with `$`"
+            not p.quotedparameter.is_builtin,
+            p,
+            "variable name must be built-in (start with `$`)",
         )
         self.assert_or_error(
-            p.quotedid not in self._vars,
+            p.quotedparameter not in self._vars,
             p,
-            f'cannot override already-defined variable V["{p.quotedid}"]',
+            f'cannot override already-defined variable V["{p.quotedparameter}"]',
         )
-        self._vars[Parameter(p.quotedid)] = Array.map_unary(p.expr, Group)
+        self._vars[p.quotedparameter] = Array.map_unary(p.expr, Group)
 
-    @_("VS LBRACK quotedid RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("VS LBRACK quotedparameter RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         self.assert_or_error(
             self._X is None, p, "stencil QoI variables use upper-case `V`"
         )
         self.assert_or_error(
-            not p.quotedid.startswith("$"), p, "variable name must not start with `$`"
+            not p.quotedparameter.is_builtin,
+            p,
+            "variable name must not be built-in (start with `$`)",
         )
         self.assert_or_error(
-            Parameter(p.quotedid) in self._vars,
+            p.quotedparameter in self._vars,
             p,
-            f'undefined variable v["{p.quotedid}"]',
+            f'undefined variable v["{p.quotedparameter}"]',
         )
-        return self._vars[Parameter(p.quotedid)]
+        return self._vars[p.quotedparameter]
 
-    @_("VA LBRACK quotedid RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("VA LBRACK quotedparameter RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         self.assert_or_error(
             self._X is not None, p, "pointwise QoI variables use lower-case `v`"
         )
         self.assert_or_error(
-            not p.quotedid.startswith("$"), p, "variable name must not start with `$`"
+            not p.quotedparameter.is_builtin,
+            p,
+            "variable name must not be built-in (start with `$`)",
         )
         self.assert_or_error(
-            Parameter(p.quotedid) in self._vars,
+            p.quotedparameter in self._vars,
             p,
-            f'undefined variable V["{p.quotedid}"]',
+            f'undefined variable V["{p.quotedparameter}"]',
         )
-        return self._vars[Parameter(p.quotedid)]
+        return self._vars[p.quotedparameter]
 
     @_("expr PLUS expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -546,11 +551,11 @@ class QoIParser(Parser):
         )
         return p.expr.transpose()
 
-    @_("CS LBRACK quotedid RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("CS LBRACK quotedparameter RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return LateBoundConstant.like(Parameter(p.quotedid), self._x)
+        return LateBoundConstant.like(p.quotedparameter, self._x)
 
-    @_("CA LBRACK quotedid RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("CA LBRACK quotedparameter RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         self.assert_or_error(
             self._X is not None,
@@ -559,7 +564,7 @@ class QoIParser(Parser):
         )
         return Array.map_unary(
             self._X,
-            lambda e: LateBoundConstant.like(Parameter(p.quotedid), e),
+            lambda e: LateBoundConstant.like(p.quotedparameter, e),
         )
 
     @_(  # type: ignore[name-defined, no-redef]  # noqa: F821
@@ -820,8 +825,7 @@ def token_to_name(token: str) -> str:
         "TRANSPOSE": "`.T`",
         "CS": "`c`",
         "CA": "`C`",
-        "QUOTEDID": "quoted identifier",
-        "QUOTE": '`"`',
+        "STRING": "string",
         "VS": "`v`",
         "VA": "`V`",
         "RETURN": "`return`",

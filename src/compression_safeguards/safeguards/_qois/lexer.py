@@ -36,8 +36,7 @@ class QoILexer(Lexer):
         TRANSPOSE,  # type: ignore[name-defined]  # noqa: F821
         CS,  # type: ignore[name-defined]  # noqa: F821
         CA,  # type: ignore[name-defined]  # noqa: F821
-        QUOTEDID,  # type: ignore[name-defined]  # noqa: F821
-        QUOTE,  # type: ignore[name-defined]  # noqa: F821
+        STRING,  # type: ignore[name-defined]  # noqa: F821
         VS,  # type: ignore[name-defined]  # noqa: F821
         VA,  # type: ignore[name-defined]  # noqa: F821
         RETURN,  # type: ignore[name-defined]  # noqa: F821
@@ -114,12 +113,14 @@ class QoILexer(Lexer):
     EQUAL = r"="
     SEMI = r";"
 
-    @_(r'"(\$)?[a-zA-Z_][a-zA-Z0-9_]*"')  # type: ignore[name-defined]  # noqa: F821
-    def QUOTEDID(self, t):
+    @_(r'"[^"]*["]?')  # type: ignore[name-defined]  # noqa: F821
+    def STRING(self, t):
+        if t.value[-1] != '"':
+            raise SyntaxError(
+                f'invalid string literal with missing closing `"` at line {self.lineno}, column {find_column(self.text, t)}'
+            )
         t.value = t.value[1:-1]
         return t
-
-    QUOTE = r'"'
 
     # Identifiers
     ID = r"[a-zA-Z_][a-zA-Z0-9_]*"

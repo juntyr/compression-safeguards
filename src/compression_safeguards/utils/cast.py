@@ -272,6 +272,8 @@ def lossless_cast(
 
     lossless_same = np.where(_isnan(xa), _isnan(xa_back), xa == xa_back)
 
+    print(xa, xa_to, xa_back, lossless_same)
+
     if not np.all(lossless_same):
         raise ValueError(
             f"cannot losslessly cast (some) {context} values from {dtype_from} to {dtype}"

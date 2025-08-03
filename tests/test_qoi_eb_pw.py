@@ -148,11 +148,17 @@ def test_variables():
         AssertionError, match="pointwise QoI variables use lower-case `v`"
     ):
         check_all_codecs(np.array([]), 'V["a"]')
-    with pytest.raises(AssertionError, match="expected identifier"):
+    with pytest.raises(
+        AssertionError, match='invalid string literal with missing closing `"`'
+    ):
+        check_all_codecs(np.array([]), 'v["a]')
+    with pytest.raises(AssertionError, match="invalid quoted parameter"):
         check_all_codecs(np.array([]), 'v["123"]')
-    # with pytest.raises(AssertionError, match="invalid QoI expression"):
-    #     check_all_codecs(np.array([]), 'v["a 123"]')
-    with pytest.raises(AssertionError, match=r"variable name must not start with `\$`"):
+    with pytest.raises(AssertionError, match="invalid quoted parameter"):
+        check_all_codecs(np.array([]), 'v["a 123"]')
+    with pytest.raises(
+        AssertionError, match=r"variable name must not be built-in \(start with `\$`\)"
+    ):
         check_all_codecs(np.array([]), 'v["$a"]')
     with pytest.raises(AssertionError, match=r'undefined variable v\["a"\]'):
         check_all_codecs(np.array([]), 'v["a"]')

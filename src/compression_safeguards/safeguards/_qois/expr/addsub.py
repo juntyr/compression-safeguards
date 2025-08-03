@@ -22,7 +22,11 @@ class ScalarAdd(Expr):
             # symbolical constant propagation of int + int
             ai, bi = a.int(), b.int()
             if (ai is not None) and (bi is not None):
-                return Number(f"{ai + bi}")
+                # only propagate if str(ai +  bi) is representable
+                try:
+                    return Number(f"{ai + bi}")
+                except ValueError:
+                    pass
         this = super(ScalarAdd, cls).__new__(cls)
         this._a = a
         this._b = b
@@ -172,7 +176,11 @@ class ScalarSubtract(Expr):
             # symbolical constant propagation of int - int
             ai, bi = a.int(), b.int()
             if (ai is not None) and (bi is not None):
-                return Number(f"{ai - bi}")
+                # only propagate if str(ai - bi) is representable
+                try:
+                    return Number(f"{ai - bi}")
+                except ValueError:
+                    pass
         this = super(ScalarSubtract, cls).__new__(cls)
         this._a = a
         this._b = b
