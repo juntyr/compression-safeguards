@@ -1,3 +1,4 @@
+import operator
 from collections.abc import Mapping
 
 import numpy as np
@@ -14,11 +15,9 @@ class ScalarNegate(Expr):
     _a: Expr
 
     def __new__(cls, a: Expr):
-        if isinstance(a, Number):
-            # symbolical constant propagation of -int
-            ai = a.int()
-            if ai is not None:
-                return Number(f"{-ai}")
+        na = Number.symbolic_fold_unary(a, operator.neg)
+        if na is not None:
+            return na
         this = super(ScalarNegate, cls).__new__(cls)
         this._a = a
         return this

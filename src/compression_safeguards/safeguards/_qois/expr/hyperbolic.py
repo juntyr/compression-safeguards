@@ -108,7 +108,7 @@ HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
             ScalarExp(Exponential.exp, x),
             ScalarExp(Exponential.exp, ScalarNegate(x)),
         ),
-        Number("2"),
+        Number.TWO,
     ),
     # cosh(x) = (e^x + e^(-x)) / 2
     Hyperbolic.cosh: lambda x: ScalarDivide(
@@ -116,7 +116,7 @@ HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
             ScalarExp(Exponential.exp, x),
             ScalarExp(Exponential.exp, ScalarNegate(x)),
         ),
-        Number("2"),
+        Number.TWO,
     ),
     # derived hyperbolic functions
     # tanh(x) = sinh(x) / cosh(x)
@@ -125,16 +125,16 @@ HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
         ScalarSubtract(
             ScalarExp(
                 Exponential.exp,
-                ScalarMultiply(Number("2"), x),
+                ScalarMultiply(Number.TWO, x),
             ),
-            Number("1"),
+            Number.ONE,
         ),
         ScalarAdd(
             ScalarExp(
                 Exponential.exp,
-                ScalarMultiply(Number("2"), x),
+                ScalarMultiply(Number.TWO, x),
             ),
-            Number("1"),
+            Number.ONE,
         ),
     ),
     # coth(x) = cosh(x) / sinh(x)
@@ -143,22 +143,22 @@ HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
         ScalarAdd(
             ScalarExp(
                 Exponential.exp,
-                ScalarMultiply(Number("2"), x),
+                ScalarMultiply(Number.TWO, x),
             ),
-            Number("1"),
+            Number.ONE,
         ),
         ScalarSubtract(
             ScalarExp(
                 Exponential.exp,
-                ScalarMultiply(Number("2"), x),
+                ScalarMultiply(Number.TWO, x),
             ),
-            Number("1"),
+            Number.ONE,
         ),
     ),
     # sech(x) = 1 / cosh(x)
     #         = 2 / (e^x + e^(-x))
     Hyperbolic.sech: lambda x: ScalarDivide(
-        Number("2"),
+        Number.TWO,
         ScalarAdd(
             ScalarExp(
                 Exponential.exp,
@@ -173,7 +173,7 @@ HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
     # csch(x) = 1 / sinh(x)
     #         = 2 / (e^x - e^(-x))
     Hyperbolic.csch: lambda x: ScalarDivide(
-        Number("2"),
+        Number.TWO,
         ScalarSubtract(
             ScalarExp(
                 Exponential.exp,
@@ -194,7 +194,7 @@ HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
             ScalarSqrt(
                 ScalarAdd(
                     ScalarSquare(x),
-                    Number("1"),
+                    Number.ONE,
                 )
             ),
         ),
@@ -207,7 +207,7 @@ HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
             ScalarSqrt(
                 ScalarSubtract(
                     ScalarSquare(x),
-                    Number("1"),
+                    Number.ONE,
                 )
             ),
         ),
@@ -219,19 +219,19 @@ HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
             ScalarLog(
                 Logarithm.ln,
                 ScalarAdd(
-                    Number("1"),
+                    Number.ONE,
                     x,
                 ),
             ),
             ScalarLog(
                 Logarithm.ln,
                 ScalarSubtract(
-                    Number("1"),
+                    Number.ONE,
                     x,
                 ),
             ),
         ),
-        Number("2"),
+        Number.TWO,
     ),
     # acoth(x) = ln( (x+1) / (x-1) ) / 2
     #          = ( ln(x+1) - ln(x-1) ) / 2
@@ -241,18 +241,18 @@ HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
                 Logarithm.ln,
                 ScalarAdd(
                     x,
-                    Number("1"),
+                    Number.ONE,
                 ),
             ),
             ScalarLog(
                 Logarithm.ln,
                 ScalarSubtract(
                     x,
-                    Number("1"),
+                    Number.ONE,
                 ),
             ),
         ),
-        Number("2"),
+        Number.TWO,
     ),
     # asech(x) = ln( 1/x + sqrt( 1/(x^2) - 1 ) )
     #          = ln( 1/x + sqrt( 1/(x^2) - (x^2)/(x^2) ) )
@@ -263,10 +263,10 @@ HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
         ScalarLog(
             Logarithm.ln,
             ScalarAdd(
-                Number("1"),
+                Number.ONE,
                 ScalarSqrt(
                     ScalarSubtract(
-                        Number("1"),
+                        Number.ONE,
                         ScalarSquare(x),
                     )
                 ),
@@ -286,10 +286,10 @@ HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
         ScalarLog(
             Logarithm.ln,
             ScalarAdd(
-                Number("1"),
+                Number.ONE,
                 ScalarSqrt(
                     ScalarAdd(
-                        Number("1"),
+                        Number.ONE,
                         ScalarSquare(x),
                     )
                 ),

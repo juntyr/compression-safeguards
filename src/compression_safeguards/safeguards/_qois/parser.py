@@ -281,18 +281,18 @@ class QoIParser(Parser):
     @_("expr")  # type: ignore[name-defined]  # noqa: F821
     def index_(self, p):
         self.assert_or_error(
-            isinstance(p.expr, Number) and p.expr.int() is not None,
+            isinstance(p.expr, Number) and p.expr.as_int() is not None,
             p,
             "cannot index by non-integer expression",
         )
-        return p.expr.int()
+        return p.expr.as_int()
 
     @_("IDX LBRACK integer RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         self.assert_or_error(
             self._I is not None, p, "index `I` is not available in pointwise QoIs"
         )
-        return Number(f"{self._I[p.integer]}")
+        return Number.from_symbolic_int(self._I[p.integer])
 
     @_("comma_expr many_comma_expr")  # type: ignore[name-defined]  # noqa: F821
     def many_comma_expr(self, p):
@@ -324,7 +324,7 @@ class QoIParser(Parser):
 
     @_("INTEGER")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Number(f"{p.INTEGER}")
+        return Number.from_symbolic_int(p.INTEGER)
 
     @_("EULER")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -649,7 +649,10 @@ class QoIParser(Parser):
 
             coefficients = finite_difference_coefficients(
                 order,
-                tuple(ScalarMultiply(Number(f"{o}"), grid_spacing) for o in offsets),
+                tuple(
+                    ScalarMultiply(Number.from_symbolic_int(o), grid_spacing)
+                    for o in offsets
+                ),
                 lambda a: a,
                 delta_transform=delta_transform,
             )

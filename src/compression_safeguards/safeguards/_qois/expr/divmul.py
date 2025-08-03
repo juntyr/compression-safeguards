@@ -1,3 +1,4 @@
+import operator
 from collections.abc import Mapping
 from math import gcd
 
@@ -20,15 +21,9 @@ class ScalarMultiply(Expr):
     _b: Expr
 
     def __new__(cls, a: Expr, b: Expr):
-        if isinstance(a, Number) and isinstance(b, Number):
-            # symbolical constant propagation of int * int
-            ai, bi = a.int(), b.int()
-            if (ai is not None) and (bi is not None):
-                # only propagate if str(ai * bi) is representable
-                try:
-                    return Number(f"{ai * bi}")
-                except ValueError:
-                    pass
+        ab = Number.symbolic_fold_binary(a, b, operator.mul)
+        if ab is not None:
+            return ab
         this = super(ScalarMultiply, cls).__new__(cls)
         this._a = a
         this._b = b
@@ -158,7 +153,7 @@ class ScalarDivide(Expr):
         if isinstance(a, Number) and isinstance(b, Number):
             # symbolical constant propagation for some cases of int / int
             # division always produces a floating point number
-            ai, bi = a.int(), b.int()
+            ai, bi = a.as_int(), b.as_int()
             if (ai is not None) and (bi is not None):
                 d = gcd(ai, bi)
                 if d > 1:
@@ -168,15 +163,19 @@ class ScalarDivide(Expr):
                     bi //= d
                 # int / 1 has an exact floating point result
                 if bi == 1:
-                    return Number(f"{ai}.0")
+                    return Number.from_symbolic_int_as_float(ai)
                 # int / -1 has an exact floating point result
                 if bi == -1:
                     # ensure that 0/1 = 0.0 and 0/-1 = -0.0
-                    return Number(f"{abs(ai)}.0") if ai < 0 else Number(f"-{ai}.0")
+                    return (
+                        Number.from_symbolic_int_as_float(abs(ai))
+                        if ai < 0
+                        else Number.from_symbolic_int_as_float(-ai)
+                    )
                 # keep a / b after reduction
                 if d > 1:
-                    a = Number(f"{ai}")
-                    b = Number(f"{bi}")
+                    a = Number.from_symbolic_int(ai)
+                    b = Number.from_symbolic_int(bi)
         this = super(ScalarDivide, cls).__new__(cls)
         this._a = a
         this._b = b
@@ -231,7 +230,7 @@ class ScalarDivide(Expr):
         from .power import ScalarPower
 
         return ScalarMultiply(
-            self._a, ScalarPower(self._b, Number("-1"))
+            self._a, ScalarPower(self._b, Number.NEG_ONE)
         ).compute_data_error_bound(eb_expr_lower, eb_expr_upper, X, Xs, late_bound)
 
     def __repr__(self) -> str:

@@ -141,22 +141,22 @@ def finite_difference_coefficients(
     N: int = len(a) - 1
 
     coeffs_num: dict[tuple[int, int, int], Expr] = {
-        (0, 0, 0): Number("1"),
+        (0, 0, 0): Number.ONE,
     }
     coeffs_denom: dict[tuple[int, int, int], Expr] = {
-        (0, 0, 0): Number("1"),
+        (0, 0, 0): Number.ONE,
     }
 
-    c1: Expr = Number("1")
+    c1: Expr = Number.ONE
 
     for n in range(1, N + 1):
-        c2: Expr = Number("1")
+        c2: Expr = Number.ONE
         for v in range(0, n):
             c3: Expr = delta_transform(Group(ScalarSubtract(a[n], a[v])))
             c2 = Group(ScalarMultiply(c2, c3))
             if n <= M:
-                coeffs_num[(n, n - 1, v)] = Number("0")
-                coeffs_denom[(n, n - 1, v)] = Number("1")
+                coeffs_num[(n, n - 1, v)] = Number.ZERO
+                coeffs_denom[(n, n - 1, v)] = Number.ONE
             for m in range(0, min(n, M) + 1):
                 if m > 0:
                     coeffs_num[(m, n, v)] = Group(
@@ -173,7 +173,7 @@ def finite_difference_coefficients(
                             Group(
                                 ScalarMultiply(
                                     ScalarMultiply(
-                                        Number(f"{m}"),
+                                        Number.from_symbolic_int(m),
                                         coeffs_num[(m - 1, n - 1, v)],
                                     ),
                                     coeffs_denom[(m, n - 1, v)],
@@ -207,7 +207,7 @@ def finite_difference_coefficients(
                                 Group(
                                     ScalarMultiply(
                                         ScalarMultiply(
-                                            Number(f"{m}"),
+                                            Number.from_symbolic_int(m),
                                             coeffs_num[(m - 1, n - 1, n - 1)],
                                         ),
                                         coeffs_denom[(m, n - 1, n - 1)],

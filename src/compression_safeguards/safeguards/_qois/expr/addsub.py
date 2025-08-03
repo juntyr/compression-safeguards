@@ -1,3 +1,4 @@
+import operator
 from collections.abc import Mapping
 
 import numpy as np
@@ -18,15 +19,9 @@ class ScalarAdd(Expr):
     _b: Expr
 
     def __new__(cls, a: Expr, b: Expr):
-        if isinstance(a, Number) and isinstance(b, Number):
-            # symbolical constant propagation of int + int
-            ai, bi = a.int(), b.int()
-            if (ai is not None) and (bi is not None):
-                # only propagate if str(ai +  bi) is representable
-                try:
-                    return Number(f"{ai + bi}")
-                except ValueError:
-                    pass
+        ab = Number.symbolic_fold_binary(a, b, operator.add)
+        if ab is not None:
+            return ab
         this = super(ScalarAdd, cls).__new__(cls)
         this._a = a
         this._b = b
@@ -172,15 +167,9 @@ class ScalarSubtract(Expr):
     _b: Expr
 
     def __new__(cls, a: Expr, b: Expr):
-        if isinstance(a, Number) and isinstance(b, Number):
-            # symbolical constant propagation of int - int
-            ai, bi = a.int(), b.int()
-            if (ai is not None) and (bi is not None):
-                # only propagate if str(ai - bi) is representable
-                try:
-                    return Number(f"{ai - bi}")
-                except ValueError:
-                    pass
+        ab = Number.symbolic_fold_binary(a, b, operator.sub)
+        if ab is not None:
+            return ab
         this = super(ScalarSubtract, cls).__new__(cls)
         this._a = a
         this._b = b

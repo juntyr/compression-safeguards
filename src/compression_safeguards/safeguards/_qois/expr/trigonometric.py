@@ -358,7 +358,7 @@ TRIGONOMETRIC_REWRITE: dict[Trigonometric, Callable[[Expr], Expr]] = {
             x,
             ScalarDivide(
                 Pi(),
-                Number("2"),
+                Number.TWO,
             ),
         ),
     ),
@@ -375,18 +375,18 @@ TRIGONOMETRIC_REWRITE: dict[Trigonometric, Callable[[Expr], Expr]] = {
     ),
     # sec(x) = 1 / cos(x)
     Trigonometric.sec: lambda x: ScalarDivide(
-        Number("1"),
+        Number.ONE,
         ScalarTrigonometric(Trigonometric.cos, x),
     ),
     # csc(x) = 1 / sin(x)
     Trigonometric.csc: lambda x: ScalarDivide(
-        Number("1"),
+        Number.ONE,
         ScalarSin(x),
     ),
     # inverse trigonometric functions
     # acos(x) = pi/2 - asin(x)
     Trigonometric.acos: lambda x: ScalarSubtract(
-        ScalarDivide(Pi(), Number("2")),
+        ScalarDivide(Pi(), Number.TWO),
         ScalarAsin(x),
     ),
     # atan(x) = asin(x / sqrt(1 + x^2))
@@ -395,7 +395,7 @@ TRIGONOMETRIC_REWRITE: dict[Trigonometric, Callable[[Expr], Expr]] = {
             x,
             ScalarSqrt(
                 ScalarAdd(
-                    Number("1"),
+                    Number.ONE,
                     ScalarSquare(x),
                 ),
             ),
@@ -404,16 +404,16 @@ TRIGONOMETRIC_REWRITE: dict[Trigonometric, Callable[[Expr], Expr]] = {
     # acot(x) = atan(1/x)
     Trigonometric.acot: lambda x: ScalarTrigonometric(
         Trigonometric.atan,
-        ScalarDivide(Number("1"), x),
+        ScalarDivide(Number.ONE, x),
     ),
     # asec(x) = acos(1/x)
     Trigonometric.asec: lambda x: ScalarTrigonometric(
         Trigonometric.acos,
-        ScalarDivide(Number("1"), x),
+        ScalarDivide(Number.ONE, x),
     ),
     # acsc(x) = asin(1/x)
     Trigonometric.acsc: lambda x: ScalarAsin(
-        ScalarDivide(Number("1"), x),
+        ScalarDivide(Number.ONE, x),
     ),
 }
 

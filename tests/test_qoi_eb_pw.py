@@ -338,8 +338,10 @@ def test_dtypes(dtype):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_fuzzer_found(check):
-    check_all_codecs(np.array([42.0], np.float16), "(((-8054**5852)-x)-1)")
-    check("(((-8054**5852)-x)-1)")
+    with pytest.warns(UserWarning, match="symbolic integer evaluation"):
+        check_all_codecs(np.array([42.0], np.float16), "(((-8054**5852)-x)-1)")
+    with pytest.warns(UserWarning, match="symbolic integer evaluation"):
+        check("(((-8054**5852)-x)-1)")
 
     check_all_codecs(
         np.array([[18312761160228738559]], dtype=np.uint64), "((pi**(x**(x+x)))**1)"
@@ -496,13 +498,15 @@ def test_constant_fold():
         ScalarLogWithBase,
     )
 
-    expr = ScalarLogWithBase(Number("100"), Number("10"))
+    expr = ScalarLogWithBase(
+        Number.from_symbolic_int(100), Number.from_symbolic_int(10)
+    )
     assert f"{expr!r}" == "log(100, base=10)"
     assert expr.eval((), np.empty(0, dtype=np.float64), {}) == 2
 
     assert expr.constant_fold(np.dtype(np.float64)) == 2
 
-    expr = ScalarLogWithBase(Data(index=()), Number("10"))
+    expr = ScalarLogWithBase(Data(index=()), Number.from_symbolic_int(10))
     assert f"{expr!r}" == "log(x, base=10)"
     assert expr.eval((), np.array(100, dtype=np.float64), {}) == 2
 
