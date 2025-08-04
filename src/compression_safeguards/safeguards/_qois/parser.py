@@ -4,6 +4,7 @@ from sly import Parser  # from sly.yacc import SlyLogger
 
 from ...utils.bindings import Parameter
 from .expr.abc import Expr
+from .expr.abs import ScalarAbs
 from .expr.addsub import ScalarAdd, ScalarSubtract
 from .expr.array import Array
 from .expr.data import Data, LateBoundConstant
@@ -399,6 +400,10 @@ class QoIParser(Parser):
     @_("SQUARE LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, ScalarSquare)
+
+    @_("ABS LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, ScalarAbs)
 
     @_("SIN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811

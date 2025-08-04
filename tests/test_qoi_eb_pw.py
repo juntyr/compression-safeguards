@@ -204,6 +204,13 @@ def test_negate(check):
 
 
 @pytest.mark.parametrize("check", CHECKS)
+def test_abs(check):
+    check("abs(x)")
+    check("abs(-x)")
+    check("abs(abs(x))")
+
+
+@pytest.mark.parametrize("check", CHECKS)
 def test_polynomial(check):
     check("x")
     check("2*x")

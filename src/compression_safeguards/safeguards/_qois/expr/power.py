@@ -170,4 +170,4 @@ class ScalarFakeAbs(Expr):
         )
 
     def __repr__(self) -> str:
-        return f"abs({self._a!r})"
+        return f"fake_abs({self._a!r})"

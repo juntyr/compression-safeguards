@@ -55,6 +55,8 @@ class QoILexer(Lexer):
         # exponentiation
         SQRT,  # type: ignore[name-defined]  # noqa: F821
         SQUARE,  # type: ignore[name-defined]  # noqa: F821
+        # absolute value
+        ABS,  # type: ignore[name-defined]  # noqa: F821
         # sign and rounding
         SIGN,  # type: ignore[name-defined]  # noqa: F821
         FLOOR,  # type: ignore[name-defined]  # noqa: F821
@@ -191,6 +193,8 @@ class QoILexer(Lexer):
     # exponentiation
     ID["sqrt"] = SQRT  # type: ignore[index, name-defined]  # noqa: F821
     ID["square"] = SQUARE  # type: ignore[index, name-defined]  # noqa: F821
+    # absolute value
+    ID["abs"] = ABS  # type: ignore[index, name-defined]  # noqa: F821
     # sign and rounding
     ID["sign"] = SIGN  # type: ignore[index, name-defined]  # noqa: F821
     ID["floor"] = FLOOR  # type: ignore[index, name-defined]  # noqa: F821
