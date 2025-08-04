@@ -1151,16 +1151,16 @@ def test_central_second_order_with_offset():
         2, F(3, 4), (F(3, 4), F(7, 4), F(-1, 4))
     ) == (-2, 1, 1)
 
-    # +1/27
-    # assert finite_difference_coefficients_float(
-    #     2, F(1, 27), (F(1, 27), F(28, 27), F(-26, 27), F(55, 27), F(-53, 27))
-    # ) == (
-    #     F(-5, 2),
-    #     F(4, 3),
-    #     F(4, 3),
-    #     F(-1, 12),
-    #     F(-1, 12),
-    # )
+    # +1/25
+    assert finite_difference_coefficients_float(
+        2, F(1, 25), (F(1, 25), F(26, 25), F(-24, 25), F(51, 25), F(-49, 25))
+    ) == (
+        F(-5, 2),
+        F(4, 3),
+        F(4, 3),
+        F(-1, 12),
+        F(-1, 12),
+    )
 
     # -1
     assert finite_difference_coefficients_float(
