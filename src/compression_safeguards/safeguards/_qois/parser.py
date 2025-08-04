@@ -136,6 +136,13 @@ class QoIParser(Parser):
         )
         self._vars[p.quotedparameter] = Array.map_unary(p.expr, Group)
 
+    @_("ID EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def assign(self, p):  # noqa: F811
+        self.raise_error(
+            p,
+            f'cannot assign to identifier `{p.ID}`, assign to a variable {"v" if self._X is None else "V"}["{p.ID}"] instead',
+        )
+
     @_("assign many_assign")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def many_assign(self, p):  # noqa: F811
         pass

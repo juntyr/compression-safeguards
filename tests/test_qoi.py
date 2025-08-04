@@ -403,28 +403,6 @@ def test_square():
             eb_X_upper,
         )
 
-    print(valid._lower[0])
-    print(
-        valid._lower[0]
-        == np.array(
-            [
-                -np.nan,
-                -np.inf,
-                -np.sqrt(np.square(42.0) + 1),
-                -np.sqrt(5.0),
-                -np.sqrt(2.0),
-                -np.sqrt(1.25),
-                -1.0,
-                -np.sqrt(1.25),
-                -np.sqrt(2.0),
-                np.sqrt(3.0),
-                np.sqrt(np.square(42.0) - 1),
-                np.inf,
-                np.nan,
-            ]
-        )
-    )
-
     # FIXME: interval based error bounds would produce these exact values
     np.testing.assert_allclose(
         valid._lower[0],

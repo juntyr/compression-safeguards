@@ -145,6 +145,11 @@ def test_comment():
 
 def test_variables():
     with pytest.raises(
+        AssertionError,
+        match=r'cannot assign to identifier `a`, assign to a variable v\["a"\] instead',
+    ):
+        check_all_codecs(np.array([]), "a = 4; return a")
+    with pytest.raises(
         AssertionError, match="pointwise QoI variables use lower-case `v`"
     ):
         check_all_codecs(np.array([]), 'V["a"]')
