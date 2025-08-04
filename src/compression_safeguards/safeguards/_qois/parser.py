@@ -15,6 +15,7 @@ from .expr.literal import Euler, Number, Pi
 from .expr.logexp import Exponential, Logarithm, ScalarExp, ScalarLog, ScalarLogWithBase
 from .expr.neg import ScalarNegate
 from .expr.power import ScalarPower
+from .expr.reciprocal import ScalarReciprocal
 from .expr.round import ScalarCeil, ScalarFloor, ScalarRoundTiesEven, ScalarTrunc
 from .expr.sign import ScalarSign
 from .expr.square import ScalarSqrt, ScalarSquare
@@ -442,6 +443,10 @@ class QoIParser(Parser):
     @_("SQUARE LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, ScalarSquare)
+
+    @_("RECIPROCAL LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, ScalarReciprocal)
 
     # absolute value
     @_("ABS LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821

@@ -2,6 +2,7 @@ import numpy as np
 
 from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
 from compression_safeguards.safeguards._qois.expr.data import Data
+from compression_safeguards.safeguards._qois.expr.reciprocal import ScalarReciprocal
 from compression_safeguards.safeguards._qois.expr.sign import ScalarSign
 from compression_safeguards.safeguards._qois.expr.square import ScalarSquare
 from compression_safeguards.safeguards._qois.interval import (
@@ -134,7 +135,7 @@ def test_sign_same():
     fmax = np.finfo(X.dtype).max
     fmin = np.finfo(X.dtype).smallest_subnormal
 
-    # FIXE: interval based error bounds would produce these exact values
+    # FIXME: interval based error bounds would produce these exact values
     np.testing.assert_allclose(
         valid._lower[0],
         np.array(
@@ -159,7 +160,7 @@ def test_sign_same():
         equal_nan=True,
     )
     assert np.all(np.isnan(valid._lower[1]))
-    # FIXE: interval based error bounds would produce these exact values
+    # FIXME: interval based error bounds would produce these exact values
     np.testing.assert_allclose(
         valid._upper[0],
         np.array(
@@ -224,7 +225,7 @@ def test_sign_one_off():
 
     fmax = np.finfo(X.dtype).max
 
-    # FIXE: interval based error bounds would produce these exact values
+    # FIXME: interval based error bounds would produce these exact values
     np.testing.assert_allclose(
         valid._lower[0],
         np.array(
@@ -249,7 +250,7 @@ def test_sign_one_off():
         equal_nan=True,
     )
     assert np.all(np.isnan(valid._lower[1]))
-    # FIXE: interval based error bounds would produce these exact values
+    # FIXME: interval based error bounds would produce these exact values
     np.testing.assert_allclose(
         valid._upper[0],
         np.array(
@@ -314,7 +315,7 @@ def test_sign_any():
 
     fmax = np.finfo(X.dtype).max
 
-    # FIXE: interval based error bounds would produce these exact values
+    # FIXME: interval based error bounds would produce these exact values
     np.testing.assert_allclose(
         valid._lower[0],
         np.array(
@@ -339,7 +340,7 @@ def test_sign_any():
         equal_nan=True,
     )
     assert np.all(np.isnan(valid._lower[1]))
-    # FIXE: interval based error bounds would produce these exact values
+    # FIXME: interval based error bounds would produce these exact values
     np.testing.assert_allclose(
         valid._upper[0],
         np.array(
@@ -424,7 +425,7 @@ def test_square():
         )
     )
 
-    # FIXE: interval based error bounds would produce these exact values
+    # FIXME: interval based error bounds would produce these exact values
     np.testing.assert_allclose(
         valid._lower[0],
         np.array(
@@ -449,7 +450,7 @@ def test_square():
         equal_nan=True,
     )
     assert np.all(np.isnan(valid._lower[1]))
-    # FIXE: interval based error bounds would produce these exact values
+    # FIXME: interval based error bounds would produce these exact values
     np.testing.assert_allclose(
         valid._upper[0],
         np.array(
@@ -473,4 +474,56 @@ def test_square():
         atol=1e-14,
         equal_nan=True,
     )
+    assert np.all(np.isnan(valid._upper[1]))
+
+
+def test_reciprocal():
+    X = np.array(
+        [
+            -np.nan,
+            -np.inf,
+            -42.0,
+            -2.0,
+            -1.0,
+            -0.5,
+            0.0,
+            0.5,
+            1.0,
+            2.0,
+            42.0,
+            np.inf,
+            np.nan,
+        ]
+    )
+
+    expr = ScalarReciprocal(Data(index=()))
+
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        eb_X_lower, eb_X_upper = expr.compute_data_error_bound(
+            -np.ones_like(X),
+            np.ones_like(X),
+            X,
+            X,
+            dict(),
+        )
+        valid = compute_safe_eb_lower_upper_interval_union(
+            X,
+            X,
+            eb_X_lower,
+            eb_X_upper,
+        )
+
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        assert np.all(
+            (np.abs(np.reciprocal(X) - np.reciprocal(valid._lower[0])) <= 1.0)
+            | (np.reciprocal(X) == np.reciprocal(valid._lower[0]))
+            | (np.isnan(X) & np.isnan(valid._lower[0]))
+        )
+    assert np.all(np.isnan(valid._lower[1]))
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        assert np.all(
+            (np.abs(np.reciprocal(X) - np.reciprocal(valid._upper[0])) <= 1.0)
+            | (np.isnan(X) == np.isnan(valid._upper[0]))
+            | (np.isnan(X) & np.isnan(valid._upper[0]))
+        )
     assert np.all(np.isnan(valid._upper[1]))

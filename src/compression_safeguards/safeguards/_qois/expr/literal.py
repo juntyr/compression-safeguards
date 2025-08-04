@@ -24,7 +24,6 @@ class Number(Expr):
 
     ZERO: "Number"
     ONE: "Number"
-    NEG_ONE: "Number"
     TWO: "Number"
 
     @staticmethod
@@ -156,7 +155,6 @@ class Number(Expr):
 
 Number.ZERO = Number.from_symbolic_int(0)
 Number.ONE = Number.from_symbolic_int(1)
-Number.NEG_ONE = Number.from_symbolic_int(-1)
 Number.TWO = Number.from_symbolic_int(2)
 
 

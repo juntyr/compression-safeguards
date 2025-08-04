@@ -12,6 +12,7 @@ from .addsub import ScalarAdd
 from .constfold import FoldedScalarConst
 from .literal import Number
 from .logexp import Exponential, Logarithm, ScalarExp, ScalarLog
+from .reciprocal import ScalarReciprocal
 from .typing import F, Ns, Ps, PsI
 
 
@@ -226,11 +227,8 @@ class ScalarDivide(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # TODO: implement separately
-        from .power import ScalarPower
-
         return ScalarMultiply(
-            self._a, ScalarPower(self._b, Number.NEG_ONE)
+            self._a, ScalarReciprocal(self._b)
         ).compute_data_error_bound(eb_expr_lower, eb_expr_upper, X, Xs, late_bound)
 
     def __repr__(self) -> str:

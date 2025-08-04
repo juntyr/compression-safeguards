@@ -266,6 +266,12 @@ def test_inverse(check):
     check("1 / x**2")
     check("1 / x**3")
 
+    check("reciprocal(x)")
+    check("reciprocal(x - 1)")
+    check("reciprocal(x**2)")
+    check("reciprocal(x**3)")
+    check("reciprocal(reciprocal(x))")
+
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_power_function(check):
