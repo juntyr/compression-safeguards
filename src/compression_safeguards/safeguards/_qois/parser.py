@@ -1,4 +1,5 @@
 import itertools
+from contextlib import contextmanager
 
 from sly import Parser  # from sly.yacc import SlyLogger
 
@@ -170,10 +171,10 @@ class QoIParser(Parser):
     # array literal
     @_("LBRACK expr many_comma_expr RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        try:
+        with self.with_error_context(
+            p, lambda err: f"invalid array literal: {err}", exception=ValueError
+        ):
             return Array(*([p.expr] + p.many_comma_expr))
-        except ValueError as err:
-            self.raise_error(p, f"invalid array literal: {err}")
 
     @_("LBRACK RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -209,38 +210,28 @@ class QoIParser(Parser):
     #  expr := expr OP expr
     @_("expr PLUS expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        try:
+        with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map_binary(p.expr0, p.expr1, ScalarAdd)
-        except ValueError as err:
-            self.raise_error(p, f"{err}")
 
     @_("expr MINUS expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        try:
+        with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map_binary(p.expr0, p.expr1, ScalarSubtract)
-        except ValueError as err:
-            self.raise_error(p, f"{err}")
 
     @_("expr TIMES expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        try:
+        with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map_binary(p.expr0, p.expr1, ScalarMultiply)
-        except ValueError as err:
-            self.raise_error(p, f"{err}")
 
     @_("expr POWER expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        try:
+        with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map_binary(p.expr0, p.expr1, ScalarPower)
-        except ValueError as err:
-            self.raise_error(p, f"{err}")
 
     @_("expr DIVIDE expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        try:
+        with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map_binary(p.expr0, p.expr1, ScalarDivide)
-        except ValueError as err:
-            self.raise_error(p, f"{err}")
 
     # array transpose: expr := expr.T
     @_("expr TRANSPOSE %prec TRANSPOSE")  # type: ignore[name-defined, no-redef]  # noqa: F821
@@ -339,12 +330,10 @@ class QoIParser(Parser):
 
     @_("STRING")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def quotedparameter(self, p):  # noqa: F811
-        try:
+        with self.with_error_context(
+            p, f'invalid quoted parameter "{p.STRING}": must be a valid identifier'
+        ):
             return Parameter(p.STRING)
-        except Exception:
-            self.raise_error(
-                p, f'invalid quoted parameter "{p.STRING}": must be a valid identifier'
-            )
 
     # array indexing
     @_("expr LBRACK IDX RBRACK %prec INDEX")  # type: ignore[name-defined, no-redef]  # noqa: F821
@@ -355,20 +344,16 @@ class QoIParser(Parser):
         self.assert_or_error(
             isinstance(p.expr, Array), p, "cannot index scalar non-array expression"
         )
-        try:
+        with self.with_error_context(p, lambda err: f"{err}", exception=IndexError):
             return p.expr.index(self._I)
-        except IndexError as err:
-            self.raise_error(p, f"{err}")
 
     @_("expr LBRACK index_ many_comma_index RBRACK %prec INDEX")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         self.assert_or_error(
             isinstance(p.expr, Array), p, "cannot index scalar non-array expression"
         )
-        try:
+        with self.with_error_context(p, lambda err: f"{err}", exception=IndexError):
             return p.expr.index(tuple([p.index_] + p.many_comma_index))
-        except IndexError as err:
-            self.raise_error(p, f"{err}")
 
     @_("comma_index many_comma_index")  # type: ignore[name-defined]  # noqa: F821
     def many_comma_index(self, p):
@@ -420,12 +405,10 @@ class QoIParser(Parser):
 
     @_("LOG LPAREN expr COMMA BASE EQUAL expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        try:
+        with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map_binary(
                 p.expr0, p.expr1, lambda a, b: ScalarLogWithBase(a, b)
             )
-        except ValueError as err:
-            self.raise_error(p, f"{err}")
 
     @_("EXP LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -612,10 +595,8 @@ class QoIParser(Parser):
             p,
             "cannot matmul(a, b) with scalar non-array parameter b",
         )
-        try:
+        with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.matmul(p.expr0, p.expr1)
-        except ValueError as err:
-            self.raise_error(p, f"{err}")
 
     # finite difference
     @_(  # type: ignore[name-defined, no-redef]  # noqa: F821
@@ -824,6 +805,16 @@ class QoIParser(Parser):
     def assert_or_error(self, check, t, message):
         if not check:
             self.raise_error(t, message() if callable(message) else message)
+
+    @contextmanager
+    def with_error_context(self, t, message, exception=Exception):
+        try:
+            yield
+        except exception as err:
+            if callable(message):
+                self.raise_error(t, message(err))
+            else:
+                self.raise_error(t, message)
 
     def find_column(self, token):
         last_cr = self._text.rfind("\n", 0, token.index)
