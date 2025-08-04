@@ -81,8 +81,10 @@ class PointwiseQuantityOfInterest:
 
 
 class StencilQuantityOfInterest:
-    __slots__ = ("_expr", "_late_bound_constants")
+    __slots__ = ("_expr", "_stencil_shape", "_stencil_I", "_late_bound_constants")
     _expr: Expr
+    _stencil_shape: tuple[int, ...]
+    _stencil_I: tuple[int, ...]
     _late_bound_constants: frozenset[Parameter]
 
     def __init__(
@@ -94,6 +96,9 @@ class StencilQuantityOfInterest:
         assert len(stencil_shape) == len(stencil_I)
         assert all(s > 0 for s in stencil_shape)
         assert all(i >= 0 and i < s for i, s in zip(stencil_I, stencil_shape))
+
+        self._stencil_shape = stencil_shape
+        self._stencil_I = stencil_I
 
         lexer = QoILexer()
         parser = QoIParser(
@@ -141,23 +146,31 @@ class StencilQuantityOfInterest:
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def eval(
         self,
-        X: np.ndarray[Ps, np.dtype[F]],
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[Ps, np.dtype[F]]:
-        expr = FoldedScalarConst.constant_fold_expr(self._expr, X.dtype)
-        return expr.eval(X.shape, Xs, late_bound)
+        X_shape: Ps = Xs.shape[: -len(self._stencil_shape)]  # type: ignore
+        stencil_shape = Xs.shape[-len(self._stencil_shape) :]
+        assert stencil_shape == self._stencil_shape
+        expr = FoldedScalarConst.constant_fold_expr(self._expr, Xs.dtype)
+        return expr.eval(X_shape, Xs, late_bound)
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def compute_data_error_bound(
         self,
         eb_qoi_lower: np.ndarray[Ps, np.dtype[F]],
         eb_qoi_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        expr = FoldedScalarConst.constant_fold_expr(self._expr, X.dtype)
+        X_shape, stencil_shape = (
+            Xs.shape[: -len(self._stencil_shape)],
+            Xs.shape[-len(self._stencil_shape) :],
+        )
+        assert X_shape == eb_qoi_lower.shape
+        assert stencil_shape == self._stencil_shape
+        X: np.ndarray[Ps, np.dtype[F]] = Xs[(...,) + self._stencil_I]  # type: ignore
+        expr = FoldedScalarConst.constant_fold_expr(self._expr, Xs.dtype)
         return expr.compute_data_error_bound(
             eb_qoi_lower, eb_qoi_upper, X, Xs, late_bound
         )

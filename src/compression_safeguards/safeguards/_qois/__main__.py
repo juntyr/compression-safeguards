@@ -23,6 +23,6 @@ if __name__ == "__main__":
             print(
                 f"folded: {FoldedScalarConst.constant_fold_expr(qoi_expr._expr, Xs.dtype)!r}"
             )
-            print(f"eval: {qoi_expr.eval(Xs[:, 1], Xs, dict())}")
+            print(f"eval: {qoi_expr.eval(Xs, dict())}")
         except Exception as err:
             print(f"{type(err).__name__}: {err}")

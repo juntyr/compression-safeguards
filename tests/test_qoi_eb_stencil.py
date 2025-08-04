@@ -783,7 +783,7 @@ def test_evaluate_expr_with_indexing():
 
     Xs = np.round(np.pi * np.arange(9)).reshape(1, 3, 3)
 
-    assert safeguard._qoi_expr.eval(Xs[:, 1, 1], Xs, dict()) == np.sum(
+    assert safeguard._qoi_expr.eval(Xs, dict()) == np.sum(
         Xs * np.array([[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])
     )
 

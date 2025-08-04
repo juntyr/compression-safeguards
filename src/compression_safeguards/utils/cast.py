@@ -384,7 +384,9 @@ def _nan_to_zero_inf_to_finite(
 # wrapper around np.sign that also works for numpy_quaddtype
 @np.errstate(invalid="ignore")
 def _sign(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
-    if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
         return np.sign(a)
     return np.where(_isnan(a), a, np.where(a == 0, 0, np.where(a < 0, -1, +1)))  # type: ignore
 
@@ -465,7 +467,9 @@ def _nextafter(
 # wrapper around np.reciprocal that also works for numpy_quaddtype
 @np.errstate(invalid="ignore")
 def _reciprocal(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
-    if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
         return np.reciprocal(a)
     return 1 / a  # type: ignore
 

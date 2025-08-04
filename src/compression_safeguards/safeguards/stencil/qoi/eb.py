@@ -547,15 +547,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
             late_bound_constants[c] = late_windows_float
 
-        s = [slice(None)] * data.ndim
-        for axis in self._neighbourhood:
-            if axis.boundary == BoundaryCondition.valid:
-                start = None if axis.before == 0 else axis.before
-                end = None if axis.after == 0 else -axis.after
-                s[axis.axis] = slice(start, end)
-
         return self._qoi_expr.eval(
-            to_float(data)[tuple(s)],
             data_windows_float,
             late_bound_constants,
         )
@@ -687,23 +679,14 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
             late_bound_constants[c] = late_windows_float
 
-        s = [slice(None)] * data.ndim
-        for axis in self._neighbourhood:
-            if axis.boundary == BoundaryCondition.valid:
-                start = None if axis.before == 0 else axis.before
-                end = None if axis.after == 0 else -axis.after
-                s[axis.axis] = slice(start, end)
-
         qoi_data: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
             self._qoi_expr.eval(
-                to_float(data)[tuple(s)],
                 data_windows_float,
                 late_bound_constants,
             )
         )
         qoi_decoded: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
             self._qoi_expr.eval(
-                to_float(decoded)[tuple(s)],
                 decoded_windows_float,
                 late_bound_constants,
             )
@@ -858,18 +841,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
             late_bound_constants[c] = late_windows_float
 
-        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
-
-        s = [slice(None)] * data.ndim
-        for axis in self._neighbourhood:
-            if axis.boundary == BoundaryCondition.valid:
-                start = None if axis.before == 0 else axis.before
-                end = None if axis.after == 0 else -axis.after
-                s[axis.axis] = slice(start, end)
-
         data_qoi: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
             self._qoi_expr.eval(
-                data_float[tuple(s)],
                 data_windows_float,
                 late_bound_constants,
             )
@@ -946,8 +919,6 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         eb_x_lower, eb_x_upper = self._qoi_expr.compute_data_error_bound(
             eb_qoi_lower,
             eb_qoi_upper,
-            # not all data points are (valid) data neighbourhood centres
-            data_float[tuple(s)],
             data_windows_float,
             late_bound_constants,
         )
@@ -1008,6 +979,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     # update the reverse mapping
                     reverse_indices_windows[idx][reverse_indices_counter[idx]] = j
                     reverse_indices_counter[idx] += 1
+
+        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
 
         # flatten the QoI error bounds and append an infinite value,
         # which is indexed if an element did not contribute to the maximum
