@@ -270,3 +270,103 @@ class QoILexer(Lexer):
             last_cr = 0
         column = (token.index - last_cr) + 1
         return column
+
+    @staticmethod
+    def token_to_name(token: str) -> str:
+        return {
+            # literals
+            "INTEGER": "integer",
+            "FLOAT": "floating-point number",
+            "STRING": "string",
+            # operators
+            "PLUS": "`+`",
+            "MINUS": "`-`",
+            "POWER": "`**`",
+            "TIMES": "`*`",
+            "DIVIDE": "`/`",
+            "EQUAL": "`=`",
+            # array transpose
+            "TRANSPOSE": "`.T`",
+            # groups
+            "LPAREN": "`(`",
+            "RPAREN": "`)`",
+            "LBRACK": "`[`",
+            "RBRACK": "`]`",
+            # separators
+            "COMMA": "`,`",
+            "SEMI": "`;`",
+            # identifiers
+            "ID": "identifier",
+            # statements
+            "RETURN": "`return`",
+            # constants
+            "EULER": "`e`",
+            "PI": "`pi`",
+            # data, late-bound constants, variables
+            "XS": "`x`",
+            "XA": "`X`",
+            "CS": "`c`",
+            "CA": "`C`",
+            "VS": "`v`",
+            "VA": "`V`",
+            # array indexing
+            "IDX": "`I`",
+            # functions
+            # logarithms and exponentials
+            "LN": "`ln`",
+            "LOG2": "`log2`",
+            "LOG": "`log`",
+            "EXP": "`exp`",
+            "EXP2": "`exp2`",
+            # exponentiation
+            "SQRT": "`sqrt`",
+            "SQUARE": "`square`",
+            # absolute value
+            "ABS": "`abs`",
+            # sign and rounding
+            "SIGN": "`sign`",
+            "FLOOR": "`floor`",
+            "CEIL": "`ceil`",
+            "TRUNC": "`trunc`",
+            "ROUND_TIES_EVEN": "`round_ties_even`",
+            # trigonometric
+            "SIN": "`sin`",
+            "COS": "`cos`",
+            "TAN": "`tan`",
+            "COT": "`cot`",
+            "SEC": "`sec`",
+            "CSC": "`csc`",
+            "ASIN": "`asin`",
+            "ACOS": "`acos`",
+            "ATAN": "`atan`",
+            "ACOT": "`acot`",
+            "ASEC": "`asec`",
+            "ACSC": "`acsc`",
+            # hyperbolic
+            "SINH": "`sinh`",
+            "COSH": "`cosh`",
+            "TANH": "`tanh`",
+            "COTH": "`coth`",
+            "SECH": "`sech`",
+            "CSCH": "`csch`",
+            "ASINH": "`asinh`",
+            "ACOSH": "`acosh`",
+            "ATANH": "`atanh`",
+            "ACOTH": "`acoth`",
+            "ASECH": "`asech`",
+            "ACSCH": "`acsch`",
+            # array operations
+            "SUM": "`sum`",
+            "MATMUL": "`matmul`",
+            # finite difference
+            "FINITE_DIFFERENCE": "`finite_difference`",
+            # keyword arguments
+            "BASE": "`base`",
+            "ORDER": "`order`",
+            "ACCURACY": "`accuracy`",
+            "TYPE": "`type`",
+            "AXIS": "`axis`",
+            "GRID_SPACING": "`grid_spacing`",
+            "GRID_CENTRE": "`grid_centre`",
+            "GRID_PERIOD": "`grid_period`",
+        }.get(token, f"<{token}>")

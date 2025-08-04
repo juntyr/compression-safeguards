@@ -59,17 +59,23 @@ class QoIParser(Parser):
 
     tokens = QoILexer.tokens
 
+    # === operator precedence and associativity ===
     precedence = (
+        # lowest precedence: add and subtract
         ("left", PLUS, MINUS),  # type: ignore[name-defined]  # noqa: F821
         ("left", TIMES, DIVIDE),  # type: ignore[name-defined]  # noqa: F821
         ("right", UPLUS, UMINUS),  # type: ignore[name-defined]  # noqa: F821
         ("right", POWER),  # type: ignore[name-defined]  # noqa: F821
         ("left", INDEX, TRANSPOSE),  # type: ignore[name-defined]  # noqa: F821
+        # highest precedence: array indexing and transpose
     )
 
+    # === grammar rules ===
+
+    # top-level: qoi := expr | { assign } return expr;
     @_("expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def qoi(self, p):  # noqa: F811
-        self.assert_or_with_error(
+        self.assert_or_error(
             not isinstance(p.expr, Array),
             p,
             lambda: f"QoI expression must be a scalar but is an array expression of shape {p.expr.shape}",
@@ -83,7 +89,7 @@ class QoIParser(Parser):
 
     @_("RETURN expr SEMI")  # type: ignore[name-defined]  # noqa: F821
     def return_expr(self, p):
-        self.assert_or_with_error(
+        self.assert_or_error(
             not isinstance(p.expr, Array),
             p,
             lambda: f"QoI return expression must be a scalar but is an array expression of shape {p.expr.shape}",
@@ -93,23 +99,7 @@ class QoIParser(Parser):
         )
         return p.expr
 
-    @_("assign many_assign")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def many_assign(self, p):  # noqa: F811
-        pass
-
-    @_("empty")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def many_assign(self, p):  # noqa: F811
-        pass
-
-    @_("STRING")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def quotedparameter(self, p):  # noqa: F811
-        try:
-            return Parameter(p.STRING)
-        except Exception:
-            self.raise_error(
-                p, f'invalid quoted parameter "{p.STRING}": must be a valid identifier'
-            )
-
+    # variable assignment: assign := V["id"] = expr;
     @_("VS LBRACK quotedparameter RBRACK EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def assign(self, p):  # noqa: F811
         self.assert_or_error(
@@ -144,40 +134,78 @@ class QoIParser(Parser):
         )
         self._vars[p.quotedparameter] = Array.map_unary(p.expr, Group)
 
-    @_("VS LBRACK quotedparameter RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        self.assert_or_error(
-            self._X is None, p, "stencil QoI variables use upper-case `V`"
-        )
-        self.assert_or_error(
-            not p.quotedparameter.is_builtin,
-            p,
-            "variable name must not be built-in (start with `$`)",
-        )
-        self.assert_or_error(
-            p.quotedparameter in self._vars,
-            p,
-            f'undefined variable v["{p.quotedparameter}"]',
-        )
-        return self._vars[p.quotedparameter]
+    @_("assign many_assign")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def many_assign(self, p):  # noqa: F811
+        pass
 
-    @_("VA LBRACK quotedparameter RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        self.assert_or_error(
-            self._X is not None, p, "pointwise QoI variables use lower-case `v`"
-        )
-        self.assert_or_error(
-            not p.quotedparameter.is_builtin,
-            p,
-            "variable name must not be built-in (start with `$`)",
-        )
-        self.assert_or_error(
-            p.quotedparameter in self._vars,
-            p,
-            f'undefined variable V["{p.quotedparameter}"]',
-        )
-        return self._vars[p.quotedparameter]
+    @_("empty")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def many_assign(self, p):  # noqa: F811
+        pass
 
+    # integer literal (non-expression)
+    @_("INTEGER")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def integer(self, p):  # noqa: F811
+        return p.INTEGER
+
+    @_("PLUS INTEGER")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def integer(self, p):  # noqa: F811
+        return p.INTEGER
+
+    @_("MINUS INTEGER")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def integer(self, p):  # noqa: F811
+        return -p.INTEGER
+
+    # expressions
+
+    # integer and floating point literals
+    @_("INTEGER")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Number.from_symbolic_int(p.INTEGER)
+
+    @_("FLOAT")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Number(p.FLOAT)
+
+    # array literal
+    @_("LBRACK expr many_comma_expr RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        try:
+            return Array(*([p.expr] + p.many_comma_expr))
+        except ValueError as err:
+            self.raise_error(p, f"invalid array literal: {err}")
+
+    @_("LBRACK RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        self.raise_error(p, "invalid empty array literal")
+
+    @_("comma_expr many_comma_expr")  # type: ignore[name-defined]  # noqa: F821
+    def many_comma_expr(self, p):
+        return [p.comma_expr] + p.many_comma_expr
+
+    @_("COMMA")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def many_comma_expr(self, p):  # noqa: F811
+        return []
+
+    @_("empty")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def many_comma_expr(self, p):  # noqa: F811
+        return []
+
+    @_("COMMA expr")  # type: ignore[name-defined]  # noqa: F821
+    def comma_expr(self, p):
+        return p.expr
+
+    # unary operators (positive, negative):
+    #  expr := OP expr
+    @_("PLUS expr %prec UPLUS")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return p.expr
+
+    @_("MINUS expr %prec UMINUS")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, ScalarNegate)
+
+    # binary operators (add, subtract, multiply, divide, power):
+    #  expr := expr OP expr
     @_("expr PLUS expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         try:
@@ -213,43 +241,111 @@ class QoIParser(Parser):
         except ValueError as err:
             self.raise_error(p, f"{err}")
 
-    @_("PLUS expr %prec UPLUS")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    # array transpose: expr := expr.T
+    @_("expr TRANSPOSE %prec TRANSPOSE")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return p.expr
+        self.assert_or_error(
+            isinstance(p.expr, Array), p, "cannot transpose scalar non-array expression"
+        )
+        return p.expr.transpose()
 
-    @_("MINUS expr %prec UMINUS")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarNegate)
-
+    # group in parentheses
     @_("LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, Group)
 
-    @_("")  # type: ignore[name-defined]  # noqa: F821
-    def empty(self, p):
+    # optional trailing comma separator
+    @_("COMMA")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def maybe_comma(self, p):  # noqa: F811
         pass
 
-    @_("LBRACK expr many_comma_expr RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        try:
-            return Array(*([p.expr] + p.many_comma_expr))
-        except ValueError as err:
-            self.raise_error(p, f"invalid array literal: {err}")
+    @_("empty")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def maybe_comma(self, p):  # noqa: F811
+        pass
 
-    @_("LBRACK RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    # constants: expr := e | pi
+    @_("EULER")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        self.raise_error(p, "invalid empty array literal")
+        return Euler()
 
-    @_("expr LBRACK index_ many_comma_index RBRACK %prec INDEX")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("PI")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Pi()
+
+    # data, late-bound constants, variables
+    @_("XS")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return self._x
+
+    @_("XA")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         self.assert_or_error(
-            isinstance(p.expr, Array), p, "cannot index scalar non-array expression"
+            self._X is not None,
+            p,
+            "data neighbourhood `X` is not available in pointwise QoIs, use pointwise `x` instead",
         )
-        try:
-            return p.expr.index(tuple([p.index_] + p.many_comma_index))
-        except IndexError as err:
-            self.raise_error(p, f"{err}")
+        return self._X
 
+    @_("CS LBRACK quotedparameter RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return LateBoundConstant.like(p.quotedparameter, self._x)
+
+    @_("CA LBRACK quotedparameter RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        self.assert_or_error(
+            self._X is not None,
+            p,
+            "late-bound constant neighbourhood `C` is not available in pointwise QoIs, use pointwise `c` instead",
+        )
+        return Array.map_unary(
+            self._X,
+            lambda e: LateBoundConstant.like(p.quotedparameter, e),
+        )
+
+    @_("VS LBRACK quotedparameter RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        self.assert_or_error(
+            self._X is None, p, "stencil QoI variables use upper-case `V`"
+        )
+        self.assert_or_error(
+            not p.quotedparameter.is_builtin,
+            p,
+            "variable name must not be built-in (start with `$`)",
+        )
+        self.assert_or_error(
+            p.quotedparameter in self._vars,
+            p,
+            f'undefined variable v["{p.quotedparameter}"]',
+        )
+        return self._vars[p.quotedparameter]
+
+    @_("VA LBRACK quotedparameter RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        self.assert_or_error(
+            self._X is not None, p, "pointwise QoI variables use lower-case `v`"
+        )
+        self.assert_or_error(
+            not p.quotedparameter.is_builtin,
+            p,
+            "variable name must not be built-in (start with `$`)",
+        )
+        self.assert_or_error(
+            p.quotedparameter in self._vars,
+            p,
+            f'undefined variable V["{p.quotedparameter}"]',
+        )
+        return self._vars[p.quotedparameter]
+
+    @_("STRING")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def quotedparameter(self, p):  # noqa: F811
+        try:
+            return Parameter(p.STRING)
+        except Exception:
+            self.raise_error(
+                p, f'invalid quoted parameter "{p.STRING}": must be a valid identifier'
+            )
+
+    # array indexing
     @_("expr LBRACK IDX RBRACK %prec INDEX")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         self.assert_or_error(
@@ -260,6 +356,16 @@ class QoIParser(Parser):
         )
         try:
             return p.expr.index(self._I)
+        except IndexError as err:
+            self.raise_error(p, f"{err}")
+
+    @_("expr LBRACK index_ many_comma_index RBRACK %prec INDEX")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        self.assert_or_error(
+            isinstance(p.expr, Array), p, "cannot index scalar non-array expression"
+        )
+        try:
+            return p.expr.index(tuple([p.index_] + p.many_comma_index))
         except IndexError as err:
             self.raise_error(p, f"{err}")
 
@@ -295,59 +401,14 @@ class QoIParser(Parser):
         )
         return Number.from_symbolic_int(self._I[p.integer])
 
-    @_("comma_expr many_comma_expr")  # type: ignore[name-defined]  # noqa: F821
-    def many_comma_expr(self, p):
-        return [p.comma_expr] + p.many_comma_expr
+    # functions
 
-    @_("COMMA")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def many_comma_expr(self, p):  # noqa: F811
-        return []
+    # unknown function
+    # @_("ID LPAREN expr many_comma_expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    # def expr(self, p):  # noqa: F811
+    #     self.raise_error(p, f"unknown function `{p.ID}`")
 
-    @_("empty")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def many_comma_expr(self, p):  # noqa: F811
-        return []
-
-    @_("COMMA expr")  # type: ignore[name-defined]  # noqa: F821
-    def comma_expr(self, p):
-        return p.expr
-
-    @_("COMMA")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def maybe_comma(self, p):  # noqa: F811
-        pass
-
-    @_("empty")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def maybe_comma(self, p):  # noqa: F811
-        pass
-
-    @_("FLOAT")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Number(p.FLOAT)
-
-    @_("INTEGER")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Number.from_symbolic_int(p.INTEGER)
-
-    @_("EULER")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Euler()
-
-    @_("PI")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Pi()
-
-    @_("XS")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return self._x
-
-    @_("XA")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        self.assert_or_error(
-            self._X is not None,
-            p,
-            "data neighbourhood `X` is not available in pointwise QoIs, use pointwise `x` instead",
-        )
-        return self._X
-
+    # logarithms and exponentials
     @_("LN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, lambda e: ScalarLog(Logarithm.ln, e))
@@ -373,6 +434,21 @@ class QoIParser(Parser):
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, lambda e: ScalarExp(Exponential.exp2, e))
 
+    # exponentiation
+    @_("SQRT LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, ScalarSqrt)
+
+    @_("SQUARE LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, ScalarSquare)
+
+    # absolute value
+    @_("ABS LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, ScalarAbs)
+
+    # sign and rounding
     @_("SIGN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, ScalarSign)
@@ -393,18 +469,7 @@ class QoIParser(Parser):
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, ScalarRoundTiesEven)
 
-    @_("SQRT LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarSqrt)
-
-    @_("SQUARE LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarSquare)
-
-    @_("ABS LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarAbs)
-
+    # trigonometric
     @_("SIN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, ScalarSin)
@@ -473,6 +538,7 @@ class QoIParser(Parser):
             p.expr, lambda e: ScalarTrigonometric(Trigonometric.acsc, e)
         )
 
+    # hypergeometric
     @_("SINH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.sinh, e))
@@ -521,10 +587,7 @@ class QoIParser(Parser):
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.acsch, e))
 
-    # @_("ID LPAREN expr many_comma_expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    # def expr(self, p):  # noqa: F811
-    #     self.raise_error(p, f"unknown function `{p.ID}`")
-
+    # array operations
     @_("SUM LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         self.assert_or_error(
@@ -549,29 +612,7 @@ class QoIParser(Parser):
         except ValueError as err:
             self.raise_error(p, f"{err}")
 
-    @_("expr TRANSPOSE %prec TRANSPOSE")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        self.assert_or_error(
-            isinstance(p.expr, Array), p, "cannot transpose scalar non-array expression"
-        )
-        return p.expr.transpose()
-
-    @_("CS LBRACK quotedparameter RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return LateBoundConstant.like(p.quotedparameter, self._x)
-
-    @_("CA LBRACK quotedparameter RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        self.assert_or_error(
-            self._X is not None,
-            p,
-            "late-bound constant neighbourhood `C` is not available in pointwise QoIs, use pointwise `c` instead",
-        )
-        return Array.map_unary(
-            self._X,
-            lambda e: LateBoundConstant.like(p.quotedparameter, e),
-        )
-
+    # finite difference
     @_(  # type: ignore[name-defined, no-redef]  # noqa: F821
         "FINITE_DIFFERENCE LPAREN expr COMMA ORDER EQUAL integer COMMA ACCURACY EQUAL integer COMMA TYPE EQUAL integer COMMA AXIS EQUAL integer finite_difference_grid_spacing finite_difference_grid_period RPAREN"
     )
@@ -696,18 +737,6 @@ class QoIParser(Parser):
         assert not isinstance(acc, Array)
         return Group(acc)
 
-    @_("INTEGER")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def integer(self, p):  # noqa: F811
-        return p.INTEGER
-
-    @_("PLUS INTEGER")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def integer(self, p):  # noqa: F811
-        return p.INTEGER
-
-    @_("MINUS INTEGER")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def integer(self, p):  # noqa: F811
-        return -p.INTEGER
-
     @_("COMMA GRID_SPACING EQUAL expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def finite_difference_grid_spacing(self, p):  # noqa: F811
         self.assert_or_error(
@@ -764,9 +793,15 @@ class QoIParser(Parser):
     def finite_difference_grid_period(self, p):  # noqa: F811
         pass
 
+    # empty rule
+    @_("")  # type: ignore[name-defined]  # noqa: F821
+    def empty(self, p):
+        pass
+
+    # === parser error handling ===
     def error(self, t):
         actions = self._lrtable.lr_action[self.state]
-        options = ", ".join(token_to_name(t) for t in actions)
+        options = ", ".join(QoILexer.token_to_name(t) for t in actions)
         oneof = " one of" if len(actions) > 1 else ""
 
         if t is None:
@@ -775,105 +810,19 @@ class QoIParser(Parser):
             )
 
         raise SyntaxError(
-            f"unexpected token `{t.value}` at line {t.lineno}, column {find_column(self._text, t)}\nexpected{oneof} {options}"
+            f"unexpected token `{t.value}` at line {t.lineno}, column {self.find_column(t)}\nexpected{oneof} {options}"
         )
 
     def raise_error(self, t, message):
-        raise SyntaxError(
-            f"{message} at line {t.lineno}, column {find_column(self._text, t)}"
-        )
+        raise SyntaxError(f"{message} at line {t.lineno}, column {self.find_column(t)}")
 
     def assert_or_error(self, check, t, message):
         if not check:
-            self.raise_error(t, message)
+            self.raise_error(t, message() if callable(message) else message)
 
-    def assert_or_with_error(self, check, t, message):
-        if not check:
-            self.raise_error(t, message())
-
-
-def find_column(text, token):
-    last_cr = text.rfind("\n", 0, token.index)
-    if last_cr < 0:
-        last_cr = 0
-    column = (token.index - last_cr) + 1
-    return column
-
-
-def token_to_name(token: str) -> str:
-    return {
-        "INTEGER": "integer",
-        "FLOAT": "floating-point number",
-        "PLUS": "`+`",
-        "TIMES": "`*`",
-        "MINUS": "`-`",
-        "DIVIDE": "`/`",
-        "LPAREN": "`(`",
-        "RPAREN": "`)`",
-        "POWER": "`**`",
-        "LBRACK": "`[`",
-        "RBRACK": "`]`",
-        "COMMA": "`,`",
-        "EQUAL": "`=`",
-        "SEMI": "`;`",
-        "EULER": "`e`",
-        "PI": "`pi`",
-        "XS": "`x`",
-        "XA": "`X`",
-        "IDX": "`I`",
-        "LN": "`ln`",
-        "LOG2": "`log2`",
-        "LOG": "`log`",
-        "BASE": "`base`",
-        "EXP": "`exp`",
-        "EXP2": "`exp2`",
-        "ID": "identifier",
-        "SUM": "`sum`",
-        "MATMUL": "`matmul`",
-        "TRANSPOSE": "`.T`",
-        "CS": "`c`",
-        "CA": "`C`",
-        "STRING": "string",
-        "VS": "`v`",
-        "VA": "`V`",
-        "RETURN": "`return`",
-        "SIGN": "`sign`",
-        "FLOOR": "`floor`",
-        "CEIL": "`ceil`",
-        "TRUNC": "`trunc`",
-        "ROUND_TIES_EVEN": "`round_ties_even`",
-        "SQRT": "`sqrt`",
-        "SQUARE": "`square`",
-        "SIN": "`sin`",
-        "COS": "`cos`",
-        "TAN": "`tan`",
-        "COT": "`cot`",
-        "SEC": "`sec`",
-        "CSC": "`csc`",
-        "ASIN": "`asin`",
-        "ACOS": "`acos`",
-        "ATAN": "`atan`",
-        "ACOT": "`acot`",
-        "ASEC": "`asec`",
-        "ACSC": "`acsc`",
-        "SINH": "`sinh`",
-        "COSH": "`cosh`",
-        "TANH": "`tanh`",
-        "COTH": "`coth`",
-        "SECH": "`sech`",
-        "CSCH": "`csch`",
-        "ASINH": "`asinh`",
-        "ACOSH": "`acosh`",
-        "ATANH": "`atanh`",
-        "ACOTH": "`acoth`",
-        "ASECH": "`asech`",
-        "ACSCH": "`acsch`",
-        "FINITE_DIFFERENCE": "`finite_difference`",
-        "ORDER": "`order`",
-        "ACCURACY": "`accuracy`",
-        "TYPE": "`type`",
-        "AXIS": "`axis`",
-        "GRID_SPACING": "`grid_spacing`",
-        "GRID_CENTRE": "`grid_centre`",
-        "GRID_PERIOD": "`grid_period`",
-    }.get(token, f"<{token}>")
+    def find_column(self, token):
+        last_cr = self._text.rfind("\n", 0, token.index)
+        if last_cr < 0:
+            last_cr = 0
+        column = (token.index - last_cr) + 1
+        return column
