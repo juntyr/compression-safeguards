@@ -13,7 +13,7 @@ class FoldedScalarConst(Expr):
     _const: np.number
 
     def __init__(self, const: np.number):
-        self._const = const
+        self._const = const[()] if isinstance(const, np.ndarray) else const  # type: ignore
 
     @property
     def has_data(self) -> bool:

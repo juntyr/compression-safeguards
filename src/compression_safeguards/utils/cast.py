@@ -348,7 +348,7 @@ def _isinf(
         not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
     ):
         return np.isinf(a)  # type: ignore
-    return np.abs(a) == np.inf
+    return np.abs(a) == np.inf  # type: ignore
 
 
 # wrapper around np.isfinite that also works for numpy_quaddtype
@@ -360,7 +360,7 @@ def _isfinite(
         not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
     ):
         return np.isfinite(a)  # type: ignore
-    return np.abs(a) < np.inf
+    return np.abs(a) < np.inf  # type: ignore
 
 
 # wrapper around np.nan_to_num that also works for numpy_quaddtype
@@ -395,7 +395,7 @@ def _sign(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
     if (type(a) is not _float128_type) and (
         not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
     ):
-        return np.sign(a)
+        return np.sign(a)  # type: ignore
     return np.where(_isnan(a), a, np.where(a == 0, 0, np.where(a < 0, -1, +1)))  # type: ignore
 
 
@@ -482,7 +482,7 @@ def _reciprocal(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
         not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
     ):
         return np.reciprocal(a)
-    return 1 / a  # type: ignore
+    return np.divide(1, a)
 
 
 # wrapper around np.mod(p, q) that guarantees that the result is in [-q/2, q/2]

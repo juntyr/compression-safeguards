@@ -9,6 +9,7 @@ from compression_safeguards.utils.bindings import Bindings
 
 from .codecs import (
     encode_decode_identity,
+    encode_decode_mock,
     encode_decode_neg,
     encode_decode_noise,
     encode_decode_zero,
@@ -533,3 +534,18 @@ def test_constant_fold():
     expr = expr.constant_fold(np.dtype(np.float64))
     assert f"{expr!r}" == f"ln(x) / ({np.log(np.float64(10))!r})"
     assert expr.eval((), np.array(100, dtype=np.float64), {}) == 2
+
+
+def test_fuzzer_found_sign_constant_fold():
+    data = np.array([], dtype=np.int64)
+    decoded = np.array([], dtype=np.int64)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            PointwiseQuantityOfInterestErrorBoundSafeguard(
+                qoi="sign(e) - x", type="rel", eb=2
+            ),
+        ],
+    )
