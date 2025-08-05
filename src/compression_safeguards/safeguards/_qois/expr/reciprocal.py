@@ -100,14 +100,14 @@ class ScalarReciprocal(Expr):
         eal: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             (eb_expr_lower == 0) | (exprv == 0),
             zero,
-            argv_lower - argv,
+            np.minimum(argv_lower - argv, 0),
         )
         eal = _nan_to_zero_inf_to_finite(eal)
 
         eau: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             (eb_expr_upper == 0) | (exprv == 0),
             zero,
-            argv_upper - argv,
+            np.maximum(0, argv_upper - argv),
         )
         eau = _nan_to_zero_inf_to_finite(eau)
 

@@ -151,7 +151,7 @@ CHECKS = [
 
 
 def test_sandbox():
-    with pytest.raises(AssertionError, match="unexpected token `f`"):
+    with pytest.raises(AssertionError, match="failed to parse stencil QoI expression"):
         # sandbox escape based on https://stackoverflow.com/q/35804961 and
         #  https://stackoverflow.com/a/35806044
         check_all_codecs(

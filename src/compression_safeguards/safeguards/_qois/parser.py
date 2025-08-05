@@ -797,8 +797,10 @@ class QoIParser(Parser):
                 f"expected more input but found EOF\nexpected{oneof} {options}"
             )
 
+        t_value = f'"{t.value}"' if t.type == "STRING" else t.value
+
         raise SyntaxError(
-            f"unexpected token `{t.value}` at line {t.lineno}, column {self.find_column(t)}\nexpected{oneof} {options}"
+            f"unexpected token `{t_value}` at line {t.lineno}, column {self.find_column(t)}\nexpected{oneof} {options}"
         )
 
     def raise_error(self, t, message):
