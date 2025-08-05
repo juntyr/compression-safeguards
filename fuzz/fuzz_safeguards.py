@@ -23,9 +23,11 @@ with atheris.instrument_imports():
 
     from compression_safeguards import SafeguardKind, Safeguards
     from compression_safeguards.safeguards.abc import Safeguard
-    from compression_safeguards.safeguards.pointwise.qoi import PointwiseExpr
+    from compression_safeguards.safeguards.qois import (
+        PointwiseQuantityOfInterestExpression,
+        StencilQuantityOfInterestExpression,
+    )
     from compression_safeguards.safeguards.stencil import NeighbourhoodBoundaryAxis
-    from compression_safeguards.safeguards.stencil.qoi import StencilExpr
     from compression_safeguards.utils.bindings import Parameter
 
 
@@ -115,68 +117,154 @@ def generate_parameter(
 
         return generate_parameter(data, ty, depth, late_bound)
 
-    if ty in (PointwiseExpr, StencilExpr):
-        raise NotImplementedError("fuzz QoIs")
-        # ATOMS = ["x", int, float] + list(MATH_CONSTANTS) + ["V"]
-        # OPS = [
-        #     "let",
-        #     "neg",
-        #     "+",
-        #     "-",
-        #     "*",
-        #     "/",
-        #     "**",
-        # ] + list(MATH_FUNCTIONS)
+    if ty in (
+        PointwiseQuantityOfInterestExpression,
+        StencilQuantityOfInterestExpression,
+    ):
+        ATOMS = [
+            # number literals
+            int,
+            float,
+            # pointwise data
+            "x",
+            # constants
+            "e",
+            "pi",
+            # variables
+            "variable",
+        ]
+        OPS = {
+            # variable assignment
+            "assignment": 2,
+            # unary operators
+            "negate": 1,
+            # binary operators
+            "+": 2,
+            "-": 2,
+            "*": 2,
+            "/": 2,
+            "**": 2,
+            # logarithms and exponentials
+            "ln": 1,
+            "log2": 1,
+            "log": 2,
+            "exp": 1,
+            "exp2": 1,
+            # exponentiation
+            "sqrt": 1,
+            "square": 1,
+            # absolute value
+            "abs": 1,
+            # sign and rounding
+            "sign": 1,
+            "floor": 1,
+            "ceil": 1,
+            "trunc": 1,
+            "round_ties_even": 1,
+            # trigonometric
+            "sin": 1,
+            "cos": 1,
+            "tan": 1,
+            "cot": 1,
+            "sec": 1,
+            "csc": 1,
+            "asin": 1,
+            "acos": 1,
+            "atan": 1,
+            "acot": 1,
+            "asec": 1,
+            "acsc": 1,
+            # hyperbolic
+            "sinh": 1,
+            "cosh": 1,
+            "tanh": 1,
+            "coth": 1,
+            "sech": 1,
+            "csch": 1,
+            "asinh": 1,
+            "acosh": 1,
+            "atanh": 1,
+            "acoth": 1,
+            "asech": 1,
+            "acsch": 1,
+        }
 
-        # if ty is StencilExpr:
-        #     ATOMS += ["X", "I"]
-        #     OPS += ["index", "finite_difference"] + list(AMATH_FUNCTIONS)
+        if ty is StencilQuantityOfInterestExpression:
+            ATOMS += [
+                # data stencil neighbourhood
+                "X",
+            ]
+            OPS = {
+                **OPS,
+                # stencil centre index
+                "I": 1,
+                # array index
+                "indexI": 1,
+                "index1": 2,
+                "index2": 3,
+                # array transpose
+                "transpose": 1,
+                # array operations
+                "sum": 1,
+                "matmul": 2,
+                # finite difference
+                "finite_difference": 1,
+            }
 
-        # atoms = []
-        # for _ in range(data.ConsumeIntInRange(2, 4)):
-        #     atom = ATOMS[data.ConsumeIntInRange(0, len(ATOMS) - 1)]
-        #     if atom is int:
-        #         atom = str(data.ConsumeInt(2))
-        #     elif atom is float:
-        #         atom = str(data.ConsumeRegularFloat())
-        #     elif atom == "V":
-        #         atom = (
-        #             f'{"v" if ty is PointwiseExpr else "V"}["{data.ConsumeString(2)}"]'
-        #         )
-        #     atoms.append(atom)
+        atoms = []
+        for _ in range(data.ConsumeIntInRange(2, 4)):
+            atom = ATOMS[data.ConsumeIntInRange(0, len(ATOMS) - 1)]
+            if atom is int:
+                atom = str(data.ConsumeInt(2))
+            elif atom is float:
+                atom = str(data.ConsumeRegularFloat())
+            elif atom == "variable":
+                atom = f'{"v" if ty is PointwiseQuantityOfInterestExpression else "V"}["{data.ConsumeString(2)}"]'
+            atoms.append(atom)
 
-        # done = False
-        # while not done:
-        #     done = len(atoms) == 1
-        #     atom1 = atoms.pop(data.ConsumeIntInRange(0, len(atoms) - 1))
-        #     atom2 = (
-        #         atoms.pop(data.ConsumeIntInRange(0, len(atoms) - 1))
-        #         if len(atoms) > 0
-        #         else "1"
-        #     )
-        #     op = OPS[data.ConsumeIntInRange(0, len(OPS) - 1)]
-        #     if op == "let":
-        #         atoms.append(
-        #             f'let({"v" if ty is PointwiseExpr else "V"}["{data.ConsumeString(2)}"],{atom1})({atom2})'
-        #         )
-        #     elif op == "neg":
-        #         atoms.append(f"(-{atom1})")
-        #     elif op in ("log", "matmul"):
-        #         atoms.append(f"log({atom1},{atom2})")
-        #     elif op in tuple(MATH_FUNCTIONS) + tuple(AMATH_FUNCTIONS):
-        #         atoms.append(f"{op}({atom1})")
-        #     elif op == "index":
-        #         atoms.append(
-        #             f"{atom1}[{data.ConsumeIntInRange(0, 20)}, {data.ConsumeIntInRange(0, 20)}]"
-        #         )
-        #     elif op == "finite_difference":
-        #         atoms.append(
-        #             f"finite_difference({atom1}, order={data.ConsumeIntInRange(0, 3)}, accuracy={data.ConsumeIntInRange(1, 4)}, type={data.ConsumeIntInRange(-1, 1)}, axis={data.ConsumeIntInRange(0, 1)}, grid_spacing={data.ConsumeRegularFloat()})"
-        #         )
-        #     else:
-        #         atoms.append(f"({atom1}{op}{atom2})")
-        # [atom] = atoms
-        # return atom
+        done = False
+        assignments = []
+        while not done:
+            done = len(atoms) == 1
+            op = list(OPS.keys())[data.ConsumeIntInRange(0, len(OPS) - 1)]
+            atom1, *atomn = [
+                atoms.pop() if len(atoms) > 0 else "1" for _ in range(OPS[op])
+            ]
+
+            if op == "assignment":
+                assignments.append(
+                    f'{"v" if ty is PointwiseQuantityOfInterestExpression else "V"}["{data.ConsumeString(2)}"] = {atomn[0]};'
+                )
+                atoms.append(atom1)
+            elif op == "neg":
+                atoms.append(f"-({atom1})")
+            elif op in ["+", "-", "*", "/", "**"]:
+                atoms.append(f"{atom1} {op} {atomn[0]}")
+            elif op == "log":
+                atoms.append(f"log({atom1}, base={atomn[0]})")
+            elif op == "I":
+                atoms.append(f"I[{data.ConsumeIntInRange(0, 1)}]")
+            elif op == "indexI":
+                atoms.append(f"({atom1})[I]")
+            elif op == "index1":
+                atoms.append(f"({atom1})[{atomn[0]}]")
+            elif op == "index2":
+                atoms.append(f"({atom1})[{atomn[0]}, {atomn[1]}]")
+            elif op == "transpose":
+                atoms.append(f"({atom1}).T")
+            elif op == "finite_difference":
+                atoms.append(
+                    f"finite_difference({atom1}, order={data.ConsumeIntInRange(0, 3)}, accuracy={data.ConsumeIntInRange(1, 4)}, type={data.ConsumeIntInRange(-1, 1)}, axis={data.ConsumeIntInRange(0, 1)}, grid_spacing={data.ConsumeRegularFloat()})"
+                )
+            else:
+                atoms.append(f"{op}({atom1}, {', '.join(atomn)})")
+        [atom] = atoms
+
+        if len(assignments) == 0:
+            return atom
+
+        nl = "\n"
+        return f"{nl.join(assignments)}\nreturn {atom};"
 
     assert False, f"unknown parameter type {ty!r}"
 
