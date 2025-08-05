@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..stencil.qoi import StencilExpr
+from ..qois import StencilQuantityOfInterestExpression
 from . import StencilQuantityOfInterest
 from .expr.constfold import FoldedScalarConst
 
@@ -14,7 +14,9 @@ if __name__ == "__main__":
             break
         try:
             qoi_expr = StencilQuantityOfInterest(
-                StencilExpr(qoi), stencil_shape=(3,), stencil_I=(1,)
+                StencilQuantityOfInterestExpression(qoi),
+                stencil_shape=(3,),
+                stencil_I=(1,),
             )
             if qoi_expr is None:
                 continue

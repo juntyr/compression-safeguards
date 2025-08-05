@@ -33,6 +33,7 @@ from ...eb import (
     _compute_finite_absolute_error,
     _compute_finite_absolute_error_bound,
 )
+from ...qois import StencilQuantityOfInterestExpression
 from .. import (
     BoundaryCondition,
     NeighbourhoodAxis,
@@ -40,7 +41,6 @@ from .. import (
     _pad_with_boundary,
 )
 from ..abc import StencilSafeguard
-from . import StencilExpr
 
 
 class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
@@ -54,19 +54,14 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     string form, over the neighbourhood tensor `X` that is centred on the
     pointwise value `x`. For example, to bound the error on the four-neighbour
     box mean in a 3x3 neighbourhood (where `x = X[I]`), set
-    `qoi="(X[I+A[-1,0]]+X[I+A[+1,0]]+X[I+A[0,-1]]+X[I+A[0,+1]])/4"`.
+    `qoi="(X[I[0]-1, I[1]] + X[I[0]+1, I[1]] + X[I[0], I[1]-1] + X[I[0], I[1]+1]) / 4"`.
     Note that `X` can be indexed absolute or relative to the centred data point
     `x` using the index array `I`.
 
     The stencil QoI safeguard can also be used to bound the pointwise error of
-    the finite-difference-approximated derivative[^1] over the data by using the
-    `finite_difference` function in the `qoi` expression.
-
-    [^1]: The finite difference coefficients for arbitrary orders, accuracies,
-    and grid spacings are derived using the algorithm from: Fornberg, B. (1988).
-    Generation of finite difference formulas on arbitrarily spaced grids.
-    *Mathematics of Computation*, 51(184), 699-706. Available from:
-    [doi:10.1090/s0025-5718-1988-0935077-0](https://doi.org/10.1090/s0025-5718-1988-0935077-0).
+    the finite-difference-approximated derivative (of arbitrary order,
+    accuracy, and grid spacing) over the data by using the `finite_difference`
+    function in the `qoi` expression.
 
     The shape of the data neighbourhood is specified as an ordered list of
     unique data axes and boundary conditions that are applied to these axes.
@@ -99,183 +94,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     type (keeps the same dtype for floating point data, chooses a dtype with a
     mantissa that has at least as many bits as / for the integer dtype).
 
-    The QoI expression is written using the following EBNF grammar[^2] for
-    `expr`:
-
-    [^2]: You can visualise the EBNF grammar at <https://matthijsgroen.github.io/ebnf2railroad/try-yourself.html>.
-
-    ```ebnf
-    expr    =
-        literal
-      | array
-      | const
-      | data
-      | var
-      | let
-      | unary
-      | binary
-      | finite_difference
-    ;
-
-    literal =
-        int
-      | float
-    ;
-
-    int     =                             (* integer literal *)
-        [ sign ], digit, { digit }
-    ;
-    float   =                             (* floating point literal *)
-        [ sign ], digit, { digit }, [
-            ".", digit, { digit }
-        ], [
-            "e", [ sign ], digit, { digit }
-        ]
-    ;
-
-    sign    =
-        "+" | "-"
-    ;
-    digit   =
-        "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
-    ;
-
-    array   =
-        "A", "[", [
-            expr, { ",", expr }, [","]    (* n-dimensional array *)
-        ], "]"
-    ;
-
-    const   =
-        "e"                               (* Euler's number *)
-      | "pi"                              (* pi *)
-      | "c", "[", '"', ident, '"', "]"    (* late-bound constant value *)
-      | "C", "[", '"', ident, '"', "]"    (* late-bound constant neighbourhood *)
-      | "c", "[",
-            '"', "$", ident, '"'          (* late-bound built-in constant value *)
-        , "]"
-      | "C", "[",
-            '"', "$", ident, '"'          (* late-bound built-in constant neighbourhood *)
-        , "]"
-    ;
-
-    data    =
-        "x"                               (* pointwise data value *)
-      | "X"                               (* data neighbourhood *)
-    ;
-
-    var     =
-        "V", "[", '"', ident, '"', "]"    (* variable *)
-    ;
-
-    ident   =
-        ( letter | "_" )                  (* identifier *)
-      , { letter | digit | "_" }
-    ;
-    letter  =
-        "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k"
-      | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v"
-      | "w" | "x" | "y" | "z" | "A" | "B" | "C" | "D" | "E" | "F" | "G"
-      | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R"
-      | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
-    ;
-
-    let     =
-        "let", "(",
-            var, ",", expr, {
-                ",", var, ",", expr       (* let var=expr in expr scope *)
-            },
-        ")", "(", expr, ")"
-    ;
-
-    unary   =
-        "(", expr, ")"                    (* parenthesis *)
-      | "-", expr                         (* negation *)
-      | "sqrt", "(", expr, ")"            (* square root *)
-      | "ln", "(", expr, ")"              (* natural logarithm *)
-      | "exp", "(", expr, ")"             (* exponential e^x *)
-      | "sign", "(", expr, ")"            (* sign function, signed NaN for NaNs *)
-      | "floor", "(", expr, ")"           (* round down, towards negative infinity *)
-      | "ceil", "(", expr, ")"            (* round up, towards positive infinity *)
-      | "trunc", "(", expr, ")"           (* round towards zero *)
-      | "round_ties_even", "(", expr, ")" (* round to nearest integer, ties to even *)
-      | "asum", "(", expr, ")"            (* sum over an array *)
-      | "tr", "(", expr, ")"              (* transpose of a matrix (2d array) *)
-      | "sin", "(", expr, ")"             (* sine sin(x) *)
-      | "cos", "(", expr, ")"             (* cosine cos(x) *)
-      | "tan", "(", expr, ")"             (* tangent tan(x) *)
-      | "cot", "(", expr, ")"             (* cotangent cot(x) *)
-      | "sec", "(", expr, ")"             (* secant sec(x) *)
-      | "csc", "(", expr, ")"             (* cosecant csc(x) *)
-      | "asin", "(", expr, ")"            (* inverse sine asin(x) *)
-      | "acos", "(", expr, ")"            (* inverse cosine acos(x) *)
-      | "atan", "(", expr, ")"            (* inverse tangent atan(x) *)
-      | "acot", "(", expr, ")"            (* inverse cotangent acot(x) *)
-      | "asec", "(", expr, ")"            (* inverse secant asec(x) *)
-      | "acsc", "(", expr, ")"            (* inverse cosecant acsc(x) *)
-      | "sinh", "(", expr, ")"            (* hyperbolic sine sinh(x) *)
-      | "cosh", "(", expr, ")"            (* hyperbolic cosine cosh(x) *)
-      | "tanh", "(", expr, ")"            (* hyperbolic tangent tanh(x) *)
-      | "coth", "(", expr, ")"            (* hyperbolic cotangent coth(x) *)
-      | "sech", "(", expr, ")"            (* hyperbolic secant sech(x) *)
-      | "csch", "(", expr, ")"            (* hyperbolic cosecant csch(x) *)
-      | "asinh", "(", expr, ")"           (* inverse hyperbolic sine asinh(x) *)
-      | "acosh", "(", expr, ")"           (* inverse hyperbolic cosine acosh(x) *)
-      | "atanh", "(", expr, ")"           (* inverse hyperbolic tangent atanh(x) *)
-      | "acoth", "(", expr, ")"           (* inverse hyperbolic cotangent acoth(x) *)
-      | "asech", "(", expr, ")"           (* inverse hyperbolic secant asech(x) *)
-      | "acsch", "(", expr, ")"           (* inverse hyperbolic cosecant acsch(x) *)
-    ;
-
-    binary  =
-        expr, "+", expr                   (* addition *)
-      | expr, "-", expr                   (* subtraction *)
-      | expr, "*", expr                   (* multiplication *)
-      | expr, "/", expr                   (* division *)
-      | expr, "**", expr                  (* exponentiation *)
-      | "log", "(",
-            expr, ","                     (* logarithm with explicit base *)
-          , "base", "=", expr,
-        ")"
-      | expr, "[", indices, "]"           (* array indexing *)
-      | "matmul", "("                     (* matrix (2d array) multiplication *)
-          , expr, ",", expr,
-        ")"
-    ;
-
-    indices =
-        index, { ",", index }, [","]
-    ;
-
-    index   =
-        "I"                               (* index of the neighbourhood centre *)
-      | expr                              (* index expression *)
-      | [expr], ":", [expr]               (* slicing *)
-    ;
-
-    finite_difference =
-        "finite_difference", "("          (* finite difference over an expression *)
-          , expr, ","
-          , "order", "=", int, ","           (* order of the derivative *)
-          , "accuracy", "=", int, ","        (* order of accuracy of the approximation *)
-          , "type", "=", (
-                "-1" | "0" | "1"             (* backwards | central | forward difference *)
-            ), ","
-          , "axis", "=", int, ","            (* axis, relative to the neighbourhood *)
-          , (
-                "grid_spacing", "=", expr    (* scalar uniform grid spacing along the axis *)
-              | "grid_centre", "=", expr     (* centre of an arbitrary grid along the axis *)
-            )
-          , [
-                ",",
-                "grid_period", "=", expr     (* optional grid period, e.g. 2*pi or 360 *)
-            ]
-      , ")"
-    ;
-    ```
-
-    The QoI expression can also contain whitespaces (space ` `, tab `\\t`,
-    newline `\\n`) and single-line inline comments starting with a hash `#`.
+    Please refer to the
+    [`StencilQuantityOfInterestExpression`][compression_safeguards.safeguards.qois.StencilQuantityOfInterestExpression]
+    for the EBNF grammar that specifies the language in which the quantities of
+    interest are written.
 
     The implementation of the error bound on pointwise quantities of interest
     is inspired by:
@@ -314,7 +136,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         "_eb",
         "_qoi_expr",
     )
-    _qoi: StencilExpr
+    _qoi: StencilQuantityOfInterestExpression
     _neighbourhood: tuple[NeighbourhoodBoundaryAxis, ...]
     _type: ErrorBound
     _eb: int | float | Parameter
@@ -324,7 +146,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
     def __init__(
         self,
-        qoi: StencilExpr,
+        qoi: StencilQuantityOfInterestExpression,
         neighbourhood: Sequence[dict | NeighbourhoodBoundaryAxis],
         type: str | ErrorBound,
         eb: int | float | str | Parameter,

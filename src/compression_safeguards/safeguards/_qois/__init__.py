@@ -3,8 +3,10 @@ from collections.abc import Mapping, Set
 import numpy as np
 
 from ...utils.bindings import Parameter
-from ..pointwise.qoi import PointwiseExpr
-from ..stencil.qoi import StencilExpr
+from ..qois import (
+    PointwiseQuantityOfInterestExpression,
+    StencilQuantityOfInterestExpression,
+)
 from .expr.abc import Expr
 from .expr.array import Array
 from .expr.constfold import FoldedScalarConst
@@ -19,7 +21,7 @@ class PointwiseQuantityOfInterest:
     _expr: Expr
     _late_bound_constants: frozenset[Parameter]
 
-    def __init__(self, qoi: PointwiseExpr):
+    def __init__(self, qoi: PointwiseQuantityOfInterestExpression):
         lexer = QoILexer()
         parser = QoIParser(x=Data(index=()), X=None, I=None)
 
@@ -89,7 +91,7 @@ class StencilQuantityOfInterest:
 
     def __init__(
         self,
-        qoi: StencilExpr,
+        qoi: StencilQuantityOfInterestExpression,
         stencil_shape: tuple[int, ...],
         stencil_I: tuple[int, ...],
     ):

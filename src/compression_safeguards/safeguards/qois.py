@@ -1,5 +1,4 @@
 """
-
 ## Safeguarding Quantities of Interest
 
 We are often not just interested in data itself, but also in quantities derived
@@ -279,8 +278,16 @@ existing (Python) code. For example (where `t1` ... are temporaries):
 ### Numerical functions
 
 Numerical evaluation of the quantities of interest in `compression-safeguards`
-is provided by `numpy`, where the QoI operators and functions map to `numpy`
-ufuncs as follows:
+is provided by `numpy`.
+
+Some mathematical expressions such as the square root can be written using (a)
+exponentiation `x ** 0.5` or (b) the built-in `sqrt(x)` function. It is
+preferable to use special built-in functions, where available, since the
+safeguards can better understand their meaning and provide better corrections
+and higher compression ratios for them.
+
+The operators and functions in the above QoI grammar are evaluated using
+`numpy` ufuncs as follows:
 
 | QoI function | `numpy` ufunc |
 | ------------ | ------------- |
@@ -354,4 +361,28 @@ coefficients for large orders or when using non-integer grid spacings,
 custom grid periods, or arbitrary late-bound constant grids. Therefore, the
 bitwise exact evaluation of the `finite_difference` function is not yet
 specified.
+"""
+
+__all__ = [
+    "PointwiseQuantityOfInterestExpression",
+    "StencilQuantityOfInterestExpression",
+]
+
+from typing import NewType
+
+PointwiseQuantityOfInterestExpression = NewType(
+    "PointwiseQuantityOfInterestExpression", str
+)
+"""
+Pointwise quantity of interest expression in [`str`][str]ing form, following
+the above EBNF grammar for pointwise QoIs.
+"""
+
+
+StencilQuantityOfInterestExpression = NewType(
+    "StencilQuantityOfInterestExpression", str
+)
+"""
+Stencil quantity of interest expression in [`str`][str]ing form, following
+the above EBNF grammar for stencil QoIs.
 """

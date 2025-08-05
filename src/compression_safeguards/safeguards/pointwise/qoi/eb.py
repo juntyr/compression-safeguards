@@ -30,8 +30,8 @@ from ...eb import (
     _compute_finite_absolute_error,
     _compute_finite_absolute_error_bound,
 )
+from ...qois import PointwiseQuantityOfInterestExpression
 from ..abc import PointwiseSafeguard
-from . import PointwiseExpr
 
 
 class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
@@ -42,7 +42,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
     The quantity of interest is specified as a non-constant expression, in
     string form, over the pointwise value `x`. For example, to bound the error
-    on the square of `x`, set `qoi="x**2"`.
+    on the square of `x`, set `qoi="square(x)"` (or `qoi="x**2"`).
 
     If the derived quantity of interest for an element evaluates to an infinite
     value, this safeguard guarantees that the quantity of interest on the
@@ -57,132 +57,10 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
     type (keeps the same dtype for floating point data, chooses a dtype with a
     mantissa that has at least as many bits as / for the integer dtype).
 
-    The QoI expression is written using the following EBNF grammar[^1] for
-    `expr`:
-
-    [^1]: You can visualise the EBNF grammar at <https://matthijsgroen.github.io/ebnf2railroad/try-yourself.html>.
-
-    ```ebnf
-    expr    =
-        literal
-      | const
-      | data
-      | var
-      | let
-      | unary
-      | binary
-    ;
-
-    literal =
-        int
-      | float
-    ;
-
-    int     =                             (* integer literal *)
-        [ sign ], digit, { digit }
-    ;
-    float   =                             (* floating point literal *)
-        [ sign ], digit, { digit }, [
-            ".", digit, { digit }
-        ], [
-            "e", [ sign ], digit, { digit }
-        ]
-    ;
-
-    sign    =
-        "+" | "-"
-    ;
-    digit   =
-        "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
-    ;
-
-    const   =
-        "e"                               (* Euler's number *)
-      | "pi"                              (* pi *)
-      | "c", "[", '"', ident, '"', "]"    (* late-bound constant value *)
-      | "c", "[",
-            '"', "$", ident, '"'          (* late-bound built-in constant value *)
-      , "]"
-    ;
-
-    data    = "x";                        (* pointwise data value *)
-
-    var     =
-        "v", "[", '"', ident, '"', "]"    (* variable *)
-    ;
-
-    ident   =
-        ( letter | "_" )                  (* identifier *)
-      , { letter | digit | "_" }
-    ;
-    letter  =
-        "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k"
-      | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v"
-      | "w" | "x" | "y" | "z" | "A" | "B" | "C" | "D" | "E" | "F" | "G"
-      | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R"
-      | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
-    ;
-
-    let     =
-        "let", "(",
-            var, ",", expr, {
-                ",", var, ",", expr       (* let var=expr in expr scope *)
-            },
-        ")", "(", expr, ")"
-    ;
-
-    unary   =
-        "(", expr, ")"                    (* parenthesis *)
-      | "-", expr                         (* negation *)
-      | "sqrt", "(", expr, ")"            (* square root *)
-      | "ln", "(", expr, ")"              (* natural logarithm *)
-      | "exp", "(", expr, ")"             (* exponential e^x *)
-      | "sign", "(", expr, ")"            (* sign function, signed NaN for NaNs *)
-      | "floor", "(", expr, ")"           (* round down, towards negative infinity *)
-      | "ceil", "(", expr, ")"            (* round up, towards positive infinity *)
-      | "trunc", "(", expr, ")"           (* round towards zero *)
-      | "round_ties_even", "(", expr, ")" (* round to nearest integer, ties to even *)
-      | "sin", "(", expr, ")"             (* sine sin(x) *)
-      | "cos", "(", expr, ")"             (* cosine cos(x) *)
-      | "tan", "(", expr, ")"             (* tangent tan(x) *)
-      | "cot", "(", expr, ")"             (* cotangent cot(x) *)
-      | "sec", "(", expr, ")"             (* secant sec(x) *)
-      | "csc", "(", expr, ")"             (* cosecant csc(x) *)
-      | "asin", "(", expr, ")"            (* inverse sine asin(x) *)
-      | "acos", "(", expr, ")"            (* inverse cosine acos(x) *)
-      | "atan", "(", expr, ")"            (* inverse tangent atan(x) *)
-      | "acot", "(", expr, ")"            (* inverse cotangent acot(x) *)
-      | "asec", "(", expr, ")"            (* inverse secant asec(x) *)
-      | "acsc", "(", expr, ")"            (* inverse cosecant acsc(x) *)
-      | "sinh", "(", expr, ")"            (* hyperbolic sine sinh(x) *)
-      | "cosh", "(", expr, ")"            (* hyperbolic cosine cosh(x) *)
-      | "tanh", "(", expr, ")"            (* hyperbolic tangent tanh(x) *)
-      | "coth", "(", expr, ")"            (* hyperbolic cotangent coth(x) *)
-      | "sech", "(", expr, ")"            (* hyperbolic secant sech(x) *)
-      | "csch", "(", expr, ")"            (* hyperbolic cosecant csch(x) *)
-      | "asinh", "(", expr, ")"           (* inverse hyperbolic sine asinh(x) *)
-      | "acosh", "(", expr, ")"           (* inverse hyperbolic cosine acosh(x) *)
-      | "atanh", "(", expr, ")"           (* inverse hyperbolic tangent atanh(x) *)
-      | "acoth", "(", expr, ")"           (* inverse hyperbolic cotangent acoth(x) *)
-      | "asech", "(", expr, ")"           (* inverse hyperbolic secant asech(x) *)
-      | "acsch", "(", expr, ")"           (* inverse hyperbolic cosecant acsch(x) *)
-    ;
-
-    binary  =
-        expr, "+", expr                   (* addition *)
-      | expr, "-", expr                   (* subtraction *)
-      | expr, "*", expr                   (* multiplication *)
-      | expr, "/", expr                   (* division *)
-      | expr, "**", expr                  (* exponentiation *)
-      | "log", "(",
-            expr, ","                     (* logarithm with explicit base *)
-          , "base", "=", expr,
-        ")"
-    ;
-    ```
-
-    The QoI expression can also contain whitespaces (space ` `, tab `\\t`,
-    newline `\\n`) and single-line inline comments starting with a hash `#`.
+    Please refer to the
+    [`PointwiseQuantityOfInterestExpression`][compression_safeguards.safeguards.qois.PointwiseQuantityOfInterestExpression]
+    for the EBNF grammar that specifies the language in which the quantities of
+    interest are written.
 
     The implementation of the error bound on pointwise quantities of interest
     is inspired by:
@@ -212,7 +90,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         "_eb",
         "_qoi_expr",
     )
-    _qoi: PointwiseExpr
+    _qoi: PointwiseQuantityOfInterestExpression
     _type: ErrorBound
     _eb: int | float | Parameter
     _qoi_expr: PointwiseQuantityOfInterest
@@ -221,7 +99,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
     def __init__(
         self,
-        qoi: PointwiseExpr,
+        qoi: PointwiseQuantityOfInterestExpression,
         type: str | ErrorBound,
         eb: int | float | str | Parameter,
     ) -> None:
