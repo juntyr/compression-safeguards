@@ -332,7 +332,9 @@ def saturating_finite_float_cast(
 def _isnan(
     a: int | float | np.ndarray[S, np.dtype[T]],
 ) -> bool | np.ndarray[S, np.dtype[np.bool]]:
-    if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
         return np.isnan(a)  # type: ignore
     return ~np.array(np.abs(a) <= np.inf)  # type: ignore
 
@@ -342,7 +344,9 @@ def _isnan(
 def _isinf(
     a: int | float | np.ndarray[S, np.dtype[T]],
 ) -> bool | np.ndarray[S, np.dtype[np.bool]]:
-    if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
         return np.isinf(a)  # type: ignore
     return np.abs(a) == np.inf
 
@@ -352,7 +356,9 @@ def _isinf(
 def _isfinite(
     a: int | float | np.ndarray[S, np.dtype[T]],
 ) -> bool | np.ndarray[S, np.dtype[np.bool]]:
-    if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
         return np.isfinite(a)  # type: ignore
     return np.abs(a) < np.inf
 
@@ -360,7 +366,9 @@ def _isfinite(
 # wrapper around np.nan_to_num that also works for numpy_quaddtype
 @np.errstate(invalid="ignore")
 def _nan_to_zero(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
-    if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
         return np.nan_to_num(a, nan=0, posinf=np.inf, neginf=-np.inf)  # type: ignore
     return np.where(_isnan(a), _float128(0), a)  # type: ignore
 
@@ -370,7 +378,9 @@ def _nan_to_zero(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
 def _nan_to_zero_inf_to_finite(
     a: np.ndarray[S, np.dtype[T]],
 ) -> np.ndarray[S, np.dtype[T]]:
-    if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
         return np.nan_to_num(a, nan=0, posinf=None, neginf=None)  # type: ignore
     return np.where(
         _isnan(a),
@@ -395,9 +405,12 @@ def _sign(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
 def _nextafter(
     a: np.ndarray[S, np.dtype[F]], b: int | float | np.ndarray[S, np.dtype[F]]
 ) -> np.ndarray[S, np.dtype[F]]:
-    if not isinstance(a, np.ndarray) or a.dtype != _float128_dtype:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
         return np.nextafter(a, b)  # type: ignore
 
+    a = np.array(a)
     b = np.array(b, dtype=a.dtype)
 
     _float128_neg_zero = -_float128(0)
