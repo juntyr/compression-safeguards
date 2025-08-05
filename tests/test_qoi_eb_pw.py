@@ -549,3 +549,24 @@ def test_fuzzer_found_sign_constant_fold():
             ),
         ],
     )
+
+
+def test_fuzzer_found_logarithm_noise():
+    from numcodecs_combinators.framed import FramedCodecStack
+    from numcodecs_safeguards import SafeguardsCodec
+
+    from .codecs import NoiseCodec
+
+    data = np.linspace(-1.0, 1.0, 100, dtype=np.float16)
+
+    codec = SafeguardsCodec(
+        codec=FramedCodecStack(NoiseCodec(seed=258957826)),
+        safeguards=[
+            PointwiseQuantityOfInterestErrorBoundSafeguard(
+                qoi="log2(x + 1)", type="ratio", eb=10
+            ),
+        ],
+    )
+
+    encoded = codec.encode(data)
+    codec.decode(encoded)

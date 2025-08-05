@@ -53,14 +53,20 @@ def ensure_bounded_derived_error(
     # check if any derived expression exceeds the error bound
     # this check matches the QoI safeguard's validity check
     def is_eb_exceeded(eb_x_guess):
+        exprv_x_guess = expr(eb_x_guess)
         return ~np.where(
             _isfinite(exprv),
-            ((expr(eb_x_guess) - exprv) >= eb_expr_lower)
-            & ((expr(eb_x_guess) - exprv) <= eb_expr_upper),
+            # check that eb_lower <= (guess - exprv) <= eb_upper
+            ((exprv_x_guess - exprv) >= eb_expr_lower)
+            & ((exprv_x_guess - exprv) <= eb_expr_upper)
+            # check that (exprv + eb_lower) <= guess <= (exprv + eb_upper)
+            & (exprv_x_guess >= (exprv + eb_expr_lower))
+            & (exprv_x_guess <= (exprv + eb_expr_upper)),
+            # why do we need to check both? because floaaaaaaaaaaaaaaaaaaaaaats
             np.where(
                 _isinf(exprv),
-                expr(eb_x_guess) == exprv,
-                _isnan(expr(eb_x_guess)),
+                exprv_x_guess == exprv,
+                _isnan(exprv_x_guess),
             ),
         ) & (eb_x_guess != 0)
 
