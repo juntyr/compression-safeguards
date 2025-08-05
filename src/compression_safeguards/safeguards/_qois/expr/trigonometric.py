@@ -17,6 +17,7 @@ from .addsub import ScalarAdd, ScalarSubtract
 from .constfold import FoldedScalarConst
 from .divmul import ScalarDivide
 from .literal import Number, Pi
+from .reciprocal import ScalarReciprocal
 from .square import ScalarSqrt, ScalarSquare
 from .typing import F, Ns, Ps, PsI
 
@@ -374,13 +375,11 @@ TRIGONOMETRIC_REWRITE: dict[Trigonometric, Callable[[Expr], Expr]] = {
         ScalarSin(x),
     ),
     # sec(x) = 1 / cos(x)
-    Trigonometric.sec: lambda x: ScalarDivide(
-        Number.ONE,
+    Trigonometric.sec: lambda x: ScalarReciprocal(
         ScalarTrigonometric(Trigonometric.cos, x),
     ),
     # csc(x) = 1 / sin(x)
-    Trigonometric.csc: lambda x: ScalarDivide(
-        Number.ONE,
+    Trigonometric.csc: lambda x: ScalarReciprocal(
         ScalarSin(x),
     ),
     # inverse trigonometric functions
@@ -404,16 +403,16 @@ TRIGONOMETRIC_REWRITE: dict[Trigonometric, Callable[[Expr], Expr]] = {
     # acot(x) = atan(1/x)
     Trigonometric.acot: lambda x: ScalarTrigonometric(
         Trigonometric.atan,
-        ScalarDivide(Number.ONE, x),
+        ScalarReciprocal(x),
     ),
     # asec(x) = acos(1/x)
     Trigonometric.asec: lambda x: ScalarTrigonometric(
         Trigonometric.acos,
-        ScalarDivide(Number.ONE, x),
+        ScalarReciprocal(x),
     ),
     # acsc(x) = asin(1/x)
     Trigonometric.acsc: lambda x: ScalarAsin(
-        ScalarDivide(Number.ONE, x),
+        ScalarReciprocal(x),
     ),
 }
 
@@ -425,7 +424,7 @@ TRIGONOMETRIC_UFUNC: dict[Trigonometric, Callable[[np.ndarray], np.ndarray]] = {
     Trigonometric.csc: lambda x: _reciprocal(np.sin(x)),
     Trigonometric.acos: np.acos,
     Trigonometric.atan: np.atan,
-    Trigonometric.acot: lambda x: _reciprocal(np.atan(x)),
-    Trigonometric.asec: lambda x: _reciprocal(np.acos(x)),
-    Trigonometric.acsc: lambda x: _reciprocal(np.asin(x)),
+    Trigonometric.acot: lambda x: np.atan(_reciprocal(x)),
+    Trigonometric.asec: lambda x: np.acos(_reciprocal(x)),
+    Trigonometric.acsc: lambda x: np.asin(_reciprocal(x)),
 }

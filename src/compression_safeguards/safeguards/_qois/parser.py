@@ -230,15 +230,15 @@ class QoIParser(Parser):
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map_binary(p.expr0, p.expr1, ScalarMultiply)
 
-    @_("expr POWER expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
-            return Array.map_binary(p.expr0, p.expr1, ScalarPower)
-
     @_("expr DIVIDE expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map_binary(p.expr0, p.expr1, ScalarDivide)
+
+    @_("expr POWER expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
+            return Array.map_binary(p.expr0, p.expr1, ScalarPower)
 
     # array transpose: expr := expr.T
     @_("expr TRANSPOSE %prec TRANSPOSE")  # type: ignore[name-defined, no-redef]  # noqa: F821
@@ -396,11 +396,6 @@ class QoIParser(Parser):
 
     # functions
 
-    # unknown function
-    # @_("ID LPAREN expr many_comma_expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    # def expr(self, p):  # noqa: F811
-    #     self.raise_error(p, f"unknown function `{p.ID}`")
-
     # logarithms and exponentials
     @_("LN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -533,7 +528,7 @@ class QoIParser(Parser):
             p.expr, lambda e: ScalarTrigonometric(Trigonometric.acsc, e)
         )
 
-    # hypergeometric
+    # hyperbolic
     @_("SINH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.sinh, e))

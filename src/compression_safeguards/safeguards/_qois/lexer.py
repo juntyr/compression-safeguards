@@ -216,7 +216,7 @@ class QoILexer(Lexer):
     ID["acot"] = ACOT  # type: ignore[index, name-defined]  # noqa: F821
     ID["asec"] = ASEC  # type: ignore[index, name-defined]  # noqa: F821
     ID["acsc"] = ACSC  # type: ignore[index, name-defined]  # noqa: F821
-    # hypergeometric
+    # hyperbolic
     ID["sinh"] = SINH  # type: ignore[index, name-defined]  # noqa: F821
     ID["cosh"] = COSH  # type: ignore[index, name-defined]  # noqa: F821
     ID["tanh"] = TANH  # type: ignore[index, name-defined]  # noqa: F821
