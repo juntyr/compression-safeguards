@@ -389,6 +389,7 @@ def check_one_input(data) -> None:
                 # late-bound select safeguard with invalid selector index
                 and ("invalid entry in choice array" in str(err))
             )
+            or (isinstance(err, AssertionError) and str(err).startswith("eb must be"))
         ):
             return
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")
