@@ -390,6 +390,10 @@ def check_one_input(data) -> None:
                 and ("invalid entry in choice array" in str(err))
             )
             or (isinstance(err, AssertionError) and str(err).startswith("eb must be"))
+            or (
+                isinstance(err, IndexError)
+                and (str(err) == "invalid select safeguard selector indices")
+            )
         ):
             return
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")

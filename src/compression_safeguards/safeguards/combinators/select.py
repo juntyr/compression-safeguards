@@ -217,7 +217,10 @@ class _SelectSafeguardBase(ABC):
             for safeguard in self.safeguards
         ]
 
-        return np.choose(selector, oks)  # type: ignore
+        try:
+            return np.choose(selector, oks)  # type: ignore
+        except IndexError as err:
+            raise IndexError("invalid select safeguard selector indices") from err
 
     def compute_safe_intervals(
         self,
@@ -245,24 +248,27 @@ class _SelectSafeguardBase(ABC):
         valid: IntervalUnion[T, int, int] = IntervalUnion.empty(
             data.dtype, data.size, umax
         )
-        valid._lower = (
-            np.take_along_axis(
-                np.stack([v._lower.T for v in valids], axis=0),
-                selector.flatten().reshape((1, data.size, umax)),
-                axis=0,
+        try:
+            valid._lower = (
+                np.take_along_axis(
+                    np.stack([v._lower.T for v in valids], axis=0),
+                    selector.flatten().reshape((1, data.size, umax)),
+                    axis=0,
+                )
+                .reshape(data.size, umax)
+                .T
             )
-            .reshape(data.size, umax)
-            .T
-        )
-        valid._upper = (
-            np.take_along_axis(
-                np.stack([v._upper.T for v in valids], axis=0),
-                selector.flatten().reshape((1, data.size, umax)),
-                axis=0,
+            valid._upper = (
+                np.take_along_axis(
+                    np.stack([v._upper.T for v in valids], axis=0),
+                    selector.flatten().reshape((1, data.size, umax)),
+                    axis=0,
+                )
+                .reshape(data.size, umax)
+                .T
             )
-            .reshape(data.size, umax)
-            .T
-        )
+        except IndexError as err:
+            raise IndexError("invalid select safeguard selector indices") from err
 
         return valid
 
