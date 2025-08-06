@@ -281,6 +281,7 @@ class SumTerm:
         assert total_abs_factor_ is not None
         total_abs_factor: np.ndarray[Ps, np.dtype[F]] = total_abs_factor_
 
+        # TODO: what to do about total_abs_factor == 0
         etl: np.ndarray[Ps, np.dtype[F]] = _nan_to_zero_inf_to_finite(
             eb_expr_lower / total_abs_factor
         )

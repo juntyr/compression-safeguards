@@ -114,12 +114,22 @@ class ScalarMultiply(Expr):
             )
 
             # composition using Lemma 3 from Jiao et al.
-            return term.compute_data_error_bound(
+            etl, etu = term.compute_data_error_bound(
                 eb_term_lower,
                 eb_term_upper,
                 X,
                 Xs,
                 late_bound,
+            )
+
+            # FIXME: test for scalar *0 earlier to avoid recursing
+            # FIXME: ensure proper rounding to avoid overlflowing into inf
+            from ....utils.cast import _float128_dtype, _float128_max
+            fmax = _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
+
+            return (
+                np.where(constv == 0, -fmax, etl),
+                np.where(constv == 0, fmax, etu),
             )
 
         return rewrite_left_associative_product_as_exp_sum_of_logs(
