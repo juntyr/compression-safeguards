@@ -8,7 +8,7 @@ from ....utils.bindings import Parameter
 from ....utils.cast import _nan_to_zero_inf_to_finite
 from ..eb import ensure_bounded_derived_error
 from .abc import Expr
-from .addsub import ScalarAdd
+from .addsub import ScalarAdd, ScalarSubtract
 from .constfold import FoldedScalarConst
 from .literal import Number
 from .logexp import Exponential, Logarithm, ScalarExp, ScalarLog
@@ -79,8 +79,6 @@ class ScalarMultiply(Expr):
         b_const = not self._b.has_data
         assert not (a_const and b_const), "constant product has no error bounds"
 
-        # TODO: handle larger products
-
         if a_const or b_const:
             term, const = (self._b, self._a) if a_const else (self._a, self._b)
 
@@ -124,15 +122,8 @@ class ScalarMultiply(Expr):
                 late_bound,
             )
 
-        # FIXME: this is just a short-term fix
-        from .power import ScalarFakeAbs
-
-        return ScalarExp(
-            Exponential.exp,
-            ScalarAdd(
-                ScalarLog(Logarithm.ln, ScalarFakeAbs(self._a)),
-                ScalarLog(Logarithm.ln, ScalarFakeAbs(self._b)),
-            ),
+        return rewrite_left_associative_product_as_exp_sum_of_logs(
+            self
         ).compute_data_error_bound(
             eb_expr_lower,
             eb_expr_upper,
@@ -233,3 +224,36 @@ class ScalarDivide(Expr):
 
     def __repr__(self) -> str:
         return f"{self._a!r} / {self._b!r}"
+
+
+def rewrite_left_associative_product_as_exp_sum_of_logs(
+    expr: ScalarMultiply | ScalarDivide,
+) -> Expr:
+    from .power import ScalarFakeAbs
+
+    terms_stack: list[tuple[Expr, bool]] = []
+
+    while True:
+        terms_stack.append((expr._b, isinstance(expr, ScalarMultiply)))
+
+        if isinstance(expr._a, (ScalarMultiply, ScalarDivide)):
+            expr = expr._a
+        else:
+            terms_stack.append((expr._a, True))
+            break
+
+    while len(terms_stack) > 1:
+        (a, _), (b, is_mul) = terms_stack.pop(), terms_stack.pop()
+        terms_stack.append(
+            (
+                (ScalarAdd if is_mul else ScalarSubtract)(
+                    ScalarLog(Logarithm.ln, ScalarFakeAbs(a)),
+                    ScalarLog(Logarithm.ln, ScalarFakeAbs(b)),
+                ),
+                True,
+            )
+        )
+
+    [(sum_of_lns, _)] = terms_stack
+
+    return ScalarExp(Exponential.exp, sum_of_lns)
