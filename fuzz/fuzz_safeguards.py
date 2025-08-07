@@ -394,6 +394,10 @@ def check_one_input(data) -> None:
                 isinstance(err, IndexError)
                 and (str(err) == "invalid select safeguard selector indices")
             )
+            or (
+                isinstance(err, AssertionError)
+                and (str(err) == "offset must not contain NaNs")
+            )
         ):
             return
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")
