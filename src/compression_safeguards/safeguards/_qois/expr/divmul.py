@@ -125,7 +125,10 @@ class ScalarMultiply(Expr):
             # FIXME: test for scalar *0 earlier to avoid recursing
             # FIXME: ensure proper rounding to avoid overlflowing into inf
             from ....utils.cast import _float128_dtype, _float128_max
-            fmax = _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
+
+            fmax = (
+                _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
+            )
 
             return (
                 np.where(constv == 0, -fmax, etl),

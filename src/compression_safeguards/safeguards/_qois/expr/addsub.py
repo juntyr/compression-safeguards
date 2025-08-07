@@ -266,7 +266,13 @@ class SumTerm:
             )
 
         # evaluate the total expression sum
-        exprv = sum(termvs[1:], start=termvs[0])
+        assert is_adds[0]
+        exprv: np.ndarray[Ps, np.dtype[F]] = np.copy(termvs[0])
+        for is_add, termv in zip(is_adds[1:], termvs[1:]):
+            if is_add:
+                exprv += termv
+            else:
+                exprv -= termv
 
         # compute the sum of absolute factors
         # unrolled loop in case a factor is a late-bound constant array
