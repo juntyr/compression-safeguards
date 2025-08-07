@@ -123,7 +123,7 @@ class ScalarMultiply(Expr):
             )
 
             # FIXME: test for scalar *0 earlier to avoid recursing
-            # FIXME: ensure proper rounding to avoid overlflowing into inf
+            # FIXME: ensure proper rounding to avoid overflowing into inf
             from ....utils.cast import _float128_dtype, _float128_max
 
             fmax = (
@@ -131,8 +131,8 @@ class ScalarMultiply(Expr):
             )
 
             return (
-                np.where(constv == 0, -fmax, etl),
-                np.where(constv == 0, fmax, etu),
+                np.where(constv == 0, -fmax, etl),  # type: ignore
+                np.where(constv == 0, fmax, etu),  # type: ignore
             )
 
         return rewrite_left_associative_product_as_exp_sum_of_logs(
