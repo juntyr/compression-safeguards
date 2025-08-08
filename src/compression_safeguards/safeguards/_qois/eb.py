@@ -103,3 +103,35 @@ def ensure_bounded_derived_error(
 
         if not np.any(eb_exceeded):
             return eb_x_guess
+
+
+def ensure_bounded_expression(
+    expr: Callable[[np.ndarray[S, np.dtype[F]]], np.ndarray[S, np.dtype[F]]],
+    exprv: np.ndarray[S, np.dtype[F]],
+    xv: np.ndarray[S, np.dtype[F]],
+    x_guess: np.ndarray[S, np.dtype[F]],
+    expr_lower: np.ndarray[S, np.dtype[F]],
+    expr_upper: np.ndarray[S, np.dtype[F]],
+) -> np.ndarray[S, np.dtype[F]]:
+    # check if any derived expression exceeds the error bound
+    # this check matches the QoI safeguard's validity check
+    def are_bounds_exceeded(x_guess):
+        exprv_x_guess = expr(x_guess)
+        return ~np.where(
+            _isfinite(exprv),
+            (exprv_x_guess >= expr_lower) & (exprv_x_guess <= expr_upper),
+            np.where(
+                _isinf(exprv),
+                exprv_x_guess == exprv,
+                _isnan(exprv_x_guess),
+            ),
+        )
+
+    while True:
+        bounds_exceeded = are_bounds_exceeded(x_guess)
+
+        if not np.any(bounds_exceeded):
+            return x_guess
+
+        # try to nudge the guess towards the data
+        x_guess = np.where(bounds_exceeded, _nextafter(x_guess, xv), x_guess)  # type: ignore

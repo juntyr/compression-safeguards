@@ -4,7 +4,8 @@ from collections.abc import Mapping
 import numpy as np
 
 from ....utils.bindings import Parameter
-from ..eb import ensure_bounded_derived_error
+from ....utils.cast import _float128_dtype, _float128_max, _isfinite
+from ..eb import ensure_bounded_derived_error, ensure_bounded_expression
 from .typing import F, Ns, Ps, PsI
 
 
@@ -241,3 +242,90 @@ class Expr:
         )
 
         return tl, tu
+
+    def compute_data_bounds_unchecked(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
+        exprv = self.eval(X.shape, Xs, late_bound)
+
+        eb_expr_lower: np.ndarray[Ps, np.dtype[F]] = expr_lower - exprv
+        eb_expr_upper: np.ndarray[Ps, np.dtype[F]] = expr_upper - exprv
+
+        fmax = _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
+
+        eb_expr_lower = np.where(
+            ~_isfinite(eb_expr_lower) & (expr_lower < exprv), -fmax, eb_expr_lower
+        )  # type: ignore
+        eb_expr_upper = np.where(
+            ~_isfinite(eb_expr_upper) & (expr_upper > exprv), fmax, eb_expr_upper
+        )  # type: ignore
+
+        eb_X_lower, eb_X_upper = self.compute_data_error_bound_unchecked(
+            eb_expr_lower,
+            eb_expr_upper,
+            X,
+            Xs,
+            late_bound,
+        )
+
+        X_lower: np.ndarray[Ps, np.dtype[F]] = np.where(
+            eb_X_lower == 0,
+            X,
+            X + eb_X_lower,
+        )  # type: ignore
+        X_upper: np.ndarray[Ps, np.dtype[F]] = np.where(
+            eb_X_upper == 0,
+            X,
+            X + eb_X_upper,
+        )  # type: ignore
+
+        return X_lower, X_upper
+
+    def compute_data_bounds(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
+        xl: np.ndarray[Ps, np.dtype[F]]
+        xu: np.ndarray[Ps, np.dtype[F]]
+        xl, xu = self.compute_data_bounds_unchecked(
+            expr_lower, expr_upper, X, Xs, late_bound
+        )
+
+        exprv = self.eval(X.shape, Xs, late_bound)
+
+        # handle rounding errors in the lower error bound computation
+        xl = ensure_bounded_expression(
+            lambda xl: self.eval(
+                X.shape,
+                xl.reshape(list(X.shape) + [1] * (Xs.ndim - X.ndim)),
+                late_bound,
+            ),  # type: ignore
+            exprv,
+            X,
+            xl,
+            expr_lower,
+            expr_upper,
+        )
+        xu = ensure_bounded_derived_error(
+            lambda xu: self.eval(
+                X.shape,
+                xu.reshape(list(X.shape) + [1] * (Xs.ndim - X.ndim)),
+                late_bound,
+            ),  # type: ignore
+            exprv,
+            X,
+            xu,
+            expr_lower,
+            expr_upper,
+        )
+
+        return xl, xu
