@@ -5,7 +5,7 @@ from math import gcd
 import numpy as np
 
 from ....utils.bindings import Parameter
-from ....utils.cast import _nan_to_zero_inf_to_finite
+from ....utils.cast import _float128_dtype, _float128_max, _nan_to_zero_inf_to_finite
 from ..eb import ensure_bounded_derived_error
 from .abc import Expr
 from .addsub import ScalarAdd, ScalarSubtract
@@ -88,8 +88,18 @@ class ScalarMultiply(Expr):
             # mul of two terms is commutative
             exprv = np.multiply(termv, constv)
 
-            efl = _nan_to_zero_inf_to_finite(eb_expr_lower / np.abs(constv))
-            efu = _nan_to_zero_inf_to_finite(eb_expr_upper / np.abs(constv))
+            fmax = (
+                _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
+            )
+
+            # for x*0, we can allow any finite x,
+            #  which would be more easily expressed with intervals
+            efl = _nan_to_zero_inf_to_finite(
+                np.where(constv == 0, -fmax - termv, eb_expr_lower / np.abs(constv))
+            )
+            efu = _nan_to_zero_inf_to_finite(
+                np.where(constv == 0, fmax - termv, eb_expr_upper / np.abs(constv))
+            )
 
             # flip the lower/upper error bound if the factor is negative
             etl: np.ndarray[Ps, np.dtype[F]] = np.where(constv < 0, -efu, efl)  # type: ignore
@@ -114,25 +124,12 @@ class ScalarMultiply(Expr):
             )
 
             # composition using Lemma 3 from Jiao et al.
-            etl, etu = term.compute_data_error_bound(
+            return term.compute_data_error_bound(
                 eb_term_lower,
                 eb_term_upper,
                 X,
                 Xs,
                 late_bound,
-            )
-
-            # FIXME: test for scalar *0 earlier to avoid recursing
-            # FIXME: ensure proper rounding to avoid overflowing into inf
-            from ....utils.cast import _float128_dtype, _float128_max
-
-            fmax = (
-                _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
-            )
-
-            return (
-                np.where(constv == 0, -fmax, etl),  # type: ignore
-                np.where(constv == 0, fmax, etu),  # type: ignore
             )
 
         return rewrite_left_associative_product_as_exp_sum_of_logs(
