@@ -13,7 +13,6 @@ Request:
 	Variable: Precipitation
 
 Citation:
-
 The web interface was developed as the successor of the original SmartSMEAR documented in:
 Junninen, H., Lauri, A., Keronen, P., Aalto, P., Hiltunen, V., Hari, P., Kulmala, M. 2009. Smart-SMEAR: online data exploration and visualization tool for SMEAR stations. Boreal Environment Research 14, 447–457.
 
@@ -26,3 +25,6 @@ Source: https://tempo.inmet.gov.br/TabelaEstacoes/A201
 Request: 
 	Date Range: 2024-04-02 -> 2024-04-04
 	Table data hourly sums
+
+Attribution:
+A rede de estações meteorológicas do INMET segue padrões internacionais e os dados coletados por essa rede são disseminados, de forma democrática e gratuita, na página https://portal.inmet.gov.br, e têm aplicação em todos os setores da economia, de modo especial no agropecuário e em apoio à Defesa Civil.
