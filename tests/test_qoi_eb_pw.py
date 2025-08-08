@@ -9,6 +9,7 @@ from compression_safeguards.utils.bindings import Bindings
 
 from .codecs import (
     encode_decode_identity,
+    encode_decode_mock,
     encode_decode_neg,
     encode_decode_noise,
     encode_decode_zero,
@@ -54,7 +55,7 @@ def check_empty(qoi: str):
 
 
 def check_unit(qoi: str):
-    check_all_codecs(np.linspace(-1.0, 1.0, 100), qoi)
+    check_all_codecs(np.linspace(-1.0, 1.0, 100, dtype=np.float16), qoi)
 
 
 def check_circle(qoi: str):
@@ -66,7 +67,7 @@ def check_arange(qoi: str):
 
 
 def check_linspace(qoi: str):
-    check_all_codecs(np.linspace(-1024, 1024, 2831), qoi)
+    check_all_codecs(np.linspace(-1024, 1024, 2831, dtype=np.float32), qoi)
 
 
 def check_edge_cases(qoi: str):
@@ -100,7 +101,9 @@ CHECKS = [
 
 
 def test_sandbox():
-    with pytest.raises(AssertionError, match="invalid QoI expression"):
+    with pytest.raises(
+        AssertionError, match="failed to parse pointwise QoI expression"
+    ):
         # sandbox escape based on https://stackoverflow.com/q/35804961 and
         #  https://stackoverflow.com/a/35806044
         check_all_codecs(
@@ -120,9 +123,9 @@ def test_empty(check):
 
 
 def test_non_expression():
-    with pytest.raises(AssertionError, match="numeric expression"):
+    with pytest.raises(AssertionError, match="EOF"):
         check_all_codecs(np.empty(0), "exp")
-    with pytest.raises(AssertionError, match="invalid QoI expression"):
+    with pytest.raises(AssertionError, match="unexpected token `x`"):
         check_all_codecs(np.empty(0), "e x p")
 
 
@@ -144,64 +147,49 @@ def test_comment():
 
 
 def test_variables():
-    with pytest.raises(AssertionError, match="invalid QoI expression"):
+    with pytest.raises(
+        AssertionError,
+        match=r'cannot assign to identifier `a`, assign to a variable v\["a"\] instead',
+    ):
+        check_all_codecs(np.array([]), "a = 4; return a")
+    with pytest.raises(
+        AssertionError, match="pointwise QoI variables use lower-case `v`"
+    ):
+        check_all_codecs(np.array([]), 'V["a"]')
+    with pytest.raises(
+        AssertionError, match='invalid string literal with missing closing `"`'
+    ):
+        check_all_codecs(np.array([]), 'v["a]')
+    with pytest.raises(AssertionError, match="invalid quoted parameter"):
         check_all_codecs(np.array([]), 'v["123"]')
-    with pytest.raises(AssertionError, match="invalid QoI expression"):
+    with pytest.raises(AssertionError, match="invalid quoted parameter"):
         check_all_codecs(np.array([]), 'v["a 123"]')
-    with pytest.raises(AssertionError, match="identifier"):
+    with pytest.raises(
+        AssertionError, match=r"variable name must not be built-in \(start with `\$`\)"
+    ):
         check_all_codecs(np.array([]), 'v["$a"]')
-    with pytest.raises(AssertionError, match=r'unresolved variable v\["a"\]'):
+    with pytest.raises(AssertionError, match=r'undefined variable v\["a"\]'):
         check_all_codecs(np.array([]), 'v["a"]')
-    with pytest.raises(AssertionError, match=r'unresolved variable v\["b"\]'):
-        check_all_codecs(np.array([]), 'let(v["a"], 3)(x + v["b"])')
-    with pytest.raises(AssertionError, match="let name"):
-        check_all_codecs(np.array([]), "let(1, 2)(x)")
-    with pytest.raises(AssertionError, match="let value"):
-        check_all_codecs(np.array([]), 'let(v["a"], log)(x + v["a"])')
-    with pytest.raises(AssertionError, match="let within"):
-        check_all_codecs(np.array([]), 'let(v["a"], x + 1)(log)')
-    with pytest.raises(AssertionError, match=r"fresh \(not overridden\)"):
+    with pytest.raises(AssertionError, match=r'undefined variable v\["b"\]'):
+        check_all_codecs(np.array([]), 'v["a"] = 3; return x + v["b"];')
+    with pytest.raises(AssertionError, match="unexpected token `=`"):
+        check_all_codecs(np.array([]), "1 = x")
+    with pytest.raises(AssertionError, match=r"expected `\(`"):
+        check_all_codecs(np.array([]), 'v["a"] = log; return x + v["a"];')
+    with pytest.raises(
+        AssertionError, match=r'cannot override already-defined variable v\["a"\]'
+    ):
         check_all_codecs(
-            np.array([]), 'let(v["a"], x + 1)(let(v["a"], v["a"])(v["a"]))'
+            np.array([]), 'v["a"] = x + 1; v["a"] = v["a"]; return v["a"];'
         )
-    with pytest.raises(AssertionError, match="pairs of names and values"):
-        check_all_codecs(np.array([]), 'let(v["a"], x + 1, v["b"])(v["a"] + v["b"])')
-    check_all_codecs(np.array([]), 'let(v["a"], 3)(x + v["a"])')
+    check_all_codecs(np.array([]), 'v["a"] = 3; return x + v["a"];')
     check_all_codecs(
-        np.array([]), 'let(v["a"], 3)(x + let(v["b"], v["a"] - 1)(v["b"] * 2))'
+        np.array([]), 'v["a"] = 3; v["b"] = v["a"] - 1; return x + (v["b"] * 2);'
     )
-    check_all_codecs(np.array([]), 'let(v["a"], x + 1, v["b"], x - 1)(v["a"] + v["b"])')
+    check_all_codecs(
+        np.array([]), 'v["a"] = x + 1; v["b"] = x - 1; return v["a"] + v["b"];'
+    )
     check_all_codecs(np.array([]), 'c["$x"] * x')
-
-
-def test_late_bound_escape():
-    import inspect
-
-    from compression_safeguards.safeguards._qois.compile import (
-        sympy_expr_to_numpy,
-    )
-
-    safeguards = PointwiseQuantityOfInterestErrorBoundSafeguard(
-        qoi='sin(c["sin"] + x)', type="abs", eb=0
-    )
-    safeguards.compute_safe_intervals(np.linspace(0, 100), late_bound=Bindings(sin=42))
-
-    fn = sympy_expr_to_numpy(
-        [safeguards._x, *safeguards._late_bound_constants],
-        safeguards._qoi_expr,
-        dtype=np.dtype(np.float64),
-    )
-
-    src = inspect.getsource(fn)
-
-    dummy = src[src.index("Dummy_") :]
-    dummy = dummy[: dummy.index(")")]
-
-    # ensure that late-bound constants don't override functions in compile
-    assert (
-        inspect.getsource(fn)
-        == f"def _lambdifygenerated(x, {dummy}):\n    return sin(((x) + ({dummy})))\n"
-    )
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -217,11 +205,17 @@ def test_constant(check):
 
 
 @pytest.mark.parametrize("check", CHECKS)
-def test_imaginary(check):
-    with pytest.raises(AssertionError, match="imaginary"):
-        check_all_codecs(np.array([2], dtype=np.uint64), "(-log(-20417, base=ln(x)))")
-    with pytest.raises(AssertionError, match="imaginary"):
-        check("(-log(-20417, base=ln(x)))")
+def test_negate(check):
+    check("-x")
+    check("--x")
+    check("--(-x)")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_abs(check):
+    check("abs(x)")
+    check("abs(-x)")
+    check("abs(abs(x))")
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -241,10 +235,14 @@ def test_exponential(check):
     check("3**x")
     check("e**(x)")
     check("exp(x)")
+    check("exp2(x)")
+    check("exp10(x)")
     check("2 ** (x + 1)")
 
     check_all_codecs(np.array([51.0]), "2**x")
     check_all_codecs(np.array([31.0]), "exp(x)")
+    check_all_codecs(np.array([42.0]), "exp2(x)")
+    check_all_codecs(np.array([42.0]), "exp10(x)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -252,6 +250,10 @@ def test_logarithm(check):
     check("log(x, base=2)")
     check("ln(x)")
     check("ln(x + 1)")
+    check("log2(x)")
+    check("log2(x + 1)")
+    check("log10(x)")
+    check("log10(x + 1)")
     check("log(2, base=x)")
 
 
@@ -276,6 +278,12 @@ def test_inverse(check):
     check("1 / x**2")
     check("1 / x**3")
 
+    check("reciprocal(x)")
+    check("reciprocal(x - 1)")
+    check("reciprocal(x**2)")
+    check("reciprocal(x**3)")
+    check("reciprocal(reciprocal(x))")
+
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_power_function(check):
@@ -287,6 +295,13 @@ def test_sqrt(check):
     check("sqrt(x)")
     check("1 / sqrt(x)")
     check("sqrt(sqrt(x))")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_square(check):
+    check("square(x)")
+    check("1 / square(x)")
+    check("square(square(x))")
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -348,7 +363,9 @@ def test_dtypes(dtype):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_fuzzer_found(check):
-    with pytest.raises(AssertionError, match="failed to parse"):
+    with pytest.warns(UserWarning, match="symbolic integer evaluation"):
+        check_all_codecs(np.array([42.0], np.float16), "(((-8054**5852)-x)-1)")
+    with pytest.warns(UserWarning, match="symbolic integer evaluation"):
         check("(((-8054**5852)-x)-1)")
 
     check_all_codecs(
@@ -361,29 +378,18 @@ def test_fuzzer_found(check):
     check("(-((e/(22020**-37))**x))")
 
 
-def test_lambdify_dtype():
-    import inspect
+def test_evaluate_expr_with_dtype():
+    from compression_safeguards.safeguards._qois.expr.addsub import ScalarAdd
+    from compression_safeguards.safeguards._qois.expr.data import Data
+    from compression_safeguards.safeguards._qois.expr.literal import Euler, Pi
 
-    import sympy as sp
+    expr = ScalarAdd(ScalarAdd(Data(()), Pi()), Euler())
 
-    from compression_safeguards.safeguards._qois.associativity import rewrite_qoi_expr
-    from compression_safeguards.safeguards._qois.compile import (
-        sympy_expr_to_numpy,
-    )
+    assert f"{expr!r}" == "x + pi + e"
 
-    x = sp.Symbol("x", extended_real=True)
-
-    fn = sympy_expr_to_numpy(
-        [x], rewrite_qoi_expr(x + sp.pi + sp.E), np.dtype(np.float16)
-    )
-
-    assert (
-        inspect.getsource(fn)
-        == "def _lambdifygenerated(x):\n    return ((x) + (float16('2.71828') + float16('3.14159')))\n"
-    )
-
-    assert np.float16("2.71828") == np.float16(np.e)
-    assert np.float16("3.14159") == np.float16(np.pi)
+    assert expr.eval((), np.float16("4.2"), dict()) == np.float16("4.2") + np.float16(
+        np.e
+    ) + np.float16(np.pi)
 
 
 def test_late_bound_eb_abs():
@@ -479,3 +485,92 @@ def test_pointwise_normalised_absolute_error(check):
 @pytest.mark.parametrize("check", CHECKS)
 def test_pointwise_histogram_index(check):
     check('round_ties_even(100 * (x - c["$x_min"]) / (c["$x_max"] - c["$x_min"]))')
+
+
+def test_gaussian_kernel():
+    safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi="""
+        v["sigma"] = 1.5;
+        v["i"] = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5];
+        v["k"] = 1/(sqrt(2*pi)*v["sigma"]) * exp((-square(v["i"])) / (2*square(v["sigma"])));
+        v["kern"] = matmul([v["k"]].T, [v["k"]]);
+        v["kernel"] = v["kern"] / sum(v["kern"]);
+        return x * v["kernel"][5,5];
+        """,
+        type="abs",
+        eb=1,
+    )
+
+    # alternative implementation for a 2D Gaussian kernel from
+    #  https://stackoverflow.com/a/43346070
+    i = np.arange(11).astype(np.float64) - 5
+    k = np.exp(-0.5 * np.square(i) / np.square(1.5))
+    kern = np.outer(k, k)
+    kernel = kern / np.sum(kern)
+
+    assert (
+        safeguard.evaluate_qoi(
+            np.array(1.0, dtype=np.float64), late_bound=Bindings.empty()
+        )
+        == kernel[5, 5]
+    )
+
+
+def test_constant_fold():
+    from compression_safeguards.safeguards._qois.expr.data import Data
+    from compression_safeguards.safeguards._qois.expr.literal import Number
+    from compression_safeguards.safeguards._qois.expr.logexp import (
+        ScalarLogWithBase,
+    )
+
+    expr = ScalarLogWithBase(
+        Number.from_symbolic_int(100), Number.from_symbolic_int(10)
+    )
+    assert f"{expr!r}" == "log(100, base=10)"
+    assert expr.eval((), np.empty(0, dtype=np.float64), {}) == 2
+
+    assert expr.constant_fold(np.dtype(np.float64)) == 2
+
+    expr = ScalarLogWithBase(Data(index=()), Number.from_symbolic_int(10))
+    assert f"{expr!r}" == "log(x, base=10)"
+    assert expr.eval((), np.array(100, dtype=np.float64), {}) == 2
+
+    expr = expr.constant_fold(np.dtype(np.float64))
+    assert f"{expr!r}" == f"ln(x) / ({np.log(np.float64(10))!r})"
+    assert expr.eval((), np.array(100, dtype=np.float64), {}) == 2
+
+
+def test_fuzzer_found_sign_constant_fold():
+    data = np.array([], dtype=np.int64)
+    decoded = np.array([], dtype=np.int64)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            PointwiseQuantityOfInterestErrorBoundSafeguard(
+                qoi="sign(e) - x", type="rel", eb=2
+            ),
+        ],
+    )
+
+
+def test_fuzzer_found_logarithm_noise():
+    from numcodecs_combinators.framed import FramedCodecStack
+    from numcodecs_safeguards import SafeguardsCodec
+
+    from .codecs import NoiseCodec
+
+    data = np.linspace(-1.0, 1.0, 100, dtype=np.float16)
+
+    codec = SafeguardsCodec(
+        codec=FramedCodecStack(NoiseCodec(seed=258957826)),
+        safeguards=[
+            PointwiseQuantityOfInterestErrorBoundSafeguard(
+                qoi="log2(x + 1)", type="ratio", eb=10
+            ),
+        ],
+    )
+
+    encoded = codec.encode(data)
+    codec.decode(encoded)

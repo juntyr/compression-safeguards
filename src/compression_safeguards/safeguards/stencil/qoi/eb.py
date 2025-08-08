@@ -4,13 +4,9 @@ Stencil quantity of interest (QoI) error bound safeguard.
 
 __all__ = ["StencilQuantityOfInterestErrorBoundSafeguard"]
 
-import re
 from collections.abc import Sequence, Set
-from typing import TypeVar
 
 import numpy as np
-import sympy as sp
-import sympy.tensor.array.expressions  # noqa: F401
 from numpy.lib.stride_tricks import sliding_window_view
 
 from ....utils.bindings import Bindings, Parameter
@@ -28,33 +24,8 @@ from ....utils.cast import (
 )
 from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import F, S, T
-from ..._qois.amath import CONSTRUCTORS as AMATH_CONSTRUCTORS
-from ..._qois.amath import FUNCTIONS as AMATH_FUNCTIONS
-from ..._qois.array import NumPyLikeArray
-from ..._qois.associativity import rewrite_qoi_expr
-from ..._qois.compile import sympy_expr_to_numpy as compile_sympy_expr_to_numpy
-from ..._qois.eb import (
-    compute_data_eb_for_stencil_qoi_eb_unchecked,
-    ensure_bounded_derived_error,
-)
-from ..._qois.finite_difference import create_finite_difference_for_neighbourhood
+from ..._qois import StencilQuantityOfInterest
 from ..._qois.interval import compute_safe_eb_lower_upper_interval_union
-from ..._qois.math import CONSTANTS as MATH_CONSTANTS
-from ..._qois.math import FUNCTIONS as MATH_FUNCTIONS
-from ..._qois.re import (
-    QOI_COMMENT_PATTERN,
-    QOI_FLOAT_LITERAL_PATTERN,
-    QOI_IDENTIFIER_PATTERN,
-    QOI_INT_LITERAL_PATTERN,
-    QOI_WHITESPACE_PATTERN,
-)
-from ..._qois.vars import FUNCTIONS as VARS_FUNCTIONS
-from ..._qois.vars import (
-    LateBoundConstant,
-    LateBoundConstantEnvironment,
-    UnresolvedVariable,
-    VariableEnvironment,
-)
 from ...eb import (
     ErrorBound,
     _apply_finite_qoi_error_bound,
@@ -62,6 +33,7 @@ from ...eb import (
     _compute_finite_absolute_error,
     _compute_finite_absolute_error_bound,
 )
+from ...qois import StencilQuantityOfInterestExpression
 from .. import (
     BoundaryCondition,
     NeighbourhoodAxis,
@@ -69,10 +41,6 @@ from .. import (
     _pad_with_boundary,
 )
 from ..abc import StencilSafeguard
-from . import StencilExpr
-
-Qs = TypeVar("Qs", bound=tuple[int, ...])
-Ns = TypeVar("Ns", bound=tuple[int, ...])
 
 
 class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
@@ -86,19 +54,14 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     string form, over the neighbourhood tensor `X` that is centred on the
     pointwise value `x`. For example, to bound the error on the four-neighbour
     box mean in a 3x3 neighbourhood (where `x = X[I]`), set
-    `qoi="(X[I+A[-1,0]]+X[I+A[+1,0]]+X[I+A[0,-1]]+X[I+A[0,+1]])/4"`.
+    `qoi="(X[I[0]-1, I[1]] + X[I[0]+1, I[1]] + X[I[0], I[1]-1] + X[I[0], I[1]+1]) / 4"`.
     Note that `X` can be indexed absolute or relative to the centred data point
     `x` using the index array `I`.
 
     The stencil QoI safeguard can also be used to bound the pointwise error of
-    the finite-difference-approximated derivative[^1] over the data by using the
-    `finite_difference` function in the `qoi` expression.
-
-    [^1]: The finite difference coefficients for arbitrary orders, accuracies,
-    and grid spacings are derived using the algorithm from: Fornberg, B. (1988).
-    Generation of finite difference formulas on arbitrarily spaced grids.
-    *Mathematics of Computation*, 51(184), 699-706. Available from:
-    [doi:10.1090/s0025-5718-1988-0935077-0](https://doi.org/10.1090/s0025-5718-1988-0935077-0).
+    the finite-difference-approximated derivative (of arbitrary order,
+    accuracy, and grid spacing) over the data by using the `finite_difference`
+    function in the `qoi` expression.
 
     The shape of the data neighbourhood is specified as an ordered list of
     unique data axes and boundary conditions that are applied to these axes.
@@ -131,182 +94,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     type (keeps the same dtype for floating point data, chooses a dtype with a
     mantissa that has at least as many bits as / for the integer dtype).
 
-    The QoI expression is written using the following EBNF grammar[^2] for
-    `expr`:
-
-    [^2]: You can visualise the EBNF grammar at <https://matthijsgroen.github.io/ebnf2railroad/try-yourself.html>.
-
-    ```ebnf
-    expr    =
-        literal
-      | array
-      | const
-      | data
-      | var
-      | let
-      | unary
-      | binary
-      | finite_difference
-    ;
-
-    literal =
-        int
-      | float
-      | array
-    ;
-
-    int     =                             (* integer literal *)
-        [ sign ], digit, { digit }
-    ;
-    float   =                             (* floating point literal *)
-        [ sign ], digit, { digit }, ".", digit, { digit }, [
-            "e", [ sign ], digit, { digit }
-        ]
-    ;
-
-    sign    =
-        "+" | "-"
-    ;
-    digit   =
-        "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
-    ;
-
-    array   =
-        "A", "[", [
-            expr, { ",", expr }, [","]    (* n-dimensional array *)
-        ], "]"
-    ;
-
-    const   =
-        "e"                               (* Euler's number *)
-      | "pi"                              (* pi *)
-      | "c", "[", '"', ident, '"', "]"    (* late-bound constant value *)
-      | "C", "[", '"', ident, '"', "]"    (* late-bound constant neighbourhood *)
-      | "c", "[",
-            '"', "$", ident, '"'          (* late-bound built-in constant value *)
-        , "]"
-      | "C", "[",
-            '"', "$", ident, '"'          (* late-bound built-in constant neighbourhood *)
-        , "]"
-    ;
-
-    data    =
-        "x"                               (* pointwise data value *)
-      | "X"                               (* data neighbourhood *)
-    ;
-
-    var     =
-        "V", "[", '"', ident, '"', "]"    (* variable *)
-    ;
-
-    ident   =
-        ( letter | "_" )                  (* identifier *)
-      , { letter | digit | "_" }
-    ;
-    letter  =
-        "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k"
-      | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v"
-      | "w" | "x" | "y" | "z" | "A" | "B" | "C" | "D" | "E" | "F" | "G"
-      | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R"
-      | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
-    ;
-
-    let     =
-        "let", "(",
-            var, ",", expr, {
-                ",", var, ",", expr       (* let var=expr in expr scope *)
-            },
-        ")", "(", expr, ")"
-    ;
-
-    unary   =
-        "(", expr, ")"                    (* parenthesis *)
-      | "-", expr                         (* negation *)
-      | "sqrt", "(", expr, ")"            (* square root *)
-      | "ln", "(", expr, ")"              (* natural logarithm *)
-      | "exp", "(", expr, ")"             (* exponential e^x *)
-      | "sign", "(", expr, ")"            (* sign function, signed NaN for NaNs *)
-      | "floor", "(", expr, ")"           (* round down, towards negative infinity *)
-      | "ceil", "(", expr, ")"            (* round up, towards positive infinity *)
-      | "trunc", "(", expr, ")"           (* round towards zero *)
-      | "round_ties_even", "(", expr, ")" (* round to nearest integer, ties to even *)
-      | "asum", "(", expr, ")"            (* sum over an array *)
-      | "tr", "(", expr, ")"              (* transpose of a matrix (2d array) *)
-      | "sin", "(", expr, ")"             (* sine sin(x) *)
-      | "cos", "(", expr, ")"             (* cosine cos(x) *)
-      | "tan", "(", expr, ")"             (* tangent tan(x) *)
-      | "cot", "(", expr, ")"             (* cotangent cot(x) *)
-      | "sec", "(", expr, ")"             (* secant sec(x) *)
-      | "csc", "(", expr, ")"             (* cosecant csc(x) *)
-      | "asin", "(", expr, ")"            (* inverse sine asin(x) *)
-      | "acos", "(", expr, ")"            (* inverse cosine acos(x) *)
-      | "atan", "(", expr, ")"            (* inverse tangent atan(x) *)
-      | "acot", "(", expr, ")"            (* inverse cotangent acot(x) *)
-      | "asec", "(", expr, ")"            (* inverse secant asec(x) *)
-      | "acsc", "(", expr, ")"            (* inverse cosecant acsc(x) *)
-      | "sinh", "(", expr, ")"            (* hyperbolic sine sinh(x) *)
-      | "cosh", "(", expr, ")"            (* hyperbolic cosine cosh(x) *)
-      | "tanh", "(", expr, ")"            (* hyperbolic tangent tanh(x) *)
-      | "coth", "(", expr, ")"            (* hyperbolic cotangent coth(x) *)
-      | "sech", "(", expr, ")"            (* hyperbolic secant sech(x) *)
-      | "csch", "(", expr, ")"            (* hyperbolic cosecant csch(x) *)
-      | "asinh", "(", expr, ")"           (* inverse hyperbolic sine asinh(x) *)
-      | "acosh", "(", expr, ")"           (* inverse hyperbolic cosine acosh(x) *)
-      | "atanh", "(", expr, ")"           (* inverse hyperbolic tangent atanh(x) *)
-      | "acoth", "(", expr, ")"           (* inverse hyperbolic cotangent acoth(x) *)
-      | "asech", "(", expr, ")"           (* inverse hyperbolic secant asech(x) *)
-      | "acsch", "(", expr, ")"           (* inverse hyperbolic cosecant acsch(x) *)
-    ;
-
-    binary  =
-        expr, "+", expr                   (* addition *)
-      | expr, "-", expr                   (* subtraction *)
-      | expr, "*", expr                   (* multiplication *)
-      | expr, "/", expr                   (* division *)
-      | expr, "**", expr                  (* exponentiation *)
-      | "log", "(",
-            expr, ","                     (* logarithm with explicit base *)
-          , "base", "=", expr,
-        ")"
-      | expr, "[", indices, "]"           (* array indexing *)
-      | "matmul", "("                     (* matrix (2d array) multiplication *)
-          , expr, ",", expr,
-        ")"
-    ;
-
-    indices =
-        index, { ",", index }, [","]
-    ;
-
-    index   =
-        "I"                               (* index of the neighbourhood centre *)
-      | expr                              (* index expression *)
-      | [expr], ":", [expr]               (* slicing *)
-    ;
-
-    finite_difference =
-        "finite_difference", "("          (* finite difference over an expression *)
-          , expr, ","
-          , "order", "=", int, ","           (* order of the derivative *)
-          , "accuracy", "=", int, ","        (* order of accuracy of the approximation *)
-          , "type", "=", (
-                "-1" | "0" | "1"             (* backwards | central | forward difference *)
-            ), ","
-          , "axis", "=", int, ","            (* axis, relative to the neighbourhood *)
-          , (
-                "grid_spacing", "=", expr    (* scalar uniform grid spacing along the axis *)
-              | "grid_centre", "=", expr     (* centre of an arbitrary grid along the axis *)
-            )
-          , [
-                ",",
-                "grid_period", "=", expr     (* optional grid period, e.g. 2*pi or 360 *)
-            ]
-      , ")"
-    ;
-    ```
-
-    The QoI expression can also contain whitespaces (space ` `, tab `\\t`,
-    newline `\\n`) and single-line inline comments starting with a hash `#`.
+    Please refer to the
+    [`StencilQuantityOfInterestExpression`][compression_safeguards.safeguards.qois.StencilQuantityOfInterestExpression]
+    for the EBNF grammar that specifies the language in which the quantities of
+    interest are written.
 
     The implementation of the error bound on pointwise quantities of interest
     is inspired by:
@@ -344,22 +135,18 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         "_type",
         "_eb",
         "_qoi_expr",
-        "_X",
-        "_late_bound_constants",
     )
-    _qoi: StencilExpr
+    _qoi: StencilQuantityOfInterestExpression
     _neighbourhood: tuple[NeighbourhoodBoundaryAxis, ...]
     _type: ErrorBound
     _eb: int | float | Parameter
-    _qoi_expr: sp.Basic
-    _X: sp.tensor.array.expressions.ArraySymbol
-    _late_bound_constants: frozenset[LateBoundConstant]
+    _qoi_expr: StencilQuantityOfInterest
 
     kind = "qoi_eb_stencil"
 
     def __init__(
         self,
-        qoi: StencilExpr,
+        qoi: StencilQuantityOfInterestExpression,
         neighbourhood: Sequence[dict | NeighbourhoodBoundaryAxis],
         type: str | ErrorBound,
         eb: int | float | str | Parameter,
@@ -388,104 +175,12 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         shape = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
         I = tuple(axis.before for axis in self._neighbourhood)  # noqa: E741
 
-        self._X = sp.tensor.array.expressions.ArraySymbol(
-            sp.Symbol("X", extended_real=True), shape
-        )
-        X = self._X.as_explicit()
-        X.__class__ = NumPyLikeArray
-
-        qoi_stripped = QOI_WHITESPACE_PATTERN.sub(
-            " ", QOI_COMMENT_PATTERN.sub(" ", qoi)
-        ).strip()
-
-        def create_late_bound_array_symbol(name: str) -> NumPyLikeArray:
-            C = sp.tensor.array.expressions.ArraySymbol(
-                LateBoundConstant(name, extended_real=True), shape
-            ).as_explicit()
-            C.__class__ = NumPyLikeArray
-            return C
-
-        def create_late_bound_value_symbol(name: str):
-            return create_late_bound_array_symbol(name)[I]
-
-        assert len(qoi_stripped) > 0, "QoI expression must not be empty"
-        assert _QOI_PATTERN.fullmatch(qoi_stripped) is not None, (
-            "invalid QoI expression"
-        )
         try:
-            qoi_expr = sp.parse_expr(
-                qoi_stripped,
-                local_dict=dict(
-                    # === data ===
-                    # data neighbourhood
-                    X=X,
-                    x=X[I],
-                    # neighbourhood index
-                    I=NumPyLikeArray(I),
-                    # === constants ===
-                    **MATH_CONSTANTS,
-                    c=LateBoundConstantEnvironment(
-                        "c",
-                        create_late_bound_value_symbol,  # type: ignore
-                    ),
-                    C=LateBoundConstantEnvironment(
-                        "C",
-                        create_late_bound_array_symbol,  # type: ignore
-                    ),
-                    # === variables ===
-                    V=VariableEnvironment("V"),
-                    **VARS_FUNCTIONS,
-                    # === operators ===
-                    # poinwise math
-                    **MATH_FUNCTIONS,
-                    # array math
-                    **AMATH_CONSTRUCTORS,
-                    **AMATH_FUNCTIONS,
-                    # finite difference
-                    finite_difference=create_finite_difference_for_neighbourhood(
-                        self._X, shape, I
-                    ),
-                ),
-                global_dict=dict(
-                    # literals
-                    Integer=sp.Integer,
-                    Float=sp.Float,
-                    Rational=sp.Rational,
-                ),
-                transformations=(sp.parsing.sympy_parser.auto_number,),
-            )
-            assert not isinstance(qoi_expr, UnresolvedVariable), (
-                f'unresolved variable {qoi_expr._env._symbol}["{qoi_expr._name}"], perhaps you forgot to define it within a let expression'
-            )
-            assert isinstance(qoi_expr, sp.Basic), (
-                "QoI expression must evaluate to a numeric expression"
-            )
-            qoi_expr = rewrite_qoi_expr(qoi_expr)
-            self._late_bound_constants = frozenset(
-                s for s in qoi_expr.free_symbols if isinstance(s, LateBoundConstant)
-            )
-            # check if the expression is well-formed (e.g. no int's that cannot
-            #  be printed) and if an error bound can be computed
-            _canary_repr = str(qoi_expr)
-            _canary_data_eb = _compute_data_eb_for_stencil_qoi_eb(
-                qoi_expr,
-                self._X,
-                np.zeros(shape),
-                np.zeros(shape),
-                np.zeros(shape),
-                np.zeros(shape),
-                {c: np.zeros(shape) for c in self._late_bound_constants},
-            )
+            qoi_expr = StencilQuantityOfInterest(qoi, stencil_shape=shape, stencil_I=I)
         except Exception as err:
             raise AssertionError(
-                f"failed to parse QoI expression {qoi!r}: {err}"
+                f"failed to parse stencil QoI expression {qoi!r}: {err}"
             ) from err
-        assert len(qoi_expr.free_symbols - self._late_bound_constants) > 0, (
-            "QoI expression must not be constant"
-        )
-        assert not qoi_expr.has(sp.I), (
-            "QoI expression must not contain imaginary numbers"
-        )
 
         self._qoi = qoi
         self._qoi_expr = qoi_expr
@@ -503,14 +198,14 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         specific data that is to be safeguarded.
         """
 
-        parameters = [c.parameter for c in self._late_bound_constants]
+        parameters = set(self._qoi_expr.late_bound_constants)
 
         if isinstance(self._eb, Parameter):
-            parameters.append(self._eb)
+            parameters.add(self._eb)
 
         for axis in self._neighbourhood:
             if isinstance(axis.constant_boundary, Parameter):
-                parameters.append(axis.constant_boundary)
+                parameters.add(axis.constant_boundary)
 
         return frozenset(parameters)
 
@@ -637,23 +332,21 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         window = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
 
-        data_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
-            to_float(
-                sliding_window_view(
-                    data_boundary,
-                    window,
-                    axis=tuple(axis.axis for axis in self._neighbourhood),
-                    writeable=False,
-                )  # type: ignore
-            )
+        data_windows_float: np.ndarray[tuple[int, ...], np.dtype[F]] = to_float(
+            sliding_window_view(
+                data_boundary,
+                window,
+                axis=tuple(axis.axis for axis in self._neighbourhood),
+                writeable=False,
+            )  # type: ignore
         )
 
-        late_bound_constants = dict()
-        for c in self._late_bound_constants:
+        late_bound_constants: dict[
+            Parameter, np.ndarray[tuple[int, ...], np.dtype[F]]
+        ] = dict()
+        for c in self._qoi_expr.late_bound_constants:
             late_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = (
-                late_bound.resolve_ndarray_with_lossless_cast(
-                    c.parameter, data.shape, data.dtype
-                )
+                late_bound.resolve_ndarray_with_lossless_cast(c, data.shape, data.dtype)
             )
             for axis, axis_constant_boundary in zip(
                 self._neighbourhood, constant_boundaries
@@ -666,30 +359,21 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     axis_constant_boundary,
                     axis.axis,
                 )
-            late_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
-                to_float(
-                    sliding_window_view(
-                        late_boundary,
-                        window,
-                        axis=tuple(axis.axis for axis in self._neighbourhood),
-                        writeable=False,
-                    )  # type: ignore
-                )
+            late_windows_float: np.ndarray[tuple[int, ...], np.dtype[F]] = to_float(
+                sliding_window_view(
+                    late_boundary,
+                    window,
+                    axis=tuple(axis.axis for axis in self._neighbourhood),
+                    writeable=False,
+                )  # type: ignore
             )
             late_bound_constants[c] = late_windows_float
 
-        qoi_lambda = compile_sympy_expr_to_numpy(
-            [self._X, *late_bound_constants.keys()],
-            self._qoi_expr,
-            data_windows_float.dtype,
+        return self._qoi_expr.eval(
+            data_windows_float,
+            late_bound_constants,
         )
 
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            return (qoi_lambda)(data_windows_float, *late_bound_constants.values())
-
-    @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -787,12 +471,12 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
         )
 
-        late_bound_constants = dict()
-        for c in self._late_bound_constants:
+        late_bound_constants: dict[
+            Parameter, np.ndarray[tuple[int, ...], np.dtype[np.floating]]
+        ] = dict()
+        for c in self._qoi_expr.late_bound_constants:
             late_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = (
-                late_bound.resolve_ndarray_with_lossless_cast(
-                    c.parameter, data.shape, data.dtype
-                )
+                late_bound.resolve_ndarray_with_lossless_cast(c, data.shape, data.dtype)
             )
             for axis, axis_constant_boundary in zip(
                 self._neighbourhood, constant_boundaries
@@ -817,21 +501,20 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
             late_bound_constants[c] = late_windows_float
 
-        qoi_lambda = compile_sympy_expr_to_numpy(
-            [self._X, *late_bound_constants.keys()],
-            self._qoi_expr,
-            data_windows_float.dtype,
+        qoi_data: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            self._qoi_expr.eval(
+                data_windows_float,
+                late_bound_constants,
+            )
+        )
+        qoi_decoded: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            self._qoi_expr.eval(
+                decoded_windows_float,
+                late_bound_constants,
+            )
         )
 
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            qoi_data = (qoi_lambda)(data_windows_float, *late_bound_constants.values())
-            qoi_decoded = (qoi_lambda)(
-                decoded_windows_float, *late_bound_constants.values()
-            )
-
-        eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
+        eb: np.ndarray[tuple[()] | tuple[int, ...], np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                 self._eb,
                 qoi_data.shape,
@@ -950,12 +633,12 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
         )
 
-        late_bound_constants = dict()
-        for c in self._late_bound_constants:
+        late_bound_constants: dict[
+            Parameter, np.ndarray[tuple[int, ...], np.dtype[np.floating]]
+        ] = dict()
+        for c in self._qoi_expr.late_bound_constants:
             late_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = (
-                late_bound.resolve_ndarray_with_lossless_cast(
-                    c.parameter, data.shape, data.dtype
-                )
+                late_bound.resolve_ndarray_with_lossless_cast(c, data.shape, data.dtype)
             )
             for axis, axis_constant_boundary in zip(
                 self._neighbourhood, constant_boundaries
@@ -980,18 +663,14 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
             late_bound_constants[c] = late_windows_float
 
-        qoi_lambda = compile_sympy_expr_to_numpy(
-            [self._X, *late_bound_constants.keys()],
-            self._qoi_expr,
-            data_windows_float.dtype,
+        data_qoi: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+            self._qoi_expr.eval(
+                data_windows_float,
+                late_bound_constants,
+            )
         )
 
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            data_qoi = (qoi_lambda)(data_windows_float, *late_bound_constants.values())
-
-        eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
+        eb: np.ndarray[tuple[()] | tuple[int, ...], np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                 self._eb,
                 data_qoi.shape,
@@ -1005,7 +684,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         _check_error_bound(self._type, eb)
 
         qoi_lower_upper: tuple[
-            np.ndarray[S, np.dtype[np.floating]], np.ndarray[S, np.dtype[np.floating]]
+            np.ndarray[tuple[int, ...], np.dtype[np.floating]],
+            np.ndarray[tuple[int, ...], np.dtype[np.floating]],
         ] = _apply_finite_qoi_error_bound(
             self._type,
             eb,
@@ -1057,29 +737,13 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 & _isfinite(eb_qoi_upper)
             )
 
-        s = [slice(None)] * data.ndim
-        for axis in self._neighbourhood:
-            if axis.boundary == BoundaryCondition.valid:
-                start = None if axis.before == 0 else axis.before
-                end = None if axis.after == 0 else -axis.after
-                s[axis.axis] = slice(start, end)
-
-        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
-
         # compute the error bound in data space
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            eb_x_lower, eb_x_upper = _compute_data_eb_for_stencil_qoi_eb(
-                self._qoi_expr,
-                self._X,
-                data_windows_float,
-                # not all data points are (valid) data neighbourhood centres
-                data_float[tuple(s)],
-                eb_qoi_lower,
-                eb_qoi_upper,
-                late_bound_constants,
-            )
+        eb_x_lower, eb_x_upper = self._qoi_expr.compute_data_error_bound(
+            eb_qoi_lower,
+            eb_qoi_upper,
+            data_windows_float,
+            late_bound_constants,
+        )
         assert np.all((eb_x_lower <= 0) & _isfinite(eb_x_lower))
         assert np.all((eb_x_upper >= 0) & _isfinite(eb_x_upper))
 
@@ -1104,10 +768,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         # only contribute window elements that are used in the QoI
         window_used = np.zeros(window, dtype=bool)
-        for x in self._qoi_expr.find(sp.tensor.array.expressions.ArrayElement):
-            name, idxs = x.args
-            if name == self._X:
-                window_used[tuple(idxs)] = True
+        for idxs in self._qoi_expr.data_indices:
+            window_used[idxs] = True
 
         # compute the reverse: for each data element, which windows is it in
         # i.e. for each data element, which QoI elements does it contribute to
@@ -1139,6 +801,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     # update the reverse mapping
                     reverse_indices_windows[idx][reverse_indices_counter[idx]] = j
                     reverse_indices_counter[idx] += 1
+
+        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
 
         # flatten the QoI error bounds and append an infinite value,
         # which is indexed if an element did not contribute to the maximum
@@ -1188,178 +852,3 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             type=self._type.name,
             eb=self._eb,
         )
-
-
-@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def _compute_data_eb_for_stencil_qoi_eb(
-    expr: sp.Basic,
-    X: sp.tensor.array.expressions.ArraySymbol,
-    XvN: np.ndarray[
-        tuple[int, ...], np.dtype[F]
-    ],  # np.ndarray[tuple[*Qs, *Ns], np.dtype[F]],
-    Xv: np.ndarray[Qs, np.dtype[F]],
-    tauv_lower: np.ndarray[Qs, np.dtype[F]],
-    tauv_upper: np.ndarray[Qs, np.dtype[F]],
-    late_bound_constants: dict[
-        LateBoundConstant, np.ndarray[tuple[int, ...], np.dtype[F]]
-    ],
-) -> tuple[np.ndarray[Qs, np.dtype[F]], np.ndarray[Qs, np.dtype[F]]]:
-    """
-    Translate an error bound on a derived quantity of interest (QoI) into an
-    error bound on the input data.
-
-    This function checks the computed error bound before returning to correct
-    any rounding errors.
-
-    Parameters
-    ----------
-    expr : sp.Basic
-        Symbolic SymPy expression that defines the QoI.
-    X : sp.tensor.array.expressions.ArraySymbol
-        Symbol for the input data neighbourhood.
-    XvN : np.ndarray[tuple[*Qs, *Ns], np.dtype[F]]
-        Actual values of the input data, with the neighbourhood on the last
-        axis.
-    Xv : np.ndarray[Qs, np.dtype[F]]
-        Actual values of the input data.
-    eb_expr_lower : np.ndarray[Qs, np.dtype[F]]
-        Finite pointwise lower bound on the QoI error, must be negative or
-        zero.
-    eb_expr_upper : np.ndarray[Qs, np.dtype[F]]
-        Finite pointwise upper bound on the QoI error, must be positive or
-        zero.
-    late_bound_constants : dict[LateBoundConstant, np.ndarray[tuple[*Qs, *Ns], np.dtype[F]]]
-        Values of the late-bound constants that are not counted as symbols,
-        with the neighbourhood on the last axis.
-
-    Returns
-    -------
-    eb_x_lower, eb_x_upper : tuple[np.ndarray[Qs, np.dtype[F]], np.ndarray[Qs, np.dtype[F]]]
-        Finite pointwise lower and upper error bound on the input data `x`.
-
-    Inspired by:
-
-    > Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
-    Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
-    Lossy Compression for Scientific Data. *Proceedings of the VLDB Endowment*.
-    16, 4 (December 2022), 697-710. Available from:
-    [doi:10.14778/3574245.3574255](https://doi.org/10.14778/3574245.3574255).
-    """
-
-    tl, tu = compute_data_eb_for_stencil_qoi_eb_unchecked(
-        expr,
-        Xv,
-        tauv_lower,
-        tauv_upper,
-        check_is_x=lambda expr: (
-            expr.func is sp.tensor.array.expressions.ArrayElement
-            and len(expr.args) == 2
-            and expr.args[0] == X
-        ),
-        evaluate_sympy_expr_to_numpy=lambda expr: compile_sympy_expr_to_numpy(
-            [X, *late_bound_constants.keys()], expr, Xv.dtype
-        )(XvN, *late_bound_constants.values()),
-        late_bound_constants=frozenset(late_bound_constants.keys()),
-        compute_data_eb_for_stencil_qoi_eb=lambda expr,
-        Xv,
-        tauv_lower,
-        tauv_upper: _compute_data_eb_for_stencil_qoi_eb(
-            expr,
-            X,
-            XvN,
-            Xv,
-            tauv_lower,
-            tauv_upper,
-            late_bound_constants,
-        ),
-    )
-
-    exprl = compile_sympy_expr_to_numpy(
-        [X, *late_bound_constants.keys()], expr, Xv.dtype
-    )
-    exprv = (exprl)(XvN, *late_bound_constants.values())
-
-    # handle rounding errors in the lower error bound computation
-    tl = ensure_bounded_derived_error(
-        # tl has shape Qs and has XvN (*Qs, *Ns), so their sum has (*Qs, *Ns)
-        #  and evaluating the expression brings us back to Qs
-        lambda tl: np.where(  # type: ignore
-            tl == 0,
-            exprv,
-            (exprl)(
-                XvN + tl.reshape(list(tl.shape) + [1] * (XvN.ndim - tl.ndim)),
-                *late_bound_constants.values(),
-            ),
-        ),
-        exprv,
-        Xv,
-        tl,
-        tauv_lower,
-        tauv_upper,
-    )
-    tu = ensure_bounded_derived_error(
-        # tu has shape Qs and has XvN (*Qs, *Ns), so their sum has (*Qs, *Ns)
-        #  and evaluating the expression brings us back to Qs
-        lambda tu: np.where(  # type: ignore
-            tu == 0,
-            exprv,
-            (exprl)(
-                XvN + tu.reshape(list(tu.shape) + [1] * (XvN.ndim - tu.ndim)),
-                *late_bound_constants.values(),
-            ),
-        ),
-        exprv,
-        Xv,
-        tu,
-        tauv_lower,
-        tauv_upper,
-    )
-
-    return tl, tu
-
-
-# pattern of syntactically weakly valid expressions
-# we only check against forbidden tokens, not for semantic validity
-#  i.e. just enough that it's safe to eval afterwards
-_QOI_KWARG_PATTERN = (
-    r"(?:"
-    + r"|".join(
-        rf"(?:{k}[ ]?=[ ]?)"
-        for k in (
-            "base",
-            "order",
-            "accuracy",
-            "type",
-            "axis",
-            "grid_spacing",
-            "grid_centre",
-            "grid_period",
-        )
-    )
-    + r")"
-)
-_QOI_ATOM_PATTERN = (
-    r"(?:"
-    + r"|".join(
-        rf"(?:{l})"
-        for l in (QOI_INT_LITERAL_PATTERN, QOI_FLOAT_LITERAL_PATTERN)  # noqa: E741
-    )
-    + r"|(?:x)"
-    + r"|(?:X)"
-    + r"|(?:I)"
-    + r"".join(rf"|(?:{c})" for c in MATH_CONSTANTS)
-    + r"".join(rf"|(?:{f})" for f in MATH_FUNCTIONS)
-    + r"".join(rf"|(?:{c})" for c in AMATH_CONSTRUCTORS)
-    + r"".join(rf"|(?:{f})" for f in AMATH_FUNCTIONS)
-    + r"|(?:finite_difference)"
-    + r"".join(rf"|(?:{v})" for v in VARS_FUNCTIONS)
-    + r"".join(
-        rf'|(?:{v}[ ]?\[[ ]?"[\$]?{QOI_IDENTIFIER_PATTERN}"[ ]?\])'
-        for v in ("c", "C", "V")
-    )
-    + r")"
-)
-_QOI_SEPARATOR_PATTERN = r"(?:[ \(\)\[\],:\+\-\*/])"
-_QOI_PATTERN = re.compile(
-    rf"{_QOI_SEPARATOR_PATTERN}*{_QOI_ATOM_PATTERN}(?:{_QOI_SEPARATOR_PATTERN}+{_QOI_KWARG_PATTERN}?{_QOI_ATOM_PATTERN})*{_QOI_SEPARATOR_PATTERN}*"
-)

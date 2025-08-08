@@ -349,7 +349,7 @@ class Interval(Generic[T, N]):
         # copy over the intervals for non-NaN elements
         Lower(self._lower) <= lower[~_isnan(a)] <= Upper(self._upper)
 
-        if not equal_nan:
+        if (not equal_nan) or (not np.any(_isnan(a))):
             # bitwise preserve NaN values
             Lower(a) <= lower[_isnan(a)] <= Upper(a)
             return lower.into_union()

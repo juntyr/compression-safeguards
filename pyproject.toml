@@ -12,15 +12,16 @@ dependencies = [
     "numpy~=2.0",
     "numpy-quaddtype~=0.0.1; sys_platform != 'emscripten'",
     "typing-extensions~=4.6",
-    "sympy~=1.14.0",
+    "sly~=0.5.0",
 ]
 
 [dependency-groups]
 bench = [
+    "earthkit-data~=0.14.0",
     "earthkit-plots~=0.3.1",
-    "numcodecs-wasm~=0.1.6",
+    "numcodecs-wasm~=0.1.7",
     "numcodecs-wasm-sz3~=0.6.0",
-    "numcodecs-wasm-zfp~=0.5.1",
+    "numcodecs-wasm-zfp~=0.5.3",
     "numcodecs-wasm-zstd~=0.3.0",
     "xarray~=2025.4",
     "netcdf4~=1.7.2",
@@ -31,11 +32,14 @@ bench = [
 dev = ["ruff~=0.9"]
 examples = [
     "cdsapi~=0.7.6",
+    "earthkit-data~=0.14.0",
+    "earthkit-plots~=0.3.1",
     "jupyterlab",
-    "numcodecs-wasm~=0.1.6",
+    "numcodecs-wasm~=0.1.7",
+    "numcodecs-wasm-sperr~=0.1.0",
     "numcodecs-wasm-sz3~=0.6.0",
     "numcodecs-wasm-tthresh~=0.2.0",
-    "numcodecs-wasm-zfp-classic~=0.3.1",
+    "numcodecs-wasm-zfp-classic~=0.3.3",
     "xarray~=2025.1",
     "netcdf4~=1.7.2",
     "matplotlib~=3.10.0",
@@ -44,7 +48,7 @@ fuzz = ["atheris~=2.3", "timeoutcontext~=1.2", "setuptools~=80.0"]
 test = [
     "dask~=2025.4",
     "numcodecs-combinators~=0.2.10",
-    "pytest~=8.3",
+    "pytest~=8.4",
     "xarray~=2025.4",
     "zarr~=3.0; python_version >= '3.11'",
     "zarr-any-numcodecs~=0.1.2; python_version >= '3.11'",
@@ -66,7 +70,7 @@ addopts = ["--import-mode=importlib"]
 xfail_strict = true
 
 [[tool.mypy.overrides]]
-module = ["numpy_quaddtype.*", "sympy.*"]
+module = ["numpy_quaddtype.*", "sly.*"]
 follow_untyped_imports = true
 
 [tool.hatch.build.targets.sdist]

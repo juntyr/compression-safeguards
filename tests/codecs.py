@@ -31,12 +31,17 @@ class IdentityCodec(Codec):
 
 
 class NoiseCodec(Codec):
-    __slots__ = ()
+    __slots__ = ("_seed",)
+    _seed: int
 
     codec_id = "noise"  # type: ignore
 
+    def __init__(self, *, seed: int):
+        self._seed = seed
+
     def encode(self, buf):
-        return buf + np.random.normal(scale=0.1, size=buf.shape).astype(buf.dtype)  # noqa: NPY002
+        rng = np.random.Generator(np.random.PCG64(seed=self._seed))
+        return buf + rng.normal(scale=0.1, size=buf.shape).astype(buf.dtype)
 
     def decode(self, buf, out=None):
         return numcodecs.compat.ndarray_copy(buf, out)
@@ -96,7 +101,9 @@ def encode_decode_identity(data: np.ndarray, **kwargs) -> np.ndarray:
 
 
 def encode_decode_noise(data: np.ndarray, **kwargs) -> np.ndarray:
-    codec = SafeguardsCodec(codec=FramedCodecStack(NoiseCodec()), **kwargs)
+    seed = np.random.randint(2**31)  # noqa: NPY002
+    print(f"noise seed = {seed}")
+    codec = SafeguardsCodec(codec=FramedCodecStack(NoiseCodec(seed=seed)), **kwargs)
 
     encoded = codec.encode(data)
     decoded = codec.decode(encoded)

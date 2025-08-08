@@ -88,8 +88,8 @@ def check_empty(qoi: str):
 
 
 def check_unit(qoi: str):
-    check_all_codecs(np.linspace(-1.0, 1.0, 100), qoi, [(0, 0)])
-    check_all_codecs(np.linspace(-1.0, 1.0, 100), qoi, [(1, 1)])
+    check_all_codecs(np.linspace(-1.0, 1.0, 100, dtype=np.float16), qoi, [(0, 0)])
+    check_all_codecs(np.linspace(-1.0, 1.0, 100, dtype=np.float16), qoi, [(1, 1)])
 
 
 def check_circle(qoi: str):
@@ -108,7 +108,7 @@ def check_arange(qoi: str):
 
 
 def check_linspace(qoi: str):
-    data = np.linspace(-1024, 1024, 2831)
+    data = np.linspace(-1024, 1024, 2831, dtype=np.float32)
     check_all_codecs(data, qoi, [(0, 0)])
     check_all_codecs(data, qoi, [(1, 1)])
 
@@ -151,7 +151,7 @@ CHECKS = [
 
 
 def test_sandbox():
-    with pytest.raises(AssertionError, match="invalid QoI expression"):
+    with pytest.raises(AssertionError, match="failed to parse stencil QoI expression"):
         # sandbox escape based on https://stackoverflow.com/q/35804961 and
         #  https://stackoverflow.com/a/35806044
         check_all_codecs(
@@ -172,9 +172,9 @@ def test_empty(check):
 
 
 def test_non_expression():
-    with pytest.raises(AssertionError, match="numeric expression"):
+    with pytest.raises(AssertionError, match="EOF"):
         check_all_codecs(np.empty(0), "exp", [(0, 0)])
-    with pytest.raises(AssertionError, match="invalid QoI expression"):
+    with pytest.raises(AssertionError, match="unexpected token `x`"):
         check_all_codecs(np.empty(0), "e x p", [(0, 0)])
 
 
@@ -198,50 +198,68 @@ def test_comment():
 
 
 def test_variables():
-    with pytest.raises(AssertionError, match="invalid QoI expression"):
+    with pytest.raises(
+        AssertionError,
+        match=r'cannot assign to identifier `a`, assign to a variable V\["a"\] instead',
+    ):
+        check_all_codecs(np.array([]), "a = 4; return a", [(0, 0)])
+    with pytest.raises(
+        AssertionError, match="stencil QoI variables use upper-case `V`"
+    ):
+        check_all_codecs(np.array([]), 'v["a"]', [(0, 0)])
+    with pytest.raises(
+        AssertionError, match='invalid string literal with missing closing `"`'
+    ):
+        check_all_codecs(np.array([]), 'V["a]', [(0, 0)])
+    with pytest.raises(AssertionError, match="invalid quoted parameter"):
         check_all_codecs(np.array([]), 'V["123"]', [(0, 0)])
-    with pytest.raises(AssertionError, match="invalid QoI expression"):
+    with pytest.raises(AssertionError, match="invalid quoted parameter"):
         check_all_codecs(np.array([]), 'V["a 123"]', [(0, 0)])
-    with pytest.raises(AssertionError, match="identifier"):
+    with pytest.raises(
+        AssertionError, match=r"variable name must not be built-in \(start with `\$`\)"
+    ):
         check_all_codecs(np.array([]), 'V["$a"]', [(0, 0)])
-    with pytest.raises(AssertionError, match=r'unresolved variable V\["a"\]'):
+    with pytest.raises(AssertionError, match=r'undefined variable V\["a"\]'):
         check_all_codecs(np.array([]), 'V["a"]', [(0, 0)])
-    with pytest.raises(AssertionError, match=r'unresolved variable V\["b"\]'):
-        check_all_codecs(np.array([]), 'let(V["a"], 3)(x + V["b"])', [(0, 0)])
-    with pytest.raises(AssertionError, match="let name"):
-        check_all_codecs(np.array([]), "let(1, 2)(x)", [(0, 0)])
-    with pytest.raises(AssertionError, match="let value"):
-        check_all_codecs(np.array([]), 'let(V["a"], log)(x + V["a"])', [(0, 0)])
-    with pytest.raises(AssertionError, match="let within"):
-        check_all_codecs(np.array([]), 'let(V["a"], x + 1)(log)', [(0, 0)])
-    with pytest.raises(AssertionError, match=r"fresh \(not overridden\)"):
+    with pytest.raises(AssertionError, match=r'undefined variable V\["b"\]'):
+        check_all_codecs(np.array([]), 'V["a"] = 3; return x + V["b"];', [(0, 0)])
+    with pytest.raises(AssertionError, match="unexpected token `=`"):
+        check_all_codecs(np.array([]), "1 = x", [(0, 0)])
+    with pytest.raises(AssertionError, match=r"expected `\(`"):
+        check_all_codecs(np.array([]), 'V["a"] = log; return x + V["a"];', [(0, 0)])
+    with pytest.raises(
+        AssertionError, match=r'cannot override already-defined variable V\["a"\]'
+    ):
         check_all_codecs(
-            np.array([]), 'let(V["a"], x + 1)(let(V["a"], V["a"])(V["a"]))', [(0, 0)]
+            np.array([]), 'V["a"] = x + 1; V["a"] = V["a"]; return V["a"];', [(0, 0)]
         )
-    with pytest.raises(AssertionError, match="pairs of names and values"):
-        check_all_codecs(
-            np.array([]), 'let(V["a"], x + 1, V["b"])(V["a"] + V["b"])', [(0, 0)]
-        )
-    check_all_codecs(np.array([]), 'let(V["a"], 3)(x + V["a"])', [(0, 0)])
+    check_all_codecs(np.array([]), 'V["a"] = 3; return x + V["a"];', [(0, 0)])
     check_all_codecs(
         np.array([]),
-        'let(V["a"], 3)(x + let(V["b"], V["a"] - 1)(V["b"] * 2))',
+        'V["a"] = 3; V["b"] = V["a"] - 1; return x + (V["b"] * 2);',
         [(0, 0)],
     )
     check_all_codecs(
-        np.array([]), 'let(V["a"], x + 1, V["b"], x - 1)(V["a"] + V["b"])', [(0, 0)]
+        np.array([]),
+        'V["a"] = x + 1; V["b"] = x - 1; return V["a"] + V["b"];',
+        [(0, 0)],
     )
     check_all_codecs(np.array([]), 'c["$x"] * x', [(0, 0)])
 
-    with pytest.raises(AssertionError, match="out of border"):
-        check_all_codecs(np.array([]), 'let(V["a"], X + 1)(V["a"][1])', [(0, 0)])
-    with pytest.raises(AssertionError, match="index greater"):
-        check_all_codecs(np.array([]), 'let(V["a"], X + 1)(V["a"][0,1])', [(0, 0)])
-    check_all_codecs(np.array([]), 'let(V["a"], 3)(X + V["a"])[0]', [(0, 0)])
-    check_all_codecs(np.array([]), 'let(V["a"], X)(V["a"][0])', [(0, 0)])
-    check_all_codecs(np.array([]), 'let(V["a"], X)(V["a"][0,0])', [(0, 0), (0, 0)])
-    check_all_codecs(np.array([]), 'let(V["a"], X)(V["a"][I])', [(0, 0), (0, 0)])
-    check_all_codecs(np.array([]), 'asum(C["$X"] * X)', [(1, 1)])
+    with pytest.raises(
+        AssertionError, match="index 1 is out of bounds for axis 0 with size 1"
+    ):
+        check_all_codecs(np.array([]), 'V["a"] = X + 1; return V["a"][1];', [(0, 0)])
+    with pytest.raises(
+        AssertionError,
+        match="too many indices for array: array is 1-dimensional, but 2 were indexed",
+    ):
+        check_all_codecs(np.array([]), 'V["a"] = X + 1; return V["a"][0,1];', [(0, 0)])
+    check_all_codecs(np.array([]), 'V["a"] = 3; return (X + V["a"])[0];', [(0, 0)])
+    check_all_codecs(np.array([]), 'V["a"] = X; return V["a"][0];', [(0, 0)])
+    check_all_codecs(np.array([]), 'V["a"] = X; return V["a"][0,0];', [(0, 0), (0, 0)])
+    check_all_codecs(np.array([]), 'V["a"] = X; return V["a"][I];', [(0, 0), (0, 0)])
+    check_all_codecs(np.array([]), 'sum(C["$X"] * X)', [(1, 1)])
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -256,42 +274,32 @@ def test_constant(check):
         check("-(-(-e))")
 
 
-@pytest.mark.parametrize("check", CHECKS)
-def test_imaginary(check):
-    with pytest.raises(AssertionError, match="imaginary"):
-        check_all_codecs(
-            np.array([2], dtype=np.uint64), "(-log(-20417, base=ln(x)))", [(0, 0)]
-        )
-    with pytest.raises(AssertionError, match="imaginary"):
-        check("(-log(-20417, base=ln(x)))")
-
-
 def test_invalid_array():
-    with pytest.raises(AssertionError, match="numeric expression"):
-        check_all_codecs(np.empty(0), "A", [(0, 0)])
-    with pytest.raises(AssertionError, match="array constructor"):
-        check_all_codecs(np.empty(0), "A(1)", [(0, 0)])
+    with pytest.raises(AssertionError, match="EOF"):
+        check_all_codecs(np.empty(0), "[[1],", [(0, 0)])
+    with pytest.raises(AssertionError, match="empty array literal"):
+        check_all_codecs(np.empty(0), "[]", [(0, 0)])
 
 
 def test_mean():
     # arithmetic mean
     check_all_codecs(
         np.arange(64, dtype=float).reshape(4, 4, 4),
-        "(X[I+A[-1,0]]+X[I+A[+1,0]]+X[I+A[0,-1]]+X[I+A[0,+1]])/4",
+        "(X[I[0]-1,I[1]]+X[I[0]+1,I[1]]+X[I[0],I[1]-1]+X[I[0],I[1]+1])/4",
         [(1, 1), (1, 1)],
     )
 
     # arithmetic mean using a convolution
     check_all_codecs(
         np.arange(64, dtype=float).reshape(4, 4, 4),
-        "asum(X * A[[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])",
+        "sum(X * [[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])",
         [(1, 1), (1, 1)],
     )
 
     # geometric mean
     check_all_codecs(
         np.arange(64, dtype=float).reshape(4, 4, 4),
-        "(X[I+A[-1,0]]*X[I+A[+1,0]]*X[I+A[0,-1]]*X[I+A[0,+1]])**(1/4)",
+        "(X[I[0]-1,I[1]]*X[I[0]+1,I[1]]*X[I[0],I[1]-1]*X[I[0],I[1]+1])**(1/4)",
         [(1, 1), (1, 1)],
     )
 
@@ -309,7 +317,7 @@ def test_finite_difference():
         "abs",
         0,
     )
-    assert f"{safeguard._qoi_expr}" == "X[4, 4]"
+    assert f"{safeguard._qoi_expr!r}" == "(X[4,4] * 1.0)"
     check_all_codecs(
         data,
         "finite_difference(x,order=0,accuracy=2,type=0,axis=0,grid_spacing=1)",
@@ -322,7 +330,7 @@ def test_finite_difference():
         "abs",
         0,
     )
-    assert f"{safeguard._qoi_expr}" == "NonAssociativeMul(X[4, 4], -1) + X[5, 4]"
+    assert f"{safeguard._qoi_expr!r}" == "(X[4,4] * -1.0 + X[5,4] * 1.0)"
     check_all_codecs(
         data,
         "finite_difference(x,order=1,accuracy=1,type=1,axis=0,grid_spacing=1)",
@@ -335,7 +343,7 @@ def test_finite_difference():
         "abs",
         0,
     )
-    assert f"{safeguard._qoi_expr}" == "NonAssociativeMul(X[3, 4], -1) + X[4, 4]"
+    assert f"{safeguard._qoi_expr!r}" == "(X[4,4] * 1.0 + X[3,4] * -1.0)"
     check_all_codecs(
         data,
         "finite_difference(x,order=1,accuracy=1,type=-1,axis=0,grid_spacing=1)",
@@ -349,8 +357,8 @@ def test_finite_difference():
         0,
     )
     assert (
-        f"{safeguard._qoi_expr}"
-        == "NonAssociativeMul(X[3, 4], -1/2) + NonAssociativeMul(X[5, 4], 1/2)"
+        f"{safeguard._qoi_expr!r}"
+        == "(X[4,4] * -0.0 + X[5,4] * (1 / 2) + X[3,4] * (-1 / 2))"
     )
     check_all_codecs(
         data,
@@ -365,8 +373,8 @@ def test_finite_difference():
         0,
     )
     assert (
-        f"{safeguard._qoi_expr}"
-        == "NonAssociativeMul(X[4, 3], -1/2) + NonAssociativeMul(X[4, 5], 1/2)"
+        f"{safeguard._qoi_expr!r}"
+        == "(X[4,4] * -0.0 + X[4,5] * (1 / 2) + X[4,3] * (-1 / 2))"
     )
     check_all_codecs(
         data,
@@ -380,9 +388,7 @@ def test_finite_difference():
         "abs",
         0,
     )
-    assert (
-        f"{safeguard._qoi_expr}" == "NonAssociativeMul(X[4, 4], -2) + X[3, 4] + X[5, 4]"
-    )
+    assert f"{safeguard._qoi_expr}" == "(X[4,4] * -2.0 + X[5,4] * 1.0 + X[3,4] * 1.0)"
     check_all_codecs(
         data,
         "finite_difference(x,order=2,accuracy=2,type=0,axis=0,grid_spacing=1)",
@@ -396,8 +402,9 @@ def test_finite_difference():
         0,
     )
     assert (
-        f"{safeguard._qoi_expr}"
-        == "NonAssociativeMul(X[2, 4], 1/4) + NonAssociativeMul(X[4, 4], -1/2) + NonAssociativeMul(X[6, 4], 1/4)"
+        f"{safeguard._qoi_expr!r}"
+        # X[2,4] * (1/4) + X[4,4] * (-1/2) + X[6,4] * (1/4)
+        == "((X[4,4] * -0.0 + X[5,4] * (1 / 2) + X[3,4] * (-1 / 2)) * -0.0 + (X[5,4] * -0.0 + X[6,4] * (1 / 2) + X[4,4] * (-1 / 2)) * (1 / 2) + (X[3,4] * -0.0 + X[4,4] * (1 / 2) + X[2,4] * (-1 / 2)) * (-1 / 2))"
     )
     check_all_codecs(
         data,
@@ -412,8 +419,9 @@ def test_finite_difference():
         0,
     )
     assert (
-        f"{safeguard._qoi_expr}"
-        == "NonAssociativeMul(X[3, 3], 1/4) + NonAssociativeMul(X[3, 5], -1/4) + NonAssociativeMul(X[5, 3], -1/4) + NonAssociativeMul(X[5, 5], 1/4)"
+        f"{safeguard._qoi_expr!r}"
+        # X[3,3] * (1/4) + X[3,5] * (-1/4) + X[5,3] * (-1/4) + X[5,5] * (1/4)
+        == "((X[4,4] * -0.0 + X[5,4] * (1 / 2) + X[3,4] * (-1 / 2)) * -0.0 + (X[4,5] * -0.0 + X[5,5] * (1 / 2) + X[3,5] * (-1 / 2)) * (1 / 2) + (X[4,3] * -0.0 + X[5,3] * (1 / 2) + X[3,3] * (-1 / 2)) * (-1 / 2))"
     )
     check_all_codecs(
         data,
@@ -426,14 +434,17 @@ def test_finite_difference_array():
     data = np.arange(5)
     decoded = np.zeros(5)
 
-    with pytest.raises(AssertionError, match="with respect to an array expression"):
+    with pytest.raises(
+        AssertionError,
+        match="expr must be a scalar array element expression, e.g. the centre value, not an array",
+    ):
         encode_decode_mock(
             data,
             decoded,
             safeguards=[
                 dict(
                     kind="qoi_eb_stencil",
-                    qoi="finite_difference(X[1:-1], order=1, accuracy=2, type=0, axis=0, grid_spacing=1)",
+                    qoi="finite_difference(X, order=1, accuracy=2, type=0, axis=0, grid_spacing=1)",
                     neighbourhood=[
                         dict(
                             axis=0,
@@ -473,7 +484,7 @@ def test_finite_difference_constant_grid_spacing():
 
     with pytest.raises(
         AssertionError,
-        match="grid_spacing must be a non-zero finite number or a constant scalar expression",
+        match="grid_spacing must be a constant scalar expression, not an array",
     ):
         safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
             qoi='finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_spacing=C["dx"])',
@@ -570,7 +581,7 @@ def test_finite_difference_arbitrary_grid():
 def test_finite_difference_periodic_grid():
     with pytest.raises(
         AssertionError,
-        match="grid_period must be a positive finite number",
+        match="grid_period must not reference late-bound constants",
     ):
         safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
             qoi='finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_centre=c["i"], grid_period=c["p"])',
@@ -625,6 +636,7 @@ def test_finite_difference_periodic_grid():
 
 
 @pytest.mark.parametrize("dtype", sorted(d.name for d in Safeguards.supported_dtypes()))
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 def test_periodic_delta_transform(dtype):
     def delta_transform(x, period):
         p, q = x, period
@@ -690,30 +702,30 @@ def test_matmul():
     ]
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-        "matmul(A[[-1, -2, -3]], matmul(X, tr(A[[1, 2, 3]])))[0,0]",
+        "matmul([[-1, -2, -3]], matmul(X, [[1, 2, 3]].T))[0,0]",
         valid_3x3_neighbourhood,
         "abs",
         0,
     )
     assert (
-        f"{safeguard._qoi_expr}"
-        == "NonAssociativeMul(X[0, 0], -1) + NonAssociativeMul(X[0, 1], -2) + NonAssociativeMul(X[0, 2], -3) + NonAssociativeMul(X[1, 0], -2) + NonAssociativeMul(X[1, 1], -4) + NonAssociativeMul(X[1, 2], -6) + NonAssociativeMul(X[2, 0], -3) + NonAssociativeMul(X[2, 1], -6) + NonAssociativeMul(X[2, 2], -9)"
+        f"{safeguard._qoi_expr!r}"
+        == "(-1 * (X[0,0] * 1 + X[0,1] * 2 + X[0,2] * 3) + -2 * (X[1,0] * 1 + X[1,1] * 2 + X[1,2] * 3) + -3 * (X[2,0] * 1 + X[2,1] * 2 + X[2,2] * 3))"
     )
     check_all_codecs(
         data,
-        "matmul(A[[-1, -2, -3]], matmul(X, tr(A[[1, 2, 3]])))[0,0]",
+        "matmul([[-1, -2, -3]], matmul(X, [[1, 2, 3]].T))[0,0]",
         [(1, 1), (1, 1)],
     )
 
 
 def test_indexing():
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-        "X[I-1] + X[I+2]",
+        "X[I[0]-1] + X[I[0]+2]",
         [dict(axis=0, before=1, after=4, boundary="valid")],
         "abs",
         0,
     )
-    assert f"{safeguard._qoi_expr}" == "X[0] + X[3]"
+    assert f"{safeguard._qoi_expr!r}" == "X[0] + X[3]"
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "X[I[0]][I[1]]",
@@ -724,7 +736,7 @@ def test_indexing():
         "abs",
         0,
     )
-    assert f"{safeguard._qoi_expr}" == "X[1, 1]"
+    assert f"{safeguard._qoi_expr!r}" == "X[1,1]"
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "X[0][0]",
@@ -735,10 +747,21 @@ def test_indexing():
         "abs",
         0,
     )
-    assert f"{safeguard._qoi_expr}" == "X[0, 0]"
+    assert f"{safeguard._qoi_expr!r}" == "X[0,0]"
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-        "(X[I+A[-1,0]]+X[I+A[+1,0]]+X[I+A[0,-1]]+X[I+A[0,+1]])/4",
+        "(X[I[0]-1,I[1]]+X[I[0]+1,I[1]]+X[I[0],I[1]-1]+X[I[0],I[1]+1])/4",
+        [
+            dict(axis=0, before=1, after=1, boundary="valid"),
+            dict(axis=1, before=1, after=1, boundary="valid"),
+        ],
+        "abs",
+        0,
+    )
+    assert f"{safeguard._qoi_expr}" == "(X[0,1] + X[2,1] + X[1,0] + X[1,2]) / 4"
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "sum(X * [[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])",
         [
             dict(axis=0, before=1, after=1, boundary="valid"),
             dict(axis=1, before=1, after=1, boundary="valid"),
@@ -748,31 +771,13 @@ def test_indexing():
     )
     assert (
         f"{safeguard._qoi_expr}"
-        == "NonAssociativeMul(X[0, 1], 1/4) + NonAssociativeMul(X[1, 0], 1/4) + NonAssociativeMul(X[1, 2], 1/4) + NonAssociativeMul(X[2, 1], 1/4)"
+        == "(X[0,0] * 0.25 + X[0,1] * 0.5 + X[0,2] * 0.25 + X[1,0] * 0.5 + X[1,1] * 1.0 + X[1,2] * 0.5 + X[2,0] * 0.25 + X[2,1] * 0.5 + X[2,2] * 0.25)"
     )
 
+
+def test_evaluate_expr_with_indexing():
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-        "asum(X * A[[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])",
-        [
-            dict(axis=0, before=1, after=1, boundary="valid"),
-            dict(axis=1, before=1, after=1, boundary="valid"),
-        ],
-        "abs",
-        0,
-    )
-    assert (
-        f"{safeguard._qoi_expr}"
-        == "NonAssociativeMul(X[0, 0], 0.25) + NonAssociativeMul(X[0, 1], 0.5) + NonAssociativeMul(X[0, 2], 0.25) + NonAssociativeMul(X[1, 0], 0.5) + NonAssociativeMul(X[1, 1], 1.0) + NonAssociativeMul(X[1, 2], 0.5) + NonAssociativeMul(X[2, 0], 0.25) + NonAssociativeMul(X[2, 1], 0.5) + NonAssociativeMul(X[2, 2], 0.25)"
-    )
-
-
-def test_lambdify_indexing():
-    import inspect
-
-    from compression_safeguards.safeguards._qois.compile import sympy_expr_to_numpy
-
-    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-        "asum(X * A[[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])",
+        "sum(X * [[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])",
         [
             dict(axis=0, before=1, after=1, boundary="valid"),
             dict(axis=1, before=1, after=1, boundary="valid"),
@@ -781,11 +786,10 @@ def test_lambdify_indexing():
         0,
     )
 
-    fn = sympy_expr_to_numpy([safeguard._X], safeguard._qoi_expr, np.dtype(np.float16))
+    Xs = np.round(np.pi * np.arange(9)).reshape(1, 3, 3)
 
-    assert (
-        inspect.getsource(fn)
-        == "def _lambdifygenerated(X):\n    return ((X[..., 0, 0]) * (float16('0.25'))) + ((X[..., 0, 1]) * (float16('0.5'))) + ((X[..., 0, 2]) * (float16('0.25'))) + ((X[..., 1, 0]) * (float16('0.5'))) + ((X[..., 1, 1]) * (float16('1.0'))) + ((X[..., 1, 2]) * (float16('0.5'))) + ((X[..., 2, 0]) * (float16('0.25'))) + ((X[..., 2, 1]) * (float16('0.5'))) + ((X[..., 2, 2]) * (float16('0.25')))\n"
+    assert safeguard._qoi_expr.eval(Xs, dict()) == np.sum(
+        Xs * np.array([[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])
     )
 
 
@@ -1088,17 +1092,29 @@ def test_late_bound_lossless_cast():
 
     with pytest.raises(ValueError, match="cannot losslessly cast"):
         safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(c=np.iinfo(np.int32).max - 1)
+        )
+        safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.int32).max)
         )
     with pytest.raises(ValueError, match="cannot losslessly cast"):
+        safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(c=np.iinfo(np.uint32).max - 1)
+        )
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.uint32).max)
         )
     with pytest.raises(ValueError, match="cannot losslessly cast"):
         safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(c=np.iinfo(np.int64).max - 1)
+        )
+        safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.int64).max)
         )
     with pytest.raises(ValueError, match="cannot losslessly cast"):
+        safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(c=np.iinfo(np.uint64).max - 1)
+        )
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.uint64).max)
         )
@@ -1249,6 +1265,9 @@ def test_late_bound_constant():
         eb=1,
     )
     assert safeguard.late_bound == {"f", "zero"}
+    assert (
+        f"{safeguard._qoi_expr!r}" == 'X[0,0] * C["zero"][1,0] + X[1,0] / C["f"][1,0]'
+    )
 
     data = np.arange(6).reshape(2, 3)
 

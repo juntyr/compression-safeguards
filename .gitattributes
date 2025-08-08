@@ -2,7 +2,14 @@ bench/era5_t2m_2012_12_01_14:00.nc filter=lfs diff=lfs merge=lfs -text
 bench/era5_tp_2024_08_02_10:00.nc filter=lfs diff=lfs merge=lfs -text
 bench/era5_o3_pv_2024_08_02_12:00.nc filter=lfs diff=lfs merge=lfs -text
 
+examples/data/cems-ercnfdr/data.grib filter=lfs diff=lfs merge=lfs -text
+examples/data/era5-lh/data.nc filter=lfs diff=lfs merge=lfs -text
+examples/data/era5-pr/data.nc filter=lfs diff=lfs merge=lfs -text
+examples/data/era5-q/data.nc filter=lfs diff=lfs merge=lfs -text
+examples/data/era5-uv/data.nc filter=lfs diff=lfs merge=lfs -text
 examples/data/hoaps-c.r30.h06.wvpa.2020-08/data.nc filter=lfs diff=lfs merge=lfs -text
+examples/data/obs-pr/belem.csv filter=lfs diff=lfs merge=lfs
+examples/data/obs-pr/helsinki.csv filter=lfs diff=lfs merge=lfs
 
 bench/* linguist-vendored
 docs/js/* linguist-vendored

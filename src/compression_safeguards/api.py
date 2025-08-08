@@ -184,7 +184,7 @@ class Safeguards:
         """
 
         assert data.dtype in _SUPPORTED_DTYPES, (
-            f"can only safeguard arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
+            f"can only safeguard arrays of dtype {', '.join(d.name for d in _SUPPORTED_DTYPES)}"
         )
 
         if len(self._stencil_safeguards) > 0:
@@ -327,6 +327,7 @@ _SUPPORTED_DTYPES: frozenset[np.dtype] = frozenset(
         np.dtype(np.uint16),
         np.dtype(np.uint32),
         np.dtype(np.uint64),
+        np.dtype(np.float16),
         np.dtype(np.float32),
         np.dtype(np.float64),
     }

@@ -3,6 +3,7 @@ mkdocstrings[python]
 mkdocs-exclude
 mkdocstrings-python-generator==1.0.0rc1
 mkdocs-open-in-new-tab
+mkdocs-jupyter
 
 Pygments
 

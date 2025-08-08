@@ -371,7 +371,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         )
 
         assert data.dtype in Safeguards.supported_dtypes(), (
-            f"can only encode arrays of dtype {', '.join(d.str for d in Safeguards.supported_dtypes())}"
+            f"can only encode arrays of dtype {', '.join(d.name for d in Safeguards.supported_dtypes())}"
         )
 
         encoded = self._codec.encode(np.copy(data))
@@ -431,7 +431,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             late_bound = late_bound.update(
                 **{
                     "$x_min": np.nanmin(data)
-                    if data.size > 0
+                    if data.size > 0 and not np.all(np.isnan(data))
                     else np.array(0, dtype=data.dtype)
                 }
             )
@@ -439,7 +439,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             late_bound = late_bound.update(
                 **{
                     "$x_max": np.nanmax(data)
-                    if data.size > 0
+                    if data.size > 0 and not np.all(np.isnan(data))
                     else np.array(0, dtype=data.dtype)
                 }
             )
