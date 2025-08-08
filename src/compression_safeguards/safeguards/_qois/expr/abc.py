@@ -9,17 +9,26 @@ from .typing import F, Ns, Ps, PsI
 
 
 class Expr:
+    """
+    Abstract base class for the quantity of interest expression abstract syntax
+    tree.
+    """
+
     __slots__ = ()
 
     @property
     @abstractmethod
     def has_data(self) -> bool:
-        pass
+        """
+        Does this expression reference the data `x` or `X[i]`?
+        """
 
     @property
     @abstractmethod
     def data_indices(self) -> frozenset[tuple[int, ...]]:
-        pass
+        """
+        The set of data indices `X[is]` that this expression uses.
+        """
 
     @abstractmethod
     def apply_array_element_offset(
@@ -27,16 +36,47 @@ class Expr:
         axis: int,
         offset: int,
     ) -> "Expr":
-        pass
+        """
+        Apply an `offset` to the array element indices along the given `axis`.
+
+        This method applies to data and late-bound constants.
+
+        Parameters
+        ----------
+        axis : int
+            The axis along which the array element indices are offset.
+        offset : int
+            The offset that is applied to the array element indices.
+
+        Returns
+        -------
+        expr : Expr
+            The modified expression.
+        """
 
     @property
     @abstractmethod
     def late_bound_constants(self) -> frozenset[Parameter]:
-        pass
+        """
+        The set of late-bound constant parameters that this expression uses.
+        """
 
     @abstractmethod
     def constant_fold(self, dtype: np.dtype[F]) -> F | "Expr":
-        pass
+        """
+        Apply scalar constant folding for the given `dtype` to this expression.
+
+        Parameters
+        ----------
+        dtype : np.dtype[F]
+            The dtype for which constant expressions are evaluated and folded.
+
+        Returns
+        -------
+        folded : F | Expr
+            The constant-folded scalar number or expression, which may have
+            been simplified.
+        """
 
     @abstractmethod
     def eval(
@@ -45,7 +85,25 @@ class Expr:
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
-        pass
+        """
+        Evaluate this expression on the stencil-extended data `Xs`.
+
+        Parameters
+        ----------
+        x : PsI
+            The shape of the pointwise data.
+        Xs : np.ndarray[Ns, np.dtype[F]]
+            The stencil-extended data, in floating point format, which must be
+            of shape [...PsI, ...stencil_shape].
+        late_bound : Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]]
+            The late-bound constants parameters for this expression, with the
+            same shape and floating point dtype as the stencil-extended data.
+
+        Returns
+        -------
+        vals : np.ndarray[PsI, np.dtype[F]]
+            The pointwise expression values.
+        """
 
     @abstractmethod
     def compute_data_error_bound_unchecked(
@@ -56,7 +114,40 @@ class Expr:
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        pass
+        """
+        Compute the lower-upper error bound on the stencil-extended data `Xs`
+        that satisfies the lower-upper error bounds `eb_expr_lower` and
+        `eb_expr_lower` on this expression.
+
+        This method is allowed to return slightly wrongly-rounded results
+        that are then corrected by
+        [`compute_data_error_bound`][compression_safeguards.safeguards._qois.expr.abc.Expr.compute_data_error_bound].
+
+        Parameters
+        ----------
+        eb_expr_lower : np.ndarray[Ps, np.dtype[F]]
+            The pointwise lower bound on the error on this expression.
+        eb_expr_upper : np.ndarray[Ps, np.dtype[F]]
+            The pointwise upper bound on the error on this expression.
+        X : np.ndarray[Ps, np.dtype[F]]
+            The pointwise data, in floating point format, which must be
+            of shape Ps.
+        Xs : np.ndarray[Ps, np.dtype[F]]
+            The stencil-extended data, in floating point format, which must be
+            of shape [...Ps, ...stencil_shape].
+        late_bound : Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]]
+            The late-bound constants parameters for this expression, with the
+            same shape and floating point dtype as the stencil-extended data.
+
+        Returns
+        -------
+        eb_X_lower, eb_X_upper : tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]
+            The pointwise lower and upper bounds on the error on the data `X`.
+
+            The error bounds have not yet reduced across neighbouring points
+            that contribute to the same expression points and thus need combine
+            their error bounds.
+        """
 
     def compute_data_error_bound(
         self,
@@ -66,6 +157,47 @@ class Expr:
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
+        """
+        Compute the lower-upper error bound on the stencil-extended data `Xs`
+        that satisfies the lower-upper error bounds `eb_expr_lower` and
+        `eb_expr_lower` on this expression.
+
+        This method, by default, calls into
+        [`compute_data_error_bound_unchecked`][compression_safeguards.safeguards._qois.expr.abc.Expr.compute_data_error_bound_unchecked]
+        and then applies extensive rounding checks to ensure that the returned
+        error bounds satisfy the error bounds on this expression.
+
+        If an implementation of
+        [`compute_data_error_bound_unchecked`][compression_safeguards.safeguards._qois.expr.abc.Expr.compute_data_error_bound_unchecked]
+        is known to have no rounding errors, this default implementation can be
+        overridden to forward its results without further rounding checks.
+
+        Parameters
+        ----------
+        eb_expr_lower : np.ndarray[Ps, np.dtype[F]]
+            The pointwise lower bound on the error on this expression.
+        eb_expr_upper : np.ndarray[Ps, np.dtype[F]]
+            The pointwise upper bound on the error on this expression.
+        X : np.ndarray[Ps, np.dtype[F]]
+            The pointwise data, in floating point format, which must be
+            of shape Ps.
+        Xs : np.ndarray[Ps, np.dtype[F]]
+            The stencil-extended data, in floating point format, which must be
+            of shape [...Ps, ...stencil_shape].
+        late_bound : Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]]
+            The late-bound constants parameters for this expression, with the
+            same shape and floating point dtype as the stencil-extended data.
+
+        Returns
+        -------
+        eb_X_lower, eb_X_upper : tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]
+            The pointwise lower and upper bounds on the error on the data `X`.
+
+            The error bounds have not yet reduced across neighbouring points
+            that contribute to the same expression points and thus need combine
+            their error bounds.
+        """
+
         tl: np.ndarray[Ps, np.dtype[F]]
         tu: np.ndarray[Ps, np.dtype[F]]
         tl, tu = self.compute_data_error_bound_unchecked(

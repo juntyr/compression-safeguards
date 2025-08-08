@@ -1,3 +1,5 @@
+__all__ = ["PointwiseQuantityOfInterest", "StencilQuantityOfInterest"]
+
 from collections.abc import Mapping, Set
 
 import numpy as np
@@ -17,6 +19,16 @@ from .parser import QoIParser
 
 
 class PointwiseQuantityOfInterest:
+    """
+    Pointwise quantity of interest, which handles parsing, evaluation, and
+    error bound propagation for the QoI expression.
+
+    Parameters
+    ----------
+    qoi : PointwiseQuantityOfInterestExpression
+        The pointwise quantity of interest in [`str`][str]ing form.
+    """
+
     __slots__ = ("_expr", "_late_bound_constants")
     _expr: Expr
     _late_bound_constants: frozenset[Parameter]
@@ -54,6 +66,10 @@ class PointwiseQuantityOfInterest:
 
     @property
     def late_bound_constants(self) -> Set[Parameter]:
+        """
+        The set of late-bound constant parameters that this QoI uses.
+        """
+
         return self._late_bound_constants
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -62,6 +78,23 @@ class PointwiseQuantityOfInterest:
         X: np.ndarray[Ps, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ps, np.dtype[F]]],
     ) -> np.ndarray[Ps, np.dtype[F]]:
+        """
+        Evaluate this pointwise quantity of interest on the data `X`.
+
+        Parameters
+        ----------
+        X : np.ndarray[Ps, np.dtype[F]]
+            The pointwise data, in floating point format.
+        late_bound : Mapping[Parameter, np.ndarray[Ps, np.dtype[F]]]
+            The late-bound constants parameters for this QoI, with the same
+            shape and floating point dtype as the data.
+
+        Returns
+        -------
+        qoi : np.ndarray[Ps, np.dtype[F]]
+            The pointwise quantity of interest values.
+        """
+
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, X.dtype)
         return expr.eval(X.shape, X, late_bound)
 
@@ -73,6 +106,28 @@ class PointwiseQuantityOfInterest:
         X: np.ndarray[Ps, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ps, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
+        """
+        Compute the lower-upper error bound on the data `X` that satisfies the
+        lower-upper error bounds `eb_qoi_lower` and `eb_qoi_lower` on the QoI.
+
+        Parameters
+        ----------
+        eb_qoi_lower : np.ndarray[Ps, np.dtype[F]]
+            The pointwise lower bound on the error on the QoI.
+        eb_qoi_upper : np.ndarray[Ps, np.dtype[F]]
+            The pointwise upper bound on the error on the QoI.
+        X : np.ndarray[Ps, np.dtype[F]]
+            The pointwise data, in floating point format.
+        late_bound : Mapping[Parameter, np.ndarray[Ps, np.dtype[F]]]
+            The late-bound constants parameters for this QoI, with the same
+            shape and floating point dtype as the data.
+
+        Returns
+        -------
+        eb_X_lower, eb_X_upper : tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]
+            The pointwise lower and upper bounds on the error on the data `X`.
+        """
+
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, X.dtype)
         return expr.compute_data_error_bound(
             eb_qoi_lower, eb_qoi_upper, X, X, late_bound
@@ -83,6 +138,20 @@ class PointwiseQuantityOfInterest:
 
 
 class StencilQuantityOfInterest:
+    """
+    Stencil quantity of interest, which handles parsing, evaluation, and
+    error bound propagation for the QoI expression.
+
+    Parameters
+    ----------
+    qoi : StencilQuantityOfInterestExpression
+        The stencil quantity of interest in [`str`][str]ing form.
+    stencil_shape : tuple[int, ...]
+        The shape of the stencil neighbourhood.
+    stencil_I : tuple[int, ...]
+        The index `I` for the centre of the stencil neighbourhood.
+    """
+
     __slots__ = ("_expr", "_stencil_shape", "_stencil_I", "_late_bound_constants")
     _expr: Expr
     _stencil_shape: tuple[int, ...]
@@ -139,10 +208,18 @@ class StencilQuantityOfInterest:
 
     @property
     def late_bound_constants(self) -> Set[Parameter]:
+        """
+        The set of late-bound constant parameters that this QoI uses.
+        """
+
         return self._late_bound_constants
 
     @property
     def data_indices(self) -> Set[tuple[int, ...]]:
+        """
+        The set of data stencil indices `X[is]` that this QoI uses.
+        """
+
         return self._expr.data_indices
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -151,6 +228,25 @@ class StencilQuantityOfInterest:
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[Ps, np.dtype[F]]:
+        """
+        Evaluate this stencil quantity of interest on the stencil-extended data
+        `Xs`.
+
+        Parameters
+        ----------
+        Xs : np.ndarray[Ns, np.dtype[F]]
+            The stencil-extended data, in floating point format, which must be
+            of shape [...Ps, ...stencil_shape].
+        late_bound : Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]]
+            The late-bound constants parameters for this QoI, with the same
+            shape and floating point dtype as the stencil-extended data.
+
+        Returns
+        -------
+        qoi : np.ndarray[Ps, np.dtype[F]]
+            The pointwise quantity of interest values.
+        """
+
         X_shape: Ps = Xs.shape[: -len(self._stencil_shape)]  # type: ignore
         stencil_shape = Xs.shape[-len(self._stencil_shape) :]
         assert stencil_shape == self._stencil_shape
@@ -165,6 +261,34 @@ class StencilQuantityOfInterest:
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
+        """
+        Compute the lower-upper error bound on the stencil-extended data `Xs`
+        that satisfies the lower-upper error bounds `eb_qoi_lower` and
+        `eb_qoi_lower` on the QoI.
+
+        Parameters
+        ----------
+        eb_qoi_lower : np.ndarray[Ps, np.dtype[F]]
+            The pointwise lower bound on the error on the QoI.
+        eb_qoi_upper : np.ndarray[Ps, np.dtype[F]]
+            The pointwise upper bound on the error on the QoI.
+        Xs : np.ndarray[Ps, np.dtype[F]]
+            The stencil-extended data, in floating point format, which must be
+            of shape [...Ps, ...stencil_shape].
+        late_bound : Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]]
+            The late-bound constants parameters for this QoI, with the same
+            shape and floating point dtype as the stencil-extended data.
+
+        Returns
+        -------
+        eb_X_lower, eb_X_upper : tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]
+            The pointwise lower and upper bounds on the error on the data `X`.
+
+            The error bounds have not yet reduced across neighbouring points
+            that contribute to the same QoI points and thus need combine their
+            error bounds.
+        """
+
         X_shape, stencil_shape = (
             Xs.shape[: -len(self._stencil_shape)],
             Xs.shape[-len(self._stencil_shape) :],
