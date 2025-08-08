@@ -49,9 +49,11 @@ class QoILexer(Lexer):
         # logarithms and exponentials
         LN,  # type: ignore[name-defined]  # noqa: F821
         LOG2,  # type: ignore[name-defined]  # noqa: F821
+        LOG10,  # type: ignore[name-defined]  # noqa: F821
         LOG,  # type: ignore[name-defined]  # noqa: F821
         EXP,  # type: ignore[name-defined]  # noqa: F821
         EXP2,  # type: ignore[name-defined]  # noqa: F821
+        EXP10,  # type: ignore[name-defined]  # noqa: F821
         # exponentiation
         SQRT,  # type: ignore[name-defined]  # noqa: F821
         SQUARE,  # type: ignore[name-defined]  # noqa: F821
@@ -145,7 +147,7 @@ class QoILexer(Lexer):
     # operators
     PLUS = r"\+"
     MINUS = r"-"
-    POWER = r"\*\*"
+    POWER = r"\*\*"  # comes before TIMES so as to not parse ** as TIMES TIMES
     TIMES = r"\*"
     DIVIDE = r"/"
     EQUAL = r"="
@@ -188,9 +190,11 @@ class QoILexer(Lexer):
     # logarithms and exponentials
     ID["ln"] = LN  # type: ignore[index, name-defined]  # noqa: F821
     ID["log2"] = LOG2  # type: ignore[index, name-defined]  # noqa: F821
+    ID["log10"] = LOG10  # type: ignore[index, name-defined]  # noqa: F821
     ID["log"] = LOG  # type: ignore[index, name-defined]  # noqa: F821
     ID["exp"] = EXP  # type: ignore[index, name-defined]  # noqa: F821
     ID["exp2"] = EXP2  # type: ignore[index, name-defined]  # noqa: F821
+    ID["exp10"] = EXP10  # type: ignore[index, name-defined]  # noqa: F821
     # exponentiation
     ID["sqrt"] = SQRT  # type: ignore[index, name-defined]  # noqa: F821
     ID["square"] = SQUARE  # type: ignore[index, name-defined]  # noqa: F821
@@ -260,11 +264,8 @@ class QoILexer(Lexer):
     def with_error_context(self, t, message, exception=Exception):
         try:
             yield
-        except exception as err:
-            if callable(message):
-                self.raise_error(t, message(err))
-            else:
-                self.raise_error(t, message)
+        except exception:
+            self.raise_error(t, message)
 
     def find_column(self, token):
         last_cr = self.text.rfind("\n", 0, token.index)
@@ -317,12 +318,15 @@ class QoILexer(Lexer):
             # logarithms and exponentials
             "LN": "`ln`",
             "LOG2": "`log2`",
+            "LOG10": "`log10`",
             "LOG": "`log`",
             "EXP": "`exp`",
             "EXP2": "`exp2`",
+            "EXP10": "`exp10`",
             # exponentiation
             "SQRT": "`sqrt`",
             "SQUARE": "`square`",
+            "RECIPROCAL": "`reciprocal`",
             # absolute value
             "ABS": "`abs`",
             # sign and rounding

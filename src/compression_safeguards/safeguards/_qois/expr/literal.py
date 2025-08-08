@@ -80,8 +80,7 @@ class Number(Expr):
         return frozenset()
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        # FIXME: what about folding integers?
-        return dtype.type(self._n)  # type: ignore
+        return dtype.type(self._n)
 
     def eval(
         self,
@@ -89,7 +88,8 @@ class Number(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
-        return Xs.dtype.type(self._n)  # type: ignore
+        n: F = Xs.dtype.type(self._n)
+        return np.broadcast_to(n, x)  # type: ignore
 
     def compute_data_error_bound_unchecked(
         self,
@@ -191,9 +191,8 @@ class Pi(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
-        if Xs.dtype == _float128_dtype:
-            return _float128_pi  # type: ignore
-        return Xs.dtype.type(np.pi)  # type: ignore
+        pi: F = _float128_pi if Xs.dtype == _float128_dtype else Xs.dtype.type(np.pi)  # type: ignore
+        return np.broadcast_to(pi, x)  # type: ignore
 
     def compute_data_error_bound_unchecked(
         self,
@@ -242,9 +241,8 @@ class Euler(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
-        if Xs.dtype == _float128_dtype:
-            return _float128_pi  # type: ignore
-        return Xs.dtype.type(np.e)  # type: ignore
+        e: F = _float128_e if Xs.dtype == _float128_dtype else Xs.dtype.type(np.e)  # type: ignore
+        return np.broadcast_to(e, x)  # type: ignore
 
     def compute_data_error_bound_unchecked(
         self,

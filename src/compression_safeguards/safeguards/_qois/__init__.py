@@ -9,7 +9,7 @@ from ..qois import (
 )
 from .expr.abc import Expr
 from .expr.array import Array
-from .expr.constfold import FoldedScalarConst
+from .expr.constfold import ScalarFoldedConstant
 from .expr.data import Data
 from .expr.typing import F, Ns, Ps
 from .lexer import QoILexer
@@ -39,7 +39,7 @@ class PointwiseQuantityOfInterest:
         ):
             # check if the expression is well-formed and if an error bound can
             #  be computed
-            _canary_data_eb = FoldedScalarConst.constant_fold_expr(
+            _canary_data_eb = ScalarFoldedConstant.constant_fold_expr(
                 expr, np.dtype(np.float64)
             ).compute_data_error_bound(
                 np.empty(0, dtype=np.float64),
@@ -62,7 +62,7 @@ class PointwiseQuantityOfInterest:
         X: np.ndarray[Ps, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ps, np.dtype[F]]],
     ) -> np.ndarray[Ps, np.dtype[F]]:
-        expr = FoldedScalarConst.constant_fold_expr(self._expr, X.dtype)
+        expr = ScalarFoldedConstant.constant_fold_expr(self._expr, X.dtype)
         return expr.eval(X.shape, X, late_bound)
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -73,7 +73,7 @@ class PointwiseQuantityOfInterest:
         X: np.ndarray[Ps, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ps, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        expr = FoldedScalarConst.constant_fold_expr(self._expr, X.dtype)
+        expr = ScalarFoldedConstant.constant_fold_expr(self._expr, X.dtype)
         return expr.compute_data_error_bound(
             eb_qoi_lower, eb_qoi_upper, X, X, late_bound
         )
@@ -121,7 +121,7 @@ class StencilQuantityOfInterest:
         ):
             # check if the expression is well-formed and if an error bound can
             #  be computed
-            _canary_data_eb = FoldedScalarConst.constant_fold_expr(
+            _canary_data_eb = ScalarFoldedConstant.constant_fold_expr(
                 expr, np.dtype(np.float64)
             ).compute_data_error_bound(
                 np.empty((0,), dtype=np.float64),
@@ -154,7 +154,7 @@ class StencilQuantityOfInterest:
         X_shape: Ps = Xs.shape[: -len(self._stencil_shape)]  # type: ignore
         stencil_shape = Xs.shape[-len(self._stencil_shape) :]
         assert stencil_shape == self._stencil_shape
-        expr = FoldedScalarConst.constant_fold_expr(self._expr, Xs.dtype)
+        expr = ScalarFoldedConstant.constant_fold_expr(self._expr, Xs.dtype)
         return expr.eval(X_shape, Xs, late_bound)
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -172,7 +172,7 @@ class StencilQuantityOfInterest:
         assert X_shape == eb_qoi_lower.shape
         assert stencil_shape == self._stencil_shape
         X: np.ndarray[Ps, np.dtype[F]] = Xs[(...,) + self._stencil_I]  # type: ignore
-        expr = FoldedScalarConst.constant_fold_expr(self._expr, Xs.dtype)
+        expr = ScalarFoldedConstant.constant_fold_expr(self._expr, Xs.dtype)
         return expr.compute_data_error_bound(
             eb_qoi_lower, eb_qoi_upper, X, Xs, late_bound
         )

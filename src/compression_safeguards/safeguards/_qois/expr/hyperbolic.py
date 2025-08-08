@@ -8,7 +8,7 @@ from ....utils.bindings import Parameter
 from ....utils.cast import _float128_dtype, _reciprocal
 from .abc import Expr
 from .addsub import ScalarAdd, ScalarSubtract
-from .constfold import FoldedScalarConst
+from .constfold import ScalarFoldedConstant
 from .divmul import ScalarDivide, ScalarMultiply
 from .literal import Number
 from .logexp import Exponential, Logarithm, ScalarExp, ScalarLog
@@ -66,7 +66,7 @@ class ScalarHyperbolic(Expr):
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         if dtype == _float128_dtype:
             return (HYPERBOLIC_REWRITE[self._func])(self._a).constant_fold(dtype)
-        return FoldedScalarConst.constant_fold_unary(
+        return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
             HYPERBOLIC_UFUNC[self._func],  # type: ignore

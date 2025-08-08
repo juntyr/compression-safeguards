@@ -7,7 +7,7 @@ derivative, or apply a smoothing kernel. In these cases, we often want to
 safeguard not just properties on the data but also on these derived quantities
 of interest (QoIs).
 
-The `compression-safeguards` provides the
+The `compression-safeguards` package provides the
 [`PointwiseQuantityOfInterestErrorBoundSafeguard`][compression_safeguards.safeguards.pointwise.qoi.eb.PointwiseQuantityOfInterestErrorBoundSafeguard]
 and
 [`StencilQuantityOfInterestErrorBoundSafeguard`][compression_safeguards.safeguards.stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard]
@@ -148,9 +148,11 @@ index =
 functions =
     "ln", "(", expr, [","], ")"  (* natural logarithm *)
   | "log2", "(", expr, [","], ")"  (* binary logarithm *)
+  | "log10", "(", expr, [","], ")"  (* decimal logarithm *)
   | "log", "(", expr, ",", "base", "=", expr, [","], ")"  (* logarithm with arbitrary base *)
   | "exp", "(", expr, [","], ")"  (* exponential e^x *)
   | "exp2", "(", expr, [","], ")"  (* binary exponentiation 2^x *)
+  | "exp10", "(", expr, [","], ")"  (* decimal exponentiation 10^x *)
   | "sqrt", "(", expr, [","], ")"  (* square root *)
   | "square", "(", expr, [","], ")"  (* square x^2 *)
   | "reciprocal", "(", expr, [","], ")"  (* reciprocal 1/x *)
@@ -255,7 +257,7 @@ provided:
 Since (true) division (left associative) in Python always produces a floating
 point number, even for `a / 1`, division does not perform symbolic integer
 constant-folding in general. However, if for `a / b` both `a` and `b` are
-integers and have a greatest common denominator / factor d, i.e. `a = g * c`
+integers and have a greatest common denominator / factor g, i.e. `a = g * c`
 and `b = g * d`, the division is symbolically simplified to `c / d`.
 Furthermore, `a / 1` is evaluated to `a.0` and `a / -1` to `-a.0`. Since `a.0`
 is a floating point literal, symbolic integer constant folding stops there.
@@ -300,9 +302,11 @@ The operators and functions in the above QoI grammar are evaluated using
 | `a ** b` | `np.power` |
 | `ln` | `np.log` |
 | `log2` | `np.log2` |
+| `log10` | `np.log10` |
 | `log(a, base=b)` | `np.divide(np.log(a), np.log(b))` |
 | `exp` | `np.exp` |
 | `exp2` | `np.exp2` |
+| `exp10` | `np.power(10, a)` |
 | `sqrt` | `np.sqrt` |
 | `square` | `np.square` |
 | `reciprocal` | `np.reciprocal` |

@@ -147,12 +147,15 @@ def generate_parameter(
             # logarithms and exponentials
             "ln": 1,
             "log2": 1,
+            "log10": 1,
             "log": 2,
             "exp": 1,
             "exp2": 1,
+            "exp10": 1,
             # exponentiation
             "sqrt": 1,
             "square": 1,
+            "reciprocal": 1,
             # absolute value
             "abs": 1,
             # sign and rounding

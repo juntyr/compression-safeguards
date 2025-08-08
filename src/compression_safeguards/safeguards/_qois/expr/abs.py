@@ -6,7 +6,7 @@ from ....utils.bindings import Parameter
 from ....utils.cast import _nan_to_zero_inf_to_finite
 from ..eb import ensure_bounded_derived_error
 from .abc import Expr
-from .constfold import FoldedScalarConst
+from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
 
 
@@ -39,7 +39,9 @@ class ScalarAbs(Expr):
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.abs, ScalarAbs)
+        return ScalarFoldedConstant.constant_fold_unary(
+            self._a, dtype, np.abs, ScalarAbs
+        )
 
     def eval(
         self,

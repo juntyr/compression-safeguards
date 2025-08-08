@@ -14,7 +14,7 @@ from ....utils.cast import (
 from ..eb import ensure_bounded_derived_error
 from .abc import Expr
 from .addsub import ScalarAdd, ScalarSubtract
-from .constfold import FoldedScalarConst
+from .constfold import ScalarFoldedConstant
 from .divmul import ScalarDivide
 from .literal import Number, Pi
 from .reciprocal import ScalarReciprocal
@@ -51,7 +51,9 @@ class ScalarSin(Expr):
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(self._a, dtype, np.sin, ScalarSin)
+        return ScalarFoldedConstant.constant_fold_unary(
+            self._a, dtype, np.sin, ScalarSin
+        )
 
     def eval(
         self,
@@ -179,7 +181,7 @@ class ScalarAsin(Expr):
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(
+        return ScalarFoldedConstant.constant_fold_unary(
             self._a, dtype, np.asin, ScalarAsin
         )
 
@@ -318,7 +320,7 @@ class ScalarTrigonometric(Expr):
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(
+        return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
             TRIGONOMETRIC_UFUNC[self._func],  # type: ignore

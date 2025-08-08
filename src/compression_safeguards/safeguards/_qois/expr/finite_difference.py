@@ -9,7 +9,7 @@ from ....utils.bindings import Parameter
 from ....utils.cast import _symmetric_modulo
 from .abc import Expr
 from .addsub import ScalarSubtract
-from .constfold import FoldedScalarConst
+from .constfold import ScalarFoldedConstant
 from .divmul import ScalarDivide, ScalarMultiply
 from .group import Group
 from .literal import Number
@@ -49,7 +49,7 @@ class ScalarSymmetricModulo(Expr):
         return self._a.late_bound_constants | self._b.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:  # type: ignore
-        return FoldedScalarConst.constant_fold_binary(
+        return ScalarFoldedConstant.constant_fold_binary(
             self._a,
             self._b,
             dtype,
@@ -140,6 +140,9 @@ def finite_difference_coefficients(
     a: tuple[Expr, ...] = offsets
     N: int = len(a) - 1
 
+    # we explicitly the coefficient fraction into numerator and denominator
+    #  expressions to delay the division for as long as possible, which allows
+    #  more symbolic integer constant folding to occur
     coeffs_num: dict[tuple[int, int, int], Expr] = {
         (0, 0, 0): Number.ONE,
     }

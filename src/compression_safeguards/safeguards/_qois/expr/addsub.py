@@ -7,7 +7,8 @@ from ....utils.bindings import Parameter
 from ....utils.cast import _nan_to_zero_inf_to_finite
 from ..eb import ensure_bounded_derived_error
 from .abc import Expr
-from .constfold import FoldedScalarConst
+from .abs import ScalarAbs
+from .constfold import ScalarFoldedConstant
 from .literal import Number
 from .typing import F, Ns, Ps, PsI
 
@@ -49,7 +50,7 @@ class ScalarAdd(Expr):
         return self._a.late_bound_constants | self._b.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_binary(
+        return ScalarFoldedConstant.constant_fold_binary(
             self._a, self._b, dtype, np.add, ScalarAdd
         )
 
@@ -128,7 +129,7 @@ class ScalarSubtract(Expr):
         return self._a.late_bound_constants | self._b.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_binary(
+        return ScalarFoldedConstant.constant_fold_binary(
             self._a, self._b, dtype, np.subtract, ScalarSubtract
         )
 
@@ -200,9 +201,7 @@ class SumTerm:
 
     @staticmethod
     def get_expr_left_associative_abs_factor_approximate(expr: Expr) -> None | Expr:
-        from .abs import ScalarAbs
         from .divmul import ScalarDivide, ScalarMultiply
-        from .literal import Number
 
         if not expr.has_data:
             return None
@@ -256,13 +255,9 @@ class SumTerm:
                 term._expr
             )
             is_adds.append(term._is_add)
-            termvs.append(
-                np.broadcast_to(term._expr.eval(X.shape, Xs, late_bound), X.shape)
-            )
+            termvs.append(term._expr.eval(X.shape, Xs, late_bound))
             abs_factorvs.append(
-                None
-                if abs_factor is None
-                else np.broadcast_to(abs_factor.eval(X.shape, Xs, late_bound), X.shape)
+                None if abs_factor is None else abs_factor.eval(X.shape, Xs, late_bound)
             )
 
         # evaluate the total expression sum
@@ -275,7 +270,6 @@ class SumTerm:
                 exprv -= termv
 
         # compute the sum of absolute factors
-        # unrolled loop in case a factor is a late-bound constant array
         total_abs_factor_: None | np.ndarray[Ps, np.dtype[F]] = None
         for abs_factorv in abs_factorvs:
             if abs_factorv is None:

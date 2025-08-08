@@ -9,7 +9,7 @@ from ....utils.cast import _nan_to_zero_inf_to_finite
 from ..eb import ensure_bounded_derived_error
 from .abc import Expr
 from .addsub import ScalarAdd, ScalarSubtract
-from .constfold import FoldedScalarConst
+from .constfold import ScalarFoldedConstant
 from .literal import Number
 from .logexp import Exponential, Logarithm, ScalarExp, ScalarLog
 from .reciprocal import ScalarReciprocal
@@ -53,7 +53,7 @@ class ScalarMultiply(Expr):
         return self._a.late_bound_constants | self._b.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_binary(
+        return ScalarFoldedConstant.constant_fold_binary(
             self._a, self._b, dtype, np.multiply, ScalarMultiply
         )
 
@@ -161,7 +161,10 @@ class ScalarDivide(Expr):
             ai, bi = a.as_int(), b.as_int()
             if (ai is not None) and (bi is not None):
                 d = gcd(ai, bi)
-                if d > 1:
+                if ai < 0 and bi < 0 and d > 0:
+                    # symbolic reduction of -a / -b to a / b
+                    d = -d
+                if d != 0:
                     # symbolic reduction of (a*d) / (b*d) to a / b
                     assert (ai % d == 0) and (bi % d == 0)
                     ai //= d
@@ -171,14 +174,11 @@ class ScalarDivide(Expr):
                     return Number.from_symbolic_int_as_float(ai)
                 # int / -1 has an exact floating point result
                 if bi == -1:
+                    assert ai >= 0
                     # ensure that 0/1 = 0.0 and 0/-1 = -0.0
-                    return (
-                        Number.from_symbolic_int_as_float(abs(ai))
-                        if ai < 0
-                        else Number.from_symbolic_int_as_float(ai, force_negative=True)
-                    )
+                    return Number.from_symbolic_int_as_float(ai, force_negative=True)
                 # keep a / b after reduction
-                if d > 1:
+                if d != 0:
                     a = Number.from_symbolic_int(ai)
                     b = Number.from_symbolic_int(bi)
         this = super(ScalarDivide, cls).__new__(cls)
@@ -209,7 +209,7 @@ class ScalarDivide(Expr):
         return self._a.late_bound_constants | self._b.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_binary(
+        return ScalarFoldedConstant.constant_fold_binary(
             self._a, self._b, dtype, np.divide, ScalarDivide
         )
 
@@ -269,4 +269,8 @@ def rewrite_left_associative_product_as_exp_sum_of_logs(
 
     [(sum_of_lns, _)] = terms_stack
 
+    # rewrite a * b * ... * z as
+    #  e^(ln(fake_abs(a)) + ln(fake_abs(b)) + ... + ln(fake_abs(z)))
+    # this is mathematically incorrect for any negative product terms but works
+    #  for deriving error bounds since fake_abs handles the error bound flips
     return ScalarExp(Exponential.exp, sum_of_lns)

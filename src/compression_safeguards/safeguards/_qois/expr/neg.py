@@ -5,7 +5,7 @@ import numpy as np
 
 from ....utils.bindings import Parameter
 from .abc import Expr
-from .constfold import FoldedScalarConst
+from .constfold import ScalarFoldedConstant
 from .literal import Number
 from .typing import F, Ns, Ps, PsI
 
@@ -44,7 +44,7 @@ class ScalarNegate(Expr):
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(
+        return ScalarFoldedConstant.constant_fold_unary(
             self._a, dtype, np.negative, ScalarNegate
         )
 

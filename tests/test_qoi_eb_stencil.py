@@ -358,7 +358,7 @@ def test_finite_difference():
     )
     assert (
         f"{safeguard._qoi_expr!r}"
-        == "(X[4,4] * -0.0 + X[5,4] * (-1 / -2) + X[3,4] * (-1 / 2))"
+        == "(X[4,4] * -0.0 + X[5,4] * (1 / 2) + X[3,4] * (-1 / 2))"
     )
     check_all_codecs(
         data,
@@ -374,7 +374,7 @@ def test_finite_difference():
     )
     assert (
         f"{safeguard._qoi_expr!r}"
-        == "(X[4,4] * -0.0 + X[4,5] * (-1 / -2) + X[4,3] * (-1 / 2))"
+        == "(X[4,4] * -0.0 + X[4,5] * (1 / 2) + X[4,3] * (-1 / 2))"
     )
     check_all_codecs(
         data,
@@ -404,7 +404,7 @@ def test_finite_difference():
     assert (
         f"{safeguard._qoi_expr!r}"
         # X[2,4] * (1/4) + X[4,4] * (-1/2) + X[6,4] * (1/4)
-        == "((X[4,4] * -0.0 + X[5,4] * (-1 / -2) + X[3,4] * (-1 / 2)) * -0.0 + (X[5,4] * -0.0 + X[6,4] * (-1 / -2) + X[4,4] * (-1 / 2)) * (-1 / -2) + (X[3,4] * -0.0 + X[4,4] * (-1 / -2) + X[2,4] * (-1 / 2)) * (-1 / 2))"
+        == "((X[4,4] * -0.0 + X[5,4] * (1 / 2) + X[3,4] * (-1 / 2)) * -0.0 + (X[5,4] * -0.0 + X[6,4] * (1 / 2) + X[4,4] * (-1 / 2)) * (1 / 2) + (X[3,4] * -0.0 + X[4,4] * (1 / 2) + X[2,4] * (-1 / 2)) * (-1 / 2))"
     )
     check_all_codecs(
         data,
@@ -421,7 +421,7 @@ def test_finite_difference():
     assert (
         f"{safeguard._qoi_expr!r}"
         # X[3,3] * (1/4) + X[3,5] * (-1/4) + X[5,3] * (-1/4) + X[5,5] * (1/4)
-        == "((X[4,4] * -0.0 + X[5,4] * (-1 / -2) + X[3,4] * (-1 / 2)) * -0.0 + (X[4,5] * -0.0 + X[5,5] * (-1 / -2) + X[3,5] * (-1 / 2)) * (-1 / -2) + (X[4,3] * -0.0 + X[5,3] * (-1 / -2) + X[3,3] * (-1 / 2)) * (-1 / 2))"
+        == "((X[4,4] * -0.0 + X[5,4] * (1 / 2) + X[3,4] * (-1 / 2)) * -0.0 + (X[4,5] * -0.0 + X[5,5] * (1 / 2) + X[3,5] * (-1 / 2)) * (1 / 2) + (X[4,3] * -0.0 + X[5,3] * (1 / 2) + X[3,3] * (-1 / 2)) * (-1 / 2))"
     )
     check_all_codecs(
         data,
@@ -1254,32 +1254,34 @@ def test_finite_difference_dx():
         )
 
 
-# def test_late_bound_constant():
-#     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-#         qoi='X[0,0] * c["zero"] + X[I] / C["f"][I]',
-#         neighbourhood=[
-#             dict(axis=0, before=1, after=0, boundary="valid"),
-#             dict(axis=1, before=0, after=0, boundary="valid"),
-#         ],
-#         type="abs",
-#         eb=1,
-#     )
-#     assert safeguard.late_bound == {"f", "zero"}
-#     assert f"{safeguard._qoi_expr!r}" == 'X[0,0] * C["zero"][1,0] + X[1,0] / C["f"][1,0]'
+def test_late_bound_constant():
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='X[0,0] * c["zero"] + X[I] / C["f"][I]',
+        neighbourhood=[
+            dict(axis=0, before=1, after=0, boundary="valid"),
+            dict(axis=1, before=0, after=0, boundary="valid"),
+        ],
+        type="abs",
+        eb=1,
+    )
+    assert safeguard.late_bound == {"f", "zero"}
+    assert (
+        f"{safeguard._qoi_expr!r}" == 'X[0,0] * C["zero"][1,0] + X[1,0] / C["f"][1,0]'
+    )
 
-#     data = np.arange(6).reshape(2, 3)
+    data = np.arange(6).reshape(2, 3)
 
-#     late_bound = Bindings(
-#         f=np.array([16, 8, 4]),
-#         zero=0,
-#     )
+    late_bound = Bindings(
+        f=np.array([16, 8, 4]),
+        zero=0,
+    )
 
-#     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
-#     assert np.all(valid._lower == (data.flatten() - np.array([16, 8, 4, 16, 8, 4])))
-#     assert np.all(valid._upper == (data.flatten() + np.array([16, 8, 4, 16, 8, 4])))
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == (data.flatten() - np.array([16, 8, 4, 16, 8, 4])))
+    assert np.all(valid._upper == (data.flatten() + np.array([16, 8, 4, 16, 8, 4])))
 
-#     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
-#     assert np.all(ok == np.array([True, True, True, True, True, False]).reshape(2, 3))
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(ok == np.array([True, True, True, True, True, False]).reshape(2, 3))
 
 
 @pytest.mark.parametrize("check", CHECKS)

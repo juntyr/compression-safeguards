@@ -236,11 +236,13 @@ def test_exponential(check):
     check("e**(x)")
     check("exp(x)")
     check("exp2(x)")
+    check("exp10(x)")
     check("2 ** (x + 1)")
 
     check_all_codecs(np.array([51.0]), "2**x")
     check_all_codecs(np.array([31.0]), "exp(x)")
     check_all_codecs(np.array([42.0]), "exp2(x)")
+    check_all_codecs(np.array([42.0]), "exp10(x)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -250,6 +252,8 @@ def test_logarithm(check):
     check("ln(x + 1)")
     check("log2(x)")
     check("log2(x + 1)")
+    check("log10(x)")
+    check("log10(x + 1)")
     check("log(2, base=x)")
 
 

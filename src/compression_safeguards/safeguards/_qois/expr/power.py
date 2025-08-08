@@ -5,7 +5,7 @@ import numpy as np
 
 from ....utils.bindings import Parameter
 from .abc import Expr
-from .constfold import FoldedScalarConst
+from .constfold import ScalarFoldedConstant
 from .divmul import ScalarMultiply
 from .literal import Number
 from .logexp import Exponential, Logarithm, ScalarExp, ScalarLog
@@ -49,7 +49,7 @@ class ScalarPower(Expr):
         return self._a.late_bound_constants | self._b.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_binary(
+        return ScalarFoldedConstant.constant_fold_binary(
             self._a, self._b, dtype, np.power, ScalarPower
         )
 
@@ -71,8 +71,9 @@ class ScalarPower(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # rewrite a ** b as e^(b*ln(abs(a)))
-        # this is mathematically incorrect for a <= 0 but works for deriving error bounds
+        # rewrite a ** b as e^(b*ln(fake_abs(a)))
+        # this is mathematically incorrect for a <= 0 but works for deriving
+        #  error bounds since fake_abs handles the error bound flips
         return ScalarExp(
             Exponential.exp,
             ScalarMultiply(self._b, ScalarLog(Logarithm.ln, ScalarFakeAbs(self._a))),
@@ -111,7 +112,7 @@ class ScalarFakeAbs(Expr):
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(
+        return ScalarFoldedConstant.constant_fold_unary(
             self._a, dtype, np.abs, ScalarFakeAbs
         )
 

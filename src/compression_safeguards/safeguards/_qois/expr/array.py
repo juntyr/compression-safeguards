@@ -7,7 +7,7 @@ import numpy as np
 from ....utils.bindings import Parameter
 from .abc import Expr
 from .addsub import ScalarAdd
-from .constfold import FoldedScalarConst
+from .constfold import ScalarFoldedConstant
 from .data import Data
 from .divmul import ScalarMultiply
 from .group import Group
@@ -73,7 +73,7 @@ class Array(Expr):
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return Array.map_unary(
-            self, lambda e: FoldedScalarConst.constant_fold_expr(e, dtype)
+            self, lambda e: ScalarFoldedConstant.constant_fold_expr(e, dtype)
         )
 
     def eval(
@@ -116,7 +116,6 @@ class Array(Expr):
                     raise ValueError(
                         f"shape mismatch between operands {left.shape} and {right.shape}"
                     )
-                assert left.shape == right.shape
                 out = Array.__new__(Array)
                 out._array = np.fromiter(
                     (m(le, ri) for le, ri in zip(left._array.flat, right._array.flat)),
@@ -185,7 +184,7 @@ class Array(Expr):
                     kk = ScalarMultiply(left._array[n, k], right._array[k, m])
                     acc = kk if acc is None else ScalarAdd(acc, kk)  # type: ignore
                 assert acc is not None
-                # we can return a group here since acc is not an array
+                # we can apply a group here since acc is not an array
                 assert not isinstance(acc, Array)
                 out._array[n, m] = Group(acc)
         return out

@@ -21,7 +21,7 @@ bench = [
     "earthkit-plots~=0.3.1",
     "numcodecs-wasm~=0.1.7",
     "numcodecs-wasm-sz3~=0.6.0",
-    "numcodecs-wasm-zfp~=0.5.1",
+    "numcodecs-wasm-zfp~=0.5.3",
     "numcodecs-wasm-zstd~=0.3.0",
     "xarray~=2025.4",
     "netcdf4~=1.7.2",
@@ -31,7 +31,6 @@ bench = [
 ]
 dev = ["ruff~=0.9"]
 examples = [
-    "astropy~=6.0",
     "cdsapi~=0.7.6",
     "earthkit-data~=0.14.0",
     "earthkit-plots~=0.3.1",
@@ -40,7 +39,7 @@ examples = [
     "numcodecs-wasm-sperr~=0.1.0",
     "numcodecs-wasm-sz3~=0.6.0",
     "numcodecs-wasm-tthresh~=0.2.0",
-    "numcodecs-wasm-zfp-classic~=0.3.1",
+    "numcodecs-wasm-zfp-classic~=0.3.3",
     "xarray~=2025.1",
     "netcdf4~=1.7.2",
     "matplotlib~=3.10.0",
@@ -49,7 +48,7 @@ fuzz = ["atheris~=2.3", "timeoutcontext~=1.2", "setuptools~=80.0"]
 test = [
     "dask~=2025.4",
     "numcodecs-combinators~=0.2.10",
-    "pytest~=8.3",
+    "pytest~=8.4",
     "xarray~=2025.4",
     "zarr~=3.0; python_version >= '3.11'",
     "zarr-any-numcodecs~=0.1.2; python_version >= '3.11'",

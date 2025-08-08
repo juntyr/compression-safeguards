@@ -8,7 +8,7 @@ from .abc import Expr
 from .typing import F, Ns, Ps, PsI
 
 
-class FoldedScalarConst(Expr):
+class ScalarFoldedConstant(Expr):
     __slots__ = ("_const",)
     _const: np.number
 
@@ -36,7 +36,8 @@ class FoldedScalarConst(Expr):
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         assert isinstance(self._const, dtype.type)
-        return self._const  # type: ignore
+        const: F = self._const  # type: ignore
+        return const
 
     def eval(
         self,
@@ -45,7 +46,8 @@ class FoldedScalarConst(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
         assert isinstance(self._const, Xs.dtype.type)
-        return self._const  # type: ignore
+        const: F = self._const  # type: ignore
+        return np.broadcast_to(const, x)  # type: ignore
 
     def compute_data_error_bound_unchecked(
         self,
@@ -79,9 +81,9 @@ class FoldedScalarConst(Expr):
         if isinstance(fleft, Expr):
             if isinstance(fright, Expr):
                 return rm(fleft, fright)
-            return rm(fleft, FoldedScalarConst(fright))
+            return rm(fleft, ScalarFoldedConstant(fright))
         if isinstance(fright, Expr):
-            return rm(FoldedScalarConst(fleft), fright)
+            return rm(ScalarFoldedConstant(fleft), fright)
         return m(fleft, fright)
 
     @staticmethod
@@ -89,7 +91,7 @@ class FoldedScalarConst(Expr):
         fexpr = expr.constant_fold(dtype)
         if isinstance(fexpr, Expr):
             return fexpr
-        return FoldedScalarConst(fexpr)
+        return ScalarFoldedConstant(fexpr)
 
     def __repr__(self) -> str:
         return f"({self._const!r})"

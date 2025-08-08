@@ -2,7 +2,7 @@ import numpy as np
 
 from ..qois import StencilQuantityOfInterestExpression
 from . import StencilQuantityOfInterest
-from .expr.constfold import FoldedScalarConst
+from .expr.constfold import ScalarFoldedConstant
 
 if __name__ == "__main__":
     while True:
@@ -23,7 +23,7 @@ if __name__ == "__main__":
             print(f"parsed: {qoi_expr!r}")
             Xs = np.array([[1.0, 2.0, 3.0]])
             print(
-                f"folded: {FoldedScalarConst.constant_fold_expr(qoi_expr._expr, Xs.dtype)!r}"
+                f"folded: {ScalarFoldedConstant.constant_fold_expr(qoi_expr._expr, Xs.dtype)!r}"
             )
             print(f"eval: {qoi_expr.eval(Xs, dict())}")
         except Exception as err:

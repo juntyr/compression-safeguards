@@ -8,13 +8,14 @@ from ....utils.bindings import Parameter
 from ....utils.cast import _nan_to_zero_inf_to_finite
 from ..eb import ensure_bounded_derived_error
 from .abc import Expr
-from .constfold import FoldedScalarConst
+from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
 
 
 class Logarithm(Enum):
     ln = auto()
     log2 = auto()
+    log10 = auto()
 
 
 class ScalarLog(Expr):
@@ -49,7 +50,7 @@ class ScalarLog(Expr):
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(
+        return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
             LOGARITHM_UFUNC[self._log],  # type: ignore
@@ -149,12 +150,14 @@ class ScalarLog(Expr):
 LOGARITHM_UFUNC: dict[Logarithm, Callable[[np.ndarray], np.ndarray]] = {
     Logarithm.ln: np.log,
     Logarithm.log2: np.log2,
+    Logarithm.log10: np.log10,
 }
 
 
 class Exponential(Enum):
     exp = auto()
     exp2 = auto()
+    exp10 = auto()
 
 
 class ScalarExp(Expr):
@@ -189,7 +192,7 @@ class ScalarExp(Expr):
         return self._a.late_bound_constants
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return FoldedScalarConst.constant_fold_unary(
+        return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
             EXPONENTIAL_UFUNC[self._exp],  # type: ignore
@@ -296,16 +299,19 @@ class ScalarExp(Expr):
 EXPONENTIAL_UFUNC: dict[Exponential, Callable[[np.ndarray], np.ndarray]] = {
     Exponential.exp: np.exp,
     Exponential.exp2: np.exp2,
+    Exponential.exp10: lambda x: np.power(10, x),
 }
 
 LOGARITHM_EXPONENTIAL_UFUNC: dict[Logarithm, Callable[[np.ndarray], np.ndarray]] = {
     Logarithm.ln: EXPONENTIAL_UFUNC[Exponential.exp],
     Logarithm.log2: EXPONENTIAL_UFUNC[Exponential.exp2],
+    Logarithm.log10: EXPONENTIAL_UFUNC[Exponential.exp10],
 }
 
 EXPONENTIAL_LOGARITHM_UFUNC: dict[Exponential, Callable[[np.ndarray], np.ndarray]] = {
     Exponential.exp: LOGARITHM_UFUNC[Logarithm.ln],
     Exponential.exp2: LOGARITHM_UFUNC[Logarithm.log2],
+    Exponential.exp10: LOGARITHM_UFUNC[Logarithm.log10],
 }
 
 

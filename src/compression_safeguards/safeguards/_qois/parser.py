@@ -1,7 +1,7 @@
 import itertools
 from contextlib import contextmanager
 
-from sly import Parser  # from sly.yacc import SlyLogger
+from sly import Parser
 
 from ...utils.bindings import Parameter
 from .expr.abc import Expr
@@ -10,6 +10,12 @@ from .expr.addsub import ScalarAdd, ScalarSubtract
 from .expr.array import Array
 from .expr.data import Data, LateBoundConstant
 from .expr.divmul import ScalarDivide, ScalarMultiply
+from .expr.finite_difference import (
+    FiniteDifference,
+    ScalarSymmetricModulo,
+    finite_difference_coefficients,
+    finite_difference_offsets,
+)
 from .expr.group import Group
 from .expr.hyperbolic import Hyperbolic, ScalarHyperbolic
 from .expr.literal import Euler, Number, Pi
@@ -29,11 +35,6 @@ from .expr.trigonometric import (
 from .lexer import QoILexer
 
 
-class NullWriter:
-    def write(self, s):
-        pass
-
-
 class QoIParser(Parser):
     __slots__ = ("_x", "_X", "_I", "_vars", "_text")
     _x: Data
@@ -41,8 +42,6 @@ class QoIParser(Parser):
     _I: None | tuple[int, ...]
     _vars: dict[Parameter, Expr]
     _text: str
-
-    # log = SlyLogger(NullWriter())
 
     def __init__(self, *, x: Data, X: None | Array, I: None | tuple[int, ...]):  # noqa: E741
         self._x = x
@@ -405,6 +404,10 @@ class QoIParser(Parser):
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, lambda e: ScalarLog(Logarithm.log2, e))
 
+    @_("LOG10 LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, lambda e: ScalarLog(Logarithm.log10, e))
+
     @_("LOG LPAREN expr COMMA BASE EQUAL expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
@@ -419,6 +422,10 @@ class QoIParser(Parser):
     @_("EXP2 LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, lambda e: ScalarExp(Exponential.exp2, e))
+
+    @_("EXP10 LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, lambda e: ScalarExp(Exponential.exp10, e))
 
     # exponentiation
     @_("SQRT LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
@@ -605,13 +612,6 @@ class QoIParser(Parser):
         "FINITE_DIFFERENCE LPAREN expr COMMA ORDER EQUAL integer COMMA ACCURACY EQUAL integer COMMA TYPE EQUAL integer COMMA AXIS EQUAL integer finite_difference_grid_spacing finite_difference_grid_period RPAREN"
     )
     def expr(self, p):  # noqa: F811
-        from .expr.finite_difference import (
-            FiniteDifference,
-            ScalarSymmetricModulo,
-            finite_difference_coefficients,
-            finite_difference_offsets,
-        )
-
         self.assert_or_error(
             self._X is not None,
             p,
@@ -640,17 +640,18 @@ class QoIParser(Parser):
             accuracy > 0, p, "`finite_difference` accuracy must be positive"
         )
 
+        TYPES: dict[int, FiniteDifference] = {
+            -1: FiniteDifference.backwards,
+            0: FiniteDifference.central,
+            1: FiniteDifference.forward,
+        }
         type = p.integer2
         self.assert_or_error(
-            type in (-1, 0, +1),
+            type in TYPES,
             p,
             "`finite_difference` type must be 1 (forward), 0 (central), or -1 (backward)",
         )
-        type = [
-            FiniteDifference.central,
-            FiniteDifference.forward,
-            FiniteDifference.backwards,
-        ][type]
+        type = TYPES[type]
         if type == FiniteDifference.central:
             self.assert_or_error(
                 accuracy % 2 == 0,
