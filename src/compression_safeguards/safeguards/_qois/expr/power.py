@@ -79,6 +79,22 @@ class ScalarPower(Expr):
             ScalarMultiply(self._b, ScalarLog(Logarithm.ln, ScalarFakeAbs(self._a))),
         ).compute_data_error_bound(eb_expr_lower, eb_expr_upper, X, Xs, late_bound)
 
+    def compute_data_bounds_unchecked(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # rewrite a ** b as e^(b*ln(fake_abs(a)))
+        # this is mathematically incorrect for a <= 0 but works for deriving
+        #  error bounds since fake_abs handles the error bound flips
+        return ScalarExp(
+            Exponential.exp,
+            ScalarMultiply(self._b, ScalarLog(Logarithm.ln, ScalarFakeAbs(self._a))),
+        ).compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
+
     def __repr__(self) -> str:
         return f"{self._a!r} ** {self._b!r}"
 

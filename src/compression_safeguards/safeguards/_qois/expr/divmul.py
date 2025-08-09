@@ -6,7 +6,7 @@ import numpy as np
 
 from ....utils.bindings import Parameter
 from ....utils.cast import _float128_dtype, _float128_max, _nan_to_zero_inf_to_finite
-from ..eb import ensure_bounded_derived_error
+from ..eb import ensure_bounded_derived_error, ensure_bounded_expression
 from .abc import Expr
 from .addsub import ScalarAdd, ScalarSubtract
 from .constfold import ScalarFoldedConstant
@@ -142,6 +142,86 @@ class ScalarMultiply(Expr):
             late_bound,
         )
 
+    def compute_data_bounds_unchecked(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        a_const = not self._a.has_data
+        b_const = not self._b.has_data
+        assert not (a_const and b_const), "constant product has no error bounds"
+
+        if a_const or b_const:
+            term, const = (self._b, self._a) if a_const else (self._a, self._b)
+
+            # evaluate the non-constant and constant term and their product
+            termv = term.eval(X.shape, Xs, late_bound)
+            constv = const.eval(X.shape, Xs, late_bound)
+            # mul of two terms is commutative
+            exprv = np.multiply(termv, constv)
+
+            fmax = (
+                _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
+            )
+
+            # for x*0, we can allow any finite x
+            tl = np.where(
+                constv == 0,
+                -fmax,
+                expr_lower / np.abs(constv),
+            )
+            tu = np.where(
+                constv == 0,
+                fmax,
+                expr_upper / np.abs(constv),
+            )
+
+            term_lower: np.ndarray[Ps, np.dtype[F]] = np.minimum(  # type: ignore
+                termv, np.where(constv < 0, -tu, tl)
+            )
+            term_upper: np.ndarray[Ps, np.dtype[F]] = np.maximum(  # type: ignore
+                termv, np.where(constv < 0, -tl, tu)
+            )
+
+            # handle rounding errors in multiply(divide(...)) early
+            term_lower = ensure_bounded_expression(
+                lambda term_lower: term_lower * constv,
+                exprv,
+                termv,
+                term_lower,
+                expr_lower,
+                expr_upper,
+            )
+            term_upper = ensure_bounded_expression(
+                lambda term_upper: term_upper * constv,
+                exprv,
+                termv,
+                term_upper,
+                expr_lower,
+                expr_upper,
+            )
+
+            return term.compute_data_bounds(
+                term_lower,
+                term_upper,
+                X,
+                Xs,
+                late_bound,
+            )
+
+        return rewrite_left_associative_product_as_exp_sum_of_logs(
+            self
+        ).compute_data_bounds(
+            expr_lower,
+            expr_upper,
+            X,
+            Xs,
+            late_bound,
+        )
+
     def __repr__(self) -> str:
         return f"{self._a!r} * {self._b!r}"
 
@@ -231,6 +311,18 @@ class ScalarDivide(Expr):
         return ScalarMultiply(
             self._a, ScalarReciprocal(self._b)
         ).compute_data_error_bound(eb_expr_lower, eb_expr_upper, X, Xs, late_bound)
+
+    def compute_data_bounds_unchecked(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        return ScalarMultiply(
+            self._a, ScalarReciprocal(self._b)
+        ).compute_data_bounds_unchecked(expr_lower, expr_upper, X, Xs, late_bound)
 
     def __repr__(self) -> str:
         return f"{self._a!r} / {self._b!r}"

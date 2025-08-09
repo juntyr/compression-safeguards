@@ -9,7 +9,7 @@ from ....utils.cast import (
     _nan_to_zero_inf_to_finite,
     _reciprocal,
 )
-from ..eb import ensure_bounded_derived_error
+from ..eb import ensure_bounded_derived_error, ensure_bounded_expression
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
@@ -151,6 +151,87 @@ class ScalarReciprocal(Expr):
         #  which is strictly monotonic in two disjoint segments
         return self.compute_data_error_bound_unchecked(
             eb_expr_lower, eb_expr_upper, X, Xs, late_bound
+        )
+
+    def compute_data_bounds_unchecked(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # evaluate arg and reciprocal(arg)
+        arg = self._a
+        argv = arg.eval(X.shape, Xs, late_bound)
+        exprv = _reciprocal(argv)
+
+        if X.dtype == _float128_dtype:
+            smallest_subnormal = _float128_smallest_subnormal
+        else:
+            smallest_subnormal = np.finfo(X.dtype).smallest_subnormal
+
+        # compute the argument bounds
+        # ensure that reciprocal(...) keeps the same sign as arg
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.minimum(
+            argv,
+            _reciprocal(
+                np.where(  # type: ignore
+                    exprv < 0,
+                    np.minimum(expr_upper, -smallest_subnormal),
+                    expr_upper,
+                )
+            ),
+        )
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.maximum(
+            argv,
+            _reciprocal(
+                np.where(  # type: ignore
+                    exprv < 0,
+                    expr_lower,
+                    np.maximum(smallest_subnormal, expr_lower),
+                )
+            ),
+        )
+
+        # handle rounding errors in reciprocal(reciprocal(...)) early
+        arg_lower = ensure_bounded_expression(
+            lambda arg_lower: _reciprocal(arg_lower),
+            exprv,
+            argv,
+            arg_lower,
+            expr_lower,
+            expr_upper,
+        )
+        arg_upper = ensure_bounded_expression(
+            lambda arg_upper: _reciprocal(arg_upper),
+            exprv,
+            argv,
+            arg_upper,
+            expr_lower,
+            expr_upper,
+        )
+
+        return arg.compute_data_bounds(
+            arg_lower,
+            arg_upper,
+            X,
+            Xs,
+            late_bound,
+        )
+
+    def compute_data_bounds(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # the unchecked method already handles rounding errors for reciprocal,
+        #  which is strictly monotonic in two disjoint segments
+        return self.compute_data_bounds_unchecked(
+            expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:

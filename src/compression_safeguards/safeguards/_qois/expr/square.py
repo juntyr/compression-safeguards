@@ -3,8 +3,12 @@ from collections.abc import Mapping
 import numpy as np
 
 from ....utils.bindings import Parameter
-from ....utils.cast import _nan_to_zero_inf_to_finite
-from ..eb import ensure_bounded_derived_error
+from ....utils.cast import (
+    _nan_to_zero_inf_to_finite,
+    _float128_dtype,
+    _float128_smallest_subnormal,
+)
+from ..eb import ensure_bounded_derived_error, ensure_bounded_expression
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
@@ -130,6 +134,77 @@ class ScalarSqrt(Expr):
             eb_expr_lower, eb_expr_upper, X, Xs, late_bound
         )
 
+    def compute_data_bounds_unchecked(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # evaluate arg and sqrt(arg)
+        arg = self._a
+        argv = arg.eval(X.shape, Xs, late_bound)
+        exprv = np.sqrt(argv)
+
+        if X.dtype == _float128_dtype:
+            smallest_subnormal = _float128_smallest_subnormal
+        else:
+            smallest_subnormal = np.finfo(X.dtype).smallest_subnormal
+
+        # apply the inverse function to get the bounds on arg
+        # sqrt(...) is NaN for negative values, so ... can be any negative value
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+            argv < 0,
+            X.dtype.type(-np.inf),
+            np.minimum(argv, np.square(expr_lower)),
+        )
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+            argv < 0,
+            -smallest_subnormal,
+            np.maximum(argv, np.square(expr_upper)),
+        )
+
+        # handle rounding errors in sqrt(square(...)) early
+        arg_lower = ensure_bounded_expression(
+            lambda arg_lower: np.sqrt(arg_lower),
+            exprv,
+            argv,
+            arg_lower,
+            expr_lower,
+            expr_upper,
+        )
+        arg_upper = ensure_bounded_expression(
+            lambda arg_upper: np.sqrt(arg_upper),
+            exprv,
+            argv,
+            arg_upper,
+            expr_lower,
+            expr_upper,
+        )
+
+        return arg.compute_data_bounds(
+            arg_lower,
+            arg_upper,
+            X,
+            Xs,
+            late_bound,
+        )
+
+    def compute_data_bounds(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # the unchecked method already handles rounding errors for sqrt,
+        #  which is strictly monotonic
+        return self.compute_data_bounds_unchecked(
+            expr_lower, expr_upper, X, Xs, late_bound
+        )
+
     def __repr__(self) -> str:
         return f"sqrt({self._a!r})"
 
@@ -248,9 +323,81 @@ class ScalarSquare(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
         # the unchecked method already handles rounding errors for square,
-        #  even though it is *not* monotonic
+        #  which is strictly monotonic in two segments
         return self.compute_data_error_bound_unchecked(
             eb_expr_lower, eb_expr_upper, X, Xs, late_bound
+        )
+
+    def compute_data_bounds_unchecked(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # evaluate arg and square(arg)
+        arg = self._a
+        argv = arg.eval(X.shape, Xs, late_bound)
+        exprv = np.square(argv)
+
+        # apply the inverse function to get the bounds on arg
+        al = np.sqrt(np.maximum(0, expr_lower))
+        au = np.sqrt(np.maximum(0, expr_upper))
+
+        # flip and swap the expr bounds to get the bounds on arg
+        # square(...) cannot be negative, but
+        #  - a > 0 and 0 < el <= eu -> al = el, au = eu
+        #  - a < 0 and 0 < el <= eu -> al = -eu, au = -el
+        #  - el <= 0 -> al = -eu, au = eu
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+            (expr_lower <= 0) | (argv < 0), -au, al
+        )
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+            (expr_lower > 0) & (argv < 0), -al, au
+        )
+
+        arg_lower = np.minimum(argv, arg_lower)
+        arg_upper = np.maximum(argv, arg_upper)
+
+        # handle rounding errors in square(sqrt(...)) early
+        arg_lower = ensure_bounded_expression(
+            lambda arg_lower: np.square(arg_lower),
+            exprv,
+            argv,
+            arg_lower,
+            expr_lower,
+            expr_upper,
+        )
+        arg_upper = ensure_bounded_expression(
+            lambda arg_upper: np.square(arg_upper),
+            exprv,
+            argv,
+            arg_upper,
+            expr_lower,
+            expr_upper,
+        )
+
+        return arg.compute_data_bounds(
+            arg_lower,
+            arg_upper,
+            X,
+            Xs,
+            late_bound,
+        )
+
+    def compute_data_bounds(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # the unchecked method already handles rounding errors for square,
+        #  which is strictly monotonic in two segments
+        return self.compute_data_bounds_unchecked(
+            expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:
