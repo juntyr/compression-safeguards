@@ -204,18 +204,18 @@ CHECKS = [
 #         check("-(-(-e))")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_negate(check):
-#     check("-x")
-#     check("--x")
-#     check("--(-x)")
+@pytest.mark.parametrize("check", CHECKS)
+def test_negate(check):
+    check("-x")
+    check("--x")
+    check("--(-x)")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_abs(check):
-#     check("abs(x)")
-#     check("abs(-x)")
-#     check("abs(abs(x))")
+@pytest.mark.parametrize("check", CHECKS)
+def test_abs(check):
+    check("abs(x)")
+    check("abs(-x)")
+    check("abs(abs(x))")
 
 
 # @pytest.mark.parametrize("check", CHECKS)

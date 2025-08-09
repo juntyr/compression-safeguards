@@ -59,6 +59,16 @@ class ScalarFoldedConstant(Expr):
     ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
         assert False, "folded constants have no error bounds"
 
+    def compute_data_bounds_unchecked(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        assert False, "folded constants have no data bounds"
+
     @staticmethod
     def constant_fold_unary(
         expr: Expr, dtype: np.dtype[F], m: Callable[[F], F], rm: Callable[[Expr], Expr]

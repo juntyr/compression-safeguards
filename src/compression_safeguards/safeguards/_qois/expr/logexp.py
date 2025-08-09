@@ -165,7 +165,7 @@ class ScalarLog(Expr):
         else:
             smallest_subnormal = np.finfo(X.dtype).smallest_subnormal
 
-        # apply the inverse function to get the error bounds on arg
+        # apply the inverse function to get the bounds on arg
         # log(...) is NaN for negative values, so ... can be any negative value
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             argv < 0,
@@ -380,7 +380,7 @@ class ScalarExp(Expr):
         argv = arg.eval(X.shape, Xs, late_bound)
         exprv = (EXPONENTIAL_UFUNC[self._exp])(argv)
 
-        # apply the inverse function to get the error bounds on arg
+        # apply the inverse function to get the bounds on arg
         # exp(...) cannot be negative, so ensure the bounds on expr also cannot
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.minimum(
             argv, (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(np.maximum(0, expr_lower))
