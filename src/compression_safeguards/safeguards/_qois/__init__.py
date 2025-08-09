@@ -258,8 +258,7 @@ class StencilQuantityOfInterest:
         qoi_upper: np.ndarray[Ps, np.dtype[F]],
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-        # FIXME: returned arrays should be of shape Ns
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         """
         Compute the lower-upper bounds on the stencil-extended data `Xs` that
         satisfy the lower-upper error bounds `qoi_lower` and `qoi_lower` on the
@@ -295,8 +294,7 @@ class StencilQuantityOfInterest:
         assert stencil_shape == self._stencil_shape
         X: np.ndarray[Ps, np.dtype[F]] = Xs[(...,) + self._stencil_I]  # type: ignore
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, Xs.dtype)
-        raise NotImplementedError
-        return expr.compute_data_error_bound(qoi_lower, qoi_upper, X, Xs, late_bound)
+        return expr.compute_data_bounds(qoi_lower, qoi_upper, X, Xs, late_bound)
 
     def __repr__(self) -> str:
         return repr(self._expr)

@@ -9,6 +9,7 @@ from ...utils.cast import (
     _nextafter,
 )
 from ...utils.typing import F, S
+from .expr.typing import Ps, Ns
 
 
 def ensure_bounded_derived_error(
@@ -106,16 +107,27 @@ def ensure_bounded_derived_error(
 
 
 def ensure_bounded_expression(
-    expr: Callable[[np.ndarray[S, np.dtype[F]]], np.ndarray[S, np.dtype[F]]],
-    exprv: np.ndarray[S, np.dtype[F]],
-    xv: np.ndarray[S, np.dtype[F]],
-    x_guess: np.ndarray[S, np.dtype[F]],
-    expr_lower: np.ndarray[S, np.dtype[F]],
-    expr_upper: np.ndarray[S, np.dtype[F]],
-) -> np.ndarray[S, np.dtype[F]]:
+    expr: Callable[[np.ndarray[Ps, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]],
+    exprv: np.ndarray[Ps, np.dtype[F]],
+    X: np.ndarray[Ps, np.dtype[F]],
+    x_guess: np.ndarray[Ps, np.dtype[F]],
+    expr_lower: np.ndarray[Ps, np.dtype[F]],
+    expr_upper: np.ndarray[Ps, np.dtype[F]],
+) -> np.ndarray[Ps, np.dtype[F]]:
+    return ensure_bounded_expression_v2(expr, exprv, X, x_guess, expr_lower, expr_upper)
+
+
+def ensure_bounded_expression_v2(
+    expr: Callable[[np.ndarray[Ns, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]],
+    exprv: np.ndarray[Ps, np.dtype[F]],
+    Xs: np.ndarray[Ns, np.dtype[F]],
+    x_guess: np.ndarray[Ns, np.dtype[F]],
+    expr_lower: np.ndarray[Ps, np.dtype[F]],
+    expr_upper: np.ndarray[Ps, np.dtype[F]],
+) -> np.ndarray[Ns, np.dtype[F]]:
     # check if any derived expression exceeds the error bound
     # this check matches the QoI safeguard's validity check
-    def are_bounds_exceeded(x_guess):
+    def are_bounds_exceeded(x_guess: np.ndarray[Ns, np.dtype[F]]):
         exprv_x_guess = expr(x_guess)
         return ~np.where(
             _isfinite(exprv),
@@ -134,4 +146,4 @@ def ensure_bounded_expression(
             return x_guess
 
         # try to nudge the guess towards the data
-        x_guess = np.where(bounds_exceeded, _nextafter(x_guess, xv), x_guess)  # type: ignore
+        x_guess = np.where(bounds_exceeded, _nextafter(x_guess, Xs), x_guess)  # type: ignore

@@ -17,6 +17,8 @@ from ....utils.cast import (
     from_float,
     saturating_finite_float_cast,
     to_float,
+    from_total_order,
+    to_total_order,
 )
 from ....utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ....utils.typing import F, S, T
@@ -313,13 +315,34 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             data_float,
             late_bound_constants,
         )
+        x_lowerf, x_upperf = x_lower.flatten(), x_upper.flatten()
 
         dataf = data.flatten()
 
-        valid = Interval.empty_like(dataf)
-        Lower(from_float(x_lower, dataf.dtype)) <= valid[:] <= Upper(
-            from_float(x_upper, dataf.dtype)
+        valid = Interval.empty_like(dataf).preserve_inf(dataf).preserve_finite(dataf)
+        Lower(np.maximum(valid._lower, from_float(x_lowerf, dataf.dtype))) <= valid[
+            _isfinite(dataf)
+        ] <= Upper(np.minimum(from_float(x_upperf, dataf.dtype), valid._upper))
+
+        # correct rounding errors in the lower and upper bound
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            lower_outside_bound = to_float(valid._lower) < x_lowerf
+            upper_outside_bound = to_float(valid._upper) > x_upperf
+
+        Lower(
+            from_total_order(
+                to_total_order(valid._lower) + lower_outside_bound,
+                data.dtype,
+            )
+        ) <= valid[_isfinite(dataf)] <= Upper(
+            from_total_order(
+                to_total_order(valid._upper) - upper_outside_bound,
+                data.dtype,
+            )
         )
+
         return valid.preserve_any_nan(dataf, equal_nan=True)
 
     def get_config(self) -> dict:

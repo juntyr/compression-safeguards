@@ -3,6 +3,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from ....utils.bindings import Parameter
+from ....utils.cast import _isfinite
 from .abc import Expr
 from .typing import F, Ns, Ps, PsI
 
@@ -69,6 +70,39 @@ class Data(Expr):
         # data just returns the computed error bounds
         return self.compute_data_error_bound_unchecked(
             eb_expr_lower, eb_expr_upper, X, Xs, late_bound
+        )
+
+    def compute_data_bounds_unchecked(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        X_lower: np.ndarray[Ns, np.dtype[F]] = np.where(
+            _isfinite(Xs), X.dtype.type(np.inf), Xs
+        )  # type: ignore
+        X_upper: np.ndarray[Ns, np.dtype[F]] = np.where(
+            _isfinite(Xs), X.dtype.type(-np.inf), Xs
+        )  # type: ignore
+
+        X_lower[(...,) + self._index] = expr_lower
+        X_upper[(...,) + self._index] = expr_upper
+
+        return X_lower, X_upper
+
+    def compute_data_bounds(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # data just returns the computed error bounds
+        return self.compute_data_bounds_unchecked(
+            expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:
