@@ -88,6 +88,32 @@ class ScalarAdd(Expr):
             eb_expr_lower, eb_expr_upper, X, Xs, late_bound
         )
 
+    def compute_data_bounds_unchecked(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        terms = SumTerm.as_left_associative_sum(self)
+        return SumTerm.compute_data_bounds(
+            terms, expr_lower, expr_upper, X, Xs, late_bound
+        )
+
+    def compute_data_bounds(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # the unchecked method already handles rounding errors for add
+        return self.compute_data_bounds_unchecked(
+            expr_lower, expr_upper, X, Xs, late_bound
+        )
+
     def __repr__(self) -> str:
         return f"{self._a!r} + {self._b!r}"
 
@@ -167,6 +193,32 @@ class ScalarSubtract(Expr):
         # the unchecked method already handles rounding errors for subtract
         return self.compute_data_error_bound_unchecked(
             eb_expr_lower, eb_expr_upper, X, Xs, late_bound
+        )
+
+    def compute_data_bounds_unchecked(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        terms = SumTerm.as_left_associative_sum(self)
+        return SumTerm.compute_data_bounds(
+            terms, expr_lower, expr_upper, X, Xs, late_bound
+        )
+
+    def compute_data_bounds(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # the unchecked method already handles rounding errors for subtract
+        return self.compute_data_bounds_unchecked(
+            expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:
@@ -397,3 +449,14 @@ class SumTerm:
         assert eb_x_upper is not None
 
         return eb_x_lower, eb_x_upper
+
+    @staticmethod
+    def compute_data_bounds(
+        left_associative_sum: "tuple[SumTerm, ...]",
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        raise NotImplementedError("compute data bounds for add and subtract")

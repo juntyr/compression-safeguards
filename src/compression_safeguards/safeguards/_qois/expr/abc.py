@@ -243,6 +243,7 @@ class Expr:
 
         return tl, tu
 
+    @abstractmethod
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -251,41 +252,40 @@ class Expr:
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        raise NotImplementedError
-        # exprv = self.eval(X.shape, Xs, late_bound)
+        """
+        Compute the lower-upper bounds on the stencil-extended data `Xs` that
+        that satisfy the lower-upper bounds `expr_lower` and `expr_lower` on
+        this expression.
 
-        # eb_expr_lower: np.ndarray[Ps, np.dtype[F]] = expr_lower - exprv
-        # eb_expr_upper: np.ndarray[Ps, np.dtype[F]] = expr_upper - exprv
+        This method is allowed to return slightly wrongly-rounded results
+        that are then corrected by
+        [`compute_data_bounds`][compression_safeguards.safeguards._qois.expr.abc.Expr.compute_data_bounds].
 
-        # fmax = _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
+        Parameters
+        ----------
+        expr_lower : np.ndarray[Ps, np.dtype[F]]
+            The pointwise lower bound on this expression.
+        eb_expr_upper : np.ndarray[Ps, np.dtype[F]]
+            The pointwise upper bound on this expression.
+        X : np.ndarray[Ps, np.dtype[F]]
+            The pointwise data, in floating point format, which must be
+            of shape Ps.
+        Xs : np.ndarray[Ps, np.dtype[F]]
+            The stencil-extended data, in floating point format, which must be
+            of shape [...Ps, ...stencil_shape].
+        late_bound : Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]]
+            The late-bound constants parameters for this expression, with the
+            same shape and floating point dtype as the stencil-extended data.
 
-        # eb_expr_lower = np.where(
-        #     ~_isfinite(eb_expr_lower) & (expr_lower < exprv), -fmax, eb_expr_lower
-        # )  # type: ignore
-        # eb_expr_upper = np.where(
-        #     ~_isfinite(eb_expr_upper) & (expr_upper > exprv), fmax, eb_expr_upper
-        # )  # type: ignore
+        Returns
+        -------
+        X_lower, X_upper : tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]
+            The stencil-extended lower and upper bounds on the stencil-extended
+            data `Xs`.
 
-        # eb_X_lower, eb_X_upper = self.compute_data_error_bound_unchecked(
-        #     eb_expr_lower,
-        #     eb_expr_upper,
-        #     X,
-        #     Xs,
-        #     late_bound,
-        # )
-
-        # X_lower: np.ndarray[Ps, np.dtype[F]] = np.where(
-        #     eb_X_lower == 0,
-        #     X,
-        #     X + eb_X_lower,
-        # )  # type: ignore
-        # X_upper: np.ndarray[Ps, np.dtype[F]] = np.where(
-        #     eb_X_upper == 0,
-        #     X,
-        #     X + eb_X_upper,
-        # )  # type: ignore
-
-        # return X_lower, X_upper
+            The bounds have not yet been combined across neighbouring points
+            that contribute to the same QoI points.
+        """
 
     def compute_data_bounds(
         self,
@@ -295,6 +295,47 @@ class Expr:
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        """
+        Compute the lower-upper bounds on the stencil-extended data `Xs` that
+        that satisfy the lower-upper bounds `expr_lower` and `expr_lower` on
+        this expression.
+
+        This method, by default, calls into
+        [`compute_data_bounds_unchecked`][compression_safeguards.safeguards._qois.expr.abc.Expr.compute_data_bounds_unchecked]
+        and then applies extensive rounding checks to ensure that the returned
+        bounds satisfy the bounds on this expression.
+
+        If an implementation of
+        [`compute_data_bounds_unchecked`][compression_safeguards.safeguards._qois.expr.abc.Expr.compute_data_bounds_unchecked]
+        is known to have no rounding errors, this default implementation can be
+        overridden to forward its results without further rounding checks.
+
+        Parameters
+        ----------
+        expr_lower : np.ndarray[Ps, np.dtype[F]]
+            The pointwise lower bound on this expression.
+        eb_expr_upper : np.ndarray[Ps, np.dtype[F]]
+            The pointwise upper bound on this expression.
+        X : np.ndarray[Ps, np.dtype[F]]
+            The pointwise data, in floating point format, which must be
+            of shape Ps.
+        Xs : np.ndarray[Ps, np.dtype[F]]
+            The stencil-extended data, in floating point format, which must be
+            of shape [...Ps, ...stencil_shape].
+        late_bound : Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]]
+            The late-bound constants parameters for this expression, with the
+            same shape and floating point dtype as the stencil-extended data.
+
+        Returns
+        -------
+        X_lower, X_upper : tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]
+            The stencil-extended lower and upper bounds on the stencil-extended
+            data `Xs`.
+
+            The bounds have not yet been combined across neighbouring points
+            that contribute to the same QoI points.
+        """
+
         xl: np.ndarray[Ns, np.dtype[F]]
         xu: np.ndarray[Ns, np.dtype[F]]
         xl, xu = self.compute_data_bounds_unchecked(
