@@ -9,9 +9,8 @@ from ....utils.cast import (
     _float128_dtype,
     _float128_pi,
     _nan_to_zero_inf_to_finite,
-    _reciprocal,
     _nextafter,
-    _isnan,
+    _reciprocal,
 )
 from ..eb import ensure_bounded_derived_error, ensure_bounded_expression
 from .abc import Expr

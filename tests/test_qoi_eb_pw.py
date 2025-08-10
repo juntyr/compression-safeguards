@@ -1,15 +1,15 @@
 import numpy as np
 import pytest
 
-# from compression_safeguards import Safeguards
-# from compression_safeguards.safeguards.pointwise.qoi.eb import (
-#     PointwiseQuantityOfInterestErrorBoundSafeguard,
-# )
-# from compression_safeguards.utils.bindings import Bindings
+from compression_safeguards import Safeguards
+from compression_safeguards.safeguards.pointwise.qoi.eb import (
+    PointwiseQuantityOfInterestErrorBoundSafeguard,
+)
+from compression_safeguards.utils.bindings import Bindings
 
 from .codecs import (
     encode_decode_identity,
-    # encode_decode_mock,
+    encode_decode_mock,
     encode_decode_neg,
     encode_decode_noise,
     encode_decode_zero,
@@ -131,19 +131,19 @@ def test_non_expression():
 
 def test_whitespace():
     check_all_codecs(np.array([]), "  \n \t x   \t\n  ")
-    # check_all_codecs(np.array([]), "  \n \t x \t \n  - \t \n 3  \t\n  ")
-    # check_all_codecs(np.array([]), "x    -    3")
+    check_all_codecs(np.array([]), "  \n \t x \t \n  - \t \n 3  \t\n  ")
+    check_all_codecs(np.array([]), "x    -    3")
     check_all_codecs(np.array([]), "sqrt   \n (x)")
-    # check_all_codecs(np.array([]), "log ( x , base \t = \n 2 )")
+    check_all_codecs(np.array([]), "log ( x , base \t = \n 2 )")
 
 
 def test_comment():
     check_all_codecs(np.array([]), "x # great variable")
     check_all_codecs(np.array([]), "# great variable\nx")
     check_all_codecs(np.array([]), "x # nothing 3+4 really matters 1/0")
-    # check_all_codecs(
-    #     np.array([]), "log #1\n ( #2\n x #3\n , #4\n base #5\n = #6\n 2 #7\n )"
-    # )
+    check_all_codecs(
+        np.array([]), "log #1\n ( #2\n x #3\n , #4\n base #5\n = #6\n 2 #7\n )"
+    )
 
 
 def test_variables():
@@ -182,13 +182,13 @@ def test_variables():
         check_all_codecs(
             np.array([]), 'v["a"] = x + 1; v["a"] = v["a"]; return v["a"];'
         )
-    # check_all_codecs(np.array([]), 'v["a"] = 3; return x + v["a"];')
-    # check_all_codecs(
-    #     np.array([]), 'v["a"] = 3; v["b"] = v["a"] - 1; return x + (v["b"] * 2);'
-    # )
-    # check_all_codecs(
-    #     np.array([]), 'v["a"] = x + 1; v["b"] = x - 1; return v["a"] + v["b"];'
-    # )
+    check_all_codecs(np.array([]), 'v["a"] = 3; return x + v["a"];')
+    check_all_codecs(
+        np.array([]), 'v["a"] = 3; v["b"] = v["a"] - 1; return x + (v["b"] * 2);'
+    )
+    check_all_codecs(
+        np.array([]), 'v["a"] = x + 1; v["b"] = x - 1; return v["a"] + v["b"];'
+    )
     check_all_codecs(np.array([]), 'c["$x"] * x')
 
 
@@ -359,9 +359,9 @@ def test_trigonometric(check):
 #     check("exp(ln(x)+x)")
 
 
-# @pytest.mark.parametrize("dtype", sorted(d.name for d in Safeguards.supported_dtypes()))
-# def test_dtypes(dtype):
-#     check_all_codecs(np.array([[1]], dtype=dtype), "x/sqrt(pi)")
+@pytest.mark.parametrize("dtype", sorted(d.name for d in Safeguards.supported_dtypes()))
+def test_dtypes(dtype):
+    check_all_codecs(np.array([[1]], dtype=dtype), "x/sqrt(pi)")
 
 
 # @pytest.mark.parametrize("check", CHECKS)
@@ -381,102 +381,102 @@ def test_trigonometric(check):
 #     check("(-((e/(22020**-37))**x))")
 
 
-# def test_evaluate_expr_with_dtype():
-#     from compression_safeguards.safeguards._qois.expr.addsub import ScalarAdd
-#     from compression_safeguards.safeguards._qois.expr.data import Data
-#     from compression_safeguards.safeguards._qois.expr.literal import Euler, Pi
+def test_evaluate_expr_with_dtype():
+    from compression_safeguards.safeguards._qois.expr.addsub import ScalarAdd
+    from compression_safeguards.safeguards._qois.expr.data import Data
+    from compression_safeguards.safeguards._qois.expr.literal import Euler, Pi
 
-#     expr = ScalarAdd(ScalarAdd(Data(()), Pi()), Euler())
+    expr = ScalarAdd(ScalarAdd(Data(()), Pi()), Euler())
 
-#     assert f"{expr!r}" == "x + pi + e"
+    assert f"{expr!r}" == "x + pi + e"
 
-#     assert expr.eval((), np.float16("4.2"), dict()) == np.float16("4.2") + np.float16(
-#         np.e
-#     ) + np.float16(np.pi)
-
-
-# def test_late_bound_eb_abs():
-#     safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
-#         qoi="x", type="abs", eb="eb"
-#     )
-#     assert safeguard.late_bound == {"eb"}
-
-#     data = np.arange(6).reshape(2, 3)
-
-#     late_bound = Bindings(
-#         eb=np.array([5, 4, 3, 2, 1, 0]).reshape(2, 3),
-#     )
-
-#     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
-#     assert np.all(valid._lower == (data.flatten() - np.array([5, 4, 3, 2, 1, 0])))
-#     assert np.all(valid._upper == (data.flatten() + np.array([5, 4, 3, 2, 1, 0])))
-
-#     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
-#     assert np.all(
-#         ok == np.array([True, True, False, False, False, False]).reshape(2, 3)
-#     )
+    assert expr.eval((), np.float16("4.2"), dict()) == np.float16("4.2") + np.float16(
+        np.e
+    ) + np.float16(np.pi)
 
 
-# def test_late_bound_eb_rel():
-#     safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
-#         qoi="x", type="rel", eb="eb"
-#     )
-#     assert safeguard.late_bound == {"eb"}
+def test_late_bound_eb_abs():
+    safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi="x", type="abs", eb="eb"
+    )
+    assert safeguard.late_bound == {"eb"}
 
-#     data = np.arange(6).reshape(2, 3)
+    data = np.arange(6).reshape(2, 3)
 
-#     late_bound = Bindings(
-#         eb=np.array([5, 4, 3, 2, 1, 0]).reshape(2, 3),
-#     )
+    late_bound = Bindings(
+        eb=np.array([5, 4, 3, 2, 1, 0]).reshape(2, 3),
+    )
 
-#     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
-#     assert np.all(valid._lower == (data.flatten() - np.array([0, 4, 6, 6, 4, 0])))
-#     assert np.all(valid._upper == (data.flatten() + np.array([0, 4, 6, 6, 4, 0])))
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == (data.flatten() - np.array([5, 4, 3, 2, 1, 0])))
+    assert np.all(valid._upper == (data.flatten() + np.array([5, 4, 3, 2, 1, 0])))
 
-#     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
-#     assert np.all(ok == np.array([True, True, True, True, False, False]).reshape(2, 3))
-
-
-# def test_late_bound_eb_ratio():
-#     safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
-#         qoi="x", type="ratio", eb="eb"
-#     )
-#     assert safeguard.late_bound == {"eb"}
-
-#     data = np.arange(6).reshape(2, 3)
-
-#     late_bound = Bindings(
-#         eb=np.array([6, 5, 4, 3, 2, 1]).reshape(2, 3),
-#     )
-
-#     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
-#     assert np.all(valid._lower == (data.flatten() - np.array([0, 0, 1, 2, 2, 0])))
-#     assert np.all(valid._upper == (data.flatten() + np.array([0, 4, 6, 6, 4, 0])))
-
-#     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
-#     assert np.all(
-#         ok == np.array([True, False, False, False, False, False]).reshape(2, 3)
-#     )
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(
+        ok == np.array([True, True, False, False, False, False]).reshape(2, 3)
+    )
 
 
-# def test_late_bound_constant():
-#     safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
-#         qoi='x / c["f"]', type="abs", eb=1
-#     )
-#     assert safeguard.late_bound == {"f"}
+def test_late_bound_eb_rel():
+    safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi="x", type="rel", eb="eb"
+    )
+    assert safeguard.late_bound == {"eb"}
 
-#     data = np.arange(6).reshape(2, 3)
+    data = np.arange(6).reshape(2, 3)
 
-#     late_bound = Bindings(
-#         f=np.array([16, 8, 4, 2, 1, 0]).reshape(2, 3),
-#     )
+    late_bound = Bindings(
+        eb=np.array([5, 4, 3, 2, 1, 0]).reshape(2, 3),
+    )
 
-#     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
-#     assert np.all(valid._lower == (data.flatten() - np.array([16, 8, 4, 2, 1, 0])))
-#     assert np.all(valid._upper == (data.flatten() + np.array([16, 8, 4, 2, 1, 0])))
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == (data.flatten() - np.array([0, 4, 6, 6, 4, 0])))
+    assert np.all(valid._upper == (data.flatten() + np.array([0, 4, 6, 6, 4, 0])))
 
-#     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
-#     assert np.all(ok == np.array([True, True, True, False, False, False]).reshape(2, 3))
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(ok == np.array([True, True, True, True, False, False]).reshape(2, 3))
+
+
+def test_late_bound_eb_ratio():
+    safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi="x", type="ratio", eb="eb"
+    )
+    assert safeguard.late_bound == {"eb"}
+
+    data = np.arange(6).reshape(2, 3)
+
+    late_bound = Bindings(
+        eb=np.array([6, 5, 4, 3, 2, 1]).reshape(2, 3),
+    )
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == (data.flatten() - np.array([0, 0, 1, 2, 2, 0])))
+    assert np.all(valid._upper == (data.flatten() + np.array([0, 4, 6, 6, 4, 0])))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(
+        ok == np.array([True, False, False, False, False, False]).reshape(2, 3)
+    )
+
+
+def test_late_bound_constant():
+    safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi='x / c["f"]', type="abs", eb=1
+    )
+    assert safeguard.late_bound == {"f"}
+
+    data = np.arange(6).reshape(2, 3)
+
+    late_bound = Bindings(
+        f=np.array([16, 8, 4, 2, 1, 0]).reshape(2, 3),
+    )
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == (data.flatten() - np.array([16, 8, 4, 2, 1, 0])))
+    assert np.all(valid._upper == (data.flatten() + np.array([16, 8, 4, 2, 1, 0])))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(ok == np.array([True, True, True, False, False, False]).reshape(2, 3))
 
 
 # @pytest.mark.parametrize("check", CHECKS)
@@ -490,72 +490,72 @@ def test_trigonometric(check):
 #     check('round_ties_even(100 * (x - c["$x_min"]) / (c["$x_max"] - c["$x_min"]))')
 
 
-# def test_gaussian_kernel():
-#     safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
-#         qoi="""
-#         v["sigma"] = 1.5;
-#         v["i"] = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5];
-#         v["k"] = 1/(sqrt(2*pi)*v["sigma"]) * exp((-square(v["i"])) / (2*square(v["sigma"])));
-#         v["kern"] = matmul([v["k"]].T, [v["k"]]);
-#         v["kernel"] = v["kern"] / sum(v["kern"]);
-#         return x * v["kernel"][5,5];
-#         """,
-#         type="abs",
-#         eb=1,
-#     )
+def test_gaussian_kernel():
+    safeguard = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi="""
+        v["sigma"] = 1.5;
+        v["i"] = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5];
+        v["k"] = 1/(sqrt(2*pi)*v["sigma"]) * exp((-square(v["i"])) / (2*square(v["sigma"])));
+        v["kern"] = matmul([v["k"]].T, [v["k"]]);
+        v["kernel"] = v["kern"] / sum(v["kern"]);
+        return x * v["kernel"][5,5];
+        """,
+        type="abs",
+        eb=1,
+    )
 
-#     # alternative implementation for a 2D Gaussian kernel from
-#     #  https://stackoverflow.com/a/43346070
-#     i = np.arange(11).astype(np.float64) - 5
-#     k = np.exp(-0.5 * np.square(i) / np.square(1.5))
-#     kern = np.outer(k, k)
-#     kernel = kern / np.sum(kern)
+    # alternative implementation for a 2D Gaussian kernel from
+    #  https://stackoverflow.com/a/43346070
+    i = np.arange(11).astype(np.float64) - 5
+    k = np.exp(-0.5 * np.square(i) / np.square(1.5))
+    kern = np.outer(k, k)
+    kernel = kern / np.sum(kern)
 
-#     assert (
-#         safeguard.evaluate_qoi(
-#             np.array(1.0, dtype=np.float64), late_bound=Bindings.empty()
-#         )
-#         == kernel[5, 5]
-#     )
-
-
-# def test_constant_fold():
-#     from compression_safeguards.safeguards._qois.expr.data import Data
-#     from compression_safeguards.safeguards._qois.expr.literal import Number
-#     from compression_safeguards.safeguards._qois.expr.logexp import (
-#         ScalarLogWithBase,
-#     )
-
-#     expr = ScalarLogWithBase(
-#         Number.from_symbolic_int(100), Number.from_symbolic_int(10)
-#     )
-#     assert f"{expr!r}" == "log(100, base=10)"
-#     assert expr.eval((), np.empty(0, dtype=np.float64), {}) == 2
-
-#     assert expr.constant_fold(np.dtype(np.float64)) == 2
-
-#     expr = ScalarLogWithBase(Data(index=()), Number.from_symbolic_int(10))
-#     assert f"{expr!r}" == "log(x, base=10)"
-#     assert expr.eval((), np.array(100, dtype=np.float64), {}) == 2
-
-#     expr = expr.constant_fold(np.dtype(np.float64))
-#     assert f"{expr!r}" == f"ln(x) / ({np.log(np.float64(10))!r})"
-#     assert expr.eval((), np.array(100, dtype=np.float64), {}) == 2
+    assert (
+        safeguard.evaluate_qoi(
+            np.array(1.0, dtype=np.float64), late_bound=Bindings.empty()
+        )
+        == kernel[5, 5]
+    )
 
 
-# def test_fuzzer_found_sign_constant_fold():
-#     data = np.array([], dtype=np.int64)
-#     decoded = np.array([], dtype=np.int64)
+def test_constant_fold():
+    from compression_safeguards.safeguards._qois.expr.data import Data
+    from compression_safeguards.safeguards._qois.expr.literal import Number
+    from compression_safeguards.safeguards._qois.expr.logexp import (
+        ScalarLogWithBase,
+    )
 
-#     encode_decode_mock(
-#         data,
-#         decoded,
-#         safeguards=[
-#             PointwiseQuantityOfInterestErrorBoundSafeguard(
-#                 qoi="sign(e) - x", type="rel", eb=2
-#             ),
-#         ],
-#     )
+    expr = ScalarLogWithBase(
+        Number.from_symbolic_int(100), Number.from_symbolic_int(10)
+    )
+    assert f"{expr!r}" == "log(100, base=10)"
+    assert expr.eval((), np.empty(0, dtype=np.float64), {}) == 2
+
+    assert expr.constant_fold(np.dtype(np.float64)) == 2
+
+    expr = ScalarLogWithBase(Data(index=()), Number.from_symbolic_int(10))
+    assert f"{expr!r}" == "log(x, base=10)"
+    assert expr.eval((), np.array(100, dtype=np.float64), {}) == 2
+
+    expr = expr.constant_fold(np.dtype(np.float64))
+    assert f"{expr!r}" == f"ln(x) / ({np.log(np.float64(10))!r})"
+    assert expr.eval((), np.array(100, dtype=np.float64), {}) == 2
+
+
+def test_fuzzer_found_sign_constant_fold():
+    data = np.array([], dtype=np.int64)
+    decoded = np.array([], dtype=np.int64)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            PointwiseQuantityOfInterestErrorBoundSafeguard(
+                qoi="sign(e) - x", type="rel", eb=2
+            ),
+        ],
+    )
 
 
 # def test_fuzzer_found_logarithm_noise():

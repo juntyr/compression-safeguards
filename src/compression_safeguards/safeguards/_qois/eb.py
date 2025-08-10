@@ -9,7 +9,7 @@ from ...utils.cast import (
     _nextafter,
 )
 from ...utils.typing import F, S
-from .expr.typing import Ps, Ns
+from .expr.typing import Ns, Ps
 
 
 def ensure_bounded_derived_error(

@@ -6,9 +6,9 @@ import numpy as np
 
 from ....utils.bindings import Parameter
 from ....utils.cast import (
-    _nan_to_zero_inf_to_finite,
     _float128_dtype,
     _float128_smallest_subnormal,
+    _nan_to_zero_inf_to_finite,
 )
 from ..eb import ensure_bounded_derived_error, ensure_bounded_expression
 from .abc import Expr

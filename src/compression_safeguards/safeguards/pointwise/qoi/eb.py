@@ -15,9 +15,9 @@ from ....utils.cast import (
     _isnan,
     as_bits,
     from_float,
+    from_total_order,
     saturating_finite_float_cast,
     to_float,
-    from_total_order,
     to_total_order,
 )
 from ....utils.intervals import Interval, IntervalUnion, Lower, Upper

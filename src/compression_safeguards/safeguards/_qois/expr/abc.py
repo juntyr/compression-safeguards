@@ -4,7 +4,6 @@ from collections.abc import Mapping
 import numpy as np
 
 from ....utils.bindings import Parameter
-from ....utils.cast import _float128_dtype, _float128_max, _isfinite
 from ..eb import ensure_bounded_derived_error, ensure_bounded_expression_v2
 from .typing import F, Ns, Ps, PsI
 
