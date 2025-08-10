@@ -386,7 +386,7 @@ class ScalarExp(Expr):
             argv, (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(np.maximum(0, expr_lower))
         )
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.maximum(
-            argv, (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(np.maximum(0, expr_upper))
+            argv, (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(expr_upper)
         )
 
         # handle rounding errors in exp(log(...)) early

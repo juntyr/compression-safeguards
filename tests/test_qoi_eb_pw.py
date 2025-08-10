@@ -320,21 +320,21 @@ def test_square(check):
 #     check("(exp(x) - exp(-x)) / (exp(x) + exp(-x))")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_trigonometric(check):
-#     check("sin(x)")
-#     check("cos(x)")
-#     check("tan(x)")
-#     check("cot(x)")
-#     check("sec(x)")
-#     check("csc(x)")
+@pytest.mark.parametrize("check", CHECKS)
+def test_trigonometric(check):
+    # check("sin(x)")
+    # check("cos(x)")
+    # check("tan(x)")
+    # check("cot(x)")
+    # check("sec(x)")
+    # check("csc(x)")
 
-#     check("asin(x)")
-#     check("acos(x)")
-#     check("atan(x)")
-#     check("acot(x)")
-#     check("asec(x)")
-#     check("acsc(x)")
+    check("asin(x)")
+    # check("acos(x)")
+    # check("atan(x)")
+    # check("acot(x)")
+    # check("asec(x)")
+    # check("acsc(x)")
 
 
 # @pytest.mark.parametrize("check", CHECKS)

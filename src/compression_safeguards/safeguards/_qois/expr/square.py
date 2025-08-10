@@ -154,10 +154,11 @@ class ScalarSqrt(Expr):
 
         # apply the inverse function to get the bounds on arg
         # sqrt(...) is NaN for negative values, so ... can be any negative value
+        # otherwise ensure that the bounds on sqrt(...) are non-negative
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             argv < 0,
             X.dtype.type(-np.inf),
-            np.minimum(argv, np.square(expr_lower)),
+            np.minimum(argv, np.square(np.maximum(0, expr_lower))),
         )
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             argv < 0,
@@ -343,7 +344,7 @@ class ScalarSquare(Expr):
 
         # apply the inverse function to get the bounds on arg
         al = np.sqrt(np.maximum(0, expr_lower))
-        au = np.sqrt(np.maximum(0, expr_upper))
+        au = np.sqrt(expr_upper)
 
         # flip and swap the expr bounds to get the bounds on arg
         # square(...) cannot be negative, but

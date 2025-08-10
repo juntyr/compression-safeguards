@@ -10,8 +10,9 @@ from ....utils.cast import (
     _float128_pi,
     _nan_to_zero_inf_to_finite,
     _reciprocal,
+    _nextafter,
 )
-from ..eb import ensure_bounded_derived_error
+from ..eb import ensure_bounded_derived_error, ensure_bounded_expression
 from .abc import Expr
 from .addsub import ScalarAdd, ScalarSubtract
 from .constfold import ScalarFoldedConstant
@@ -266,9 +267,87 @@ class ScalarAsin(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
         # the unchecked method already handles rounding errors for asin,
-        #  which is monotonic
+        #  which is strictly monotonic
         return self.compute_data_error_bound_unchecked(
             eb_expr_lower, eb_expr_upper, X, Xs, late_bound
+        )
+
+    def compute_data_bounds_unchecked(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # evaluate arg and asin(arg)
+        arg = self._a
+        argv = arg.eval(X.shape, Xs, late_bound)
+        exprv = np.asin(argv)
+
+        pi = _float128_pi if X.dtype == _float128_dtype else X.dtype.type(np.pi)
+        one_eps = _nextafter(np.array(1, dtype=X.dtype), np.array(2, dtype=X.dtype))
+
+        # apply the inverse function to get the bounds on arg
+        # asin(...) is NaN when abs(...) > 1, so abs(...) can be any value > 1
+        # otherwise ensure that the bounds on asin(...) are in [-pi/2, +pi/2]
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+            argv < -1,
+            X.dtype.type(-np.inf),
+            np.where(
+                argv > 1,
+                one_eps,
+                np.minimum(argv, np.sin(np.maximum(-pi / 2, expr_lower))),
+            ),
+        )
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+            argv < -1,
+            -one_eps,
+            np.where(
+                argv > 1,
+                X.dtype.type(np.inf),
+                np.maximum(argv, np.sin(np.minimum(expr_upper, pi / 2))),
+            ),
+        )
+
+        # handle rounding errors in asin(sin(...)) early
+        arg_lower = ensure_bounded_expression(
+            lambda arg_lower: np.asin(arg_lower),
+            exprv,
+            argv,
+            arg_lower,
+            expr_lower,
+            expr_upper,
+        )
+        arg_upper = ensure_bounded_expression(
+            lambda arg_upper: np.asin(arg_upper),
+            exprv,
+            argv,
+            arg_upper,
+            expr_lower,
+            expr_upper,
+        )
+
+        return arg.compute_data_bounds(
+            arg_lower,
+            arg_upper,
+            X,
+            Xs,
+            late_bound,
+        )
+
+    def compute_data_bounds(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # the unchecked method already handles rounding errors for asin,
+        #  which is strictly monotonic
+        return self.compute_data_bounds_unchecked(
+            expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:
