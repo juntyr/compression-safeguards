@@ -136,8 +136,8 @@ class ScalarFloor(Expr):
         # compute the rounded result that meets the expr bounds
         # rounding uses integer steps, so e.g. floor(...) in [-3.1, 4.7] means
         #  that floor(...) in [-3, 4]
-        expr_lower = np.trunc(expr_lower)
-        expr_upper = np.trunc(expr_upper)
+        expr_lower = np.ceil(expr_lower)
+        expr_upper = np.floor(expr_upper)
 
         # compute the arg bound that will round to meet the expr bounds
         # floor rounds down
@@ -295,8 +295,8 @@ class ScalarCeil(Expr):
         # compute the rounded result that meets the expr bounds
         # rounding uses integer steps, so e.g. ceil(...) in [-3.1, 4.7] means
         #  that ceil(...) in [-3, 4]
-        expr_lower = np.trunc(expr_lower)
-        expr_upper = np.trunc(expr_upper)
+        expr_lower = np.ceil(expr_lower)
+        expr_upper = np.floor(expr_upper)
 
         # compute the arg bound that will round to meet the expr bounds
         # ceil rounds up
@@ -458,8 +458,8 @@ class ScalarTrunc(Expr):
         # compute the rounded result that meets the expr bounds
         # rounding uses integer steps, so e.g. trunc(...) in [-3.1, 4.7] means
         #  that trunc(...) in [-3, 4]
-        expr_lower = np.trunc(expr_lower)
-        expr_upper = np.trunc(expr_upper)
+        expr_lower = np.ceil(expr_lower)
+        expr_upper = np.floor(expr_upper)
 
         # compute the arg bound that will round to meet the expr bounds
         # trunc rounds towards zero
@@ -624,8 +624,8 @@ class ScalarRoundTiesEven(Expr):
         # compute the rounded result that meets the expr bounds
         # rounding uses integer steps, so e.g. round_ties_even(...) in
         #  [-3.1, 4.7] means that round_ties_even(...) in [-3, 4]
-        expr_lower = np.trunc(expr_lower)
-        expr_upper = np.trunc(expr_upper)
+        expr_lower = np.ceil(expr_lower)
+        expr_upper = np.floor(expr_upper)
 
         # estimate the arg bound that will round to meet the expr bounds
         # round_ties_even rounds to the nearest integer, with tie breaks

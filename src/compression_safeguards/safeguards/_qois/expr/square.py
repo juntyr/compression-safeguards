@@ -343,7 +343,7 @@ class ScalarSquare(Expr):
         exprv = np.square(argv)
 
         # apply the inverse function to get the bounds on arg
-        al = np.sqrt(np.maximum(0, expr_lower))
+        al = np.sqrt(np.maximum(expr_lower, 0))
         au = np.sqrt(expr_upper)
 
         # flip and swap the expr bounds to get the bounds on arg

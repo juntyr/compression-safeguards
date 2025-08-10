@@ -185,7 +185,7 @@ def ensure_bounded_expression_v2(
             bounds_exceeded,
             np.where(
                 below,
-                np.minimum(Xs_nudged, Xs),
+                np.minimum(Xs, Xs_nudged),
                 np.maximum(Xs, Xs_nudged),
             ),
             Xs_guess,
