@@ -507,15 +507,15 @@ class SumTerm:
         # stack the lower and upper bounds for each term factor
         tl_stack = np.stack(
             [
-                exprv + (tld * abs_factorv)
-                for abs_factorv in abs_factorvs
+                (termv if is_add else -termv) + (tld * abs_factorv)
+                for is_add, termv, abs_factorv in zip(is_adds, termvs, abs_factorvs)
                 if abs_factorv is not None
             ]
         )
         tu_stack = np.stack(
             [
-                exprv + (tlu * abs_factorv)
-                for abs_factorv in abs_factorvs
+                (termv if is_add else -termv) + (tlu * abs_factorv)
+                for is_add, termv, abs_factorv in zip(is_adds, termvs, abs_factorvs)
                 if abs_factorv is not None
             ]
         )
@@ -538,7 +538,8 @@ class SumTerm:
                 elif abs_factorv is None:
                     total_sum -= termv
                 else:
-                    total_sum -= t_stack[i]
+                    # subtract already taken into account above
+                    total_sum += t_stack[i]
                 i += abs_factorv is not None
             assert total_sum is not None
             return total_sum
