@@ -222,10 +222,11 @@ def test_abs(check):
 def test_polynomial(check):
     check("x")
     check("2*x")
-    # check("3*x + pi")
+    check("x + x")
+    check("3*x + pi")
     check("x**2")
     check("x**3")
-    # check("x**2 + x + 1")
+    check("x**2 + x + 1")
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -237,7 +238,7 @@ def test_exponential(check):
     check("exp(x)")
     check("exp2(x)")
     check("exp10(x)")
-    # check("2 ** (x + 1)")
+    check("2 ** (x + 1)")
 
     check_all_codecs(np.array([51.0]), "2**x")
     check_all_codecs(np.array([31.0]), "exp(x)")
@@ -249,23 +250,29 @@ def test_exponential(check):
 def test_logarithm(check):
     check("log(x, base=2)")
     check("ln(x)")
-    # check("ln(x + 1)")
+    check("ln(x + 1)")
     check("log2(x)")
-    # check("log2(x + 1)")
+    check("log2(x + 1)")
     check("log10(x)")
-    # check("log10(x + 1)")
+    check("log10(x + 1)")
     check("log(2, base=x)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_sign(check):
     check("sign(x)")
+    check("sign(x + 1)")
     check("sign(x * 2)")
     check("sign(e**x)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_rounding(check):
+    # check("floor(x)")
+    # check("ceil(x)")
+    # check("trunc(x)")
+    # check("round_ties_even(x)")
+
     check("floor(x) * floor(1.5)")
     check("ceil(x) * ceil(1.5)")
     check("trunc(x) * trunc(1.5)")
@@ -282,15 +289,15 @@ def test_inverse(check):
     check("1 / x**3")
 
     check("reciprocal(x)")
-    # check("reciprocal(x - 1)")
+    check("reciprocal(x - 1)")
     check("reciprocal(x**2)")
     check("reciprocal(x**3)")
     check("reciprocal(reciprocal(x))")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_power_function(check):
-#     check("1 / (x + 3)")
+@pytest.mark.parametrize("check", CHECKS)
+def test_power_function(check):
+    check("1 / (x + 3)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -307,56 +314,56 @@ def test_square(check):
     check("square(square(x))")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_sigmoid(check):
-#     check("1 / (1 + exp(-x))")
+@pytest.mark.parametrize("check", CHECKS)
+def test_sigmoid(check):
+    check("1 / (1 + exp(-x))")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_tanh(check):
-#     check("(exp(x) - exp(-x)) / (exp(x) + exp(-x))")
+@pytest.mark.parametrize("check", CHECKS)
+def test_tanh(check):
+    check("(exp(x) - exp(-x)) / (exp(x) + exp(-x))")
 
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_trigonometric(check):
     check("sin(x)")
-    # check("cos(x)")
-    # check("tan(x)")
-    # check("cot(x)")
-    # check("sec(x)")
-    # check("csc(x)")
+    check("cos(x)")
+    check("tan(x)")
+    check("cot(x)")
+    check("sec(x)")
+    check("csc(x)")
 
     check("asin(x)")
-    # check("acos(x)")
-    # check("atan(x)")
-    # check("acot(x)")
-    # check("asec(x)")
-    # check("acsc(x)")
+    check("acos(x)")
+    check("atan(x)")
+    check("acot(x)")
+    check("asec(x)")
+    check("acsc(x)")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_hyperbolic(check):
-#     check("sinh(x)")
-#     check("cosh(x)")
-#     check("tanh(x)")
-#     check("coth(x)")
-#     check("sech(x)")
-#     check("csch(x)")
+@pytest.mark.parametrize("check", CHECKS)
+def test_hyperbolic(check):
+    check("sinh(x)")
+    check("cosh(x)")
+    check("tanh(x)")
+    check("coth(x)")
+    check("sech(x)")
+    check("csch(x)")
 
-#     check("asinh(x)")
-#     check("acosh(x)")
-#     check("atanh(x)")
-#     check("acoth(x)")
-#     check("asech(x)")
-#     check("acsch(x)")
+    check("asinh(x)")
+    # check("acosh(x)")
+    check("atanh(x)")
+    check("acoth(x)")
+    check("asech(x)")
+    check("acsch(x)")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_composed(check):
-#     check("2 / (ln(x) + sqrt(x))")
+@pytest.mark.parametrize("check", CHECKS)
+def test_composed(check):
+    check("2 / (ln(x) + sqrt(x))")
 
-#     check_all_codecs(np.array([-1, 0, 1]), "exp(ln(x)+x)")
-#     check("exp(ln(x)+x)")
+    # check_all_codecs(np.array([-1, 0, 1]), "exp(ln(x)+x)")
+    # check("exp(ln(x)+x)")
 
 
 @pytest.mark.parametrize("dtype", sorted(d.name for d in Safeguards.supported_dtypes()))
@@ -364,21 +371,21 @@ def test_dtypes(dtype):
     check_all_codecs(np.array([[1]], dtype=dtype), "x/sqrt(pi)")
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_fuzzer_found(check):
-#     with pytest.warns(UserWarning, match="symbolic integer evaluation"):
-#         check_all_codecs(np.array([42.0], np.float16), "(((-8054**5852)-x)-1)")
-#     with pytest.warns(UserWarning, match="symbolic integer evaluation"):
-#         check("(((-8054**5852)-x)-1)")
+@pytest.mark.parametrize("check", CHECKS)
+def test_fuzzer_found(check):
+    with pytest.warns(UserWarning, match="symbolic integer evaluation"):
+        check_all_codecs(np.array([42.0], np.float16), "(((-8054**5852)-x)-1)")
+    with pytest.warns(UserWarning, match="symbolic integer evaluation"):
+        check("(((-8054**5852)-x)-1)")
 
-#     check_all_codecs(
-#         np.array([[18312761160228738559]], dtype=np.uint64), "((pi**(x**(x+x)))**1)"
-#     )
-#     check_all_codecs(np.array([-1024.0]), "((pi**(x**(x+x)))**1)")
-#     check("((pi**(x**(x+x)))**1)")
+    check_all_codecs(
+        np.array([[18312761160228738559]], dtype=np.uint64), "((pi**(x**(x+x)))**1)"
+    )
+    # check_all_codecs(np.array([-1024.0]), "((pi**(x**(x+x)))**1)")
+    # check("((pi**(x**(x+x)))**1)")
 
-#     check_all_codecs(np.array([], np.uint64), "(-((e/(22020**-37))**x))")
-#     check("(-((e/(22020**-37))**x))")
+    check_all_codecs(np.array([], np.uint64), "(-((e/(22020**-37))**x))")
+    check("(-((e/(22020**-37))**x))")
 
 
 def test_evaluate_expr_with_dtype():
@@ -479,10 +486,10 @@ def test_late_bound_constant():
     assert np.all(ok == np.array([True, True, True, False, False, False]).reshape(2, 3))
 
 
-# @pytest.mark.parametrize("check", CHECKS)
-# def test_pointwise_normalised_absolute_error(check):
-#     # pointwise normalised / range-relative absolute error bound
-#     check('(x - c["$x_min"]) / (c["$x_max"] - c["$x_min"])')
+@pytest.mark.parametrize("check", CHECKS)
+def test_pointwise_normalised_absolute_error(check):
+    # pointwise normalised / range-relative absolute error bound
+    check('(x - c["$x_min"]) / (c["$x_max"] - c["$x_min"])')
 
 
 # @pytest.mark.parametrize("check", CHECKS)
@@ -558,22 +565,22 @@ def test_fuzzer_found_sign_constant_fold():
     )
 
 
-# def test_fuzzer_found_logarithm_noise():
-#     from numcodecs_combinators.framed import FramedCodecStack
-#     from numcodecs_safeguards import SafeguardsCodec
+def test_fuzzer_found_logarithm_noise():
+    from numcodecs_combinators.framed import FramedCodecStack
+    from numcodecs_safeguards import SafeguardsCodec
 
-#     from .codecs import NoiseCodec
+    from .codecs import NoiseCodec
 
-#     data = np.linspace(-1.0, 1.0, 100, dtype=np.float16)
+    data = np.linspace(-1.0, 1.0, 100, dtype=np.float16)
 
-#     codec = SafeguardsCodec(
-#         codec=FramedCodecStack(NoiseCodec(seed=258957826)),
-#         safeguards=[
-#             PointwiseQuantityOfInterestErrorBoundSafeguard(
-#                 qoi="log2(x + 1)", type="ratio", eb=10
-#             ),
-#         ],
-#     )
+    codec = SafeguardsCodec(
+        codec=FramedCodecStack(NoiseCodec(seed=258957826)),
+        safeguards=[
+            PointwiseQuantityOfInterestErrorBoundSafeguard(
+                qoi="log2(x + 1)", type="ratio", eb=10
+            ),
+        ],
+    )
 
-#     encoded = codec.encode(data)
-#     codec.decode(encoded)
+    encoded = codec.encode(data)
+    codec.decode(encoded)

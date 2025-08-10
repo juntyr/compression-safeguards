@@ -559,7 +559,7 @@ class SumTerm:
             expr_lower,
             expr_upper,
         )
-        tu_stack = ensure_bounded_derived_error(
+        tu_stack = ensure_bounded_expression(
             compute_sum,
             exprv,
             np.stack(
@@ -574,10 +574,10 @@ class SumTerm:
             expr_upper,
         )
 
-        xl: np.ndarray[Ps, np.dtype[F]]
-        xu: np.ndarray[Ps, np.dtype[F]]
-        Xs_lower: None | np.ndarray[Ps, np.dtype[F]] = None
-        Xs_upper: None | np.ndarray[Ps, np.dtype[F]] = None
+        xl: np.ndarray[Ns, np.dtype[F]]
+        xu: np.ndarray[Ns, np.dtype[F]]
+        Xs_lower: None | np.ndarray[Ns, np.dtype[F]] = None
+        Xs_upper: None | np.ndarray[Ns, np.dtype[F]] = None
         i = 0
         for term, is_add, abs_factorv in zip(
             left_associative_sum, is_adds, abs_factorvs
@@ -585,8 +585,8 @@ class SumTerm:
             if abs_factorv is None:
                 continue
 
-            # recurse into the terms with a weighted error bound
-            xl, xu = term._expr.compute_data_error_bound(
+            # recurse into the terms with a weighted bound
+            xl, xu = term._expr.compute_data_bounds(
                 # flip the lower/upper error bound if the term is subtracted
                 tl_stack[i] if is_add else -tu_stack[i],
                 tu_stack[i] if is_add else -tl_stack[i],
