@@ -133,7 +133,8 @@ def ensure_bounded_expression_v2(
         exprv_Xs_guess = expr(Xs_guess)
         return ~np.where(
             _isfinite(exprv),
-            ((exprv_Xs_guess >= expr_lower) & (exprv_Xs_guess <= expr_upper)) | (Xs_guess == Xs),
+            ((exprv_Xs_guess >= expr_lower) & (exprv_Xs_guess <= expr_upper))
+            | (Xs_guess == Xs),
             np.where(
                 _isinf(exprv),
                 exprv_Xs_guess == exprv,
@@ -177,8 +178,7 @@ def ensure_bounded_expression_v2(
             print(Xs)
             print(Xs_guess)
             print("\n=====\n")
-            
-        
+
         Xs_nudged = Xs_guess + nudge * backoff
 
         Xs_guess = np.where(  # type: ignore

@@ -11,6 +11,7 @@ from ....utils.cast import (
     _nan_to_zero_inf_to_finite,
     _reciprocal,
     _nextafter,
+    _isnan,
 )
 from ..eb import ensure_bounded_derived_error, ensure_bounded_expression
 from .abc import Expr
@@ -147,6 +148,86 @@ class ScalarSin(Expr):
         #  even though it is periodic
         return self.compute_data_error_bound_unchecked(
             eb_expr_lower, eb_expr_upper, X, Xs, late_bound
+        )
+
+    def compute_data_bounds_unchecked(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # evaluate arg and sin(arg)
+        arg = self._a
+        argv = arg.eval(X.shape, Xs, late_bound)
+        exprv = np.sin(argv)
+
+        # apply the inverse function to get the bounds on arg
+        # ensure that the bounds on sin(...) are in [-1, +1]
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.asin(np.maximum(-1, expr_lower))
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.asin(np.minimum(expr_upper, 1))
+
+        # sin(...) is periodic, so we need to drop to difference bounds before
+        #  applying the difference to argv to stay in the same period
+        arg_lower_diff = arg_lower - np.asin(exprv)
+        arg_upper_diff = arg_upper - np.asin(exprv)
+
+        # np.asin maps to [-pi/2, +pi/2] where sin is monotonically increasing
+        # flip the argument error bounds where sin is monotonically decreasing
+        arg_lower = np.minimum(
+            argv,
+            argv
+            + np.where(
+                np.sin(argv + arg_lower_diff) > exprv, -arg_upper_diff, arg_lower_diff
+            ),
+        )  # type: ignore
+        arg_upper = np.maximum(
+            argv,
+            argv
+            + np.where(
+                np.sin(argv + arg_upper_diff) < exprv, -arg_lower_diff, arg_upper_diff
+            ),
+        )  # type: ignore
+
+        # handle rounding errors in asin(sin(...)) early
+        arg_lower = ensure_bounded_expression(
+            lambda arg_lower: np.sin(arg_lower),
+            exprv,
+            argv,
+            arg_lower,
+            expr_lower,
+            expr_upper,
+        )
+        arg_upper = ensure_bounded_expression(
+            lambda arg_upper: np.sin(arg_upper),
+            exprv,
+            argv,
+            arg_upper,
+            expr_lower,
+            expr_upper,
+        )
+
+        return arg.compute_data_bounds(
+            arg_lower,
+            arg_upper,
+            X,
+            Xs,
+            late_bound,
+        )
+
+    def compute_data_bounds(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # the unchecked method already handles rounding errors for sin,
+        #  even though it is periodic
+        return self.compute_data_bounds_unchecked(
+            expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:

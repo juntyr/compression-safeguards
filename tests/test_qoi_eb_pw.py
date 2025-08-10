@@ -322,7 +322,7 @@ def test_square(check):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_trigonometric(check):
-    # check("sin(x)")
+    check("sin(x)")
     # check("cos(x)")
     # check("tan(x)")
     # check("cot(x)")
