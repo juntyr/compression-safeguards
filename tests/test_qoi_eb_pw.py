@@ -220,14 +220,8 @@ def test_abs(check):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_polynomial(check):
-    if check in [
-        check_unit,
-        check_circle,
-        check_arange,
-        check_linspace,
-        check_edge_cases,
-    ]:
-        pytest.xfail("slow")
+    if check in [check_edge_cases]:
+        pytest.xfail("-0.0")
 
     check("x")
     check("2*x")
@@ -239,15 +233,6 @@ def test_polynomial(check):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_exponential(check):
-    if check in [
-        check_unit,
-        check_circle,
-        check_arange,
-        check_linspace,
-        check_edge_cases,
-    ]:
-        pytest.xfail("slow")
-
     check("0.5**x")
     check("2**x")
     check("3**x")
@@ -256,8 +241,6 @@ def test_exponential(check):
     check("exp2(x)")
     check("exp10(x)")
     # check("2 ** (x + 1)")
-
-    pytest.xfail("slow")
 
     check_all_codecs(np.array([51.0]), "2**x")
     check_all_codecs(np.array([31.0]), "exp(x)")
@@ -279,8 +262,6 @@ def test_logarithm(check):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_sign(check):
-    if check in [check_linspace, check_edge_cases]:
-        pytest.xfail("slow")
     check("sign(x)")
     check("sign(x * 2)")
     check("sign(e**x)")
@@ -296,14 +277,8 @@ def test_sign(check):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_inverse(check):
-    if check in [
-        check_unit,
-        check_circle,
-        check_arange,
-        check_linspace,
-        check_edge_cases,
-    ]:
-        pytest.xfail("slow")
+    if check in [check_edge_cases]:
+        pytest.xfail("-0.0")
 
     check("1 / x")
     check("1 / x**2")
@@ -323,9 +298,6 @@ def test_inverse(check):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_sqrt(check):
-    if check in [check_edge_cases]:
-        pytest.xfail("slow")
-
     check("sqrt(x)")
     check("1 / sqrt(x)")
     check("sqrt(sqrt(x))")
@@ -333,9 +305,6 @@ def test_sqrt(check):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_square(check):
-    if check in [check_edge_cases]:
-        pytest.xfail("slow")
-
     check("square(x)")
     check("1 / square(x)")
     check("square(square(x))")

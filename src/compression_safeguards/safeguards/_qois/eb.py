@@ -109,41 +109,48 @@ def ensure_bounded_derived_error(
 def ensure_bounded_expression(
     expr: Callable[[np.ndarray[Ps, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]],
     exprv: np.ndarray[Ps, np.dtype[F]],
-    X: np.ndarray[Ps, np.dtype[F]],
-    x_guess: np.ndarray[Ps, np.dtype[F]],
+    argv: np.ndarray[Ps, np.dtype[F]],
+    argv_guess: np.ndarray[Ps, np.dtype[F]],
     expr_lower: np.ndarray[Ps, np.dtype[F]],
     expr_upper: np.ndarray[Ps, np.dtype[F]],
 ) -> np.ndarray[Ps, np.dtype[F]]:
-    return ensure_bounded_expression_v2(expr, exprv, X, x_guess, expr_lower, expr_upper)
+    return ensure_bounded_expression_v2(
+        expr, exprv, argv, argv_guess, expr_lower, expr_upper
+    )
 
 
 def ensure_bounded_expression_v2(
     expr: Callable[[np.ndarray[Ns, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]],
     exprv: np.ndarray[Ps, np.dtype[F]],
     Xs: np.ndarray[Ns, np.dtype[F]],
-    x_guess: np.ndarray[Ns, np.dtype[F]],
+    Xs_guess: np.ndarray[Ns, np.dtype[F]],
     expr_lower: np.ndarray[Ps, np.dtype[F]],
     expr_upper: np.ndarray[Ps, np.dtype[F]],
 ) -> np.ndarray[Ns, np.dtype[F]]:
     # check if any derived expression exceeds the error bound
     # this check matches the QoI safeguard's validity check
-    def are_bounds_exceeded(x_guess: np.ndarray[Ns, np.dtype[F]]):
-        exprv_x_guess = expr(x_guess)
+    def are_bounds_exceeded(Xs_guess: np.ndarray[Ns, np.dtype[F]]):
+        exprv_Xs_guess = expr(Xs_guess)
         return ~np.where(
             _isfinite(exprv),
-            (exprv_x_guess >= expr_lower) & (exprv_x_guess <= expr_upper),
+            (exprv_Xs_guess >= expr_lower) & (exprv_Xs_guess <= expr_upper),
             np.where(
                 _isinf(exprv),
-                exprv_x_guess == exprv,
-                _isnan(exprv_x_guess),
+                exprv_Xs_guess == exprv,
+                _isnan(exprv_Xs_guess),
             ),
         )
 
-    while True:
-        bounds_exceeded = are_bounds_exceeded(x_guess)
+    for _ in range(3):
+        bounds_exceeded = are_bounds_exceeded(Xs_guess)
 
         if not np.any(bounds_exceeded):
-            return x_guess
+            return Xs_guess
 
         # try to nudge the guess towards the data
-        x_guess = np.where(bounds_exceeded, _nextafter(x_guess, Xs), x_guess)  # type: ignore
+        Xs_guess = np.where(bounds_exceeded, _nextafter(Xs_guess, Xs), Xs_guess)  # type: ignore
+
+    bounds_exceeded = are_bounds_exceeded(Xs_guess)
+
+    # TODO: improve with np.spacing
+    return np.where(bounds_exceeded, Xs, Xs_guess)  # type: ignore
