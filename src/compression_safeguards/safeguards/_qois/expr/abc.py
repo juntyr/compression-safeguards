@@ -301,6 +301,9 @@ class Expr:
             expr_lower, expr_upper, X, Xs, late_bound
         )
 
+        xl = np.minimum(Xs, xl)
+        xu = np.maximum(Xs, xu)
+
         exprv = self.eval(X.shape, Xs, late_bound)
 
         # handle rounding errors in the lower error bound computation

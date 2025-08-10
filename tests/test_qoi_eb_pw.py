@@ -220,9 +220,6 @@ def test_abs(check):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_polynomial(check):
-    if check in [check_edge_cases]:
-        pytest.xfail("-0.0")
-
     check("x")
     check("2*x")
     # check("3*x + pi")
@@ -250,14 +247,14 @@ def test_exponential(check):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_logarithm(check):
-    # check("log(x, base=2)")
+    check("log(x, base=2)")
     check("ln(x)")
     # check("ln(x + 1)")
     check("log2(x)")
     # check("log2(x + 1)")
     check("log10(x)")
     # check("log10(x + 1)")
-    # check("log(2, base=x)")
+    check("log(2, base=x)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
