@@ -224,6 +224,8 @@ def test_abs(check):
 @pytest.mark.parametrize("check", CHECKS)
 def test_polynomial(check):
     check("x")
+    check("x + 0")
+    check("x * 1")
     check("2*x")
     check("x + x")
     check("3*x + pi")
@@ -347,7 +349,7 @@ def test_hyperbolic(check):
     check("sinh(x)")
     check("cosh(x)")
     check("tanh(x)")
-    # check("coth(x)")
+    check("coth(x)")
     check("sech(x)")
     # check("csch(x)")
 

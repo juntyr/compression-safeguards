@@ -185,6 +185,9 @@ class ScalarMultiply(Expr):
             term_upper: np.ndarray[Ps, np.dtype[F]] = np.maximum(  # type: ignore
                 termv, np.where(constv < 0, -tl, tu)
             )
+            # if term_upper == termv and termv == -0.0, we need to guarantee
+            #  that term_upper is also -0.0
+            term_upper = np.where(term_upper == termv, termv, term_upper)  # type: ignore
 
             # handle rounding errors in multiply(divide(...)) early
             term_lower = ensure_bounded_expression(

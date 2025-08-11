@@ -181,20 +181,18 @@ class ScalarSin(Expr):
                 np.sin(argv + arg_lower_diff) > exprv, -arg_upper_diff, arg_lower_diff
             ),
         )  # type: ignore
-        # if argv == -0.0, we need to ensure that arg_upper is also -0.0
-        arg_upper = np.where(
-            argv == 0,
+        arg_upper = np.maximum(
             argv,
-            np.maximum(
-                argv,
-                argv
-                + np.where(
-                    np.sin(argv + arg_upper_diff) < exprv,
-                    -arg_lower_diff,
-                    arg_upper_diff,
-                ),
+            argv
+            + np.where(
+                np.sin(argv + arg_upper_diff) < exprv,
+                -arg_lower_diff,
+                arg_upper_diff,
             ),
         )  # type: ignore
+        # if arg_upper == argv and argv == -0.0, we need to guarantee that
+        #  arg_upper is also -0.0
+        arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
 
         # handle rounding errors in asin(sin(...)) early
         arg_lower = ensure_bounded_expression(
@@ -396,6 +394,9 @@ class ScalarAsin(Expr):
                 np.maximum(argv, np.sin(np.minimum(expr_upper, pi / 2))),
             ),
         )
+        # if arg_upper == argv and argv == -0.0, we need to guarantee that
+        #  arg_upper is also -0.0
+        arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
 
         # handle rounding errors in asin(sin(...)) early
         arg_lower = ensure_bounded_expression(
