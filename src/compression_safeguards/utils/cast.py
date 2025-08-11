@@ -92,7 +92,7 @@ def from_float(
         return np.where(
             x < imin,
             imin,
-            np.where(x <= imax, np.rint(x).astype(dtype, casting="unsafe"), imax),
+            np.where(x <= imax, _rint(x).astype(dtype, casting="unsafe"), imax),
         )  # type: ignore
 
 
@@ -494,6 +494,25 @@ def _symmetric_modulo(
     if (type(p) is _float128_type) or (p.dtype == _float128_dtype):
         res = np.mod(res + q, q)
     return np.subtract(res, q2)
+
+
+# wrapper around np.rint(a) that also works for numpy_quaddtype
+def _rint(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
+        return np.rint(a)  # type: ignore
+
+    a = np.array(a)
+
+    halfway = np.trunc(a) + np.where(a < 0, a.dtype.type(-0.5), a.dtype.type(0.5))
+
+    return np.where(  # type: ignore
+        a == halfway,
+        # we trust numpy_quaddtype on actual halfway cases
+        np.rint(a),
+        np.where(a < halfway, np.floor(a), np.ceil(a)),
+    )
 
 
 try:

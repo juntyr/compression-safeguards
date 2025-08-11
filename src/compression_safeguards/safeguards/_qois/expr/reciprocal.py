@@ -161,6 +161,12 @@ class ScalarReciprocal(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        def _is_negative(
+            x: np.ndarray[Ps, np.dtype[F]],
+        ) -> np.ndarray[Ps, np.dtype[np.bool]]:
+            # check not just for x < 0 but also for x == -0.0
+            return (x < 0) | ((1 / x) < 0)  # type: ignore
+
         # evaluate arg and reciprocal(arg)
         arg = self._a
         argv = arg.eval(X.shape, Xs, late_bound)
@@ -177,7 +183,7 @@ class ScalarReciprocal(Expr):
             argv,
             _reciprocal(
                 np.where(  # type: ignore
-                    exprv < 0,
+                    _is_negative(exprv),
                     np.minimum(expr_upper, -smallest_subnormal),
                     expr_upper,
                 )
@@ -187,7 +193,7 @@ class ScalarReciprocal(Expr):
             argv,
             _reciprocal(
                 np.where(  # type: ignore
-                    exprv < 0,
+                    _is_negative(exprv),
                     expr_lower,
                     np.maximum(smallest_subnormal, expr_lower),
                 )

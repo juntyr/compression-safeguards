@@ -6,6 +6,7 @@ from ...utils.cast import (
     _isfinite,
     _isinf,
     _isnan,
+    _nan_to_zero_inf_to_finite,
     _nextafter,
 )
 from ...utils.typing import F, S
@@ -132,14 +133,15 @@ def ensure_bounded_expression_v2(
     def are_bounds_exceeded(Xs_guess: np.ndarray[Ns, np.dtype[F]]):
         exprv_Xs_guess = expr(Xs_guess)
         return ~np.where(
-            _isfinite(exprv),
+            # NaN expressions must be preserved as NaN
+            _isnan(exprv),
+            _isnan(exprv_Xs_guess),
+            # otherwise check that the expression result is in bounds
             ((exprv_Xs_guess >= expr_lower) & (exprv_Xs_guess <= expr_upper))
+            # also allow equivalent inputs, which is needed for rewrites where
+            #  the rewrite might evaluate outside the bounds even for the
+            #  original input
             | (Xs_guess == Xs),
-            np.where(
-                _isinf(exprv),
-                exprv_Xs_guess == exprv,
-                _isnan(exprv_Xs_guess),
-            ),
         )
 
     for _ in range(3):
@@ -150,6 +152,17 @@ def ensure_bounded_expression_v2(
 
         # try to nudge the guess towards the data
         Xs_guess = np.where(bounds_exceeded, _nextafter(Xs_guess, Xs), Xs_guess)  # type: ignore
+
+    Xs_diff = _nan_to_zero_inf_to_finite(Xs_guess - Xs)
+
+    while True:
+        bounds_exceeded = are_bounds_exceeded(Xs_guess)
+
+        if not np.any(bounds_exceeded):
+            return Xs_guess
+
+        Xs_diff /= 2
+        Xs_guess = np.where(bounds_exceeded, Xs + Xs_diff, Xs_guess)  # type: ignore
 
     bounds_exceeded = are_bounds_exceeded(Xs_guess)
 

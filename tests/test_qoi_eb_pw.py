@@ -281,9 +281,6 @@ def test_rounding(check):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_inverse(check):
-    if check in [check_edge_cases]:
-        pytest.xfail("-0.0")
-
     check("1 / x")
     check("1 / x**2")
     check("1 / x**3")

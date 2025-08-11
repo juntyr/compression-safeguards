@@ -194,18 +194,24 @@ class ScalarFakeAbs(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        def _is_negative(
+            x: np.ndarray[Ps, np.dtype[F]],
+        ) -> np.ndarray[Ps, np.dtype[np.bool]]:
+            # check not just for x < 0 but also for x == -0.0
+            return (x < 0) | ((1 / x) < 0)  # type: ignore
+
         # evaluate arg
         arg = self._a
         argv = arg.eval(X.shape, Xs, late_bound)
 
         # flip the lower/upper bounds if the arg is negative
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            argv < 0,
+            _is_negative(argv),
             -expr_upper,
             expr_lower,
         )
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            argv < 0,
+            _is_negative(argv),
             -expr_lower,
             expr_upper,
         )

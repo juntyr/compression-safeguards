@@ -142,6 +142,11 @@ class ScalarSqrt(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # for sqrt(-0.0), we should return -0.0 as the inverse
+        # this ensures that 1/sqrt(-0.0) doesn't become 1/sqrt(0.0)
+        def _sqrt_inv(x: np.ndarray[Ps, np.dtype[F]]) -> np.ndarray[Ps, np.dtype[F]]:
+            return np.where(x == 0, x, np.square(np.maximum(0, x)))  # type: ignore
+
         # evaluate arg and sqrt(arg)
         arg = self._a
         argv = arg.eval(X.shape, Xs, late_bound)
@@ -158,12 +163,12 @@ class ScalarSqrt(Expr):
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             argv < 0,
             X.dtype.type(-np.inf),
-            np.minimum(argv, np.square(np.maximum(0, expr_lower))),
+            np.minimum(argv, _sqrt_inv(expr_lower)),
         )
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             argv < 0,
             -smallest_subnormal,
-            np.maximum(argv, np.square(expr_upper)),
+            np.maximum(argv, _sqrt_inv(expr_upper)),
         )
 
         # handle rounding errors in sqrt(square(...)) early

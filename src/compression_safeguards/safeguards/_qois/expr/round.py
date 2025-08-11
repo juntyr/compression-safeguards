@@ -3,7 +3,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from ....utils.bindings import Parameter
-from ....utils.cast import _nan_to_zero_inf_to_finite, _nextafter
+from ....utils.cast import _nan_to_zero_inf_to_finite, _nextafter, _rint
 from ..eb import ensure_bounded_derived_error, ensure_bounded_expression
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
@@ -525,7 +525,10 @@ class ScalarRoundTiesEven(Expr):
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
-            self._a, dtype, np.rint, ScalarRoundTiesEven
+            self._a,
+            dtype,
+            _rint,  # type: ignore
+            ScalarRoundTiesEven,
         )
 
     def eval(
@@ -534,7 +537,7 @@ class ScalarRoundTiesEven(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.rint(self._a.eval(x, Xs, late_bound))
+        return _rint(self._a.eval(x, Xs, late_bound))
 
     def compute_data_error_bound_unchecked(
         self,
@@ -547,7 +550,7 @@ class ScalarRoundTiesEven(Expr):
         # evaluate arg and round_ties_even(arg)
         arg = self._a
         argv = arg.eval(X.shape, Xs, late_bound)
-        exprv = np.rint(argv)
+        exprv = _rint(argv)
 
         # compute the rounded result that meets the error bounds
         exprv_lower = np.trunc(exprv + eb_expr_lower)
@@ -560,15 +563,15 @@ class ScalarRoundTiesEven(Expr):
         # update the error bounds
         # rounding allows zero error bounds on the expression to expand into
         #  non-zero error bounds on the argument
-        eal = np.minimum(argv_lower - argv, 0)
+        eal: np.ndarray[Ps, np.dtype[F]] = np.minimum(np.subtract(argv_lower, argv), 0)
         eal = _nan_to_zero_inf_to_finite(eal)
 
-        eau = np.maximum(0, argv_upper - argv)
+        eau: np.ndarray[Ps, np.dtype[F]] = np.maximum(0, np.subtract(argv_upper, argv))
         eau = _nan_to_zero_inf_to_finite(eau)
 
         # handle rounding errors in round_ties_even(...) early
         eal = ensure_bounded_derived_error(
-            lambda eal: np.rint(argv + eal),
+            lambda eal: _rint(argv + eal),
             exprv,
             argv,
             eal,
@@ -576,7 +579,7 @@ class ScalarRoundTiesEven(Expr):
             eb_expr_upper,
         )
         eau = ensure_bounded_derived_error(
-            lambda eau: np.rint(argv + eau),
+            lambda eau: _rint(argv + eau),
             exprv,
             argv,
             eau,
@@ -619,7 +622,7 @@ class ScalarRoundTiesEven(Expr):
         # evaluate arg and round_ties_even(arg)
         arg = self._a
         argv = arg.eval(X.shape, Xs, late_bound)
-        exprv = np.rint(argv)
+        exprv = _rint(argv)
 
         # compute the rounded result that meets the expr bounds
         # rounding uses integer steps, so e.g. round_ties_even(...) in
@@ -636,8 +639,9 @@ class ScalarRoundTiesEven(Expr):
         # handle rounding errors in round_ties_even(...) early
         # which can occur since our +-0.5 estimate doesn't account for the even
         #  tie breaking cases
+        # FIXME: https://github.com/numpy/numpy-user-dtypes/issues/129
         arg_lower = ensure_bounded_expression(
-            lambda arg_lower: np.rint(arg_lower),
+            lambda arg_lower: _rint(arg_lower),
             exprv,
             argv,
             arg_lower,
@@ -645,7 +649,7 @@ class ScalarRoundTiesEven(Expr):
             expr_upper,
         )
         arg_upper = ensure_bounded_expression(
-            lambda arg_upper: np.rint(arg_upper),
+            lambda arg_upper: _rint(arg_upper),
             exprv,
             argv,
             arg_upper,
