@@ -181,11 +181,18 @@ class ScalarSin(Expr):
                 np.sin(argv + arg_lower_diff) > exprv, -arg_upper_diff, arg_lower_diff
             ),
         )  # type: ignore
-        arg_upper = np.maximum(
+        # if argv == -0.0, we need to ensure that arg_upper is also -0.0
+        arg_upper = np.where(
+            argv == 0,
             argv,
-            argv
-            + np.where(
-                np.sin(argv + arg_upper_diff) < exprv, -arg_lower_diff, arg_upper_diff
+            np.maximum(
+                argv,
+                argv
+                + np.where(
+                    np.sin(argv + arg_upper_diff) < exprv,
+                    -arg_lower_diff,
+                    arg_upper_diff,
+                ),
             ),
         )  # type: ignore
 

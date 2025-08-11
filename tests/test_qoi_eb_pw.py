@@ -70,6 +70,7 @@ def check_linspace(qoi: str):
     check_all_codecs(np.linspace(-1024, 1024, 2831, dtype=np.float32), qoi)
 
 
+# FIXME: could we also test the float128 edge cases, somehow?
 def check_edge_cases(qoi: str):
     check_all_codecs(
         np.array(
@@ -80,10 +81,12 @@ def check_edge_cases(qoi: str):
                 -np.nan,
                 np.finfo(float).min,
                 np.finfo(float).max,
-                np.finfo(float).tiny,
-                -np.finfo(float).tiny,
+                np.finfo(float).smallest_normal,
+                -np.finfo(float).smallest_normal,
+                np.finfo(float).smallest_subnormal,
+                -np.finfo(float).smallest_subnormal,
+                0.0,
                 -0.0,
-                +0.0,
             ]
         ),
         qoi,
@@ -301,6 +304,7 @@ def test_power_function(check):
 def test_sqrt(check):
     check("sqrt(x)")
     check("1 / sqrt(x)")
+    check("reciprocal(sqrt(x))")
     check("sqrt(sqrt(x))")
 
 
@@ -326,9 +330,9 @@ def test_trigonometric(check):
     check("sin(x)")
     check("cos(x)")
     check("tan(x)")
-    # check("cot(x)")
+    check("cot(x)")
     check("sec(x)")
-    # check("csc(x)")
+    check("csc(x)")
 
     check("asin(x)")
     check("acos(x)")

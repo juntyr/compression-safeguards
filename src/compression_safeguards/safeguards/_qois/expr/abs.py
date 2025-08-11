@@ -141,6 +141,12 @@ class ScalarAbs(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        def _is_negative(
+            x: np.ndarray[Ps, np.dtype[F]],
+        ) -> np.ndarray[Ps, np.dtype[np.bool]]:
+            # check not just for x < 0 but also for x == -0.0
+            return (x < 0) | ((1 / x) < 0)  # type: ignore
+
         # evaluate arg
         arg = self._a
         argv = arg.eval(X.shape, Xs, late_bound)
@@ -151,10 +157,10 @@ class ScalarAbs(Expr):
         #  - a < 0 and 0 < el <= eu -> al = -eu, au = -el
         #  - el <= 0 -> al = -eu, au = eu
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            (expr_lower <= 0) | (argv < 0), -expr_upper, expr_lower
+            (expr_lower <= 0) | _is_negative(argv), -expr_upper, expr_lower
         )
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            (expr_lower > 0) & (argv < 0), -expr_lower, expr_upper
+            (expr_lower > 0) & _is_negative(argv), -expr_lower, expr_upper
         )
 
         return arg.compute_data_bounds(

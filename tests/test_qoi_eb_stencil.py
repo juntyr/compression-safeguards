@@ -122,10 +122,12 @@
 #             -np.nan,
 #             np.finfo(float).min,
 #             np.finfo(float).max,
-#             np.finfo(float).tiny,
-#             -np.finfo(float).tiny,
+#             np.finfo(float).smallest_normal,
+#             -np.finfo(float).smallest_normal,
+#             np.finfo(float).smallest_subnormal,
+#             -np.finfo(float).smallest_subnormal,
+#             0.0,
 #             -0.0,
-#             +0.0,
 #         ]
 #     )
 #     check_all_codecs(

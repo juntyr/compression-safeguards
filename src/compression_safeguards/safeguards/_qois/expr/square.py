@@ -342,6 +342,12 @@ class ScalarSquare(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        def _is_negative(
+            x: np.ndarray[Ps, np.dtype[F]],
+        ) -> np.ndarray[Ps, np.dtype[np.bool]]:
+            # check not just for x < 0 but also for x == -0.0
+            return (x < 0) | ((1 / x) < 0)  # type: ignore
+
         # evaluate arg and square(arg)
         arg = self._a
         argv = arg.eval(X.shape, Xs, late_bound)
@@ -357,10 +363,10 @@ class ScalarSquare(Expr):
         #  - a < 0 and 0 < el <= eu -> al = -eu, au = -el
         #  - el <= 0 -> al = -eu, au = eu
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            (expr_lower <= 0) | (argv < 0), -au, al
+            (expr_lower <= 0) | _is_negative(argv), -au, al
         )
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            (expr_lower > 0) & (argv < 0), -al, au
+            (expr_lower > 0) & _is_negative(argv), -al, au
         )
 
         arg_lower = np.minimum(argv, arg_lower)
