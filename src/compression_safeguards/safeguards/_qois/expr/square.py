@@ -170,8 +170,9 @@ class ScalarSqrt(Expr):
             -smallest_subnormal,
             np.maximum(argv, _sqrt_inv(expr_upper)),
         )
-        # if arg_upper == argv and argv == -0.0, we need to guarantee that
-        #  arg_upper is also -0.0
+        # if arg_lower == argv and argv == -0.0, we need to guarantee that
+        #  arg_lower is also -0.0, same for arg_upper
+        arg_lower = np.where(arg_lower == argv, argv, arg_lower)  # type: ignore
         arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
 
         # handle rounding errors in sqrt(square(...)) early
@@ -374,8 +375,9 @@ class ScalarSquare(Expr):
 
         arg_lower = np.minimum(argv, arg_lower)
         arg_upper = np.maximum(argv, arg_upper)
-        # if arg_upper == argv and argv == -0.0, we need to guarantee that
-        #  arg_upper is also -0.0
+        # if arg_lower == argv and argv == -0.0, we need to guarantee that
+        #  arg_lower is also -0.0, same for arg_upper
+        arg_lower = np.where(arg_lower == argv, argv, arg_lower)  # type: ignore
         arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
 
         # handle rounding errors in square(sqrt(...)) early

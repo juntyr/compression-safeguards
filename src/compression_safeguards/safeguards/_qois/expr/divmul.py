@@ -5,7 +5,12 @@ from math import gcd
 import numpy as np
 
 from ....utils.bindings import Parameter
-from ....utils.cast import _float128_dtype, _float128_max, _nan_to_zero_inf_to_finite
+from ....utils.cast import (
+    _float128_dtype,
+    _float128_max,
+    _isnan,
+    _nan_to_zero_inf_to_finite,
+)
 from ..eb import ensure_bounded_derived_error, ensure_bounded_expression
 from .abc import Expr
 from .addsub import ScalarAdd, ScalarSubtract
@@ -168,15 +173,25 @@ class ScalarMultiply(Expr):
             )
 
             # for x*0, we can allow any finite x
+            # for x*NaN, we can allow any x but only propagate [-inf, inf]
+            #  since [-NaN, NaN] would be misunderstood as only NaN
             tl = np.where(
                 constv == 0,
                 -fmax,
-                expr_lower / np.abs(constv),
+                np.where(
+                    _isnan(constv),
+                    X.dtype.type(-np.inf),
+                    expr_lower / np.abs(constv),
+                ),
             )
             tu = np.where(
                 constv == 0,
                 fmax,
-                expr_upper / np.abs(constv),
+                np.where(
+                    _isnan(constv),
+                    X.dtype.type(np.inf),
+                    expr_upper / np.abs(constv),
+                ),
             )
 
             term_lower: np.ndarray[Ps, np.dtype[F]] = np.minimum(  # type: ignore

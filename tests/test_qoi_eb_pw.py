@@ -351,14 +351,14 @@ def test_hyperbolic(check):
     check("tanh(x)")
     check("coth(x)")
     check("sech(x)")
-    # check("csch(x)")
+    check("csch(x)")
 
     check("asinh(x)")
-    # check("acosh(x)")
+    check("acosh(x)")
     check("atanh(x)")
     check("acoth(x)")
     check("asech(x)")
-    # check("acsch(x)")
+    check("acsch(x)")
 
 
 @pytest.mark.parametrize("check", CHECKS)

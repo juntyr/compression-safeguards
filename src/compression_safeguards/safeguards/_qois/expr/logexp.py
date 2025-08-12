@@ -177,8 +177,9 @@ class ScalarLog(Expr):
             -smallest_subnormal,
             np.maximum(argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_upper)),
         )
-        # if arg_upper == argv and argv == -0.0, we need to guarantee that
-        #  arg_upper is also -0.0
+        # if arg_lower == argv and argv == -0.0, we need to guarantee that
+        #  arg_lower is also -0.0, same for arg_upper
+        arg_lower = np.where(arg_lower == argv, argv, arg_lower)  # type: ignore
         arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
 
         # handle rounding errors in log(exp(...)) early
@@ -391,8 +392,9 @@ class ScalarExp(Expr):
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.maximum(
             argv, (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(expr_upper)
         )
-        # if arg_upper == argv and argv == -0.0, we need to guarantee that
-        #  arg_upper is also -0.0
+        # if arg_lower == argv and argv == -0.0, we need to guarantee that
+        #  arg_lower is also -0.0, same for arg_upper
+        arg_lower = np.where(arg_lower == argv, argv, arg_lower)  # type: ignore
         arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
 
         # handle rounding errors in exp(log(...)) early

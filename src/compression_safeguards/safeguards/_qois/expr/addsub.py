@@ -459,6 +459,11 @@ class SumTerm:
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        def _zero_add(
+            a: np.ndarray[Ps, np.dtype[F]], b: np.ndarray[Ps, np.dtype[F]]
+        ) -> np.ndarray[Ps, np.dtype[F]]:
+            return np.where(b == 0, a, a + b)  # type: ignore
+
         is_adds: list[bool] = []
         termvs: list[np.ndarray[Ps, np.dtype[F]]] = []
         abs_factorvs: list[None | np.ndarray[Ps, np.dtype[F]]] = []
@@ -501,20 +506,21 @@ class SumTerm:
         # if total_abs_factor is zero, then all abs_factorv are also zero
         # eb/0 = NaN is converted back to zero, so we just push down zero
         #  error bounds, which is not incorrect
+        # TODO: deal with zero and NaN abs factors here
         tld: np.ndarray[Ps, np.dtype[F]] = expr_lower_diff / total_abs_factor
         tlu: np.ndarray[Ps, np.dtype[F]] = expr_upper_diff / total_abs_factor
 
         # stack the lower and upper bounds for each term factor
         tl_stack = np.stack(
             [
-                (termv if is_add else -termv) + (tld * abs_factorv)
+                _zero_add((termv if is_add else -termv), (tld * abs_factorv))
                 for is_add, termv, abs_factorv in zip(is_adds, termvs, abs_factorvs)
                 if abs_factorv is not None
             ]
         )
         tu_stack = np.stack(
             [
-                (termv if is_add else -termv) + (tlu * abs_factorv)
+                _zero_add((termv if is_add else -termv), (tlu * abs_factorv))
                 for is_add, termv, abs_factorv in zip(is_adds, termvs, abs_factorvs)
                 if abs_factorv is not None
             ]
@@ -576,8 +582,8 @@ class SumTerm:
 
         xl: np.ndarray[Ns, np.dtype[F]]
         xu: np.ndarray[Ns, np.dtype[F]]
-        Xs_lower: None | np.ndarray[Ns, np.dtype[F]] = None
-        Xs_upper: None | np.ndarray[Ns, np.dtype[F]] = None
+        Xs_lower_: None | np.ndarray[Ns, np.dtype[F]] = None
+        Xs_upper_: None | np.ndarray[Ns, np.dtype[F]] = None
         i = 0
         for term, is_add, abs_factorv in zip(
             left_associative_sum, is_adds, abs_factorvs
@@ -596,18 +602,26 @@ class SumTerm:
             )
 
             # combine the inner error bounds
-            if Xs_lower is None:
-                Xs_lower = xl
+            if Xs_lower_ is None:
+                Xs_lower_ = xl
             else:
-                Xs_lower = np.maximum(Xs_lower, xl)
-            if Xs_upper is None:
-                Xs_upper = xu
+                Xs_lower_ = np.maximum(Xs_lower_, xl)
+            if Xs_upper_ is None:
+                Xs_upper_ = xu
             else:
-                Xs_upper = np.minimum(Xs_upper, xu)
+                Xs_upper_ = np.minimum(Xs_upper_, xu)
 
             i += 1
 
-        assert Xs_lower is not None
-        assert Xs_upper is not None
+        assert Xs_lower_ is not None
+        assert Xs_upper_ is not None
+        Xs_lower: np.ndarray[Ns, np.dtype[F]] = Xs_lower_
+        Xs_upper: np.ndarray[Ns, np.dtype[F]] = Xs_upper_
 
-        return np.minimum(Xs, Xs_lower), np.maximum(Xs, Xs_upper)
+        Xs_lower = np.minimum(Xs_lower, Xs)
+        Xs_upper = np.maximum(Xs_upper, Xs)
+
+        Xs_lower = np.where(Xs_lower == Xs, Xs, Xs_lower)  # type: ignore
+        Xs_upper = np.where(Xs_upper == Xs, Xs, Xs_upper)  # type: ignore
+
+        return Xs_lower, Xs_upper
