@@ -309,27 +309,32 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         qoi_lower, qoi_upper = qoi_lower_upper
 
         # compute the bounds in data space
-        x_lower, x_upper = self._qoi_expr.compute_data_bounds(
+        data_float_lower, data_float_upper = self._qoi_expr.compute_data_bounds(
             qoi_lower,
             qoi_upper,
             data_float,
             late_bound_constants,
         )
-        x_lowerf, x_upperf = x_lower.flatten(), x_upper.flatten()
+        dataf_float_lower, dataf_float_upper = (
+            data_float_lower.flatten(),
+            data_float_upper.flatten(),
+        )
 
         dataf = data.flatten()
 
         valid = Interval.empty_like(dataf).preserve_inf(dataf).preserve_finite(dataf)
-        Lower(np.maximum(valid._lower, from_float(x_lowerf, dataf.dtype))) <= valid[
-            _isfinite(dataf)
-        ] <= Upper(np.minimum(from_float(x_upperf, dataf.dtype), valid._upper))
+        Lower(
+            np.maximum(valid._lower, from_float(dataf_float_lower, dataf.dtype))
+        ) <= valid[_isfinite(dataf)] <= Upper(
+            np.minimum(from_float(dataf_float_upper, dataf.dtype), valid._upper)
+        )
 
         # correct rounding errors in the lower and upper bound
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            lower_outside_bound = to_float(valid._lower) < x_lowerf
-            upper_outside_bound = to_float(valid._upper) > x_upperf
+            lower_outside_bound = to_float(valid._lower) < dataf_float_lower
+            upper_outside_bound = to_float(valid._upper) > dataf_float_upper
 
         Lower(
             from_total_order(
