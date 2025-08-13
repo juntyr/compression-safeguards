@@ -1,5 +1,5 @@
 import itertools
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from typing import Callable
 
 import numpy as np
@@ -120,38 +120,67 @@ class Array(Expr):
 
     @staticmethod
     def map_binary(left: Expr, right: Expr, m: Callable[[Expr, Expr], Expr]) -> Expr:
-        if isinstance(left, Array):
-            if isinstance(right, Array):
-                if left.shape != right.shape:
+        if not (isinstance(left, Array) or isinstance(right, Array)):
+            return m(left, right)
+
+        shape = None
+        size = 0
+        iters: list[Iterator[Expr]] = []
+
+        for i, expr in enumerate([left, right]):
+            if isinstance(expr, Array):
+                if shape is not None and expr.shape != shape:
                     raise ValueError(
-                        f"shape mismatch between operands {left.shape} and {right.shape}"
+                        f"shape mismatch between operands, expected {shape} but found {expr.shape} for operand {i + 1}"
                     )
-                out = Array.__new__(Array)
-                out._array = np.fromiter(
-                    (m(le, ri) for le, ri in zip(left._array.flat, right._array.flat)),
-                    dtype=object,
-                    count=left._array.size,
-                ).reshape(left._array.shape)
-                return out
+                shape = expr.shape
+                size = expr._array.size
+                iters.append(expr._array.flat)
+            else:
+                iters.append(itertools.repeat(expr))
 
-            out = Array.__new__(Array)
-            out._array = np.fromiter(
-                (m(le, right) for le in left._array.flat),
-                dtype=object,
-                count=left._array.size,
-            ).reshape(left._array.shape)
-            return out
+        out = Array.__new__(Array)
+        out._array = np.fromiter(
+            (m(li, ri) for li, ri in zip(*iters)),
+            dtype=object,
+            count=size,
+        ).reshape(shape)
+        return out
 
-        if isinstance(right, Array):
-            out = Array.__new__(Array)
-            out._array = np.fromiter(
-                (m(left, ri) for ri in right._array.flat),
-                dtype=object,
-                count=right._array.size,
-            ).reshape(right._array.shape)
-            return out
+    @staticmethod
+    def map_ternary(
+        left: Expr, middle: Expr, right: Expr, m: Callable[[Expr, Expr, Expr], Expr]
+    ) -> Expr:
+        if not (
+            isinstance(left, Array)
+            or isinstance(middle, Array)
+            or isinstance(right, Array)
+        ):
+            return m(left, middle, right)
 
-        return m(left, right)
+        shape = None
+        size = 0
+        iters: list[Iterator[Expr]] = []
+
+        for i, expr in enumerate([left, middle, right]):
+            if isinstance(expr, Array):
+                if shape is not None and expr.shape != shape:
+                    raise ValueError(
+                        f"shape mismatch between operands, expected {shape} but found {expr.shape} for operand {i + 1}"
+                    )
+                shape = expr.shape
+                size = expr._array.size
+                iters.append(expr._array.flat)
+            else:
+                iters.append(itertools.repeat(expr))
+
+        out = Array.__new__(Array)
+        out._array = np.fromiter(
+            (m(li, mi, ri) for li, mi, ri in zip(*iters)),
+            dtype=object,
+            count=size,
+        ).reshape(shape)
+        return out
 
     def index(self, index: tuple[int | slice, ...]) -> Expr:
         a = self._array[index]

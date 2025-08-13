@@ -92,6 +92,12 @@ class QoILexer(Lexer):
         ACOTH,  # type: ignore[name-defined]  # noqa: F821
         ASECH,  # type: ignore[name-defined]  # noqa: F821
         ACSCH,  # type: ignore[name-defined]  # noqa: F821
+        # classification
+        ISFINITE,  # type: ignore[name-defined]  # noqa: F821
+        ISINF,  # type: ignore[name-defined]  # noqa: F821
+        ISNAN,  # type: ignore[name-defined]  # noqa: F821
+        # conditional
+        WHERE,  # type: ignore[name-defined]  # noqa: F821
         # array operations
         SUM,  # type: ignore[name-defined]  # noqa: F821
         MATMUL,  # type: ignore[name-defined]  # noqa: F821
@@ -233,6 +239,12 @@ class QoILexer(Lexer):
     ID["acoth"] = ACOTH  # type: ignore[index, name-defined]  # noqa: F821
     ID["asech"] = ASECH  # type: ignore[index, name-defined]  # noqa: F821
     ID["acsch"] = ACSCH  # type: ignore[index, name-defined]  # noqa: F821
+    # classification
+    ID["isfinite"] = ISFINITE  # type: ignore[index, name-defined]  # noqa: F821
+    ID["isinf"] = ISINF  # type: ignore[index, name-defined]  # noqa: F821
+    ID["isnan"] = ISNAN  # type: ignore[index, name-defined]  # noqa: F821
+    # conditional
+    ID["where"] = WHERE  # type: ignore[index, name-defined]  # noqa: F821
     # array operations
     ID["sum"] = SUM  # type: ignore[index, name-defined]  # noqa: F821
     ID["matmul"] = MATMUL  # type: ignore[index, name-defined]  # noqa: F821
@@ -361,6 +373,12 @@ class QoILexer(Lexer):
             "ACOTH": "`acoth`",
             "ASECH": "`asech`",
             "ACSCH": "`acsch`",
+            # classification
+            "ISFINITE": "`isfinite`",
+            "ISINF": "`isinf`",
+            "ISNAN": "`isnan`",
+            # conditional
+            "WHERE": "`where`",
             # array operations
             "SUM": "`sum`",
             "MATMUL": "`matmul`",

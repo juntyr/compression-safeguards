@@ -88,13 +88,42 @@ class ScalarFoldedConstant(Expr):
     ) -> F | Expr:
         fleft = left.constant_fold(dtype)
         fright = right.constant_fold(dtype)
-        if isinstance(fleft, Expr):
-            if isinstance(fright, Expr):
-                return rm(fleft, fright)
-            return rm(fleft, ScalarFoldedConstant(fright))
-        if isinstance(fright, Expr):
-            return rm(ScalarFoldedConstant(fleft), fright)
-        return m(fleft, fright)
+
+        if not (isinstance(fleft, Expr) or isinstance(fright, Expr)):
+            return m(fleft, fright)
+
+        fleft = fleft if isinstance(fleft, Expr) else ScalarFoldedConstant(fleft)
+        fright = fright if isinstance(fright, Expr) else ScalarFoldedConstant(fright)
+
+        return rm(fleft, fright)
+
+    @staticmethod
+    def constant_fold_ternary(
+        left: Expr,
+        middle: Expr,
+        right: Expr,
+        dtype: np.dtype[F],
+        m: Callable[[F, F, F], F],
+        rm: Callable[[Expr, Expr, Expr], Expr],
+    ) -> F | Expr:
+        fleft = left.constant_fold(dtype)
+        fmiddle = middle.constant_fold(dtype)
+        fright = right.constant_fold(dtype)
+
+        if not (
+            isinstance(fleft, Expr)
+            or isinstance(fmiddle, Expr)
+            or isinstance(fright, Expr)
+        ):
+            return m(fleft, fmiddle, fright)
+
+        fleft = fleft if isinstance(fleft, Expr) else ScalarFoldedConstant(fleft)
+        fmiddle = (
+            fmiddle if isinstance(fmiddle, Expr) else ScalarFoldedConstant(fmiddle)
+        )
+        fright = fright if isinstance(fright, Expr) else ScalarFoldedConstant(fright)
+
+        return rm(fleft, fmiddle, fright)
 
     @staticmethod
     def constant_fold_expr(expr: Expr, dtype: np.dtype[F]) -> "Expr":

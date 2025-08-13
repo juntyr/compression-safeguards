@@ -8,6 +8,7 @@ from .expr.abc import Expr
 from .expr.abs import ScalarAbs
 from .expr.addsub import ScalarAdd, ScalarSubtract
 from .expr.array import Array
+from .expr.classification import ScalarIsFinite, ScalarIsInf, ScalarIsNaN
 from .expr.data import Data, LateBoundConstant
 from .expr.divmul import ScalarDivide, ScalarMultiply
 from .expr.finite_difference import (
@@ -32,6 +33,7 @@ from .expr.trigonometric import (
     ScalarTrigonometric,
     Trigonometric,
 )
+from .expr.where import ScalarWhere
 from .lexer import QoILexer
 
 
@@ -411,9 +413,7 @@ class QoIParser(Parser):
     @_("LOG LPAREN expr COMMA BASE EQUAL expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
-            return Array.map_binary(
-                p.expr0, p.expr1, lambda a, b: ScalarLogWithBase(a, b)
-            )
+            return Array.map_binary(p.expr0, p.expr1, ScalarLogWithBase)
 
     @_("EXP LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -583,6 +583,25 @@ class QoIParser(Parser):
     @_("ACSCH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.acsch, e))
+
+    # classification
+    @_("ISFINITE LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, ScalarIsFinite)
+
+    @_("ISINF LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, ScalarIsInf)
+
+    @_("ISNAN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map_unary(p.expr, ScalarIsNaN)
+
+    # conditional
+    @_("WHERE LPAREN expr COMMA expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
+            return Array.map_ternary(p.expr0, p.expr1, p.expr2, ScalarWhere)
 
     # array operations
     @_("SUM LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821

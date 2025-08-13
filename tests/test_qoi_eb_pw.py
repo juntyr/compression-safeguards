@@ -383,6 +383,18 @@ def test_hyperbolic(check):
 
 
 @pytest.mark.parametrize("check", CHECKS)
+def test_classification(check):
+    check("isfinite(x)")
+    check("isinf(x)")
+    check("isnan(x)")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_where(check):
+    check("where(x, 1, 0)")
+
+
+@pytest.mark.parametrize("check", CHECKS)
 def test_composed(check):
     check("2 / (ln(x) + sqrt(x))")
 
