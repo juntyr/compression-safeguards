@@ -190,6 +190,12 @@ def generate_parameter(
             "acoth": 1,
             "asech": 1,
             "acsch": 1,
+            # classification
+            "isfinite": 1,
+            "isinf": 1,
+            "isnan": 1,
+            # conditional
+            "where": 3,
         }
 
         if ty is StencilQuantityOfInterestExpression:
