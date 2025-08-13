@@ -8,6 +8,8 @@ from ....utils.bindings import Parameter
 from ....utils.cast import (
     _float128_dtype,
     _float128_max,
+    _float128_smallest_subnormal,
+    _isinf,
     _isnan,
     _nan_to_zero_inf_to_finite,
 )
@@ -168,29 +170,42 @@ class ScalarMultiply(Expr):
             # mul of two terms is commutative
             exprv = np.multiply(termv, constv)
 
-            fmax = (
-                _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
-            )
+            if X.dtype == _float128_dtype:
+                fmax = _float128_max
+                smallest_subnormal = _float128_smallest_subnormal
+            else:
+                finfo = np.finfo(X.dtype)
+                fmax = finfo.max
+                smallest_subnormal = finfo.smallest_subnormal
 
             # for x*0, we can allow any finite x
+            # for x*Inf, we can allow any non-zero non-NaN x with the same sign
             # for x*NaN, we can allow any x but only propagate [-inf, inf]
             #  since [-NaN, NaN] would be misunderstood as only NaN
             tl = np.where(
                 constv == 0,
                 -fmax,
                 np.where(
-                    _isnan(constv),
-                    X.dtype.type(-np.inf),
-                    expr_lower / np.abs(constv),
+                    _isinf(constv),
+                    smallest_subnormal,
+                    np.where(
+                        _isnan(constv),
+                        X.dtype.type(-np.inf),
+                        expr_lower / np.abs(constv),
+                    ),
                 ),
             )
             tu = np.where(
                 constv == 0,
                 fmax,
                 np.where(
-                    _isnan(constv),
+                    _isinf(constv),
                     X.dtype.type(np.inf),
-                    expr_upper / np.abs(constv),
+                    np.where(
+                        _isnan(constv),
+                        X.dtype.type(np.inf),
+                        expr_upper / np.abs(constv),
+                    ),
                 ),
             )
 
@@ -200,8 +215,9 @@ class ScalarMultiply(Expr):
             term_upper: np.ndarray[Ps, np.dtype[F]] = np.maximum(  # type: ignore
                 termv, np.where(constv < 0, -tl, tu)
             )
-            # if term_upper == termv and termv == -0.0, we need to guarantee
-            #  that term_upper is also -0.0
+            # if term_lower == termv and termv == -0.0, we need to guarantee
+            #  that term_lower is also -0.0, same for term_upper
+            term_lower = np.where(term_lower == termv, termv, term_lower)  # type: ignore
             term_upper = np.where(term_upper == termv, termv, term_upper)  # type: ignore
 
             # handle rounding errors in multiply(divide(...)) early

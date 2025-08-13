@@ -223,9 +223,30 @@ def test_abs(check):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_polynomial(check):
+    # identities
     check("x")
     check("x + 0")
     check("x * 1")
+
+    # x * 0
+    check("x * 0")
+
+    # x + (inf / -inf, NaN)
+    check("x + (1/0)")
+    check("x + (-1/0)")
+    check("x + (0/0)")
+
+    # x * (inf / -inf, NaN)
+    check("x * (1/0)")
+    check("x * (-1/0)")
+    check("x * (0/0)")
+
+    # sum(x * (inf / -inf, NaN), 0)
+    check("x * (1/0) + 0")
+    check("x * (-1/0) + 0")
+    check("x * (0/0) + 0")
+
+    # some simple polynomials
     check("2*x")
     check("x + x")
     check("3*x + pi")
@@ -365,8 +386,8 @@ def test_hyperbolic(check):
 def test_composed(check):
     check("2 / (ln(x) + sqrt(x))")
 
-    # check_all_codecs(np.array([-1, 0, 1]), "exp(ln(x)+x)")
-    # check("exp(ln(x)+x)")
+    check_all_codecs(np.array([-1, 0, 1]), "exp(ln(x)+x)")
+    check("exp(ln(x)+x)")
 
 
 @pytest.mark.parametrize("dtype", sorted(d.name for d in Safeguards.supported_dtypes()))
@@ -384,6 +405,7 @@ def test_fuzzer_found(check):
     check_all_codecs(
         np.array([[18312761160228738559]], dtype=np.uint64), "((pi**(x**(x+x)))**1)"
     )
+    # FIXME: maybe (...)**(...=0) is not correctly propagated?
     # check_all_codecs(np.array([-1024.0]), "((pi**(x**(x+x)))**1)")
     # check("((pi**(x**(x+x)))**1)")
 

@@ -4,7 +4,14 @@ from collections.abc import Mapping
 import numpy as np
 
 from ....utils.bindings import Parameter
-from ....utils.cast import _nan_to_zero_inf_to_finite
+from ....utils.cast import (
+    _float128_dtype,
+    _float128_max,
+    _isinf,
+    _isnan,
+    _nan_to_zero,
+    _nan_to_zero_inf_to_finite,
+)
 from ..eb import ensure_bounded_derived_error, ensure_bounded_expression
 from .abc import Expr
 from .abs import ScalarAbs
@@ -500,27 +507,58 @@ class SumTerm:
         total_abs_factor: np.ndarray[Ps, np.dtype[F]] = total_abs_factor_
 
         # drop into expression difference bounds to divide up the bound
-        expr_lower_diff: np.ndarray[Ps, np.dtype[F]] = expr_lower - exprv
-        expr_upper_diff: np.ndarray[Ps, np.dtype[F]] = expr_upper - exprv
+        # for NaN sums, we use a zero difference to ensure NaNs don't
+        #  accidentally propagate into the term error bounds
+        expr_lower_diff: np.ndarray[Ps, np.dtype[F]] = _nan_to_zero(expr_lower - exprv)
+        expr_upper_diff: np.ndarray[Ps, np.dtype[F]] = _nan_to_zero(expr_upper - exprv)
 
-        # if total_abs_factor is zero, then all abs_factorv are also zero
-        # eb/0 = NaN is converted back to zero, so we just push down zero
-        #  error bounds, which is not incorrect
-        # TODO: deal with zero and NaN abs factors here
+        # if total_abs_factor is zero, all abs_factorv are also zero and we can
+        #  allow terms to have any finite value
+        # if total_abs_factor is Inf, we cannot do better than a zero error
+        #  bound for all terms, making sure that Inf*0 != NaN
+        # if total_abs_factor or exprv is NaN, we can allow terms to have any
+        #  value, but propagating non-NaN error bounds works better
+        # TODO: optimize infinite sums
         tld: np.ndarray[Ps, np.dtype[F]] = expr_lower_diff / total_abs_factor
         tlu: np.ndarray[Ps, np.dtype[F]] = expr_upper_diff / total_abs_factor
+
+        fmax = _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
 
         # stack the lower and upper bounds for each term factor
         tl_stack = np.stack(
             [
-                _zero_add((termv if is_add else -termv), (tld * abs_factorv))
+                np.where(
+                    total_abs_factor == 0,
+                    -fmax,
+                    np.where(
+                        _isinf(total_abs_factor),
+                        X.dtype.type(0.0),
+                        np.where(
+                            _isnan(total_abs_factor) | _isnan(exprv),
+                            X.dtype.type(-np.inf),
+                            _zero_add((termv if is_add else -termv), tld * abs_factorv),
+                        ),
+                    ),
+                )
                 for is_add, termv, abs_factorv in zip(is_adds, termvs, abs_factorvs)
                 if abs_factorv is not None
             ]
         )
         tu_stack = np.stack(
             [
-                _zero_add((termv if is_add else -termv), (tlu * abs_factorv))
+                np.where(
+                    total_abs_factor == 0,
+                    fmax,
+                    np.where(
+                        _isinf(total_abs_factor),
+                        X.dtype.type(0.0),
+                        np.where(
+                            _isnan(total_abs_factor) | _isnan(exprv),
+                            X.dtype.type(np.inf),
+                            _zero_add((termv if is_add else -termv), tlu * abs_factorv),
+                        ),
+                    ),
+                )
                 for is_add, termv, abs_factorv in zip(is_adds, termvs, abs_factorvs)
                 if abs_factorv is not None
             ]
