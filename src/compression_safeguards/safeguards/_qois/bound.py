@@ -33,18 +33,23 @@ def ensure_bounded_expression_v2(
 ) -> np.ndarray[Ns, np.dtype[F]]:
     # check if any derived expression exceeds the error bound
     # this check matches the QoI safeguard's validity check
-    def are_bounds_exceeded(Xs_guess: np.ndarray[Ns, np.dtype[F]]):
+    def are_bounds_exceeded(
+        Xs_guess: np.ndarray[Ns, np.dtype[F]],
+    ) -> np.ndarray[Ns, np.dtype[F]]:
         exprv_Xs_guess = expr(Xs_guess)
-        return ~np.where(
-            # NaN expressions must be preserved as NaN
-            _isnan(exprv),
-            _isnan(exprv_Xs_guess),
-            # otherwise check that the expression result is in bounds
-            ((exprv_Xs_guess >= expr_lower) & (exprv_Xs_guess <= expr_upper))
-            # also allow equivalent inputs, which is needed for rewrites where
-            #  the rewrite might evaluate outside the bounds even for the
-            #  original input
-            | np.all(Xs_guess == Xs, axis=tuple(range(exprv.ndim, Xs.ndim))),
+        return np.broadcast_to(  # type: ignore
+            ~np.where(
+                # NaN expressions must be preserved as NaN
+                _isnan(exprv),
+                _isnan(exprv_Xs_guess),
+                # otherwise check that the expression result is in bounds
+                ((exprv_Xs_guess >= expr_lower) & (exprv_Xs_guess <= expr_upper))
+                # also allow equivalent inputs, which is needed for rewrites where
+                #  the rewrite might evaluate outside the bounds even for the
+                #  original input
+                | np.all(Xs_guess == Xs, axis=tuple(range(exprv.ndim, Xs.ndim))),
+            ).reshape(exprv.shape + (1,) * (Xs.ndim - exprv.ndim)),
+            Xs.shape,
         )
 
     for _ in range(3):
