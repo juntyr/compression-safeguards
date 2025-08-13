@@ -8,9 +8,8 @@ from ....utils.bindings import Parameter
 from ....utils.cast import (
     _float128_dtype,
     _float128_smallest_subnormal,
-    _nan_to_zero_inf_to_finite,
 )
-from ..eb import ensure_bounded_derived_error, ensure_bounded_expression
+from ..bound import ensure_bounded_expression
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
@@ -68,84 +67,6 @@ class ScalarLog(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return (LOGARITHM_UFUNC[self._log])(self._a.eval(x, Xs, late_bound))
-
-    def compute_data_error_bound_unchecked(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        zero = X.dtype.type(0)
-
-        # evaluate arg and log(arg)
-        arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
-        exprv = (LOGARITHM_UFUNC[self._log])(argv)
-
-        # update the error bounds
-        eal: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            (eb_expr_lower == 0),
-            zero,
-            np.minimum(
-                (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(exprv + eb_expr_lower) - argv,
-                0,
-            ),
-        )
-        eal = _nan_to_zero_inf_to_finite(eal)
-
-        eau: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            (eb_expr_upper == 0),
-            zero,
-            np.maximum(
-                0,
-                (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(exprv + eb_expr_upper) - argv,
-            ),
-        )
-        eau = _nan_to_zero_inf_to_finite(eau)
-
-        # handle rounding errors in log(exp(...)) early
-        eal = ensure_bounded_derived_error(
-            lambda eal: (LOGARITHM_UFUNC[self._log])(argv + eal),
-            exprv,
-            argv,
-            eal,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eau = ensure_bounded_derived_error(
-            lambda eau: (LOGARITHM_UFUNC[self._log])(argv + eau),
-            exprv,
-            argv,
-            eau,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eb_arg_lower, eb_arg_upper = eal, eau
-
-        # composition using Lemma 3 from Jiao et al.
-        return arg.compute_data_error_bound(
-            eb_arg_lower,
-            eb_arg_upper,
-            X,
-            Xs,
-            late_bound,
-        )
-
-    def compute_data_error_bound(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # the unchecked method already handles rounding errors for ln / log2 /
-        #  log10, which are strictly monotonic
-        return self.compute_data_error_bound_unchecked(
-            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
-        )
 
     def compute_data_bounds_unchecked(
         self,
@@ -285,91 +206,6 @@ class ScalarExp(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return (EXPONENTIAL_UFUNC[self._exp])(self._a.eval(x, Xs, late_bound))
-
-    def compute_data_error_bound_unchecked(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        zero = X.dtype.type(0)
-
-        # evaluate arg and exp(arg)
-        arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
-        exprv = (EXPONENTIAL_UFUNC[self._exp])(argv)
-
-        # update the error bounds
-        # ensure that log is not passed a negative argument
-        eal: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            (eb_expr_lower == 0),
-            zero,
-            np.minimum(
-                (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(
-                    np.maximum(0, exprv + eb_expr_lower)
-                )
-                - argv,
-                0,
-            ),
-        )
-        eal = _nan_to_zero_inf_to_finite(eal)
-
-        eau: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            (eb_expr_upper == 0),
-            zero,
-            np.maximum(
-                0,
-                (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(
-                    np.maximum(0, exprv + eb_expr_upper)
-                )
-                - argv,
-            ),
-        )
-        eau = _nan_to_zero_inf_to_finite(eau)
-
-        # handle rounding errors in exp(log(...)) early
-        eal = ensure_bounded_derived_error(
-            lambda eal: (EXPONENTIAL_UFUNC[self._exp])(argv + eal),
-            exprv,
-            argv,
-            eal,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eau = ensure_bounded_derived_error(
-            lambda eau: (EXPONENTIAL_UFUNC[self._exp])(argv + eau),
-            exprv,
-            argv,
-            eau,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eb_arg_lower, eb_arg_upper = eal, eau
-
-        # composition using Lemma 3 from Jiao et al.
-        return arg.compute_data_error_bound(
-            eb_arg_lower,
-            eb_arg_upper,
-            X,
-            Xs,
-            late_bound,
-        )
-
-    def compute_data_error_bound(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # the unchecked method already handles rounding errors for exp / exp2 /
-        #  exp10, which are strictly monotonic
-        return self.compute_data_error_bound_unchecked(
-            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
-        )
 
     def compute_data_bounds_unchecked(
         self,
@@ -523,27 +359,6 @@ class ScalarLogWithBase(Expr):
                 self._b,
             ),
         ).eval(x, Xs, late_bound)
-
-    def compute_data_error_bound_unchecked(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        from .divmul import ScalarDivide
-
-        return ScalarDivide(
-            ScalarLog(
-                Logarithm.ln,
-                self._a,
-            ),
-            ScalarLog(
-                Logarithm.ln,
-                self._b,
-            ),
-        ).compute_data_error_bound(eb_expr_lower, eb_expr_upper, X, Xs, late_bound)
 
     def compute_data_bounds_unchecked(
         self,

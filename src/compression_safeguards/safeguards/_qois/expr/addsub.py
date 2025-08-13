@@ -10,9 +10,8 @@ from ....utils.cast import (
     _isinf,
     _isnan,
     _nan_to_zero,
-    _nan_to_zero_inf_to_finite,
 )
-from ..eb import ensure_bounded_derived_error, ensure_bounded_expression
+from ..bound import ensure_bounded_expression
 from .abc import Expr
 from .abs import ScalarAbs
 from .constfold import ScalarFoldedConstant
@@ -68,32 +67,6 @@ class ScalarAdd(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.add(self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound))
-
-    def compute_data_error_bound_unchecked(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        terms = SumTerm.as_left_associative_sum(self)
-        return SumTerm.compute_data_error_bound(
-            terms, eb_expr_lower, eb_expr_upper, X, Xs, late_bound
-        )
-
-    def compute_data_error_bound(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # the unchecked method already handles rounding errors for add
-        return self.compute_data_error_bound_unchecked(
-            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
-        )
 
     def compute_data_bounds_unchecked(
         self,
@@ -174,32 +147,6 @@ class ScalarSubtract(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.subtract(
             self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound)
-        )
-
-    def compute_data_error_bound_unchecked(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        terms = SumTerm.as_left_associative_sum(self)
-        return SumTerm.compute_data_error_bound(
-            terms, eb_expr_lower, eb_expr_upper, X, Xs, late_bound
-        )
-
-    def compute_data_error_bound(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # the unchecked method already handles rounding errors for subtract
-        return self.compute_data_error_bound_unchecked(
-            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
         )
 
     def compute_data_bounds_unchecked(
@@ -295,167 +242,6 @@ class SumTerm:
         [(factor, _)] = factor_stack
 
         return ScalarAbs(factor)
-
-    @staticmethod
-    def compute_data_error_bound(
-        left_associative_sum: "tuple[SumTerm, ...]",
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        is_adds: list[bool] = []
-        termvs: list[np.ndarray[Ps, np.dtype[F]]] = []
-        abs_factorvs: list[None | np.ndarray[Ps, np.dtype[F]]] = []
-
-        for term in left_associative_sum:
-            abs_factor = SumTerm.get_expr_left_associative_abs_factor_approximate(
-                term._expr
-            )
-            is_adds.append(term._is_add)
-            termvs.append(term._expr.eval(X.shape, Xs, late_bound))
-            abs_factorvs.append(
-                None if abs_factor is None else abs_factor.eval(X.shape, Xs, late_bound)
-            )
-
-        # evaluate the total expression sum
-        assert is_adds[0]
-        exprv: np.ndarray[Ps, np.dtype[F]] = np.copy(termvs[0])
-        for is_add, termv in zip(is_adds[1:], termvs[1:]):
-            if is_add:
-                exprv += termv
-            else:
-                exprv -= termv
-
-        # compute the sum of absolute factors
-        total_abs_factor_: None | np.ndarray[Ps, np.dtype[F]] = None
-        for abs_factorv in abs_factorvs:
-            if abs_factorv is None:
-                continue
-            if total_abs_factor_ is None:
-                total_abs_factor_ = np.copy(abs_factorv)
-            else:
-                total_abs_factor_ += abs_factorv
-        assert total_abs_factor_ is not None
-        total_abs_factor: np.ndarray[Ps, np.dtype[F]] = total_abs_factor_
-
-        # if total_abs_factor is zero, then all abs_factorv are also zero
-        # eb/0 = NaN is converted back to zero, so we just push down zero
-        #  error bounds, which is not incorrect
-        etl: np.ndarray[Ps, np.dtype[F]] = _nan_to_zero_inf_to_finite(
-            eb_expr_lower / total_abs_factor
-        )
-        etu: np.ndarray[Ps, np.dtype[F]] = _nan_to_zero_inf_to_finite(
-            eb_expr_upper / total_abs_factor
-        )
-
-        # stack the lower and upper bounds for each term factor
-        etl_stack = np.stack(
-            [
-                etl * abs_factorv
-                for abs_factorv in abs_factorvs
-                if abs_factorv is not None
-            ]
-        )
-        etu_stack = np.stack(
-            [
-                etu * abs_factorv
-                for abs_factorv in abs_factorvs
-                if abs_factorv is not None
-            ]
-        )
-
-        def compute_sum(et_stack: np.ndarray) -> np.ndarray:
-            total_sum = None
-            i = 0
-            for is_add, termv, abs_factorv in zip(is_adds, termvs, abs_factorvs):
-                if total_sum is None:
-                    assert is_add
-                    if abs_factorv is None:
-                        total_sum = np.copy(termv)
-                    else:
-                        total_sum = termv + et_stack[i]
-                elif is_add:
-                    if abs_factorv is None:
-                        total_sum += termv
-                    else:
-                        total_sum += termv + et_stack[i]
-                elif abs_factorv is None:
-                    total_sum -= termv
-                else:
-                    total_sum -= termv - et_stack[i]
-                i += abs_factorv is not None
-            assert total_sum is not None
-            return total_sum
-
-        # handle rounding errors in the total absolute factor early
-        etl_stack = ensure_bounded_derived_error(
-            compute_sum,
-            exprv,
-            np.stack(
-                [
-                    termv
-                    for termv, abs_factorv in zip(termvs, abs_factorvs)
-                    if abs_factorv is not None
-                ]
-            ),
-            etl_stack,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        etu_stack = ensure_bounded_derived_error(
-            compute_sum,
-            exprv,
-            np.stack(
-                [
-                    termv
-                    for termv, abs_factorv in zip(termvs, abs_factorvs)
-                    if abs_factorv is not None
-                ]
-            ),
-            etu_stack,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-
-        exl: np.ndarray[Ps, np.dtype[F]]
-        exu: np.ndarray[Ps, np.dtype[F]]
-        eb_x_lower: None | np.ndarray[Ps, np.dtype[F]] = None
-        eb_x_upper: None | np.ndarray[Ps, np.dtype[F]] = None
-        i = 0
-        for term, is_add, abs_factorv in zip(
-            left_associative_sum, is_adds, abs_factorvs
-        ):
-            if abs_factorv is None:
-                continue
-
-            # recurse into the terms with a weighted error bound
-            exl, exu = term._expr.compute_data_error_bound(
-                # flip the lower/upper error bound if the term is subtracted
-                etl_stack[i] if is_add else -etu_stack[i],
-                etu_stack[i] if is_add else -etl_stack[i],
-                X,
-                Xs,
-                late_bound,
-            )
-
-            # combine the inner error bounds
-            if eb_x_lower is None:
-                eb_x_lower = exl
-            else:
-                eb_x_lower = np.maximum(eb_x_lower, exl)
-            if eb_x_upper is None:
-                eb_x_upper = exu
-            else:
-                eb_x_upper = np.minimum(eb_x_upper, exu)
-
-            i += 1
-
-        assert eb_x_lower is not None
-        assert eb_x_upper is not None
-
-        return eb_x_lower, eb_x_upper
 
     @staticmethod
     def compute_data_bounds(
@@ -639,7 +425,7 @@ class SumTerm:
                 late_bound,
             )
 
-            # combine the inner error bounds
+            # combine the inner data bounds
             if Xs_lower_ is None:
                 Xs_lower_ = xl
             else:

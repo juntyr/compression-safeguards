@@ -51,16 +51,6 @@ class ScalarIsFinite(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.astype(_isfinite(self._a.eval(x, Xs, late_bound)), Xs.dtype)  # type: ignore
 
-    def compute_data_error_bound_unchecked(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        raise NotADirectoryError
-
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -167,16 +157,6 @@ class ScalarIsInf(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.astype(_isinf(self._a.eval(x, Xs, late_bound)), Xs.dtype)  # type: ignore
 
-    def compute_data_error_bound_unchecked(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        raise NotADirectoryError
-
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -282,16 +262,6 @@ class ScalarIsNaN(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.astype(_isnan(self._a.eval(x, Xs, late_bound)), Xs.dtype)  # type: ignore
-
-    def compute_data_error_bound_unchecked(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        raise NotADirectoryError
 
     def compute_data_bounds_unchecked(
         self,

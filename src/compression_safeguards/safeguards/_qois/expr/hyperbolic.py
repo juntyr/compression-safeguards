@@ -6,7 +6,7 @@ import numpy as np
 
 from ....utils.bindings import Parameter
 from ....utils.cast import _float128_dtype, _float128_type, _reciprocal
-from ..eb import ensure_bounded_expression
+from ..bound import ensure_bounded_expression
 from .abc import Expr
 from .abs import ScalarAbs
 from .addsub import ScalarAdd, ScalarSubtract
@@ -61,16 +61,6 @@ class ScalarSinh(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return _sinh(self._a.eval(x, Xs, late_bound))
-
-    def compute_data_error_bound_unchecked(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        raise NotImplementedError
 
     def compute_data_bounds_unchecked(
         self,
@@ -180,16 +170,6 @@ class ScalarAsinh(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return _asinh(self._a.eval(x, Xs, late_bound))
-
-    def compute_data_error_bound_unchecked(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        raise NotImplementedError
 
     def compute_data_bounds_unchecked(
         self,
@@ -324,19 +304,6 @@ class ScalarHyperbolic(Expr):
         )[self._func]
         return fn(self._a.eval(x, Xs, late_bound))
 
-    def compute_data_error_bound_unchecked(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # rewrite hyperbolic functions with base cases for sinh and asinh
-        return (HYPERBOLIC_REWRITE[self._func])(self._a).compute_data_error_bound(
-            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
-        )
-
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -354,17 +321,6 @@ class ScalarHyperbolic(Expr):
         return f"{self._func.name}({self._a!r})"
 
 
-# FIXME: the rewrites are not propagating -0.0 correctly, we need to express them with actual implementations for at least sinh and asinh
-# cosh = sqrt(1+square(sinh(x)))
-# tanh = sinh(x)/cosh(x)
-# coth = cosh(x)/sinh(x)
-# sech = recip(cosh(x))
-# csch = recip(sinh(x))
-# acosh = abs(asinh(sqrt(square(x)-1)))
-# atanh = asinh(x/sqrt(1-square(x)))
-# acoth = asinh(recip(sqrt(square(x)-1)))
-# asech = asinh(sqrt(recip(square(x))-1))
-# acsch = asinh(recip(x))
 HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
     # basic hyperbolic functions
     # cosh(x) = sqrt(1 + square(sinh(x)))

@@ -8,11 +8,10 @@ from ....utils.bindings import Parameter
 from ....utils.cast import (
     _float128_dtype,
     _float128_pi,
-    _nan_to_zero_inf_to_finite,
     _nextafter,
     _reciprocal,
 )
-from ..eb import ensure_bounded_derived_error, ensure_bounded_expression
+from ..bound import ensure_bounded_expression
 from .abc import Expr
 from .addsub import ScalarAdd, ScalarSubtract
 from .constfold import ScalarFoldedConstant
@@ -63,91 +62,6 @@ class ScalarSin(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.sin(self._a.eval(x, Xs, late_bound))
-
-    def compute_data_error_bound_unchecked(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        zero = X.dtype.type(0)
-
-        # evaluate arg and sin(arg)
-        arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
-        exprv = np.sin(argv)
-
-        # update the error bounds
-        eal: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            (eb_expr_lower == 0),
-            zero,
-            # we need to compare to asin(sin(...)) instead of ... to account
-            #  for asin's output domain
-            np.minimum(
-                np.asin(np.maximum(-1, exprv + eb_expr_lower)) - np.asin(exprv), 0
-            ),
-        )
-        eal = _nan_to_zero_inf_to_finite(eal)
-
-        eau: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            (eb_expr_upper == 0),
-            zero,
-            np.maximum(
-                0, np.asin(np.minimum(exprv + eb_expr_upper, 1)) - np.asin(exprv)
-            ),
-        )
-        eau = _nan_to_zero_inf_to_finite(eau)
-
-        # np.asin maps to [-pi/2, +pi/2] where sin is monotonically increasing
-        # flip the argument error bounds where sin is monotonically decreasing
-        eal, eau = (
-            np.where(np.sin(argv + eal) > exprv, -eau, eal),  # type: ignore
-            np.where(np.sin(argv + eau) < exprv, -eal, eau),  # type: ignore
-        )
-
-        # handle rounding errors in sin(asin(...)) early
-        eal = ensure_bounded_derived_error(
-            lambda eal: np.sin(np.add(argv, eal)),
-            exprv,
-            argv,
-            eal,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eau = ensure_bounded_derived_error(
-            lambda eau: np.sin(np.add(argv, eau)),
-            exprv,
-            argv,
-            eau,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eb_arg_lower, eb_arg_upper = eal, eau
-
-        # composition using Lemma 3 from Jiao et al.
-        return arg.compute_data_error_bound(
-            eb_arg_lower,
-            eb_arg_upper,
-            X,
-            Xs,
-            late_bound,
-        )
-
-    def compute_data_error_bound(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # the unchecked method already handles rounding errors for sin,
-        #  even though it is periodic
-        return self.compute_data_error_bound_unchecked(
-            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
-        )
 
     def compute_data_bounds_unchecked(
         self,
@@ -279,84 +193,6 @@ class ScalarAsin(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.asin(self._a.eval(x, Xs, late_bound))
-
-    def compute_data_error_bound_unchecked(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        zero = X.dtype.type(0)
-
-        # evaluate arg and asin(arg)
-        arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
-        exprv = np.asin(argv)
-
-        pi = _float128_pi if X.dtype == _float128_dtype else X.dtype.type(np.pi)
-
-        # update the error bounds
-        eal: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            (eb_expr_lower == 0),
-            zero,
-            # np.sin(max(-pi/2, ...)) might not be precise, so explicitly
-            #  bound lower bounds to be <= 0
-            np.minimum(np.sin(np.maximum(-pi / 2, exprv + eb_expr_lower)) - argv, 0),
-        )
-        eal = _nan_to_zero_inf_to_finite(eal)
-
-        eau: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            (eb_expr_upper == 0),
-            zero,
-            # np.sin(min(..., pi/2)) might not be precise, so explicitly
-            #  bound upper bounds to be >= 0
-            np.maximum(0, np.sin(np.minimum(exprv + eb_expr_upper, pi / 2)) - argv),
-        )
-        eau = _nan_to_zero_inf_to_finite(eau)
-
-        # handle rounding errors in asin(sin(...)) early
-        eal = ensure_bounded_derived_error(
-            lambda eal: np.asin(np.add(argv, eal)),
-            exprv,
-            argv,
-            eal,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eau = ensure_bounded_derived_error(
-            lambda eau: np.asin(np.add(argv, eau)),
-            exprv,
-            argv,
-            eau,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eb_arg_lower, eb_arg_upper = eal, eau
-
-        # composition using Lemma 3 from Jiao et al.
-        return arg.compute_data_error_bound(
-            eb_arg_lower,
-            eb_arg_upper,
-            X,
-            Xs,
-            late_bound,
-        )
-
-    def compute_data_error_bound(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # the unchecked method already handles rounding errors for asin,
-        #  which is strictly monotonic
-        return self.compute_data_error_bound_unchecked(
-            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
-        )
 
     def compute_data_bounds_unchecked(
         self,
@@ -503,19 +339,6 @@ class ScalarTrigonometric(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return (TRIGONOMETRIC_UFUNC[self._func])(self._a.eval(x, Xs, late_bound))
-
-    def compute_data_error_bound_unchecked(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # rewrite trigonometric functions with base cases for sin and asin
-        return (TRIGONOMETRIC_REWRITE[self._func])(self._a).compute_data_error_bound(
-            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
-        )
 
     def compute_data_bounds_unchecked(
         self,

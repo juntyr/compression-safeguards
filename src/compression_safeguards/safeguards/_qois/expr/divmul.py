@@ -11,9 +11,8 @@ from ....utils.cast import (
     _float128_smallest_subnormal,
     _isinf,
     _isnan,
-    _nan_to_zero_inf_to_finite,
 )
-from ..eb import ensure_bounded_derived_error, ensure_bounded_expression
+from ..bound import ensure_bounded_expression
 from .abc import Expr
 from .addsub import ScalarAdd, ScalarSubtract
 from .constfold import ScalarFoldedConstant
@@ -72,81 +71,6 @@ class ScalarMultiply(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.multiply(
             self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound)
-        )
-
-    def compute_data_error_bound_unchecked(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        a_const = not self._a.has_data
-        b_const = not self._b.has_data
-        assert not (a_const and b_const), "constant product has no error bounds"
-
-        if a_const or b_const:
-            term, const = (self._b, self._a) if a_const else (self._a, self._b)
-
-            # evaluate the non-constant and constant term and their product
-            termv = term.eval(X.shape, Xs, late_bound)
-            constv = const.eval(X.shape, Xs, late_bound)
-            # mul of two terms is commutative
-            exprv = np.multiply(termv, constv)
-
-            fmax = (
-                _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
-            )
-
-            # for x*0, we can allow any finite x,
-            #  which would be more easily expressed with intervals
-            efl = _nan_to_zero_inf_to_finite(
-                np.where(constv == 0, -fmax - termv, eb_expr_lower / np.abs(constv))
-            )
-            efu = _nan_to_zero_inf_to_finite(
-                np.where(constv == 0, fmax - termv, eb_expr_upper / np.abs(constv))
-            )
-
-            # flip the lower/upper error bound if the factor is negative
-            etl: np.ndarray[Ps, np.dtype[F]] = np.where(constv < 0, -efu, efl)  # type: ignore
-            etu: np.ndarray[Ps, np.dtype[F]] = np.where(constv < 0, -efl, efu)  # type: ignore
-
-            # handle rounding errors in the multiplication
-            eb_term_lower = ensure_bounded_derived_error(
-                lambda etl: (termv + etl) * constv,
-                exprv,
-                termv,
-                etl,
-                eb_expr_lower,
-                eb_expr_upper,
-            )
-            eb_term_upper = ensure_bounded_derived_error(
-                lambda etu: (termv + etu) * constv,
-                exprv,
-                termv,
-                etu,
-                eb_expr_lower,
-                eb_expr_upper,
-            )
-
-            # composition using Lemma 3 from Jiao et al.
-            return term.compute_data_error_bound(
-                eb_term_lower,
-                eb_term_upper,
-                X,
-                Xs,
-                late_bound,
-            )
-
-        return rewrite_left_associative_product_as_exp_sum_of_logs(
-            self
-        ).compute_data_error_bound(
-            eb_expr_lower,
-            eb_expr_upper,
-            X,
-            Xs,
-            late_bound,
         )
 
     def compute_data_bounds_unchecked(
@@ -333,18 +257,6 @@ class ScalarDivide(Expr):
         return np.divide(
             self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound)
         )
-
-    def compute_data_error_bound_unchecked(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        return ScalarMultiply(
-            self._a, ScalarReciprocal(self._b)
-        ).compute_data_error_bound(eb_expr_lower, eb_expr_upper, X, Xs, late_bound)
 
     def compute_data_bounds_unchecked(
         self,
