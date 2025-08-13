@@ -239,7 +239,7 @@ def test_mean():
         [(1, 1), (1, 1)],
     )
 
-    # # geometric mean
+    # geometric mean
     check_all_codecs(
         np.arange(64, dtype=float).reshape(4, 4, 4),
         "(X[I[0]-1,I[1]]*X[I[0]+1,I[1]]*X[I[0],I[1]-1]*X[I[0],I[1]+1])**(1/4)",
@@ -1197,34 +1197,68 @@ def test_finite_difference_dx():
         )
 
 
-# def test_late_bound_constant():
-#     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-#         qoi='X[0,0] * c["zero"] + X[I] / C["f"][I]',
-#         neighbourhood=[
-#             dict(axis=0, before=1, after=0, boundary="valid"),
-#             dict(axis=1, before=0, after=0, boundary="valid"),
-#         ],
-#         type="abs",
-#         eb=1,
-#     )
-#     assert safeguard.late_bound == {"f", "zero"}
-#     assert (
-#         f"{safeguard._qoi_expr!r}" == 'X[0,0] * C["zero"][1,0] + X[1,0] / C["f"][1,0]'
-#     )
+def test_late_bound_constant():
+    # with a valid stencil and some neighbours that are only multiplied by zero
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='X[0,0] * c["zero"] + X[I] / C["f"][I]',
+        neighbourhood=[
+            dict(axis=0, before=1, after=0, boundary="valid"),
+            dict(axis=1, before=0, after=0, boundary="valid"),
+        ],
+        type="abs",
+        eb=1,
+    )
+    assert safeguard.late_bound == {"f", "zero"}
+    assert (
+        f"{safeguard._qoi_expr!r}" == 'X[0,0] * C["zero"][1,0] + X[1,0] / C["f"][1,0]'
+    )
 
-#     data = np.arange(6).reshape(2, 3)
+    data = np.arange(6).reshape(2, 3)
 
-#     late_bound = Bindings(
-#         f=np.array([16, 8, 4]),
-#         zero=0,
-#     )
+    late_bound = Bindings(
+        f=np.array([16, 8, 4]),
+        zero=0,
+    )
 
-#     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
-#     assert np.all(valid._lower == (data.flatten() - np.array([16, 8, 4, 16, 8, 4])))
-#     assert np.all(valid._upper == (data.flatten() + np.array([16, 8, 4, 16, 8, 4])))
+    imin = np.iinfo(data.dtype).min
+    imax = np.iinfo(data.dtype).max
 
-#     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
-#     assert np.all(ok == np.array([True, True, True, True, True, False]).reshape(2, 3))
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == np.array([imin, imin, imin, 3 - 16, 4 - 8, 5 - 4]))
+    assert np.all(valid._upper == np.array([imax, imax, imax, 3 + 16, 4 + 8, 5 + 4]))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(ok == np.array([True, True, True, True, True, False]).reshape(2, 3))
+
+    # with an edge stencil so that all points have bounds
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='X[0,0] * c["zero"] + X[I] / C["f"][I]',
+        neighbourhood=[
+            dict(axis=0, before=1, after=0, boundary="edge"),
+            dict(axis=1, before=0, after=0, boundary="edge"),
+        ],
+        type="abs",
+        eb=1,
+    )
+    assert safeguard.late_bound == {"f", "zero"}
+    assert (
+        f"{safeguard._qoi_expr!r}" == 'X[0,0] * C["zero"][1,0] + X[1,0] / C["f"][1,0]'
+    )
+
+    late_bound = Bindings(
+        f=np.array([[16, 8, 4], [16, 8, 4]]),
+        zero=0,
+    )
+
+    imin = np.iinfo(data.dtype).min
+    imax = np.iinfo(data.dtype).max
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == (data.flatten() - np.array([16, 8, 4, 16, 8, 4])))
+    assert np.all(valid._upper == (data.flatten() + np.array([16, 8, 4, 16, 8, 4])))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(ok == np.array([True, True, True, True, True, False]).reshape(2, 3))
 
 
 @pytest.mark.parametrize("check", CHECKS)

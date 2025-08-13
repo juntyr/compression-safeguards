@@ -71,6 +71,8 @@ class QoIParser(Parser):
         ("right", POWER),  # type: ignore[name-defined]  # noqa: F821
         ("left", INDEX, TRANSPOSE),  # type: ignore[name-defined]  # noqa: F821
         # highest precedence: array indexing and transpose
+        # help array indexing by giving the opening `[` an even higher precedence
+        ("left", LBRACK),  # type: ignore[name-defined]  # noqa: F821
     )
 
     # === grammar rules ===
@@ -242,7 +244,7 @@ class QoIParser(Parser):
             return Array.map_binary(p.expr0, p.expr1, ScalarPower)
 
     # array transpose: expr := expr.T
-    @_("expr TRANSPOSE %prec TRANSPOSE")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("expr TRANSPOSE")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         self.assert_or_error(
             isinstance(p.expr, Array), p, "cannot transpose scalar non-array expression"

@@ -236,3 +236,7 @@ class Expr:
         )
 
         return xl, xu
+
+    @abstractmethod
+    def __repr__(self) -> str:
+        pass

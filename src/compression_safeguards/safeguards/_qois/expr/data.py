@@ -58,10 +58,10 @@ class Data(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         X_lower: np.ndarray[Ns, np.dtype[F]] = np.where(
-            _isfinite(Xs), X.dtype.type(np.inf), Xs
+            _isfinite(Xs), X.dtype.type(-np.inf), Xs
         )  # type: ignore
         X_upper: np.ndarray[Ns, np.dtype[F]] = np.where(
-            _isfinite(Xs), X.dtype.type(-np.inf), Xs
+            _isfinite(Xs), X.dtype.type(np.inf), Xs
         )  # type: ignore
 
         X_lower[(...,) + self._index] = expr_lower
