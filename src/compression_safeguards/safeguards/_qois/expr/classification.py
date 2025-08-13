@@ -6,7 +6,7 @@ from ....utils.bindings import Parameter
 from ....utils.cast import _float128_dtype, _float128_max, _isfinite, _isinf, _isnan
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
-from .typing import F, Ns, Ps, PsI
+from .typing import F, Fi, Ns, Ps, PsI
 
 
 class ScalarIsFinite(Expr):
@@ -35,11 +35,11 @@ class ScalarIsFinite(Expr):
     def late_bound_constants(self) -> frozenset[Parameter]:
         return self._a.late_bound_constants
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
-            _isfinite,  # type: ignore
+            lambda x: np.astype(_isfinite(x), dtype),  # type: ignore
             ScalarIsFinite,
         )
 
@@ -141,11 +141,11 @@ class ScalarIsInf(Expr):
     def late_bound_constants(self) -> frozenset[Parameter]:
         return self._a.late_bound_constants
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
-            _isinf,  # type: ignore
+            lambda x: np.astype(_isinf(x), dtype),  # type: ignore
             ScalarIsInf,
         )
 
@@ -247,11 +247,11 @@ class ScalarIsNaN(Expr):
     def late_bound_constants(self) -> frozenset[Parameter]:
         return self._a.late_bound_constants
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
-            _isnan,  # type: ignore
+            lambda x: np.astype(_isnan(x), dtype),  # type: ignore
             ScalarIsNaN,
         )
 

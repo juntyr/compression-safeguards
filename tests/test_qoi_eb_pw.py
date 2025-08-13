@@ -621,3 +621,20 @@ def test_fuzzer_found_logarithm_noise():
 
     encoded = codec.encode(data)
     codec.decode(encoded)
+
+
+def test_fuzzer_found_classification():
+    data = np.array([], dtype=np.int16)
+    decoded = np.array([], dtype=np.int16)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            PointwiseQuantityOfInterestErrorBoundSafeguard(
+                qoi="isinf(log(exp2(exp10(isnan(exp10(e)))), base=x))",
+                type="rel",
+                eb=0,
+            ),
+        ],
+    )

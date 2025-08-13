@@ -127,7 +127,7 @@ class Expr:
         ----------
         expr_lower : np.ndarray[Ps, np.dtype[F]]
             The pointwise lower bound on this expression.
-        eb_expr_upper : np.ndarray[Ps, np.dtype[F]]
+        expr_upper : np.ndarray[Ps, np.dtype[F]]
             The pointwise upper bound on this expression.
         X : np.ndarray[Ps, np.dtype[F]]
             The pointwise data, in floating point format, which must be
@@ -176,7 +176,7 @@ class Expr:
         ----------
         expr_lower : np.ndarray[Ps, np.dtype[F]]
             The pointwise lower bound on this expression.
-        eb_expr_upper : np.ndarray[Ps, np.dtype[F]]
+        expr_upper : np.ndarray[Ps, np.dtype[F]]
             The pointwise upper bound on this expression.
         X : np.ndarray[Ps, np.dtype[F]]
             The pointwise data, in floating point format, which must be

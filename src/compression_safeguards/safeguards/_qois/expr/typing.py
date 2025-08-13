@@ -2,7 +2,13 @@ __all__ = ["F", "Ps", "PsI", "Ns"]
 
 from typing import TypeVar
 
-from ....utils.typing import F
+import numpy as np
+
+F = TypeVar("F", bound=np.floating, covariant=True)
+""" Any numpy [`floating`][numpy.floating] data type (covariant). """
+
+Fi = TypeVar("Fi", bound=np.floating)
+""" Any numpy [`floating`][numpy.floating] data type (invariant). """
 
 Ps = TypeVar("Ps", bound=tuple[int, ...], covariant=True)
 """ Any pointwise array shape [...X] (covariant). """
