@@ -372,12 +372,16 @@ class SumTerm:
                     total_sum += t_stack[i]
                 i += abs_factorv is not None
             assert total_sum is not None
-            return total_sum
+            return np.broadcast_to(
+                total_sum.reshape((1,) + exprv.shape), (t_stack.shape[0],) + exprv.shape
+            )
 
         # handle rounding errors in the total absolute factor early
         tl_stack = ensure_bounded_expression(
             compute_sum,
-            exprv,
+            np.broadcast_to(
+                exprv.reshape((1,) + exprv.shape), (tl_stack.shape[0],) + exprv.shape
+            ),
             np.stack(
                 [
                     termv
@@ -386,12 +390,20 @@ class SumTerm:
                 ]
             ),
             tl_stack,
-            expr_lower,
-            expr_upper,
+            np.broadcast_to(
+                expr_lower.reshape((1,) + exprv.shape),
+                (tl_stack.shape[0],) + exprv.shape,
+            ),
+            np.broadcast_to(
+                expr_upper.reshape((1,) + exprv.shape),
+                (tl_stack.shape[0],) + exprv.shape,
+            ),
         )
         tu_stack = ensure_bounded_expression(
             compute_sum,
-            exprv,
+            np.broadcast_to(
+                exprv.reshape((1,) + exprv.shape), (tu_stack.shape[0],) + exprv.shape
+            ),
             np.stack(
                 [
                     termv
@@ -400,8 +412,14 @@ class SumTerm:
                 ]
             ),
             tu_stack,
-            expr_lower,
-            expr_upper,
+            np.broadcast_to(
+                expr_lower.reshape((1,) + exprv.shape),
+                (tu_stack.shape[0],) + exprv.shape,
+            ),
+            np.broadcast_to(
+                expr_upper.reshape((1,) + exprv.shape),
+                (tu_stack.shape[0],) + exprv.shape,
+            ),
         )
 
         xl: np.ndarray[Ns, np.dtype[F]]

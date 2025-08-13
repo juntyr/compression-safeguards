@@ -44,7 +44,7 @@ def ensure_bounded_expression_v2(
             # also allow equivalent inputs, which is needed for rewrites where
             #  the rewrite might evaluate outside the bounds even for the
             #  original input
-            | (Xs_guess == Xs),
+            | np.all(Xs_guess == Xs, axis=tuple(range(exprv.ndim, Xs.ndim))),
         )
 
     for _ in range(3):
@@ -66,46 +66,3 @@ def ensure_bounded_expression_v2(
 
         Xs_diff /= 2
         Xs_guess = np.where(bounds_exceeded, Xs + Xs_diff, Xs_guess)  # type: ignore
-
-    bounds_exceeded = are_bounds_exceeded(Xs_guess)
-
-    # TODO: improve with np.spacing
-    return np.where(bounds_exceeded, Xs, Xs_guess)  # type: ignore
-
-    below = Xs_guess < Xs
-
-    last_backoff = 1
-    backoff = 2
-
-    while True:
-        bounds_exceeded = are_bounds_exceeded(Xs_guess)
-
-        if not np.any(bounds_exceeded):
-            return Xs_guess
-
-        # try to nudge the guess towards the data, using increasing steps
-        nudge = _nextafter(Xs_guess, Xs) - Xs_guess
-
-        if backoff == 13:
-            print(bounds_exceeded)
-            print(expr_lower)
-            print(expr(Xs_guess))
-            print(expr_upper)
-            print(Xs)
-            print(Xs_guess)
-            print("\n=====\n")
-
-        Xs_nudged = Xs_guess + nudge * backoff
-
-        Xs_guess = np.where(  # type: ignore
-            bounds_exceeded,
-            np.where(
-                below,
-                np.minimum(Xs, Xs_nudged),
-                np.maximum(Xs, Xs_nudged),
-            ),
-            Xs_guess,
-        )
-
-        # Fibonacci backoff
-        last_backoff, backoff = backoff, backoff + last_backoff
