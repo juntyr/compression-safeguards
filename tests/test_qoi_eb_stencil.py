@@ -224,153 +224,153 @@ def test_invalid_array():
         check_all_codecs(np.empty(0), "[]", [(0, 0)])
 
 
-# def test_mean():
-#     # arithmetic mean
-#     check_all_codecs(
-#         np.arange(64, dtype=float).reshape(4, 4, 4),
-#         "(X[I[0]-1,I[1]]+X[I[0]+1,I[1]]+X[I[0],I[1]-1]+X[I[0],I[1]+1])/4",
-#         [(1, 1), (1, 1)],
-#     )
+def test_mean():
+    # arithmetic mean
+    check_all_codecs(
+        np.arange(64, dtype=float).reshape(4, 4, 4),
+        "(X[I[0]-1,I[1]]+X[I[0]+1,I[1]]+X[I[0],I[1]-1]+X[I[0],I[1]+1])/4",
+        [(1, 1), (1, 1)],
+    )
 
-#     # arithmetic mean using a convolution
-#     check_all_codecs(
-#         np.arange(64, dtype=float).reshape(4, 4, 4),
-#         "sum(X * [[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])",
-#         [(1, 1), (1, 1)],
-#     )
+    # arithmetic mean using a convolution
+    check_all_codecs(
+        np.arange(64, dtype=float).reshape(4, 4, 4),
+        "sum(X * [[0.25, 0.5, 0.25], [0.5, 1.0, 0.5], [0.25, 0.5, 0.25]])",
+        [(1, 1), (1, 1)],
+    )
 
-#     # geometric mean
-#     check_all_codecs(
-#         np.arange(64, dtype=float).reshape(4, 4, 4),
-#         "(X[I[0]-1,I[1]]*X[I[0]+1,I[1]]*X[I[0],I[1]-1]*X[I[0],I[1]+1])**(1/4)",
-#         [(1, 1), (1, 1)],
-#     )
+    # # geometric mean
+    check_all_codecs(
+        np.arange(64, dtype=float).reshape(4, 4, 4),
+        "(X[I[0]-1,I[1]]*X[I[0]+1,I[1]]*X[I[0],I[1]-1]*X[I[0],I[1]+1])**(1/4)",
+        [(1, 1), (1, 1)],
+    )
 
 
-# def test_finite_difference():
-#     data = np.arange(81, dtype=float).reshape(9, 9)
-#     valid_5x5_neighbourhood = [
-#         dict(axis=0, before=4, after=4, boundary="valid"),
-#         dict(axis=1, before=4, after=4, boundary="valid"),
-#     ]
+def test_finite_difference():
+    data = np.arange(81, dtype=float).reshape(9, 9)
+    valid_5x5_neighbourhood = [
+        dict(axis=0, before=4, after=4, boundary="valid"),
+        dict(axis=1, before=4, after=4, boundary="valid"),
+    ]
 
-#     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-#         "finite_difference(x,order=0,accuracy=2,type=0,axis=0,grid_spacing=1)",
-#         valid_5x5_neighbourhood,
-#         "abs",
-#         0,
-#     )
-#     assert f"{safeguard._qoi_expr!r}" == "(X[4,4] * 1.0)"
-#     check_all_codecs(
-#         data,
-#         "finite_difference(x,order=0,accuracy=2,type=0,axis=0,grid_spacing=1)",
-#         [(4, 4), (4, 4)],
-#     )
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "finite_difference(x,order=0,accuracy=2,type=0,axis=0,grid_spacing=1)",
+        valid_5x5_neighbourhood,
+        "abs",
+        0,
+    )
+    assert f"{safeguard._qoi_expr!r}" == "(X[4,4] * 1.0)"
+    check_all_codecs(
+        data,
+        "finite_difference(x,order=0,accuracy=2,type=0,axis=0,grid_spacing=1)",
+        [(4, 4), (4, 4)],
+    )
 
-#     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-#         "finite_difference(x,order=1,accuracy=1,type=1,axis=0,grid_spacing=1)",
-#         valid_5x5_neighbourhood,
-#         "abs",
-#         0,
-#     )
-#     assert f"{safeguard._qoi_expr!r}" == "(X[4,4] * -1.0 + X[5,4] * 1.0)"
-#     check_all_codecs(
-#         data,
-#         "finite_difference(x,order=1,accuracy=1,type=1,axis=0,grid_spacing=1)",
-#         [(4, 4), (4, 4)],
-#     )
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "finite_difference(x,order=1,accuracy=1,type=1,axis=0,grid_spacing=1)",
+        valid_5x5_neighbourhood,
+        "abs",
+        0,
+    )
+    assert f"{safeguard._qoi_expr!r}" == "(X[4,4] * -1.0 + X[5,4] * 1.0)"
+    check_all_codecs(
+        data,
+        "finite_difference(x,order=1,accuracy=1,type=1,axis=0,grid_spacing=1)",
+        [(4, 4), (4, 4)],
+    )
 
-#     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-#         "finite_difference(x,order=1,accuracy=1,type=-1,axis=0,grid_spacing=1)",
-#         valid_5x5_neighbourhood,
-#         "abs",
-#         0,
-#     )
-#     assert f"{safeguard._qoi_expr!r}" == "(X[4,4] * 1.0 + X[3,4] * -1.0)"
-#     check_all_codecs(
-#         data,
-#         "finite_difference(x,order=1,accuracy=1,type=-1,axis=0,grid_spacing=1)",
-#         [(4, 4), (4, 4)],
-#     )
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "finite_difference(x,order=1,accuracy=1,type=-1,axis=0,grid_spacing=1)",
+        valid_5x5_neighbourhood,
+        "abs",
+        0,
+    )
+    assert f"{safeguard._qoi_expr!r}" == "(X[4,4] * 1.0 + X[3,4] * -1.0)"
+    check_all_codecs(
+        data,
+        "finite_difference(x,order=1,accuracy=1,type=-1,axis=0,grid_spacing=1)",
+        [(4, 4), (4, 4)],
+    )
 
-#     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-#         "finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1)",
-#         valid_5x5_neighbourhood,
-#         "abs",
-#         0,
-#     )
-#     assert (
-#         f"{safeguard._qoi_expr!r}"
-#         == "(X[4,4] * -0.0 + X[5,4] * (1 / 2) + X[3,4] * (-1 / 2))"
-#     )
-#     check_all_codecs(
-#         data,
-#         "finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1)",
-#         [(4, 4), (4, 4)],
-#     )
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1)",
+        valid_5x5_neighbourhood,
+        "abs",
+        0,
+    )
+    assert (
+        f"{safeguard._qoi_expr!r}"
+        == "(X[4,4] * -0.0 + X[5,4] * (1 / 2) + X[3,4] * (-1 / 2))"
+    )
+    check_all_codecs(
+        data,
+        "finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1)",
+        [(4, 4), (4, 4)],
+    )
 
-#     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-#         "finite_difference(x,order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
-#         valid_5x5_neighbourhood,
-#         "abs",
-#         0,
-#     )
-#     assert (
-#         f"{safeguard._qoi_expr!r}"
-#         == "(X[4,4] * -0.0 + X[4,5] * (1 / 2) + X[4,3] * (-1 / 2))"
-#     )
-#     check_all_codecs(
-#         data,
-#         "finite_difference(x,order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
-#         [(4, 4), (4, 4)],
-#     )
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "finite_difference(x,order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
+        valid_5x5_neighbourhood,
+        "abs",
+        0,
+    )
+    assert (
+        f"{safeguard._qoi_expr!r}"
+        == "(X[4,4] * -0.0 + X[4,5] * (1 / 2) + X[4,3] * (-1 / 2))"
+    )
+    check_all_codecs(
+        data,
+        "finite_difference(x,order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
+        [(4, 4), (4, 4)],
+    )
 
-#     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-#         "finite_difference(x,order=2,accuracy=2,type=0,axis=0,grid_spacing=1)",
-#         valid_5x5_neighbourhood,
-#         "abs",
-#         0,
-#     )
-#     assert f"{safeguard._qoi_expr}" == "(X[4,4] * -2.0 + X[5,4] * 1.0 + X[3,4] * 1.0)"
-#     check_all_codecs(
-#         data,
-#         "finite_difference(x,order=2,accuracy=2,type=0,axis=0,grid_spacing=1)",
-#         [(4, 4), (4, 4)],
-#     )
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "finite_difference(x,order=2,accuracy=2,type=0,axis=0,grid_spacing=1)",
+        valid_5x5_neighbourhood,
+        "abs",
+        0,
+    )
+    assert f"{safeguard._qoi_expr}" == "(X[4,4] * -2.0 + X[5,4] * 1.0 + X[3,4] * 1.0)"
+    check_all_codecs(
+        data,
+        "finite_difference(x,order=2,accuracy=2,type=0,axis=0,grid_spacing=1)",
+        [(4, 4), (4, 4)],
+    )
 
-#     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-#         "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=0,grid_spacing=1)",
-#         valid_5x5_neighbourhood,
-#         "abs",
-#         0,
-#     )
-#     assert (
-#         f"{safeguard._qoi_expr!r}"
-#         # X[2,4] * (1/4) + X[4,4] * (-1/2) + X[6,4] * (1/4)
-#         == "((X[4,4] * -0.0 + X[5,4] * (1 / 2) + X[3,4] * (-1 / 2)) * -0.0 + (X[5,4] * -0.0 + X[6,4] * (1 / 2) + X[4,4] * (-1 / 2)) * (1 / 2) + (X[3,4] * -0.0 + X[4,4] * (1 / 2) + X[2,4] * (-1 / 2)) * (-1 / 2))"
-#     )
-#     check_all_codecs(
-#         data,
-#         "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=0,grid_spacing=1)",
-#         [(4, 4), (4, 4)],
-#     )
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=0,grid_spacing=1)",
+        valid_5x5_neighbourhood,
+        "abs",
+        0,
+    )
+    assert (
+        f"{safeguard._qoi_expr!r}"
+        # X[2,4] * (1/4) + X[4,4] * (-1/2) + X[6,4] * (1/4)
+        == "((X[4,4] * -0.0 + X[5,4] * (1 / 2) + X[3,4] * (-1 / 2)) * -0.0 + (X[5,4] * -0.0 + X[6,4] * (1 / 2) + X[4,4] * (-1 / 2)) * (1 / 2) + (X[3,4] * -0.0 + X[4,4] * (1 / 2) + X[2,4] * (-1 / 2)) * (-1 / 2))"
+    )
+    check_all_codecs(
+        data,
+        "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=0,grid_spacing=1)",
+        [(4, 4), (4, 4)],
+    )
 
-#     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-#         "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
-#         valid_5x5_neighbourhood,
-#         "abs",
-#         0,
-#     )
-#     assert (
-#         f"{safeguard._qoi_expr!r}"
-#         # X[3,3] * (1/4) + X[3,5] * (-1/4) + X[5,3] * (-1/4) + X[5,5] * (1/4)
-#         == "((X[4,4] * -0.0 + X[5,4] * (1 / 2) + X[3,4] * (-1 / 2)) * -0.0 + (X[4,5] * -0.0 + X[5,5] * (1 / 2) + X[3,5] * (-1 / 2)) * (1 / 2) + (X[4,3] * -0.0 + X[5,3] * (1 / 2) + X[3,3] * (-1 / 2)) * (-1 / 2))"
-#     )
-#     check_all_codecs(
-#         data,
-#         "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
-#         [(4, 4), (4, 4)],
-#     )
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
+        valid_5x5_neighbourhood,
+        "abs",
+        0,
+    )
+    assert (
+        f"{safeguard._qoi_expr!r}"
+        # X[3,3] * (1/4) + X[3,5] * (-1/4) + X[5,3] * (-1/4) + X[5,5] * (1/4)
+        == "((X[4,4] * -0.0 + X[5,4] * (1 / 2) + X[3,4] * (-1 / 2)) * -0.0 + (X[4,5] * -0.0 + X[5,5] * (1 / 2) + X[3,5] * (-1 / 2)) * (1 / 2) + (X[4,3] * -0.0 + X[5,3] * (1 / 2) + X[3,3] * (-1 / 2)) * (-1 / 2))"
+    )
+    check_all_codecs(
+        data,
+        "finite_difference(finite_difference(x,order=1,accuracy=2,type=0,axis=0,grid_spacing=1),order=1,accuracy=2,type=0,axis=1,grid_spacing=1)",
+        [(4, 4), (4, 4)],
+    )
 
 
 def test_finite_difference_array():
@@ -637,28 +637,28 @@ def test_periodic_delta_transform(dtype):
         assert np.all(periodic <= (period / 2))
 
 
-# def test_matmul():
-#     data = np.arange(16, dtype=float).reshape(4, 4)
-#     valid_3x3_neighbourhood = [
-#         dict(axis=0, before=1, after=1, boundary="valid"),
-#         dict(axis=1, before=1, after=1, boundary="valid"),
-#     ]
+def test_matmul():
+    data = np.arange(16, dtype=float).reshape(4, 4)
+    valid_3x3_neighbourhood = [
+        dict(axis=0, before=1, after=1, boundary="valid"),
+        dict(axis=1, before=1, after=1, boundary="valid"),
+    ]
 
-#     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
-#         "matmul([[-1, -2, -3]], matmul(X, [[1, 2, 3]].T))[0,0]",
-#         valid_3x3_neighbourhood,
-#         "abs",
-#         0,
-#     )
-#     assert (
-#         f"{safeguard._qoi_expr!r}"
-#         == "(-1 * (X[0,0] * 1 + X[0,1] * 2 + X[0,2] * 3) + -2 * (X[1,0] * 1 + X[1,1] * 2 + X[1,2] * 3) + -3 * (X[2,0] * 1 + X[2,1] * 2 + X[2,2] * 3))"
-#     )
-#     check_all_codecs(
-#         data,
-#         "matmul([[-1, -2, -3]], matmul(X, [[1, 2, 3]].T))[0,0]",
-#         [(1, 1), (1, 1)],
-#     )
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "matmul([[-1, -2, -3]], matmul(X, [[1, 2, 3]].T))[0,0]",
+        valid_3x3_neighbourhood,
+        "abs",
+        0,
+    )
+    assert (
+        f"{safeguard._qoi_expr!r}"
+        == "(-1 * (X[0,0] * 1 + X[0,1] * 2 + X[0,2] * 3) + -2 * (X[1,0] * 1 + X[1,1] * 2 + X[1,2] * 3) + -3 * (X[2,0] * 1 + X[2,1] * 2 + X[2,2] * 3))"
+    )
+    check_all_codecs(
+        data,
+        "matmul([[-1, -2, -3]], matmul(X, [[1, 2, 3]].T))[0,0]",
+        [(1, 1), (1, 1)],
+    )
 
 
 def test_indexing():
@@ -831,98 +831,98 @@ def test_fuzzer_finite_difference_fraction_overflow():
         )
 
 
-# def test_fuzzer_finite_difference_fraction_compare():
-#     data = np.array([1978047305655558])
+def test_fuzzer_finite_difference_fraction_compare():
+    data = np.array([1978047305655558])
 
-#     for boundary in BoundaryCondition:
-#         encode_decode_zero(
-#             data,
-#             safeguards=[
-#                 dict(kind="same", value=7),
-#                 dict(
-#                     kind="qoi_eb_stencil",
-#                     qoi="finite_difference(x, order=7, accuracy=7, type=1, axis=0, grid_spacing=2.2250738585072014e-308)",
-#                     neighbourhood=[
-#                         dict(
-#                             axis=0,
-#                             before=0,
-#                             after=13,
-#                             boundary=boundary,
-#                             constant_boundary=42
-#                             if boundary == BoundaryCondition.constant
-#                             else None,
-#                         )
-#                     ],
-#                     type="abs",
-#                     eb=2.2250738585072014e-308,
-#                 ),
-#                 dict(kind="sign"),
-#             ],
-#         )
-
-
-# def test_fuzzer_finite_difference_eb_abs():
-#     data = np.array([[-27, 8, 8], [8, 8, 8], [8, 8, 8]], dtype=np.int8)
-#     decoded = np.array([[8, 8, 8], [8, 8, 8], [8, 8, 8]], dtype=np.int8)
-
-#     for boundary in BoundaryCondition:
-#         encode_decode_mock(
-#             data,
-#             decoded,
-#             safeguards=[
-#                 dict(
-#                     kind="qoi_eb_stencil",
-#                     qoi="finite_difference(x, order=4, accuracy=4, type=1, axis=0, grid_spacing=4)",
-#                     neighbourhood=[
-#                         dict(
-#                             axis=0,
-#                             before=0,
-#                             after=7,
-#                             boundary=boundary,
-#                             constant_boundary=42
-#                             if boundary == BoundaryCondition.constant
-#                             else None,
-#                         )
-#                     ],
-#                     type="abs",
-#                     eb=1,
-#                 ),
-#                 dict(kind="sign"),
-#             ],
-#         )
+    for boundary in BoundaryCondition:
+        encode_decode_zero(
+            data,
+            safeguards=[
+                dict(kind="same", value=7),
+                dict(
+                    kind="qoi_eb_stencil",
+                    qoi="finite_difference(x, order=7, accuracy=7, type=1, axis=0, grid_spacing=2.2250738585072014e-308)",
+                    neighbourhood=[
+                        dict(
+                            axis=0,
+                            before=0,
+                            after=13,
+                            boundary=boundary,
+                            constant_boundary=42
+                            if boundary == BoundaryCondition.constant
+                            else None,
+                        )
+                    ],
+                    type="abs",
+                    eb=2.2250738585072014e-308,
+                ),
+                dict(kind="sign"),
+            ],
+        )
 
 
-# def test_fuzzer_finite_difference_fraction_float_overflow():
-#     data = np.array([[0], [0], [7], [0], [4], [0], [59], [199]], dtype=np.uint16)
-#     decoded = np.array(
-#         [[1], [1], [0], [30720], [124], [32768], [16427], [3797]], dtype=np.uint16
-#     )
+def test_fuzzer_finite_difference_eb_abs():
+    data = np.array([[-27, 8, 8], [8, 8, 8], [8, 8, 8]], dtype=np.int8)
+    decoded = np.array([[8, 8, 8], [8, 8, 8], [8, 8, 8]], dtype=np.int8)
 
-#     for boundary in BoundaryCondition:
-#         encode_decode_mock(
-#             data,
-#             decoded,
-#             safeguards=[
-#                 dict(
-#                     kind="qoi_eb_stencil",
-#                     qoi="finite_difference(x, order=1, accuracy=3, type=1, axis=0, grid_spacing=59)",
-#                     neighbourhood=[
-#                         dict(
-#                             axis=0,
-#                             before=0,
-#                             after=3,
-#                             boundary=boundary,
-#                             constant_boundary=42
-#                             if boundary == BoundaryCondition.constant
-#                             else None,
-#                         )
-#                     ],
-#                     type="abs",
-#                     eb=8.812221249325077e307,
-#                 ),
-#                 dict(kind="sign"),
-#             ],
-#         )
+    for boundary in BoundaryCondition:
+        encode_decode_mock(
+            data,
+            decoded,
+            safeguards=[
+                dict(
+                    kind="qoi_eb_stencil",
+                    qoi="finite_difference(x, order=4, accuracy=4, type=1, axis=0, grid_spacing=4)",
+                    neighbourhood=[
+                        dict(
+                            axis=0,
+                            before=0,
+                            after=7,
+                            boundary=boundary,
+                            constant_boundary=42
+                            if boundary == BoundaryCondition.constant
+                            else None,
+                        )
+                    ],
+                    type="abs",
+                    eb=1,
+                ),
+                dict(kind="sign"),
+            ],
+        )
+
+
+def test_fuzzer_finite_difference_fraction_float_overflow():
+    data = np.array([[0], [0], [7], [0], [4], [0], [59], [199]], dtype=np.uint16)
+    decoded = np.array(
+        [[1], [1], [0], [30720], [124], [32768], [16427], [3797]], dtype=np.uint16
+    )
+
+    for boundary in BoundaryCondition:
+        encode_decode_mock(
+            data,
+            decoded,
+            safeguards=[
+                dict(
+                    kind="qoi_eb_stencil",
+                    qoi="finite_difference(x, order=1, accuracy=3, type=1, axis=0, grid_spacing=59)",
+                    neighbourhood=[
+                        dict(
+                            axis=0,
+                            before=0,
+                            after=3,
+                            boundary=boundary,
+                            constant_boundary=42
+                            if boundary == BoundaryCondition.constant
+                            else None,
+                        )
+                    ],
+                    type="abs",
+                    eb=8.812221249325077e307,
+                ),
+                dict(kind="sign"),
+            ],
+        )
 
 
 def test_fuzzer_tuple_index_out_of_range():
@@ -1153,48 +1153,48 @@ def test_late_bound_eb_ratio():
     assert np.all(ok == np.array([True, True, True, True, False, True]).reshape(2, 3))
 
 
-# def test_finite_difference_dx():
-#     data = np.array([1, 2, 3], dtype=np.int8)
-#     decoded = np.array([0, 0, 0], dtype=np.int8)
+def test_finite_difference_dx():
+    data = np.array([1, 2, 3], dtype=np.int8)
+    decoded = np.array([0, 0, 0], dtype=np.int8)
 
-#     for boundary in BoundaryCondition:
-#         safeguards = Safeguards(
-#             safeguards=[
-#                 dict(
-#                     kind="qoi_eb_stencil",
-#                     qoi="finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_spacing=0.1)",
-#                     neighbourhood=[
-#                         dict(
-#                             axis=0,
-#                             before=1,
-#                             after=1,
-#                             boundary=boundary,
-#                             constant_boundary=42
-#                             if boundary == BoundaryCondition.constant
-#                             else None,
-#                         )
-#                     ],
-#                     type="abs",
-#                     eb=1,
-#                 ),
-#             ]
-#         )
+    for boundary in BoundaryCondition:
+        safeguards = Safeguards(
+            safeguards=[
+                dict(
+                    kind="qoi_eb_stencil",
+                    qoi="finite_difference(x, order=1, accuracy=2, type=0, axis=0, grid_spacing=0.1)",
+                    neighbourhood=[
+                        dict(
+                            axis=0,
+                            before=1,
+                            after=1,
+                            boundary=boundary,
+                            constant_boundary=42
+                            if boundary == BoundaryCondition.constant
+                            else None,
+                        )
+                    ],
+                    type="abs",
+                    eb=1,
+                ),
+            ]
+        )
 
-#         correction = safeguards.compute_correction(data, decoded)
-#         corrected = safeguards.apply_correction(decoded, correction)
+        correction = safeguards.compute_correction(data, decoded)
+        corrected = safeguards.apply_correction(decoded, correction)
 
-#         data_finite_difference = safeguards.safeguards[0].evaluate_qoi(
-#             data, Bindings.empty()
-#         )
-#         corrected_finite_difference = safeguards.safeguards[0].evaluate_qoi(
-#             corrected, Bindings.empty()
-#         )
+        data_finite_difference = safeguards.safeguards[0].evaluate_qoi(
+            data, Bindings.empty()
+        )
+        corrected_finite_difference = safeguards.safeguards[0].evaluate_qoi(
+            corrected, Bindings.empty()
+        )
 
-#         assert data_finite_difference[len(data_finite_difference) // 2] == 10
-#         assert (
-#             np.abs(10 - corrected_finite_difference[len(data_finite_difference) // 2])
-#             <= 1
-#         )
+        assert data_finite_difference[len(data_finite_difference) // 2] == 10
+        assert (
+            np.abs(10 - corrected_finite_difference[len(data_finite_difference) // 2])
+            <= 1
+        )
 
 
 # def test_late_bound_constant():

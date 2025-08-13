@@ -730,7 +730,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         # i.e. for each data element, which QoI elements does it contribute to
         #      and thus which error bounds affect it
         reverse_indices_windows = np.full(
-            (data.size, np.sum(window_used)), indices_windows.shape[0]
+            (data.size, np.sum(window_used)), indices_windows.size
         )
         reverse_indices_counter = np.zeros(data.size, dtype=int)
         for i, u in enumerate(window_used.flat):
@@ -747,7 +747,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     if reverse_indices_counter[idx] >= reverse_indices_windows.shape[1]:
                         new_reverse_indices_windows = np.full(
                             (data.size, reverse_indices_windows.shape[1] * 2),
-                            indices_windows.shape[0],
+                            indices_windows.size,
                         )
                         new_reverse_indices_windows[
                             :, : reverse_indices_windows.shape[1]
