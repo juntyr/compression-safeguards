@@ -639,3 +639,18 @@ def test_fuzzer_found_classification():
             ),
         ],
     )
+
+    data = np.array([], dtype=np.int64)
+    decoded = np.array([], dtype=np.int64)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            PointwiseQuantityOfInterestErrorBoundSafeguard(
+                qoi="exp10(exp10(isinf(exp2(1.5298016088828333e+308))) - x)",
+                type="rel",
+                eb=0,
+            ),
+        ],
+    )

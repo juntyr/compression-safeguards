@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from typing import Callable
 
 import numpy as np
 
@@ -39,7 +40,7 @@ class ScalarIsFinite(Expr):
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
-            lambda x: np.astype(_isfinite(x), dtype),  # type: ignore
+            lambda x: classify_to_dtype(_isfinite, x, dtype),  # type: ignore
             ScalarIsFinite,
         )
 
@@ -49,7 +50,7 @@ class ScalarIsFinite(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.astype(_isfinite(self._a.eval(x, Xs, late_bound)), Xs.dtype)  # type: ignore
+        return classify_to_dtype(_isfinite, self._a.eval(x, Xs, late_bound), Xs.dtype)
 
     def compute_data_bounds_unchecked(
         self,
@@ -145,7 +146,7 @@ class ScalarIsInf(Expr):
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
-            lambda x: np.astype(_isinf(x), dtype),  # type: ignore
+            lambda x: classify_to_dtype(_isinf, x, dtype),  # type: ignore
             ScalarIsInf,
         )
 
@@ -155,7 +156,7 @@ class ScalarIsInf(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.astype(_isinf(self._a.eval(x, Xs, late_bound)), Xs.dtype)  # type: ignore
+        return classify_to_dtype(_isinf, self._a.eval(x, Xs, late_bound), Xs.dtype)
 
     def compute_data_bounds_unchecked(
         self,
@@ -251,7 +252,7 @@ class ScalarIsNaN(Expr):
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
-            lambda x: np.astype(_isnan(x), dtype),  # type: ignore
+            lambda x: classify_to_dtype(_isnan, x, dtype),  # type: ignore
             ScalarIsNaN,
         )
 
@@ -261,7 +262,7 @@ class ScalarIsNaN(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.astype(_isnan(self._a.eval(x, Xs, late_bound)), Xs.dtype)  # type: ignore
+        return classify_to_dtype(_isnan, self._a.eval(x, Xs, late_bound), Xs.dtype)
 
     def compute_data_bounds_unchecked(
         self,
@@ -323,3 +324,18 @@ class ScalarIsNaN(Expr):
 
     def __repr__(self) -> str:
         return f"isnan({self._a!r})"
+
+
+def classify_to_dtype(
+    classify: Callable[
+        [np.ndarray[Ps, np.dtype[F]]], bool | np.ndarray[Ps, np.dtype[np.bool]]
+    ],
+    a: np.ndarray[Ps, np.dtype[F]],
+    dtype: np.dtype[F],
+) -> np.ndarray[Ps, np.dtype[F]]:
+    c = classify(a)
+
+    if not isinstance(c, np.ndarray):
+        return np.array(c).astype(dtype)[()]  # type: ignore
+
+    return c.astype(dtype)
