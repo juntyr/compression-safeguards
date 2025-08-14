@@ -514,9 +514,11 @@ def test_late_bound_constant():
         f=np.array([16, 8, 4, 2, 1, 0]).reshape(2, 3),
     )
 
+    imax = np.iinfo(data.dtype).max
+
     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
-    assert np.all(valid._lower == (data.flatten() - np.array([16, 8, 4, 2, 1, 0])))
-    assert np.all(valid._upper == (data.flatten() + np.array([16, 8, 4, 2, 1, 0])))
+    assert np.all(valid._lower == np.array([0 - 16, 1 - 8, 2 - 4, 3 - 2, 4 - 1, 1]))
+    assert np.all(valid._upper == np.array([0 + 16, 1 + 8, 2 + 4, 3 + 2, 4 + 1, imax]))
 
     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
     assert np.all(ok == np.array([True, True, True, False, False, False]).reshape(2, 3))

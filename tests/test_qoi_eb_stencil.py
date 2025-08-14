@@ -1220,8 +1220,7 @@ def test_late_bound_constant():
         zero=0,
     )
 
-    imin = np.iinfo(data.dtype).min
-    imax = np.iinfo(data.dtype).max
+    imin, imax = np.iinfo(data.dtype).min, np.iinfo(data.dtype).max
 
     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
     assert np.all(valid._lower == np.array([imin, imin, imin, 3 - 16, 4 - 8, 5 - 4]))
@@ -1249,9 +1248,6 @@ def test_late_bound_constant():
         f=np.array([[16, 8, 4], [16, 8, 4]]),
         zero=0,
     )
-
-    imin = np.iinfo(data.dtype).min
-    imax = np.iinfo(data.dtype).max
 
     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
     assert np.all(valid._lower == (data.flatten() - np.array([16, 8, 4, 16, 8, 4])))

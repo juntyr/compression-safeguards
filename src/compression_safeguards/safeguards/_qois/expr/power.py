@@ -77,25 +77,25 @@ class ScalarPower(Expr):
             # check not just for x < 0 but also for x == -0.0
             return (x < 0) | ((1 / x) < 0)  # type: ignore
 
-        # evaluate a
-        a = self._a
+        # evaluate a, b, and power(a, b)
+        a, b = self._a, self._b
         av = a.eval(X.shape, Xs, late_bound)
-
-        # rewrite a ** b as e^(b*ln(fake_abs(a)))
-        # this is mathematically incorrect for a <= 0 but works for deriving
-        #  error bounds since fake_abs handles the error bound flips
-        Xs_lower, Xs_upper = ScalarExp(
-            Exponential.exp,
-            ScalarMultiply(self._b, ScalarLog(Logarithm.ln, ScalarFakeAbs(self._a))),
-        ).compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
+        bv = b.eval(X.shape, Xs, late_bound)
+        exprv = np.power(av, bv)
 
         # powers of negative numbers are just too tricky since
         #  they easily become NaN, so let's force the exact same
         #  data for them
-        Xs_lower = np.where(_is_negative(av), Xs, Xs_lower)  # type: ignore
-        Xs_upper = np.where(_is_negative(av), Xs, Xs_upper)  # type: ignore
+        expr_lower = np.where(_is_negative(av), exprv, expr_lower)  # type: ignore
+        expr_upper = np.where(_is_negative(av), exprv, expr_upper)  # type: ignore
 
-        return Xs_lower, Xs_upper
+        # rewrite a ** b as e^(b*ln(fake_abs(a)))
+        # this is mathematically incorrect for a <= 0 but works for deriving
+        #  error bounds since fake_abs handles the error bound flips
+        return ScalarExp(
+            Exponential.exp,
+            ScalarMultiply(self._b, ScalarLog(Logarithm.ln, ScalarFakeAbs(self._a))),
+        ).compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 
     def __repr__(self) -> str:
         return f"{self._a!r} ** {self._b!r}"
