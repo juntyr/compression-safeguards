@@ -1263,8 +1263,6 @@ def test_late_bound_constant():
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_pointwise_normalised_absolute_error(check):
-    if check in [check_circle, check_arange]:
-        pytest.xfail("slow or hang")
     # pointwise normalised / range-relative absolute error bound
     check('(x - c["$x_min"]) / (c["$x_max"] - c["$x_min"])')
 

@@ -12,7 +12,7 @@ from ....utils.cast import (
     _isinf,
     _isnan,
 )
-from ..bound import ensure_bounded_expression
+from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
 from .addsub import ScalarAdd, ScalarSubtract
 from .constfold import ScalarFoldedConstant
@@ -145,7 +145,7 @@ class ScalarMultiply(Expr):
             term_upper = np.where(term_upper == termv, termv, term_upper)  # type: ignore
 
             # handle rounding errors in multiply(divide(...)) early
-            term_lower = ensure_bounded_expression(
+            term_lower = guarantee_arg_within_expr_bounds(
                 lambda term_lower: term_lower * constv,
                 exprv,
                 termv,
@@ -153,7 +153,7 @@ class ScalarMultiply(Expr):
                 expr_lower,
                 expr_upper,
             )
-            term_upper = ensure_bounded_expression(
+            term_upper = guarantee_arg_within_expr_bounds(
                 lambda term_upper: term_upper * constv,
                 exprv,
                 termv,

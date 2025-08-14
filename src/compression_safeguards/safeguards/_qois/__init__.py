@@ -279,7 +279,7 @@ class StencilQuantityOfInterest:
 
         Returns
         -------
-        X_lower, X_upper : tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]
+        Xs_lower, Xs_upper : tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]
             The stencil-extended lower and upper bounds on the stencil-extended
             data `Xs`.
 

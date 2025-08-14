@@ -4,7 +4,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from ....utils.bindings import Parameter
-from ..bound import ensure_bounded_expression_v2
+from ..bound import guarantee_data_within_expr_bounds
 from .typing import F, Ns, Ps, PsI
 
 
@@ -141,7 +141,7 @@ class Expr:
 
         Returns
         -------
-        X_lower, X_upper : tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]
+        Xs_lower, Xs_upper : tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]
             The stencil-extended lower and upper bounds on the stencil-extended
             data `Xs`.
 
@@ -190,7 +190,7 @@ class Expr:
 
         Returns
         -------
-        X_lower, X_upper : tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]
+        Xs_lower, Xs_upper : tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]
             The stencil-extended lower and upper bounds on the stencil-extended
             data `Xs`.
 
@@ -198,44 +198,47 @@ class Expr:
             that contribute to the same QoI points.
         """
 
-        xl: np.ndarray[Ns, np.dtype[F]]
-        xu: np.ndarray[Ns, np.dtype[F]]
-        xl, xu = self.compute_data_bounds_unchecked(
+        Xs_lower: np.ndarray[Ns, np.dtype[F]]
+        Xs_upper: np.ndarray[Ns, np.dtype[F]]
+        Xs_lower, Xs_upper = self.compute_data_bounds_unchecked(
             expr_lower, expr_upper, X, Xs, late_bound
         )
 
-        xl = np.minimum(Xs, xl)
-        xu = np.maximum(Xs, xu)
+        # ensure that the original data values are within the data bounds
+        Xs_lower = np.minimum(Xs, Xs_lower)
+        Xs_upper = np.maximum(Xs, Xs_upper)
+        Xs_lower = np.where(Xs_lower == Xs, Xs, Xs_lower)  # type: ignore
+        Xs_upper = np.where(Xs_upper == Xs, Xs, Xs_upper)  # type: ignore
 
         exprv = self.eval(X.shape, Xs, late_bound)
 
         # handle rounding errors in the lower error bound computation
-        xl = ensure_bounded_expression_v2(
-            lambda xl: self.eval(
+        Xs_lower = guarantee_data_within_expr_bounds(
+            lambda Xs_lower: self.eval(
                 X.shape,
-                xl,
+                Xs_lower,
                 late_bound,
             ),
             exprv,
             Xs,
-            xl,
+            Xs_lower,
             expr_lower,
             expr_upper,
         )
-        xu = ensure_bounded_expression_v2(
-            lambda xu: self.eval(
+        Xs_upper = guarantee_data_within_expr_bounds(
+            lambda Xs_upper: self.eval(
                 X.shape,
-                xu,
+                Xs_upper,
                 late_bound,
             ),
             exprv,
             Xs,
-            xu,
+            Xs_upper,
             expr_lower,
             expr_upper,
         )
 
-        return xl, xu
+        return Xs_lower, Xs_upper
 
     @abstractmethod
     def __repr__(self) -> str:

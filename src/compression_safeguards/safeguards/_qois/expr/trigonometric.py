@@ -11,7 +11,7 @@ from ....utils.cast import (
     _nextafter,
     _reciprocal,
 )
-from ..bound import ensure_bounded_expression
+from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
 from .addsub import ScalarAdd, ScalarSubtract
 from .constfold import ScalarFoldedConstant
@@ -110,7 +110,7 @@ class ScalarSin(Expr):
         arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
 
         # handle rounding errors in asin(sin(...)) early
-        arg_lower = ensure_bounded_expression(
+        arg_lower = guarantee_arg_within_expr_bounds(
             lambda arg_lower: np.sin(arg_lower),
             exprv,
             argv,
@@ -118,7 +118,7 @@ class ScalarSin(Expr):
             expr_lower,
             expr_upper,
         )
-        arg_upper = ensure_bounded_expression(
+        arg_upper = guarantee_arg_within_expr_bounds(
             lambda arg_upper: np.sin(arg_upper),
             exprv,
             argv,
@@ -237,7 +237,7 @@ class ScalarAsin(Expr):
         arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
 
         # handle rounding errors in asin(sin(...)) early
-        arg_lower = ensure_bounded_expression(
+        arg_lower = guarantee_arg_within_expr_bounds(
             lambda arg_lower: np.asin(arg_lower),
             exprv,
             argv,
@@ -245,7 +245,7 @@ class ScalarAsin(Expr):
             expr_lower,
             expr_upper,
         )
-        arg_upper = ensure_bounded_expression(
+        arg_upper = guarantee_arg_within_expr_bounds(
             lambda arg_upper: np.asin(arg_upper),
             exprv,
             argv,

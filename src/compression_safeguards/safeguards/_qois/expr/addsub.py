@@ -11,7 +11,7 @@ from ....utils.cast import (
     _isnan,
     _nan_to_zero,
 )
-from ..bound import ensure_bounded_expression
+from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
 from .abs import ScalarAbs
 from .constfold import ScalarFoldedConstant
@@ -318,7 +318,7 @@ class SumTerm:
                     -fmax,
                     np.where(
                         _isinf(total_abs_factor),
-                        X.dtype.type(0.0),
+                        termv if is_add else -termv,
                         np.where(
                             _isnan(total_abs_factor) | _isnan(exprv),
                             X.dtype.type(-np.inf),
@@ -337,7 +337,7 @@ class SumTerm:
                     fmax,
                     np.where(
                         _isinf(total_abs_factor),
-                        X.dtype.type(0.0),
+                        termv if is_add else -termv,
                         np.where(
                             _isnan(total_abs_factor) | _isnan(exprv),
                             X.dtype.type(np.inf),
@@ -377,15 +377,15 @@ class SumTerm:
             )
 
         # handle rounding errors in the total absolute factor early
-        tl_stack = ensure_bounded_expression(
+        tl_stack = guarantee_arg_within_expr_bounds(
             compute_sum,
             np.broadcast_to(
                 exprv.reshape((1,) + exprv.shape), (tl_stack.shape[0],) + exprv.shape
             ),
             np.stack(
                 [
-                    termv
-                    for termv, abs_factorv in zip(termvs, abs_factorvs)
+                    termv if is_add else -termv
+                    for is_add, termv, abs_factorv in zip(is_adds, termvs, abs_factorvs)
                     if abs_factorv is not None
                 ]
             ),
@@ -399,15 +399,15 @@ class SumTerm:
                 (tl_stack.shape[0],) + exprv.shape,
             ),
         )
-        tu_stack = ensure_bounded_expression(
+        tu_stack = guarantee_arg_within_expr_bounds(
             compute_sum,
             np.broadcast_to(
                 exprv.reshape((1,) + exprv.shape), (tu_stack.shape[0],) + exprv.shape
             ),
             np.stack(
                 [
-                    termv
-                    for termv, abs_factorv in zip(termvs, abs_factorvs)
+                    termv if is_add else -termv
+                    for is_add, termv, abs_factorv in zip(is_adds, termvs, abs_factorvs)
                     if abs_factorv is not None
                 ]
             ),

@@ -7,7 +7,7 @@ from ....utils.cast import (
     _float128_dtype,
     _float128_smallest_subnormal,
 )
-from ..bound import ensure_bounded_expression
+from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
@@ -96,7 +96,7 @@ class ScalarSqrt(Expr):
         arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
 
         # handle rounding errors in sqrt(square(...)) early
-        arg_lower = ensure_bounded_expression(
+        arg_lower = guarantee_arg_within_expr_bounds(
             lambda arg_lower: np.sqrt(arg_lower),
             exprv,
             argv,
@@ -104,7 +104,7 @@ class ScalarSqrt(Expr):
             expr_lower,
             expr_upper,
         )
-        arg_upper = ensure_bounded_expression(
+        arg_upper = guarantee_arg_within_expr_bounds(
             lambda arg_upper: np.sqrt(arg_upper),
             exprv,
             argv,
@@ -223,7 +223,7 @@ class ScalarSquare(Expr):
         arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
 
         # handle rounding errors in square(sqrt(...)) early
-        arg_lower = ensure_bounded_expression(
+        arg_lower = guarantee_arg_within_expr_bounds(
             lambda arg_lower: np.square(arg_lower),
             exprv,
             argv,
@@ -231,7 +231,7 @@ class ScalarSquare(Expr):
             expr_lower,
             expr_upper,
         )
-        arg_upper = ensure_bounded_expression(
+        arg_upper = guarantee_arg_within_expr_bounds(
             lambda arg_upper: np.square(arg_upper),
             exprv,
             argv,

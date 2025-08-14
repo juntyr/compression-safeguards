@@ -4,7 +4,7 @@ import numpy as np
 
 from ....utils.bindings import Parameter
 from ....utils.cast import _nextafter, _rint
-from ..bound import ensure_bounded_expression
+from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
@@ -348,7 +348,7 @@ class ScalarRoundTiesEven(Expr):
         # which can occur since our +-0.5 estimate doesn't account for the even
         #  tie breaking cases
         # FIXME: https://github.com/numpy/numpy-user-dtypes/issues/129
-        arg_lower = ensure_bounded_expression(
+        arg_lower = guarantee_arg_within_expr_bounds(
             lambda arg_lower: _rint(arg_lower),
             exprv,
             argv,
@@ -356,7 +356,7 @@ class ScalarRoundTiesEven(Expr):
             expr_lower,
             expr_upper,
         )
-        arg_upper = ensure_bounded_expression(
+        arg_upper = guarantee_arg_within_expr_bounds(
             lambda arg_upper: _rint(arg_upper),
             exprv,
             argv,

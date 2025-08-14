@@ -6,7 +6,7 @@ import numpy as np
 
 from ....utils.bindings import Parameter
 from ....utils.cast import _float128_dtype, _float128_type, _reciprocal
-from ..bound import ensure_bounded_expression
+from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
 from .abs import ScalarAbs
 from .addsub import ScalarAdd, ScalarSubtract
@@ -84,7 +84,7 @@ class ScalarSinh(Expr):
         arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
 
         # handle rounding errors in sinh(asinh(...)) early
-        arg_lower = ensure_bounded_expression(
+        arg_lower = guarantee_arg_within_expr_bounds(
             lambda arg_lower: _sinh(arg_lower),
             exprv,
             argv,
@@ -92,7 +92,7 @@ class ScalarSinh(Expr):
             expr_lower,
             expr_upper,
         )
-        arg_upper = ensure_bounded_expression(
+        arg_upper = guarantee_arg_within_expr_bounds(
             lambda arg_upper: _sinh(arg_upper),
             exprv,
             argv,
@@ -193,7 +193,7 @@ class ScalarAsinh(Expr):
         arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
 
         # handle rounding errors in asinh(sinh(...)) early
-        arg_lower = ensure_bounded_expression(
+        arg_lower = guarantee_arg_within_expr_bounds(
             lambda arg_lower: _asinh(arg_lower),
             exprv,
             argv,
@@ -201,7 +201,7 @@ class ScalarAsinh(Expr):
             expr_lower,
             expr_upper,
         )
-        arg_upper = ensure_bounded_expression(
+        arg_upper = guarantee_arg_within_expr_bounds(
             lambda arg_upper: _asinh(arg_upper),
             exprv,
             argv,

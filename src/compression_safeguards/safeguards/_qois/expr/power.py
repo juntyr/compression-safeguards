@@ -71,13 +71,31 @@ class ScalarPower(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        def _is_negative(
+            x: np.ndarray[Ps, np.dtype[F]],
+        ) -> np.ndarray[Ps, np.dtype[np.bool]]:
+            # check not just for x < 0 but also for x == -0.0
+            return (x < 0) | ((1 / x) < 0)  # type: ignore
+
+        # evaluate a
+        a = self._a
+        av = a.eval(X.shape, Xs, late_bound)
+
         # rewrite a ** b as e^(b*ln(fake_abs(a)))
         # this is mathematically incorrect for a <= 0 but works for deriving
         #  error bounds since fake_abs handles the error bound flips
-        return ScalarExp(
+        Xs_lower, Xs_upper = ScalarExp(
             Exponential.exp,
             ScalarMultiply(self._b, ScalarLog(Logarithm.ln, ScalarFakeAbs(self._a))),
         ).compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
+
+        # powers of negative numbers are just too tricky since
+        #  they easily become NaN, so let's force the exact same
+        #  data for them
+        Xs_lower = np.where(_is_negative(av), Xs, Xs_lower)  # type: ignore
+        Xs_upper = np.where(_is_negative(av), Xs, Xs_upper)  # type: ignore
+
+        return Xs_lower, Xs_upper
 
     def __repr__(self) -> str:
         return f"{self._a!r} ** {self._b!r}"

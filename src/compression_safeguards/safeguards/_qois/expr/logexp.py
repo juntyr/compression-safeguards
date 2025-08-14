@@ -9,7 +9,7 @@ from ....utils.cast import (
     _float128_dtype,
     _float128_smallest_subnormal,
 )
-from ..bound import ensure_bounded_expression
+from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
@@ -104,7 +104,7 @@ class ScalarLog(Expr):
         arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
 
         # handle rounding errors in log(exp(...)) early
-        arg_lower = ensure_bounded_expression(
+        arg_lower = guarantee_arg_within_expr_bounds(
             lambda arg_lower: (LOGARITHM_UFUNC[self._log])(arg_lower),
             exprv,
             argv,
@@ -112,7 +112,7 @@ class ScalarLog(Expr):
             expr_lower,
             expr_upper,
         )
-        arg_upper = ensure_bounded_expression(
+        arg_upper = guarantee_arg_within_expr_bounds(
             lambda arg_upper: (LOGARITHM_UFUNC[self._log])(arg_upper),
             exprv,
             argv,
@@ -234,7 +234,7 @@ class ScalarExp(Expr):
         arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
 
         # handle rounding errors in exp(log(...)) early
-        arg_lower = ensure_bounded_expression(
+        arg_lower = guarantee_arg_within_expr_bounds(
             lambda arg_lower: (EXPONENTIAL_UFUNC[self._exp])(arg_lower),
             exprv,
             argv,
@@ -242,7 +242,7 @@ class ScalarExp(Expr):
             expr_lower,
             expr_upper,
         )
-        arg_upper = ensure_bounded_expression(
+        arg_upper = guarantee_arg_within_expr_bounds(
             lambda arg_upper: (EXPONENTIAL_UFUNC[self._exp])(arg_upper),
             exprv,
             argv,
