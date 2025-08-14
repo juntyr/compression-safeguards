@@ -120,7 +120,7 @@ class QoIParser(Parser):
             p,
             f'cannot override already-defined variable v["{p.quotedparameter}"]',
         )
-        self._vars[p.quotedparameter] = Array.map_unary(p.expr, Group)
+        self._vars[p.quotedparameter] = Array.map(Group, p.expr)
 
     @_("VA LBRACK quotedparameter RBRACK EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def assign(self, p):  # noqa: F811
@@ -137,7 +137,7 @@ class QoIParser(Parser):
             p,
             f'cannot override already-defined variable V["{p.quotedparameter}"]',
         )
-        self._vars[p.quotedparameter] = Array.map_unary(p.expr, Group)
+        self._vars[p.quotedparameter] = Array.map(Group, p.expr)
 
     @_("ID EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def assign(self, p):  # noqa: F811
@@ -214,34 +214,34 @@ class QoIParser(Parser):
 
     @_("MINUS expr %prec UMINUS")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarNegate)
+        return Array.map(ScalarNegate, p.expr)
 
     # binary operators (add, subtract, multiply, divide, power):
     #  expr := expr OP expr
     @_("expr PLUS expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
-            return Array.map_binary(p.expr0, p.expr1, ScalarAdd)
+            return Array.map(ScalarAdd, p.expr0, p.expr1)
 
     @_("expr MINUS expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
-            return Array.map_binary(p.expr0, p.expr1, ScalarSubtract)
+            return Array.map(ScalarSubtract, p.expr0, p.expr1)
 
     @_("expr TIMES expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
-            return Array.map_binary(p.expr0, p.expr1, ScalarMultiply)
+            return Array.map(ScalarMultiply, p.expr0, p.expr1)
 
     @_("expr DIVIDE expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
-            return Array.map_binary(p.expr0, p.expr1, ScalarDivide)
+            return Array.map(ScalarDivide, p.expr0, p.expr1)
 
     @_("expr POWER expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
-            return Array.map_binary(p.expr0, p.expr1, ScalarPower)
+            return Array.map(ScalarPower, p.expr0, p.expr1)
 
     # array transpose: expr := expr.T
     @_("expr TRANSPOSE")  # type: ignore[name-defined, no-redef]  # noqa: F821
@@ -254,7 +254,7 @@ class QoIParser(Parser):
     # group in parentheses
     @_("LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, Group)
+        return Array.map(Group, p.expr)
 
     # optional trailing comma separator
     @_("COMMA")  # type: ignore[name-defined, no-redef]  # noqa: F821
@@ -299,9 +299,9 @@ class QoIParser(Parser):
             p,
             "late-bound constant neighbourhood `C` is not available in pointwise QoIs, use pointwise `c` instead",
         )
-        return Array.map_unary(
-            self._X,
+        return Array.map(
             lambda e: LateBoundConstant.like(p.quotedparameter, e),
+            self._X,
         )
 
     @_("VS LBRACK quotedparameter RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
@@ -402,208 +402,188 @@ class QoIParser(Parser):
     # logarithms and exponentials
     @_("LN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, lambda e: ScalarLog(Logarithm.ln, e))
+        return Array.map(lambda e: ScalarLog(Logarithm.ln, e), p.expr)
 
     @_("LOG2 LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, lambda e: ScalarLog(Logarithm.log2, e))
+        return Array.map(lambda e: ScalarLog(Logarithm.log2, e), p.expr)
 
     @_("LOG10 LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, lambda e: ScalarLog(Logarithm.log10, e))
+        return Array.map(lambda e: ScalarLog(Logarithm.log10, e), p.expr)
 
     @_("LOG LPAREN expr COMMA BASE EQUAL expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
-            return Array.map_binary(p.expr0, p.expr1, ScalarLogWithBase)
+            return Array.map(ScalarLogWithBase, p.expr0, p.expr1)
 
     @_("EXP LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, lambda e: ScalarExp(Exponential.exp, e))
+        return Array.map(lambda e: ScalarExp(Exponential.exp, e), p.expr)
 
     @_("EXP2 LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, lambda e: ScalarExp(Exponential.exp2, e))
+        return Array.map(lambda e: ScalarExp(Exponential.exp2, e), p.expr)
 
     @_("EXP10 LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, lambda e: ScalarExp(Exponential.exp10, e))
+        return Array.map(lambda e: ScalarExp(Exponential.exp10, e), p.expr)
 
     # exponentiation
     @_("SQRT LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarSqrt)
+        return Array.map(ScalarSqrt, p.expr)
 
     @_("SQUARE LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarSquare)
+        return Array.map(ScalarSquare, p.expr)
 
     @_("RECIPROCAL LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarReciprocal)
+        return Array.map(ScalarReciprocal, p.expr)
 
     # absolute value
     @_("ABS LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarAbs)
+        return Array.map(ScalarAbs, p.expr)
 
     # sign and rounding
     @_("SIGN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarSign)
+        return Array.map(ScalarSign, p.expr)
 
     @_("FLOOR LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarFloor)
+        return Array.map(ScalarFloor, p.expr)
 
     @_("CEIL LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarCeil)
+        return Array.map(ScalarCeil, p.expr)
 
     @_("TRUNC LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarTrunc)
+        return Array.map(ScalarTrunc, p.expr)
 
     @_("ROUND_TIES_EVEN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarRoundTiesEven)
+        return Array.map(ScalarRoundTiesEven, p.expr)
 
     # trigonometric
     @_("SIN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarSin)
+        return Array.map(ScalarSin, p.expr)
 
     @_("COS LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(
-            p.expr, lambda e: ScalarTrigonometric(Trigonometric.cos, e)
-        )
+        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.cos, e), p.expr)
 
     @_("TAN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(
-            p.expr, lambda e: ScalarTrigonometric(Trigonometric.tan, e)
-        )
+        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.tan, e), p.expr)
 
     @_("COT LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(
-            p.expr, lambda e: ScalarTrigonometric(Trigonometric.cot, e)
-        )
+        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.cot, e), p.expr)
 
     @_("SEC LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(
-            p.expr, lambda e: ScalarTrigonometric(Trigonometric.sec, e)
-        )
+        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.sec, e), p.expr)
 
     @_("CSC LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(
-            p.expr, lambda e: ScalarTrigonometric(Trigonometric.csc, e)
-        )
+        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.csc, e), p.expr)
 
     @_("ASIN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarAsin)
+        return Array.map(ScalarAsin, p.expr)
 
     @_("ACOS LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(
-            p.expr, lambda e: ScalarTrigonometric(Trigonometric.acos, e)
-        )
+        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.acos, e), p.expr)
 
     @_("ATAN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(
-            p.expr, lambda e: ScalarTrigonometric(Trigonometric.atan, e)
-        )
+        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.atan, e), p.expr)
 
     @_("ACOT LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(
-            p.expr, lambda e: ScalarTrigonometric(Trigonometric.acot, e)
-        )
+        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.acot, e), p.expr)
 
     @_("ASEC LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(
-            p.expr, lambda e: ScalarTrigonometric(Trigonometric.asec, e)
-        )
+        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.asec, e), p.expr)
 
     @_("ACSC LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(
-            p.expr, lambda e: ScalarTrigonometric(Trigonometric.acsc, e)
-        )
+        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.acsc, e), p.expr)
 
     # hyperbolic
     @_("SINH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarSinh)
+        return Array.map(ScalarSinh, p.expr)
 
     @_("COSH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.cosh, e))
+        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.cosh, e), p.expr)
 
     @_("TANH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.tanh, e))
+        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.tanh, e), p.expr)
 
     @_("COTH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.coth, e))
+        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.coth, e), p.expr)
 
     @_("SECH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.sech, e))
+        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.sech, e), p.expr)
 
     @_("CSCH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.csch, e))
+        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.csch, e), p.expr)
 
     @_("ASINH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarAsinh)
+        return Array.map(ScalarAsinh, p.expr)
 
     @_("ACOSH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.acosh, e))
+        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.acosh, e), p.expr)
 
     @_("ATANH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.atanh, e))
+        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.atanh, e), p.expr)
 
     @_("ACOTH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.acoth, e))
+        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.acoth, e), p.expr)
 
     @_("ASECH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.asech, e))
+        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.asech, e), p.expr)
 
     @_("ACSCH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, lambda e: ScalarHyperbolic(Hyperbolic.acsch, e))
+        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.acsch, e), p.expr)
 
     # classification
     @_("ISFINITE LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarIsFinite)
+        return Array.map(ScalarIsFinite, p.expr)
 
     @_("ISINF LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarIsInf)
+        return Array.map(ScalarIsInf, p.expr)
 
     @_("ISNAN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map_unary(p.expr, ScalarIsNaN)
+        return Array.map(ScalarIsNaN, p.expr)
 
     # conditional
     @_("WHERE LPAREN expr COMMA expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
-            return Array.map_ternary(p.expr0, p.expr1, p.expr2, ScalarWhere)
+            return Array.map(ScalarWhere, p.expr0, p.expr1, p.expr2)
 
     # array operations
     @_("SUM LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
@@ -694,9 +674,7 @@ class QoIParser(Parser):
             (lambda e: e)
             if grid_period is None
             else (
-                lambda e: Array.map_unary(
-                    e, lambda f: ScalarSymmetricModulo(f, grid_period)
-                )
+                lambda e: Array.map(lambda f: ScalarSymmetricModulo(f, grid_period), e)
             )
         )
 

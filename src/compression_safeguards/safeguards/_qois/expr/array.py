@@ -3,6 +3,7 @@ from collections.abc import Iterator, Mapping
 from typing import Callable
 
 import numpy as np
+from typing_extensions import TypeVarTuple, Unpack  # MSPV 3.11
 
 from ....utils.bindings import Parameter
 from .abc import Expr
@@ -12,6 +13,11 @@ from .data import Data
 from .divmul import ScalarMultiply
 from .group import Group
 from .typing import F, Ns, Ps, PsI
+
+# FIXME: actually bound the types to be Expr
+# https://discuss.python.org/t/how-to-use-typevartuple/67502
+Es = TypeVarTuple("Es")
+""" Tuple of [`Expr`][compression_safeguards.safeguards._qois.expr.abc.Expr]s. """
 
 
 class Array(Expr):
@@ -60,9 +66,7 @@ class Array(Expr):
         axis: int,
         offset: int,
     ) -> Expr:
-        return Array.map_unary(
-            self, lambda e: e.apply_array_element_offset(axis, offset)
-        )
+        return Array.map(lambda e: e.apply_array_element_offset(axis, offset), self)
 
     @property
     def late_bound_constants(self) -> frozenset[Parameter]:
@@ -72,8 +76,8 @@ class Array(Expr):
         return frozenset(late_bound)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return Array.map_unary(
-            self, lambda e: ScalarFoldedConstant.constant_fold_expr(e, dtype)
+        return Array.map(
+            lambda e: ScalarFoldedConstant.constant_fold_expr(e, dtype), self
         )
 
     def eval(
@@ -99,25 +103,15 @@ class Array(Expr):
         return self._array.shape
 
     @staticmethod
-    def map_unary(expr: Expr, m: Callable[[Expr], Expr]) -> Expr:
-        if isinstance(expr, Array):
-            out = Array.__new__(Array)
-            out._array = np.fromiter(
-                (m(e) for e in expr._array.flat), dtype=object, count=expr._array.size
-            ).reshape(expr._array.shape)
-            return out
-        return m(expr)
-
-    @staticmethod
-    def map_binary(left: Expr, right: Expr, m: Callable[[Expr, Expr], Expr]) -> Expr:
-        if not (isinstance(left, Array) or isinstance(right, Array)):
-            return m(left, right)
+    def map(map: Callable[[Unpack[Es]], Expr], *exprs: Unpack[Es]) -> Expr:
+        if not any(isinstance(e, Array) for e in exprs):
+            return map(*exprs)
 
         shape = None
         size = 0
         iters: list[Iterator[Expr]] = []
 
-        for i, expr in enumerate([left, right]):
+        for i, expr in enumerate(exprs):  # type: ignore
             if isinstance(expr, Array):
                 if shape is not None and expr.shape != shape:
                     raise ValueError(
@@ -131,42 +125,7 @@ class Array(Expr):
 
         out = Array.__new__(Array)
         out._array = np.fromiter(
-            (m(li, ri) for li, ri in zip(*iters)),
-            dtype=object,
-            count=size,
-        ).reshape(shape)
-        return out
-
-    @staticmethod
-    def map_ternary(
-        left: Expr, middle: Expr, right: Expr, m: Callable[[Expr, Expr, Expr], Expr]
-    ) -> Expr:
-        if not (
-            isinstance(left, Array)
-            or isinstance(middle, Array)
-            or isinstance(right, Array)
-        ):
-            return m(left, middle, right)
-
-        shape = None
-        size = 0
-        iters: list[Iterator[Expr]] = []
-
-        for i, expr in enumerate([left, middle, right]):
-            if isinstance(expr, Array):
-                if shape is not None and expr.shape != shape:
-                    raise ValueError(
-                        f"shape mismatch between operands, expected {shape} but found {expr.shape} for operand {i + 1}"
-                    )
-                shape = expr.shape
-                size = expr._array.size
-                iters.append(expr._array.flat)
-            else:
-                iters.append(itertools.repeat(expr))
-
-        out = Array.__new__(Array)
-        out._array = np.fromiter(
-            (m(li, mi, ri) for li, mi, ri in zip(*iters)),
+            (map(*its) for its in zip(*iters)),
             dtype=object,
             count=size,
         ).reshape(shape)
