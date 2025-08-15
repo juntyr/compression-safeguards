@@ -282,19 +282,27 @@ def compute_left_associate_sum_data_bounds(
     expr_lower_diff: np.ndarray[Ps, np.dtype[F]] = _nan_to_zero(expr_lower - exprv)
     expr_upper_diff: np.ndarray[Ps, np.dtype[F]] = _nan_to_zero(expr_upper - exprv)
 
-    # if total_abs_factor is zero, all abs_factorv are also zero and we can
-    #  allow terms to have any finite value
-    # if total_abs_factor is Inf, we cannot do better than a zero error
-    #  bound for all terms, making sure that Inf*0 != NaN
-    # if total_abs_factor or exprv is NaN, we can allow terms to have any
-    #  value, but propagating non-NaN error bounds works better
-    # TODO: optimize infinite sums
-    tld: np.ndarray[Ps, np.dtype[F]] = expr_lower_diff / total_abs_factor
-    tlu: np.ndarray[Ps, np.dtype[F]] = expr_upper_diff / total_abs_factor
+    # if exprv is NaN, expr_[lower|upper]_diff are zero
+    # if expr_[lower|upper] is infinite but exprv is finite,
+    #  expr_[lower|upper]_diff is the same infinity as expr_[lower|upper]
+    # if expr_[lower|upper] is infinite and exprv is infinite,
+    #  (a) -inf - -inf and inf - inf are NaN, so expr_[lower|upper]_diff is
+    #      zero
+    #  (b) -inf - inf and inf - -inf are +-inf, so expr_[lower|upper]_diff is
+    #      the same infinity as expr_[lower|upper]
+    tfl: np.ndarray[Ps, np.dtype[F]] = expr_lower_diff / total_abs_factor
+    tfu: np.ndarray[Ps, np.dtype[F]] = expr_upper_diff / total_abs_factor
 
     fmax = _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
 
     # stack the lower and upper bounds for each term factor
+    # if total_abs_factor is zero, all abs_factorv are also zero and we can
+    #  allow terms to have any finite value
+    # if total_abs_factor is inf, we cannot do better than a zero error
+    #  bound for all terms, making sure that inf * 0 != NaN
+    # if total_abs_factor or exprv is NaN, we can allow terms to have any
+    #  value, but propagating non-NaN error bounds works better
+    # TODO: optimize infinite sums
     tl_stack = np.stack(
         [
             np.where(
@@ -306,7 +314,7 @@ def compute_left_associate_sum_data_bounds(
                     np.where(
                         _isnan(total_abs_factor) | _isnan(exprv),
                         X.dtype.type(-np.inf),
-                        _zero_add(termv, tld * abs_factorv),
+                        _zero_add(termv, tfl * abs_factorv),
                     ),
                 ),
             )
@@ -325,7 +333,7 @@ def compute_left_associate_sum_data_bounds(
                     np.where(
                         _isnan(total_abs_factor) | _isnan(exprv),
                         X.dtype.type(np.inf),
-                        _zero_add(termv, tlu * abs_factorv),
+                        _zero_add(termv, tfu * abs_factorv),
                     ),
                 ),
             )
@@ -334,9 +342,12 @@ def compute_left_associate_sum_data_bounds(
         ]
     )
 
-    def compute_sum(t_stack: np.ndarray) -> np.ndarray:
-        total_sum = None
+    def compute_term_sum(
+        t_stack: np.ndarray[tuple[int, ...], np.dtype[F]],
+    ) -> np.ndarray[tuple[int, ...], np.dtype[F]]:
+        total_sum: None | np.ndarray[tuple[int, ...], np.dtype[F]] = None
         i = 0
+
         for termv, abs_factorv in zip(termvs, abs_factorvs):
             if total_sum is None:
                 if abs_factorv is None:
@@ -348,14 +359,16 @@ def compute_left_associate_sum_data_bounds(
             else:
                 total_sum += t_stack[i]
             i += abs_factorv is not None
+
         assert total_sum is not None
-        return np.broadcast_to(
+
+        return np.broadcast_to(  # type: ignore
             total_sum.reshape((1,) + exprv.shape), (t_stack.shape[0],) + exprv.shape
         )
 
     # handle rounding errors in the total absolute factor early
     tl_stack = guarantee_arg_within_expr_bounds(
-        compute_sum,
+        compute_term_sum,
         np.broadcast_to(
             exprv.reshape((1,) + exprv.shape), (tl_stack.shape[0],) + exprv.shape
         ),
@@ -377,7 +390,7 @@ def compute_left_associate_sum_data_bounds(
         ),
     )
     tu_stack = guarantee_arg_within_expr_bounds(
-        compute_sum,
+        compute_term_sum,
         np.broadcast_to(
             exprv.reshape((1,) + exprv.shape), (tu_stack.shape[0],) + exprv.shape
         ),
