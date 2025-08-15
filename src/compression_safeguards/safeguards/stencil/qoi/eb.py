@@ -15,16 +15,14 @@ from ....utils.cast import (
     _isinf,
     _isnan,
     as_bits,
-    from_float,
-    from_total_order,
     lossless_cast,
     saturating_finite_float_cast,
     to_float,
-    to_total_order,
 )
-from ....utils.intervals import Interval, IntervalUnion, Lower, Upper
+from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import F, S, T
 from ..._qois import StencilQuantityOfInterest
+from ..._qois.interval import compute_safe_data_lower_upper_interval_union
 from ...eb import (
     ErrorBound,
     _apply_finite_qoi_error_bound,
@@ -785,40 +783,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             data_windows_float_upper_flat[reverse_indices_windows], axis=1
         ).reshape(data.shape)
 
-        dataf_float_lower, dataf_float_upper = (
-            data_float_lower.flatten(),
-            data_float_upper.flatten(),
+        return compute_safe_data_lower_upper_interval_union(
+            data, data_float_lower, data_float_upper
         )
-
-        dataf = data.flatten()
-
-        valid = Interval.empty_like(dataf).preserve_inf(dataf).preserve_finite(dataf)
-        Lower(
-            np.maximum(valid._lower, from_float(dataf_float_lower, dataf.dtype))
-        ) <= valid[_isfinite(dataf)] <= Upper(
-            np.minimum(from_float(dataf_float_upper, dataf.dtype), valid._upper)
-        )
-
-        # correct rounding errors in the lower and upper bound
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            lower_outside_bound = to_float(valid._lower) < dataf_float_lower
-            upper_outside_bound = to_float(valid._upper) > dataf_float_upper
-
-        Lower(
-            from_total_order(
-                to_total_order(valid._lower) + lower_outside_bound,
-                data.dtype,
-            )
-        ) <= valid[_isfinite(dataf)] <= Upper(
-            from_total_order(
-                to_total_order(valid._upper) - upper_outside_bound,
-                data.dtype,
-            )
-        )
-
-        return valid.preserve_any_nan(dataf, equal_nan=True)
 
     def get_config(self) -> dict:
         """
