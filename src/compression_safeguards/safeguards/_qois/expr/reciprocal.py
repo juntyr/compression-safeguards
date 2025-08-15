@@ -70,7 +70,7 @@ class ScalarReciprocal(Expr):
             x: np.ndarray[Ps, np.dtype[F]],
         ) -> np.ndarray[Ps, np.dtype[np.bool]]:
             # check not just for x < 0 but also for x == -0.0
-            return (x < 0) | ((1 / x) < 0)  # type: ignore
+            return (x < 0) | (_reciprocal(x) < 0)  # type: ignore
 
         # evaluate arg and reciprocal(arg)
         arg = self._a

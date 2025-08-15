@@ -4,6 +4,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from ....utils.bindings import Parameter
+from ....utils.cast import _reciprocal
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .divmul import ScalarMultiply
@@ -75,7 +76,7 @@ class ScalarPower(Expr):
             x: np.ndarray[Ps, np.dtype[F]],
         ) -> np.ndarray[Ps, np.dtype[np.bool]]:
             # check not just for x < 0 but also for x == -0.0
-            return (x < 0) | ((1 / x) < 0)  # type: ignore
+            return (x < 0) | (_reciprocal(x) < 0)  # type: ignore
 
         # evaluate a, b, and power(a, b)
         a, b = self._a, self._b
@@ -83,9 +84,9 @@ class ScalarPower(Expr):
         bv = b.eval(X.shape, Xs, late_bound)
         exprv = np.power(av, bv)
 
-        # powers of negative numbers are just too tricky since
-        #  they easily become NaN, so let's force the exact same
-        #  data for them
+        # powers of negative numbers are just too tricky since they easily
+        #  become NaN, so let's enforce bounds that only contain the original
+        #  expression value
         expr_lower = np.where(_is_negative(av), exprv, expr_lower)  # type: ignore
         expr_upper = np.where(_is_negative(av), exprv, expr_upper)  # type: ignore
 
@@ -154,7 +155,7 @@ class ScalarFakeAbs(Expr):
             x: np.ndarray[Ps, np.dtype[F]],
         ) -> np.ndarray[Ps, np.dtype[np.bool]]:
             # check not just for x < 0 but also for x == -0.0
-            return (x < 0) | ((1 / x) < 0)  # type: ignore
+            return (x < 0) | (_reciprocal(x) < 0)  # type: ignore
 
         # evaluate arg
         arg = self._a

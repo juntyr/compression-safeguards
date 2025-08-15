@@ -6,6 +6,7 @@ from ....utils.bindings import Parameter
 from ....utils.cast import (
     _float128_dtype,
     _float128_smallest_subnormal,
+    _reciprocal,
 )
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
@@ -192,7 +193,7 @@ class ScalarSquare(Expr):
             x: np.ndarray[Ps, np.dtype[F]],
         ) -> np.ndarray[Ps, np.dtype[np.bool]]:
             # check not just for x < 0 but also for x == -0.0
-            return (x < 0) | ((1 / x) < 0)  # type: ignore
+            return (x < 0) | (_reciprocal(x) < 0)  # type: ignore
 
         # evaluate arg and square(arg)
         arg = self._a

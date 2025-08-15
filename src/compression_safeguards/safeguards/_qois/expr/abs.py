@@ -3,6 +3,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from ....utils.bindings import Parameter
+from ....utils.cast import _reciprocal
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
@@ -61,7 +62,7 @@ class ScalarAbs(Expr):
             x: np.ndarray[Ps, np.dtype[F]],
         ) -> np.ndarray[Ps, np.dtype[np.bool]]:
             # check not just for x < 0 but also for x == -0.0
-            return (x < 0) | ((1 / x) < 0)  # type: ignore
+            return (x < 0) | (_reciprocal(x) < 0)  # type: ignore
 
         # evaluate arg
         arg = self._a

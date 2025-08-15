@@ -11,6 +11,7 @@ from ....utils.cast import (
     _float128_smallest_subnormal,
     _isinf,
     _isnan,
+    _reciprocal,
 )
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
@@ -85,7 +86,7 @@ class ScalarMultiply(Expr):
             x: np.ndarray[Ps, np.dtype[F]],
         ) -> np.ndarray[Ps, np.dtype[np.bool]]:
             # check not just for x < 0 but also for x == -0.0
-            return (x < 0) | ((1 / x) < 0)  # type: ignore
+            return (x < 0) | (_reciprocal(x) < 0)  # type: ignore
 
         a_const = not self._a.has_data
         b_const = not self._b.has_data

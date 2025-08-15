@@ -76,8 +76,8 @@ class ScalarAdd(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        terms = SumTerm.as_left_associative_sum(self)
-        return SumTerm.compute_data_bounds(
+        terms = as_left_associative_sum(self)
+        return compute_left_associate_sum_data_bounds(
             terms, expr_lower, expr_upper, X, Xs, late_bound
         )
 
@@ -157,8 +157,8 @@ class ScalarSubtract(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        terms = SumTerm.as_left_associative_sum(self)
-        return SumTerm.compute_data_bounds(
+        terms = as_left_associative_sum(self)
+        return compute_left_associate_sum_data_bounds(
             terms, expr_lower, expr_upper, X, Xs, late_bound
         )
 
@@ -179,291 +179,265 @@ class ScalarSubtract(Expr):
         return f"{self._a!r} - {self._b!r}"
 
 
-class SumTerm:
-    __slots__ = ("_expr", "_is_add")
-    _expr: Expr
-    _is_add: bool
+def as_left_associative_sum(
+    expr: ScalarAdd | ScalarSubtract,
+) -> tuple[Expr, ...]:
+    from .neg import ScalarNegate
 
-    def __init__(self, expr: Expr, is_add: bool):
-        self._expr = expr
-        self._is_add = is_add
+    terms_rev: list[Expr] = []
 
-    @staticmethod
-    def as_left_associative_sum(
-        expr: ScalarAdd | ScalarSubtract,
-    ) -> "tuple[SumTerm, ...]":
-        terms_rev: list[SumTerm] = []
+    while True:
+        # rewrite ( a - b ) as ( a + (-b) ), which is equivalent for
+        #  floating point numbers
+        terms_rev.append(
+            ScalarNegate(expr._b) if isinstance(expr, ScalarSubtract) else expr._b
+        )
 
-        while True:
-            terms_rev.append(SumTerm(expr._b, isinstance(expr, ScalarAdd)))
+        if isinstance(expr._a, (ScalarAdd, ScalarSubtract)):
+            expr = expr._a
+        else:
+            terms_rev.append(expr._a)
+            break
 
-            if isinstance(expr._a, (ScalarAdd, ScalarSubtract)):
-                expr = expr._a
-            else:
-                terms_rev.append(SumTerm(expr._a, True))
-                break
+    return tuple(terms_rev[::-1])
 
-        return tuple(terms_rev[::-1])
 
-    @staticmethod
-    def get_expr_left_associative_abs_factor_approximate(expr: Expr) -> None | Expr:
-        from .divmul import ScalarDivide, ScalarMultiply
+def get_expr_left_associative_abs_factor_approximate(expr: Expr) -> None | Expr:
+    from .divmul import ScalarDivide, ScalarMultiply
 
-        if not expr.has_data:
-            return None
+    if not expr.has_data:
+        return None
 
-        if not isinstance(expr, (ScalarMultiply, ScalarDivide)):
-            return Number.ONE
+    if not isinstance(expr, (ScalarMultiply, ScalarDivide)):
+        return Number.ONE
 
-        factor_stack: list[tuple[Expr, bool]] = []
+    factor_stack: list[tuple[Expr, type[ScalarMultiply] | type[ScalarDivide]]] = []
 
-        while True:
-            factor_stack.append((expr._b, isinstance(expr, ScalarDivide)))
+    while True:
+        factor_stack.append((expr._b, type(expr)))
 
-            if isinstance(expr._a, (ScalarMultiply, ScalarDivide)):
-                expr = expr._a
-            else:
-                factor_stack.append(
-                    (Number.ONE if expr._a.has_data else expr._a, False)
-                )
-                break
-
-        while len(factor_stack) > 1:
-            (a, _), (b, is_div) = factor_stack.pop(), factor_stack.pop()
+        if isinstance(expr._a, (ScalarMultiply, ScalarDivide)):
+            expr = expr._a
+        else:
             factor_stack.append(
-                (
-                    (ScalarDivide if is_div else ScalarMultiply)(
-                        a, Number.ONE if b.has_data else b
-                    ),
-                    False,
-                )
+                (Number.ONE if expr._a.has_data else expr._a, ScalarMultiply)
             )
+            break
 
-        [(factor, _)] = factor_stack
-
-        return ScalarAbs(factor)
-
-    @staticmethod
-    def compute_data_bounds(
-        left_associative_sum: "tuple[SumTerm, ...]",
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        def _zero_add(
-            a: np.ndarray[Ps, np.dtype[F]], b: np.ndarray[Ps, np.dtype[F]]
-        ) -> np.ndarray[Ps, np.dtype[F]]:
-            return np.where(b == 0, a, a + b)  # type: ignore
-
-        is_adds: list[bool] = []
-        termvs: list[np.ndarray[Ps, np.dtype[F]]] = []
-        abs_factorvs: list[None | np.ndarray[Ps, np.dtype[F]]] = []
-
-        for term in left_associative_sum:
-            abs_factor = SumTerm.get_expr_left_associative_abs_factor_approximate(
-                term._expr
+    while len(factor_stack) > 1:
+        (a, _), (b, ty) = factor_stack.pop(), factor_stack.pop()
+        factor_stack.append(
+            (
+                ty(a, Number.ONE if b.has_data else b),
+                ScalarMultiply,
             )
-            is_adds.append(term._is_add)
-            termvs.append(term._expr.eval(X.shape, Xs, late_bound))
-            abs_factorvs.append(
-                None if abs_factor is None else abs_factor.eval(X.shape, Xs, late_bound)
-            )
+        )
 
-        # evaluate the total expression sum
-        assert is_adds[0]
-        exprv: np.ndarray[Ps, np.dtype[F]] = np.copy(termvs[0])
-        for is_add, termv in zip(is_adds[1:], termvs[1:]):
-            if is_add:
-                exprv += termv
-            else:
-                exprv -= termv
+    [(factor, _)] = factor_stack
 
-        # compute the sum of absolute factors
-        total_abs_factor_: None | np.ndarray[Ps, np.dtype[F]] = None
-        for abs_factorv in abs_factorvs:
-            if abs_factorv is None:
-                continue
-            if total_abs_factor_ is None:
-                total_abs_factor_ = np.copy(abs_factorv)
-            else:
-                total_abs_factor_ += abs_factorv
-        assert total_abs_factor_ is not None
-        total_abs_factor: np.ndarray[Ps, np.dtype[F]] = total_abs_factor_
+    return ScalarAbs(factor)
 
-        # drop into expression difference bounds to divide up the bound
-        # for NaN sums, we use a zero difference to ensure NaNs don't
-        #  accidentally propagate into the term error bounds
-        expr_lower_diff: np.ndarray[Ps, np.dtype[F]] = _nan_to_zero(expr_lower - exprv)
-        expr_upper_diff: np.ndarray[Ps, np.dtype[F]] = _nan_to_zero(expr_upper - exprv)
 
-        # if total_abs_factor is zero, all abs_factorv are also zero and we can
-        #  allow terms to have any finite value
-        # if total_abs_factor is Inf, we cannot do better than a zero error
-        #  bound for all terms, making sure that Inf*0 != NaN
-        # if total_abs_factor or exprv is NaN, we can allow terms to have any
-        #  value, but propagating non-NaN error bounds works better
-        # TODO: optimize infinite sums
-        tld: np.ndarray[Ps, np.dtype[F]] = expr_lower_diff / total_abs_factor
-        tlu: np.ndarray[Ps, np.dtype[F]] = expr_upper_diff / total_abs_factor
+def compute_left_associate_sum_data_bounds(
+    left_associative_sum: tuple[Expr, ...],
+    expr_lower: np.ndarray[Ps, np.dtype[F]],
+    expr_upper: np.ndarray[Ps, np.dtype[F]],
+    X: np.ndarray[Ps, np.dtype[F]],
+    Xs: np.ndarray[Ns, np.dtype[F]],
+    late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+    def _zero_add(
+        a: np.ndarray[Ps, np.dtype[F]], b: np.ndarray[Ps, np.dtype[F]]
+    ) -> np.ndarray[Ps, np.dtype[F]]:
+        return np.where(b == 0, a, a + b)  # type: ignore
 
-        fmax = _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
+    termvs: list[np.ndarray[Ps, np.dtype[F]]] = []
+    abs_factorvs: list[None | np.ndarray[Ps, np.dtype[F]]] = []
 
-        # stack the lower and upper bounds for each term factor
-        tl_stack = np.stack(
-            [
+    for term in left_associative_sum:
+        abs_factor = get_expr_left_associative_abs_factor_approximate(term)
+        termvs.append(term.eval(X.shape, Xs, late_bound))
+        abs_factorvs.append(
+            None if abs_factor is None else abs_factor.eval(X.shape, Xs, late_bound)
+        )
+
+    # evaluate the total expression sum
+    exprv: np.ndarray[Ps, np.dtype[F]] = sum(termvs[1:], start=termvs[0])
+
+    # compute the sum of absolute factors
+    total_abs_factor_: None | np.ndarray[Ps, np.dtype[F]] = None
+    for abs_factorv in abs_factorvs:
+        if abs_factorv is None:
+            continue
+        if total_abs_factor_ is None:
+            total_abs_factor_ = np.copy(abs_factorv)
+        else:
+            total_abs_factor_ += abs_factorv
+    assert total_abs_factor_ is not None
+    total_abs_factor: np.ndarray[Ps, np.dtype[F]] = total_abs_factor_
+
+    # drop into expression difference bounds to divide up the bound
+    # for NaN sums, we use a zero difference to ensure NaNs don't
+    #  accidentally propagate into the term error bounds
+    expr_lower_diff: np.ndarray[Ps, np.dtype[F]] = _nan_to_zero(expr_lower - exprv)
+    expr_upper_diff: np.ndarray[Ps, np.dtype[F]] = _nan_to_zero(expr_upper - exprv)
+
+    # if total_abs_factor is zero, all abs_factorv are also zero and we can
+    #  allow terms to have any finite value
+    # if total_abs_factor is Inf, we cannot do better than a zero error
+    #  bound for all terms, making sure that Inf*0 != NaN
+    # if total_abs_factor or exprv is NaN, we can allow terms to have any
+    #  value, but propagating non-NaN error bounds works better
+    # TODO: optimize infinite sums
+    tld: np.ndarray[Ps, np.dtype[F]] = expr_lower_diff / total_abs_factor
+    tlu: np.ndarray[Ps, np.dtype[F]] = expr_upper_diff / total_abs_factor
+
+    fmax = _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
+
+    # stack the lower and upper bounds for each term factor
+    tl_stack = np.stack(
+        [
+            np.where(
+                total_abs_factor == 0,
+                -fmax,
                 np.where(
-                    total_abs_factor == 0,
-                    -fmax,
+                    _isinf(total_abs_factor),
+                    termv,
                     np.where(
-                        _isinf(total_abs_factor),
-                        termv if is_add else -termv,
-                        np.where(
-                            _isnan(total_abs_factor) | _isnan(exprv),
-                            X.dtype.type(-np.inf),
-                            _zero_add((termv if is_add else -termv), tld * abs_factorv),
-                        ),
+                        _isnan(total_abs_factor) | _isnan(exprv),
+                        X.dtype.type(-np.inf),
+                        _zero_add(termv, tld * abs_factorv),
                     ),
-                )
-                for is_add, termv, abs_factorv in zip(is_adds, termvs, abs_factorvs)
-                if abs_factorv is not None
-            ]
-        )
-        tu_stack = np.stack(
-            [
-                np.where(
-                    total_abs_factor == 0,
-                    fmax,
-                    np.where(
-                        _isinf(total_abs_factor),
-                        termv if is_add else -termv,
-                        np.where(
-                            _isnan(total_abs_factor) | _isnan(exprv),
-                            X.dtype.type(np.inf),
-                            _zero_add((termv if is_add else -termv), tlu * abs_factorv),
-                        ),
-                    ),
-                )
-                for is_add, termv, abs_factorv in zip(is_adds, termvs, abs_factorvs)
-                if abs_factorv is not None
-            ]
-        )
-
-        def compute_sum(t_stack: np.ndarray) -> np.ndarray:
-            total_sum = None
-            i = 0
-            for is_add, termv, abs_factorv in zip(is_adds, termvs, abs_factorvs):
-                if total_sum is None:
-                    assert is_add
-                    if abs_factorv is None:
-                        total_sum = np.copy(termv)
-                    else:
-                        total_sum = np.copy(t_stack[i])
-                elif is_add:
-                    if abs_factorv is None:
-                        total_sum += termv
-                    else:
-                        total_sum += t_stack[i]
-                elif abs_factorv is None:
-                    total_sum -= termv
-                else:
-                    # subtract already taken into account above
-                    total_sum += t_stack[i]
-                i += abs_factorv is not None
-            assert total_sum is not None
-            return np.broadcast_to(
-                total_sum.reshape((1,) + exprv.shape), (t_stack.shape[0],) + exprv.shape
+                ),
             )
+            for termv, abs_factorv in zip(termvs, abs_factorvs)
+            if abs_factorv is not None
+        ]
+    )
+    tu_stack = np.stack(
+        [
+            np.where(
+                total_abs_factor == 0,
+                fmax,
+                np.where(
+                    _isinf(total_abs_factor),
+                    termv,
+                    np.where(
+                        _isnan(total_abs_factor) | _isnan(exprv),
+                        X.dtype.type(np.inf),
+                        _zero_add(termv, tlu * abs_factorv),
+                    ),
+                ),
+            )
+            for termv, abs_factorv in zip(termvs, abs_factorvs)
+            if abs_factorv is not None
+        ]
+    )
 
-        # handle rounding errors in the total absolute factor early
-        tl_stack = guarantee_arg_within_expr_bounds(
-            compute_sum,
-            np.broadcast_to(
-                exprv.reshape((1,) + exprv.shape), (tl_stack.shape[0],) + exprv.shape
-            ),
-            np.stack(
-                [
-                    termv if is_add else -termv
-                    for is_add, termv, abs_factorv in zip(is_adds, termvs, abs_factorvs)
-                    if abs_factorv is not None
-                ]
-            ),
-            tl_stack,
-            np.broadcast_to(
-                expr_lower.reshape((1,) + exprv.shape),
-                (tl_stack.shape[0],) + exprv.shape,
-            ),
-            np.broadcast_to(
-                expr_upper.reshape((1,) + exprv.shape),
-                (tl_stack.shape[0],) + exprv.shape,
-            ),
-        )
-        tu_stack = guarantee_arg_within_expr_bounds(
-            compute_sum,
-            np.broadcast_to(
-                exprv.reshape((1,) + exprv.shape), (tu_stack.shape[0],) + exprv.shape
-            ),
-            np.stack(
-                [
-                    termv if is_add else -termv
-                    for is_add, termv, abs_factorv in zip(is_adds, termvs, abs_factorvs)
-                    if abs_factorv is not None
-                ]
-            ),
-            tu_stack,
-            np.broadcast_to(
-                expr_lower.reshape((1,) + exprv.shape),
-                (tu_stack.shape[0],) + exprv.shape,
-            ),
-            np.broadcast_to(
-                expr_upper.reshape((1,) + exprv.shape),
-                (tu_stack.shape[0],) + exprv.shape,
-            ),
-        )
-
-        xl: np.ndarray[Ns, np.dtype[F]]
-        xu: np.ndarray[Ns, np.dtype[F]]
-        Xs_lower_: None | np.ndarray[Ns, np.dtype[F]] = None
-        Xs_upper_: None | np.ndarray[Ns, np.dtype[F]] = None
+    def compute_sum(t_stack: np.ndarray) -> np.ndarray:
+        total_sum = None
         i = 0
-        for term, is_add, abs_factorv in zip(
-            left_associative_sum, is_adds, abs_factorvs
-        ):
-            if abs_factorv is None:
-                continue
-
-            # recurse into the terms with a weighted bound
-            xl, xu = term._expr.compute_data_bounds(
-                # flip the lower/upper error bound if the term is subtracted
-                tl_stack[i] if is_add else -tu_stack[i],
-                tu_stack[i] if is_add else -tl_stack[i],
-                X,
-                Xs,
-                late_bound,
-            )
-
-            # combine the inner data bounds
-            if Xs_lower_ is None:
-                Xs_lower_ = xl
+        for termv, abs_factorv in zip(termvs, abs_factorvs):
+            if total_sum is None:
+                if abs_factorv is None:
+                    total_sum = np.copy(termv)
+                else:
+                    total_sum = np.copy(t_stack[i])
+            elif abs_factorv is None:
+                total_sum += termv
             else:
-                Xs_lower_ = np.maximum(Xs_lower_, xl)
-            if Xs_upper_ is None:
-                Xs_upper_ = xu
-            else:
-                Xs_upper_ = np.minimum(Xs_upper_, xu)
+                total_sum += t_stack[i]
+            i += abs_factorv is not None
+        assert total_sum is not None
+        return np.broadcast_to(
+            total_sum.reshape((1,) + exprv.shape), (t_stack.shape[0],) + exprv.shape
+        )
 
-            i += 1
+    # handle rounding errors in the total absolute factor early
+    tl_stack = guarantee_arg_within_expr_bounds(
+        compute_sum,
+        np.broadcast_to(
+            exprv.reshape((1,) + exprv.shape), (tl_stack.shape[0],) + exprv.shape
+        ),
+        np.stack(
+            [
+                termv
+                for termv, abs_factorv in zip(termvs, abs_factorvs)
+                if abs_factorv is not None
+            ]
+        ),
+        tl_stack,
+        np.broadcast_to(
+            expr_lower.reshape((1,) + exprv.shape),
+            (tl_stack.shape[0],) + exprv.shape,
+        ),
+        np.broadcast_to(
+            expr_upper.reshape((1,) + exprv.shape),
+            (tl_stack.shape[0],) + exprv.shape,
+        ),
+    )
+    tu_stack = guarantee_arg_within_expr_bounds(
+        compute_sum,
+        np.broadcast_to(
+            exprv.reshape((1,) + exprv.shape), (tu_stack.shape[0],) + exprv.shape
+        ),
+        np.stack(
+            [
+                termv
+                for termv, abs_factorv in zip(termvs, abs_factorvs)
+                if abs_factorv is not None
+            ]
+        ),
+        tu_stack,
+        np.broadcast_to(
+            expr_lower.reshape((1,) + exprv.shape),
+            (tu_stack.shape[0],) + exprv.shape,
+        ),
+        np.broadcast_to(
+            expr_upper.reshape((1,) + exprv.shape),
+            (tu_stack.shape[0],) + exprv.shape,
+        ),
+    )
 
-        assert Xs_lower_ is not None
-        assert Xs_upper_ is not None
-        Xs_lower: np.ndarray[Ns, np.dtype[F]] = Xs_lower_
-        Xs_upper: np.ndarray[Ns, np.dtype[F]] = Xs_upper_
+    xl: np.ndarray[Ns, np.dtype[F]]
+    xu: np.ndarray[Ns, np.dtype[F]]
+    Xs_lower_: None | np.ndarray[Ns, np.dtype[F]] = None
+    Xs_upper_: None | np.ndarray[Ns, np.dtype[F]] = None
+    i = 0
+    for term, abs_factorv in zip(left_associative_sum, abs_factorvs):
+        if abs_factorv is None:
+            continue
 
-        Xs_lower = np.minimum(Xs_lower, Xs)
-        Xs_upper = np.maximum(Xs_upper, Xs)
+        # recurse into the terms with a weighted bound
+        xl, xu = term.compute_data_bounds(
+            tl_stack[i],
+            tu_stack[i],
+            X,
+            Xs,
+            late_bound,
+        )
 
-        Xs_lower = np.where(Xs_lower == Xs, Xs, Xs_lower)  # type: ignore
-        Xs_upper = np.where(Xs_upper == Xs, Xs, Xs_upper)  # type: ignore
+        # combine the inner data bounds
+        if Xs_lower_ is None:
+            Xs_lower_ = xl
+        else:
+            Xs_lower_ = np.maximum(Xs_lower_, xl)
+        if Xs_upper_ is None:
+            Xs_upper_ = xu
+        else:
+            Xs_upper_ = np.minimum(Xs_upper_, xu)
 
-        return Xs_lower, Xs_upper
+        i += 1
+
+    assert Xs_lower_ is not None
+    assert Xs_upper_ is not None
+    Xs_lower: np.ndarray[Ns, np.dtype[F]] = Xs_lower_
+    Xs_upper: np.ndarray[Ns, np.dtype[F]] = Xs_upper_
+
+    Xs_lower = np.minimum(Xs_lower, Xs)
+    Xs_upper = np.maximum(Xs_upper, Xs)
+
+    Xs_lower = np.where(Xs_lower == Xs, Xs, Xs_lower)  # type: ignore
+    Xs_upper = np.where(Xs_upper == Xs, Xs, Xs_upper)  # type: ignore
+
+    return Xs_lower, Xs_upper

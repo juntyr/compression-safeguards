@@ -3,7 +3,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from ....utils.bindings import Parameter
-from ....utils.cast import _nextafter, _rint
+from ....utils.cast import _nextafter, _reciprocal, _rint
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
@@ -59,6 +59,11 @@ class ScalarFloor(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        def is_negative_zero(
+            x: np.ndarray[Ps, np.dtype[F]],
+        ) -> np.ndarray[Ps, np.dtype[np.bool]]:
+            return (x == 0) & (_reciprocal(x) < 0)
+
         arg = self._a
 
         # compute the rounded result that meets the expr bounds
@@ -69,8 +74,18 @@ class ScalarFloor(Expr):
 
         # compute the arg bound that will round to meet the expr bounds
         # floor rounds down
-        arg_lower = expr_lower
-        arg_upper = _nextafter(expr_upper + 1, expr_upper)
+        # if expr_lower is -0.0, ceil(-0.0) = -0.0, only floor(-0.0) = -0.0
+        # if expr_lower is +0.0, ceil(+0.0) = +0.0, there is nothing below +0.0
+        #  for which floor(...) = +0.0
+        # if expr_upper is -0.0, floor(-0.0) = -0.0, we need to force arg_upper
+        #  to -0.0
+        # if expr_upper is +0.0, floor(+0.0) = +0.0, and floor(1-eps) = +0.0
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = expr_lower
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+            is_negative_zero(expr_upper),
+            X.dtype.type(-0.0),
+            _nextafter(expr_upper + 1, expr_upper),
+        )
 
         return arg.compute_data_bounds(
             arg_lower,
@@ -146,6 +161,11 @@ class ScalarCeil(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        def is_positive_zero(
+            x: np.ndarray[Ps, np.dtype[F]],
+        ) -> np.ndarray[Ps, np.dtype[np.bool]]:
+            return (x == 0) & (_reciprocal(x) > 0)
+
         arg = self._a
 
         # compute the rounded result that meets the expr bounds
@@ -156,8 +176,18 @@ class ScalarCeil(Expr):
 
         # compute the arg bound that will round to meet the expr bounds
         # ceil rounds up
-        arg_lower = _nextafter(expr_lower - 1, expr_lower)
-        arg_upper = expr_upper
+        # if expr_lower is -0.0, ceil(-0.0) = -0.0, and ceil(-1+eps) = -0.0
+        # if expr_lower is +0.0, ceil(+0.0) = +0.0, we need to force arg_lower
+        #  to +0.0
+        # if expr_upper is -0.0, floor(-0.0) = -0.0, there is nothing above
+        #  -0.0 for which ceil(...) = -0.0
+        # if expr_upper is +0.0, floor(+0.0) = +0.0, only ceil(+0.0) = +0.0
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+            is_positive_zero(expr_lower),
+            X.dtype.type(+0.0),
+            _nextafter(expr_lower - 1, expr_lower),
+        )
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = expr_upper
 
         return arg.compute_data_bounds(
             arg_lower,
@@ -233,6 +263,18 @@ class ScalarTrunc(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        def _is_negative(
+            x: np.ndarray[Ps, np.dtype[F]],
+        ) -> np.ndarray[Ps, np.dtype[np.bool]]:
+            # check not just for x < 0 but also for x == -0.0
+            return (x < 0) | (_reciprocal(x) < 0)  # type: ignore
+
+        def _is_positive(
+            x: np.ndarray[Ps, np.dtype[F]],
+        ) -> np.ndarray[Ps, np.dtype[np.bool]]:
+            # check not just for x > 0 but also for x == +0.0
+            return (x > 0) | (_reciprocal(x) > 0)  # type: ignore
+
         arg = self._a
 
         # compute the rounded result that meets the expr bounds
@@ -243,11 +285,17 @@ class ScalarTrunc(Expr):
 
         # compute the arg bound that will round to meet the expr bounds
         # trunc rounds towards zero
+        # if expr_lower is -0.0, ceil(-0.0) = -0.0, and trunc(-1+eps) = -0.0
+        # if expr_lower is +0.0, ceil(+0.0) = +0.0, there is nothing below +0.0
+        #  for which trunc(...) = +0.0
+        # if expr_upper is -0.0, floor(-0.0) = -0.0, there is nothing above
+        #  -0.0 for which trunc(...) = -0.0
+        # if expr_upper is +0.0, floor(+0.0) = +0.0, and trunc(1-eps) = +0.0
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            expr_lower <= 0, _nextafter(expr_lower - 1, expr_lower), expr_lower
+            _is_negative(expr_lower), _nextafter(expr_lower - 1, expr_lower), expr_lower
         )
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            expr_upper >= 0, _nextafter(expr_upper + 1, expr_upper), expr_upper
+            _is_positive(expr_upper), _nextafter(expr_upper + 1, expr_upper), expr_upper
         )
 
         return arg.compute_data_bounds(
@@ -327,6 +375,16 @@ class ScalarRoundTiesEven(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        def is_positive_zero(
+            x: np.ndarray[Ps, np.dtype[F]],
+        ) -> np.ndarray[Ps, np.dtype[np.bool]]:
+            return (x == 0) & (_reciprocal(x) > 0)
+
+        def is_negative_zero(
+            x: np.ndarray[Ps, np.dtype[F]],
+        ) -> np.ndarray[Ps, np.dtype[np.bool]]:
+            return (x == 0) & (_reciprocal(x) < 0)
+
         # evaluate arg and round_ties_even(arg)
         arg = self._a
         argv = arg.eval(X.shape, Xs, late_bound)
@@ -341,13 +399,24 @@ class ScalarRoundTiesEven(Expr):
         # estimate the arg bound that will round to meet the expr bounds
         # round_ties_even rounds to the nearest integer, with tie breaks
         #  towards the nearest *even* integer
-        arg_lower = np.subtract(expr_lower, 0.5)
-        arg_upper = np.add(expr_upper, 0.5)
+        # if expr_lower is -0.0, ceil(-0.0) = -0.0, and rint(-0.5) = -0.0
+        # if expr_lower is +0.0, ceil(+0.0) = +0.0, we need to force arg_lower
+        #  to +0.0
+        # if expr_upper is -0.0, floor(-0.0) = -0.0, we need to force arg_upper
+        #  to -0.0
+        # if expr_upper is +0.0, floor(+0.0) = +0.0, and rint(+0.5) = +0.0
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+            is_positive_zero(expr_lower),
+            X.dtype.type(+0.0),
+            np.subtract(expr_lower, 0.5),
+        )
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+            is_negative_zero(expr_upper), X.dtype.type(-0.0), np.add(expr_upper, 0.5)
+        )
 
         # handle rounding errors in round_ties_even(...) early
         # which can occur since our +-0.5 estimate doesn't account for the even
         #  tie breaking cases
-        # FIXME: https://github.com/numpy/numpy-user-dtypes/issues/129
         arg_lower = guarantee_arg_within_expr_bounds(
             lambda arg_lower: _rint(arg_lower),
             exprv,
