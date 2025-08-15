@@ -66,6 +66,10 @@ class ScalarIsFinite(Expr):
 
         fmax = _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
 
+        # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
+        # if expr_lower > 0, isfinite(Xs) = True, so Xs must be finite
+        # if expr_upper < 0, isfinite(Xs) = False, Xs must stay non-finite
+        # otherwise, isfinite(Xs) in [True, False] and Xs can be anything
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             expr_lower > 0,
             # must be finite
@@ -172,6 +176,10 @@ class ScalarIsInf(Expr):
 
         fmax = _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
 
+        # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
+        # if expr_lower > 0, isinf(Xs) = True, so Xs must stay infinite
+        # if expr_upper < 0, isinf(Xs) = False, Xs must be non-infinite
+        # otherwise, isinf(Xs) in [True, False] and Xs can be anything
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             expr_lower > 0,
             # must be infinite, i.e. stay the same
@@ -276,6 +284,10 @@ class ScalarIsNaN(Expr):
         arg = self._a
         argv = arg.eval(X.shape, Xs, late_bound)
 
+        # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
+        # if expr_lower > 0, isnan(Xs) = True, so Xs must stay NaN
+        # if expr_upper < 0, isnan(Xs) = False, Xs must be non-NaN
+        # otherwise, isnan(Xs) in [True, False] and Xs can be anything
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             expr_lower > 0,
             # must be NaN, i.e. stay the same

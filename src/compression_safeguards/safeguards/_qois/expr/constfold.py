@@ -87,6 +87,9 @@ class ScalarFoldedConstant(Expr):
 
         return rm(fleft, fright)
 
+    # FIXME: more general constant_fold_ternary is blocked on not being able to
+    #        relate on TypeVarTuple to another, here *Expr to *F, see e.g.
+    #        https://github.com/python/typing/issues/1216
     @staticmethod
     def constant_fold_ternary(
         left: Expr,

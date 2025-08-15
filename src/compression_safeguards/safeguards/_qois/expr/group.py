@@ -62,13 +62,7 @@ class Group(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        return self._expr.compute_data_bounds(
-            expr_lower,
-            expr_upper,
-            X,
-            Xs,
-            late_bound,
-        )
+        return self._expr.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 
     def compute_data_bounds(
         self,

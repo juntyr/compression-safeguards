@@ -81,6 +81,12 @@ class ScalarMultiply(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        def _is_negative(
+            x: np.ndarray[Ps, np.dtype[F]],
+        ) -> np.ndarray[Ps, np.dtype[np.bool]]:
+            # check not just for x < 0 but also for x == -0.0
+            return (x < 0) | ((1 / x) < 0)  # type: ignore
+
         a_const = not self._a.has_data
         b_const = not self._b.has_data
         assert not (a_const and b_const), "constant product has no error bounds"
@@ -134,10 +140,10 @@ class ScalarMultiply(Expr):
             )
 
             term_lower: np.ndarray[Ps, np.dtype[F]] = np.minimum(  # type: ignore
-                termv, np.where(constv < 0, -tu, tl)
+                termv, np.where(_is_negative(constv), -tu, tl)
             )
             term_upper: np.ndarray[Ps, np.dtype[F]] = np.maximum(  # type: ignore
-                termv, np.where(constv < 0, -tl, tu)
+                termv, np.where(_is_negative(constv), -tl, tu)
             )
             # if term_lower == termv and termv == -0.0, we need to guarantee
             #  that term_lower is also -0.0, same for term_upper

@@ -87,7 +87,8 @@ class ScalarLog(Expr):
             smallest_subnormal = np.finfo(X.dtype).smallest_subnormal
 
         # apply the inverse function to get the bounds on arg
-        # log(...) is NaN for negative values, so ... can be any negative value
+        # log(...) is NaN for negative values and can then take any negative
+        #  value
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             argv < 0,
             X.dtype.type(-np.inf),

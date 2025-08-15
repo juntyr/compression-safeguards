@@ -64,13 +64,7 @@ class ScalarNegate(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        return self._a.compute_data_bounds(
-            -expr_upper,
-            -expr_lower,
-            X,
-            Xs,
-            late_bound,
-        )
+        return self._a.compute_data_bounds(-expr_upper, -expr_lower, X, Xs, late_bound)
 
     def compute_data_bounds(
         self,
