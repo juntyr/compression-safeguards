@@ -92,6 +92,12 @@ def guarantee_data_within_expr_bounds(
         `isnan(exprv) & isnan(expr(Xs_bound_guess))`.
     """
 
+    exprv = np.array(exprv)
+    Xs = np.array(Xs)
+    Xs_bound_guess = np.array(Xs_bound_guess)
+    expr_lower = np.array(expr_lower)
+    expr_upper = np.array(expr_upper)
+
     # check if any derived expression exceeds the expression bounds
     def exceeds_expr_bounds(
         Xs_bound_guess: np.ndarray[Ns, np.dtype[F]],

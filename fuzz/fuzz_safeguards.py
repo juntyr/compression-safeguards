@@ -1,10 +1,4 @@
 import atheris
-
-with atheris.instrument_imports():
-    import numcodecs
-    import numcodecs.compat
-    import numpy as np
-
 from timeoutcontext import timeout
 
 with atheris.instrument_imports():
@@ -16,6 +10,8 @@ with atheris.instrument_imports():
     from enum import Enum
     from inspect import signature
 
+    import numcodecs
+    import numcodecs.compat
     import numcodecs.registry
     import numpy as np
     from numcodecs.abc import Codec
