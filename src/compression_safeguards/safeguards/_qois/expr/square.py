@@ -79,7 +79,9 @@ class ScalarSqrt(Expr):
             smallest_subnormal = np.finfo(X.dtype).smallest_subnormal
 
         # apply the inverse function to get the bounds on arg
-        # sqrt(...) is NaN for negative values, so ... can be any negative value
+        # sqrt(-0.0) = -0.0 and sqrt(+0.0) = +0.0
+        # sqrt(...) is NaN for negative values and can then take any negative
+        #  value
         # otherwise ensure that the bounds on sqrt(...) are non-negative
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             argv < 0,

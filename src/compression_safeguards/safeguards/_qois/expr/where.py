@@ -82,15 +82,15 @@ class ScalarWhere(Expr):
         cond, a, b = self._condition, self._a, self._b
         condv = cond.eval(X.shape, Xs, late_bound)
 
-        Xs_lower: None | np.ndarray[Ns, np.dtype[F]] = None
-        Xs_upper: None | np.ndarray[Ns, np.dtype[F]] = None
+        Xs_lower: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(-np.inf))
+        Xs_upper: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(np.inf))
 
         if cond.has_data:
             # for simplicity, we assume that the condition must always be
             #  preserved exactly
-            Xs_lower, Xs_upper = cond.compute_data_bounds(
-                condv, condv, X, Xs, late_bound
-            )
+            cl, cu = cond.compute_data_bounds(condv, condv, X, Xs, late_bound)
+            Xs_lower = np.maximum(Xs_lower, cl)
+            Xs_upper = np.minimum(Xs_upper, cu)
 
         if np.any(condv) and a.has_data:
             # pass on the data bounds to a but only use its bounds on Xs if
@@ -98,22 +98,16 @@ class ScalarWhere(Expr):
             al, au = a.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 
             # combine the data bounds
-            if Xs_lower is None:
-                Xs_lower = al
-            else:
-                Xs_lower = np.where(  # type: ignore
-                    condv,
-                    np.maximum(Xs_lower, al),
-                    Xs_lower,
-                )
-            if Xs_upper is None:
-                Xs_upper = au
-            else:
-                Xs_upper = np.where(  # type: ignore
-                    condv,
-                    np.minimum(Xs_upper, au),
-                    Xs_upper,
-                )
+            Xs_lower = np.where(  # type: ignore
+                condv,
+                np.maximum(Xs_lower, al),
+                Xs_lower,
+            )
+            Xs_upper = np.where(  # type: ignore
+                condv,
+                np.minimum(Xs_upper, au),
+                Xs_upper,
+            )
 
         if (not np.all(condv)) and b.has_data:
             # pass on the data bounds to b but only use its bounds on Xs if
@@ -121,25 +115,17 @@ class ScalarWhere(Expr):
             bl, bu = b.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 
             # combine the data bounds
-            if Xs_lower is None:
-                Xs_lower = bl
-            else:
-                Xs_lower = np.where(  # type: ignore
-                    condv,
-                    Xs_lower,
-                    np.maximum(Xs_lower, bl),
-                )
-            if Xs_upper is None:
-                Xs_upper = bu
-            else:
-                Xs_upper = np.where(  # type: ignore
-                    condv,
-                    Xs_upper,
-                    np.minimum(Xs_upper, bu),
-                )
+            Xs_lower = np.where(  # type: ignore
+                condv,
+                Xs_lower,
+                np.maximum(Xs_lower, bl),
+            )
+            Xs_upper = np.where(  # type: ignore
+                condv,
+                Xs_upper,
+                np.minimum(Xs_upper, bu),
+            )
 
-        assert Xs_lower is not None
-        assert Xs_upper is not None
         return Xs_lower, Xs_upper
 
     def compute_data_bounds(

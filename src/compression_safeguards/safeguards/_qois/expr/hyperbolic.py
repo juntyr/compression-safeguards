@@ -147,7 +147,7 @@ class ScalarAsinh(Expr):
         axis: int,
         offset: int,
     ) -> Expr:
-        return ScalarSinh(
+        return ScalarAsinh(
             self._a.apply_array_element_offset(axis, offset),
         )
 
@@ -160,7 +160,7 @@ class ScalarAsinh(Expr):
             self._a,
             dtype,
             _asinh,  # type: ignore
-            ScalarSinh,
+            ScalarAsinh,
         )
 
     def eval(

@@ -381,6 +381,9 @@ def test_hyperbolic(check):
     check("asech(x)")
     check("acsch(x)")
 
+    check("sinh(x) * sinh(1.5)")
+    check("asinh(x) * asinh(1.5)")
+
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_classification(check):
@@ -392,6 +395,13 @@ def test_classification(check):
 @pytest.mark.parametrize("check", CHECKS)
 def test_where(check):
     check("where(x, 1, 0)")
+    check("where(0, x*2, 0)")
+    check("where(0, 1, x/2)")
+    check("where(1, x*2, 0)")
+    check("where(1, 1, x/2)")
+    check("where(0, x*2, x/2)")
+    check("where(1, x*2, x/2)")
+    check("where(x, x*2, x/2)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
