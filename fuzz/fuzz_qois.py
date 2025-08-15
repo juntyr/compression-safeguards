@@ -48,7 +48,6 @@ with atheris.instrument_imports():
     )
     from compression_safeguards.utils.cast import _float128_dtype, _isnan
     # from compression_safeguards.safeguards._qois.expr.addsub import ScalarAdd, ScalarSubtract
-    # from compression_safeguards.safeguards._qois.expr.array import Array
     # from compression_safeguards.safeguards._qois.expr.divmul import ScalarDivide, ScalarMultiply
     # from compression_safeguards.safeguards._qois.expr.logexp import ScalarLogWithBase
     # from compression_safeguards.safeguards._qois.expr.power import ScalarPower

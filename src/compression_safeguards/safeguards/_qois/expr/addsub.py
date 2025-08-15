@@ -262,7 +262,9 @@ def compute_left_associate_sum_data_bounds(
         )
 
     # evaluate the total expression sum
-    exprv: np.ndarray[Ps, np.dtype[F]] = sum(termvs[1:], start=termvs[0])
+    exprv: np.ndarray[Ps, np.dtype[F]] = np.array(sum(termvs[1:], start=termvs[0]))
+    expr_lower = np.array(expr_lower)
+    expr_upper = np.array(expr_upper)
 
     # compute the sum of absolute factors
     total_abs_factor_: None | np.ndarray[Ps, np.dtype[F]] = None
@@ -363,7 +365,8 @@ def compute_left_associate_sum_data_bounds(
         assert total_sum is not None
 
         return np.broadcast_to(  # type: ignore
-            total_sum.reshape((1,) + exprv.shape), (t_stack.shape[0],) + exprv.shape
+            np.array(total_sum).reshape((1,) + exprv.shape),
+            (t_stack.shape[0],) + exprv.shape,
         )
 
     # handle rounding errors in the total absolute factor early
