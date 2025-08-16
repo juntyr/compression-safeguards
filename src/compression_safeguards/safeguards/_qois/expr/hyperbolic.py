@@ -313,7 +313,7 @@ class ScalarHyperbolic(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         # rewrite hyperbolic functions with base cases for sinh and asinh
-        return (HYPERBOLIC_REWRITE[self._func])(self._a).compute_data_bounds_unchecked(
+        return (HYPERBOLIC_REWRITE[self._func])(self._a).compute_data_bounds(
             expr_lower, expr_upper, X, Xs, late_bound
         )
 

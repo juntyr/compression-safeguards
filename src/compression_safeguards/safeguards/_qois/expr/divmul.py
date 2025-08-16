@@ -273,9 +273,9 @@ class ScalarDivide(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        return ScalarMultiply(
-            self._a, ScalarReciprocal(self._b)
-        ).compute_data_bounds_unchecked(expr_lower, expr_upper, X, Xs, late_bound)
+        return ScalarMultiply(self._a, ScalarReciprocal(self._b)).compute_data_bounds(
+            expr_lower, expr_upper, X, Xs, late_bound
+        )
 
     def __repr__(self) -> str:
         return f"{self._a!r} / {self._b!r}"

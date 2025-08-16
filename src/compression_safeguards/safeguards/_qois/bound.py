@@ -138,7 +138,7 @@ def guarantee_data_within_expr_bounds(
         bounds_exceeded = exceeds_expr_bounds(Xs_bound_guess)
 
         if not np.any(bounds_exceeded):
-            return Xs_bound_guess
+            return np.where(Xs_bound_guess == Xs, Xs, Xs_bound_guess)  # type: ignore
 
         # nudge the guess towards the data by 1 ULP
         Xs_bound_guess = np.where(  # type: ignore
@@ -154,7 +154,7 @@ def guarantee_data_within_expr_bounds(
         bounds_exceeded = exceeds_expr_bounds(Xs_bound_guess)
 
         if not np.any(bounds_exceeded):
-            return Xs_bound_guess
+            return np.where(Xs_bound_guess == Xs, Xs, Xs_bound_guess)  # type: ignore
 
         # shove the guess towards the data by exponentially reducing the
         #  difference

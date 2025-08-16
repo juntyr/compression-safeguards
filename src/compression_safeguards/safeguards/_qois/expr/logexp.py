@@ -380,7 +380,7 @@ class ScalarLogWithBase(Expr):
                 Logarithm.ln,
                 self._b,
             ),
-        ).compute_data_bounds_unchecked(expr_lower, expr_upper, X, Xs, late_bound)
+        ).compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 
     def __repr__(self) -> str:
         return f"log({self._a!r}, base={self._b!r})"

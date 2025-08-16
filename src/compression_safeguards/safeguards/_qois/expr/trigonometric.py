@@ -8,6 +8,7 @@ from ....utils.bindings import Parameter
 from ....utils.cast import (
     _float128_dtype,
     _float128_pi,
+    _isinf,
     _nextafter,
     _reciprocal,
 )
@@ -88,22 +89,39 @@ class ScalarSin(Expr):
 
         # np.asin maps to [-pi/2, +pi/2] where sin is monotonically increasing
         # flip the argument error bounds where sin is monotonically decreasing
-        arg_lower = np.minimum(
+        needs_flip = (np.sin(argv + arg_lower_diff) > exprv) | (
+            np.sin(argv + arg_upper_diff) < exprv
+        )
+
+        # sin(+-inf) = NaN, so force infinite argv to have exact bounds
+        # FIXME: how do we handle bounds right next to the peak where the
+        #        expression bounds could be exceeded inside the interval?
+        arg_lower = np.where(  # type: ignore
+            _isinf(argv),
             argv,
-            argv
-            + np.where(
-                np.sin(argv + arg_lower_diff) > exprv, -arg_upper_diff, arg_lower_diff
+            np.minimum(
+                argv,
+                argv
+                + np.where(
+                    needs_flip,
+                    -arg_upper_diff,
+                    arg_lower_diff,
+                ),
             ),
-        )  # type: ignore
-        arg_upper = np.maximum(
+        )
+        arg_upper = np.where(  # type: ignore
+            _isinf(argv),
             argv,
-            argv
-            + np.where(
-                np.sin(argv + arg_upper_diff) < exprv,
-                -arg_lower_diff,
-                arg_upper_diff,
+            np.maximum(
+                argv,
+                argv
+                + np.where(
+                    needs_flip,
+                    -arg_lower_diff,
+                    arg_upper_diff,
+                ),
             ),
-        )  # type: ignore
+        )
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
         arg_lower = np.where(arg_lower == argv, argv, arg_lower)  # type: ignore
@@ -211,7 +229,7 @@ class ScalarAsin(Expr):
         one_eps = _nextafter(np.array(1, dtype=X.dtype), np.array(2, dtype=X.dtype))
 
         # apply the inverse function to get the bounds on arg
-        # asin(...) is NaN when abs(...) > 1, so abs(...) can be any value > 1
+        # asin(...) is NaN when abs(...) > 1 and can then take any value > 1
         # otherwise ensure that the bounds on asin(...) are in [-pi/2, +pi/2]
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             argv < -1,
@@ -349,9 +367,9 @@ class ScalarTrigonometric(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         # rewrite trigonometric functions with base cases for sin and asin
-        return (TRIGONOMETRIC_REWRITE[self._func])(
-            self._a
-        ).compute_data_bounds_unchecked(expr_lower, expr_upper, X, Xs, late_bound)
+        return (TRIGONOMETRIC_REWRITE[self._func])(self._a).compute_data_bounds(
+            expr_lower, expr_upper, X, Xs, late_bound
+        )
 
     def __repr__(self) -> str:
         return f"{self._func.name}({self._a!r})"

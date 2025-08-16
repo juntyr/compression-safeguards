@@ -220,27 +220,3 @@ def check_one_input(data) -> None:
 
 atheris.Setup(sys.argv, check_one_input)
 atheris.Fuzz()
-
-
-"""
-
-Bugs to fix:
-    
-=== trigonometric functions on infinite inputs ===
-
-dtype = <class 'numpy.float32'>
-X = array(-inf, dtype=float32)
-e = cot(x)
-exprv = np.float32(nan)
-expr_lower = array(nan, dtype=float32)
-expr_upper = array(nan, dtype=float32)
-X_lower = array(nan, dtype=float32)
-X_upper = array(nan, dtype=float32)
-exprv_X_lower = np.float32(nan)
-exprv_X_upper = np.float32(nan)
-X_test = array(nan, dtype=float32)
-exprv_X_test = np.float32(nan)
-
-===
-
-"""
