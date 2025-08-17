@@ -1,4 +1,5 @@
 import atheris
+from timeoutcontext import timeout
 
 with atheris.instrument_imports():
     import sys
@@ -221,7 +222,27 @@ def check_one_input(data) -> None:
 
     # compute the lower and upper bounds on the data
     # and evaluate the expression for them
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    try:
+        with timeout(1):
+            X_lower, X_upper = expr.compute_data_bounds(
+                expr_lower, expr_upper, X, X, dict()
+            )
+    except TimeoutError as err:
+        print(
+            "\n===\n\n"
+            + "\n".join(
+                [
+                    f"dtype = {dtype!r}",
+                    f"X = {X!r}",
+                    f"expr = {expr!r}",
+                    f"exprv = {exprv!r}",
+                    f"expr_lower = {expr_lower!r}",
+                    f"expr_upper = {expr_upper!r}",
+                ]
+            )
+            + "\n\n===\n"
+        )
+        raise err
     X_lower, X_upper = np.array(X_lower), np.array(X_upper)
     exprv_X_lower = expr.eval((), X_lower, late_bound=dict())
     exprv_X_upper = expr.eval((), X_upper, late_bound=dict())
