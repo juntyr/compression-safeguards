@@ -2,18 +2,29 @@ import atheris
 
 with atheris.instrument_imports():
     import sys
-    from typing import Callable
+    from typing import Any, Callable
 
     import numpy as np
 
     from compression_safeguards.safeguards._qois.expr.abc import Expr
     from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
+    from compression_safeguards.safeguards._qois.expr.addsub import (
+        ScalarAdd,
+        ScalarSubtract,
+    )
     from compression_safeguards.safeguards._qois.expr.classification import (
         ScalarIsFinite,
         ScalarIsInf,
         ScalarIsNaN,
     )
+    from compression_safeguards.safeguards._qois.expr.constfold import (
+        ScalarFoldedConstant,
+    )
     from compression_safeguards.safeguards._qois.expr.data import Data
+    from compression_safeguards.safeguards._qois.expr.divmul import (
+        ScalarDivide,
+        ScalarMultiply,
+    )
     from compression_safeguards.safeguards._qois.expr.group import Group
     from compression_safeguards.safeguards._qois.expr.hyperbolic import (
         Hyperbolic,
@@ -21,13 +32,16 @@ with atheris.instrument_imports():
         ScalarHyperbolic,
         ScalarSinh,
     )
+    from compression_safeguards.safeguards._qois.expr.literal import Euler, Number, Pi
     from compression_safeguards.safeguards._qois.expr.logexp import (
         Exponential,
         Logarithm,
         ScalarExp,
         ScalarLog,
+        ScalarLogWithBase,
     )
     from compression_safeguards.safeguards._qois.expr.neg import ScalarNegate
+    from compression_safeguards.safeguards._qois.expr.power import ScalarPower
     from compression_safeguards.safeguards._qois.expr.reciprocal import ScalarReciprocal
     from compression_safeguards.safeguards._qois.expr.round import (
         ScalarCeil,
@@ -46,12 +60,8 @@ with atheris.instrument_imports():
         ScalarTrigonometric,
         Trigonometric,
     )
+    from compression_safeguards.safeguards._qois.expr.where import ScalarWhere
     from compression_safeguards.utils.cast import _float128_dtype, _isnan
-    # from compression_safeguards.safeguards._qois.expr.addsub import ScalarAdd, ScalarSubtract
-    # from compression_safeguards.safeguards._qois.expr.divmul import ScalarDivide, ScalarMultiply
-    # from compression_safeguards.safeguards._qois.expr.logexp import ScalarLogWithBase
-    # from compression_safeguards.safeguards._qois.expr.power import ScalarPower
-    # from compression_safeguards.safeguards._qois.expr.where import ScalarWhere
 
 
 DTYPES = [
@@ -61,7 +71,14 @@ DTYPES = [
     _float128_dtype,
 ]
 
-EXPRESSIONS: list[Callable[[Expr], Expr]] = [
+NULLARY_EXPRESSIONS: list[Callable[[Any, np.dtype], Expr]] = [
+    lambda data, dtype: Euler(),
+    lambda data, dtype: Pi(),
+    lambda data, dtype: Number(f"{data.ConsumeInt(4)}"),
+    lambda data, dtype: Number(f"{data.ConsumeRegularFloat()}"),
+    lambda data, dtype: ScalarFoldedConstant(dtype.type(data.ConsumeFloat())),
+]
+UNARY_EXPRESSIONS: list[Callable[[Expr], Expr]] = [
     ScalarAbs,
     ScalarIsFinite,
     ScalarIsInf,
@@ -107,22 +124,84 @@ EXPRESSIONS: list[Callable[[Expr], Expr]] = [
     lambda a: ScalarTrigonometric(Trigonometric.asec, a),
     lambda a: ScalarTrigonometric(Trigonometric.acsc, a),
 ]
+BINARY_EXPRESSIONS: list[Callable[[Expr, Expr], Expr]] = [
+    ScalarAdd,
+    ScalarSubtract,
+    ScalarDivide,
+    ScalarMultiply,
+    ScalarLogWithBase,
+    ScalarPower,
+]
+TERNARY_EXPRESSIONS: list[Callable[[Expr, Expr, Expr], Expr]] = [
+    ScalarWhere,
+    lambda a, b, c: ScalarAdd(ScalarAdd(a, b), c),
+    lambda a, b, c: ScalarAdd(a, ScalarAdd(b, c)),
+    lambda a, b, c: ScalarAdd(ScalarSubtract(a, b), c),
+    lambda a, b, c: ScalarSubtract(ScalarAdd(a, b), c),
+    lambda a, b, c: ScalarMultiply(ScalarMultiply(a, b), c),
+    lambda a, b, c: ScalarMultiply(a, ScalarMultiply(b, c)),
+    lambda a, b, c: ScalarMultiply(ScalarDivide(a, b), c),
+    lambda a, b, c: ScalarDivide(ScalarMultiply(a, b), c),
+]
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 def check_one_input(data) -> None:
     data = atheris.FuzzedDataProvider(data)
 
-    # select the dtype and expression to test
+    # select the dtype to test
     dtype = DTYPES[data.ConsumeIntInRange(0, len(DTYPES) - 1)]
-    expr = EXPRESSIONS[data.ConsumeIntInRange(0, len(EXPRESSIONS) - 1)]
+
+    # build the shallow unary/binary/ternary expression to test
+    dataexpr = Data(index=())
+    exprid = data.ConsumeIntInRange(
+        0,
+        len(UNARY_EXPRESSIONS) + len(BINARY_EXPRESSIONS) + len(TERNARY_EXPRESSIONS) - 1,
+    )
+    if exprid < len(UNARY_EXPRESSIONS):
+        expr: Expr = (UNARY_EXPRESSIONS[exprid])(dataexpr)
+    elif exprid < (len(UNARY_EXPRESSIONS) + len(BINARY_EXPRESSIONS)):
+        exprs = []
+        for _ in range(2):
+            i = data.ConsumeIntInRange(
+                0, len(NULLARY_EXPRESSIONS) + len(UNARY_EXPRESSIONS) - 1
+            )
+            if i < len(NULLARY_EXPRESSIONS):
+                exprs.append((NULLARY_EXPRESSIONS[i])(data, dtype))
+            else:
+                exprs.append(
+                    (UNARY_EXPRESSIONS[i - len(NULLARY_EXPRESSIONS)])(dataexpr)
+                )
+        [expra, exprb] = exprs
+        expr = (BINARY_EXPRESSIONS[exprid - len(UNARY_EXPRESSIONS)])(expra, exprb)
+    else:
+        exprs = []
+        for _ in range(3):
+            i = data.ConsumeIntInRange(
+                0, len(NULLARY_EXPRESSIONS) + len(UNARY_EXPRESSIONS) - 1
+            )
+            if i < len(NULLARY_EXPRESSIONS):
+                exprs.append((NULLARY_EXPRESSIONS[i])(data, dtype))
+            else:
+                exprs.append(
+                    (UNARY_EXPRESSIONS[i - len(NULLARY_EXPRESSIONS)])(dataexpr)
+                )
+        [expra, exprb, exprc] = exprs
+        expr = (
+            TERNARY_EXPRESSIONS[
+                exprid - len(UNARY_EXPRESSIONS) - len(BINARY_EXPRESSIONS)
+            ]
+        )(expra, exprb, exprc)
+
+    # skip if the expression is constant
+    if not expr.has_data:
+        return
 
     # generate the data
     X = np.array(data.ConsumeFloat(), dtype=dtype)
 
     # evaluate the expression on the data
-    e: Expr = expr(Data(index=()))
-    exprv = e.eval((), X, late_bound=dict())
+    exprv = expr.eval((), X, late_bound=dict())
 
     # generate the lower and upper bounds on the expression
     expr_lower = np.array(data.ConsumeFloat(), dtype=dtype)
@@ -142,9 +221,9 @@ def check_one_input(data) -> None:
 
     # compute the lower and upper bounds on the data
     # and evaluate the expression for them
-    X_lower, X_upper = e.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
-    exprv_X_lower = e.eval((), X_lower, late_bound=dict())
-    exprv_X_upper = e.eval((), X_upper, late_bound=dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    exprv_X_lower = expr.eval((), X_lower, late_bound=dict())
+    exprv_X_upper = expr.eval((), X_upper, late_bound=dict())
 
     # generate a test data value
     X_test = np.array(data.ConsumeFloat(), dtype=dtype)
@@ -160,7 +239,7 @@ def check_one_input(data) -> None:
     X_test = np.where(X_test == X_upper, X_upper, X_test)
 
     # evaluate the expression on X_test
-    exprv_X_test = e.eval((), X_test, late_bound=dict())
+    exprv_X_test = expr.eval((), X_test, late_bound=dict())
 
     try:
         # ASSERT: X bounds must only be NaN if X is NaN
@@ -201,7 +280,7 @@ def check_one_input(data) -> None:
                 [
                     f"dtype = {dtype!r}",
                     f"X = {X!r}",
-                    f"e = {e!r}",
+                    f"expr = {expr!r}",
                     f"exprv = {exprv!r}",
                     f"expr_lower = {expr_lower!r}",
                     f"expr_upper = {expr_upper!r}",
