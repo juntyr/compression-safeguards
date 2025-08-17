@@ -21,72 +21,40 @@ from .codecs import (
 )
 
 
-def check_all_codecs(data: np.ndarray):
+def check_all_codecs(data: np.ndarray, constant_boundary=4.2):
     for monotonicity, window, boundary in product(
         Monotonicity,
         range(1, 3 + 1),
         BoundaryCondition,
     ):
-        encode_decode_zero(
-            data,
-            safeguards=[
-                dict(
-                    kind="monotonicity",
-                    monotonicity=monotonicity,
-                    window=window,
-                    boundary=boundary,
-                    constant_boundary=4.2
-                    if boundary == BoundaryCondition.constant
-                    else None,
-                )
-            ],
-        )
-        encode_decode_neg(
-            data,
-            safeguards=[
-                dict(
-                    kind="monotonicity",
-                    monotonicity=monotonicity,
-                    window=window,
-                    boundary=boundary,
-                    constant_boundary=4.2
-                    if boundary == BoundaryCondition.constant
-                    else None,
-                )
-            ],
-        )
-        encode_decode_identity(
-            data,
-            safeguards=[
-                dict(
-                    kind="monotonicity",
-                    monotonicity=monotonicity,
-                    window=window,
-                    boundary=boundary,
-                    constant_boundary=4.2
-                    if boundary == BoundaryCondition.constant
-                    else None,
-                )
-            ],
-        )
-        encode_decode_noise(
-            data,
-            safeguards=[
-                dict(
-                    kind="monotonicity",
-                    monotonicity=monotonicity,
-                    window=window,
-                    boundary=boundary,
-                    constant_boundary=4.2
-                    if boundary == BoundaryCondition.constant
-                    else None,
-                )
-            ],
-        )
+        safeguards = [
+            dict(
+                kind="monotonicity",
+                monotonicity=monotonicity,
+                window=window,
+                boundary=boundary,
+                constant_boundary=constant_boundary
+                if boundary == BoundaryCondition.constant
+                else None,
+            )
+        ]
+
+        encode_decode_zero(data, safeguards=safeguards)
+        encode_decode_neg(data, safeguards=safeguards)
+        encode_decode_identity(data, safeguards=safeguards)
+        encode_decode_noise(data, safeguards=safeguards)
 
 
 def test_empty():
     check_all_codecs(np.empty(0))
+
+
+def test_dimensions():
+    check_all_codecs(np.array(42.0))
+    check_all_codecs(np.array(42, dtype=np.int64), constant_boundary=42)
+    check_all_codecs(np.array([42.0]))
+    check_all_codecs(np.array([[42.0]]))
+    check_all_codecs(np.array([[[42.0]]]))
 
 
 def test_arange():

@@ -80,6 +80,8 @@ def from_float(
         The re-converted array with the original `dtype`.
     """
 
+    x = np.array(x)
+
     if x.dtype == dtype:
         return x  # type: ignore
 

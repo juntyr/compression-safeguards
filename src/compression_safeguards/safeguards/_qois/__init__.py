@@ -95,8 +95,9 @@ class PointwiseQuantityOfInterest:
             The pointwise quantity of interest values.
         """
 
+        X = np.array(X)
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, X.dtype)
-        return expr.eval(X.shape, X, late_bound)
+        return np.array(expr.eval(X.shape, X, late_bound))
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def compute_data_bounds(
@@ -128,8 +129,13 @@ class PointwiseQuantityOfInterest:
             The pointwise lower and upper bounds on the data `X`.
         """
 
+        qoi_lower, qoi_upper = np.array(qoi_lower), np.array(qoi_upper)
+        X = np.array(X)
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, X.dtype)
-        return expr.compute_data_bounds(qoi_lower, qoi_upper, X, X, late_bound)
+        X_lower, X_upper = expr.compute_data_bounds(
+            qoi_lower, qoi_upper, X, X, late_bound
+        )
+        return np.array(X_lower), np.array(X_upper)
 
     def __repr__(self) -> str:
         return repr(self._expr)
@@ -245,11 +251,12 @@ class StencilQuantityOfInterest:
             The pointwise quantity of interest values.
         """
 
+        Xs = np.array(Xs)
         X_shape: Ps = Xs.shape[: -len(self._stencil_shape)]  # type: ignore
         stencil_shape = Xs.shape[-len(self._stencil_shape) :]
         assert stencil_shape == self._stencil_shape
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, Xs.dtype)
-        return expr.eval(X_shape, Xs, late_bound)
+        return np.array(expr.eval(X_shape, Xs, late_bound))
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def compute_data_bounds(
@@ -287,6 +294,8 @@ class StencilQuantityOfInterest:
             that contribute to the same QoI points.
         """
 
+        qoi_lower, qoi_upper = np.array(qoi_lower), np.array(qoi_upper)
+        Xs = np.array(Xs)
         X_shape, stencil_shape = (
             Xs.shape[: -len(self._stencil_shape)],
             Xs.shape[-len(self._stencil_shape) :],
@@ -295,7 +304,10 @@ class StencilQuantityOfInterest:
         assert stencil_shape == self._stencil_shape
         X: np.ndarray[Ps, np.dtype[F]] = Xs[(...,) + self._stencil_I]  # type: ignore
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, Xs.dtype)
-        return expr.compute_data_bounds(qoi_lower, qoi_upper, X, Xs, late_bound)
+        Xs_lower, Xs_upper = expr.compute_data_bounds(
+            qoi_lower, qoi_upper, X, Xs, late_bound
+        )
+        return np.array(Xs_lower), np.array(Xs_upper)
 
     def __repr__(self) -> str:
         return repr(self._expr)
