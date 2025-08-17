@@ -65,9 +65,9 @@ with atheris.instrument_imports():
 
 
 DTYPES = [
-    np.float16,
-    np.float32,
-    np.float64,
+    np.dtype(np.float16),
+    np.dtype(np.float32),
+    np.dtype(np.float64),
     _float128_dtype,
 ]
 
