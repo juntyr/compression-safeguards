@@ -1,7 +1,13 @@
 import numpy as np
 
 from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
+from compression_safeguards.safeguards._qois.expr.addsub import ScalarSubtract
 from compression_safeguards.safeguards._qois.expr.data import Data
+from compression_safeguards.safeguards._qois.expr.hyperbolic import (
+    Hyperbolic,
+    ScalarHyperbolic,
+)
+from compression_safeguards.safeguards._qois.expr.power import ScalarPower
 from compression_safeguards.safeguards._qois.expr.reciprocal import ScalarReciprocal
 from compression_safeguards.safeguards._qois.expr.sign import ScalarSign
 from compression_safeguards.safeguards._qois.expr.square import ScalarSquare
@@ -690,3 +696,47 @@ def test_asin():
         equal_nan=True,
     )
     assert np.all(np.isnan(valid._upper[1]))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_bounded_hang():
+    X = np.array(-1.79769313e308, dtype=np.float64)
+
+    expr = ScalarPower(
+        ScalarSign(Data(index=())),
+        ScalarHyperbolic(Hyperbolic.coth, Data(index=())),
+    )
+
+    assert expr.eval((), X, dict()) == np.float64(-1.0)
+
+    expr_lower = np.array(-1, dtype=np.float64)
+    expr_upper = np.array(0, dtype=np.float64)
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower <= X
+    assert X_upper == X
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.float64(-1.0)
+    assert expr.eval((), np.array(X_upper), dict()) == np.float64(-1.0)
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_subtract_inf():
+    X = np.array(0.0, dtype=np.float32)
+
+    expr = ScalarSubtract(Data(index=()), Data(index=()))
+
+    assert expr.eval((), X, dict()) == np.float64(0.0)
+
+    expr_lower = np.array(-np.inf, dtype=np.float32)
+    expr_upper = np.array(np.inf, dtype=np.float32)
+
+    fmax = np.finfo(X.dtype).max
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    # bad: -inf - -inf = NaN and +inf - +inf = NaN
+    assert X_lower == np.array(-fmax, dtype=np.float32)
+    assert X_upper == np.array(fmax, dtype=np.float32)
+
+    assert expr.eval((), np.array(X_lower), dict()) == 0
+    assert expr.eval((), np.array(X_upper), dict()) == 0

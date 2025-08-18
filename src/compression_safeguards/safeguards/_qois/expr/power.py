@@ -82,7 +82,7 @@ class ScalarPower(Expr):
         a, b = self._a, self._b
         av = a.eval(X.shape, Xs, late_bound)
         bv = b.eval(X.shape, Xs, late_bound)
-        exprv = np.power(av, bv)
+        exprv: np.ndarray[Ps, np.dtype[F]] = np.power(av, bv)
 
         # powers of negative numbers are just too tricky since they easily
         #  become NaN, so let's enforce bounds that only contain the original
@@ -90,7 +90,15 @@ class ScalarPower(Expr):
         expr_lower = np.where(_is_negative(av), exprv, expr_lower)  # type: ignore
         expr_upper = np.where(_is_negative(av), exprv, expr_upper)  # type: ignore
 
-        # rewrite a ** b as e^(b*ln(fake_abs(a)))
+        # inlined outer ScalarFakeAbs
+        # flip the lower/upper bounds if the result is negative
+        #  since our rewrite below only works with non-negative exprv
+        expr_lower, expr_upper = (
+            np.where(_is_negative(exprv), -expr_upper, expr_lower),  # type: ignore
+            np.where(_is_negative(exprv), -expr_lower, expr_upper),  # type: ignore
+        )
+
+        # rewrite a ** b as fake_abs(e^(b*ln(fake_abs(a))))
         # this is mathematically incorrect for a <= 0 but works for deriving
         #  error bounds since fake_abs handles the error bound flips
         return ScalarExp(

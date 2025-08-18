@@ -3,11 +3,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from ....utils.bindings import Parameter
-from ....utils.cast import (
-    _float128_dtype,
-    _float128_smallest_subnormal,
-    _reciprocal,
-)
+from ....utils.cast import _reciprocal
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
@@ -77,11 +73,6 @@ class ScalarReciprocal(Expr):
         argv = arg.eval(X.shape, Xs, late_bound)
         exprv = _reciprocal(argv)
 
-        if X.dtype == _float128_dtype:
-            smallest_subnormal = _float128_smallest_subnormal
-        else:
-            smallest_subnormal = np.finfo(X.dtype).smallest_subnormal
-
         # compute the argument bounds
         # ensure that reciprocal(...) keeps the same sign as arg
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.minimum(
@@ -89,7 +80,7 @@ class ScalarReciprocal(Expr):
             _reciprocal(
                 np.where(  # type: ignore
                     _is_negative(exprv),
-                    np.minimum(expr_upper, -smallest_subnormal),
+                    np.minimum(expr_upper, -0.0),
                     expr_upper,
                 )
             ),
@@ -100,7 +91,7 @@ class ScalarReciprocal(Expr):
                 np.where(  # type: ignore
                     _is_negative(exprv),
                     expr_lower,
-                    np.maximum(smallest_subnormal, expr_lower),
+                    np.maximum(+0.0, expr_lower),
                 )
             ),
         )

@@ -92,14 +92,14 @@ class ScalarMultiply(Expr):
         b_const = not self._b.has_data
         assert not (a_const and b_const), "constant product has no error bounds"
 
-        if a_const or b_const:
-            term, const = (self._b, self._a) if a_const else (self._a, self._b)
+        # evaluate a and b and a*b
+        a, b = self._a, self._b
+        av = a.eval(X.shape, Xs, late_bound)
+        bv = b.eval(X.shape, Xs, late_bound)
+        exprv = np.multiply(av, bv)
 
-            # evaluate the non-constant and constant term and their product
-            termv = term.eval(X.shape, Xs, late_bound)
-            constv = const.eval(X.shape, Xs, late_bound)
-            # mul of two terms is commutative
-            exprv = np.multiply(termv, constv)
+        if a_const or b_const:
+            term, termv, constv = (b, bv, av) if a_const else (a, av, bv)
 
             if X.dtype == _float128_dtype:
                 fmax = _float128_max
@@ -176,6 +176,14 @@ class ScalarMultiply(Expr):
                 Xs,
                 late_bound,
             )
+
+        # inlined outer ScalarFakeAbs
+        # flip the lower/upper bounds if the result is negative
+        #  since our rewrite below only works with non-negative exprv
+        expr_lower, expr_upper = (
+            np.where(_is_negative(exprv), -expr_upper, expr_lower),  # type: ignore
+            np.where(_is_negative(exprv), -expr_lower, expr_upper),  # type: ignore
+        )
 
         return rewrite_left_associative_product_as_exp_sum_of_logs(
             self
@@ -312,7 +320,7 @@ def rewrite_left_associative_product_as_exp_sum_of_logs(
     [(sum_of_lns, _)] = terms_stack
 
     # rewrite a * b * ... * z as
-    #  e^(ln(fake_abs(a)) + ln(fake_abs(b)) + ... + ln(fake_abs(z)))
+    #  fake_abs(e^(ln(fake_abs(a)) + ln(fake_abs(b)) + ... + ln(fake_abs(z))))
     # this is mathematically incorrect for any negative product terms but works
     #  for deriving error bounds since fake_abs handles the error bound flips
     return ScalarExp(Exponential.exp, sum_of_lns)

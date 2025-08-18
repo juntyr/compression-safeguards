@@ -7,7 +7,7 @@ from ....utils.bindings import Parameter
 from ....utils.cast import (
     _float128_dtype,
     _float128_max,
-    _isinf,
+    _isfinite,
     _isnan,
     _nan_to_zero,
 )
@@ -297,27 +297,33 @@ def compute_left_associate_sum_data_bounds(
 
     fmax = _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
 
+    # ensure that the bounds never contain both -inf and +inf since that would
+    #  allow NaN to sneak in
+    inf_clash = (tfl == -np.inf) & (tfu == np.inf)
+    tfl = np.where(inf_clash, -fmax, tfl)  # type: ignore
+    tfu = np.where(inf_clash, fmax, tfu)  # type: ignore
+
+    any_nan: np.ndarray[Ps, np.dtype[np.bool]] = _isnan(termvs[0])  # type: ignore
+    for termv in termvs[1:]:
+        any_nan |= _isnan(termv)
+
     # stack the lower and upper bounds for each term factor
+    # if total_abs_factor or exprv is non-finite:
+    #  - non-finite values must be preserved exactly
+    #  - if there is any NaN term, finite values can have any finite value
+    #  - otherwise finite values are also preserved exactly, for simplicity
     # if total_abs_factor is zero, all abs_factorv are also zero and we can
-    #  allow terms to have any finite value
-    # if total_abs_factor is inf, we cannot do better than a zero error
-    #  bound for all terms, making sure that inf * 0 != NaN
-    # if total_abs_factor or exprv is NaN, we can allow terms to have any
-    #  value, but propagating non-NaN error bounds works better
-    # TODO: optimize infinite sums
+    #  allow the finite terms terms to have any finite value
+    # otherwise we split up the error bound for the terms by their factors
     tl_stack = np.stack(
         [
             np.where(
-                total_abs_factor == 0,
-                -fmax,
+                ~_isfinite(total_abs_factor) | ~_isfinite(exprv),
+                np.where(_isfinite(termv) & any_nan, -fmax, termv),
                 np.where(
-                    _isinf(total_abs_factor),
-                    termv,
-                    np.where(
-                        _isnan(total_abs_factor) | _isnan(exprv),
-                        X.dtype.type(-np.inf),
-                        _zero_add(termv, tfl * abs_factorv),
-                    ),
+                    total_abs_factor == 0,
+                    -fmax,
+                    _zero_add(termv, tfl * abs_factorv),
                 ),
             )
             for termv, abs_factorv in zip(termvs, abs_factorvs)
@@ -327,16 +333,12 @@ def compute_left_associate_sum_data_bounds(
     tu_stack = np.stack(
         [
             np.where(
-                total_abs_factor == 0,
-                fmax,
+                ~_isfinite(total_abs_factor) | ~_isfinite(exprv),
+                np.where(_isfinite(termv) & any_nan, fmax, termv),
                 np.where(
-                    _isinf(total_abs_factor),
-                    termv,
-                    np.where(
-                        _isnan(total_abs_factor) | _isnan(exprv),
-                        X.dtype.type(np.inf),
-                        _zero_add(termv, tfu * abs_factorv),
-                    ),
+                    total_abs_factor == 0,
+                    fmax,
+                    _zero_add(termv, tfu * abs_factorv),
                 ),
             )
             for termv, abs_factorv in zip(termvs, abs_factorvs)

@@ -78,6 +78,7 @@ NULLARY_EXPRESSIONS: list[Callable[[Any, np.dtype], Expr]] = [
     lambda data, dtype: Number(f"{data.ConsumeInt(4)}"),
     lambda data, dtype: Number(f"{data.ConsumeRegularFloat()}"),
     lambda data, dtype: ScalarFoldedConstant(dtype.type(data.ConsumeFloat())),
+    lambda data, dtype: Data(index=()),
 ]
 UNARY_EXPRESSIONS: list[Callable[[Expr], Expr]] = [
     ScalarAbs,
