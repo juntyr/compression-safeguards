@@ -129,8 +129,11 @@ class ScalarMultiply(Expr):
                             _isnan(constv),
                             X.dtype.type(-np.inf),
                             np.where(
-                                _is_negative(constv), expr_upper / constv, expr_lower
-                            ),
+                                _is_negative(constv),
+                                expr_upper,
+                                expr_lower,
+                            )
+                            / constv,
                         ),
                     ),
                 ),
@@ -151,8 +154,11 @@ class ScalarMultiply(Expr):
                             _isnan(constv),
                             X.dtype.type(np.inf),
                             np.where(
-                                _is_negative(constv), expr_lower / constv, expr_upper
-                            ),
+                                _is_negative(constv),
+                                expr_lower,
+                                expr_upper,
+                            )
+                            / constv,
                         ),
                     ),
                 ),
