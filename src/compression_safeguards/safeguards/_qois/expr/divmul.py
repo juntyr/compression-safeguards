@@ -113,38 +113,49 @@ class ScalarMultiply(Expr):
             # for x*Inf, we can allow any non-zero non-NaN x with the same sign
             # for x*NaN, we can allow any x but only propagate [-inf, inf]
             #  since [-NaN, NaN] would be misunderstood as only NaN
-            tl = np.where(
-                constv == 0,
-                -fmax,
-                np.where(
-                    _isinf(constv),
-                    smallest_subnormal,
+            term_lower: np.ndarray[Ps, np.dtype[F]] = np.minimum(
+                termv,
+                np.where(  # type: ignore
+                    constv == 0,
+                    -fmax,
                     np.where(
-                        _isnan(constv),
-                        X.dtype.type(-np.inf),
-                        expr_lower / np.abs(constv),
+                        _isinf(constv),
+                        np.where(
+                            _is_negative(termv),
+                            X.dtype.type(-np.inf),
+                            smallest_subnormal,
+                        ),
+                        np.where(
+                            _isnan(constv),
+                            X.dtype.type(-np.inf),
+                            np.where(
+                                _is_negative(constv), expr_upper / constv, expr_lower
+                            ),
+                        ),
                     ),
                 ),
             )
-            tu = np.where(
-                constv == 0,
-                fmax,
-                np.where(
-                    _isinf(constv),
-                    X.dtype.type(np.inf),
+            term_upper: np.ndarray[Ps, np.dtype[F]] = np.maximum(
+                termv,
+                np.where(  # type: ignore
+                    constv == 0,
+                    fmax,
                     np.where(
-                        _isnan(constv),
-                        X.dtype.type(np.inf),
-                        expr_upper / np.abs(constv),
+                        _isinf(constv),
+                        np.where(
+                            _is_negative(termv),
+                            -smallest_subnormal,
+                            X.dtype.type(np.inf),
+                        ),
+                        np.where(
+                            _isnan(constv),
+                            X.dtype.type(np.inf),
+                            np.where(
+                                _is_negative(constv), expr_lower / constv, expr_upper
+                            ),
+                        ),
                     ),
                 ),
-            )
-
-            term_lower: np.ndarray[Ps, np.dtype[F]] = np.minimum(  # type: ignore
-                termv, np.where(_is_negative(constv), -tu, tl)
-            )
-            term_upper: np.ndarray[Ps, np.dtype[F]] = np.maximum(  # type: ignore
-                termv, np.where(_is_negative(constv), -tl, tu)
             )
             # if term_lower == termv and termv == -0.0, we need to guarantee
             #  that term_lower is also -0.0, same for term_upper

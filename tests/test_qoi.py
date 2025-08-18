@@ -3,10 +3,12 @@ import numpy as np
 from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
 from compression_safeguards.safeguards._qois.expr.addsub import ScalarSubtract
 from compression_safeguards.safeguards._qois.expr.data import Data
+from compression_safeguards.safeguards._qois.expr.divmul import ScalarMultiply
 from compression_safeguards.safeguards._qois.expr.hyperbolic import (
     Hyperbolic,
     ScalarHyperbolic,
 )
+from compression_safeguards.safeguards._qois.expr.literal import Number
 from compression_safeguards.safeguards._qois.expr.power import ScalarPower
 from compression_safeguards.safeguards._qois.expr.reciprocal import ScalarReciprocal
 from compression_safeguards.safeguards._qois.expr.sign import ScalarSign
@@ -726,7 +728,7 @@ def test_fuzzer_found_subtract_inf():
 
     expr = ScalarSubtract(Data(index=()), Data(index=()))
 
-    assert expr.eval((), X, dict()) == np.float64(0.0)
+    assert expr.eval((), X, dict()) == np.float32(0.0)
 
     expr_lower = np.array(-np.inf, dtype=np.float32)
     expr_upper = np.array(np.inf, dtype=np.float32)
@@ -738,5 +740,27 @@ def test_fuzzer_found_subtract_inf():
     assert X_lower == np.array(-fmax, dtype=np.float32)
     assert X_upper == np.array(fmax, dtype=np.float32)
 
-    assert expr.eval((), np.array(X_lower), dict()) == 0
-    assert expr.eval((), np.array(X_upper), dict()) == 0
+    assert expr.eval((), np.array(X_lower), dict()) == np.float32(0.0)
+    assert expr.eval((), np.array(X_upper), dict()) == np.float32(0.0)
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_times_zero():
+    X = np.array(-np.inf, dtype=np.float16)
+
+    expr = ScalarMultiply(Number("-9.58497987659779e+300"), ScalarAbs(Data(index=())))
+
+    assert expr.eval((), X, dict()) == np.float16(-np.inf)
+
+    expr_lower = np.array(-np.inf, dtype=np.float16)
+    expr_upper = np.array(np.inf, dtype=np.float16)
+
+    smallest_subnormal = np.finfo(X.dtype).smallest_subnormal
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(-np.inf, dtype=np.float16)
+    assert X_upper == np.array(-smallest_subnormal, dtype=np.float16)
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.float16(-np.inf)
+    assert expr.eval((), np.array(X_upper), dict()) == np.float16(-np.inf)
