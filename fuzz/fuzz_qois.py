@@ -3,6 +3,7 @@ from timeoutcontext import timeout
 
 with atheris.instrument_imports():
     import sys
+    import warnings
     from typing import Any, Callable
 
     import numpy as np
@@ -147,6 +148,9 @@ TERNARY_EXPRESSIONS: list[Callable[[Expr, Expr, Expr], Expr]] = [
 ]
 
 
+warnings.filterwarnings("error")
+
+
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 def check_one_input(data) -> None:
     data = atheris.FuzzedDataProvider(data)
@@ -155,45 +159,56 @@ def check_one_input(data) -> None:
     dtype = DTYPES[data.ConsumeIntInRange(0, len(DTYPES) - 1)]
 
     # build the shallow unary/binary/ternary expression to test
-    dataexpr = Data(index=())
-    exprid = data.ConsumeIntInRange(
-        0,
-        len(UNARY_EXPRESSIONS) + len(BINARY_EXPRESSIONS) + len(TERNARY_EXPRESSIONS) - 1,
-    )
-    if exprid < len(UNARY_EXPRESSIONS):
-        expr: Expr = (UNARY_EXPRESSIONS[exprid])(dataexpr)
-    elif exprid < (len(UNARY_EXPRESSIONS) + len(BINARY_EXPRESSIONS)):
-        exprs = []
-        for _ in range(2):
-            i = data.ConsumeIntInRange(
-                0, len(NULLARY_EXPRESSIONS) + len(UNARY_EXPRESSIONS) - 1
-            )
-            if i < len(NULLARY_EXPRESSIONS):
-                exprs.append((NULLARY_EXPRESSIONS[i])(data, dtype))
-            else:
-                exprs.append(
-                    (UNARY_EXPRESSIONS[i - len(NULLARY_EXPRESSIONS)])(dataexpr)
+    try:
+        dataexpr = Data(index=())
+        exprid = data.ConsumeIntInRange(
+            0,
+            len(UNARY_EXPRESSIONS)
+            + len(BINARY_EXPRESSIONS)
+            + len(TERNARY_EXPRESSIONS)
+            - 1,
+        )
+        if exprid < len(UNARY_EXPRESSIONS):
+            expr: Expr = (UNARY_EXPRESSIONS[exprid])(dataexpr)
+        elif exprid < (len(UNARY_EXPRESSIONS) + len(BINARY_EXPRESSIONS)):
+            exprs = []
+            for _ in range(2):
+                i = data.ConsumeIntInRange(
+                    0, len(NULLARY_EXPRESSIONS) + len(UNARY_EXPRESSIONS) - 1
                 )
-        [expra, exprb] = exprs
-        expr = (BINARY_EXPRESSIONS[exprid - len(UNARY_EXPRESSIONS)])(expra, exprb)
-    else:
-        exprs = []
-        for _ in range(3):
-            i = data.ConsumeIntInRange(
-                0, len(NULLARY_EXPRESSIONS) + len(UNARY_EXPRESSIONS) - 1
-            )
-            if i < len(NULLARY_EXPRESSIONS):
-                exprs.append((NULLARY_EXPRESSIONS[i])(data, dtype))
-            else:
-                exprs.append(
-                    (UNARY_EXPRESSIONS[i - len(NULLARY_EXPRESSIONS)])(dataexpr)
+                if i < len(NULLARY_EXPRESSIONS):
+                    exprs.append((NULLARY_EXPRESSIONS[i])(data, dtype))
+                else:
+                    exprs.append(
+                        (UNARY_EXPRESSIONS[i - len(NULLARY_EXPRESSIONS)])(dataexpr)
+                    )
+            [expra, exprb] = exprs
+            expr = (BINARY_EXPRESSIONS[exprid - len(UNARY_EXPRESSIONS)])(expra, exprb)
+        else:
+            exprs = []
+            for _ in range(3):
+                i = data.ConsumeIntInRange(
+                    0, len(NULLARY_EXPRESSIONS) + len(UNARY_EXPRESSIONS) - 1
                 )
-        [expra, exprb, exprc] = exprs
-        expr = (
-            TERNARY_EXPRESSIONS[
-                exprid - len(UNARY_EXPRESSIONS) - len(BINARY_EXPRESSIONS)
-            ]
-        )(expra, exprb, exprc)
+                if i < len(NULLARY_EXPRESSIONS):
+                    exprs.append((NULLARY_EXPRESSIONS[i])(data, dtype))
+                else:
+                    exprs.append(
+                        (UNARY_EXPRESSIONS[i - len(NULLARY_EXPRESSIONS)])(dataexpr)
+                    )
+            [expra, exprb, exprc] = exprs
+            expr = (
+                TERNARY_EXPRESSIONS[
+                    exprid - len(UNARY_EXPRESSIONS) - len(BINARY_EXPRESSIONS)
+                ]
+            )(expra, exprb, exprc)
+    except Warning as err:
+        # skip expressions that try to perform a**b with excessive digits
+        if str(err).contains("symbolic integer evaluation") and str(err).contains(
+            "excessive number of digits"
+        ):
+            return
+        raise err
 
     # skip if the expression is constant
     if not expr.has_data:

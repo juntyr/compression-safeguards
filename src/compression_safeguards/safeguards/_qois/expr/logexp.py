@@ -231,8 +231,15 @@ class ScalarExp(Expr):
         )
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower = np.where(arg_lower == argv, argv, arg_lower)  # type: ignore
-        arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
+        # we also need to force argv if expr_lower == expr_upper, which can
+        #  be triggered by power of a negative base, which requires an exact
+        #  bound on exprv
+        arg_lower = np.where(
+            (arg_lower == argv) | (expr_lower == expr_upper), argv, arg_lower
+        )  # type: ignore
+        arg_upper = np.where(
+            (arg_upper == argv) | (expr_lower == expr_upper), argv, arg_upper
+        )  # type: ignore
 
         # handle rounding errors in exp(log(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
