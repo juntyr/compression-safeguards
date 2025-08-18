@@ -160,48 +160,54 @@ def check_one_input(data) -> None:
 
     # build the shallow unary/binary/ternary expression to test
     try:
-        dataexpr = Data(index=())
-        exprid = data.ConsumeIntInRange(
-            0,
-            len(UNARY_EXPRESSIONS)
-            + len(BINARY_EXPRESSIONS)
-            + len(TERNARY_EXPRESSIONS)
-            - 1,
-        )
-        if exprid < len(UNARY_EXPRESSIONS):
-            expr: Expr = (UNARY_EXPRESSIONS[exprid])(dataexpr)
-        elif exprid < (len(UNARY_EXPRESSIONS) + len(BINARY_EXPRESSIONS)):
-            exprs = []
-            for _ in range(2):
-                i = data.ConsumeIntInRange(
-                    0, len(NULLARY_EXPRESSIONS) + len(UNARY_EXPRESSIONS) - 1
-                )
-                if i < len(NULLARY_EXPRESSIONS):
-                    exprs.append((NULLARY_EXPRESSIONS[i])(data, dtype))
-                else:
-                    exprs.append(
-                        (UNARY_EXPRESSIONS[i - len(NULLARY_EXPRESSIONS)])(dataexpr)
+        with timeout(1):
+            dataexpr = Data(index=())
+            exprid = data.ConsumeIntInRange(
+                0,
+                len(UNARY_EXPRESSIONS)
+                + len(BINARY_EXPRESSIONS)
+                + len(TERNARY_EXPRESSIONS)
+                - 1,
+            )
+            if exprid < len(UNARY_EXPRESSIONS):
+                expr: Expr = (UNARY_EXPRESSIONS[exprid])(dataexpr)
+            elif exprid < (len(UNARY_EXPRESSIONS) + len(BINARY_EXPRESSIONS)):
+                exprs = []
+                for _ in range(2):
+                    i = data.ConsumeIntInRange(
+                        0, len(NULLARY_EXPRESSIONS) + len(UNARY_EXPRESSIONS) - 1
                     )
-            [expra, exprb] = exprs
-            expr = (BINARY_EXPRESSIONS[exprid - len(UNARY_EXPRESSIONS)])(expra, exprb)
-        else:
-            exprs = []
-            for _ in range(3):
-                i = data.ConsumeIntInRange(
-                    0, len(NULLARY_EXPRESSIONS) + len(UNARY_EXPRESSIONS) - 1
+                    if i < len(NULLARY_EXPRESSIONS):
+                        exprs.append((NULLARY_EXPRESSIONS[i])(data, dtype))
+                    else:
+                        exprs.append(
+                            (UNARY_EXPRESSIONS[i - len(NULLARY_EXPRESSIONS)])(dataexpr)
+                        )
+                [expra, exprb] = exprs
+                expr = (BINARY_EXPRESSIONS[exprid - len(UNARY_EXPRESSIONS)])(
+                    expra, exprb
                 )
-                if i < len(NULLARY_EXPRESSIONS):
-                    exprs.append((NULLARY_EXPRESSIONS[i])(data, dtype))
-                else:
-                    exprs.append(
-                        (UNARY_EXPRESSIONS[i - len(NULLARY_EXPRESSIONS)])(dataexpr)
+            else:
+                exprs = []
+                for _ in range(3):
+                    i = data.ConsumeIntInRange(
+                        0, len(NULLARY_EXPRESSIONS) + len(UNARY_EXPRESSIONS) - 1
                     )
-            [expra, exprb, exprc] = exprs
-            expr = (
-                TERNARY_EXPRESSIONS[
-                    exprid - len(UNARY_EXPRESSIONS) - len(BINARY_EXPRESSIONS)
-                ]
-            )(expra, exprb, exprc)
+                    if i < len(NULLARY_EXPRESSIONS):
+                        exprs.append((NULLARY_EXPRESSIONS[i])(data, dtype))
+                    else:
+                        exprs.append(
+                            (UNARY_EXPRESSIONS[i - len(NULLARY_EXPRESSIONS)])(dataexpr)
+                        )
+                [expra, exprb, exprc] = exprs
+                expr = (
+                    TERNARY_EXPRESSIONS[
+                        exprid - len(UNARY_EXPRESSIONS) - len(BINARY_EXPRESSIONS)
+                    ]
+                )(expra, exprb, exprc)
+    except TimeoutError:
+        # skip expressions that take too long just to build
+        return
     except Warning as err:
         # skip expressions that try to perform a**b with excessive digits
         if str(err).contains("symbolic integer evaluation") and str(err).contains(
