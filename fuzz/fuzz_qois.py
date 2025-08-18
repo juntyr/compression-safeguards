@@ -223,6 +223,11 @@ def check_one_input(data) -> None:
     # generate the data
     X = np.array(data.ConsumeFloat(), dtype=dtype)
 
+    # NaN data values are always preserved externally by the QoI safeguards, so
+    #  the expressions don't need to handle them
+    if _isnan(X):
+        return
+
     # evaluate the expression on the data
     exprv = expr.eval((), X, late_bound=dict())
 
