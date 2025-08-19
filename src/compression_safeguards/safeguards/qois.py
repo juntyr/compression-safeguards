@@ -293,57 +293,64 @@ safeguards can better understand their meaning and provide better corrections
 and higher compression ratios for them.
 
 The operators and functions in the above QoI grammar are evaluated using
-`numpy` ufuncs as follows:
+`numpy` ufuncs and follow the specification of the `math.h` ISO C standard
+(see e.g. <https://pubs.opengroup.org/onlinepubs/9799919799/>):
 
-| QoI function | `numpy` ufunc |
-| ------------ | ------------- |
-| `+a` | no-op |
-| `-a` | `np.negative` |
-| `a + b` | `np.add` |
-| `a - b` | `np.subtract` |
-| `a * b` | `np.multiply` |
-| `a / b` | `np.divide` |
-| `a ** b` | `np.power` |
-| `ln` | `np.log` |
-| `log2` | `np.log2` |
-| `log10` | `np.log10` |
-| `log(a, base=b)` | `np.divide(np.log(a), np.log(b))` |
-| `exp` | `np.exp` |
-| `exp2` | `np.exp2` |
-| `exp10` | `np.power(10, a)` |
-| `sqrt` | `np.sqrt` |
-| `square` | `np.square` |
-| `reciprocal` | `np.reciprocal` |
-| `abs` | `np.abs` |
-| `sign` | `np.sign` |
-| `floor` | `np.floor` |
-| `ceil` | `np.ceil` |
-| `trunc` | `np.trunc` |
-| `round_ties_even` | `np.rint` |
-| `sin` | `np.sin` |
-| `cos` | `np.cos` |
-| `tan` | `np.tan` |
-| `cot` | `np.reciprocal(np.tan(a))` |
-| `sec` | `np.reciprocal(np.cos(a))` |
-| `csc` | `np.reciprocal(np.sin(a))` |
-| `asin` | `np.arcsin` |
-| `acos` | `np.arccos` |
-| `atan` | `np.arctan` |
-| `acot` | `np.arctan(np.reciprocal(a))` |
-| `asec` | `np.arccos(np.reciprocal(a))` |
-| `acsc` | `np.arcsin(np.reciprocal(a))` |
-| `sinh` | `np.sinh` |
-| `cosh` | `np.cosh` |
-| `tanh` | `np.tanh` |
-| `coth` | `np.reciprocal(np.tanh(a))` |
-| `sech` | `np.reciprocal(np.cosh(a))` |
-| `csch` | `np.reciprocal(np.sinh(a))` |
-| `asinh` | `np.arcsinh` |
-| `acosh` | `np.arccosh` |
-| `atanh` | `np.arctanh` |
-| `acoth` | `np.arctanh(np.reciprocal(a))` |
-| `asech` | `np.arccosh(np.reciprocal(a))` |
-| `acsch` | `np.arcsinh(np.reciprocal(a))` |
+| QoI function | `numpy` ufunc | `math.h` equivalent |
+| ------------ | ------------- | ------------------- |
+| `+a` | no-op | |
+| `-a` | `np.negative` | |
+| `a + b` | `np.add` | |
+| `a - b` | `np.subtract` | |
+| `a * b` | `np.multiply` | |
+| `a / b` | `np.divide` | |
+| `a ** b` | `np.power` | `pow` |
+| `ln` | `np.log` | `log` |
+| `log2` | `np.log2` | `log2` |
+| `log10` | `np.log10` | `log10` |
+| `log(a, base=b)` | `np.divide(np.log(a), np.log(b))` | |
+| `exp` | `np.exp` | `exp` |
+| `exp2` | `np.exp2` | `exp2` |
+| `exp10` | `np.power(10, a)` | |
+| `sqrt` | `np.sqrt` | `sqrt` |
+| `square` | `np.square` | |
+| `reciprocal` | `np.reciprocal` | |
+| `abs` | `np.abs` | |
+| `sign` | `np.sign` | |
+| `floor` | `np.floor` | `floor` |
+| `ceil` | `np.ceil` | `ceil` |
+| `trunc` | `np.trunc` | `trunc` |
+| `round_ties_even` | `np.rint` | `rint`[^4] |
+| `sin` | `np.sin` | `sin` |
+| `cos` | `np.cos` | `cos` |
+| `tan` | `np.tan` | `tan` |
+| `cot` | `np.reciprocal(np.tan(a))` | |
+| `sec` | `np.reciprocal(np.cos(a))` | |
+| `csc` | `np.reciprocal(np.sin(a))` | |
+| `asin` | `np.arcsin` | `asin` |
+| `acos` | `np.arccos` | `acos` |
+| `atan` | `np.arctan` | `atan` |
+| `acot` | `np.arctan(np.reciprocal(a))` | |
+| `asec` | `np.arccos(np.reciprocal(a))` | |
+| `acsc` | `np.arcsin(np.reciprocal(a))` | |
+| `sinh` | `np.sinh` | `sinh` |
+| `cosh` | `np.cosh` | `cosh` |
+| `tanh` | `np.tanh` | `tanh` |
+| `coth` | `np.reciprocal(np.tanh(a))` | |
+| `sech` | `np.reciprocal(np.cosh(a))` | |
+| `csch` | `np.reciprocal(np.sinh(a))` | |
+| `asinh` | `np.arcsinh` | `asinh` |
+| `acosh` | `np.arccosh` | `acosh` |
+| `atanh` | `np.arctanh` | `atanh` |
+| `acoth` | `np.arctanh(np.reciprocal(a))` | |
+| `asech` | `np.arccosh(np.reciprocal(a))` | |
+| `acsch` | `np.arcsinh(np.reciprocal(a))` | |
+| `isfinite` | `np.isfinite` | `isfinite` |
+| `isinf` | `np.isinf` | `isinf` |
+| `isnan` | `np.isnan` | `isnan` |
+| `where` | `np.where` | |
+
+[^4]: with the round-to-nearest rounding mode
 
 Furthermore, the array `sum` and `matmul` functions are implemented as explicit
 sums over the array elements in natural order, e.g.
