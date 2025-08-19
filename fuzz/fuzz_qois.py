@@ -210,8 +210,8 @@ def check_one_input(data) -> None:
         return
     except Warning as err:
         # skip expressions that try to perform a**b with excessive digits
-        if str(err).contains("symbolic integer evaluation") and str(err).contains(
-            "excessive number of digits"
+        if ("symbolic integer evaluation" in str(err)) and (
+            "excessive number of digits" in str(err)
         ):
             return
         raise err
