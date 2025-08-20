@@ -63,7 +63,8 @@ with atheris.instrument_imports():
         Trigonometric,
     )
     from compression_safeguards.safeguards._qois.expr.where import ScalarWhere
-    from compression_safeguards.utils.cast import _float128_dtype, _isnan
+    from compression_safeguards.utils._compat import _isnan
+    from compression_safeguards.utils._float128 import _float128_dtype
 
 
 DTYPES = [

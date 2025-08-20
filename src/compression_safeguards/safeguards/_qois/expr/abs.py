@@ -2,8 +2,8 @@ from collections.abc import Mapping
 
 import numpy as np
 
+from ....utils._compat import _reciprocal
 from ....utils.bindings import Parameter
-from ....utils.cast import _reciprocal
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI

@@ -9,11 +9,8 @@ from enum import Enum, auto
 import numpy as np
 from typing_extensions import assert_never  # MSPV 3.11
 
+from ..utils._compat import _isfinite, _nan_to_zero_inf_to_finite, _nextafter, _sign
 from ..utils.cast import (
-    _isfinite,
-    _nan_to_zero_inf_to_finite,
-    _nextafter,
-    _sign,
     from_float,
     from_total_order,
     to_float,

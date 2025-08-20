@@ -4,15 +4,17 @@ from math import gcd
 
 import numpy as np
 
-from ....utils.bindings import Parameter
-from ....utils.cast import (
-    _float128_dtype,
-    _float128_max,
-    _float128_smallest_subnormal,
+from ....utils._compat import (
     _isinf,
     _isnan,
     _reciprocal,
 )
+from ....utils._float128 import (
+    _float128_dtype,
+    _float128_max,
+    _float128_smallest_subnormal,
+)
+from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
 from .addsub import ScalarAdd, ScalarSubtract

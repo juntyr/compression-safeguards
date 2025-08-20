@@ -9,11 +9,9 @@ from collections.abc import Sequence, Set
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
+from ....utils._compat import _isfinite, _isinf, _isnan
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import (
-    _isfinite,
-    _isinf,
-    _isnan,
     as_bits,
     lossless_cast,
     saturating_finite_float_cast,

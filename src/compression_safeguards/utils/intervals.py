@@ -20,15 +20,8 @@ from typing import Any, Generic, Literal, TypeVar
 import numpy as np
 from typing_extensions import Self  # MSPV 3.11
 
-from .cast import (
-    _isfinite,
-    _isinf,
-    _isnan,
-    _nextafter,
-    as_bits,
-    from_total_order,
-    to_total_order,
-)
+from ._compat import _isfinite, _isinf, _isnan, _nextafter
+from .cast import as_bits, from_total_order, to_total_order
 from .typing import S, T
 
 N = TypeVar("N", bound=int, covariant=True)

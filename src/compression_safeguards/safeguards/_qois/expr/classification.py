@@ -3,8 +3,9 @@ from typing import Callable
 
 import numpy as np
 
+from ....utils._compat import _isfinite, _isinf, _isnan
+from ....utils._float128 import _float128_dtype, _float128_max
 from ....utils.bindings import Parameter
-from ....utils.cast import _float128_dtype, _float128_max, _isfinite, _isinf, _isnan
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Fi, Ns, Ps, PsI

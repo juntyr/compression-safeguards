@@ -8,8 +8,9 @@ from compression_safeguards.safeguards.stencil import BoundaryCondition
 from compression_safeguards.safeguards.stencil.qoi.eb import (
     StencilQuantityOfInterestErrorBoundSafeguard,
 )
+from compression_safeguards.utils._float128 import _float128_dtype
 from compression_safeguards.utils.bindings import Bindings
-from compression_safeguards.utils.cast import _float128_dtype, to_float
+from compression_safeguards.utils.cast import to_float
 
 from .codecs import (
     encode_decode_identity,

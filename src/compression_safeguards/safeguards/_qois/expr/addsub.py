@@ -3,14 +3,9 @@ from collections.abc import Mapping
 
 import numpy as np
 
+from ....utils._compat import _isfinite, _isnan, _nan_to_zero
+from ....utils._float128 import _float128_dtype, _float128_max
 from ....utils.bindings import Parameter
-from ....utils.cast import (
-    _float128_dtype,
-    _float128_max,
-    _isfinite,
-    _isnan,
-    _nan_to_zero,
-)
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
 from .abs import ScalarAbs

@@ -2,8 +2,8 @@ from collections.abc import Mapping
 
 import numpy as np
 
+from ....utils._compat import _isfinite
 from ....utils.bindings import Parameter
-from ....utils.cast import _isfinite
 from .abc import Expr
 from .typing import F, Ns, Ps, PsI
 

@@ -12,8 +12,9 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 from typing_extensions import assert_never  # MSPV 3.11
 
+from ...utils._compat import _isnan
 from ...utils.bindings import Bindings, Parameter
-from ...utils.cast import _isnan, from_total_order, lossless_cast, to_total_order
+from ...utils.cast import from_total_order, lossless_cast, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import S, T
 from . import BoundaryCondition, NeighbourhoodAxis, _pad_with_boundary

@@ -1,7 +1,7 @@
 import numpy as np
 
+from ...utils._compat import _isfinite
 from ...utils.cast import (
-    _isfinite,
     from_float,
     from_total_order,
     to_float,

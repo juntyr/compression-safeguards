@@ -5,8 +5,8 @@ from typing import Callable
 import numpy as np
 from typing_extensions import assert_never  # MSPV 3.11
 
+from ....utils._compat import _symmetric_modulo
 from ....utils.bindings import Parameter
-from ....utils.cast import _symmetric_modulo
 from .abc import Expr
 from .addsub import ScalarSubtract
 from .constfold import ScalarFoldedConstant

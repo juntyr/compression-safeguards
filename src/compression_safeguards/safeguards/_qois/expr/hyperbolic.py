@@ -4,8 +4,9 @@ from typing import Callable
 
 import numpy as np
 
+from ....utils._compat import _reciprocal
+from ....utils._float128 import _float128_dtype, _float128_type
 from ....utils.bindings import Parameter
-from ....utils.cast import _float128_dtype, _float128_type, _reciprocal
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
 from .abs import ScalarAbs

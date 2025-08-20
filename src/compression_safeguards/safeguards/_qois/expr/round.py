@@ -2,8 +2,8 @@ from collections.abc import Mapping
 
 import numpy as np
 
+from ....utils._compat import _nextafter, _reciprocal, _rint
 from ....utils.bindings import Parameter
-from ....utils.cast import _nextafter, _reciprocal, _rint
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant

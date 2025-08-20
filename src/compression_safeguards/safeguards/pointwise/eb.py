@@ -8,11 +8,9 @@ from collections.abc import Set
 
 import numpy as np
 
+from ...utils._compat import _isfinite, _isinf, _isnan
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import (
-    _isfinite,
-    _isinf,
-    _isnan,
     as_bits,
     saturating_finite_float_cast,
     to_float,

@@ -2,12 +2,8 @@ from typing import Callable
 
 import numpy as np
 
-from ...utils.cast import (
-    _isnan,
-    _nan_to_zero_inf_to_finite,
-    _nextafter,
-    as_bits,
-)
+from ...utils._compat import _isnan, _nan_to_zero_inf_to_finite, _nextafter
+from ...utils.cast import as_bits
 from .expr.typing import F, Ns, Ps
 
 

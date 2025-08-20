@@ -5,12 +5,12 @@ from warnings import warn
 
 import numpy as np
 
-from ....utils.bindings import Parameter
-from ....utils.cast import (
+from ....utils._float128 import (
     _float128_dtype,
     _float128_e,
     _float128_pi,
 )
+from ....utils.bindings import Parameter
 from .abc import Expr
 from .typing import F, Ns, Ps, PsI
 

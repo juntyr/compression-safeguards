@@ -4,11 +4,11 @@ from typing import Callable
 
 import numpy as np
 
-from ....utils.bindings import Parameter
-from ....utils.cast import (
+from ....utils._float128 import (
     _float128_dtype,
     _float128_smallest_subnormal,
 )
+from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant

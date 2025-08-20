@@ -1,13 +1,12 @@
 import numpy as np
 
-from compression_safeguards.utils.cast import (
+from compression_safeguards.utils._compat import _isnan, _nextafter
+from compression_safeguards.utils._float128 import (
     _float128,
     _float128_max,
     _float128_min,
     _float128_smallest_normal,
     _float128_smallest_subnormal,
-    _isnan,
-    _nextafter,
 )
 
 
