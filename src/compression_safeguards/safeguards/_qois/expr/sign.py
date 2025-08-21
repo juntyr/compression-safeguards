@@ -2,7 +2,13 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _floating_smallest_subnormal, _isnan, _sign
+from ....utils._compat import (
+    _floating_smallest_subnormal,
+    _isnan,
+    _maximum,
+    _minimum,
+    _sign,
+)
 from ....utils.bindings import Parameter
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
@@ -67,8 +73,8 @@ class ScalarSign(Expr):
         exprv: np.ndarray[Ps, np.dtype[F]] = _sign(argv)
 
         # evaluate the lower and upper sign bounds that satisfy the expression bound
-        expr_lower = np.maximum(-1, np.ceil(expr_lower))
-        expr_upper = np.minimum(np.floor(expr_upper), +1)
+        expr_lower = _maximum(-1, np.ceil(expr_lower))
+        expr_upper = _minimum(np.floor(expr_upper), +1)
 
         smallest_subnormal = _floating_smallest_subnormal(X.dtype)
 

@@ -9,6 +9,8 @@ from ....utils._compat import (
     _floating_smallest_subnormal,
     _isinf,
     _isnan,
+    _maximum,
+    _minimum,
     _reciprocal,
 )
 from ....utils.bindings import Parameter
@@ -107,7 +109,9 @@ class ScalarMultiply(Expr):
             # for x*Inf, we can allow any non-zero non-NaN x with the same sign
             # for x*NaN, we can allow any x but only propagate [-inf, inf]
             #  since [-NaN, NaN] would be misunderstood as only NaN
-            term_lower: np.ndarray[Ps, np.dtype[F]] = np.minimum(
+            # if term_lower == termv and termv == -0.0, we need to guarantee
+            #  that term_lower is also -0.0, same for term_upper
+            term_lower: np.ndarray[Ps, np.dtype[F]] = _minimum(
                 termv,
                 np.where(  # type: ignore
                     constv == 0,
@@ -132,7 +136,7 @@ class ScalarMultiply(Expr):
                     ),
                 ),
             )
-            term_upper: np.ndarray[Ps, np.dtype[F]] = np.maximum(
+            term_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(
                 termv,
                 np.where(  # type: ignore
                     constv == 0,
@@ -157,10 +161,6 @@ class ScalarMultiply(Expr):
                     ),
                 ),
             )
-            # if term_lower == termv and termv == -0.0, we need to guarantee
-            #  that term_lower is also -0.0, same for term_upper
-            term_lower = np.where(term_lower == termv, termv, term_lower)  # type: ignore
-            term_upper = np.where(term_upper == termv, termv, term_upper)  # type: ignore
 
             # handle rounding errors in multiply(divide(...)) early
             term_lower = guarantee_arg_within_expr_bounds(

@@ -3,6 +3,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
+from ....utils._compat import _maximum, _minimum
 from ....utils.bindings import Parameter
 from ..bound import guarantee_data_within_expr_bounds
 from .typing import F, Ns, Ps, PsI
@@ -205,10 +206,8 @@ class Expr:
         )
 
         # ensure that the original data values are within the data bounds
-        Xs_lower = np.minimum(Xs, Xs_lower)
-        Xs_upper = np.maximum(Xs, Xs_upper)
-        Xs_lower = np.where(Xs_lower == Xs, Xs, Xs_lower)  # type: ignore
-        Xs_upper = np.where(Xs_upper == Xs, Xs, Xs_upper)  # type: ignore
+        Xs_lower = _minimum(Xs, Xs_lower)
+        Xs_upper = _maximum(Xs, Xs_upper)
 
         exprv = self.eval(X.shape, Xs, late_bound)
 

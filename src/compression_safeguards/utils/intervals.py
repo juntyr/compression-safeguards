@@ -20,7 +20,18 @@ from typing import Any, Generic, Literal, TypeVar
 import numpy as np
 from typing_extensions import Self  # MSPV 3.11
 
-from ._compat import _isfinite, _isinf, _isnan, _nextafter
+from ._compat import (
+    _isfinite,
+    _isinf,
+    _isnan,
+    _nextafter,
+)
+from ._compat import (
+    _maximum as _np_maximum,
+)
+from ._compat import (
+    _minimum as _np_minimum,
+)
 from .cast import as_bits, from_total_order, to_total_order
 from .typing import S, T
 
@@ -449,11 +460,11 @@ class Interval(Generic[T, N]):
             n,
         )
 
-        intersection_lower = np.maximum(
-            to_total_order(self._lower), to_total_order(other._lower)
+        intersection_lower: np.ndarray[tuple[N], np.dtype[np.unsignedinteger]] = (
+            _np_maximum(to_total_order(self._lower), to_total_order(other._lower))
         )
-        intersection_upper = np.minimum(
-            to_total_order(self._upper), to_total_order(other._upper)
+        intersection_upper: np.ndarray[tuple[N], np.dtype[np.unsignedinteger]] = (
+            _np_minimum(to_total_order(self._upper), to_total_order(other._upper))
         )
 
         out._lower[:] = from_total_order(intersection_lower, out._lower.dtype)
@@ -764,10 +775,14 @@ class IntervalUnion(Generic[T, N, U]):
 
         for i in range(u):
             for j in range(v):
-                intersection_lower = np.maximum(
+                intersection_lower: np.ndarray[
+                    tuple[U, N], np.dtype[np.unsignedinteger]
+                ] = _np_maximum(
                     to_total_order(self._lower[i]), to_total_order(other._lower[j])
                 )
-                intersection_upper = np.minimum(
+                intersection_upper: np.ndarray[
+                    tuple[U, N], np.dtype[np.unsignedinteger]
+                ] = _np_minimum(
                     to_total_order(self._upper[i]), to_total_order(other._upper[j])
                 )
 
@@ -835,14 +850,14 @@ class IntervalUnion(Generic[T, N, U]):
             lower_i: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
                 to_total_order(
                     np.take_along_axis(
-                        self._lower, np.minimum(i_s, u - 1).reshape(1, -1), axis=0
+                        self._lower, _np_minimum(i_s, u - 1).reshape(1, -1), axis=0
                     ).flatten()
                 )
             )
             upper_i: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
                 to_total_order(
                     np.take_along_axis(
-                        self._upper, np.minimum(i_s, u - 1).reshape(1, -1), axis=0
+                        self._upper, _np_minimum(i_s, u - 1).reshape(1, -1), axis=0
                     ).flatten()
                 )
             )
@@ -850,14 +865,14 @@ class IntervalUnion(Generic[T, N, U]):
             lower_j: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
                 to_total_order(
                     np.take_along_axis(
-                        otheru._lower, np.minimum(j_s, v - 1).reshape(1, -1), axis=0
+                        otheru._lower, _np_minimum(j_s, v - 1).reshape(1, -1), axis=0
                     ).flatten()
                 )
             )
             upper_j: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
                 to_total_order(
                     np.take_along_axis(
-                        otheru._upper, np.minimum(j_s, v - 1).reshape(1, -1), axis=0
+                        otheru._upper, _np_minimum(j_s, v - 1).reshape(1, -1), axis=0
                     ).flatten()
                 )
             )
@@ -866,7 +881,7 @@ class IntervalUnion(Generic[T, N, U]):
                 to_total_order(
                     np.take_along_axis(
                         out._lower,
-                        np.maximum(n_intervals - 1, 0).reshape(1, -1),
+                        _np_maximum(n_intervals - 1, 0).reshape(1, -1),
                         axis=0,
                     ).flatten()
                 )
@@ -875,7 +890,7 @@ class IntervalUnion(Generic[T, N, U]):
                 to_total_order(
                     np.take_along_axis(
                         out._upper,
-                        np.maximum(n_intervals - 1, 0).reshape(1, -1),
+                        _np_maximum(n_intervals - 1, 0).reshape(1, -1),
                         axis=0,
                     ).flatten()
                 )
@@ -900,7 +915,7 @@ class IntervalUnion(Generic[T, N, U]):
                 & valid_o
                 & (
                     # check for normal intersection
-                    (np.maximum(lower_ij, lower_o) <= np.minimum(upper_ij, upper_o))
+                    (_np_maximum(lower_ij, lower_o) <= _np_minimum(upper_ij, upper_o))
                     |
                     # check for adjacent intervals, e.g [1..3] | [4..5] -> [1..5]
                     ((lower_ij > upper_o) & (lower_ij == (upper_o + 1)))
@@ -911,12 +926,12 @@ class IntervalUnion(Generic[T, N, U]):
             # - no intersection -> next is next interval
             next_lower = np.where(
                 has_intersection_with_out,
-                np.minimum(lower_o, lower_ij),
+                _np_minimum(lower_o, lower_ij),
                 np.where(choose_i, lower_i, lower_j),
             )
             next_upper = np.where(
                 has_intersection_with_out,
-                np.maximum(upper_o, upper_ij),
+                _np_maximum(upper_o, upper_ij),
                 np.where(choose_i, upper_i, upper_j),
             )
 
@@ -1056,7 +1071,7 @@ class IntervalUnion(Generic[T, N, U]):
         #    since ~half the upper bound works well for symmetric intervals
         upper = np.where(
             upper_lz < lower_lz,
-            (allbits >> np.minimum(upper_lz + 2, lower_lz)) + 1,
+            (allbits >> _np_minimum(upper_lz + 2, lower_lz)) + 1,
             upper,
         )  # type: ignore
 

@@ -16,11 +16,16 @@ __all__ = [
     "_rint",
     "_sinh",
     "_asinh",
+    "_signbit_non_nan",
+    "_minimum",
+    "_maximum",
     "_floating_max",
     "_floating_smallest_subnormal",
     "_pi",
     "_e",
 ]
+
+from typing import overload
 
 import numpy as np
 
@@ -248,6 +253,80 @@ def _asinh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
 
     # propagate asinh(-0.0) = -0.0
     return np.where(asinh == a, a, asinh)  # type: ignore
+
+
+# wrapper around np.signbit(a) that also works for numpy_quaddtype, but only
+#  for non-NaN values
+def _signbit_non_nan(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[np.bool]]:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
+        return np.signbit(a)  # type: ignore
+    return (a > 0) | (_reciprocal(a) > 0)  # type: ignore
+
+
+# wrapper around np.minimum that also works for +0.0 and -0.0
+@overload
+def _minimum(a: int | T, b: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
+    pass
+
+
+@overload
+def _minimum(a: np.ndarray[S, np.dtype[T]], b: int | T) -> np.ndarray[S, np.dtype[T]]:
+    pass
+
+
+@overload
+def _minimum(
+    a: np.ndarray[S, np.dtype[T]], b: np.ndarray[S, np.dtype[T]]
+) -> np.ndarray[S, np.dtype[T]]:
+    pass
+
+
+def _minimum(a, b):
+    minimum = np.minimum(a, b)
+    if np.issubdtype(np.array(a).dtype, np.integer) and np.issubdtype(
+        np.array(b).dtype, np.integer
+    ):
+        return minimum
+    minimum = np.where(
+        minimum == 0,
+        np.where((a < b) | (_signbit_non_nan(a) > _signbit_non_nan(b)), a, b),
+        minimum,
+    )
+    return minimum  # type: ignore
+
+
+# wrapper around np.maximum that also works for +0.0 and -0.0
+@overload
+def _maximum(a: int | T, b: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
+    pass
+
+
+@overload
+def _maximum(a: np.ndarray[S, np.dtype[T]], b: int | T) -> np.ndarray[S, np.dtype[T]]:
+    pass
+
+
+@overload
+def _maximum(
+    a: np.ndarray[S, np.dtype[T]], b: np.ndarray[S, np.dtype[T]]
+) -> np.ndarray[S, np.dtype[T]]:
+    pass
+
+
+def _maximum(a, b):
+    maximum = np.maximum(a, b)
+    if np.issubdtype(np.array(a).dtype, np.integer) and np.issubdtype(
+        np.array(b).dtype, np.integer
+    ):
+        return maximum
+    maximum = np.where(
+        maximum == 0,
+        np.where((a > b) | (_signbit_non_nan(a) < _signbit_non_nan(b)), a, b),
+        maximum,
+    )
+    return maximum  # type: ignore
 
 
 # wrapper around np.finfo(dtype).max that also works for numpy_quaddtype

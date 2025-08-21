@@ -1,6 +1,6 @@
 import numpy as np
 
-from ...utils._compat import _isfinite
+from ...utils._compat import _isfinite, _maximum, _minimum
 from ...utils.cast import (
     from_float,
     from_total_order,
@@ -42,11 +42,9 @@ def compute_safe_data_lower_upper_interval_union(
 
     valid = Interval.empty_like(dataf).preserve_inf(dataf).preserve_finite(dataf)
 
-    Lower(
-        np.maximum(valid._lower, from_float(dataf_float_lower, dataf.dtype))
-    ) <= valid[_isfinite(dataf)] <= Upper(
-        np.minimum(from_float(dataf_float_upper, dataf.dtype), valid._upper)
-    )
+    Lower(_maximum(valid._lower, from_float(dataf_float_lower, dataf.dtype))) <= valid[
+        _isfinite(dataf)
+    ] <= Upper(_minimum(from_float(dataf_float_upper, dataf.dtype), valid._upper))
 
     # correct rounding errors in the lower and upper bound
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):

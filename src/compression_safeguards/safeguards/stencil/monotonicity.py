@@ -12,7 +12,7 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 from typing_extensions import assert_never  # MSPV 3.11
 
-from ...utils._compat import _isnan
+from ...utils._compat import _isnan, _maximum, _minimum
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
@@ -508,14 +508,14 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                         elem_lt_left[s_inner] |= elem_lt_left[s_boundary]
                         elem_lt_right[s_inner] |= elem_lt_right[s_boundary]
                         valid_lt_lower[s_inner] = from_total_order(
-                            np.maximum(
+                            _maximum(
                                 to_total_order(valid_lt_lower[s_inner]),
                                 to_total_order(valid_lt_lower[s_boundary]),
                             ),
                             dtype=data.dtype,
                         )
                         valid_lt_upper[s_inner] = from_total_order(
-                            np.minimum(
+                            _minimum(
                                 to_total_order(valid_lt_upper[s_inner]),
                                 to_total_order(valid_lt_upper[s_boundary]),
                             ),
@@ -588,14 +588,14 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                         elem_gt_left[s_inner] |= elem_gt_left[s_boundary]
                         elem_gt_right[s_inner] |= elem_gt_right[s_boundary]
                         valid_gt_lower[s_inner] = from_total_order(
-                            np.maximum(
+                            _maximum(
                                 to_total_order(valid_gt_lower[s_inner]),
                                 to_total_order(valid_gt_lower[s_boundary]),
                             ),
                             dtype=data.dtype,
                         )
                         valid_gt_upper[s_inner] = from_total_order(
-                            np.minimum(
+                            _minimum(
                                 to_total_order(valid_gt_upper[s_inner]),
                                 to_total_order(valid_gt_upper[s_boundary]),
                             ),

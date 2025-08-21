@@ -2,7 +2,12 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _floating_smallest_subnormal, _reciprocal
+from ....utils._compat import (
+    _floating_smallest_subnormal,
+    _maximum,
+    _minimum,
+    _reciprocal,
+)
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
@@ -62,7 +67,7 @@ class ScalarSqrt(Expr):
         # for sqrt(-0.0), we should return -0.0 as the inverse
         # this ensures that 1/sqrt(-0.0) doesn't become 1/sqrt(0.0)
         def _sqrt_inv(x: np.ndarray[Ps, np.dtype[F]]) -> np.ndarray[Ps, np.dtype[F]]:
-            return np.where(x == 0, x, np.square(np.maximum(0, x)))  # type: ignore
+            return np.where(x == 0, x, np.square(_maximum(0, x)))  # type: ignore
 
         # evaluate arg and sqrt(arg)
         arg = self._a
@@ -76,20 +81,18 @@ class ScalarSqrt(Expr):
         # sqrt(...) is NaN for negative values and can then take any negative
         #  value
         # otherwise ensure that the bounds on sqrt(...) are non-negative
+        # if arg_lower == argv and argv == -0.0, we need to guarantee that
+        #  arg_lower is also -0.0, same for arg_upper
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             argv < 0,
             X.dtype.type(-np.inf),
-            np.minimum(argv, _sqrt_inv(expr_lower)),
+            _minimum(argv, _sqrt_inv(expr_lower)),
         )
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             argv < 0,
             -smallest_subnormal,
-            np.maximum(argv, _sqrt_inv(expr_upper)),
+            _maximum(argv, _sqrt_inv(expr_upper)),
         )
-        # if arg_lower == argv and argv == -0.0, we need to guarantee that
-        #  arg_lower is also -0.0, same for arg_upper
-        arg_lower = np.where(arg_lower == argv, argv, arg_lower)  # type: ignore
-        arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
 
         # handle rounding errors in sqrt(square(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
@@ -196,7 +199,7 @@ class ScalarSquare(Expr):
         exprv = np.square(argv)
 
         # apply the inverse function to get the bounds on arg
-        al = np.sqrt(np.maximum(expr_lower, 0))
+        al = np.sqrt(_maximum(expr_lower, 0))
         au = np.sqrt(expr_upper)
 
         # flip and swap the expr bounds to get the bounds on arg
@@ -211,12 +214,10 @@ class ScalarSquare(Expr):
             (expr_lower > 0) & _is_negative(argv), -al, au
         )
 
-        arg_lower = np.minimum(argv, arg_lower)
-        arg_upper = np.maximum(argv, arg_upper)
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower = np.where(arg_lower == argv, argv, arg_lower)  # type: ignore
-        arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
+        arg_lower = _minimum(argv, arg_lower)
+        arg_upper = _maximum(argv, arg_upper)
 
         # handle rounding errors in square(sqrt(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(

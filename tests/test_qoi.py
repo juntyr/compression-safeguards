@@ -16,7 +16,10 @@ from compression_safeguards.safeguards._qois.expr.square import ScalarSquare
 from compression_safeguards.safeguards._qois.expr.trigonometric import (
     ScalarAsin,
     ScalarSin,
+    ScalarTrigonometric,
+    Trigonometric,
 )
+from compression_safeguards.safeguards._qois.expr.where import ScalarWhere
 from compression_safeguards.safeguards._qois.interval import (
     compute_safe_data_lower_upper_interval_union,
 )
@@ -747,7 +750,6 @@ def test_fuzzer_found_subtract_inf():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 def test_fuzzer_found_times_zero():
     X = np.array(-np.inf, dtype=np.float16)
 
@@ -766,3 +768,26 @@ def test_fuzzer_found_times_zero():
 
     assert expr.eval((), np.array(X_lower), dict()) == np.float16(-np.inf)
     assert expr.eval((), np.array(X_upper), dict()) == np.float16(-np.inf)
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_where():
+    X = np.array(0.0, dtype=np.float16)
+
+    expr = ScalarWhere(
+        ScalarAbs(Data(index=())),
+        ScalarTrigonometric(Trigonometric.acos, Data(index=())),
+        ScalarHyperbolic(Hyperbolic.asech, Data(index=())),
+    )
+
+    assert expr.eval((), X, dict()) == np.float16(np.inf)
+
+    expr_lower = np.array(0.0, dtype=np.float16)
+    expr_upper = np.array(np.inf, dtype=np.float16)
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(0.0, dtype=np.float16) and not np.signbit(X_lower)
+    assert X_upper == np.array(0.0, dtype=np.float16) and not np.signbit(X_upper)
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.float16(np.inf)
+    assert expr.eval((), np.array(X_upper), dict()) == np.float16(np.inf)

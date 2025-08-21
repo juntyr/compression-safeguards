@@ -3,7 +3,14 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _floating_max, _isfinite, _isnan, _nan_to_zero
+from ....utils._compat import (
+    _floating_max,
+    _isfinite,
+    _isnan,
+    _maximum,
+    _minimum,
+    _nan_to_zero,
+)
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
@@ -433,11 +440,11 @@ def compute_left_associate_sum_data_bounds(
         if Xs_lower_ is None:
             Xs_lower_ = xl
         else:
-            Xs_lower_ = np.maximum(Xs_lower_, xl)
+            Xs_lower_ = _maximum(Xs_lower_, xl)
         if Xs_upper_ is None:
             Xs_upper_ = xu
         else:
-            Xs_upper_ = np.minimum(Xs_upper_, xu)
+            Xs_upper_ = _minimum(Xs_upper_, xu)
 
         i += 1
 
@@ -446,10 +453,7 @@ def compute_left_associate_sum_data_bounds(
     Xs_lower: np.ndarray[Ns, np.dtype[F]] = Xs_lower_
     Xs_upper: np.ndarray[Ns, np.dtype[F]] = Xs_upper_
 
-    Xs_lower = np.minimum(Xs_lower, Xs)
-    Xs_upper = np.maximum(Xs_upper, Xs)
-
-    Xs_lower = np.where(Xs_lower == Xs, Xs, Xs_lower)  # type: ignore
-    Xs_upper = np.where(Xs_upper == Xs, Xs, Xs_upper)  # type: ignore
+    Xs_lower = _minimum(Xs_lower, Xs)
+    Xs_upper = _maximum(Xs_upper, Xs)
 
     return Xs_lower, Xs_upper

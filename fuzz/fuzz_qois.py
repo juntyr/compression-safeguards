@@ -63,7 +63,7 @@ with atheris.instrument_imports():
         Trigonometric,
     )
     from compression_safeguards.safeguards._qois.expr.where import ScalarWhere
-    from compression_safeguards.utils._compat import _isnan
+    from compression_safeguards.utils._compat import _isnan, _maximum, _minimum
     from compression_safeguards.utils._float128 import _float128_dtype
 
 
@@ -242,10 +242,8 @@ def check_one_input(data) -> None:
 
     # ensure that expr_lower <= exprv <= expr_upper
     # and that -0.0 bounds are handled correctly
-    expr_lower = np.minimum(expr_lower, exprv)
-    expr_lower = np.where(expr_lower == exprv, exprv, expr_lower)
-    expr_upper = np.maximum(exprv, expr_upper)
-    expr_upper = np.where(expr_upper == exprv, exprv, expr_upper)
+    expr_lower = _minimum(expr_lower, exprv)
+    expr_upper = _maximum(exprv, expr_upper)
     expr_lower, expr_upper = np.array(expr_lower), np.array(expr_upper)
 
     # compute the lower and upper bounds on the data
@@ -283,10 +281,7 @@ def check_one_input(data) -> None:
 
     # ensure that X_lower <= X_test <= X_upper
     # and that -0.0 bounds are handled correctly
-    X_test = np.maximum(X_lower, np.minimum(X_test, X_upper))
-    X_test = np.where(X_test == X, X, X_test)
-    X_test = np.where(X_test == X_lower, X_lower, X_test)
-    X_test = np.where(X_test == X_upper, X_upper, X_test)
+    X_test = _maximum(X_lower, _minimum(X_test, X_upper))
     X_test = np.array(X_test)
 
     # evaluate the expression on X_test

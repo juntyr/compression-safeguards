@@ -4,7 +4,15 @@ from typing import Callable
 
 import numpy as np
 
-from ....utils._compat import _floating_max, _isinf, _nextafter, _pi, _reciprocal
+from ....utils._compat import (
+    _floating_max,
+    _isinf,
+    _maximum,
+    _minimum,
+    _nextafter,
+    _pi,
+    _reciprocal,
+)
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
@@ -73,8 +81,8 @@ class ScalarSin(Expr):
 
         # apply the inverse function to get the bounds on arg
         # ensure that the bounds on sin(...) are in [-1, +1]
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.asin(np.maximum(-1, expr_lower))
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.asin(np.minimum(expr_upper, 1))
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.asin(_maximum(-1, expr_lower))
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.asin(_minimum(expr_upper, 1))
 
         # sin(...) is periodic, so we need to drop to difference bounds before
         #  applying the difference to argv to stay in the same period
@@ -95,6 +103,8 @@ class ScalarSin(Expr):
         # sin(+-inf) = NaN, so force infinite argv to have exact bounds
         # sin(finite) in [-1, +1] so allow any finite argv if the all of
         #  [-1, +1] is allowed
+        # if arg_lower == argv and argv == -0.0, we need to guarantee that
+        #  arg_lower is also -0.0, same for arg_upper
         # FIXME: how do we handle bounds right next to the peak where the
         #        expression bounds could be exceeded inside the interval?
         arg_lower = np.where(  # type: ignore
@@ -103,7 +113,7 @@ class ScalarSin(Expr):
             np.where(
                 full_domain,
                 -fmax,
-                np.minimum(
+                _minimum(
                     argv,
                     argv
                     + np.where(
@@ -120,7 +130,7 @@ class ScalarSin(Expr):
             np.where(
                 full_domain,
                 fmax,
-                np.maximum(
+                _maximum(
                     argv,
                     argv
                     + np.where(
@@ -131,10 +141,6 @@ class ScalarSin(Expr):
                 ),
             ),
         )
-        # if arg_lower == argv and argv == -0.0, we need to guarantee that
-        #  arg_lower is also -0.0, same for arg_upper
-        arg_lower = np.where(arg_lower == argv, argv, arg_lower)  # type: ignore
-        arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
 
         # handle rounding errors in asin(sin(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
@@ -240,13 +246,15 @@ class ScalarAsin(Expr):
         # apply the inverse function to get the bounds on arg
         # asin(...) is NaN when abs(...) > 1 and can then take any value > 1
         # otherwise ensure that the bounds on asin(...) are in [-pi/2, +pi/2]
+        # if arg_lower == argv and argv == -0.0, we need to guarantee that
+        #  arg_lower is also -0.0, same for arg_upper
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             argv < -1,
             X.dtype.type(-np.inf),
             np.where(
                 argv > 1,
                 one_eps,
-                np.minimum(argv, np.sin(np.maximum(-pi / 2, expr_lower))),
+                _minimum(argv, np.sin(_maximum(-pi / 2, expr_lower))),  # type: ignore
             ),
         )
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
@@ -255,13 +263,9 @@ class ScalarAsin(Expr):
             np.where(
                 argv > 1,
                 X.dtype.type(np.inf),
-                np.maximum(argv, np.sin(np.minimum(expr_upper, pi / 2))),
+                _maximum(argv, np.sin(_minimum(expr_upper, pi / 2))),  # type: ignore
             ),
         )
-        # if arg_lower == argv and argv == -0.0, we need to guarantee that
-        #  arg_lower is also -0.0, same for arg_upper
-        arg_lower = np.where(arg_lower == argv, argv, arg_lower)  # type: ignore
-        arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
 
         # handle rounding errors in asin(sin(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(

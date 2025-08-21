@@ -2,6 +2,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
+from ....utils._compat import _maximum, _minimum
 from ....utils.bindings import Parameter
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
@@ -89,8 +90,10 @@ class ScalarWhere(Expr):
             # for simplicity, we assume that the condition must always be
             #  preserved exactly
             cl, cu = cond.compute_data_bounds(condv, condv, X, Xs, late_bound)
-            Xs_lower = np.maximum(Xs_lower, cl)
-            Xs_upper = np.minimum(Xs_upper, cu)
+            Xs_lower = _maximum(Xs_lower, cl)
+            Xs_upper = _minimum(Xs_upper, cu)
+
+            print("cond", cl, cu, Xs_lower, Xs_upper)
 
         if np.any(condv) and a.has_data:
             # pass on the data bounds to a but only use its bounds on Xs if
@@ -100,14 +103,16 @@ class ScalarWhere(Expr):
             # combine the data bounds
             Xs_lower = np.where(  # type: ignore
                 condv,
-                np.maximum(Xs_lower, al),
+                _maximum(Xs_lower, al),
                 Xs_lower,
             )
             Xs_upper = np.where(  # type: ignore
                 condv,
-                np.minimum(Xs_upper, au),
+                _minimum(Xs_upper, au),
                 Xs_upper,
             )
+
+            print("a", al, au, Xs_lower, Xs_upper)
 
         if (not np.all(condv)) and b.has_data:
             # pass on the data bounds to b but only use its bounds on Xs if
@@ -118,13 +123,15 @@ class ScalarWhere(Expr):
             Xs_lower = np.where(  # type: ignore
                 condv,
                 Xs_lower,
-                np.maximum(Xs_lower, bl),
+                _maximum(Xs_lower, bl),
             )
             Xs_upper = np.where(  # type: ignore
                 condv,
                 Xs_upper,
-                np.minimum(Xs_upper, bu),
+                _minimum(Xs_upper, bu),
             )
+
+            print("b", bl, bu, Xs_lower, Xs_upper)
 
         return Xs_lower, Xs_upper
 

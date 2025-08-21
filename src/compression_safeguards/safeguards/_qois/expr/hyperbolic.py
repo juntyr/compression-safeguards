@@ -4,7 +4,7 @@ from typing import Callable
 
 import numpy as np
 
-from ....utils._compat import _asinh, _reciprocal, _sinh
+from ....utils._compat import _asinh, _maximum, _minimum, _reciprocal, _sinh
 from ....utils._float128 import _float128_dtype
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
@@ -77,12 +77,10 @@ class ScalarSinh(Expr):
         exprv = _sinh(argv)
 
         # apply the inverse function to get the bounds on arg
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.minimum(argv, _asinh(expr_lower))
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.maximum(argv, _asinh(expr_upper))
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower = np.where(arg_lower == argv, argv, arg_lower)  # type: ignore
-        arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum(argv, _asinh(expr_lower))
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(argv, _asinh(expr_upper))
 
         # handle rounding errors in sinh(asinh(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
@@ -186,12 +184,10 @@ class ScalarAsinh(Expr):
         exprv = _asinh(argv)
 
         # apply the inverse function to get the bounds on arg
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.minimum(argv, _sinh(expr_lower))
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.maximum(argv, _sinh(expr_upper))
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower = np.where(arg_lower == argv, argv, arg_lower)  # type: ignore
-        arg_upper = np.where(arg_upper == argv, argv, arg_upper)  # type: ignore
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum(argv, _sinh(expr_lower))
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(argv, _sinh(expr_upper))
 
         # handle rounding errors in asinh(sinh(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
