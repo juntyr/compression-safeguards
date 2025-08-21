@@ -81,8 +81,12 @@ class ScalarSin(Expr):
 
         # apply the inverse function to get the bounds on arg
         # ensure that the bounds on sin(...) are in [-1, +1]
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.asin(_maximum(-1, expr_lower))
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.asin(_minimum(expr_upper, 1))
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.asin(
+            _maximum(X.dtype.type(-1), expr_lower)
+        )
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.asin(
+            _minimum(expr_upper, X.dtype.type(1))
+        )
 
         # sin(...) is periodic, so we need to drop to difference bounds before
         #  applying the difference to argv to stay in the same period
@@ -254,7 +258,7 @@ class ScalarAsin(Expr):
             np.where(
                 argv > 1,
                 one_eps,
-                _minimum(argv, np.sin(_maximum(-pi / 2, expr_lower))),  # type: ignore
+                _minimum(argv, np.sin(_maximum(np.divide(-pi, 2), expr_lower))),  # type: ignore
             ),
         )
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
@@ -263,7 +267,7 @@ class ScalarAsin(Expr):
             np.where(
                 argv > 1,
                 X.dtype.type(np.inf),
-                _maximum(argv, np.sin(_minimum(expr_upper, pi / 2))),  # type: ignore
+                _maximum(argv, np.sin(_minimum(expr_upper, np.divide(pi, 2)))),  # type: ignore
             ),
         )
 

@@ -94,6 +94,11 @@ def guarantee_data_within_expr_bounds(
     expr_lower = np.array(expr_lower)
     expr_upper = np.array(expr_upper)
 
+    assert exprv.dtype == Xs.dtype
+    assert Xs_bound_guess.dtype == Xs.dtype
+    assert expr_lower.dtype == Xs.dtype
+    assert expr_upper.dtype == Xs.dtype
+
     # check if any derived expression exceeds the expression bounds
     def exceeds_expr_bounds(
         Xs_bound_guess: np.ndarray[Ns, np.dtype[F]],

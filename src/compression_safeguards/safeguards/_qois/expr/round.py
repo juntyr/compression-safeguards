@@ -408,10 +408,12 @@ class ScalarRoundTiesEven(Expr):
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
             is_positive_zero(expr_lower),
             X.dtype.type(+0.0),
-            np.subtract(expr_lower, 0.5),
+            np.subtract(expr_lower, X.dtype.type(0.5)),
         )
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            is_negative_zero(expr_upper), X.dtype.type(-0.0), np.add(expr_upper, 0.5)
+            is_negative_zero(expr_upper),
+            X.dtype.type(-0.0),
+            np.add(expr_upper, X.dtype.type(0.5)),
         )
 
         # handle rounding errors in round_ties_even(...) early

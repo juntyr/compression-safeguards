@@ -97,7 +97,10 @@ class PointwiseQuantityOfInterest:
 
         X = np.array(X)
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, X.dtype)
-        return np.array(expr.eval(X.shape, X, late_bound))
+        exprv = np.array(expr.eval(X.shape, X, late_bound))
+        assert exprv.dtype == X.dtype
+        assert exprv.shape == X.shape
+        return exprv
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def compute_data_bounds(
@@ -135,7 +138,12 @@ class PointwiseQuantityOfInterest:
         X_lower, X_upper = expr.compute_data_bounds(
             qoi_lower, qoi_upper, X, X, late_bound
         )
-        return np.array(X_lower), np.array(X_upper)
+        X_lower, X_upper = np.array(X_lower), np.array(X_upper)
+        assert X_lower.dtype == X.dtype
+        assert X_upper.dtype == X.dtype
+        assert X_lower.shape == X.shape
+        assert X_upper.shape == X.shape
+        return X_lower, X_upper
 
     def __repr__(self) -> str:
         return repr(self._expr)
@@ -256,7 +264,10 @@ class StencilQuantityOfInterest:
         stencil_shape = Xs.shape[-len(self._stencil_shape) :]
         assert stencil_shape == self._stencil_shape
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, Xs.dtype)
-        return np.array(expr.eval(X_shape, Xs, late_bound))
+        exprv = np.array(expr.eval(X_shape, Xs, late_bound))
+        assert exprv.dtype == Xs.dtype
+        assert exprv.shape == X_shape
+        return exprv
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def compute_data_bounds(
@@ -307,7 +318,12 @@ class StencilQuantityOfInterest:
         Xs_lower, Xs_upper = expr.compute_data_bounds(
             qoi_lower, qoi_upper, X, Xs, late_bound
         )
-        return np.array(Xs_lower), np.array(Xs_upper)
+        Xs_lower, Xs_upper = np.array(Xs_lower), np.array(Xs_upper)
+        assert Xs_lower.dtype == Xs.dtype
+        assert Xs_upper.dtype == Xs.dtype
+        assert Xs_lower.shape == Xs.shape
+        assert Xs_upper.shape == Xs.shape
+        return Xs_lower, Xs_upper
 
     def __repr__(self) -> str:
         return repr(self._expr)

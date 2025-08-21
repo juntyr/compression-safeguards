@@ -180,8 +180,8 @@ class SameValueSafeguard(PointwiseSafeguard):
             tuple[()] | tuple[int], np.dtype[np.unsignedinteger]
         ] = to_total_order(valuef)
 
-        total_min = np.iinfo(valuef_total.dtype).min
-        total_max = np.iinfo(valuef_total.dtype).max
+        total_min = np.array(np.iinfo(valuef_total.dtype).min, dtype=valuef_total.dtype)
+        total_max = np.array(np.iinfo(valuef_total.dtype).max, dtype=valuef_total.dtype)
 
         valid_below = Interval.empty_like(dataf)
         valid_above = Interval.empty_like(dataf)

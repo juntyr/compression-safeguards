@@ -218,7 +218,10 @@ class ScalarExp(Expr):
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
         arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum(
-            argv, (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(_maximum(0, expr_lower))
+            argv,
+            (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(
+                _maximum(X.dtype.type(0), expr_lower)
+            ),
         )
         arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(
             argv, (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(expr_upper)

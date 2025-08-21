@@ -67,7 +67,7 @@ class ScalarSqrt(Expr):
         # for sqrt(-0.0), we should return -0.0 as the inverse
         # this ensures that 1/sqrt(-0.0) doesn't become 1/sqrt(0.0)
         def _sqrt_inv(x: np.ndarray[Ps, np.dtype[F]]) -> np.ndarray[Ps, np.dtype[F]]:
-            return np.where(x == 0, x, np.square(_maximum(0, x)))  # type: ignore
+            return np.where(x == 0, x, np.square(_maximum(X.dtype.type(0), x)))  # type: ignore
 
         # evaluate arg and sqrt(arg)
         arg = self._a
@@ -199,7 +199,7 @@ class ScalarSquare(Expr):
         exprv = np.square(argv)
 
         # apply the inverse function to get the bounds on arg
-        al = np.sqrt(_maximum(expr_lower, 0))
+        al = np.sqrt(_maximum(expr_lower, X.dtype.type(0)))
         au = np.sqrt(expr_upper)
 
         # flip and swap the expr bounds to get the bounds on arg

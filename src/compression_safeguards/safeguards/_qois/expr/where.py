@@ -93,8 +93,6 @@ class ScalarWhere(Expr):
             Xs_lower = _maximum(Xs_lower, cl)
             Xs_upper = _minimum(Xs_upper, cu)
 
-            print("cond", cl, cu, Xs_lower, Xs_upper)
-
         if np.any(condv) and a.has_data:
             # pass on the data bounds to a but only use its bounds on Xs if
             #  chosen by the condition
@@ -112,8 +110,6 @@ class ScalarWhere(Expr):
                 Xs_upper,
             )
 
-            print("a", al, au, Xs_lower, Xs_upper)
-
         if (not np.all(condv)) and b.has_data:
             # pass on the data bounds to b but only use its bounds on Xs if
             #  chosen by the condition
@@ -130,8 +126,6 @@ class ScalarWhere(Expr):
                 Xs_upper,
                 _minimum(Xs_upper, bu),
             )
-
-            print("b", bl, bu, Xs_lower, Xs_upper)
 
         return Xs_lower, Xs_upper
 

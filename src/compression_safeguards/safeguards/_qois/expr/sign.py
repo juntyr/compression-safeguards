@@ -73,8 +73,8 @@ class ScalarSign(Expr):
         exprv: np.ndarray[Ps, np.dtype[F]] = _sign(argv)
 
         # evaluate the lower and upper sign bounds that satisfy the expression bound
-        expr_lower = _maximum(-1, np.ceil(expr_lower))
-        expr_upper = _minimum(np.floor(expr_upper), +1)
+        expr_lower = _maximum(X.dtype.type(-1), np.ceil(expr_lower))
+        expr_upper = _minimum(np.floor(expr_upper), X.dtype.type(+1))
 
         smallest_subnormal = _floating_smallest_subnormal(X.dtype)
 

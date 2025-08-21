@@ -40,7 +40,7 @@ from ._float128 import (
     _float128_smallest_subnormal,
     _float128_type,
 )
-from .typing import F, S, T
+from .typing import F, S, T, Ti
 
 
 # wrapper around np.isnan that also works for numpy_quaddtype
@@ -112,7 +112,14 @@ def _sign(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
         not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
     ):
         return np.sign(a)  # type: ignore
-    return np.where(_isnan(a), a, np.where(a == 0, 0, np.where(a < 0, -1, +1)))  # type: ignore
+    a = np.array(a)
+    return np.where(
+        _isnan(a),
+        a,
+        np.where(
+            a == 0, a.dtype.type(0), np.where(a < 0, a.dtype.type(-1), a.dtype.type(+1))
+        ),
+    )  # type: ignore
 
 
 # wrapper around np.nextafter that also works for numpy_quaddtype
@@ -262,17 +269,17 @@ def _signbit_non_nan(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[np
         not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
     ):
         return np.signbit(a)  # type: ignore
-    return (a > 0) | (_reciprocal(a) > 0)  # type: ignore
+    return (a < 0) | (_reciprocal(a) < 0)  # type: ignore
 
 
 # wrapper around np.minimum that also works for +0.0 and -0.0
 @overload
-def _minimum(a: int | T, b: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
+def _minimum(a: Ti, b: np.ndarray[S, np.dtype[Ti]]) -> np.ndarray[S, np.dtype[Ti]]:
     pass
 
 
 @overload
-def _minimum(a: np.ndarray[S, np.dtype[T]], b: int | T) -> np.ndarray[S, np.dtype[T]]:
+def _minimum(a: np.ndarray[S, np.dtype[Ti]], b: Ti) -> np.ndarray[S, np.dtype[Ti]]:
     pass
 
 
@@ -284,11 +291,14 @@ def _minimum(
 
 
 def _minimum(a, b):
+    a = np.array(a)
+    b = np.array(b)
     minimum = np.minimum(a, b)
-    if np.issubdtype(np.array(a).dtype, np.integer) and np.issubdtype(
-        np.array(b).dtype, np.integer
-    ):
+    if np.issubdtype(a.dtype, np.integer) and np.issubdtype(b.dtype, np.integer):
         return minimum
+    minimum_array = np.array(minimum)
+    a = np.broadcast_to(a.astype(minimum_array.dtype), minimum_array.shape)
+    b = np.broadcast_to(b.astype(minimum_array.dtype), minimum_array.shape)
     minimum = np.where(
         minimum == 0,
         np.where((a < b) | (_signbit_non_nan(a) > _signbit_non_nan(b)), a, b),
@@ -299,12 +309,12 @@ def _minimum(a, b):
 
 # wrapper around np.maximum that also works for +0.0 and -0.0
 @overload
-def _maximum(a: int | T, b: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
+def _maximum(a: Ti, b: np.ndarray[S, np.dtype[Ti]]) -> np.ndarray[S, np.dtype[Ti]]:
     pass
 
 
 @overload
-def _maximum(a: np.ndarray[S, np.dtype[T]], b: int | T) -> np.ndarray[S, np.dtype[T]]:
+def _maximum(a: np.ndarray[S, np.dtype[Ti]], b: Ti) -> np.ndarray[S, np.dtype[Ti]]:
     pass
 
 
@@ -316,11 +326,14 @@ def _maximum(
 
 
 def _maximum(a, b):
+    a = np.array(a)
+    b = np.array(b)
     maximum = np.maximum(a, b)
-    if np.issubdtype(np.array(a).dtype, np.integer) and np.issubdtype(
-        np.array(b).dtype, np.integer
-    ):
+    if np.issubdtype(a.dtype, np.integer) and np.issubdtype(b.dtype, np.integer):
         return maximum
+    maximum_array = np.array(maximum)
+    a = np.broadcast_to(a.astype(maximum_array.dtype), maximum_array.shape)
+    b = np.broadcast_to(b.astype(maximum_array.dtype), maximum_array.shape)
     maximum = np.where(
         maximum == 0,
         np.where((a > b) | (_signbit_non_nan(a) < _signbit_non_nan(b)), a, b),
@@ -333,7 +346,7 @@ def _maximum(a, b):
 def _floating_max(dtype: np.dtype[F]) -> F:
     if dtype == _float128_dtype:
         return _float128_max  # type: ignore
-    return np.finfo(dtype).max  # type: ignore
+    return dtype.type(np.finfo(dtype).max)
 
 
 # wrapper around np.finfo(dtype).smallest_subnormal that also works for
@@ -341,7 +354,7 @@ def _floating_max(dtype: np.dtype[F]) -> F:
 def _floating_smallest_subnormal(dtype: np.dtype[F]) -> F:
     if dtype == _float128_dtype:
         return _float128_smallest_subnormal  # type: ignore
-    return np.finfo(dtype).smallest_subnormal  # type: ignore
+    return dtype.type(np.finfo(dtype).smallest_subnormal)
 
 
 # wrapper around np.pi, of the dtype, that also works for numpy_quaddtype

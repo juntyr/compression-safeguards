@@ -8,6 +8,7 @@ from collections.abc import Set
 
 import numpy as np
 
+from ...utils._compat import _floating_smallest_subnormal
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
@@ -177,18 +178,18 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             if np.issubdtype(data.dtype, np.floating):
                 # special case for floating point -0.0 / +0.0 which both have
                 #  zero sign and thus have weird below / above intervals
-                info = np.finfo(data.dtype)  # type: ignore
+                smallest_subnormal = _floating_smallest_subnormal(data.dtype)  # type: ignore
                 below_upper = np.array(
                     np.where(
                         offsetf == 0,
-                        -info.smallest_subnormal,
+                        -smallest_subnormal,
                         from_total_order(offsetf_total - 1, data.dtype),
                     )
                 )
                 above_lower = np.array(
                     np.where(
                         offsetf == 0,
-                        info.smallest_subnormal,
+                        smallest_subnormal,
                         from_total_order(offsetf_total + 1, data.dtype),
                     )
                 )

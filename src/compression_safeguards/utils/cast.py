@@ -162,7 +162,9 @@ def to_total_order(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[U]]:
             over="ignore",
             under="ignore",
         ):
-            return a.view(utype) + np.array(shift, dtype=utype) + 1
+            return (
+                a.view(utype) + np.array(shift, dtype=utype) + np.array(1, dtype=utype)
+            )
 
     if not np.issubdtype(a.dtype, np.floating):
         raise TypeError(f"unsupported interval type {a.dtype}")
@@ -204,12 +206,12 @@ def from_total_order(
         return a  # type: ignore
 
     if np.issubdtype(dtype, np.signedinteger):
-        shift = np.iinfo(dtype).max  # type: ignore
+        shift = np.array(np.iinfo(dtype).max, dtype=dtype)  # type: ignore
         with np.errstate(
             over="ignore",
             under="ignore",
         ):
-            return a.view(dtype) + shift + 1
+            return a.view(dtype) + shift + dtype.type(1)
 
     if not np.issubdtype(dtype, np.floating):
         raise TypeError(f"unsupported interval type {dtype}")
