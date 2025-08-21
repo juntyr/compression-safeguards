@@ -5,7 +5,7 @@ from typing import Callable
 import numpy as np
 
 from ....utils._compat import _isinf, _nextafter, _reciprocal
-from ....utils._float128 import _float128_dtype, _float128_pi
+from ....utils._float128 import _float128_dtype, _float128_max, _float128_pi
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
@@ -88,32 +88,47 @@ class ScalarSin(Expr):
             np.sin(argv + arg_upper_diff) < exprv
         )
 
+        # check for the case where any finite value would work
+        full_domain = (expr_lower <= -1) & (expr_upper >= 1)
+
+        fmax = _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
+
         # sin(+-inf) = NaN, so force infinite argv to have exact bounds
+        # sin(finite) in [-1, +1] so allow any finite argv if the all of
+        #  [-1, +1] is allowed
         # FIXME: how do we handle bounds right next to the peak where the
         #        expression bounds could be exceeded inside the interval?
         arg_lower = np.where(  # type: ignore
             _isinf(argv),
             argv,
-            np.minimum(
-                argv,
-                argv
-                + np.where(
-                    needs_flip,
-                    -arg_upper_diff,
-                    arg_lower_diff,
+            np.where(
+                full_domain,
+                -fmax,
+                np.minimum(
+                    argv,
+                    argv
+                    + np.where(
+                        needs_flip,
+                        -arg_upper_diff,
+                        arg_lower_diff,
+                    ),
                 ),
             ),
         )
         arg_upper = np.where(  # type: ignore
             _isinf(argv),
             argv,
-            np.maximum(
-                argv,
-                argv
-                + np.where(
-                    needs_flip,
-                    -arg_lower_diff,
-                    arg_upper_diff,
+            np.where(
+                full_domain,
+                fmax,
+                np.maximum(
+                    argv,
+                    argv
+                    + np.where(
+                        needs_flip,
+                        -arg_lower_diff,
+                        arg_upper_diff,
+                    ),
                 ),
             ),
         )

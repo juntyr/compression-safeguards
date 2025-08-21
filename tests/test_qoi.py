@@ -557,6 +557,8 @@ def test_sin():
             X_upper,
         )
 
+    fmax = np.finfo(X.dtype).max
+
     np.testing.assert_allclose(
         valid._lower[0],
         np.array(
@@ -567,8 +569,8 @@ def test_sin():
                 -2.0 - (np.asin(np.sin(-2.0) + 1.0) - np.asin(np.sin(-2.0))),
                 -np.pi / 2,
                 -np.pi / 2,
-                -np.pi / 2,
-                -np.pi / 2,
+                -fmax,
+                -fmax,
                 0.5 + (np.asin(np.sin(0.5) - 1) - np.asin(np.sin(0.5))),
                 1.0 + (np.asin(np.sin(1.0) - 1) - np.asin(np.sin(1.0))),
                 np.pi / 2,
@@ -592,8 +594,8 @@ def test_sin():
                 -np.pi / 2,
                 -1.0 + (np.asin(np.sin(-1.0) + 1) - np.asin(np.sin(-1.0))),
                 -0.5 + (np.asin(np.sin(-0.5) + 1) - np.asin(np.sin(-0.5))),
-                np.pi / 2,
-                np.pi / 2,
+                fmax,
+                fmax,
                 np.pi / 2,
                 np.pi / 2,
                 2.0 - (np.asin(np.sin(2.0) - 1.0) - np.asin(np.sin(2.0))),
