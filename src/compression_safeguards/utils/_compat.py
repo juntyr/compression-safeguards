@@ -14,6 +14,12 @@ __all__ = [
     "_reciprocal",
     "_symmetric_modulo",
     "_rint",
+    "_sinh",
+    "_asinh",
+    "_floating_max",
+    "_floating_smallest_subnormal",
+    "_pi",
+    "_e",
 ]
 
 import numpy as np
@@ -21,8 +27,10 @@ import numpy as np
 from ._float128 import (
     _float128,
     _float128_dtype,
+    _float128_e,
     _float128_max,
     _float128_min,
+    _float128_pi,
     _float128_smallest_normal,
     _float128_smallest_subnormal,
     _float128_type,
@@ -214,3 +222,58 @@ def _rint(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
         np.rint(a),
         np.where(a < halfway, np.floor(a), np.ceil(a)),
     )
+
+
+# wrapper around np.sinh(a) that also works for numpy_quaddtype
+def _sinh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
+        return np.sinh(a)  # type: ignore
+
+    sinh = (np.exp(a) - np.exp(-a)) / 2
+
+    # propagate sinh(-0.0) = -0.0
+    return np.where(sinh == a, a, sinh)  # type: ignore
+
+
+# wrapper around np.asinh(a) that also works for numpy_quaddtype
+def _asinh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
+        return np.asinh(a)  # type: ignore
+
+    asinh = np.log(a + np.sqrt(np.square(a) + 1))
+
+    # propagate asinh(-0.0) = -0.0
+    return np.where(asinh == a, a, asinh)  # type: ignore
+
+
+# wrapper around np.finfo(dtype).max that also works for numpy_quaddtype
+def _floating_max(dtype: np.dtype[F]) -> F:
+    if dtype == _float128_dtype:
+        return _float128_max  # type: ignore
+    return np.finfo(dtype).max  # type: ignore
+
+
+# wrapper around np.finfo(dtype).smallest_subnormal that also works for
+#  numpy_quaddtype
+def _floating_smallest_subnormal(dtype: np.dtype[F]) -> F:
+    if dtype == _float128_dtype:
+        return _float128_smallest_subnormal  # type: ignore
+    return np.finfo(dtype).smallest_subnormal  # type: ignore
+
+
+# wrapper around np.pi, of the dtype, that also works for numpy_quaddtype
+def _pi(dtype: np.dtype[F]) -> F:
+    if dtype == _float128_dtype:
+        return _float128_pi  # type: ignore
+    return dtype.type(np.pi)
+
+
+# wrapper around np.e, of the dtype, that also works for numpy_quaddtype
+def _e(dtype: np.dtype[F]) -> F:
+    if dtype == _float128_dtype:
+        return _float128_e  # type: ignore
+    return dtype.type(np.e)

@@ -3,8 +3,7 @@ from typing import Callable
 
 import numpy as np
 
-from ....utils._compat import _isfinite, _isinf, _isnan
-from ....utils._float128 import _float128_dtype, _float128_max
+from ....utils._compat import _floating_max, _isfinite, _isinf, _isnan
 from ....utils.bindings import Parameter
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
@@ -65,7 +64,7 @@ class ScalarIsFinite(Expr):
         arg = self._a
         argv = arg.eval(X.shape, Xs, late_bound)
 
-        fmax = _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
+        fmax = _floating_max(X.dtype)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, isfinite(Xs) = True, so Xs must be finite
@@ -175,7 +174,7 @@ class ScalarIsInf(Expr):
         arg = self._a
         argv = arg.eval(X.shape, Xs, late_bound)
 
-        fmax = _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
+        fmax = _floating_max(X.dtype)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, isinf(Xs) = True, so Xs must stay infinite

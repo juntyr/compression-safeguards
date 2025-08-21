@@ -5,11 +5,7 @@ from warnings import warn
 
 import numpy as np
 
-from ....utils._float128 import (
-    _float128_dtype,
-    _float128_e,
-    _float128_pi,
-)
+from ....utils._compat import _e, _pi
 from ....utils.bindings import Parameter
 from .abc import Expr
 from .typing import F, Ns, Ps, PsI
@@ -181,9 +177,7 @@ class Pi(Expr):
         return frozenset()
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        if dtype == _float128_dtype:
-            return _float128_pi  # type: ignore
-        return dtype.type(np.pi)
+        return _pi(dtype)
 
     def eval(
         self,
@@ -191,7 +185,7 @@ class Pi(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
-        pi: F = _float128_pi if Xs.dtype == _float128_dtype else Xs.dtype.type(np.pi)  # type: ignore
+        pi: F = _pi(Xs.dtype)
         return np.broadcast_to(pi, x)  # type: ignore
 
     def compute_data_bounds_unchecked(
@@ -231,9 +225,7 @@ class Euler(Expr):
         return frozenset()
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        if dtype == _float128_dtype:
-            return _float128_e  # type: ignore
-        return dtype.type(np.e)
+        return _e(dtype)
 
     def eval(
         self,
@@ -241,7 +233,7 @@ class Euler(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
-        e: F = _float128_e if Xs.dtype == _float128_dtype else Xs.dtype.type(np.e)  # type: ignore
+        e: F = _e(Xs.dtype)
         return np.broadcast_to(e, x)  # type: ignore
 
     def compute_data_bounds_unchecked(

@@ -4,10 +4,7 @@ from typing import Callable
 
 import numpy as np
 
-from ....utils._float128 import (
-    _float128_dtype,
-    _float128_smallest_subnormal,
-)
+from ....utils._compat import _floating_smallest_subnormal
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
@@ -81,10 +78,7 @@ class ScalarLog(Expr):
         argv = arg.eval(X.shape, Xs, late_bound)
         exprv = (LOGARITHM_UFUNC[self._log])(argv)
 
-        if X.dtype == _float128_dtype:
-            smallest_subnormal = _float128_smallest_subnormal
-        else:
-            smallest_subnormal = np.finfo(X.dtype).smallest_subnormal
+        smallest_subnormal = _floating_smallest_subnormal(X.dtype)
 
         # apply the inverse function to get the bounds on arg
         # log(...) is NaN for negative values and can then take any negative

@@ -2,8 +2,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _reciprocal
-from ....utils._float128 import _float128_dtype, _float128_smallest_subnormal
+from ....utils._compat import _floating_smallest_subnormal, _reciprocal
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
@@ -70,10 +69,7 @@ class ScalarSqrt(Expr):
         argv = arg.eval(X.shape, Xs, late_bound)
         exprv = np.sqrt(argv)
 
-        if X.dtype == _float128_dtype:
-            smallest_subnormal = _float128_smallest_subnormal
-        else:
-            smallest_subnormal = np.finfo(X.dtype).smallest_subnormal
+        smallest_subnormal = _floating_smallest_subnormal(X.dtype)
 
         # apply the inverse function to get the bounds on arg
         # sqrt(-0.0) = -0.0 and sqrt(+0.0) = +0.0

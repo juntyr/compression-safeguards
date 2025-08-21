@@ -5,14 +5,11 @@ from math import gcd
 import numpy as np
 
 from ....utils._compat import (
+    _floating_max,
+    _floating_smallest_subnormal,
     _isinf,
     _isnan,
     _reciprocal,
-)
-from ....utils._float128 import (
-    _float128_dtype,
-    _float128_max,
-    _float128_smallest_subnormal,
 )
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
@@ -103,13 +100,8 @@ class ScalarMultiply(Expr):
         if a_const or b_const:
             term, termv, constv = (b, bv, av) if a_const else (a, av, bv)
 
-            if X.dtype == _float128_dtype:
-                fmax = _float128_max
-                smallest_subnormal = _float128_smallest_subnormal
-            else:
-                finfo = np.finfo(X.dtype)
-                fmax = finfo.max
-                smallest_subnormal = finfo.smallest_subnormal
+            fmax = _floating_max(X.dtype)
+            smallest_subnormal = _floating_smallest_subnormal(X.dtype)
 
             # for x*0, we can allow any finite x
             # for x*Inf, we can allow any non-zero non-NaN x with the same sign

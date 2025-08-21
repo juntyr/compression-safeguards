@@ -4,8 +4,8 @@ from typing import Callable
 
 import numpy as np
 
-from ....utils._compat import _reciprocal
-from ....utils._float128 import _float128_dtype, _float128_type
+from ....utils._compat import _asinh, _reciprocal, _sinh
+from ....utils._float128 import _float128_dtype
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
@@ -405,26 +405,6 @@ HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
         ScalarReciprocal(x),
     ),
 }
-
-
-# wrapper around np.sinh(a) that also works for numpy_quaddtype
-def _sinh(a: np.ndarray[Ps, np.dtype[F]]) -> np.ndarray[Ps, np.dtype[F]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.sinh(a)  # type: ignore
-
-    return propagate_negative_zero(a, (np.exp(a) - np.exp(-a)) / 2)  # type: ignore
-
-
-# wrapper around np.asinh(a) that also works for numpy_quaddtype
-def _asinh(a: np.ndarray[Ps, np.dtype[F]]) -> np.ndarray[Ps, np.dtype[F]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.asinh(a)  # type: ignore
-
-    return propagate_negative_zero(a, np.log(a + np.sqrt(np.square(a) + 1)))  # type: ignore
 
 
 HYPERBOLIC_UFUNC: dict[Hyperbolic, Callable[[np.ndarray], np.ndarray]] = {

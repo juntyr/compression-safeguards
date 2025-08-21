@@ -3,8 +3,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _isfinite, _isnan, _nan_to_zero
-from ....utils._float128 import _float128_dtype, _float128_max
+from ....utils._compat import _floating_max, _isfinite, _isnan, _nan_to_zero
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
@@ -290,7 +289,7 @@ def compute_left_associate_sum_data_bounds(
     tfl: np.ndarray[Ps, np.dtype[F]] = expr_lower_diff / total_abs_factor
     tfu: np.ndarray[Ps, np.dtype[F]] = expr_upper_diff / total_abs_factor
 
-    fmax = _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
+    fmax = _floating_max(X.dtype)
 
     # ensure that the bounds never contain both -inf and +inf since that would
     #  allow NaN to sneak in

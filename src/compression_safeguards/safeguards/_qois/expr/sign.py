@@ -2,8 +2,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _isnan, _sign
-from ....utils._float128 import _float128_dtype, _float128_smallest_subnormal
+from ....utils._compat import _floating_smallest_subnormal, _isnan, _sign
 from ....utils.bindings import Parameter
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
@@ -71,10 +70,7 @@ class ScalarSign(Expr):
         expr_lower = np.maximum(-1, np.ceil(expr_lower))
         expr_upper = np.minimum(np.floor(expr_upper), +1)
 
-        if X.dtype == _float128_dtype:
-            smallest_subnormal = _float128_smallest_subnormal
-        else:
-            smallest_subnormal = np.finfo(X.dtype).smallest_subnormal
+        smallest_subnormal = _floating_smallest_subnormal(X.dtype)
 
         # compute the lower and upper arg bounds that produce the sign bounds
         # sign(-0.0) = +0.0 and sign(+0.0) = +0.0

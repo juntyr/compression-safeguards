@@ -4,8 +4,7 @@ from typing import Callable
 
 import numpy as np
 
-from ....utils._compat import _isinf, _nextafter, _reciprocal
-from ....utils._float128 import _float128_dtype, _float128_max, _float128_pi
+from ....utils._compat import _floating_max, _isinf, _nextafter, _pi, _reciprocal
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
@@ -91,7 +90,7 @@ class ScalarSin(Expr):
         # check for the case where any finite value would work
         full_domain = (expr_lower <= -1) & (expr_upper >= 1)
 
-        fmax = _float128_max if X.dtype == _float128_dtype else np.finfo(X.dtype).max
+        fmax = _floating_max(X.dtype)
 
         # sin(+-inf) = NaN, so force infinite argv to have exact bounds
         # sin(finite) in [-1, +1] so allow any finite argv if the all of
@@ -235,7 +234,7 @@ class ScalarAsin(Expr):
         argv = arg.eval(X.shape, Xs, late_bound)
         exprv = np.asin(argv)
 
-        pi = _float128_pi if X.dtype == _float128_dtype else X.dtype.type(np.pi)
+        pi = _pi(X.dtype)
         one_eps = _nextafter(np.array(1, dtype=X.dtype), np.array(2, dtype=X.dtype))
 
         # apply the inverse function to get the bounds on arg
