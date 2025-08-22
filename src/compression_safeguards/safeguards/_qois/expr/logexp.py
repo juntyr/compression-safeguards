@@ -4,7 +4,7 @@ from typing import Callable
 
 import numpy as np
 
-from ....utils._compat import _floating_smallest_subnormal, _maximum, _minimum
+from ....utils._compat import _floating_smallest_subnormal, _maximum, _minimum, _where
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
@@ -85,13 +85,13 @@ class ScalarLog(Expr):
         #  value
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            argv < 0,
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.less(argv, 0),
             X.dtype.type(-np.inf),
             _minimum(argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_lower)),
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            argv < 0,
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.less(argv, 0),
             -smallest_subnormal,
             _maximum(argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_upper)),
         )
@@ -230,8 +230,8 @@ class ScalarExp(Expr):
         # we need to force argv if expr_lower == expr_upper, which can be
         #  triggered by power of a negative base, which requires an exact bound
         #  on exprv
-        arg_lower = np.where(expr_lower == expr_upper, argv, arg_lower)  # type: ignore
-        arg_upper = np.where(expr_lower == expr_upper, argv, arg_upper)  # type: ignore
+        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
+        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
 
         # handle rounding errors in exp(log(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(

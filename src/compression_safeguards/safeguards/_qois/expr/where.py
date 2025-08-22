@@ -2,11 +2,11 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _maximum, _minimum
+from ....utils._compat import _maximum, _minimum, _where
 from ....utils.bindings import Parameter
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
-from .typing import F, Ns, Ps, PsI
+from .typing import F, Fi, Ns, Ps, PsI
 
 
 class ScalarWhere(Expr):
@@ -49,13 +49,13 @@ class ScalarWhere(Expr):
             | self._b.late_bound_constants
         )
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | Expr:
         return ScalarFoldedConstant.constant_fold_ternary(
             self._condition,
             self._a,
             self._b,
             dtype,
-            np.where,  # type: ignore
+            lambda cond, a, b: _where(cond != 0, a, b),
             ScalarWhere,
         )
 
@@ -65,8 +65,8 @@ class ScalarWhere(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.where(  # type: ignore
-            self._condition.eval(x, Xs, late_bound),
+        return _where(
+            self._condition.eval(x, Xs, late_bound) != 0,
             self._a.eval(x, Xs, late_bound),
             self._b.eval(x, Xs, late_bound),
         )
@@ -99,13 +99,13 @@ class ScalarWhere(Expr):
             al, au = a.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 
             # combine the data bounds
-            Xs_lower = np.where(  # type: ignore
-                condv,
+            Xs_lower = _where(
+                condv != 0,
                 _maximum(Xs_lower, al),
                 Xs_lower,
             )
-            Xs_upper = np.where(  # type: ignore
-                condv,
+            Xs_upper = _where(
+                condv != 0,
                 _minimum(Xs_upper, au),
                 Xs_upper,
             )
@@ -116,13 +116,13 @@ class ScalarWhere(Expr):
             bl, bu = b.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 
             # combine the data bounds
-            Xs_lower = np.where(  # type: ignore
-                condv,
+            Xs_lower = _where(
+                condv != 0,
                 Xs_lower,
                 _maximum(Xs_lower, bl),
             )
-            Xs_upper = np.where(  # type: ignore
-                condv,
+            Xs_upper = _where(
+                condv != 0,
                 Xs_upper,
                 _minimum(Xs_upper, bu),
             )

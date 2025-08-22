@@ -9,7 +9,13 @@ from enum import Enum, auto
 import numpy as np
 from typing_extensions import assert_never  # MSPV 3.11
 
-from ..utils._compat import _isfinite, _nan_to_zero_inf_to_finite, _nextafter, _sign
+from ..utils._compat import (
+    _isfinite,
+    _nan_to_zero_inf_to_finite,
+    _nextafter,
+    _sign,
+    _where,
+)
 from ..utils.cast import (
     from_float,
     from_total_order,
@@ -235,15 +241,15 @@ def _compute_finite_absolute_error(
         #  here since the error bound will include the data value that together
         #  form a relative error bound
         case ErrorBound.abs | ErrorBound.rel:
-            return np.abs(data_float - decoded_float)  # type: ignore
+            return np.abs(np.subtract(data_float, decoded_float))
         case ErrorBound.ratio:
-            return np.where(  # type: ignore
+            return _where(
                 (data_float == 0) & (decoded_float == 0),
                 np.array(0, dtype=data_float.dtype),
-                np.where(
+                _where(
                     _sign(data_float) != _sign(decoded_float),
                     np.array(np.inf, dtype=data_float.dtype),
-                    np.where(
+                    _where(
                         np.abs(data_float) > np.abs(decoded_float),
                         data_float / decoded_float,
                         decoded_float / data_float,
@@ -294,29 +300,37 @@ def _apply_finite_error_bound(
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
-                lower = from_float(data_float - eb_abs, data.dtype)
-                upper = from_float(data_float + eb_abs, data.dtype)
+                lower: np.ndarray[S, np.dtype[T]] = from_float(
+                    data_float - eb_abs, data.dtype
+                )
+                upper: np.ndarray[S, np.dtype[T]] = from_float(
+                    data_float + eb_abs, data.dtype
+                )
 
             # correct rounding errors in the lower and upper bound
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
-                lower_outside_eb = (data_float - to_float(lower)) > eb_abs
-                upper_outside_eb = (to_float(upper) - data_float) > eb_abs
+                lower_outside_eb: np.ndarray[S, np.dtype[np.bool]] = np.greater(
+                    data_float - to_float(lower), eb_abs
+                )
+                upper_outside_eb: np.ndarray[S, np.dtype[np.bool]] = np.greater(
+                    to_float(upper) - data_float, eb_abs
+                )
 
             lower = from_total_order(
-                to_total_order(lower) + lower_outside_eb,
+                np.add(to_total_order(lower), lower_outside_eb),  # type: ignore
                 data.dtype,
             )
             upper = from_total_order(
-                to_total_order(upper) - upper_outside_eb,
+                np.subtract(to_total_order(upper), upper_outside_eb),  # type: ignore
                 data.dtype,
             )
 
             # a zero-error bound must preserve exactly, e.g. even for -0.0
             if np.any(eb == 0):
-                lower = np.where(eb == 0, data, lower)
-                upper = np.where(eb == 0, data, upper)
+                lower = _where(eb == 0, data, lower)
+                upper = _where(eb == 0, data, upper)
         case ErrorBound.ratio:
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
@@ -325,8 +339,8 @@ def _apply_finite_error_bound(
                     from_float(data_float * eb_abs, data.dtype),
                     from_float(data_float / eb_abs, data.dtype),
                 )
-            lower = np.where(data < 0, data_mul, data_div)
-            upper = np.where(data < 0, data_div, data_mul)
+            lower = _where(np.less(data, 0), data_mul, data_div)
+            upper = _where(np.less(data, 0), data_div, data_mul)
 
             # correct rounding errors in the lower and upper bound
             with np.errstate(
@@ -334,8 +348,8 @@ def _apply_finite_error_bound(
             ):
                 lower_outside_eb = (
                     np.abs(
-                        np.where(
-                            data < 0,
+                        _where(
+                            np.less(data, 0),
                             to_float(lower) / data_float,
                             data_float / to_float(lower),
                         )
@@ -344,8 +358,8 @@ def _apply_finite_error_bound(
                 )
                 upper_outside_eb = (
                     np.abs(
-                        np.where(
-                            data < 0,
+                        _where(
+                            np.less(data, 0),
                             data_float / to_float(upper),
                             to_float(upper) / data_float,
                         )
@@ -354,27 +368,27 @@ def _apply_finite_error_bound(
                 )
 
             lower = from_total_order(
-                to_total_order(lower) + lower_outside_eb,
+                to_total_order(lower) + lower_outside_eb,  # type: ignore
                 data.dtype,
             )
             upper = from_total_order(
-                to_total_order(upper) - upper_outside_eb,
+                to_total_order(upper) - upper_outside_eb,  # type: ignore
                 data.dtype,
             )
 
             # a ratio of 1 bound must preserve exactly, e.g. even for -0.0
             if np.any(eb == 1):
-                lower = np.where(eb == 1, data, lower)
-                upper = np.where(eb == 1, data, upper)
+                lower = _where(eb == 1, data, lower)
+                upper = _where(eb == 1, data, upper)
         case _:
             assert_never(type)
 
     if type in (ErrorBound.rel, ErrorBound.ratio):
         # special case zero to handle +0.0 and -0.0
-        lower = np.where(data == 0, data, lower)
-        upper = np.where(data == 0, data, upper)
+        lower = _where(data == 0, data, lower)
+        upper = _where(data == 0, data, upper)
 
-    return (lower, upper)  # type: ignore
+    return (lower, upper)
 
 
 def _apply_finite_qoi_error_bound(
@@ -425,25 +439,29 @@ def _apply_finite_qoi_error_bound(
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
-                lower_outside_eb = (qoi_float - lower) > eb_abs
-                upper_outside_eb = (upper - qoi_float) > eb_abs
+                lower_outside_eb: np.ndarray[S, np.dtype[np.bool]] = np.greater(
+                    qoi_float - lower, eb_abs
+                )
+                upper_outside_eb: np.ndarray[S, np.dtype[np.bool]] = np.greater(
+                    upper - qoi_float, eb_abs
+                )
 
             # we can nudge with nextafter since the QoIs are floating point
-            lower = np.where(  # type: ignore
-                lower_outside_eb & _isfinite(qoi_float),
+            lower = _where(
+                lower_outside_eb & _isfinite(qoi_float),  # type: ignore
                 _nextafter(lower, qoi_float),
                 lower,
             )
-            upper = np.where(  # type: ignore
-                upper_outside_eb & _isfinite(qoi_float),
+            upper = _where(
+                upper_outside_eb & _isfinite(qoi_float),  # type: ignore
                 _nextafter(upper, qoi_float),
                 upper,
             )
 
             # a zero-error bound must preserve exactly, e.g. even for -0.0
             if np.any(eb == 0):
-                lower = np.where(eb == 0, qoi_float, lower)  # type: ignore
-                upper = np.where(eb == 0, qoi_float, upper)  # type: ignore
+                lower = _where(eb == 0, qoi_float, lower)
+                upper = _where(eb == 0, qoi_float, upper)
         case ErrorBound.ratio:
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
@@ -452,8 +470,8 @@ def _apply_finite_qoi_error_bound(
                     qoi_float * eb_abs,
                     qoi_float / eb_abs,
                 )
-            lower = np.where(qoi_float < 0, data_mul, data_div)  # type: ignore
-            upper = np.where(qoi_float < 0, data_div, data_mul)  # type: ignore
+            lower = _where(np.less(qoi_float, 0), data_mul, data_div)
+            upper = _where(np.less(qoi_float, 0), data_div, data_mul)
 
             # correct rounding errors in the lower and upper bound
             with np.errstate(
@@ -461,7 +479,7 @@ def _apply_finite_qoi_error_bound(
             ):
                 lower_outside_eb = (
                     np.abs(
-                        np.where(
+                        _where(
                             qoi_float < 0,
                             lower / qoi_float,
                             qoi_float / lower,
@@ -471,7 +489,7 @@ def _apply_finite_qoi_error_bound(
                 )
                 upper_outside_eb = (
                     np.abs(
-                        np.where(
+                        _where(
                             qoi_float < 0,
                             qoi_float / upper,
                             upper / qoi_float,
@@ -481,27 +499,27 @@ def _apply_finite_qoi_error_bound(
                 )
 
             # we can nudge with nextafter since the QoIs are floating point
-            lower = np.where(  # type: ignore
-                lower_outside_eb & _isfinite(qoi_float),
+            lower = _where(
+                lower_outside_eb & _isfinite(qoi_float),  # type: ignore
                 _nextafter(lower, qoi_float),
                 lower,
             )
-            upper = np.where(  # type: ignore
-                upper_outside_eb & _isfinite(qoi_float),
+            upper = _where(
+                upper_outside_eb & _isfinite(qoi_float),  # type: ignore
                 _nextafter(upper, qoi_float),
                 upper,
             )
 
             # a ratio of 1 bound must preserve exactly, e.g. even for -0.0
             if np.any(eb == 1):
-                lower = np.where(eb == 1, qoi_float, lower)  # type: ignore
-                upper = np.where(eb == 1, qoi_float, upper)  # type: ignore
+                lower = _where(eb == 1, qoi_float, lower)
+                upper = _where(eb == 1, qoi_float, upper)
         case _:
             assert_never(type)
 
     if type in (ErrorBound.rel, ErrorBound.ratio):
         # special case zero to handle +0.0 and -0.0
-        lower = np.where(qoi_float == 0, qoi_float, lower)  # type: ignore
-        upper = np.where(qoi_float == 0, qoi_float, upper)  # type: ignore
+        lower = _where(qoi_float == 0, qoi_float, lower)
+        upper = _where(qoi_float == 0, qoi_float, upper)
 
-    return (lower, upper)  # type: ignore
+    return (lower, upper)

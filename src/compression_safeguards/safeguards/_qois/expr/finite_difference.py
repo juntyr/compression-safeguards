@@ -14,7 +14,7 @@ from .divmul import ScalarDivide, ScalarMultiply
 from .group import Group
 from .literal import Number
 from .neg import ScalarNegate
-from .typing import F, Ns, Ps, PsI
+from .typing import F, Fi, Ns, Ps, PsI
 
 
 class ScalarSymmetricModulo(Expr):
@@ -48,7 +48,7 @@ class ScalarSymmetricModulo(Expr):
     def late_bound_constants(self) -> frozenset[Parameter]:
         return self._a.late_bound_constants | self._b.late_bound_constants
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:  # type: ignore
+    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | Expr:
         return ScalarFoldedConstant.constant_fold_binary(
             self._a,
             self._b,

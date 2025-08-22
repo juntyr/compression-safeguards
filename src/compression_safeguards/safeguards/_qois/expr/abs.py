@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _reciprocal
+from ....utils._compat import _reciprocal, _where
 from ....utils.bindings import Parameter
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
@@ -73,11 +73,11 @@ class ScalarAbs(Expr):
         #  - a > 0 and 0 < el <= eu -> al = el, au = eu
         #  - a < 0 and 0 < el <= eu -> al = -eu, au = -el
         #  - el <= 0 -> al = -eu, au = eu
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            (expr_lower <= 0) | _is_negative(argv), -expr_upper, expr_lower
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.less_equal(expr_lower, 0) | _is_negative(argv), -expr_upper, expr_lower
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            (expr_lower > 0) & _is_negative(argv), -expr_lower, expr_upper
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.greater(expr_lower, 0) & _is_negative(argv), -expr_lower, expr_upper
         )
 
         return arg.compute_data_bounds(

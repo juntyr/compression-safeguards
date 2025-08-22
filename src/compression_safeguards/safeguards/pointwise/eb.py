@@ -8,7 +8,7 @@ from collections.abc import Set
 
 import numpy as np
 
-from ...utils._compat import _isfinite, _isinf, _isnan
+from ...utils._compat import _isfinite, _isinf, _isnan, _where
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import (
     as_bits,
@@ -144,17 +144,15 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         same_bits = as_bits(data) == as_bits(decoded)
         both_nan = self._equal_nan and (_isnan(data) & _isnan(decoded))
 
-        ok = np.where(
+        return _where(
             _isfinite(data),
             finite_ok,
-            np.where(
+            _where(
                 _isinf(data),
                 same_bits,
                 both_nan if self._equal_nan else same_bits,
             ),
         )
-
-        return ok  # type: ignore
 
     def compute_safe_intervals(
         self,

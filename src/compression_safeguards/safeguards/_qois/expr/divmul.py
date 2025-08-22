@@ -12,6 +12,7 @@ from ....utils._compat import (
     _maximum,
     _minimum,
     _reciprocal,
+    _where,
 )
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
@@ -113,20 +114,20 @@ class ScalarMultiply(Expr):
             #  that term_lower is also -0.0, same for term_upper
             term_lower: np.ndarray[Ps, np.dtype[F]] = _minimum(
                 termv,
-                np.where(  # type: ignore
+                _where(
                     constv == 0,
                     -fmax,
-                    np.where(
+                    _where(
                         _isinf(constv),
-                        np.where(
+                        _where(
                             _is_negative(termv),
                             X.dtype.type(-np.inf),
                             smallest_subnormal,
                         ),
-                        np.where(
+                        _where(
                             _isnan(constv),
                             X.dtype.type(-np.inf),
-                            np.where(
+                            _where(
                                 _is_negative(constv),
                                 expr_upper,
                                 expr_lower,
@@ -138,20 +139,20 @@ class ScalarMultiply(Expr):
             )
             term_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(
                 termv,
-                np.where(  # type: ignore
+                _where(
                     constv == 0,
                     fmax,
-                    np.where(
+                    _where(
                         _isinf(constv),
-                        np.where(
+                        _where(
                             _is_negative(termv),
                             -smallest_subnormal,
                             X.dtype.type(np.inf),
                         ),
-                        np.where(
+                        _where(
                             _isnan(constv),
                             X.dtype.type(np.inf),
-                            np.where(
+                            _where(
                                 _is_negative(constv),
                                 expr_lower,
                                 expr_upper,
@@ -192,8 +193,8 @@ class ScalarMultiply(Expr):
         # flip the lower/upper bounds if the result is negative
         #  since our rewrite below only works with non-negative exprv
         expr_lower, expr_upper = (
-            np.where(_is_negative(exprv), -expr_upper, expr_lower),  # type: ignore
-            np.where(_is_negative(exprv), -expr_lower, expr_upper),  # type: ignore
+            _where(_is_negative(exprv), -expr_upper, expr_lower),
+            _where(_is_negative(exprv), -expr_lower, expr_upper),
         )
 
         return rewrite_left_associative_product_as_exp_sum_of_logs(

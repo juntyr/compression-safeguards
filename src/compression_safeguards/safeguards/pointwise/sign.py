@@ -8,7 +8,7 @@ from collections.abc import Set
 
 import numpy as np
 
-from ...utils._compat import _floating_smallest_subnormal
+from ...utils._compat import _floating_smallest_subnormal, _where
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
@@ -122,21 +122,19 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         )
         assert np.all(~np.isnan(offset)), "offset must not contain NaNs"
 
-        ok = np.where(
+        return _where(
             # NaN values keep their sign bit
             np.isnan(data),
             np.isnan(decoded) & (np.signbit(data) == np.signbit(decoded)),
-            np.where(
+            _where(
                 # values equal to the offset (sign=0) stay equal
                 data == offset,
                 decoded == offset,
                 # values below (sign=-1) stay below,
                 # values above (sign=+1) stay above
-                np.where(data < offset, decoded < offset, decoded > offset),
+                _where(data < offset, decoded < offset, decoded > offset),
             ),
         )
-
-        return ok  # type: ignore
 
     def compute_safe_intervals(
         self,
@@ -180,14 +178,14 @@ class SignPreservingSafeguard(PointwiseSafeguard):
                 #  zero sign and thus have weird below / above intervals
                 smallest_subnormal = _floating_smallest_subnormal(data.dtype)  # type: ignore
                 below_upper = np.array(
-                    np.where(
+                    _where(
                         offsetf == 0,
                         -smallest_subnormal,
                         from_total_order(offsetf_total - 1, data.dtype),
                     )
                 )
                 above_lower = np.array(
-                    np.where(
+                    _where(
                         offsetf == 0,
                         smallest_subnormal,
                         from_total_order(offsetf_total + 1, data.dtype),

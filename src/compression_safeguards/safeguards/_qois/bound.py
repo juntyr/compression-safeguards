@@ -2,7 +2,7 @@ from typing import Callable
 
 import numpy as np
 
-from ...utils._compat import _isnan, _nan_to_zero_inf_to_finite, _nextafter
+from ...utils._compat import _isnan, _nan_to_zero_inf_to_finite, _nextafter, _where
 from ...utils.cast import as_bits
 from .expr.typing import F, Ns, Ps
 
@@ -105,7 +105,7 @@ def guarantee_data_within_expr_bounds(
     ) -> np.ndarray[Ns, np.dtype[np.bool]]:
         exprv_Xs_bound_guess = expr(Xs_bound_guess)
 
-        in_bounds: np.ndarray[Ps, np.dtype[np.bool]] = np.where(  # type: ignore
+        in_bounds: np.ndarray[Ps, np.dtype[np.bool]] = _where(
             # NaN expressions must be preserved as NaN
             _isnan(exprv),
             _isnan(exprv_Xs_bound_guess),
@@ -139,10 +139,10 @@ def guarantee_data_within_expr_bounds(
         bounds_exceeded = exceeds_expr_bounds(Xs_bound_guess)
 
         if not np.any(bounds_exceeded):
-            return np.where(Xs_bound_guess == Xs, Xs, Xs_bound_guess)  # type: ignore
+            return _where(Xs_bound_guess == Xs, Xs, Xs_bound_guess)
 
         # nudge the guess towards the data by 1 ULP
-        Xs_bound_guess = np.where(  # type: ignore
+        Xs_bound_guess = _where(
             bounds_exceeded, _nextafter(Xs_bound_guess, Xs), Xs_bound_guess
         )
 
@@ -155,12 +155,10 @@ def guarantee_data_within_expr_bounds(
         bounds_exceeded = exceeds_expr_bounds(Xs_bound_guess)
 
         if not np.any(bounds_exceeded):
-            return np.where(Xs_bound_guess == Xs, Xs, Xs_bound_guess)  # type: ignore
+            return _where(Xs_bound_guess == Xs, Xs, Xs_bound_guess)
 
         # shove the guess towards the data by exponentially reducing the
         #  difference
         Xs_diff *= backoff
         backoff = np.divide(backoff, 2)
-        Xs_bound_guess = np.where(  # type: ignore
-            bounds_exceeded, Xs + Xs_diff, Xs_bound_guess
-        )
+        Xs_bound_guess = _where(bounds_exceeded, Xs + Xs_diff, Xs_bound_guess)

@@ -25,6 +25,7 @@ from ._compat import (
     _isinf,
     _isnan,
     _nextafter,
+    _where,
 )
 from ._compat import (
     _maximum as _np_maximum,
@@ -298,14 +299,14 @@ class Interval(Generic[T, N]):
         # any NaN with the same sign is valid
         # this is slightly stricter than what equal_nan requires
         Lower(
-            np.where(
+            _where(
                 # ensure the NaN has the correct sign
                 np.signbit(a),
                 np.copysign(nan_max, -1),
                 np.copysign(nan_min, +1),
             )
         ) <= self[_isnan(a)] <= Upper(
-            np.where(
+            _where(
                 np.signbit(a),
                 np.copysign(nan_min, -1),
                 np.copysign(nan_max, +1),
@@ -905,8 +906,8 @@ class IntervalUnion(Generic[T, N, U]):
             choose_i = valid_i & ((lower_i < lower_j) | ~valid_j)
             choose_j = valid_j & ((lower_i >= lower_j) | ~valid_i)
 
-            lower_ij = np.where(choose_i, lower_i, lower_j)
-            upper_ij = np.where(choose_i, upper_i, upper_j)
+            lower_ij = _where(choose_i, lower_i, lower_j)
+            upper_ij = _where(choose_i, upper_i, upper_j)
 
             # check if the selected interval intersects with the previously
             #  output interval
@@ -924,15 +925,15 @@ class IntervalUnion(Generic[T, N, U]):
 
             # - intersection -> next is intersection
             # - no intersection -> next is next interval
-            next_lower = np.where(
+            next_lower = _where(
                 has_intersection_with_out,
                 _np_minimum(lower_o, lower_ij),
-                np.where(choose_i, lower_i, lower_j),
+                _where(choose_i, lower_i, lower_j),
             )
-            next_upper = np.where(
+            next_upper = _where(
                 has_intersection_with_out,
                 _np_maximum(upper_o, upper_ij),
-                np.where(choose_i, upper_i, upper_j),
+                _where(choose_i, upper_i, upper_j),
             )
 
             # update either the previous or the next output interval
@@ -996,9 +997,7 @@ class IntervalUnion(Generic[T, N, U]):
         #  1. if prediction is in the interval, use it
         #  2. otherwise pick the lower bound of the first interval
         pick = self._lower[0].reshape(prediction.shape).copy()
-        pick = np.where(self.contains(prediction), prediction, pick)
-
-        return pick  # type: ignore
+        return _where(self.contains(prediction), prediction, pick)
 
     def _pick_more_zeros(
         self, prediction: np.ndarray[S, np.dtype[T]]
@@ -1034,13 +1033,17 @@ class IntervalUnion(Generic[T, N, U]):
         upper = prediction_bits - upper
 
         # 3. only work with "positive" unsigned values
-        negative = as_bits(lower, kind="i") < 0
-        lower = np.where(negative, ~lower + 1, lower)  # type: ignore
-        upper = np.where(negative, ~upper + 1, upper)  # type: ignore
+        negative: np.ndarray[tuple[U, N], np.dtype[np.bool]] = np.less(
+            as_bits(lower, kind="i"), 0
+        )
+        lower = _where(negative, ~lower + 1, lower)
+        upper = _where(negative, ~upper + 1, upper)
 
         # 4. ensure that lower <= upper also in binary
-        flip = (lower > upper) & interval_nonempty
-        lower, upper = np.where(flip, upper, lower), np.where(flip, lower, upper)  # type: ignore
+        flip: np.ndarray[tuple[U, N], np.dtype[np.bool]] = (
+            np.greater(lower, upper) & interval_nonempty
+        )
+        lower, upper = _where(flip, upper, lower), _where(flip, lower, upper)
 
         # 5. 0b1111...1111
         allbits = np.array(-1, dtype=upper.dtype.str.replace("u", "i")).view(
@@ -1049,14 +1052,18 @@ class IntervalUnion(Generic[T, N, U]):
 
         # 6. if there are several intervals, pick the one with the smallest
         #    lower bound, ensuring that empty intervals are not picked
-        least = np.where(interval_nonempty, lower, allbits).argmin(axis=0)
+        least = _where(interval_nonempty, lower, allbits).argmin(axis=0)
         lower, upper = lower[least, np.arange(n)], upper[least, np.arange(n)]
         negative = negative[least, np.arange(n)]
         assert np.all(lower <= upper)
 
         # 7. count the number of leading zero bits in lower and upper
-        lower_lz = _count_leading_zeros(lower)
-        upper_lz = _count_leading_zeros(upper)
+        lower_lz: np.ndarray[tuple[U, N], np.dtype[np.uint8]] = _count_leading_zeros(
+            lower
+        )
+        upper_lz: np.ndarray[tuple[U, N], np.dtype[np.uint8]] = _count_leading_zeros(
+            upper
+        )
 
         # 8. if upper_lz < lower_lz,
         #    i.e. ceil(log2(upper)) > ceil(log2(lower)),
@@ -1069,11 +1076,11 @@ class IntervalUnion(Generic[T, N, U]):
         #    we actually end up choosing, if possible (larger than upper above)
         #    upper: 0b00..0010000000000
         #    since ~half the upper bound works well for symmetric intervals
-        upper = np.where(
-            upper_lz < lower_lz,
-            (allbits >> _np_minimum(upper_lz + 2, lower_lz)) + 1,
+        upper = _where(
+            np.less(upper_lz, lower_lz),  # type: ignore
+            (allbits >> _np_minimum(upper_lz + 2, lower_lz)) + 1,  # type: ignore
             upper,
-        )  # type: ignore
+        )
 
         # 9. count the number of leading zero bits in (lower ^ upper) to find
         #    the most significant bit where lower and upper differ.
@@ -1089,11 +1096,11 @@ class IntervalUnion(Generic[T, N, U]):
         pick = upper & ~(allbits >> (lxu_lz + 1))
 
         # 11. undo the negation step to allow "negative" unsigned values again
-        pick = np.where(negative, ~pick + 1, pick)
+        pick = _where(negative, ~pick + 1, pick)
 
         # 12. undo the difference with prediction and enforce the special case
         #     from (a) that prediction values inside the interval are kept as-is
-        pick = np.where(contains_prediction, prediction_bits, prediction_bits - pick)
+        pick = _where(contains_prediction, prediction_bits, prediction_bits - pick)
 
         # 13. convert everything back from total-ordered bits to value space
         pick = from_total_order(pick.view(todtype), prediction.dtype).reshape(
@@ -1160,6 +1167,6 @@ def _count_leading_zeros(
     _, high_exp = np.frexp(x_bits.astype(np.uint64, casting="safe") >> 32)
     _, low_exp = np.frexp(x_bits.astype(np.uint64, casting="safe") & 0xFFFFFFFF)
     # then lossless truncation of the number of leading zeros
-    return (nbits - np.where(high_exp, high_exp + 32, low_exp)).astype(  # type: ignore
+    return (nbits - _where(high_exp, high_exp + 32, low_exp)).astype(  # type: ignore
         np.uint8, casting="unsafe"
     )

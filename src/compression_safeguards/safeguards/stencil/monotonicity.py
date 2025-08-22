@@ -12,7 +12,7 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 from typing_extensions import assert_never  # MSPV 3.11
 
-from ...utils._compat import _isnan, _maximum, _minimum
+from ...utils._compat import _isnan, _maximum, _minimum, _where
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
@@ -267,7 +267,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             )
         )
 
-        ok = np.ones_like(data, dtype=np.bool)
+        ok: np.ndarray[S, np.dtype[np.bool]] = np.ones_like(data, dtype=np.bool)  # type: ignore
 
         window = 1 + self._window * 2
 
@@ -322,7 +322,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
             ok[s] &= ~axis_ok.reshape(ok[s].shape)
 
-        return ok  # type: ignore
+        return ok
 
     def compute_safe_intervals(
         self,
@@ -625,7 +625,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             data.flatten()
         )
         if not is_weak:
-            lt = np.where((lt + 1) > 0, lt + 1, lt)  # type: ignore
+            lt = _where(np.greater(lt + 1, 0), lt + 1, lt)
 
         # Hacker's Delight's algorithm to compute (a + b) / 2:
         #  ((a ^ b) >> 1) + (a & b)
@@ -690,28 +690,32 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         (lt, gt, eq, _is_weak) = self._monotonicity.value[int(is_decoded)]
 
         # default to NaN
-        monotonic = np.empty(x.shape[:-1])
+        monotonic: np.ndarray[tuple[int, ...], np.dtype[np.float64]] = np.empty(
+            x.shape[:-1]
+        )
         monotonic.fill(np.nan)
 
         # use comparison instead of diff to account for uints
 
         # +1: all(x[i+1] > x[i])
-        monotonic = np.where(
-            np.all(gt(x[..., 1:], x[..., :-1]), axis=-1), +1, monotonic
+        monotonic = _where(
+            np.all(gt(x[..., 1:], x[..., :-1]), axis=-1), np.float64(+1), monotonic
         )
         # -1: all(x[i+1] < x[i])
-        monotonic = np.where(
-            np.all(lt(x[..., 1:], x[..., :-1]), axis=-1), -1, monotonic
+        monotonic = _where(
+            np.all(lt(x[..., 1:], x[..., :-1]), axis=-1), np.float64(-1), monotonic
         )
 
         # 0/NaN: all(x[i+1] == x[i])
-        monotonic = np.where(
-            np.all(x[..., 1:] == x[..., :-1], axis=-1), 0 if eq else np.nan, monotonic
+        monotonic = _where(
+            np.all(x[..., 1:] == x[..., :-1], axis=-1),
+            np.float64(0 if eq else np.nan),
+            monotonic,
         )
 
         # NaN values cannot participate in monotonic sequences
         # NaN: any(isnan(x[i]))
-        monotonic = np.where(np.any(_isnan(x), axis=-1), np.nan, monotonic)
+        monotonic = _where(np.any(_isnan(x), axis=-1), np.float64(np.nan), monotonic)
 
         # return the result in a shape that's broadcastable to x
         return monotonic[..., np.newaxis]
@@ -723,13 +727,13 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         match self._monotonicity:
             case Monotonicity.strict | Monotonicity.strict_with_consts:
-                return np.where(  # type: ignore
+                return _where(
                     _isnan(data_monotonic),
                     False,
                     decoded_monotonic != data_monotonic,
                 )
             case Monotonicity.strict_to_weak | Monotonicity.weak:
-                return np.where(  # type: ignore
+                return _where(
                     _isnan(data_monotonic),
                     False,
                     # having the opposite sign or no sign are both not equal

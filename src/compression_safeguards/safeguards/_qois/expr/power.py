@@ -3,7 +3,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _reciprocal
+from ....utils._compat import _reciprocal, _where
 from ....utils.bindings import Parameter
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
@@ -87,15 +87,15 @@ class ScalarPower(Expr):
         # powers of negative numbers are just too tricky since they easily
         #  become NaN, so let's enforce bounds that only contain the original
         #  expression value
-        expr_lower = np.where(_is_negative(av), exprv, expr_lower)  # type: ignore
-        expr_upper = np.where(_is_negative(av), exprv, expr_upper)  # type: ignore
+        expr_lower = _where(_is_negative(av), exprv, expr_lower)
+        expr_upper = _where(_is_negative(av), exprv, expr_upper)
 
         # inlined outer ScalarFakeAbs
         # flip the lower/upper bounds if the result is negative
         #  since our rewrite below only works with non-negative exprv
         expr_lower, expr_upper = (
-            np.where(_is_negative(exprv), -expr_upper, expr_lower),  # type: ignore
-            np.where(_is_negative(exprv), -expr_lower, expr_upper),  # type: ignore
+            _where(_is_negative(exprv), -expr_upper, expr_lower),
+            _where(_is_negative(exprv), -expr_lower, expr_upper),
         )
 
         # rewrite a ** b as fake_abs(e^(b*ln(fake_abs(a))))
@@ -170,12 +170,12 @@ class ScalarFakeAbs(Expr):
         argv = arg.eval(X.shape, Xs, late_bound)
 
         # flip the lower/upper bounds if the arg is negative
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
             _is_negative(argv),
             -expr_upper,
             expr_lower,
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
             _is_negative(argv),
             -expr_lower,
             expr_upper,

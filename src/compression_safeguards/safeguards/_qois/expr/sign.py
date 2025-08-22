@@ -8,6 +8,7 @@ from ....utils._compat import (
     _maximum,
     _minimum,
     _sign,
+    _where,
 )
 from ....utils.bindings import Parameter
 from .abc import Expr
@@ -80,27 +81,27 @@ class ScalarSign(Expr):
 
         # compute the lower and upper arg bounds that produce the sign bounds
         # sign(-0.0) = +0.0 and sign(+0.0) = +0.0
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
             _isnan(exprv),
             exprv,
-            np.where(
+            _where(
                 expr_lower == 0,
                 X.dtype.type(-0.0),
-                np.where(
-                    expr_lower < 0,
+                _where(
+                    np.less(expr_lower, 0),
                     np.array(-np.inf, dtype=X.dtype),
                     smallest_subnormal,
                 ),
             ),
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
             _isnan(exprv),
             exprv,
-            np.where(
+            _where(
                 expr_upper == 0,
                 X.dtype.type(+0.0),
-                np.where(
-                    expr_upper < 0,
+                _where(
+                    np.less(expr_upper, 0),
                     -smallest_subnormal,
                     np.array(np.inf, dtype=X.dtype),
                 ),

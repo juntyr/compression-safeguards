@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _maximum, _minimum, _reciprocal
+from ....utils._compat import _maximum, _minimum, _reciprocal, _where
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
@@ -78,7 +78,7 @@ class ScalarReciprocal(Expr):
         arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum(
             argv,
             _reciprocal(
-                np.where(  # type: ignore
+                _where(
                     _is_negative(exprv),
                     _minimum(expr_upper, X.dtype.type(-0.0)),
                     expr_upper,
@@ -88,7 +88,7 @@ class ScalarReciprocal(Expr):
         arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(
             argv,
             _reciprocal(
-                np.where(  # type: ignore
+                _where(
                     _is_negative(exprv),
                     expr_lower,
                     _maximum(X.dtype.type(+0.0), expr_lower),

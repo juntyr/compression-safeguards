@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _isfinite
+from ....utils._compat import _isfinite, _where
 from ....utils.bindings import Parameter
 from .abc import Expr
 from .typing import F, Ns, Ps, PsI
@@ -57,12 +57,12 @@ class Data(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        X_lower: np.ndarray[Ns, np.dtype[F]] = np.where(
+        X_lower: np.ndarray[Ns, np.dtype[F]] = _where(
             _isfinite(Xs), X.dtype.type(-np.inf), Xs
-        )  # type: ignore
-        X_upper: np.ndarray[Ns, np.dtype[F]] = np.where(
+        )
+        X_upper: np.ndarray[Ns, np.dtype[F]] = _where(
             _isfinite(Xs), X.dtype.type(np.inf), Xs
-        )  # type: ignore
+        )
 
         X_lower[(...,) + self._index] = expr_lower
         X_upper[(...,) + self._index] = expr_upper

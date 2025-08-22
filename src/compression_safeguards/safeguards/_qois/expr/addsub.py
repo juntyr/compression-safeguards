@@ -10,6 +10,7 @@ from ....utils._compat import (
     _maximum,
     _minimum,
     _nan_to_zero,
+    _where,
 )
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
@@ -250,7 +251,7 @@ def compute_left_associate_sum_data_bounds(
     def _zero_add(
         a: np.ndarray[Ps, np.dtype[F]], b: np.ndarray[Ps, np.dtype[F]]
     ) -> np.ndarray[Ps, np.dtype[F]]:
-        return np.where(b == 0, a, a + b)  # type: ignore
+        return _where(b == 0, a, a + b)
 
     termvs: list[np.ndarray[Ps, np.dtype[F]]] = []
     abs_factorvs: list[None | np.ndarray[Ps, np.dtype[F]]] = []
@@ -301,10 +302,10 @@ def compute_left_associate_sum_data_bounds(
     # ensure that the bounds never contain both -inf and +inf since that would
     #  allow NaN to sneak in
     inf_clash = (tfl == -np.inf) & (tfu == np.inf)
-    tfl = np.where(inf_clash, -fmax, tfl)  # type: ignore
-    tfu = np.where(inf_clash, fmax, tfu)  # type: ignore
+    tfl = _where(inf_clash, -fmax, tfl)
+    tfu = _where(inf_clash, fmax, tfu)
 
-    any_nan: np.ndarray[Ps, np.dtype[np.bool]] = _isnan(termvs[0])  # type: ignore
+    any_nan: np.ndarray[Ps, np.dtype[np.bool]] = _isnan(termvs[0])
     for termv in termvs[1:]:
         any_nan |= _isnan(termv)
 
@@ -318,10 +319,10 @@ def compute_left_associate_sum_data_bounds(
     # otherwise we split up the error bound for the terms by their factors
     tl_stack = np.stack(
         [
-            np.where(
+            _where(
                 ~_isfinite(total_abs_factor) | ~_isfinite(exprv),
-                np.where(_isfinite(termv) & any_nan, -fmax, termv),
-                np.where(
+                _where(_isfinite(termv) & any_nan, -fmax, termv),  # type: ignore
+                _where(
                     total_abs_factor == 0,
                     -fmax,
                     _zero_add(termv, tfl * abs_factorv),
@@ -333,10 +334,10 @@ def compute_left_associate_sum_data_bounds(
     )
     tu_stack = np.stack(
         [
-            np.where(
+            _where(
                 ~_isfinite(total_abs_factor) | ~_isfinite(exprv),
-                np.where(_isfinite(termv) & any_nan, fmax, termv),
-                np.where(
+                _where(_isfinite(termv) & any_nan, fmax, termv),  # type: ignore
+                _where(
                     total_abs_factor == 0,
                     fmax,
                     _zero_add(termv, tfu * abs_factorv),

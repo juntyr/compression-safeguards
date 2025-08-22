@@ -4,7 +4,7 @@ from typing import Callable
 
 import numpy as np
 
-from ....utils._compat import _asinh, _maximum, _minimum, _reciprocal, _sinh
+from ....utils._compat import _asinh, _maximum, _minimum, _reciprocal, _sinh, _where
 from ....utils._float128 import _float128_dtype
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
@@ -420,7 +420,7 @@ HYPERBOLIC_UFUNC: dict[Hyperbolic, Callable[[np.ndarray], np.ndarray]] = {
 def propagate_negative_zero(
     x: np.ndarray[Ps, np.dtype[F]], fx: np.ndarray[Ps, np.dtype[F]]
 ) -> np.ndarray[Ps, np.dtype[F]]:
-    return np.where(fx == x, x, fx)  # type: ignore
+    return _where(fx == x, x, fx)
 
 
 HYPERBOLIC_QUADDTYPE_UFUNC: dict[Hyperbolic, Callable[[np.ndarray], np.ndarray]] = {

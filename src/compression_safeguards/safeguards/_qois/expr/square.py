@@ -7,6 +7,7 @@ from ....utils._compat import (
     _maximum,
     _minimum,
     _reciprocal,
+    _where,
 )
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
@@ -67,7 +68,7 @@ class ScalarSqrt(Expr):
         # for sqrt(-0.0), we should return -0.0 as the inverse
         # this ensures that 1/sqrt(-0.0) doesn't become 1/sqrt(0.0)
         def _sqrt_inv(x: np.ndarray[Ps, np.dtype[F]]) -> np.ndarray[Ps, np.dtype[F]]:
-            return np.where(x == 0, x, np.square(_maximum(X.dtype.type(0), x)))  # type: ignore
+            return _where(x == 0, x, np.square(_maximum(X.dtype.type(0), x)))
 
         # evaluate arg and sqrt(arg)
         arg = self._a
@@ -83,13 +84,13 @@ class ScalarSqrt(Expr):
         # otherwise ensure that the bounds on sqrt(...) are non-negative
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            argv < 0,
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.less(argv, 0),
             X.dtype.type(-np.inf),
             _minimum(argv, _sqrt_inv(expr_lower)),
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            argv < 0,
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.less(argv, 0),
             -smallest_subnormal,
             _maximum(argv, _sqrt_inv(expr_upper)),
         )
@@ -207,11 +208,11 @@ class ScalarSquare(Expr):
         #  - a > 0 and 0 < el <= eu -> al = el, au = eu
         #  - a < 0 and 0 < el <= eu -> al = -eu, au = -el
         #  - el <= 0 -> al = -eu, au = eu
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            (expr_lower <= 0) | _is_negative(argv), -au, al
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.less_equal(expr_lower, 0) | _is_negative(argv), -au, al
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            (expr_lower > 0) & _is_negative(argv), -al, au
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.greater(expr_lower, 0) & _is_negative(argv), -al, au
         )
 
         # if arg_lower == argv and argv == -0.0, we need to guarantee that

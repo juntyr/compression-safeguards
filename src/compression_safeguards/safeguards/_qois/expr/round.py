@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _nextafter, _reciprocal, _rint
+from ....utils._compat import _nextafter, _reciprocal, _rint, _where
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
@@ -81,7 +81,7 @@ class ScalarFloor(Expr):
         #  to -0.0
         # if expr_upper is +0.0, floor(+0.0) = +0.0, and floor(1-eps) = +0.0
         arg_lower: np.ndarray[Ps, np.dtype[F]] = expr_lower
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
             is_negative_zero(expr_upper),
             X.dtype.type(-0.0),
             _nextafter(expr_upper + 1, expr_upper),
@@ -182,7 +182,7 @@ class ScalarCeil(Expr):
         # if expr_upper is -0.0, floor(-0.0) = -0.0, there is nothing above
         #  -0.0 for which ceil(...) = -0.0
         # if expr_upper is +0.0, floor(+0.0) = +0.0, only ceil(+0.0) = +0.0
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
             is_positive_zero(expr_lower),
             X.dtype.type(+0.0),
             _nextafter(expr_lower - 1, expr_lower),
@@ -291,10 +291,10 @@ class ScalarTrunc(Expr):
         # if expr_upper is -0.0, floor(-0.0) = -0.0, there is nothing above
         #  -0.0 for which trunc(...) = -0.0
         # if expr_upper is +0.0, floor(+0.0) = +0.0, and trunc(1-eps) = +0.0
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
             _is_negative(expr_lower), _nextafter(expr_lower - 1, expr_lower), expr_lower
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
             _is_positive(expr_upper), _nextafter(expr_upper + 1, expr_upper), expr_upper
         )
 
@@ -405,12 +405,12 @@ class ScalarRoundTiesEven(Expr):
         # if expr_upper is -0.0, floor(-0.0) = -0.0, we need to force arg_upper
         #  to -0.0
         # if expr_upper is +0.0, floor(+0.0) = +0.0, and rint(+0.5) = +0.0
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
             is_positive_zero(expr_lower),
             X.dtype.type(+0.0),
             np.subtract(expr_lower, X.dtype.type(0.5)),
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
             is_negative_zero(expr_upper),
             X.dtype.type(-0.0),
             np.add(expr_upper, X.dtype.type(0.5)),

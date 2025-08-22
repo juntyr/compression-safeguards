@@ -44,10 +44,22 @@ from .typing import F, S, T, Ti
 
 
 # wrapper around np.isnan that also works for numpy_quaddtype
-@np.errstate(invalid="ignore")
+@overload
 def _isnan(
-    a: int | float | np.ndarray[S, np.dtype[T]],
-) -> bool | np.ndarray[S, np.dtype[np.bool]]:
+    a: int | float,
+) -> bool:
+    pass
+
+
+@overload
+def _isnan(
+    a: np.ndarray[S, np.dtype[T]],
+) -> np.ndarray[S, np.dtype[np.bool]]:
+    pass
+
+
+@np.errstate(invalid="ignore")
+def _isnan(a):
     if (type(a) is not _float128_type) and (
         not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
     ):
@@ -56,10 +68,22 @@ def _isnan(
 
 
 # wrapper around np.isinf that also works for numpy_quaddtype
-@np.errstate(invalid="ignore")
+@overload
 def _isinf(
-    a: int | float | np.ndarray[S, np.dtype[T]],
-) -> bool | np.ndarray[S, np.dtype[np.bool]]:
+    a: int | float,
+) -> bool:
+    pass
+
+
+@overload
+def _isinf(
+    a: np.ndarray[S, np.dtype[T]],
+) -> np.ndarray[S, np.dtype[np.bool]]:
+    pass
+
+
+@np.errstate(invalid="ignore")
+def _isinf(a):
     if (type(a) is not _float128_type) and (
         not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
     ):
@@ -68,10 +92,22 @@ def _isinf(
 
 
 # wrapper around np.isfinite that also works for numpy_quaddtype
-@np.errstate(invalid="ignore")
+@overload
 def _isfinite(
-    a: int | float | np.ndarray[S, np.dtype[T]],
-) -> bool | np.ndarray[S, np.dtype[np.bool]]:
+    a: int | float,
+) -> bool:
+    pass
+
+
+@overload
+def _isfinite(
+    a: np.ndarray[S, np.dtype[T]],
+) -> np.ndarray[S, np.dtype[np.bool]]:
+    pass
+
+
+@np.errstate(invalid="ignore")
+def _isfinite(a):
     if (type(a) is not _float128_type) and (
         not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
     ):
@@ -340,6 +376,55 @@ def _maximum(a, b):
         maximum,
     )
     return maximum  # type: ignore
+
+
+# wrapper around np.where but with better type hints
+@overload
+def _where(
+    cond: np.ndarray[S, np.dtype[np.bool]],
+    a: np.ndarray[S, np.dtype[T]],
+    b: np.ndarray[S, np.dtype[T]],
+) -> np.ndarray[S, np.dtype[T]]:
+    pass
+
+
+@overload
+def _where(
+    cond: np.ndarray[S, np.dtype[np.bool]],
+    a: np.ndarray[S, np.dtype[np.bool]],
+    b: np.ndarray[S, np.dtype[np.bool]],
+) -> np.ndarray[S, np.dtype[np.bool]]:
+    pass
+
+
+@overload
+def _where(
+    cond: np.ndarray[S, np.dtype[np.bool]], a: Ti, b: np.ndarray[S, np.dtype[Ti]]
+) -> np.ndarray[S, np.dtype[Ti]]:
+    pass
+
+
+@overload
+def _where(
+    cond: np.ndarray[S, np.dtype[np.bool]], a: np.ndarray[S, np.dtype[Ti]], b: Ti
+) -> np.ndarray[S, np.dtype[Ti]]:
+    pass
+
+
+@overload
+def _where(
+    cond: np.ndarray[S, np.dtype[np.bool]], a: Ti, b: Ti
+) -> np.ndarray[S, np.dtype[Ti]]:
+    pass
+
+
+@overload
+def _where(cond: bool, a: Ti, b: Ti) -> Ti:
+    pass
+
+
+def _where(cond, a, b):
+    return np.where(cond, a, b)
 
 
 # wrapper around np.finfo(dtype).max that also works for numpy_quaddtype

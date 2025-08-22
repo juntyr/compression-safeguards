@@ -12,6 +12,7 @@ from ....utils._compat import (
     _nextafter,
     _pi,
     _reciprocal,
+    _where,
 )
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
@@ -100,7 +101,9 @@ class ScalarSin(Expr):
         )
 
         # check for the case where any finite value would work
-        full_domain = (expr_lower <= -1) & (expr_upper >= 1)
+        full_domain: np.ndarray[Ps, np.dtype[np.bool]] = np.less_equal(
+            expr_lower, -1
+        ) & np.greater_equal(expr_upper, 1)
 
         fmax = _floating_max(X.dtype)
 
@@ -111,16 +114,16 @@ class ScalarSin(Expr):
         #  arg_lower is also -0.0, same for arg_upper
         # FIXME: how do we handle bounds right next to the peak where the
         #        expression bounds could be exceeded inside the interval?
-        arg_lower = np.where(  # type: ignore
+        arg_lower = _where(
             _isinf(argv),
             argv,
-            np.where(
+            _where(
                 full_domain,
                 -fmax,
                 _minimum(
                     argv,
                     argv
-                    + np.where(
+                    + _where(
                         needs_flip,
                         -arg_upper_diff,
                         arg_lower_diff,
@@ -128,16 +131,16 @@ class ScalarSin(Expr):
                 ),
             ),
         )
-        arg_upper = np.where(  # type: ignore
+        arg_upper = _where(
             _isinf(argv),
             argv,
-            np.where(
+            _where(
                 full_domain,
                 fmax,
                 _maximum(
                     argv,
                     argv
-                    + np.where(
+                    + _where(
                         needs_flip,
                         -arg_lower_diff,
                         arg_upper_diff,
@@ -252,20 +255,20 @@ class ScalarAsin(Expr):
         # otherwise ensure that the bounds on asin(...) are in [-pi/2, +pi/2]
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            argv < -1,
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.less(argv, -1),
             X.dtype.type(-np.inf),
-            np.where(
-                argv > 1,
+            _where(
+                np.greater(argv, 1),
                 one_eps,
                 _minimum(argv, np.sin(_maximum(np.divide(-pi, 2), expr_lower))),  # type: ignore
             ),
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            argv < -1,
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.less(argv, -1),
             -one_eps,
-            np.where(
-                argv > 1,
+            _where(
+                np.greater(argv, 1),
                 X.dtype.type(np.inf),
                 _maximum(argv, np.sin(_minimum(expr_upper, np.divide(pi, 2)))),  # type: ignore
             ),

@@ -3,7 +3,7 @@ from typing import Callable
 
 import numpy as np
 
-from ....utils._compat import _floating_max, _isfinite, _isinf, _isnan
+from ....utils._compat import _floating_max, _isfinite, _isinf, _isnan, _where
 from ....utils.bindings import Parameter
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
@@ -70,24 +70,24 @@ class ScalarIsFinite(Expr):
         # if expr_lower > 0, isfinite(Xs) = True, so Xs must be finite
         # if expr_upper < 0, isfinite(Xs) = False, Xs must stay non-finite
         # otherwise, isfinite(Xs) in [True, False] and Xs can be anything
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            expr_lower > 0,
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.greater(expr_lower, 0),
             # must be finite
             -fmax,
-            np.where(
-                expr_upper < 1,
+            _where(
+                np.less(expr_upper, 1),
                 # must be non-finite, i.e. stay the same
                 argv,
                 # can be finite or non-finite
                 X.dtype.type(-np.inf),
             ),
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            expr_lower > 0,
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.greater(expr_lower, 0),
             # must be finite
             fmax,
-            np.where(
-                expr_upper < 1,
+            _where(
+                np.less(expr_upper, 1),
                 # must be non-finite, i.e. stay the same
                 argv,
                 # can be finite or non-finite
@@ -180,24 +180,24 @@ class ScalarIsInf(Expr):
         # if expr_lower > 0, isinf(Xs) = True, so Xs must stay infinite
         # if expr_upper < 0, isinf(Xs) = False, Xs must be non-infinite
         # otherwise, isinf(Xs) in [True, False] and Xs can be anything
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            expr_lower > 0,
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.greater(expr_lower, 0),
             # must be infinite, i.e. stay the same
             argv,
-            np.where(
-                expr_upper < 1,
+            _where(
+                np.less(expr_upper, 1),
                 # must be non-infinite
                 -fmax,
                 # can be infinite or non-infinite
                 X.dtype.type(-np.inf),
             ),
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            expr_lower > 0,
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.greater(expr_lower, 0),
             # must be infinite, i.e. stay the same
             argv,
-            np.where(
-                expr_upper < 1,
+            _where(
+                np.less(expr_upper, 1),
                 # must be non-infinite
                 fmax,
                 # can be infinite or non-infinite
@@ -288,24 +288,24 @@ class ScalarIsNaN(Expr):
         # if expr_lower > 0, isnan(Xs) = True, so Xs must stay NaN
         # if expr_upper < 0, isnan(Xs) = False, Xs must be non-NaN
         # otherwise, isnan(Xs) in [True, False] and Xs can be anything
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            expr_lower > 0,
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.greater(expr_lower, 0),
             # must be NaN, i.e. stay the same
             argv,
-            np.where(
-                expr_upper < 1,
+            _where(
+                np.less(expr_upper, 1),
                 # must be non-NaN
                 X.dtype.type(-np.inf),
                 # can be NaN or non-NaN
                 X.dtype.type(-np.inf),
             ),
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            expr_lower > 0,
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.greater(expr_lower, 0),
             # must be NaN, i.e. stay the same
             argv,
-            np.where(
-                expr_upper < 1,
+            _where(
+                np.less(expr_upper, 1),
                 # must be non-NaN
                 X.dtype.type(np.inf),
                 # can be NaN or non-NaN
