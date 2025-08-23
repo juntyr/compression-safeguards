@@ -65,6 +65,13 @@ with atheris.instrument_imports():
     from compression_safeguards.safeguards._qois.expr.where import ScalarWhere
     from compression_safeguards.utils._compat import _isnan, _maximum, _minimum
     from compression_safeguards.utils._float128 import _float128_dtype
+    from compression_safeguards.utils.typing import T
+
+
+def ConsumeDtypeElement(data, dtype: np.dtype[T]) -> T:
+    raw: bytes = data.ConsumeBytes(dtype.itemsize)
+    raw += b"\0" * (dtype.itemsize - len(raw))
+    return np.frombuffer(raw, dtype=dtype, count=1)[0]  # type: ignore
 
 
 DTYPES = [
@@ -79,7 +86,7 @@ NULLARY_EXPRESSIONS: list[Callable[[Any, np.dtype], Expr]] = [
     lambda data, dtype: Pi(),
     lambda data, dtype: Number(f"{data.ConsumeInt(4)}"),
     lambda data, dtype: Number(f"{data.ConsumeRegularFloat()}"),
-    lambda data, dtype: ScalarFoldedConstant(dtype.type(data.ConsumeFloat())),
+    lambda data, dtype: ScalarFoldedConstant(ConsumeDtypeElement(data, dtype)),
     lambda data, dtype: Data(index=()),
 ]
 UNARY_EXPRESSIONS: list[Callable[[Expr], Expr]] = [
@@ -222,7 +229,7 @@ def check_one_input(data) -> None:
         return
 
     # generate the data
-    X = np.array(data.ConsumeFloat(), dtype=dtype)
+    X = np.array(ConsumeDtypeElement(data, dtype))
 
     # NaN data values are always preserved externally by the QoI safeguards, so
     #  the expressions don't need to handle them
@@ -233,8 +240,8 @@ def check_one_input(data) -> None:
     exprv = expr.eval((), X, late_bound=dict())
 
     # generate the lower and upper bounds on the expression
-    expr_lower = np.array(data.ConsumeFloat(), dtype=dtype)
-    expr_upper = np.array(data.ConsumeFloat(), dtype=dtype)
+    expr_lower = np.array(ConsumeDtypeElement(data, dtype))
+    expr_upper = np.array(ConsumeDtypeElement(data, dtype))
 
     # skip if exprv and its bounds disagree on NaNs
     if (_isnan(exprv) != _isnan(expr_lower)) or (_isnan(exprv) != _isnan(expr_upper)):
@@ -274,7 +281,7 @@ def check_one_input(data) -> None:
     exprv_X_upper = expr.eval((), X_upper, late_bound=dict())
 
     # generate a test data value
-    X_test = np.array(data.ConsumeFloat(), dtype=dtype)
+    X_test = np.array(ConsumeDtypeElement(data, dtype))
 
     # ensure that X and X_test agree on NaN
     X_test = np.where(_isnan(X) != _isnan(X_test), X, X_test)

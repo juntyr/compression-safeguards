@@ -11,6 +11,7 @@ from compression_safeguards.safeguards._qois.expr.hyperbolic import (
 from compression_safeguards.safeguards._qois.expr.literal import Number
 from compression_safeguards.safeguards._qois.expr.power import ScalarPower
 from compression_safeguards.safeguards._qois.expr.reciprocal import ScalarReciprocal
+from compression_safeguards.safeguards._qois.expr.round import ScalarRoundTiesEven
 from compression_safeguards.safeguards._qois.expr.sign import ScalarSign
 from compression_safeguards.safeguards._qois.expr.square import ScalarSquare
 from compression_safeguards.safeguards._qois.expr.trigonometric import (
@@ -23,6 +24,7 @@ from compression_safeguards.safeguards._qois.expr.where import ScalarWhere
 from compression_safeguards.safeguards._qois.interval import (
     compute_safe_data_lower_upper_interval_union,
 )
+from compression_safeguards.utils._float128 import _float128
 
 
 def test_abs():
@@ -723,8 +725,8 @@ def test_fuzzer_found_bounded_hang():
     assert X_lower <= X
     assert X_upper == X
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.float64(-1.0)
-    assert expr.eval((), np.array(X_upper), dict()) == np.float64(-1.0)
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float64(-1.0))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float64(-1.0))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -733,7 +735,7 @@ def test_fuzzer_found_subtract_inf():
 
     expr = ScalarSubtract(Data(index=()), Data(index=()))
 
-    assert expr.eval((), X, dict()) == np.float32(0.0)
+    assert expr.eval((), X, dict()) == np.array(np.float32(0.0))
 
     expr_lower = np.array(-np.inf, dtype=np.float32)
     expr_upper = np.array(np.inf, dtype=np.float32)
@@ -745,8 +747,8 @@ def test_fuzzer_found_subtract_inf():
     assert X_lower == np.array(-fmax, dtype=np.float32)
     assert X_upper == np.array(fmax, dtype=np.float32)
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.float32(0.0)
-    assert expr.eval((), np.array(X_upper), dict()) == np.float32(0.0)
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float32(0.0))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float32(0.0))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -755,7 +757,7 @@ def test_fuzzer_found_times_zero():
 
     expr = ScalarMultiply(Number("-9.58497987659779e+300"), ScalarAbs(Data(index=())))
 
-    assert expr.eval((), X, dict()) == np.float16(-np.inf)
+    assert expr.eval((), X, dict()) == np.array(np.float16(-np.inf))
 
     expr_lower = np.array(-np.inf, dtype=np.float16)
     expr_upper = np.array(np.inf, dtype=np.float16)
@@ -766,8 +768,8 @@ def test_fuzzer_found_times_zero():
     assert X_lower == np.array(-np.inf, dtype=np.float16)
     assert X_upper == np.array(-smallest_subnormal, dtype=np.float16)
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.float16(-np.inf)
-    assert expr.eval((), np.array(X_upper), dict()) == np.float16(-np.inf)
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(-np.inf))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float16(-np.inf))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -780,7 +782,7 @@ def test_fuzzer_found_where():
         ScalarHyperbolic(Hyperbolic.asech, Data(index=())),
     )
 
-    assert expr.eval((), X, dict()) == np.float16(np.inf)
+    assert expr.eval((), X, dict()) == np.array(np.float16(np.inf))
 
     expr_lower = np.array(0.0, dtype=np.float16)
     expr_upper = np.array(np.inf, dtype=np.float16)
@@ -789,5 +791,27 @@ def test_fuzzer_found_where():
     assert X_lower == np.array(0.0, dtype=np.float16) and not np.signbit(X_lower)
     assert X_upper == np.array(0.0, dtype=np.float16) and not np.signbit(X_upper)
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.float16(np.inf)
-    assert expr.eval((), np.array(X_upper), dict()) == np.float16(np.inf)
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(np.inf))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float16(np.inf))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_inconsistent_where():
+    X = np.array(_float128("-1.797693134862315708145274237317044e+308"))
+
+    expr = ScalarWhere(
+        ScalarTrigonometric(Trigonometric.acos, Data(index=())),
+        ScalarRoundTiesEven(Data(index=())),
+        ScalarTrigonometric(Trigonometric.acot, Data(index=())),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(
+        _float128("-5.562684646268004075307639094889258e-309")
+    )
+
+    expr_lower = np.array(_float128("-5.562684646268004075307639094889258e-309"))
+    expr_upper = np.array(_float128("0.0e+000"))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(_float128("-1.797693134862315708145274237317044e+308"))
+    assert X_upper == np.array(_float128("-1.797693134862315708145274237317044e+308"))

@@ -81,7 +81,10 @@ class ScalarWhere(Expr):
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         # evaluate the condition
         cond, a, b = self._condition, self._a, self._b
-        condv = cond.eval(X.shape, Xs, late_bound)
+        condv: np.ndarray[Ps, np.dtype[F]] = cond.eval(X.shape, Xs, late_bound)
+        condvb: np.ndarray[Ns, np.dtype[np.bool]] = np.broadcast_to(
+            np.array(condv != 0).reshape(X.shape + (1,) * (Xs.ndim - X.ndim)), Xs.shape
+        )
 
         Xs_lower: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(-np.inf))
         Xs_upper: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(np.inf))
@@ -93,36 +96,36 @@ class ScalarWhere(Expr):
             Xs_lower = _maximum(Xs_lower, cl)
             Xs_upper = _minimum(Xs_upper, cu)
 
-        if np.any(condv) and a.has_data:
+        if np.any(condvb) and a.has_data:
             # pass on the data bounds to a but only use its bounds on Xs if
             #  chosen by the condition
             al, au = a.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 
             # combine the data bounds
             Xs_lower = _where(
-                condv != 0,
+                condvb,
                 _maximum(Xs_lower, al),
                 Xs_lower,
             )
             Xs_upper = _where(
-                condv != 0,
+                condvb,
                 _minimum(Xs_upper, au),
                 Xs_upper,
             )
 
-        if (not np.all(condv)) and b.has_data:
+        if (not np.all(condvb)) and b.has_data:
             # pass on the data bounds to b but only use its bounds on Xs if
             #  chosen by the condition
             bl, bu = b.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 
             # combine the data bounds
             Xs_lower = _where(
-                condv != 0,
+                condvb,
                 Xs_lower,
                 _maximum(Xs_lower, bl),
             )
             Xs_upper = _where(
-                condv != 0,
+                condvb,
                 Xs_upper,
                 _minimum(Xs_upper, bu),
             )
