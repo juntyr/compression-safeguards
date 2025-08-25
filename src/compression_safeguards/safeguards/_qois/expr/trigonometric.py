@@ -91,14 +91,14 @@ class ScalarSin(Expr):
 
         # sin(...) is periodic, so we need to drop to difference bounds before
         #  applying the difference to argv to stay in the same period
-        arg_lower_diff = arg_lower - np.asin(exprv)
-        arg_upper_diff = arg_upper - np.asin(exprv)
+        argv_asin = np.asin(exprv)
+        arg_lower_diff = arg_lower - argv_asin
+        arg_upper_diff = arg_upper - argv_asin
 
         # np.asin maps to [-pi/2, +pi/2] where sin is monotonically increasing
         # flip the argument error bounds where sin is monotonically decreasing
-        needs_flip = (np.sin(argv + arg_lower_diff) > exprv) | (
-            np.sin(argv + arg_upper_diff) < exprv
-        )
+        # we check monotonicity using the derivative sin'(x) = cos(x)
+        needs_flip = np.cos(argv) < 0
 
         # check for the case where any finite value would work
         full_domain: np.ndarray[Ps, np.dtype[np.bool]] = np.less_equal(

@@ -815,3 +815,18 @@ def test_fuzzer_found_inconsistent_where():
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
     assert X_lower == np.array(_float128("-1.797693134862315708145274237317044e+308"))
     assert X_upper == np.array(_float128("-1.797693134862315708145274237317044e+308"))
+
+
+def test_fuzzer_found_cosine_monotonicity():
+    X = np.array(0.1133, dtype=np.float16)
+
+    expr = ScalarTrigonometric(Trigonometric.cos, Data(index=()))
+
+    assert expr.eval((), X, dict()) == np.array(0.9937, dtype=np.float16)
+
+    expr_lower = np.array(7.3e-06, dtype=np.float16)
+    expr_upper = np.array(0.9937, dtype=np.float16)
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(0.1133, dtype=np.float16)
+    assert X_upper == np.array(1.57, dtype=np.float16)
