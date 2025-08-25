@@ -6,6 +6,7 @@ from compression_safeguards.safeguards._qois.expr.data import Data
 from compression_safeguards.safeguards._qois.expr.divmul import ScalarMultiply
 from compression_safeguards.safeguards._qois.expr.hyperbolic import (
     Hyperbolic,
+    ScalarAsinh,
     ScalarHyperbolic,
 )
 from compression_safeguards.safeguards._qois.expr.literal import Number
@@ -830,3 +831,12 @@ def test_fuzzer_found_cosine_monotonicity():
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
     assert X_lower == np.array(0.1133, dtype=np.float16)
     assert X_upper == np.array(1.57, dtype=np.float16)
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_asinh_overflow():
+    X = np.array(_float128("-4.237431194812790058760014731131757e+4778"))
+
+    expr = ScalarAsinh(Data(index=()))
+
+    assert expr.eval((), X, dict()) == np.array(_float128("-inf"))

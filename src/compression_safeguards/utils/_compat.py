@@ -292,7 +292,10 @@ def _asinh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
     ):
         return np.asinh(a)  # type: ignore
 
-    asinh = np.log(a + np.sqrt(np.square(a) + 1))
+    # evaluate asinh(abs(a)) first since it overflows correctly in
+    #  sqrt(square(a)), then copy the sign of the input a
+    asinh_abs = np.log(np.abs(a) + np.sqrt(np.square(np.abs(a)) + 1))
+    asinh = np.where(a < 0, -asinh_abs, asinh_abs)
 
     # propagate asinh(-0.0) = -0.0
     return np.where(asinh == a, a, asinh)  # type: ignore
