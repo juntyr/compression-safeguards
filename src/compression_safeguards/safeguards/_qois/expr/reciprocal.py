@@ -2,7 +2,13 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _maximum, _minimum, _reciprocal, _where
+from ....utils._compat import (
+    _floating_smallest_subnormal,
+    _maximum,
+    _minimum,
+    _reciprocal,
+    _where,
+)
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
 from .abc import Expr
@@ -94,6 +100,17 @@ class ScalarReciprocal(Expr):
                     _maximum(X.dtype.type(+0.0), expr_lower),
                 )
             ),
+        )
+
+        smallest_subnormal = _floating_smallest_subnormal(X.dtype)
+
+        # FIXME: since we use reciprocal to rewrite division, we need to ensure
+        #        that 1/x for x != 0 cannot include x = 0
+        arg_lower = _where(
+            (arg_lower == 0) & (argv != 0), smallest_subnormal, arg_lower
+        )
+        arg_upper = _where(
+            (arg_upper == 0) & (argv != 0), -smallest_subnormal, arg_upper
         )
 
         # handle rounding errors in reciprocal(reciprocal(...)) early

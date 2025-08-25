@@ -2,8 +2,12 @@ import numpy as np
 
 from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
 from compression_safeguards.safeguards._qois.expr.addsub import ScalarSubtract
+from compression_safeguards.safeguards._qois.expr.classification import ScalarIsInf
 from compression_safeguards.safeguards._qois.expr.data import Data
-from compression_safeguards.safeguards._qois.expr.divmul import ScalarMultiply
+from compression_safeguards.safeguards._qois.expr.divmul import (
+    ScalarDivide,
+    ScalarMultiply,
+)
 from compression_safeguards.safeguards._qois.expr.hyperbolic import (
     Hyperbolic,
     ScalarAsinh,
@@ -840,3 +844,22 @@ def test_fuzzer_found_asinh_overflow():
     expr = ScalarAsinh(Data(index=()))
 
     assert expr.eval((), X, dict()) == np.array(_float128("-inf"))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_invalid_divide_rewrite():
+    X = np.array(2.9e-322, dtype=np.float64)
+
+    expr = ScalarDivide(ScalarIsInf(Data(index=())), ScalarAbs(Data(index=())))
+
+    assert expr.eval((), X, dict()) == np.array(0.0, dtype=np.float64)
+
+    expr_lower = np.array(0.0, dtype=np.float64)
+    expr_upper = np.array(0.0, dtype=np.float64)
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(5.0e-324, dtype=np.float64)
+    assert X_upper == np.array(2.9e-322, dtype=np.float64)
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(0.0, dtype=np.float64)
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(0.0, dtype=np.float64)

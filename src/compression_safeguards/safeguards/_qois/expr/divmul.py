@@ -309,22 +309,24 @@ def rewrite_left_associative_product_as_exp_sum_of_logs(
     terms_stack: list[tuple[Expr, bool]] = []
 
     while True:
-        terms_stack.append((expr._b, isinstance(expr, ScalarMultiply)))
+        terms_stack.append(
+            (
+                ScalarLog(Logarithm.ln, ScalarFakeAbs(expr._b)),
+                isinstance(expr, ScalarMultiply),
+            )
+        )
 
         if isinstance(expr._a, (ScalarMultiply, ScalarDivide)):
             expr = expr._a
         else:
-            terms_stack.append((expr._a, True))
+            terms_stack.append((ScalarLog(Logarithm.ln, ScalarFakeAbs(expr._a)), True))
             break
 
     while len(terms_stack) > 1:
         (a, _), (b, is_mul) = terms_stack.pop(), terms_stack.pop()
         terms_stack.append(
             (
-                (ScalarAdd if is_mul else ScalarSubtract)(
-                    ScalarLog(Logarithm.ln, ScalarFakeAbs(a)),
-                    ScalarLog(Logarithm.ln, ScalarFakeAbs(b)),
-                ),
+                (ScalarAdd if is_mul else ScalarSubtract)(a, b),
                 True,
             )
         )
