@@ -114,6 +114,10 @@ class ScalarSin(Expr):
         #  arg_lower is also -0.0, same for arg_upper
         # FIXME: how do we handle bounds right next to the peak where the
         #        expression bounds could be exceeded inside the interval?
+        # TODO: the intervals can sometimes be extended if expr_lower <= -1 or
+        #       expr_upper >= 1
+        # TODO: since sin is periodic, an interval union could be used in the
+        #       future
         arg_lower = _where(
             _isinf(argv),
             argv,

@@ -208,6 +208,8 @@ class ScalarSquare(Expr):
         #  - a > 0 and 0 < el <= eu -> al = el, au = eu
         #  - a < 0 and 0 < el <= eu -> al = -eu, au = -el
         #  - el <= 0 -> al = -eu, au = eu
+        # TODO: an interval union could represent that the two sometimes-
+        #       disjoint intervals in the future
         arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
             np.less_equal(expr_lower, 0) | _is_negative(argv), -au, al
         )

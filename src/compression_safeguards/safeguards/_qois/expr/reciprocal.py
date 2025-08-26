@@ -81,6 +81,8 @@ class ScalarReciprocal(Expr):
 
         # compute the argument bounds
         # ensure that reciprocal(...) keeps the same sign as arg
+        # TODO: an interval union could represent that the two disjoint
+        #       intervals in the future
         arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum(
             argv,
             _reciprocal(

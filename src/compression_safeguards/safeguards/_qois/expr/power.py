@@ -90,6 +90,8 @@ class ScalarPower(Expr):
         expr_lower = _where(_is_negative(av), exprv, expr_lower)
         expr_upper = _where(_is_negative(av), exprv, expr_upper)
 
+        # TODO: handle a^const and const^b more efficiently
+
         # inlined outer ScalarFakeAbs
         # flip the lower/upper bounds if the result is negative
         #  since our rewrite below only works with non-negative exprv
