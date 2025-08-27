@@ -78,13 +78,22 @@ class ScalarPower(Expr):
         bv = b.eval(X.shape, Xs, late_bound)
         exprv: np.ndarray[Ps, np.dtype[F]] = np.power(av, bv)
 
+        # TODO: handle a^const and const^b more efficiently
+
+        # rewrite a ** b as fake_abs(e^(b*ln(fake_abs(a))))
+        # this is mathematically incorrect for a <= 0 but works for deriving
+        #  error bounds since fake_abs handles the error bound flips
+        rewritten = ScalarExp(
+            Exponential.exp,
+            ScalarMultiply(self._b, ScalarLog(Logarithm.ln, ScalarFakeAbs(self._a))),
+        )
+        exprv_rewritten = rewritten.eval(X.shape, Xs, late_bound)
+
         # powers of negative numbers are just too tricky since they easily
         #  become NaN, so let's enforce bounds that only contain the original
-        #  expression value
-        expr_lower = _where(_is_negative(av), exprv, expr_lower)
-        expr_upper = _where(_is_negative(av), exprv, expr_upper)
-
-        # TODO: handle a^const and const^b more efficiently
+        #  expression value, but evaluated for the rewritten expression
+        expr_lower = _where(_is_negative(av), exprv_rewritten, expr_lower)
+        expr_upper = _where(_is_negative(av), exprv_rewritten, expr_upper)
 
         # inlined outer ScalarFakeAbs
         # flip the lower/upper bounds if the result is negative
@@ -94,13 +103,7 @@ class ScalarPower(Expr):
             _where(_is_negative(exprv), -expr_lower, expr_upper),
         )
 
-        # rewrite a ** b as fake_abs(e^(b*ln(fake_abs(a))))
-        # this is mathematically incorrect for a <= 0 but works for deriving
-        #  error bounds since fake_abs handles the error bound flips
-        return ScalarExp(
-            Exponential.exp,
-            ScalarMultiply(self._b, ScalarLog(Logarithm.ln, ScalarFakeAbs(self._a))),
-        ).compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
+        return rewritten.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 
     def __repr__(self) -> str:
         return f"{self._a!r} ** {self._b!r}"

@@ -690,10 +690,9 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         (lt, gt, eq, _is_weak) = self._monotonicity.value[int(is_decoded)]
 
         # default to NaN
-        monotonic: np.ndarray[tuple[int, ...], np.dtype[np.float64]] = np.empty(
-            x.shape[:-1]
+        monotonic: np.ndarray[tuple[int, ...], np.dtype[np.float64]] = np.full(
+            x.shape[:-1], np.nan
         )
-        monotonic.fill(np.nan)
 
         # use comparison instead of diff to account for uints
 

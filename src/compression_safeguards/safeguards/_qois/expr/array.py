@@ -170,7 +170,7 @@ class Array(Expr):
         out._array = np.empty((left.shape[0], right.shape[1]), dtype=object)
         for n in range(left.shape[0]):
             for m in range(right.shape[1]):
-                acc = None
+                acc: None | Expr = None
                 for k in range(left.shape[1]):
                     kk = ScalarMultiply(left._array[n, k], right._array[k, m])
                     if acc is None:

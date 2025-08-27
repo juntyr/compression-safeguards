@@ -863,3 +863,22 @@ def test_fuzzer_found_invalid_divide_rewrite():
 
     assert expr.eval((), np.array(X_lower), dict()) == np.array(0.0, dtype=np.float64)
     assert expr.eval((), np.array(X_upper), dict()) == np.array(0.0, dtype=np.float64)
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_power_nan_hang():
+    X = np.array(-1.26836425e-30, dtype=np.float64)
+
+    expr = ScalarPower(ScalarSign(Data(index=())), Data(index=()))
+
+    assert np.isnan(expr.eval((), X, dict()))
+
+    expr_lower = np.array(np.nan, dtype=np.float64)
+    expr_upper = np.array(np.nan, dtype=np.float64)
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(-1.26836425e-30, dtype=np.float64)
+    assert X_upper == np.array(-1.26836425e-30, dtype=np.float64)
+
+    assert np.isnan(expr.eval((), np.array(X_lower), dict()))
+    assert np.isnan(expr.eval((), np.array(X_upper), dict()))

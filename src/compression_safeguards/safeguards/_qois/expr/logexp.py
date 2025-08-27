@@ -96,6 +96,10 @@ class ScalarLog(Expr):
             _maximum(argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_upper)),
         )
 
+        # we need to force argv if expr_lower == expr_upper
+        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
+        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+
         # handle rounding errors in log(exp(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
             lambda arg_lower: (LOGARITHM_UFUNC[self._log])(arg_lower),
