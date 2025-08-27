@@ -2,7 +2,13 @@ from typing import Callable
 
 import numpy as np
 
-from ...utils._compat import _isnan, _nan_to_zero_inf_to_finite, _nextafter, _where
+from ...utils._compat import (
+    _broadcast_to,
+    _isnan,
+    _nan_to_zero_inf_to_finite,
+    _nextafter,
+    _where,
+)
 from ...utils.cast import as_bits
 from .expr.typing import F, Ns, Ps
 
@@ -123,15 +129,11 @@ def guarantee_data_within_expr_bounds(
             ),
         )
 
-        bounds_exceeded: np.ndarray[tuple[int, ...], np.dtype[np.bool]] = (
-            np.broadcast_to(
-                ~in_bounds.reshape(exprv.shape + (1,) * (Xs.ndim - exprv.ndim)),
-                Xs.shape,
-            )
+        bounds_exceeded: np.ndarray[Ns, np.dtype[np.bool]] = _broadcast_to(
+            (~in_bounds).reshape(exprv.shape + (1,) * (Xs.ndim - exprv.ndim)),
+            Xs.shape,
         )
-        assert bounds_exceeded.shape == Xs.shape
-
-        return bounds_exceeded  # type: ignore
+        return bounds_exceeded
 
     # FIXME: what to do about NaNs?
 

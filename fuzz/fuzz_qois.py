@@ -63,7 +63,7 @@ with atheris.instrument_imports():
         Trigonometric,
     )
     from compression_safeguards.safeguards._qois.expr.where import ScalarWhere
-    from compression_safeguards.utils._compat import _isnan, _maximum, _minimum
+    from compression_safeguards.utils._compat import _isnan, _maximum, _minimum, _where
     from compression_safeguards.utils._float128 import _float128_dtype
     from compression_safeguards.utils.typing import T
 
@@ -284,7 +284,7 @@ def check_one_input(data) -> None:
     X_test = np.array(ConsumeDtypeElement(data, dtype))
 
     # ensure that X and X_test agree on NaN
-    X_test = np.where(_isnan(X) != _isnan(X_test), X, X_test)
+    X_test = _where(_isnan(X) != _isnan(X_test), X, X_test)
 
     # ensure that X_lower <= X_test <= X_upper
     # and that -0.0 bounds are handled correctly

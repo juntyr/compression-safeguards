@@ -1108,7 +1108,7 @@ class IntervalUnion(Generic[T, N, U]):
         )
         assert np.all(self.contains(pick))
 
-        return pick.reshape(prediction.shape)  # type: ignore
+        return pick.reshape(prediction.shape)
 
     def pick(
         self, prediction: np.ndarray[S, np.dtype[T]]

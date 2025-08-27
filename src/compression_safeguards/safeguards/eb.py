@@ -368,11 +368,11 @@ def _apply_finite_error_bound(
                 )
 
             lower = from_total_order(
-                to_total_order(lower) + lower_outside_eb,  # type: ignore
+                np.add(to_total_order(lower), lower_outside_eb),  # type: ignore
                 data.dtype,
             )
             upper = from_total_order(
-                to_total_order(upper) - upper_outside_eb,  # type: ignore
+                np.subtract(to_total_order(upper), upper_outside_eb),  # type: ignore
                 data.dtype,
             )
 

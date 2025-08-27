@@ -5,7 +5,7 @@ from warnings import warn
 
 import numpy as np
 
-from ....utils._compat import _e, _pi
+from ....utils._compat import _broadcast_to, _e, _pi
 from ....utils.bindings import Parameter
 from .abc import Expr
 from .typing import F, Ns, Ps, PsI
@@ -85,7 +85,7 @@ class Number(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
         n: F = Xs.dtype.type(self._n)
-        return np.broadcast_to(n, x)  # type: ignore
+        return _broadcast_to(n, x)
 
     def compute_data_bounds_unchecked(
         self,
@@ -186,7 +186,7 @@ class Pi(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
         pi: F = _pi(Xs.dtype)
-        return np.broadcast_to(pi, x)  # type: ignore
+        return _broadcast_to(pi, x)
 
     def compute_data_bounds_unchecked(
         self,
@@ -234,7 +234,7 @@ class Euler(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
         e: F = _e(Xs.dtype)
-        return np.broadcast_to(e, x)  # type: ignore
+        return _broadcast_to(e, x)
 
     def compute_data_bounds_unchecked(
         self,

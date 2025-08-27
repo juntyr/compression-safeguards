@@ -7,11 +7,11 @@ import numpy as np
 from ....utils._compat import (
     _floating_max,
     _floating_smallest_subnormal,
+    _is_negative,
     _isinf,
     _isnan,
     _maximum,
     _minimum,
-    _reciprocal,
     _where,
 )
 from ....utils.bindings import Parameter
@@ -84,12 +84,6 @@ class ScalarMultiply(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        def _is_negative(
-            x: np.ndarray[Ps, np.dtype[F]],
-        ) -> np.ndarray[Ps, np.dtype[np.bool]]:
-            # check not just for x < 0 but also for x == -0.0
-            return (x < 0) | (_reciprocal(x) < 0)  # type: ignore
-
         a_const = not self._a.has_data
         b_const = not self._b.has_data
         assert not (a_const and b_const), "constant product has no error bounds"

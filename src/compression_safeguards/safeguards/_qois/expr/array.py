@@ -147,7 +147,10 @@ class Array(Expr):
     def sum(self) -> Expr:
         acc = None
         for e in self._array.flat:
-            acc = e if acc is None else ScalarAdd(acc, e)  # type: ignore
+            if acc is None:
+                acc = e
+            else:
+                acc = ScalarAdd(acc, e)
         assert acc is not None
         # we can return a group here since acc is not an array
         assert not isinstance(acc, Array)
@@ -170,7 +173,10 @@ class Array(Expr):
                 acc = None
                 for k in range(left.shape[1]):
                     kk = ScalarMultiply(left._array[n, k], right._array[k, m])
-                    acc = kk if acc is None else ScalarAdd(acc, kk)  # type: ignore
+                    if acc is None:
+                        acc = kk
+                    else:
+                        acc = ScalarAdd(acc, kk)
                 assert acc is not None
                 # we can apply a group here since acc is not an array
                 assert not isinstance(acc, Array)

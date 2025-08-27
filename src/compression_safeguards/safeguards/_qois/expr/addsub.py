@@ -4,6 +4,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from ....utils._compat import (
+    _broadcast_to,
     _floating_max,
     _isfinite,
     _isnan,
@@ -368,7 +369,7 @@ def compute_left_associate_sum_data_bounds(
 
         assert total_sum is not None
 
-        return np.broadcast_to(  # type: ignore
+        return _broadcast_to(
             np.array(total_sum).reshape((1,) + exprv.shape),
             (t_stack.shape[0],) + exprv.shape,
         )
@@ -376,7 +377,7 @@ def compute_left_associate_sum_data_bounds(
     # handle rounding errors in the total absolute factor early
     tl_stack = guarantee_arg_within_expr_bounds(
         compute_term_sum,
-        np.broadcast_to(
+        _broadcast_to(
             exprv.reshape((1,) + exprv.shape), (tl_stack.shape[0],) + exprv.shape
         ),
         np.stack(
@@ -387,18 +388,18 @@ def compute_left_associate_sum_data_bounds(
             ]
         ),
         tl_stack,
-        np.broadcast_to(
+        _broadcast_to(
             expr_lower.reshape((1,) + exprv.shape),
             (tl_stack.shape[0],) + exprv.shape,
         ),
-        np.broadcast_to(
+        _broadcast_to(
             expr_upper.reshape((1,) + exprv.shape),
             (tl_stack.shape[0],) + exprv.shape,
         ),
     )
     tu_stack = guarantee_arg_within_expr_bounds(
         compute_term_sum,
-        np.broadcast_to(
+        _broadcast_to(
             exprv.reshape((1,) + exprv.shape), (tu_stack.shape[0],) + exprv.shape
         ),
         np.stack(
@@ -409,11 +410,11 @@ def compute_left_associate_sum_data_bounds(
             ]
         ),
         tu_stack,
-        np.broadcast_to(
+        _broadcast_to(
             expr_lower.reshape((1,) + exprv.shape),
             (tu_stack.shape[0],) + exprv.shape,
         ),
-        np.broadcast_to(
+        _broadcast_to(
             expr_upper.reshape((1,) + exprv.shape),
             (tu_stack.shape[0],) + exprv.shape,
         ),

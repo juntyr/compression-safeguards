@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _reciprocal, _where
+from ....utils._compat import _is_negative, _where
 from ....utils.bindings import Parameter
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
@@ -58,12 +58,6 @@ class ScalarAbs(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        def _is_negative(
-            x: np.ndarray[Ps, np.dtype[F]],
-        ) -> np.ndarray[Ps, np.dtype[np.bool]]:
-            # check not just for x < 0 but also for x == -0.0
-            return (x < 0) | (_reciprocal(x) < 0)  # type: ignore
-
         # evaluate arg
         arg = self._a
         argv = arg.eval(X.shape, Xs, late_bound)

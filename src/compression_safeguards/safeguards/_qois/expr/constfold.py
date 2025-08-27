@@ -3,6 +3,7 @@ from typing import Callable
 
 import numpy as np
 
+from ....utils._compat import _broadcast_to
 from ....utils.bindings import Parameter
 from .abc import Expr
 from .typing import F, Ns, Ps, PsI
@@ -47,7 +48,7 @@ class ScalarFoldedConstant(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         assert isinstance(self._const, Xs.dtype.type)
         const: F = self._const  # type: ignore
-        return np.broadcast_to(const, x)  # type: ignore
+        return _broadcast_to(const, x)
 
     def compute_data_bounds_unchecked(
         self,

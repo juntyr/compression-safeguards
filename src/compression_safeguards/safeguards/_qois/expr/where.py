@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _maximum, _minimum, _where
+from ....utils._compat import _broadcast_to, _maximum, _minimum, _where
 from ....utils.bindings import Parameter
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
@@ -82,7 +82,7 @@ class ScalarWhere(Expr):
         # evaluate the condition
         cond, a, b = self._condition, self._a, self._b
         condv: np.ndarray[Ps, np.dtype[F]] = cond.eval(X.shape, Xs, late_bound)
-        condvb: np.ndarray[Ns, np.dtype[np.bool]] = np.broadcast_to(
+        condvb: np.ndarray[Ns, np.dtype[np.bool]] = _broadcast_to(
             np.array(condv != 0).reshape(X.shape + (1,) * (Xs.ndim - X.ndim)), Xs.shape
         )
 

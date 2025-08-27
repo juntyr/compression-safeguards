@@ -19,6 +19,10 @@ __all__ = [
     "_signbit_non_nan",
     "_minimum",
     "_maximum",
+    "_where",
+    "_broadcast_to",
+    "_is_negative",
+    "_is_positive",
     "_floating_max",
     "_floating_smallest_subnormal",
     "_pi",
@@ -40,7 +44,7 @@ from ._float128 import (
     _float128_smallest_subnormal,
     _float128_type,
 )
-from .typing import F, S, T, Ti
+from .typing import F, S, Si, T, Ti
 
 
 # wrapper around np.isnan that also works for numpy_quaddtype
@@ -336,8 +340,8 @@ def _minimum(a, b):
     if np.issubdtype(a.dtype, np.integer) and np.issubdtype(b.dtype, np.integer):
         return minimum
     minimum_array = np.array(minimum)
-    a = np.broadcast_to(a.astype(minimum_array.dtype), minimum_array.shape)
-    b = np.broadcast_to(b.astype(minimum_array.dtype), minimum_array.shape)
+    a = _broadcast_to(a.astype(minimum_array.dtype), minimum_array.shape)
+    b = _broadcast_to(b.astype(minimum_array.dtype), minimum_array.shape)
     minimum = np.where(
         minimum == 0,
         np.where((a < b) | (_signbit_non_nan(a) > _signbit_non_nan(b)), a, b),
@@ -371,8 +375,8 @@ def _maximum(a, b):
     if np.issubdtype(a.dtype, np.integer) and np.issubdtype(b.dtype, np.integer):
         return maximum
     maximum_array = np.array(maximum)
-    a = np.broadcast_to(a.astype(maximum_array.dtype), maximum_array.shape)
-    b = np.broadcast_to(b.astype(maximum_array.dtype), maximum_array.shape)
+    a = _broadcast_to(a.astype(maximum_array.dtype), maximum_array.shape)
+    b = _broadcast_to(b.astype(maximum_array.dtype), maximum_array.shape)
     maximum = np.where(
         maximum == 0,
         np.where((a > b) | (_signbit_non_nan(a) < _signbit_non_nan(b)), a, b),
@@ -428,6 +432,46 @@ def _where(cond: bool, a: Ti, b: Ti) -> Ti:
 
 def _where(cond, a, b):
     return np.where(cond, a, b)
+
+
+# wrapper around np.broadcast_to but with better type hints
+@overload
+def _broadcast_to(
+    a: np.ndarray[tuple[int, ...], np.dtype[T]], shape: Si
+) -> np.ndarray[Si, np.dtype[T]]:
+    pass
+
+
+@overload
+def _broadcast_to(
+    a: np.ndarray[tuple[int, ...], np.dtype[np.bool]], shape: Si
+) -> np.ndarray[Si, np.dtype[np.bool]]:
+    pass
+
+
+@overload
+def _broadcast_to(a: Ti, shape: Si) -> np.ndarray[Si, np.dtype[Ti]]:
+    pass
+
+
+def _broadcast_to(a, shape):
+    return np.broadcast_to(a, shape)
+
+
+# wrapper around a < 0 that also works for -0.0 (is negative)
+def _is_negative(
+    a: np.ndarray[S, np.dtype[F]],
+) -> np.ndarray[S, np.dtype[np.bool]]:
+    # check not just for a < 0 but also for a == -0.0
+    return np.less(a, 0) | np.less(_reciprocal(a), 0)
+
+
+# wrapper around a > 0 that also works for -0.0 (is not positive)
+def _is_positive(
+    x: np.ndarray[S, np.dtype[F]],
+) -> np.ndarray[S, np.dtype[np.bool]]:
+    # check not just for x > 0 but also for x == +0.0
+    return np.greater(x, 0) | np.greater(_reciprocal(x), 0)
 
 
 # wrapper around np.finfo(dtype).max that also works for numpy_quaddtype
