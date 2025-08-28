@@ -82,6 +82,10 @@ class ScalarSinh(Expr):
         arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum(argv, _asinh(expr_lower))
         arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(argv, _asinh(expr_upper))
 
+        # we need to force argv if expr_lower == expr_upper
+        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
+        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+
         # handle rounding errors in sinh(asinh(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
             lambda arg_lower: _sinh(arg_lower),
@@ -188,6 +192,10 @@ class ScalarAsinh(Expr):
         #  arg_lower is also -0.0, same for arg_upper
         arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum(argv, _sinh(expr_lower))
         arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(argv, _sinh(expr_upper))
+
+        # we need to force argv if expr_lower == expr_upper
+        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
+        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
 
         # handle rounding errors in asinh(sinh(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(

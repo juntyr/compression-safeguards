@@ -8,6 +8,7 @@ from ....utils._compat import (
     _floating_max,
     _floating_smallest_subnormal,
     _is_negative,
+    _isfinite,
     _isinf,
     _isnan,
     _maximum,
@@ -157,6 +158,19 @@ class ScalarMultiply(Expr):
                 ),
             )
 
+            # we need to force argv if expr_lower == expr_upper and constv is
+            #  finite non-zero (in other cases we explicitly expand ranges)
+            term_lower = _where(
+                (expr_lower == expr_upper) & _isfinite(constv) & (constv != 0),
+                termv,
+                term_lower,
+            )
+            term_upper = _where(
+                (expr_lower == expr_upper) & _isfinite(constv) & (constv != 0),
+                termv,
+                term_upper,
+            )
+
             # handle rounding errors in multiply(divide(...)) early
             term_lower = guarantee_arg_within_expr_bounds(
                 lambda term_lower: term_lower * constv,
@@ -287,6 +301,7 @@ class ScalarDivide(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # rewrite division as multiplication by the reciprocal
         return ScalarMultiply(self._a, ScalarReciprocal(self._b)).compute_data_bounds(
             expr_lower, expr_upper, X, Xs, late_bound
         )

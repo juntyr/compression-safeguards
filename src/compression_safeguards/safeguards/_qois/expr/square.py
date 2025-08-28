@@ -95,6 +95,10 @@ class ScalarSqrt(Expr):
             _maximum(argv, _sqrt_inv(expr_upper)),
         )
 
+        # we need to force argv if expr_lower == expr_upper
+        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
+        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+
         # handle rounding errors in sqrt(square(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
             lambda arg_lower: np.sqrt(arg_lower),
@@ -204,17 +208,16 @@ class ScalarSquare(Expr):
         #  - el <= 0 -> al = -eu, au = eu
         # TODO: an interval union could represent that the two sometimes-
         #       disjoint intervals in the future
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
-            np.less_equal(expr_lower, 0) | _is_negative(argv), -au, al
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum(
+            argv, _where(np.less_equal(expr_lower, 0) | _is_negative(argv), -au, al)
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
-            np.greater(expr_lower, 0) & _is_negative(argv), -al, au
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(
+            argv, _where(np.greater(expr_lower, 0) & _is_negative(argv), -al, au)
         )
 
-        # if arg_lower == argv and argv == -0.0, we need to guarantee that
-        #  arg_lower is also -0.0, same for arg_upper
-        arg_lower = _minimum(argv, arg_lower)
-        arg_upper = _maximum(argv, arg_upper)
+        # we need to force argv if expr_lower == expr_upper
+        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
+        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
 
         # handle rounding errors in square(sqrt(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(

@@ -153,6 +153,10 @@ class ScalarSin(Expr):
             ),
         )
 
+        # we need to force argv if expr_lower == expr_upper
+        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
+        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+
         # handle rounding errors in asin(sin(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
             lambda arg_lower: np.sin(arg_lower),
@@ -276,6 +280,14 @@ class ScalarAsin(Expr):
                 X.dtype.type(np.inf),
                 _maximum(argv, np.sin(_minimum(expr_upper, np.divide(pi, 2)))),  # type: ignore
             ),
+        )
+
+        # we need to force argv if expr_lower == expr_upper and abs(argv) < 1
+        arg_lower = _where(
+            (expr_lower == expr_upper) & np.less(np.abs(argv), 1), argv, arg_lower
+        )
+        arg_upper = _where(
+            (expr_lower == expr_upper) & np.less(np.abs(argv), 1), argv, arg_upper
         )
 
         # handle rounding errors in asin(sin(...)) early

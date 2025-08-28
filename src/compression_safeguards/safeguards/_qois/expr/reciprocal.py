@@ -99,6 +99,10 @@ class ScalarReciprocal(Expr):
             ),
         )
 
+        # we need to force argv if expr_lower == expr_upper
+        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
+        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+
         smallest_subnormal = _floating_smallest_subnormal(X.dtype)
 
         # FIXME: since we use reciprocal to rewrite division, we need to ensure
