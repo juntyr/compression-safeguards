@@ -1,6 +1,4 @@
 from collections.abc import Mapping
-from enum import Enum, auto
-from typing import Callable
 
 import numpy as np
 
@@ -13,17 +11,14 @@ from ....utils._compat import (
     _maximum,
     _minimum,
     _nextafter,
-    _reciprocal,
     _sinh,
     _tanh,
     _where,
 )
-from ....utils._float128 import _float128_dtype
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds, guaranteed_data_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
-from .reciprocal import ScalarReciprocal
 from .typing import F, Ns, Ps, PsI
 
 
@@ -660,140 +655,3 @@ class ScalarAtanh(Expr):
 
     def __repr__(self) -> str:
         return f"atanh({self._a!r})"
-
-
-class Hyperbolic(Enum):
-    coth = auto()
-    sech = auto()
-    csch = auto()
-    acoth = auto()
-    asech = auto()
-    acsch = auto()
-
-
-class ScalarHyperbolic(Expr):
-    __slots__ = ("_func", "_a")
-    _func: Hyperbolic
-    _a: Expr
-
-    def __init__(self, func: Hyperbolic, a: Expr):
-        self._func = func
-        self._a = a
-
-    @property
-    def has_data(self) -> bool:
-        return self._a.has_data
-
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarHyperbolic(
-            self._func,
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
-
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        fn = (
-            HYPERBOLIC_QUADDTYPE_UFUNC if dtype == _float128_dtype else HYPERBOLIC_UFUNC
-        )[self._func]
-        return ScalarFoldedConstant.constant_fold_unary(
-            self._a,
-            dtype,
-            fn,  # type: ignore
-            lambda e: ScalarHyperbolic(self._func, e),
-        )
-
-    def eval(
-        self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        fn = (
-            HYPERBOLIC_QUADDTYPE_UFUNC
-            if Xs.dtype == _float128_dtype
-            else HYPERBOLIC_UFUNC
-        )[self._func]
-        return fn(self._a.eval(x, Xs, late_bound))
-
-    def compute_data_bounds_unchecked(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # rewrite hyperbolic functions with base cases for sinh and asinh
-        rewritten = (HYPERBOLIC_REWRITE[self._func])(self._a)
-        exprv_rewritten = rewritten.eval(X.shape, Xs, late_bound)
-
-        # ensure that the bounds at least contain the rewritten expression
-        #  result
-        expr_lower = _minimum(expr_lower, exprv_rewritten)
-        expr_upper = _maximum(expr_upper, exprv_rewritten)
-
-        return rewritten.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
-
-    def __repr__(self) -> str:
-        return f"{self._func.name}({self._a!r})"
-
-
-HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
-    # derived hyperbolic functions
-    # coth(x) = 1 / tanh(x)
-    Hyperbolic.coth: lambda x: ScalarReciprocal(
-        ScalarTanh(x),
-    ),
-    # sech(x) = 1 / cosh(x)
-    Hyperbolic.sech: lambda x: ScalarReciprocal(
-        ScalarCosh(x),
-    ),
-    # csch(x) = 1 / sinh(x)
-    Hyperbolic.csch: lambda x: ScalarReciprocal(
-        ScalarSinh(x),
-    ),
-    # inverse hyperbolic functions
-    # acoth(x) = atanh(1/x)
-    Hyperbolic.acoth: lambda x: ScalarAtanh(
-        ScalarReciprocal(x),
-    ),
-    # asech(x) = acosh(1/x)
-    Hyperbolic.asech: lambda x: ScalarAcosh(
-        ScalarReciprocal(x),
-    ),
-    # acsch(x) = asinh(1/x)
-    Hyperbolic.acsch: lambda x: ScalarAsinh(
-        ScalarReciprocal(x),
-    ),
-}
-
-
-HYPERBOLIC_UFUNC: dict[Hyperbolic, Callable[[np.ndarray], np.ndarray]] = {
-    Hyperbolic.coth: lambda x: _reciprocal(np.tanh(x)),
-    Hyperbolic.sech: lambda x: _reciprocal(np.cosh(x)),
-    Hyperbolic.csch: lambda x: _reciprocal(np.sinh(x)),
-    Hyperbolic.acoth: lambda x: np.atanh(_reciprocal(x)),
-    Hyperbolic.asech: lambda x: np.acosh(_reciprocal(x)),
-    Hyperbolic.acsch: lambda x: np.asinh(_reciprocal(x)),
-}
-
-
-HYPERBOLIC_QUADDTYPE_UFUNC: dict[Hyperbolic, Callable[[np.ndarray], np.ndarray]] = {
-    Hyperbolic.coth: lambda x: _reciprocal(_tanh(x)),
-    Hyperbolic.sech: lambda x: _reciprocal(_cosh(x)),
-    Hyperbolic.csch: lambda x: _reciprocal(_sinh(x)),
-    Hyperbolic.acoth: lambda x: _tanh(_reciprocal(x)),
-    Hyperbolic.asech: lambda x: _acosh(_reciprocal(x)),
-    Hyperbolic.acsch: lambda x: _asinh(_reciprocal(x)),
-}

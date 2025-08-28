@@ -19,12 +19,10 @@ from .expr.finite_difference import (
 )
 from .expr.group import Group
 from .expr.hyperbolic import (
-    Hyperbolic,
     ScalarAcosh,
     ScalarAsinh,
     ScalarAtanh,
     ScalarCosh,
-    ScalarHyperbolic,
     ScalarSinh,
     ScalarTanh,
 )
@@ -525,18 +523,6 @@ class QoIParser(Parser):
     def expr(self, p):  # noqa: F811
         return Array.map(ScalarTanh, p.expr)
 
-    @_("COTH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.coth, e), p.expr)
-
-    @_("SECH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.sech, e), p.expr)
-
-    @_("CSCH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.csch, e), p.expr)
-
     @_("ASINH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map(ScalarAsinh, p.expr)
@@ -548,18 +534,6 @@ class QoIParser(Parser):
     @_("ATANH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map(ScalarAtanh, p.expr)
-
-    @_("ACOTH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.acoth, e), p.expr)
-
-    @_("ASECH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.asech, e), p.expr)
-
-    @_("ACSCH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.acsch, e), p.expr)
 
     # classification
     @_("ISFINITE LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821

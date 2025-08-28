@@ -79,15 +79,9 @@ class QoILexer(Lexer):
         SINH,  # type: ignore[name-defined]  # noqa: F821
         COSH,  # type: ignore[name-defined]  # noqa: F821
         TANH,  # type: ignore[name-defined]  # noqa: F821
-        COTH,  # type: ignore[name-defined]  # noqa: F821
-        SECH,  # type: ignore[name-defined]  # noqa: F821
-        CSCH,  # type: ignore[name-defined]  # noqa: F821
         ASINH,  # type: ignore[name-defined]  # noqa: F821
         ACOSH,  # type: ignore[name-defined]  # noqa: F821
         ATANH,  # type: ignore[name-defined]  # noqa: F821
-        ACOTH,  # type: ignore[name-defined]  # noqa: F821
-        ASECH,  # type: ignore[name-defined]  # noqa: F821
-        ACSCH,  # type: ignore[name-defined]  # noqa: F821
         # classification
         ISFINITE,  # type: ignore[name-defined]  # noqa: F821
         ISINF,  # type: ignore[name-defined]  # noqa: F821
@@ -224,15 +218,9 @@ class QoILexer(Lexer):
     ID["sinh"] = SINH  # type: ignore[index, name-defined]  # noqa: F821
     ID["cosh"] = COSH  # type: ignore[index, name-defined]  # noqa: F821
     ID["tanh"] = TANH  # type: ignore[index, name-defined]  # noqa: F821
-    ID["coth"] = COTH  # type: ignore[index, name-defined]  # noqa: F821
-    ID["sech"] = SECH  # type: ignore[index, name-defined]  # noqa: F821
-    ID["csch"] = CSCH  # type: ignore[index, name-defined]  # noqa: F821
     ID["asinh"] = ASINH  # type: ignore[index, name-defined]  # noqa: F821
     ID["acosh"] = ACOSH  # type: ignore[index, name-defined]  # noqa: F821
     ID["atanh"] = ATANH  # type: ignore[index, name-defined]  # noqa: F821
-    ID["acoth"] = ACOTH  # type: ignore[index, name-defined]  # noqa: F821
-    ID["asech"] = ASECH  # type: ignore[index, name-defined]  # noqa: F821
-    ID["acsch"] = ACSCH  # type: ignore[index, name-defined]  # noqa: F821
     # classification
     ID["isfinite"] = ISFINITE  # type: ignore[index, name-defined]  # noqa: F821
     ID["isinf"] = ISINF  # type: ignore[index, name-defined]  # noqa: F821
@@ -354,15 +342,9 @@ class QoILexer(Lexer):
             "SINH": "`sinh`",
             "COSH": "`cosh`",
             "TANH": "`tanh`",
-            "COTH": "`coth`",
-            "SECH": "`sech`",
-            "CSCH": "`csch`",
             "ASINH": "`asinh`",
             "ACOSH": "`acosh`",
             "ATANH": "`atanh`",
-            "ACOTH": "`acoth`",
-            "ASECH": "`asech`",
-            "ACSCH": "`acsch`",
             # classification
             "ISFINITE": "`isfinite`",
             "ISINF": "`isinf`",

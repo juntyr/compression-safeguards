@@ -9,9 +9,9 @@ from compression_safeguards.safeguards._qois.expr.divmul import (
     ScalarMultiply,
 )
 from compression_safeguards.safeguards._qois.expr.hyperbolic import (
-    Hyperbolic,
+    ScalarAcosh,
     ScalarAsinh,
-    ScalarHyperbolic,
+    ScalarTanh,
 )
 from compression_safeguards.safeguards._qois.expr.literal import Number
 from compression_safeguards.safeguards._qois.expr.power import ScalarPower
@@ -719,7 +719,7 @@ def test_fuzzer_found_bounded_hang():
 
     expr = ScalarPower(
         ScalarSign(Data(index=())),
-        ScalarHyperbolic(Hyperbolic.coth, Data(index=())),
+        ScalarReciprocal(ScalarTanh(Data(index=()))),  # coth(x)
     )
 
     assert expr.eval((), X, dict()) == np.float64(-1.0)
@@ -785,7 +785,7 @@ def test_fuzzer_found_where():
     expr = ScalarWhere(
         ScalarAbs(Data(index=())),
         ScalarAcos(Data(index=())),
-        ScalarHyperbolic(Hyperbolic.asech, Data(index=())),
+        ScalarAcosh(ScalarReciprocal(Data(index=()))),
     )
 
     assert expr.eval((), X, dict()) == np.array(np.float16(np.inf))

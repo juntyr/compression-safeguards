@@ -29,12 +29,10 @@ with atheris.instrument_imports():
     )
     from compression_safeguards.safeguards._qois.expr.group import Group
     from compression_safeguards.safeguards._qois.expr.hyperbolic import (
-        Hyperbolic,
         ScalarAcosh,
         ScalarAsinh,
         ScalarAtanh,
         ScalarCosh,
-        ScalarHyperbolic,
         ScalarSinh,
         ScalarTanh,
     )
@@ -104,15 +102,9 @@ UNARY_EXPRESSIONS: list[Callable[[Expr], Expr]] = [
     ScalarSinh,
     ScalarCosh,
     ScalarTanh,
-    lambda a: ScalarHyperbolic(Hyperbolic.coth, a),
-    lambda a: ScalarHyperbolic(Hyperbolic.sech, a),
-    lambda a: ScalarHyperbolic(Hyperbolic.csch, a),
     ScalarAsinh,
     ScalarAcosh,
     ScalarAtanh,
-    lambda a: ScalarHyperbolic(Hyperbolic.acoth, a),
-    lambda a: ScalarHyperbolic(Hyperbolic.asech, a),
-    lambda a: ScalarHyperbolic(Hyperbolic.acsch, a),
     lambda a: ScalarExp(Exponential.exp, a),
     lambda a: ScalarExp(Exponential.exp2, a),
     lambda a: ScalarExp(Exponential.exp10, a),

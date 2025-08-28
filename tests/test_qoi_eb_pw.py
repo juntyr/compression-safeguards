@@ -379,7 +379,7 @@ def test_trigonometric(check):
 
     check("asin(x) * asin(0.5)")
     check("acos(x) * acos(0.5)")
-    check("atan(x) * acos(0.5)")
+    check("atan(x) * atan(0.5)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -387,19 +387,18 @@ def test_hyperbolic(check):
     check("sinh(x)")
     check("cosh(x)")
     check("tanh(x)")
-    check("coth(x)")
-    check("sech(x)")
-    check("csch(x)")
 
     check("asinh(x)")
     check("acosh(x)")
     check("atanh(x)")
-    check("acoth(x)")
-    check("asech(x)")
-    check("acsch(x)")
 
     check("sinh(x) * sinh(1.5)")
+    check("cosh(x) * cosh(1.5)")
+    check("tanh(x) * tanh(1.5)")
+
     check("asinh(x) * asinh(1.5)")
+    check("acosh(x) * acosh(1.5)")
+    check("atanh(x) * atanh(0.5)")
 
 
 @pytest.mark.parametrize("check", CHECKS)

@@ -173,15 +173,9 @@ functions =
   | "sinh", "(", expr, [","], ")"  (* hyperbolic sine sinh(x) *)
   | "cosh", "(", expr, [","], ")"  (* hyperbolic cosine cosh(x) *)
   | "tanh", "(", expr, [","], ")"  (* hyperbolic tangent tanh(x) *)
-  | "coth", "(", expr, [","], ")"  (* hyperbolic cotangent coth(x) *)
-  | "sech", "(", expr, [","], ")"  (* hyperbolic secant sech(x) *)
-  | "csch", "(", expr, [","], ")"  (* hyperbolic cosecant csch(x) *)
   | "asinh", "(", expr, [","], ")"  (* inverse hyperbolic sine asinh(x) *)
   | "acosh", "(", expr, [","], ")"  (* inverse hyperbolic cosine acosh(x) *)
   | "atanh", "(", expr, [","], ")"  (* inverse hyperbolic tangent atanh(x) *)
-  | "acoth", "(", expr, [","], ")"  (* inverse hyperbolic cotangent acoth(x) *)
-  | "asech", "(", expr, [","], ")"  (* inverse hyperbolic secant asech(x) *)
-  | "acsch", "(", expr, [","], ")"  (* inverse hyperbolic cosecant acsch(x) *)
   | "isfinite", "(", expr, [","], ")"  (* 1 if finite, 0 if inf or NaN *)
   | "isinf", "(", expr, [","], ")"  (* 1 if inf, 0 if finite or NaN *)
   | "isnan", "(", expr, [","], ")"  (* 1 if NaN, 0 if finite or inf *)
@@ -326,15 +320,9 @@ The operators and functions in the above QoI grammar are evaluated using
 | `sinh` | `np.sinh` | `sinh` |
 | `cosh` | `np.cosh` | `cosh` |
 | `tanh` | `np.tanh` | `tanh` |
-| `coth` | `np.reciprocal(np.tanh(a))` | |
-| `sech` | `np.reciprocal(np.cosh(a))` | |
-| `csch` | `np.reciprocal(np.sinh(a))` | |
 | `asinh` | `np.arcsinh` | `asinh` |
 | `acosh` | `np.arccosh` | `acosh` |
 | `atanh` | `np.arctanh` | `atanh` |
-| `acoth` | `np.arctanh(np.reciprocal(a))` | |
-| `asech` | `np.arccosh(np.reciprocal(a))` | |
-| `acsch` | `np.arcsinh(np.reciprocal(a))` | |
 | `isfinite` | `np.isfinite` | `isfinite` |
 | `isinf` | `np.isinf` | `isinf` |
 | `isnan` | `np.isnan` | `isnan` |
