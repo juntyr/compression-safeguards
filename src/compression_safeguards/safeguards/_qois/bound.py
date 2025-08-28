@@ -128,8 +128,8 @@ def guarantee_data_within_expr_bounds(
             _isnan(exprv_Xs_bound_guess),
             # otherwise check that the expression result is in bounds
             (
-                (exprv_Xs_bound_guess >= expr_lower)
-                & (exprv_Xs_bound_guess <= expr_upper)
+                np.greater_equal(exprv_Xs_bound_guess, expr_lower)
+                & np.less_equal(exprv_Xs_bound_guess, expr_upper)
             ),
         )
 

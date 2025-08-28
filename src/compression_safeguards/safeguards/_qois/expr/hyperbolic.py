@@ -302,8 +302,8 @@ class ScalarHyperbolic(Expr):
         if self._func == Hyperbolic.acosh:
             # acosh(arg < 1) = NaN but the rewrite doesn't fully capture this,
             #  so instead force arg to remain the same in that case
-            expr_lower = _where(argv < 1, exprv_rewritten, expr_lower)
-            expr_upper = _where(argv < 1, exprv_rewritten, expr_upper)
+            expr_lower = _where(np.less(argv, 1), exprv_rewritten, expr_lower)
+            expr_upper = _where(np.less(argv, 1), exprv_rewritten, expr_upper)
 
         # ensure that the bounds at least contain the rewritten expression
         #  result

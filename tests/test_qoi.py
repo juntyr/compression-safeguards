@@ -20,7 +20,9 @@ from compression_safeguards.safeguards._qois.expr.round import ScalarRoundTiesEv
 from compression_safeguards.safeguards._qois.expr.sign import ScalarSign
 from compression_safeguards.safeguards._qois.expr.square import ScalarSquare
 from compression_safeguards.safeguards._qois.expr.trigonometric import (
+    ScalarAcos,
     ScalarAsin,
+    ScalarCos,
     ScalarSin,
     ScalarTrigonometric,
     Trigonometric,
@@ -783,7 +785,7 @@ def test_fuzzer_found_where():
 
     expr = ScalarWhere(
         ScalarAbs(Data(index=())),
-        ScalarTrigonometric(Trigonometric.acos, Data(index=())),
+        ScalarAcos(Data(index=())),
         ScalarHyperbolic(Hyperbolic.asech, Data(index=())),
     )
 
@@ -805,7 +807,7 @@ def test_fuzzer_found_inconsistent_where():
     X = np.array(_float128("-1.797693134862315708145274237317044e+308"))
 
     expr = ScalarWhere(
-        ScalarTrigonometric(Trigonometric.acos, Data(index=())),
+        ScalarAcos(Data(index=())),
         ScalarRoundTiesEven(Data(index=())),
         ScalarTrigonometric(Trigonometric.acot, Data(index=())),
     )
@@ -825,7 +827,7 @@ def test_fuzzer_found_inconsistent_where():
 def test_fuzzer_found_cosine_monotonicity():
     X = np.array(0.1133, dtype=np.float16)
 
-    expr = ScalarTrigonometric(Trigonometric.cos, Data(index=()))
+    expr = ScalarCos(Data(index=()))
 
     assert expr.eval((), X, dict()) == np.array(0.9937, dtype=np.float16)
 

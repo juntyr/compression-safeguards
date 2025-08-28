@@ -28,8 +28,12 @@ from .expr.round import ScalarCeil, ScalarFloor, ScalarRoundTiesEven, ScalarTrun
 from .expr.sign import ScalarSign
 from .expr.square import ScalarSqrt, ScalarSquare
 from .expr.trigonometric import (
+    ScalarAcos,
     ScalarAsin,
+    ScalarAtan,
+    ScalarCos,
     ScalarSin,
+    ScalarTan,
     ScalarTrigonometric,
     Trigonometric,
 )
@@ -483,11 +487,11 @@ class QoIParser(Parser):
 
     @_("COS LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.cos, e), p.expr)
+        return Array.map(ScalarCos, p.expr)
 
     @_("TAN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.tan, e), p.expr)
+        return Array.map(ScalarTan, p.expr)
 
     @_("COT LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -507,11 +511,11 @@ class QoIParser(Parser):
 
     @_("ACOS LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.acos, e), p.expr)
+        return Array.map(ScalarAcos, p.expr)
 
     @_("ATAN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.atan, e), p.expr)
+        return Array.map(ScalarAtan, p.expr)
 
     @_("ACOT LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
