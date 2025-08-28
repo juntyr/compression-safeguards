@@ -72,15 +72,9 @@ class QoILexer(Lexer):
         SIN,  # type: ignore[name-defined]  # noqa: F821
         COS,  # type: ignore[name-defined]  # noqa: F821
         TAN,  # type: ignore[name-defined]  # noqa: F821
-        COT,  # type: ignore[name-defined]  # noqa: F821
-        SEC,  # type: ignore[name-defined]  # noqa: F821
-        CSC,  # type: ignore[name-defined]  # noqa: F821
         ASIN,  # type: ignore[name-defined]  # noqa: F821
         ACOS,  # type: ignore[name-defined]  # noqa: F821
         ATAN,  # type: ignore[name-defined]  # noqa: F821
-        ACOT,  # type: ignore[name-defined]  # noqa: F821
-        ASEC,  # type: ignore[name-defined]  # noqa: F821
-        ACSC,  # type: ignore[name-defined]  # noqa: F821
         # hyperbolic
         SINH,  # type: ignore[name-defined]  # noqa: F821
         COSH,  # type: ignore[name-defined]  # noqa: F821
@@ -223,15 +217,9 @@ class QoILexer(Lexer):
     ID["sin"] = SIN  # type: ignore[index, name-defined]  # noqa: F821
     ID["cos"] = COS  # type: ignore[index, name-defined]  # noqa: F821
     ID["tan"] = TAN  # type: ignore[index, name-defined]  # noqa: F821
-    ID["cot"] = COT  # type: ignore[index, name-defined]  # noqa: F821
-    ID["sec"] = SEC  # type: ignore[index, name-defined]  # noqa: F821
-    ID["csc"] = CSC  # type: ignore[index, name-defined]  # noqa: F821
     ID["asin"] = ASIN  # type: ignore[index, name-defined]  # noqa: F821
     ID["acos"] = ACOS  # type: ignore[index, name-defined]  # noqa: F821
     ID["atan"] = ATAN  # type: ignore[index, name-defined]  # noqa: F821
-    ID["acot"] = ACOT  # type: ignore[index, name-defined]  # noqa: F821
-    ID["asec"] = ASEC  # type: ignore[index, name-defined]  # noqa: F821
-    ID["acsc"] = ACSC  # type: ignore[index, name-defined]  # noqa: F821
     # hyperbolic
     ID["sinh"] = SINH  # type: ignore[index, name-defined]  # noqa: F821
     ID["cosh"] = COSH  # type: ignore[index, name-defined]  # noqa: F821
@@ -359,15 +347,9 @@ class QoILexer(Lexer):
             "SIN": "`sin`",
             "COS": "`cos`",
             "TAN": "`tan`",
-            "COT": "`cot`",
-            "SEC": "`sec`",
-            "CSC": "`csc`",
             "ASIN": "`asin`",
             "ACOS": "`acos`",
             "ATAN": "`atan`",
-            "ACOT": "`acot`",
-            "ASEC": "`asec`",
-            "ACSC": "`acsc`",
             # hyperbolic
             "SINH": "`sinh`",
             "COSH": "`cosh`",

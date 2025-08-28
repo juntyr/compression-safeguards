@@ -167,15 +167,9 @@ functions =
   | "sin", "(", expr, [","], ")"  (* sine sin(x) *)
   | "cos", "(", expr, [","], ")"  (* cosine cos(x) *)
   | "tan", "(", expr, [","], ")"  (* tangent tan(x) *)
-  | "cot", "(", expr, [","], ")"  (* cotangent cot(x) *)
-  | "sec", "(", expr, [","], ")"  (* secant sec(x) *)
-  | "csc", "(", expr, [","], ")"  (* cosecant csc(x) *)
   | "asin", "(", expr, [","], ")"  (* inverse sine asin(x) *)
   | "acos", "(", expr, [","], ")"  (* inverse cosine acos(x) *)
   | "atan", "(", expr, [","], ")"  (* inverse tangent atan(x) *)
-  | "acot", "(", expr, [","], ")"  (* inverse cotangent acot(x) *)
-  | "asec", "(", expr, [","], ")"  (* inverse secant asec(x) *)
-  | "acsc", "(", expr, [","], ")"  (* inverse cosecant acsc(x) *)
   | "sinh", "(", expr, [","], ")"  (* hyperbolic sine sinh(x) *)
   | "cosh", "(", expr, [","], ")"  (* hyperbolic cosine cosh(x) *)
   | "tanh", "(", expr, [","], ")"  (* hyperbolic tangent tanh(x) *)
@@ -326,15 +320,9 @@ The operators and functions in the above QoI grammar are evaluated using
 | `sin` | `np.sin` | `sin` |
 | `cos` | `np.cos` | `cos` |
 | `tan` | `np.tan` | `tan` |
-| `cot` | `np.reciprocal(np.tan(a))` | |
-| `sec` | `np.reciprocal(np.cos(a))` | |
-| `csc` | `np.reciprocal(np.sin(a))` | |
 | `asin` | `np.arcsin` | `asin` |
 | `acos` | `np.arccos` | `acos` |
 | `atan` | `np.arctan` | `atan` |
-| `acot` | `np.arctan(np.reciprocal(a))` | |
-| `asec` | `np.arccos(np.reciprocal(a))` | |
-| `acsc` | `np.arcsin(np.reciprocal(a))` | |
 | `sinh` | `np.sinh` | `sinh` |
 | `cosh` | `np.cosh` | `cosh` |
 | `tanh` | `np.tanh` | `tanh` |

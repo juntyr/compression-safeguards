@@ -22,10 +22,9 @@ from compression_safeguards.safeguards._qois.expr.square import ScalarSquare
 from compression_safeguards.safeguards._qois.expr.trigonometric import (
     ScalarAcos,
     ScalarAsin,
+    ScalarAtan,
     ScalarCos,
     ScalarSin,
-    ScalarTrigonometric,
-    Trigonometric,
 )
 from compression_safeguards.safeguards._qois.expr.where import ScalarWhere
 from compression_safeguards.safeguards._qois.interval import (
@@ -809,7 +808,7 @@ def test_fuzzer_found_inconsistent_where():
     expr = ScalarWhere(
         ScalarAcos(Data(index=())),
         ScalarRoundTiesEven(Data(index=())),
-        ScalarTrigonometric(Trigonometric.acot, Data(index=())),
+        ScalarReciprocal(ScalarAtan(Data(index=()))),  # acot(x)
     )
 
     assert expr.eval((), X, dict()) == np.array(

@@ -1,6 +1,4 @@
 from collections.abc import Mapping
-from enum import Enum, auto
-from typing import Callable
 
 import numpy as np
 
@@ -11,14 +9,12 @@ from ....utils._compat import (
     _minimum,
     _nextafter,
     _pi,
-    _reciprocal,
     _where,
 )
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds, guaranteed_data_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
-from .reciprocal import ScalarReciprocal
 from .typing import F, Ns, Ps, PsI
 
 
@@ -809,121 +805,3 @@ class ScalarAtan(Expr):
 
     def __repr__(self) -> str:
         return f"atan({self._a!r})"
-
-
-class Trigonometric(Enum):
-    cot = auto()
-    sec = auto()
-    csc = auto()
-    acot = auto()
-    asec = auto()
-    acsc = auto()
-
-
-class ScalarTrigonometric(Expr):
-    __slots__ = ("_func", "_a")
-    _func: Trigonometric
-    _a: Expr
-
-    def __init__(self, func: Trigonometric, a: Expr):
-        self._func = func
-        self._a = a
-
-    @property
-    def has_data(self) -> bool:
-        return self._a.has_data
-
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarTrigonometric(
-            self._func,
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
-
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return ScalarFoldedConstant.constant_fold_unary(
-            self._a,
-            dtype,
-            TRIGONOMETRIC_UFUNC[self._func],  # type: ignore
-            lambda e: ScalarTrigonometric(self._func, e),
-        )
-
-    def eval(
-        self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return (TRIGONOMETRIC_UFUNC[self._func])(self._a.eval(x, Xs, late_bound))
-
-    def compute_data_bounds_unchecked(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # rewrite trigonometric functions with base cases for sin and asin
-        rewritten = (TRIGONOMETRIC_REWRITE[self._func])(self._a)
-        exprv_rewritten = rewritten.eval(X.shape, Xs, late_bound)
-
-        # ensure that the bounds at least contain the rewritten expression
-        #  result
-        expr_lower = _minimum(expr_lower, exprv_rewritten)
-        expr_upper = _maximum(expr_upper, exprv_rewritten)
-
-        return rewritten.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
-
-    def __repr__(self) -> str:
-        return f"{self._func.name}({self._a!r})"
-
-
-TRIGONOMETRIC_REWRITE: dict[Trigonometric, Callable[[Expr], Expr]] = {
-    # derived trigonometric functions
-    # cot(x) = 1 / tan(x)
-    Trigonometric.cot: lambda x: ScalarReciprocal(
-        ScalarTan(x),
-    ),
-    # sec(x) = 1 / cos(x)
-    Trigonometric.sec: lambda x: ScalarReciprocal(
-        ScalarCos(x),
-    ),
-    # csc(x) = 1 / sin(x)
-    Trigonometric.csc: lambda x: ScalarReciprocal(
-        ScalarSin(x),
-    ),
-    # inverse trigonometric functions
-    # acot(x) = atan(1/x)
-    Trigonometric.acot: lambda x: ScalarAtan(
-        ScalarReciprocal(x),
-    ),
-    # asec(x) = acos(1/x)
-    Trigonometric.asec: lambda x: ScalarAcos(
-        ScalarReciprocal(x),
-    ),
-    # acsc(x) = asin(1/x)
-    Trigonometric.acsc: lambda x: ScalarAsin(
-        ScalarReciprocal(x),
-    ),
-}
-
-TRIGONOMETRIC_UFUNC: dict[Trigonometric, Callable[[np.ndarray], np.ndarray]] = {
-    Trigonometric.cot: lambda x: _reciprocal(np.tan(x)),
-    Trigonometric.sec: lambda x: _reciprocal(np.cos(x)),
-    Trigonometric.csc: lambda x: _reciprocal(np.sin(x)),
-    Trigonometric.acot: lambda x: np.atan(_reciprocal(x)),
-    Trigonometric.asec: lambda x: np.acos(_reciprocal(x)),
-    Trigonometric.acsc: lambda x: np.asin(_reciprocal(x)),
-}

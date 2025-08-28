@@ -63,8 +63,6 @@ with atheris.instrument_imports():
         ScalarCos,
         ScalarSin,
         ScalarTan,
-        ScalarTrigonometric,
-        Trigonometric,
     )
     from compression_safeguards.safeguards._qois.expr.where import ScalarWhere
     from compression_safeguards.utils._compat import _isnan, _maximum, _minimum, _where
@@ -129,15 +127,9 @@ UNARY_EXPRESSIONS: list[Callable[[Expr], Expr]] = [
     ScalarSin,
     ScalarCos,
     ScalarTan,
-    lambda a: ScalarTrigonometric(Trigonometric.cot, a),
-    lambda a: ScalarTrigonometric(Trigonometric.sec, a),
-    lambda a: ScalarTrigonometric(Trigonometric.csc, a),
     ScalarAsin,
     ScalarAcos,
     ScalarAtan,
-    lambda a: ScalarTrigonometric(Trigonometric.acot, a),
-    lambda a: ScalarTrigonometric(Trigonometric.asec, a),
-    lambda a: ScalarTrigonometric(Trigonometric.acsc, a),
 ]
 BINARY_EXPRESSIONS: list[Callable[[Expr, Expr], Expr]] = [
     ScalarAdd,

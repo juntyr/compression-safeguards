@@ -368,16 +368,18 @@ def test_trigonometric(check):
     check("sin(x)")
     check("cos(x)")
     check("tan(x)")
-    check("cot(x)")
-    check("sec(x)")
-    check("csc(x)")
 
     check("asin(x)")
     check("acos(x)")
     check("atan(x)")
-    check("acot(x)")
-    check("asec(x)")
-    check("acsc(x)")
+
+    check("sin(x) * sin(1.5)")
+    check("cos(x) * cos(1.5)")
+    check("tan(x) * tan(1.5)")
+
+    check("asin(x) * asin(0.5)")
+    check("acos(x) * acos(0.5)")
+    check("atan(x) * acos(0.5)")
 
 
 @pytest.mark.parametrize("check", CHECKS)

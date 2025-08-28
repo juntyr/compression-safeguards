@@ -34,8 +34,6 @@ from .expr.trigonometric import (
     ScalarCos,
     ScalarSin,
     ScalarTan,
-    ScalarTrigonometric,
-    Trigonometric,
 )
 from .expr.where import ScalarWhere
 from .lexer import QoILexer
@@ -493,18 +491,6 @@ class QoIParser(Parser):
     def expr(self, p):  # noqa: F811
         return Array.map(ScalarTan, p.expr)
 
-    @_("COT LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.cot, e), p.expr)
-
-    @_("SEC LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.sec, e), p.expr)
-
-    @_("CSC LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.csc, e), p.expr)
-
     @_("ASIN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map(ScalarAsin, p.expr)
@@ -516,18 +502,6 @@ class QoIParser(Parser):
     @_("ATAN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map(ScalarAtan, p.expr)
-
-    @_("ACOT LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.acot, e), p.expr)
-
-    @_("ASEC LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.asec, e), p.expr)
-
-    @_("ACSC LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarTrigonometric(Trigonometric.acsc, e), p.expr)
 
     # hyperbolic
     @_("SINH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
