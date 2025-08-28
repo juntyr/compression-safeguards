@@ -11,6 +11,8 @@ class QoILexer(Lexer):
         # literals
         INTEGER,  # type: ignore[name-defined]  # noqa: F821
         FLOAT,  # type: ignore[name-defined]  # noqa: F821
+        INF,  # type: ignore[name-defined]  # noqa: F821
+        NAN,  # type: ignore[name-defined]  # noqa: F821
         STRING,  # type: ignore[name-defined]  # noqa: F821
         # operators
         PLUS,  # type: ignore[name-defined]  # noqa: F821
@@ -177,6 +179,10 @@ class QoILexer(Lexer):
     # statements
     ID["return"] = RETURN  # type: ignore[index, name-defined]  # noqa: F821
 
+    # literals
+    ID["Inf"] = INF  # type: ignore[index, name-defined]  # noqa: F821
+    ID["NaN"] = NAN  # type: ignore[index, name-defined]  # noqa: F821
+
     # constants
     ID["e"] = EULER  # type: ignore[index, name-defined]  # noqa: F821
     ID["pi"] = PI  # type: ignore[index, name-defined]  # noqa: F821
@@ -292,6 +298,8 @@ class QoILexer(Lexer):
             # literals
             "INTEGER": "integer",
             "FLOAT": "floating-point number",
+            "Inf": "`Inf`",
+            "NaN": "`NaN`",
             "STRING": "string",
             # operators
             "PLUS": "`+`",

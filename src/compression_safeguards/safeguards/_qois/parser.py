@@ -178,6 +178,14 @@ class QoIParser(Parser):
     def expr(self, p):  # noqa: F811
         return Number(p.FLOAT)
 
+    @_("INF")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Number("inf")
+
+    @_("NAN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Number("nan")
+
     # array literal
     @_("LBRACK expr many_comma_expr RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811

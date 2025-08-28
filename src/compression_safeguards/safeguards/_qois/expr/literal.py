@@ -98,7 +98,12 @@ class Number(Expr):
         assert False, "number literals have no data bounds"
 
     def as_int(self) -> None | int:
-        if ("." in self._n) or ("e" in self._n):
+        if (
+            ("." in self._n)
+            or ("e" in self._n)
+            or ("inf" in self._n)
+            or ("nan" in self._n)
+        ):
             return None
         try:
             return int(self._n)

@@ -4,7 +4,7 @@ from timeoutcontext import timeout
 with atheris.instrument_imports():
     import sys
     import warnings
-    from typing import Any, Callable
+    from typing import Callable
 
     import numpy as np
 
@@ -81,11 +81,11 @@ DTYPES = [
     _float128_dtype,
 ]
 
-NULLARY_EXPRESSIONS: list[Callable[[Any, np.dtype], Expr]] = [
+NULLARY_EXPRESSIONS: list[Callable[[atheris.FuzzedDataProvider, np.dtype], Expr]] = [
     lambda data, dtype: Euler(),
     lambda data, dtype: Pi(),
     lambda data, dtype: Number(f"{data.ConsumeInt(4)}"),
-    lambda data, dtype: Number(f"{data.ConsumeRegularFloat()}"),
+    lambda data, dtype: Number(f"{data.ConsumeFloat()}"),
     lambda data, dtype: ScalarFoldedConstant(ConsumeDtypeElement(data, dtype)),
     lambda data, dtype: Data(index=()),
 ]

@@ -117,6 +117,10 @@ def generate_parameter(
         PointwiseQuantityOfInterestExpression,
         StencilQuantityOfInterestExpression,
     ):
+
+        def consume_float_str(data: atheris.FuzzedDataProvider) -> str:
+            return str(data.ConsumeFloat()).replace("nan", "NaN").replace("inf", "Inf")
+
         ATOMS = [
             # number literals
             int,
@@ -222,7 +226,7 @@ def generate_parameter(
             if atom is int:
                 atom = str(data.ConsumeInt(2))
             elif atom is float:
-                atom = str(data.ConsumeRegularFloat())
+                atom = consume_float_str(data)
             elif atom == "variable":
                 atom = f'{"v" if ty is PointwiseQuantityOfInterestExpression else "V"}["{data.ConsumeString(2)}"]'
             atoms.append(atom)
@@ -259,7 +263,7 @@ def generate_parameter(
                 atoms.append(f"({atom1}).T")
             elif op == "finite_difference":
                 atoms.append(
-                    f"finite_difference({atom1}, order={data.ConsumeIntInRange(0, 3)}, accuracy={data.ConsumeIntInRange(1, 4)}, type={data.ConsumeIntInRange(-1, 1)}, axis={data.ConsumeIntInRange(0, 1)}, grid_spacing={data.ConsumeRegularFloat()})"
+                    f"finite_difference({atom1}, order={data.ConsumeIntInRange(0, 3)}, accuracy={data.ConsumeIntInRange(1, 4)}, type={data.ConsumeIntInRange(-1, 1)}, axis={data.ConsumeIntInRange(0, 1)}, grid_spacing={consume_float_str(data)})"
                 )
             else:
                 atoms.append(f"{op}({atom1}, {', '.join(atomn)})")

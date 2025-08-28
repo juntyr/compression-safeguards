@@ -209,6 +209,12 @@ def test_constant(check):
     with pytest.raises(AssertionError, match="constant"):
         check("0")
     with pytest.raises(AssertionError, match="constant"):
+        check("NaN")
+    with pytest.raises(AssertionError, match="constant"):
+        check("Inf")
+    with pytest.raises(AssertionError, match="constant"):
+        check("-Inf")
+    with pytest.raises(AssertionError, match="constant"):
         check("pi")
     with pytest.raises(AssertionError, match="constant"):
         check("e")

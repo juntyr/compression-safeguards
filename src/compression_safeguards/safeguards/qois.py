@@ -57,6 +57,8 @@ expr =
 number =
     integer
   | float
+  | "Inf"  (* infinity *)
+  | "NaN"  (* not a number *)
 ;
 
 integer =
