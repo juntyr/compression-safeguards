@@ -30,9 +30,13 @@ with atheris.instrument_imports():
     from compression_safeguards.safeguards._qois.expr.group import Group
     from compression_safeguards.safeguards._qois.expr.hyperbolic import (
         Hyperbolic,
+        ScalarAcosh,
         ScalarAsinh,
+        ScalarAtanh,
+        ScalarCosh,
         ScalarHyperbolic,
         ScalarSinh,
+        ScalarTanh,
     )
     from compression_safeguards.safeguards._qois.expr.literal import Euler, Number, Pi
     from compression_safeguards.safeguards._qois.expr.logexp import (
@@ -98,14 +102,14 @@ UNARY_EXPRESSIONS: list[Callable[[Expr], Expr]] = [
     ScalarIsNaN,
     Group,
     ScalarSinh,
-    lambda a: ScalarHyperbolic(Hyperbolic.cosh, a),
-    lambda a: ScalarHyperbolic(Hyperbolic.tanh, a),
+    ScalarCosh,
+    ScalarTanh,
     lambda a: ScalarHyperbolic(Hyperbolic.coth, a),
     lambda a: ScalarHyperbolic(Hyperbolic.sech, a),
     lambda a: ScalarHyperbolic(Hyperbolic.csch, a),
     ScalarAsinh,
-    lambda a: ScalarHyperbolic(Hyperbolic.acosh, a),
-    lambda a: ScalarHyperbolic(Hyperbolic.atanh, a),
+    ScalarAcosh,
+    ScalarAtanh,
     lambda a: ScalarHyperbolic(Hyperbolic.acoth, a),
     lambda a: ScalarHyperbolic(Hyperbolic.asech, a),
     lambda a: ScalarHyperbolic(Hyperbolic.acsch, a),

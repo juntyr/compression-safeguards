@@ -18,7 +18,16 @@ from .expr.finite_difference import (
     finite_difference_offsets,
 )
 from .expr.group import Group
-from .expr.hyperbolic import Hyperbolic, ScalarAsinh, ScalarHyperbolic, ScalarSinh
+from .expr.hyperbolic import (
+    Hyperbolic,
+    ScalarAcosh,
+    ScalarAsinh,
+    ScalarAtanh,
+    ScalarCosh,
+    ScalarHyperbolic,
+    ScalarSinh,
+    ScalarTanh,
+)
 from .expr.literal import Euler, Number, Pi
 from .expr.logexp import Exponential, Logarithm, ScalarExp, ScalarLog, ScalarLogWithBase
 from .expr.neg import ScalarNegate
@@ -510,11 +519,11 @@ class QoIParser(Parser):
 
     @_("COSH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.cosh, e), p.expr)
+        return Array.map(ScalarCosh, p.expr)
 
     @_("TANH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.tanh, e), p.expr)
+        return Array.map(ScalarTanh, p.expr)
 
     @_("COTH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
@@ -534,11 +543,11 @@ class QoIParser(Parser):
 
     @_("ACOSH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.acosh, e), p.expr)
+        return Array.map(ScalarAcosh, p.expr)
 
     @_("ATANH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
-        return Array.map(lambda e: ScalarHyperbolic(Hyperbolic.atanh, e), p.expr)
+        return Array.map(ScalarAtanh, p.expr)
 
     @_("ACOTH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811

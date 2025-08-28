@@ -15,7 +15,11 @@ __all__ = [
     "_symmetric_modulo",
     "_rint",
     "_sinh",
+    "_cosh",
+    "_tanh",
     "_asinh",
+    "_acosh",
+    "_atanh",
     "_signbit_non_nan",
     "_minimum",
     "_maximum",
@@ -289,6 +293,29 @@ def _sinh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
     return np.where(sinh == a, a, sinh)  # type: ignore
 
 
+# wrapper around np.cosh(a) that also works for numpy_quaddtype
+def _cosh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
+        return np.cosh(a)  # type: ignore
+
+    return np.divide(np.add(np.exp(a), np.exp(-a)), 2)
+
+
+# wrapper around np.tanh(a) that also works for numpy_quaddtype
+def _tanh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
+        return np.tanh(a)  # type: ignore
+
+    tanh = (np.exp(a * 2) - 1) / (np.exp(a * 2) + 1)
+
+    # propagate tanh(-0.0) = -0.0
+    return np.where(tanh == a, a, tanh)  # type: ignore
+
+
 # wrapper around np.asinh(a) that also works for numpy_quaddtype
 def _asinh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
     if (type(a) is not _float128_type) and (
@@ -303,6 +330,29 @@ def _asinh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
 
     # propagate asinh(-0.0) = -0.0
     return np.where(asinh == a, a, asinh)  # type: ignore
+
+
+# wrapper around np.acosh(a) that also works for numpy_quaddtype
+def _acosh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
+        return np.acosh(a)  # type: ignore
+
+    return np.log(a + np.sqrt(np.square(a) - 1))
+
+
+# wrapper around np.atanh(a) that also works for numpy_quaddtype
+def _atanh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
+        return np.acosh(a)  # type: ignore
+
+    atanh = (np.log(1 + a) - np.log(1 - a)) / 2
+
+    # propagate atanh(-0.0) = -0.0
+    return np.where(atanh == a, a, atanh)  # type: ignore
 
 
 # wrapper around np.signbit(a) that also works for numpy_quaddtype, but only

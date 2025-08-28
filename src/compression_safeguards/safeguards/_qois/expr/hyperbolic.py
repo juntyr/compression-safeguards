@@ -4,18 +4,26 @@ from typing import Callable
 
 import numpy as np
 
-from ....utils._compat import _asinh, _maximum, _minimum, _reciprocal, _sinh, _where
+from ....utils._compat import (
+    _acosh,
+    _asinh,
+    _atanh,
+    _cosh,
+    _is_negative,
+    _maximum,
+    _minimum,
+    _nextafter,
+    _reciprocal,
+    _sinh,
+    _tanh,
+    _where,
+)
 from ....utils._float128 import _float128_dtype
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds, guaranteed_data_bounds
 from .abc import Expr
-from .abs import ScalarAbs
-from .addsub import ScalarAdd, ScalarSubtract
 from .constfold import ScalarFoldedConstant
-from .divmul import ScalarDivide
-from .literal import Number
 from .reciprocal import ScalarReciprocal
-from .square import ScalarSqrt, ScalarSquare
 from .typing import F, Ns, Ps, PsI
 
 
@@ -117,6 +125,219 @@ class ScalarSinh(Expr):
         return f"sinh({self._a!r})"
 
 
+class ScalarCosh(Expr):
+    __slots__ = ("_a",)
+    _a: Expr
+
+    def __init__(self, a: Expr):
+        self._a = a
+
+    @property
+    def has_data(self) -> bool:
+        return self._a.has_data
+
+    @property
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        return self._a.data_indices
+
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        return ScalarCosh(
+            self._a.apply_array_element_offset(axis, offset),
+        )
+
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return self._a.late_bound_constants
+
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+        return ScalarFoldedConstant.constant_fold_unary(
+            self._a,
+            dtype,
+            _cosh,  # type: ignore
+            ScalarCosh,
+        )
+
+    def eval(
+        self,
+        x: PsI,
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> np.ndarray[PsI, np.dtype[F]]:
+        return _cosh(self._a.eval(x, Xs, late_bound))
+
+    @guaranteed_data_bounds
+    def compute_data_bounds_unchecked(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # evaluate arg and cosh(arg)
+        arg = self._a
+        argv = arg.eval(X.shape, Xs, late_bound)
+        exprv = _cosh(argv)
+
+        # apply the inverse function to get the bounds on arg
+        al = _acosh(_maximum(expr_lower, X.dtype.type(1)))
+        au = _acosh(expr_upper)
+
+        # flip and swap the expr bounds to get the bounds on arg
+        # cosh(...) cannot be less than 1, but
+        #  - a > 0 and 1 < el <= eu -> al = el, au = eu
+        #  - a < 0 and 1 < el <= eu -> al = -eu, au = -el
+        #  - el <= 1 -> al = -eu, au = eu
+        # TODO: an interval union could represent that the two sometimes-
+        #       disjoint intervals in the future
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum(
+            argv, _where(np.less_equal(expr_lower, 1) | _is_negative(argv), -au, al)
+        )
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(
+            argv, _where(np.greater(expr_lower, 1) & _is_negative(argv), -al, au)
+        )
+
+        # we need to force argv if expr_lower == expr_upper
+        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
+        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+
+        # handle rounding errors in cosh(acosh(...)) early
+        arg_lower = guarantee_arg_within_expr_bounds(
+            lambda arg_lower: _cosh(arg_lower),
+            exprv,
+            argv,
+            arg_lower,
+            expr_lower,
+            expr_upper,
+        )
+        arg_upper = guarantee_arg_within_expr_bounds(
+            lambda arg_upper: _cosh(arg_upper),
+            exprv,
+            argv,
+            arg_upper,
+            expr_lower,
+            expr_upper,
+        )
+
+        return arg.compute_data_bounds(
+            arg_lower,
+            arg_upper,
+            X,
+            Xs,
+            late_bound,
+        )
+
+    def __repr__(self) -> str:
+        return f"cosh({self._a!r})"
+
+
+class ScalarTanh(Expr):
+    __slots__ = ("_a",)
+    _a: Expr
+
+    def __init__(self, a: Expr):
+        self._a = a
+
+    @property
+    def has_data(self) -> bool:
+        return self._a.has_data
+
+    @property
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        return self._a.data_indices
+
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        return ScalarTanh(
+            self._a.apply_array_element_offset(axis, offset),
+        )
+
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return self._a.late_bound_constants
+
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+        return ScalarFoldedConstant.constant_fold_unary(
+            self._a,
+            dtype,
+            _tanh,  # type: ignore
+            ScalarTanh,
+        )
+
+    def eval(
+        self,
+        x: PsI,
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> np.ndarray[PsI, np.dtype[F]]:
+        return _tanh(self._a.eval(x, Xs, late_bound))
+
+    @guaranteed_data_bounds
+    def compute_data_bounds_unchecked(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # evaluate arg and tanh(arg)
+        arg = self._a
+        argv = arg.eval(X.shape, Xs, late_bound)
+        exprv = _tanh(argv)
+
+        # apply the inverse function to get the bounds on arg
+        # ensure that the bounds on tanh(...) are in [-1, +1]
+        # if arg_lower == argv and argv == -0.0, we need to guarantee that
+        #  arg_lower is also -0.0, same for arg_upper
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum(
+            argv, _atanh(_maximum(X.dtype.type(-1), expr_lower))
+        )
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(
+            argv, _atanh(_minimum(expr_upper, X.dtype.type(1)))
+        )
+
+        # we need to force argv if expr_lower == expr_upper
+        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
+        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+
+        # handle rounding errors in tanh(atanh(...)) early
+        arg_lower = guarantee_arg_within_expr_bounds(
+            lambda arg_lower: _tanh(arg_lower),
+            exprv,
+            argv,
+            arg_lower,
+            expr_lower,
+            expr_upper,
+        )
+        arg_upper = guarantee_arg_within_expr_bounds(
+            lambda arg_upper: _tanh(arg_upper),
+            exprv,
+            argv,
+            arg_upper,
+            expr_lower,
+            expr_upper,
+        )
+
+        return arg.compute_data_bounds(
+            arg_lower,
+            arg_upper,
+            X,
+            Xs,
+            late_bound,
+        )
+
+    def __repr__(self) -> str:
+        return f"tanh({self._a!r})"
+
+
 class ScalarAsinh(Expr):
     __slots__ = ("_a",)
     _a: Expr
@@ -215,14 +436,236 @@ class ScalarAsinh(Expr):
         return f"asinh({self._a!r})"
 
 
+class ScalarAcosh(Expr):
+    __slots__ = ("_a",)
+    _a: Expr
+
+    def __init__(self, a: Expr):
+        self._a = a
+
+    @property
+    def has_data(self) -> bool:
+        return self._a.has_data
+
+    @property
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        return self._a.data_indices
+
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        return ScalarAcosh(
+            self._a.apply_array_element_offset(axis, offset),
+        )
+
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return self._a.late_bound_constants
+
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+        return ScalarFoldedConstant.constant_fold_unary(
+            self._a,
+            dtype,
+            _acosh,  # type: ignore
+            ScalarAcosh,
+        )
+
+    def eval(
+        self,
+        x: PsI,
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> np.ndarray[PsI, np.dtype[F]]:
+        return _acosh(self._a.eval(x, Xs, late_bound))
+
+    @guaranteed_data_bounds
+    def compute_data_bounds_unchecked(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # evaluate arg and acosh(arg)
+        arg = self._a
+        argv = arg.eval(X.shape, Xs, late_bound)
+        exprv = _acosh(argv)
+
+        eps_one = _nextafter(np.array(1, dtype=X.dtype), np.array(0, dtype=X.dtype))
+
+        # apply the inverse function to get the bounds on arg
+        # acosh(...) is NaN for values smaller than 1 and can then take any
+        #  value smaller than one
+        # otherwise ensure that the bounds on acosh(...) are non-negative
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.less(argv, 1),
+            X.dtype.type(-np.inf),
+            _minimum(argv, _cosh(_maximum(X.dtype.type(0), expr_lower))),
+        )
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.less(argv, 1),
+            eps_one,
+            _maximum(argv, _cosh(expr_upper)),
+        )
+
+        # we need to force argv if expr_lower == expr_upper
+        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
+        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+
+        # handle rounding errors in acosh(cosh(...)) early
+        arg_lower = guarantee_arg_within_expr_bounds(
+            lambda arg_lower: _acosh(arg_lower),
+            exprv,
+            argv,
+            arg_lower,
+            expr_lower,
+            expr_upper,
+        )
+        arg_upper = guarantee_arg_within_expr_bounds(
+            lambda arg_upper: _acosh(arg_upper),
+            exprv,
+            argv,
+            arg_upper,
+            expr_lower,
+            expr_upper,
+        )
+
+        return arg.compute_data_bounds(
+            arg_lower,
+            arg_upper,
+            X,
+            Xs,
+            late_bound,
+        )
+
+    def __repr__(self) -> str:
+        return f"acosh({self._a!r})"
+
+
+class ScalarAtanh(Expr):
+    __slots__ = ("_a",)
+    _a: Expr
+
+    def __init__(self, a: Expr):
+        self._a = a
+
+    @property
+    def has_data(self) -> bool:
+        return self._a.has_data
+
+    @property
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        return self._a.data_indices
+
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Expr:
+        return ScalarAtanh(
+            self._a.apply_array_element_offset(axis, offset),
+        )
+
+    @property
+    def late_bound_constants(self) -> frozenset[Parameter]:
+        return self._a.late_bound_constants
+
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+        return ScalarFoldedConstant.constant_fold_unary(
+            self._a,
+            dtype,
+            _atanh,  # type: ignore
+            ScalarAtanh,
+        )
+
+    def eval(
+        self,
+        x: PsI,
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> np.ndarray[PsI, np.dtype[F]]:
+        return _atanh(self._a.eval(x, Xs, late_bound))
+
+    @guaranteed_data_bounds
+    def compute_data_bounds_unchecked(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # evaluate arg and atanh(arg)
+        arg = self._a
+        argv = arg.eval(X.shape, Xs, late_bound)
+        exprv = _atanh(argv)
+
+        one_eps = _nextafter(np.array(1, dtype=X.dtype), np.array(2, dtype=X.dtype))
+
+        # apply the inverse function to get the bounds on arg
+        # atanh(...) is NaN when abs(...) > 1 and can then take any value > 1
+        # if arg_lower == argv and argv == -0.0, we need to guarantee that
+        #  arg_lower is also -0.0, same for arg_upper
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.less(argv, -1),
+            X.dtype.type(-np.inf),
+            _where(
+                np.greater(argv, 1),
+                one_eps,
+                _minimum(argv, _tanh(expr_lower)),
+            ),
+        )
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
+            np.less(argv, -1),
+            -one_eps,
+            _where(
+                np.greater(argv, 1),
+                X.dtype.type(np.inf),
+                _maximum(argv, _tanh(expr_upper)),
+            ),
+        )
+
+        # we need to force argv if expr_lower == expr_upper
+        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
+        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+
+        # handle rounding errors in atanh(tanh(...)) early
+        arg_lower = guarantee_arg_within_expr_bounds(
+            lambda arg_lower: _atanh(arg_lower),
+            exprv,
+            argv,
+            arg_lower,
+            expr_lower,
+            expr_upper,
+        )
+        arg_upper = guarantee_arg_within_expr_bounds(
+            lambda arg_upper: _tanh(arg_upper),
+            exprv,
+            argv,
+            arg_upper,
+            expr_lower,
+            expr_upper,
+        )
+
+        return arg.compute_data_bounds(
+            arg_lower,
+            arg_upper,
+            X,
+            Xs,
+            late_bound,
+        )
+
+    def __repr__(self) -> str:
+        return f"atanh({self._a!r})"
+
+
 class Hyperbolic(Enum):
-    cosh = auto()
-    tanh = auto()
     coth = auto()
     sech = auto()
     csch = auto()
-    acosh = auto()
-    atanh = auto()
     acoth = auto()
     asech = auto()
     acsch = auto()
@@ -291,19 +734,9 @@ class ScalarHyperbolic(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # evaluate arg
-        arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
-
         # rewrite hyperbolic functions with base cases for sinh and asinh
-        rewritten = (HYPERBOLIC_REWRITE[self._func])(arg)
+        rewritten = (HYPERBOLIC_REWRITE[self._func])(self._a)
         exprv_rewritten = rewritten.eval(X.shape, Xs, late_bound)
-
-        if self._func == Hyperbolic.acosh:
-            # acosh(arg < 1) = NaN but the rewrite doesn't fully capture this,
-            #  so instead force arg to remain the same in that case
-            expr_lower = _where(np.less(argv, 1), exprv_rewritten, expr_lower)
-            expr_upper = _where(np.less(argv, 1), exprv_rewritten, expr_upper)
 
         # ensure that the bounds at least contain the rewritten expression
         #  result
@@ -317,66 +750,26 @@ class ScalarHyperbolic(Expr):
 
 
 HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
-    # basic hyperbolic functions
-    # cosh(x) = sqrt(1 + square(sinh(x)))
-    Hyperbolic.cosh: lambda x: ScalarSqrt(
-        ScalarAdd(
-            Number.ONE,
-            ScalarSquare(
-                ScalarSinh(x),
-            ),
-        ),
-    ),
     # derived hyperbolic functions
-    # tanh(x) = sinh(x) / cosh(x)
-    Hyperbolic.tanh: lambda x: ScalarDivide(
-        ScalarSinh(x),
-        ScalarHyperbolic(Hyperbolic.cosh, x),
-    ),
     # coth(x) = 1 / tanh(x)
     Hyperbolic.coth: lambda x: ScalarReciprocal(
-        ScalarHyperbolic(Hyperbolic.tanh, x),
+        ScalarTanh(x),
     ),
     # sech(x) = 1 / cosh(x)
     Hyperbolic.sech: lambda x: ScalarReciprocal(
-        ScalarHyperbolic(Hyperbolic.cosh, x),
+        ScalarCosh(x),
     ),
     # csch(x) = 1 / sinh(x)
     Hyperbolic.csch: lambda x: ScalarReciprocal(
         ScalarSinh(x),
     ),
     # inverse hyperbolic functions
-    # acosh(x) = abs(asinh(sqrt(square(x) - 1)))
-    Hyperbolic.acosh: lambda x: ScalarAbs(
-        ScalarAsinh(
-            ScalarSqrt(
-                ScalarSubtract(
-                    ScalarSquare(x),
-                    Number.ONE,
-                ),
-            ),
-        ),
-    ),
-    # atanh(x) = asinh(x / sqrt(1 - square(x)))
-    Hyperbolic.atanh: lambda x: ScalarAsinh(
-        ScalarDivide(
-            x,
-            ScalarSqrt(
-                ScalarSubtract(
-                    Number.ONE,
-                    ScalarSquare(x),
-                ),
-            ),
-        )
-    ),
     # acoth(x) = atanh(1/x)
-    Hyperbolic.acoth: lambda x: ScalarHyperbolic(
-        Hyperbolic.atanh,
+    Hyperbolic.acoth: lambda x: ScalarAtanh(
         ScalarReciprocal(x),
     ),
     # asech(x) = acosh(1/x)
-    Hyperbolic.asech: lambda x: ScalarHyperbolic(
-        Hyperbolic.acosh,
+    Hyperbolic.asech: lambda x: ScalarAcosh(
         ScalarReciprocal(x),
     ),
     # acsch(x) = asinh(1/x)
@@ -387,46 +780,20 @@ HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
 
 
 HYPERBOLIC_UFUNC: dict[Hyperbolic, Callable[[np.ndarray], np.ndarray]] = {
-    Hyperbolic.cosh: np.cosh,
-    Hyperbolic.tanh: np.tanh,
     Hyperbolic.coth: lambda x: _reciprocal(np.tanh(x)),
     Hyperbolic.sech: lambda x: _reciprocal(np.cosh(x)),
     Hyperbolic.csch: lambda x: _reciprocal(np.sinh(x)),
-    Hyperbolic.acosh: np.acosh,
-    Hyperbolic.atanh: np.atanh,
     Hyperbolic.acoth: lambda x: np.atanh(_reciprocal(x)),
     Hyperbolic.asech: lambda x: np.acosh(_reciprocal(x)),
     Hyperbolic.acsch: lambda x: np.asinh(_reciprocal(x)),
 }
 
 
-def propagate_negative_zero(
-    x: np.ndarray[Ps, np.dtype[F]], fx: np.ndarray[Ps, np.dtype[F]]
-) -> np.ndarray[Ps, np.dtype[F]]:
-    return _where(fx == x, x, fx)
-
-
 HYPERBOLIC_QUADDTYPE_UFUNC: dict[Hyperbolic, Callable[[np.ndarray], np.ndarray]] = {
-    Hyperbolic.cosh: lambda x: (np.exp(x) + np.exp(-x)) / 2,
-    Hyperbolic.tanh: lambda x: propagate_negative_zero(
-        x, (np.exp(x * 2) - 1) / (np.exp(x * 2) + 1)
-    ),
-    Hyperbolic.coth: lambda x: _reciprocal(
-        (HYPERBOLIC_QUADDTYPE_UFUNC[Hyperbolic.tanh])(x)
-    ),
-    Hyperbolic.sech: lambda x: _reciprocal(
-        (HYPERBOLIC_QUADDTYPE_UFUNC[Hyperbolic.cosh])(x)
-    ),
+    Hyperbolic.coth: lambda x: _reciprocal(_tanh(x)),
+    Hyperbolic.sech: lambda x: _reciprocal(_cosh(x)),
     Hyperbolic.csch: lambda x: _reciprocal(_sinh(x)),
-    Hyperbolic.acosh: lambda x: np.log(x + np.sqrt(np.square(x) - 1)),
-    Hyperbolic.atanh: lambda x: propagate_negative_zero(
-        x, (np.log(1 + x) - np.log(1 - x)) / 2
-    ),
-    Hyperbolic.acoth: lambda x: (HYPERBOLIC_QUADDTYPE_UFUNC[Hyperbolic.atanh])(
-        _reciprocal(x)
-    ),
-    Hyperbolic.asech: lambda x: (HYPERBOLIC_QUADDTYPE_UFUNC[Hyperbolic.acosh])(
-        _reciprocal(x)
-    ),
+    Hyperbolic.acoth: lambda x: _tanh(_reciprocal(x)),
+    Hyperbolic.asech: lambda x: _acosh(_reciprocal(x)),
     Hyperbolic.acsch: lambda x: _asinh(_reciprocal(x)),
 }
