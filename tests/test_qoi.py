@@ -808,7 +808,7 @@ def test_fuzzer_found_inconsistent_where():
     expr = ScalarWhere(
         ScalarAcos(Data(index=())),
         ScalarRoundTiesEven(Data(index=())),
-        ScalarReciprocal(ScalarAtan(Data(index=()))),  # acot(x)
+        ScalarAtan(ScalarReciprocal(Data(index=()))),  # acot(x)
     )
 
     assert expr.eval((), X, dict()) == np.array(
@@ -819,8 +819,13 @@ def test_fuzzer_found_inconsistent_where():
     expr_upper = np.array(_float128("0.0e+000"))
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
-    assert X_lower == np.array(_float128("-1.797693134862315708145274237317044e+308"))
+    assert X_lower == np.array(_float128("-inf"))
     assert X_upper == np.array(_float128("-1.797693134862315708145274237317044e+308"))
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(_float128("-0.0e+000"))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(
+        _float128("-5.562684646268004075307639094889258e-309")
+    )
 
 
 def test_fuzzer_found_cosine_monotonicity():
@@ -859,7 +864,7 @@ def test_fuzzer_found_invalid_divide_rewrite():
     expr_upper = np.array(0.0, dtype=np.float64)
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
-    assert X_lower == np.array(5.0e-324, dtype=np.float64)
+    assert X_lower == np.array(2.9e-322, dtype=np.float64)
     assert X_upper == np.array(2.9e-322, dtype=np.float64)
 
     assert expr.eval((), np.array(X_lower), dict()) == np.array(0.0, dtype=np.float64)

@@ -247,8 +247,8 @@ class ScalarCos(Expr):
         # cos(...) is periodic, so we need to drop to difference bounds before
         #  applying the difference to argv to stay in the same period
         argv_acos = np.acos(exprv)
-        arg_lower_diff = arg_lower - argv_acos
-        arg_upper_diff = arg_upper - argv_acos
+        arg_lower_diff = argv_acos - arg_lower
+        arg_upper_diff = argv_acos - arg_upper
 
         # np.acos maps to [pi, 0] where cos is monotonically decreasing
         # flip the argument error bounds where cos is monotonically decreasing
