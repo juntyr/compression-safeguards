@@ -198,7 +198,7 @@ class LorenzoPredictor(Codec):
         with np.printoptions(threshold=50):
             print(
                 len(np.unique(encoded)),
-                np.unique(as_bits(encoded, kind="i")),
+                np.unique(as_bits(encoded)),
                 np.count_nonzero(encoded),
                 encoded.size,
             )

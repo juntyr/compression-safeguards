@@ -9,10 +9,9 @@ from collections.abc import Sequence, Set
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
-from ....utils._compat import _isfinite, _isinf, _isnan, _where
+from ....utils._compat import _isnan, _where
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import (
-    as_bits,
     lossless_cast,
     saturating_finite_float_cast,
     to_float,
@@ -526,17 +525,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             self._type, qoi_data, qoi_decoded
         ) <= _compute_finite_absolute_error_bound(self._type, eb, qoi_data)
 
-        same_bits = as_bits(qoi_data, kind="V") == as_bits(qoi_decoded, kind="V")
-        both_nan = _isnan(qoi_data) & _isnan(qoi_decoded)
-
         windows_ok: np.ndarray[tuple[int, ...], np.dtype[np.bool]] = _where(
-            _isfinite(qoi_data),
-            finite_ok,
-            _where(
-                _isinf(qoi_data),
-                same_bits,
-                both_nan,
-            ),
+            _isnan(qoi_data), _isnan(qoi_decoded), finite_ok | (qoi_data == qoi_decoded)
         )
 
         s = [slice(None)] * data.ndim

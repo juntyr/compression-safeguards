@@ -291,10 +291,26 @@ class ScalarHyperbolic(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # evaluate arg
+        arg = self._a
+        argv = arg.eval(X.shape, Xs, late_bound)
+
         # rewrite hyperbolic functions with base cases for sinh and asinh
-        return (HYPERBOLIC_REWRITE[self._func])(self._a).compute_data_bounds(
-            expr_lower, expr_upper, X, Xs, late_bound
-        )
+        rewritten = (HYPERBOLIC_REWRITE[self._func])(arg)
+        exprv_rewritten = rewritten.eval(X.shape, Xs, late_bound)
+
+        if self._func == Hyperbolic.acosh:
+            # acosh(arg < 1) = NaN but the rewrite doesn't fully capture this,
+            #  so instead force arg to remain the same in that case
+            expr_lower = _where(argv < 1, exprv_rewritten, expr_lower)
+            expr_upper = _where(argv < 1, exprv_rewritten, expr_upper)
+
+        # ensure that the bounds at least contain the rewritten expression
+        #  result
+        expr_lower = _minimum(expr_lower, exprv_rewritten)
+        expr_upper = _maximum(expr_upper, exprv_rewritten)
+
+        return rewritten.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 
     def __repr__(self) -> str:
         return f"{self._func.name}({self._a!r})"
@@ -317,10 +333,9 @@ HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
         ScalarSinh(x),
         ScalarHyperbolic(Hyperbolic.cosh, x),
     ),
-    # coth(x) = cosh(x) / sinh(x)
-    Hyperbolic.coth: lambda x: ScalarDivide(
-        ScalarHyperbolic(Hyperbolic.cosh, x),
-        ScalarSinh(x),
+    # coth(x) = 1 / tanh(x)
+    Hyperbolic.coth: lambda x: ScalarReciprocal(
+        ScalarHyperbolic(Hyperbolic.tanh, x),
     ),
     # sech(x) = 1 / cosh(x)
     Hyperbolic.sech: lambda x: ScalarReciprocal(
@@ -355,28 +370,14 @@ HYPERBOLIC_REWRITE: dict[Hyperbolic, Callable[[Expr], Expr]] = {
         )
     ),
     # acoth(x) = atanh(1/x)
-    #          = asinh(recip(sqrt(square(x) - 1)))
-    Hyperbolic.acoth: lambda x: ScalarAsinh(
-        ScalarReciprocal(
-            ScalarSqrt(
-                ScalarSubtract(
-                    ScalarSquare(x),
-                    Number.ONE,
-                ),
-            ),
-        ),
+    Hyperbolic.acoth: lambda x: ScalarHyperbolic(
+        Hyperbolic.atanh,
+        ScalarReciprocal(x),
     ),
     # asech(x) = acosh(1/x)
-    #          = asinh(sqrt(recip(square(x)) - 1))
-    Hyperbolic.asech: lambda x: ScalarAsinh(
-        ScalarSqrt(
-            ScalarSubtract(
-                ScalarReciprocal(
-                    ScalarSquare(x),
-                ),
-                Number.ONE,
-            ),
-        ),
+    Hyperbolic.asech: lambda x: ScalarHyperbolic(
+        Hyperbolic.acosh,
+        ScalarReciprocal(x),
     ),
     # acsch(x) = asinh(1/x)
     Hyperbolic.acsch: lambda x: ScalarAsinh(

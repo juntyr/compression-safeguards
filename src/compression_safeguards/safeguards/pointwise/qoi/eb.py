@@ -8,13 +8,9 @@ from collections.abc import Set
 
 import numpy as np
 
-from ....utils._compat import _isfinite, _isinf, _isnan, _where
+from ....utils._compat import _isnan, _where
 from ....utils.bindings import Bindings, Parameter
-from ....utils.cast import (
-    as_bits,
-    saturating_finite_float_cast,
-    to_float,
-)
+from ....utils.cast import saturating_finite_float_cast, to_float
 from ....utils.intervals import IntervalUnion
 from ....utils.typing import F, S, T
 from ..._qois import PointwiseQuantityOfInterest
@@ -233,17 +229,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             self._type, qoi_data, qoi_decoded
         ) <= _compute_finite_absolute_error_bound(self._type, eb, qoi_data)
 
-        same_bits = as_bits(qoi_data, kind="V") == as_bits(qoi_decoded, kind="V")
-        both_nan = _isnan(qoi_data) & _isnan(qoi_decoded)
-
         return _where(
-            _isfinite(qoi_data),
-            finite_ok,
-            _where(
-                _isinf(qoi_data),
-                same_bits,
-                both_nan,
-            ),
+            _isnan(qoi_data), _isnan(qoi_decoded), finite_ok | (qoi_data == qoi_decoded)
         )
 
     def compute_safe_intervals(

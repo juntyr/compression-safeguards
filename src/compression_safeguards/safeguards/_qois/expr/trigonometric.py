@@ -377,9 +377,15 @@ class ScalarTrigonometric(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         # rewrite trigonometric functions with base cases for sin and asin
-        return (TRIGONOMETRIC_REWRITE[self._func])(self._a).compute_data_bounds(
-            expr_lower, expr_upper, X, Xs, late_bound
-        )
+        rewritten = (TRIGONOMETRIC_REWRITE[self._func])(self._a)
+        exprv_rewritten = rewritten.eval(X.shape, Xs, late_bound)
+
+        # ensure that the bounds at least contain the rewritten expression
+        #  result
+        expr_lower = _minimum(expr_lower, exprv_rewritten)
+        expr_upper = _maximum(expr_upper, exprv_rewritten)
+
+        return rewritten.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 
     def __repr__(self) -> str:
         return f"{self._func.name}({self._a!r})"
@@ -404,10 +410,8 @@ TRIGONOMETRIC_REWRITE: dict[Trigonometric, Callable[[Expr], Expr]] = {
         ScalarTrigonometric(Trigonometric.cos, x),
     ),
     # cot(x) = 1 / tan(x)
-    #        = cos(x) / sin(x)
-    Trigonometric.cot: lambda x: ScalarDivide(
-        ScalarTrigonometric(Trigonometric.cos, x),
-        ScalarSin(x),
+    Trigonometric.cot: lambda x: ScalarReciprocal(
+        ScalarTrigonometric(Trigonometric.tan, x),
     ),
     # sec(x) = 1 / cos(x)
     Trigonometric.sec: lambda x: ScalarReciprocal(

@@ -205,9 +205,15 @@ class ScalarMultiply(Expr):
             _where(_is_negative(exprv), -expr_lower, expr_upper),
         )
 
-        return rewrite_left_associative_product_as_exp_sum_of_logs(
-            self
-        ).compute_data_bounds(
+        rewritten = rewrite_left_associative_product_as_exp_sum_of_logs(self)
+        exprv_rewritten = rewritten.eval(X.shape, Xs, late_bound)
+
+        # ensure that the bounds at least contain the rewritten expression
+        #  result
+        expr_lower = _minimum(expr_lower, exprv_rewritten)
+        expr_upper = _maximum(expr_upper, exprv_rewritten)
+
+        return rewritten.compute_data_bounds(
             expr_lower,
             expr_upper,
             X,
@@ -302,9 +308,15 @@ class ScalarDivide(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         # rewrite division as multiplication by the reciprocal
-        return ScalarMultiply(self._a, ScalarReciprocal(self._b)).compute_data_bounds(
-            expr_lower, expr_upper, X, Xs, late_bound
-        )
+        rewritten = ScalarMultiply(self._a, ScalarReciprocal(self._b))
+        exprv_rewritten = rewritten.eval(X.shape, Xs, late_bound)
+
+        # ensure that the bounds at least contain the rewritten expression
+        #  result
+        expr_lower = _minimum(expr_lower, exprv_rewritten)
+        expr_upper = _maximum(expr_upper, exprv_rewritten)
+
+        return rewritten.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 
     def __repr__(self) -> str:
         return f"{self._a!r} / {self._b!r}"

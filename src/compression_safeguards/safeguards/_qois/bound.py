@@ -10,7 +10,6 @@ from ...utils._compat import (
     _nextafter,
     _where,
 )
-from ...utils.cast import as_bits
 from .expr.typing import Ci, F, Ns, Ps
 
 
@@ -131,13 +130,6 @@ def guarantee_data_within_expr_bounds(
             (
                 (exprv_Xs_bound_guess >= expr_lower)
                 & (exprv_Xs_bound_guess <= expr_upper)
-            )
-            # also allow bitwise equivalent inputs, which is needed for
-            #  rewrites where the rewrite might evaluate outside the bounds
-            #  even for the original input
-            | np.all(
-                as_bits(Xs_bound_guess, kind="V") == as_bits(Xs, kind="V"),
-                axis=tuple(range(exprv.ndim, Xs.ndim)),
             ),
         )
 
