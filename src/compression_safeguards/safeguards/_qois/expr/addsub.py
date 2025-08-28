@@ -14,7 +14,7 @@ from ....utils._compat import (
     _where,
 )
 from ....utils.bindings import Parameter
-from ..bound import guarantee_arg_within_expr_bounds
+from ..bound import guarantee_arg_within_expr_bounds, guaranteed_data_bounds
 from .abc import Expr
 from .abs import ScalarAbs
 from .constfold import ScalarFoldedConstant
@@ -71,6 +71,7 @@ class ScalarAdd(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.add(self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound))
 
+    @guaranteed_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -82,19 +83,6 @@ class ScalarAdd(Expr):
         terms = as_left_associative_sum(self)
         return compute_left_associate_sum_data_bounds(
             terms, expr_lower, expr_upper, X, Xs, late_bound
-        )
-
-    def compute_data_bounds(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # the unchecked method already handles rounding errors for add
-        return self.compute_data_bounds_unchecked(
-            expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:
@@ -152,6 +140,7 @@ class ScalarSubtract(Expr):
             self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound)
         )
 
+    @guaranteed_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -163,19 +152,6 @@ class ScalarSubtract(Expr):
         terms = as_left_associative_sum(self)
         return compute_left_associate_sum_data_bounds(
             terms, expr_lower, expr_upper, X, Xs, late_bound
-        )
-
-    def compute_data_bounds(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # the unchecked method already handles rounding errors for subtract
-        return self.compute_data_bounds_unchecked(
-            expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:

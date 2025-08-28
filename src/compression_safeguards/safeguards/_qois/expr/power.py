@@ -5,6 +5,7 @@ import numpy as np
 
 from ....utils._compat import _is_negative, _where
 from ....utils.bindings import Parameter
+from ..bound import guaranteed_data_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .divmul import ScalarMultiply
@@ -150,6 +151,7 @@ class ScalarFakeAbs(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.abs(self._a.eval(x, Xs, late_bound))
 
+    @guaranteed_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -180,19 +182,6 @@ class ScalarFakeAbs(Expr):
             X,
             Xs,
             late_bound,
-        )
-
-    def compute_data_bounds(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # fake_abs cannot cause any rounding errors
-        return self.compute_data_bounds_unchecked(
-            expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:

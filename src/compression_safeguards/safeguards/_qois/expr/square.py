@@ -10,7 +10,7 @@ from ....utils._compat import (
     _where,
 )
 from ....utils.bindings import Parameter
-from ..bound import guarantee_arg_within_expr_bounds
+from ..bound import guarantee_arg_within_expr_bounds, guaranteed_data_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
@@ -57,6 +57,7 @@ class ScalarSqrt(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.sqrt(self._a.eval(x, Xs, late_bound))
 
+    @guaranteed_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -125,20 +126,6 @@ class ScalarSqrt(Expr):
             late_bound,
         )
 
-    def compute_data_bounds(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # the unchecked method already handles rounding errors for sqrt,
-        #  which is strictly monotonic
-        return self.compute_data_bounds_unchecked(
-            expr_lower, expr_upper, X, Xs, late_bound
-        )
-
     def __repr__(self) -> str:
         return f"sqrt({self._a!r})"
 
@@ -184,6 +171,7 @@ class ScalarSquare(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.square(self._a.eval(x, Xs, late_bound))
 
+    @guaranteed_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -243,20 +231,6 @@ class ScalarSquare(Expr):
             X,
             Xs,
             late_bound,
-        )
-
-    def compute_data_bounds(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # the unchecked method already handles rounding errors for square,
-        #  which is strictly monotonic in two segments
-        return self.compute_data_bounds_unchecked(
-            expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:

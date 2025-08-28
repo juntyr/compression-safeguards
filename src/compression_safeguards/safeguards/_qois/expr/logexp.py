@@ -6,7 +6,7 @@ import numpy as np
 
 from ....utils._compat import _floating_smallest_subnormal, _maximum, _minimum, _where
 from ....utils.bindings import Parameter
-from ..bound import guarantee_arg_within_expr_bounds
+from ..bound import guarantee_arg_within_expr_bounds, guaranteed_data_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
@@ -65,6 +65,7 @@ class ScalarLog(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return (LOGARITHM_UFUNC[self._log])(self._a.eval(x, Xs, late_bound))
 
+    @guaranteed_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -124,20 +125,6 @@ class ScalarLog(Expr):
             X,
             Xs,
             late_bound,
-        )
-
-    def compute_data_bounds(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # the unchecked method already handles rounding errors for ln / log2 /
-        #  log10, which are strictly monotonic
-        return self.compute_data_bounds_unchecked(
-            expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:
@@ -204,6 +191,7 @@ class ScalarExp(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return (EXPONENTIAL_UFUNC[self._exp])(self._a.eval(x, Xs, late_bound))
 
+    @guaranteed_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -261,20 +249,6 @@ class ScalarExp(Expr):
             X,
             Xs,
             late_bound,
-        )
-
-    def compute_data_bounds(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # the unchecked method already handles rounding errors for exp / exp2 /
-        #  exp10, which are strictly monotonic
-        return self.compute_data_bounds_unchecked(
-            expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:

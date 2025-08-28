@@ -5,6 +5,7 @@ import numpy as np
 
 from ....utils._compat import _floating_max, _isfinite, _isinf, _isnan, _where
 from ....utils.bindings import Parameter
+from ..bound import guaranteed_data_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Fi, Ns, Ps, PsI
@@ -52,6 +53,7 @@ class ScalarIsFinite(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return classify_to_dtype(_isfinite, self._a.eval(x, Xs, late_bound), Xs.dtype)
 
+    @guaranteed_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -103,19 +105,6 @@ class ScalarIsFinite(Expr):
             late_bound,
         )
 
-    def compute_data_bounds(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # isfinite cannot cause any rounding errors
-        return self.compute_data_bounds_unchecked(
-            expr_lower, expr_upper, X, Xs, late_bound
-        )
-
     def __repr__(self) -> str:
         return f"isfinite({self._a!r})"
 
@@ -162,6 +151,7 @@ class ScalarIsInf(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return classify_to_dtype(_isinf, self._a.eval(x, Xs, late_bound), Xs.dtype)
 
+    @guaranteed_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -213,19 +203,6 @@ class ScalarIsInf(Expr):
             late_bound,
         )
 
-    def compute_data_bounds(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # isinf cannot cause any rounding errors
-        return self.compute_data_bounds_unchecked(
-            expr_lower, expr_upper, X, Xs, late_bound
-        )
-
     def __repr__(self) -> str:
         return f"isinf({self._a!r})"
 
@@ -272,6 +249,7 @@ class ScalarIsNaN(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return classify_to_dtype(_isnan, self._a.eval(x, Xs, late_bound), Xs.dtype)
 
+    @guaranteed_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -319,19 +297,6 @@ class ScalarIsNaN(Expr):
             X,
             Xs,
             late_bound,
-        )
-
-    def compute_data_bounds(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # isnan cannot cause any rounding errors
-        return self.compute_data_bounds_unchecked(
-            expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:

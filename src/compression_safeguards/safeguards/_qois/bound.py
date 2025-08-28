@@ -1,4 +1,5 @@
 from typing import Callable
+from warnings import warn
 
 import numpy as np
 
@@ -10,7 +11,7 @@ from ...utils._compat import (
     _where,
 )
 from ...utils.cast import as_bits
-from .expr.typing import F, Ns, Ps
+from .expr.typing import Ci, F, Ns, Ps
 
 
 def guarantee_arg_within_expr_bounds(
@@ -52,7 +53,13 @@ def guarantee_arg_within_expr_bounds(
     """
 
     return guarantee_data_within_expr_bounds(
-        expr, exprv, argv, argv_bound_guess, expr_lower, expr_upper
+        expr,
+        exprv,
+        argv,
+        argv_bound_guess,
+        expr_lower,
+        expr_upper,
+        warn_on_bounds_exceeded=False,
     )
 
 
@@ -63,6 +70,8 @@ def guarantee_data_within_expr_bounds(
     Xs_bound_guess: np.ndarray[Ns, np.dtype[F]],
     expr_lower: np.ndarray[Ps, np.dtype[F]],
     expr_upper: np.ndarray[Ps, np.dtype[F]],
+    *,
+    warn_on_bounds_exceeded: bool,
 ) -> np.ndarray[Ns, np.dtype[F]]:
     """
     Ensure that `Xs_bound_guess`, a guess for a lower or upper bound on `Xs`,
@@ -85,6 +94,9 @@ def guarantee_data_within_expr_bounds(
     expr_upper : np.ndarray[Ps, np.dtype[F]]
         Pointwise upper bound on the expression, must be greater than or equal
         to `exprv`.
+    warn_on_bounds_exceeded : bool
+        If [`True`][True], a warning is emitted when the `Xs_bound_guess` does
+        not already meet the `expr_lower` and `expr_upper` bounds.
 
     Returns
     -------
@@ -143,6 +155,10 @@ def guarantee_data_within_expr_bounds(
         if not np.any(bounds_exceeded):
             return _where(Xs_bound_guess == Xs, Xs, Xs_bound_guess)
 
+        if warn_on_bounds_exceeded:
+            warn_on_bounds_exceeded = False
+            warn("guaranteed data bounds do not meet the expression bounds")
+
         # nudge the guess towards the data by 1 ULP
         Xs_bound_guess = _where(
             bounds_exceeded, _nextafter(Xs_bound_guess, Xs), Xs_bound_guess
@@ -164,3 +180,12 @@ def guarantee_data_within_expr_bounds(
         Xs_diff *= backoff
         backoff = np.divide(backoff, 2)
         Xs_bound_guess = _where(bounds_exceeded, Xs + Xs_diff, Xs_bound_guess)
+
+
+def guaranteed_data_bounds(func: Ci) -> Ci:
+    setattr(func, "_guaranteed_data_bounds", True)
+    return func
+
+
+def are_data_bounds_guaranteed(func: Callable) -> bool:
+    return getattr(func, "_guaranteed_data_bounds", False)

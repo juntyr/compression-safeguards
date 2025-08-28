@@ -1,6 +1,6 @@
-__all__ = ["F", "Ps", "PsI", "Ns"]
+__all__ = ["F", "Fi", "Ps", "PsI", "Ns", "Ci"]
 
-from typing import TypeVar
+from typing import Callable, TypeVar
 
 import numpy as np
 
@@ -18,3 +18,6 @@ PsI = TypeVar("PsI", bound=tuple[int, ...])
 
 Ns = TypeVar("Ns", bound=tuple[int, ...], covariant=True)
 """ Any stencil neighbourhood array shape [...X, ...S] (covariant). """
+
+Ci = TypeVar("Ci", bound=Callable)
+""" Any callable type (invariant). """

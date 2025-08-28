@@ -4,6 +4,7 @@ import numpy as np
 
 from ....utils._compat import _isfinite, _where
 from ....utils.bindings import Parameter
+from ..bound import guaranteed_data_bounds
 from .abc import Expr
 from .typing import F, Ns, Ps, PsI
 
@@ -49,6 +50,7 @@ class Data(Expr):
         assert out.shape == x
         return out  # type: ignore
 
+    @guaranteed_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -68,19 +70,6 @@ class Data(Expr):
         X_upper[(...,) + self._index] = expr_upper
 
         return X_lower, X_upper
-
-    def compute_data_bounds(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # data just returns the computed error bounds
-        return self.compute_data_bounds_unchecked(
-            expr_lower, expr_upper, X, Xs, late_bound
-        )
 
     def __repr__(self) -> str:
         if self._index == ():

@@ -1,11 +1,12 @@
 from abc import abstractmethod
 from collections.abc import Mapping
+from typing import final
 
 import numpy as np
 
 from ....utils._compat import _maximum, _minimum
 from ....utils.bindings import Parameter
-from ..bound import guarantee_data_within_expr_bounds
+from ..bound import are_data_bounds_guaranteed, guarantee_data_within_expr_bounds
 from .typing import F, Ns, Ps, PsI
 
 
@@ -120,9 +121,15 @@ class Expr:
         that satisfy the lower-upper bounds `expr_lower` and `expr_lower` on
         this expression.
 
+        This method should *not* be called manually.
+
         This method is allowed to return slightly wrongly-rounded results
         that are then corrected by
         [`compute_data_bounds`][compression_safeguards.safeguards._qois.expr.abc.Expr.compute_data_bounds].
+
+        If this method is known to have no rounding errors and always return
+        the correct data bounds, it can be decorated with
+        [`@guaranteed_data_bounds`][compression_safeguards.safeguards._qois.bound.guaranteed_data_bounds].
 
         Parameters
         ----------
@@ -150,6 +157,7 @@ class Expr:
             that contribute to the same QoI points.
         """
 
+    @final
     def compute_data_bounds(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -167,11 +175,6 @@ class Expr:
         [`compute_data_bounds_unchecked`][compression_safeguards.safeguards._qois.expr.abc.Expr.compute_data_bounds_unchecked]
         and then applies extensive rounding checks to ensure that the returned
         bounds satisfy the bounds on this expression.
-
-        If an implementation of
-        [`compute_data_bounds_unchecked`][compression_safeguards.safeguards._qois.expr.abc.Expr.compute_data_bounds_unchecked]
-        is known to have no rounding errors, this default implementation can be
-        overridden to forward its results without further rounding checks.
 
         Parameters
         ----------
@@ -223,6 +226,9 @@ class Expr:
             Xs_lower,
             expr_lower,
             expr_upper,
+            warn_on_bounds_exceeded=are_data_bounds_guaranteed(
+                self.compute_data_bounds_unchecked
+            ),
         )
         Xs_upper = guarantee_data_within_expr_bounds(
             lambda Xs_upper: self.eval(
@@ -235,6 +241,9 @@ class Expr:
             Xs_upper,
             expr_lower,
             expr_upper,
+            warn_on_bounds_exceeded=are_data_bounds_guaranteed(
+                self.compute_data_bounds_unchecked
+            ),
         )
 
         return Xs_lower, Xs_upper

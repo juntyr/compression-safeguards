@@ -11,7 +11,7 @@ from ....utils._compat import (
     _where,
 )
 from ....utils.bindings import Parameter
-from ..bound import guarantee_arg_within_expr_bounds
+from ..bound import guarantee_arg_within_expr_bounds, guaranteed_data_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
@@ -58,6 +58,7 @@ class ScalarFloor(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.floor(self._a.eval(x, Xs, late_bound))
 
+    @guaranteed_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -100,19 +101,6 @@ class ScalarFloor(Expr):
             X,
             Xs,
             late_bound,
-        )
-
-    def compute_data_bounds(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # floor cannot cause any rounding errors
-        return self.compute_data_bounds_unchecked(
-            expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:
@@ -160,6 +148,7 @@ class ScalarCeil(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.ceil(self._a.eval(x, Xs, late_bound))
 
+    @guaranteed_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -202,19 +191,6 @@ class ScalarCeil(Expr):
             X,
             Xs,
             late_bound,
-        )
-
-    def compute_data_bounds(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # ceil cannot cause any rounding errors
-        return self.compute_data_bounds_unchecked(
-            expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:
@@ -262,6 +238,7 @@ class ScalarTrunc(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.trunc(self._a.eval(x, Xs, late_bound))
 
+    @guaranteed_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -299,19 +276,6 @@ class ScalarTrunc(Expr):
             X,
             Xs,
             late_bound,
-        )
-
-    def compute_data_bounds(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # trunc cannot cause any rounding errors
-        return self.compute_data_bounds_unchecked(
-            expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:
@@ -362,6 +326,7 @@ class ScalarRoundTiesEven(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return _rint(self._a.eval(x, Xs, late_bound))
 
+    @guaranteed_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -437,20 +402,6 @@ class ScalarRoundTiesEven(Expr):
             X,
             Xs,
             late_bound,
-        )
-
-    def compute_data_bounds(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # the unchecked method already handles rounding errors for
-        #  round_ties_even, which is strictly monotonic
-        return self.compute_data_bounds_unchecked(
-            expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:
