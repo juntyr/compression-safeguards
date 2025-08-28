@@ -84,8 +84,9 @@ class ScalarWhere(Expr):
         # evaluate the condition, a, and b
         cond, a, b = self._condition, self._a, self._b
         condv: np.ndarray[Ps, np.dtype[F]] = cond.eval(X.shape, Xs, late_bound)
-        condvb: np.ndarray[Ns, np.dtype[np.bool]] = _broadcast_to(
-            np.array(condv != 0).reshape(X.shape + (1,) * (Xs.ndim - X.ndim)), Xs.shape
+        condvb_Ps: np.ndarray[Ps, np.dtype[np.bool]] = condv != 0
+        condvb_Ns: np.ndarray[Ns, np.dtype[np.bool]] = _broadcast_to(
+            np.array(condvb_Ps).reshape(X.shape + (1,) * (Xs.ndim - X.ndim)), Xs.shape
         )
         av = a.eval(X.shape, Xs, late_bound)
         bv = b.eval(X.shape, Xs, late_bound)
@@ -100,12 +101,12 @@ class ScalarWhere(Expr):
             Xs_lower = _maximum(Xs_lower, cl)
             Xs_upper = _minimum(Xs_upper, cu)
 
-        if np.any(condvb) and a.has_data:
+        if np.any(condvb_Ps) and a.has_data:
             # pass on the data bounds to a but only use its bounds on Xs if
             #  chosen by the condition
             al, au = a.compute_data_bounds(
-                _where(condvb, expr_lower, av),
-                _where(condvb, expr_upper, av),
+                _where(condvb_Ps, expr_lower, av),
+                _where(condvb_Ps, expr_upper, av),
                 X,
                 Xs,
                 late_bound,
@@ -113,22 +114,22 @@ class ScalarWhere(Expr):
 
             # combine the data bounds
             Xs_lower = _where(
-                condvb,
+                condvb_Ns,
                 _maximum(Xs_lower, al),
                 Xs_lower,
             )
             Xs_upper = _where(
-                condvb,
+                condvb_Ns,
                 _minimum(Xs_upper, au),
                 Xs_upper,
             )
 
-        if (not np.all(condvb)) and b.has_data:
+        if (not np.all(condvb_Ps)) and b.has_data:
             # pass on the data bounds to b but only use its bounds on Xs if
             #  chosen by the condition
             bl, bu = b.compute_data_bounds(
-                _where(condvb, bv, expr_lower),
-                _where(condvb, bv, expr_upper),
+                _where(condvb_Ps, bv, expr_lower),
+                _where(condvb_Ps, bv, expr_upper),
                 X,
                 Xs,
                 late_bound,
@@ -136,12 +137,12 @@ class ScalarWhere(Expr):
 
             # combine the data bounds
             Xs_lower = _where(
-                condvb,
+                condvb_Ns,
                 Xs_lower,
                 _maximum(Xs_lower, bl),
             )
             Xs_upper = _where(
-                condvb,
+                condvb_Ns,
                 Xs_upper,
                 _minimum(Xs_upper, bu),
             )

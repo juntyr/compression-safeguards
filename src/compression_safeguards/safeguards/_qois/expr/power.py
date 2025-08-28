@@ -3,7 +3,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _is_negative, _maximum, _minimum, _where
+from ....utils._compat import _is_negative, _isnan, _maximum, _minimum, _where
 from ....utils.bindings import Parameter
 from ..bound import guaranteed_data_bounds
 from .abc import Expr
@@ -108,6 +108,15 @@ class ScalarPower(Expr):
         #  result
         expr_lower = _minimum(expr_lower, exprv_rewritten)
         expr_upper = _maximum(expr_upper, exprv_rewritten)
+
+        # bail out and just use the rewritten expression result as an exact
+        #  bound in case isnan was changed by the rewrite
+        expr_lower = _where(
+            _isnan(exprv) != _isnan(exprv_rewritten), exprv_rewritten, expr_lower
+        )
+        expr_upper = _where(
+            _isnan(exprv) != _isnan(exprv_rewritten), exprv_rewritten, expr_upper
+        )
 
         return rewritten.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 

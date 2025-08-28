@@ -888,3 +888,22 @@ def test_fuzzer_found_power_nan_hang():
 
     assert np.isnan(expr.eval((), np.array(X_lower), dict()))
     assert np.isnan(expr.eval((), np.array(X_upper), dict()))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_divide_tiny_hang():
+    X = np.array(2.81944e-319, dtype=np.float64)
+
+    expr = ScalarDivide(ScalarMultiply(Data(index=()), Data(index=())), Data(index=()))
+
+    assert expr.eval((), X, dict()) == np.array(0.0, dtype=np.float64)
+
+    expr_lower = np.array(0.0, dtype=np.float64)
+    expr_upper = np.array(0.0, dtype=np.float64)
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(2.81944e-319, dtype=np.float64)
+    assert X_upper == np.array(2.81944e-319, dtype=np.float64)
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(0.0, dtype=np.float64)
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(0.0, dtype=np.float64)

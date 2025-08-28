@@ -980,7 +980,7 @@ def test_fuzzer_list_assignment_out_of_range():
         safeguards=[
             dict(
                 kind="qoi_eb_stencil",
-                qoi="acsc((x-e))",
+                qoi="asin(reciprocal(x-e))",  # acsc
                 neighbourhood=[
                     dict(
                         axis=-1,

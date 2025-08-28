@@ -213,6 +213,15 @@ class ScalarMultiply(Expr):
         expr_lower = _minimum(expr_lower, exprv_rewritten)
         expr_upper = _maximum(expr_upper, exprv_rewritten)
 
+        # bail out and just use the rewritten expression result as an exact
+        #  bound in case isnan was changed by the rewrite
+        expr_lower = _where(
+            _isnan(exprv) != _isnan(exprv_rewritten), exprv_rewritten, expr_lower
+        )
+        expr_upper = _where(
+            _isnan(exprv) != _isnan(exprv_rewritten), exprv_rewritten, expr_upper
+        )
+
         return rewritten.compute_data_bounds(
             expr_lower,
             expr_upper,
