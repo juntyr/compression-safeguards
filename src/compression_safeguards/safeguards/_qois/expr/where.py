@@ -81,12 +81,14 @@ class ScalarWhere(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # evaluate the condition
+        # evaluate the condition, a, and b
         cond, a, b = self._condition, self._a, self._b
         condv: np.ndarray[Ps, np.dtype[F]] = cond.eval(X.shape, Xs, late_bound)
         condvb: np.ndarray[Ns, np.dtype[np.bool]] = _broadcast_to(
             np.array(condv != 0).reshape(X.shape + (1,) * (Xs.ndim - X.ndim)), Xs.shape
         )
+        av = a.eval(X.shape, Xs, late_bound)
+        bv = b.eval(X.shape, Xs, late_bound)
 
         Xs_lower: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(-np.inf))
         Xs_upper: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(np.inf))
@@ -101,7 +103,13 @@ class ScalarWhere(Expr):
         if np.any(condvb) and a.has_data:
             # pass on the data bounds to a but only use its bounds on Xs if
             #  chosen by the condition
-            al, au = a.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
+            al, au = a.compute_data_bounds(
+                _where(condvb, expr_lower, av),
+                _where(condvb, expr_upper, av),
+                X,
+                Xs,
+                late_bound,
+            )
 
             # combine the data bounds
             Xs_lower = _where(
@@ -118,7 +126,13 @@ class ScalarWhere(Expr):
         if (not np.all(condvb)) and b.has_data:
             # pass on the data bounds to b but only use its bounds on Xs if
             #  chosen by the condition
-            bl, bu = b.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
+            bl, bu = b.compute_data_bounds(
+                _where(condvb, bv, expr_lower),
+                _where(condvb, bv, expr_upper),
+                X,
+                Xs,
+                late_bound,
+            )
 
             # combine the data bounds
             Xs_lower = _where(
