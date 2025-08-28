@@ -339,7 +339,10 @@ def _acosh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
     ):
         return np.acosh(a)  # type: ignore
 
-    return np.log(a + np.sqrt(np.square(a) - 1))
+    acosh = np.log(a + np.sqrt(np.square(a) - 1))
+
+    # explicitly set acosh(<1) = NaN to avoid overflow in sqrt(square(a) - 1)
+    return np.where(np.less(a, 1), _float128(np.nan), acosh)  # type: ignore
 
 
 # wrapper around np.atanh(a) that also works for numpy_quaddtype
@@ -347,7 +350,7 @@ def _atanh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
     if (type(a) is not _float128_type) and (
         not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
     ):
-        return np.acosh(a)  # type: ignore
+        return np.atanh(a)  # type: ignore
 
     atanh = (np.log(1 + a) - np.log(1 - a)) / 2
 

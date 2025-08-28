@@ -637,7 +637,7 @@ class ScalarAtanh(Expr):
             expr_upper,
         )
         arg_upper = guarantee_arg_within_expr_bounds(
-            lambda arg_upper: _tanh(arg_upper),
+            lambda arg_upper: _atanh(arg_upper),
             exprv,
             argv,
             arg_upper,
