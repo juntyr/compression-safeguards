@@ -3,7 +3,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _is_negative, _where
+from ....utils._compat import _is_negative, _maximum, _minimum, _where
 from ....utils.bindings import Parameter
 from ..bound import guaranteed_data_bounds
 from .abc import Expr
@@ -90,12 +90,6 @@ class ScalarPower(Expr):
         )
         exprv_rewritten = rewritten.eval(X.shape, Xs, late_bound)
 
-        # powers of negative numbers are just too tricky since they easily
-        #  become NaN, so let's enforce bounds that only contain the original
-        #  expression value, but evaluated for the rewritten expression
-        expr_lower = _where(_is_negative(av), exprv_rewritten, expr_lower)
-        expr_upper = _where(_is_negative(av), exprv_rewritten, expr_upper)
-
         # inlined outer ScalarFakeAbs
         # flip the lower/upper bounds if the result is negative
         #  since our rewrite below only works with non-negative exprv
@@ -103,6 +97,17 @@ class ScalarPower(Expr):
             _where(_is_negative(exprv), -expr_upper, expr_lower),
             _where(_is_negative(exprv), -expr_lower, expr_upper),
         )
+
+        # powers of negative numbers are just too tricky since they easily
+        #  become NaN, so let's enforce bounds that only contain the original
+        #  expression value, but evaluated for the rewritten expression
+        expr_lower = _where(_is_negative(av), exprv_rewritten, expr_lower)
+        expr_upper = _where(_is_negative(av), exprv_rewritten, expr_upper)
+
+        # ensure that the bounds at least contain the rewritten expression
+        #  result
+        expr_lower = _minimum(expr_lower, exprv_rewritten)
+        expr_upper = _maximum(expr_upper, exprv_rewritten)
 
         return rewritten.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 
