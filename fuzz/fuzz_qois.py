@@ -252,7 +252,7 @@ def check_one_input(data) -> None:
             X_lower, X_upper = expr.compute_data_bounds(
                 expr_lower, expr_upper, X, X, dict()
             )
-    except TimeoutError as err:
+    except Exception as err:
         print(
             "\n===\n\n"
             + "\n".join(
