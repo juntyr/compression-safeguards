@@ -22,7 +22,6 @@ from .addsub import ScalarAdd, ScalarSubtract
 from .constfold import ScalarFoldedConstant
 from .literal import Number
 from .logexp import Exponential, Logarithm, ScalarExp, ScalarLog
-from .reciprocal import ScalarReciprocal
 from .typing import F, Ns, Ps, PsI
 
 
@@ -87,7 +86,7 @@ class ScalarMultiply(Expr):
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         a_const = not self._a.has_data
         b_const = not self._b.has_data
-        assert not (a_const and b_const), "constant product has no error bounds"
+        assert not (a_const and b_const), "constant multiplication has no error bounds"
 
         # evaluate a and b and a*b
         a, b = self._a, self._b
@@ -122,12 +121,14 @@ class ScalarMultiply(Expr):
                         _where(
                             _isnan(constv),
                             X.dtype.type(-np.inf),
-                            _where(
-                                _is_negative(constv),
-                                expr_upper,
-                                expr_lower,
-                            )
-                            / constv,
+                            np.divide(
+                                _where(
+                                    _is_negative(constv),
+                                    expr_upper,
+                                    expr_lower,
+                                ),
+                                constv,
+                            ),
                         ),
                     ),
                 ),
@@ -147,12 +148,14 @@ class ScalarMultiply(Expr):
                         _where(
                             _isnan(constv),
                             X.dtype.type(np.inf),
-                            _where(
-                                _is_negative(constv),
-                                expr_lower,
-                                expr_upper,
-                            )
-                            / constv,
+                            np.divide(
+                                _where(
+                                    _is_negative(constv),
+                                    expr_lower,
+                                    expr_upper,
+                                ),
+                                constv,
+                            ),
                         ),
                     ),
                 ),
@@ -173,7 +176,7 @@ class ScalarMultiply(Expr):
 
             # handle rounding errors in multiply(divide(...)) early
             term_lower = guarantee_arg_within_expr_bounds(
-                lambda term_lower: term_lower * constv,
+                lambda term_lower: np.multiply(term_lower, constv),
                 exprv,
                 termv,
                 term_lower,
@@ -181,7 +184,7 @@ class ScalarMultiply(Expr):
                 expr_upper,
             )
             term_upper = guarantee_arg_within_expr_bounds(
-                lambda term_upper: term_upper * constv,
+                lambda term_upper: np.multiply(term_upper, constv),
                 exprv,
                 termv,
                 term_upper,
@@ -197,37 +200,8 @@ class ScalarMultiply(Expr):
                 late_bound,
             )
 
-        # inlined outer ScalarFakeAbs
-        # flip the lower/upper bounds if the result is negative
-        #  since our rewrite below only works with non-negative exprv
-        expr_lower, expr_upper = (
-            _where(_is_negative(exprv), -expr_upper, expr_lower),
-            _where(_is_negative(exprv), -expr_lower, expr_upper),
-        )
-
-        rewritten = rewrite_left_associative_product_as_exp_sum_of_logs(self)
-        exprv_rewritten = rewritten.eval(X.shape, Xs, late_bound)
-
-        # ensure that the bounds at least contain the rewritten expression
-        #  result
-        expr_lower = _minimum(expr_lower, exprv_rewritten)
-        expr_upper = _maximum(expr_upper, exprv_rewritten)
-
-        # bail out and just use the rewritten expression result as an exact
-        #  bound in case isnan was changed by the rewrite
-        expr_lower = _where(
-            _isnan(exprv) != _isnan(exprv_rewritten), exprv_rewritten, expr_lower
-        )
-        expr_upper = _where(
-            _isnan(exprv) != _isnan(exprv_rewritten), exprv_rewritten, expr_upper
-        )
-
-        return rewritten.compute_data_bounds(
-            expr_lower,
-            expr_upper,
-            X,
-            Xs,
-            late_bound,
+        return compute_left_associative_product_data_bounds(
+            self, exprv, expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:
@@ -316,19 +290,296 @@ class ScalarDivide(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # rewrite division as multiplication by the reciprocal
-        rewritten = ScalarMultiply(self._a, ScalarReciprocal(self._b))
-        exprv_rewritten = rewritten.eval(X.shape, Xs, late_bound)
+        a_const = not self._a.has_data
+        b_const = not self._b.has_data
+        assert not (a_const and b_const), "constant division has no error bounds"
 
-        # ensure that the bounds at least contain the rewritten expression
-        #  result
-        expr_lower = _minimum(expr_lower, exprv_rewritten)
-        expr_upper = _maximum(expr_upper, exprv_rewritten)
+        # evaluate a and b and a*b
+        a, b = self._a, self._b
+        av = a.eval(X.shape, Xs, late_bound)
+        bv = b.eval(X.shape, Xs, late_bound)
+        exprv = np.divide(av, bv)
 
-        return rewritten.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
+        fmax = _floating_max(X.dtype)
+        smallest_subnormal = _floating_smallest_subnormal(X.dtype)
+
+        term_lower: np.ndarray[Ps, np.dtype[F]]
+        term_upper: np.ndarray[Ps, np.dtype[F]]
+
+        if a_const:
+            term, termv, constv = b, bv, av
+
+            # ensure that the expression keeps the same sign
+            expr_lower = _where(
+                _is_negative(exprv),
+                expr_lower,
+                _maximum(X.dtype.type(+0.0), expr_lower),
+            )
+            expr_upper = _where(
+                _is_negative(exprv),
+                _minimum(expr_upper, X.dtype.type(-0.0)),
+                expr_upper,
+            )
+
+            # compute the divisor bounds
+            # for Inf/x, we can allow any finite x with the same sign
+            # for 0/x, we can allow any non-zero non-NaN x with the same sign
+            # for NaN/x, we can allow any x but only propagate [-inf, inf]
+            #  since [-NaN, NaN] would be misunderstood as only NaN
+            # otherwise ensure that the divisor keeps the same sign:
+            #  - c < 0, t >= +0: el <= e <= eu <= -0 -> tl = -el, tu = -eu
+            #  - c < 0, t <= -0: +0 <= el <= e <= eu -> tl = -el, tu = -eu
+            #  - c > 0, t >= +0: +0 <= el <= e <= eu -> tl = eu, tu = el
+            #  - c > 0, t <= -0: el <= e <= eu <= -0 -> tl = eu, tu = el
+            # if term_lower == termv and termv == -0.0, we need to guarantee
+            #  that term_lower is also -0.0, same for term_upper
+            # TODO: an interval union could represent that the two disjoint
+            #       intervals in the future
+            term_lower = _minimum(
+                termv,
+                _where(
+                    _isinf(constv),
+                    _where(
+                        _is_negative(termv),
+                        -fmax,
+                        X.dtype.type(+0.0),
+                    ),
+                    _where(
+                        constv == 0,
+                        _where(
+                            _is_negative(termv),
+                            X.dtype.type(-np.inf),
+                            smallest_subnormal,
+                        ),
+                        _where(
+                            _isnan(constv),
+                            X.dtype.type(-np.inf),
+                            np.divide(
+                                constv,
+                                _where(
+                                    _is_negative(constv),
+                                    -expr_lower,
+                                    expr_upper,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            )
+            term_upper = _maximum(
+                termv,
+                _where(
+                    _isinf(constv),
+                    _where(
+                        _is_negative(termv),
+                        X.dtype.type(-0.0),
+                        fmax,
+                    ),
+                    _where(
+                        constv == 0,
+                        _where(
+                            _is_negative(termv),
+                            -smallest_subnormal,
+                            X.dtype.type(np.inf),
+                        ),
+                        _where(
+                            _isnan(constv),
+                            X.dtype.type(np.inf),
+                            np.divide(
+                                constv,
+                                _where(
+                                    _is_negative(constv),
+                                    -expr_upper,
+                                    expr_lower,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            )
+
+            # we need to force argv if expr_lower == expr_upper
+            term_lower = _where(expr_lower == expr_upper, termv, term_lower)
+            term_upper = _where(expr_lower == expr_upper, termv, term_upper)
+
+            # handle rounding errors in divide(divide(...)) early
+            term_lower = guarantee_arg_within_expr_bounds(
+                lambda term_lower: np.divide(constv, term_lower),
+                exprv,
+                termv,
+                term_lower,
+                expr_lower,
+                expr_upper,
+            )
+            term_upper = guarantee_arg_within_expr_bounds(
+                lambda term_upper: np.divide(constv, term_upper),
+                exprv,
+                termv,
+                term_upper,
+                expr_lower,
+                expr_upper,
+            )
+
+            return term.compute_data_bounds(
+                term_lower,
+                term_upper,
+                X,
+                Xs,
+                late_bound,
+            )
+
+        if b_const:
+            term, termv, constv = a, av, bv
+
+            # for x/Inf, we can allow any finite x
+            # for x/0, we can allow any non-zero non-NaN x with the same sign
+            # for x/NaN, we can allow any x but only propagate [-inf, inf]
+            #  since [-NaN, NaN] would be misunderstood as only NaN
+            # if term_lower == termv and termv == -0.0, we need to guarantee
+            #  that term_lower is also -0.0, same for term_upper
+            term_lower = _minimum(
+                termv,
+                _where(
+                    _isinf(constv),
+                    -fmax,
+                    _where(
+                        constv == 0,
+                        _where(
+                            _is_negative(termv),
+                            X.dtype.type(-np.inf),
+                            smallest_subnormal,
+                        ),
+                        _where(
+                            _isnan(constv),
+                            X.dtype.type(-np.inf),
+                            _where(
+                                _is_negative(constv),
+                                expr_upper,
+                                expr_lower,
+                            )
+                            * constv,
+                        ),
+                    ),
+                ),
+            )
+            term_upper = _maximum(
+                termv,
+                _where(
+                    _isinf(constv),
+                    fmax,
+                    _where(
+                        constv == 0,
+                        _where(
+                            _is_negative(termv),
+                            -smallest_subnormal,
+                            X.dtype.type(np.inf),
+                        ),
+                        _where(
+                            _isnan(constv),
+                            X.dtype.type(np.inf),
+                            _where(
+                                _is_negative(constv),
+                                expr_lower,
+                                expr_upper,
+                            )
+                            * constv,
+                        ),
+                    ),
+                ),
+            )
+
+            # we need to force argv if expr_lower == expr_upper and constv is
+            #  finite non-zero (in other cases we explicitly expand ranges)
+            term_lower = _where(
+                (expr_lower == expr_upper) & _isfinite(constv) & (constv != 0),
+                termv,
+                term_lower,
+            )
+            term_upper = _where(
+                (expr_lower == expr_upper) & _isfinite(constv) & (constv != 0),
+                termv,
+                term_upper,
+            )
+
+            # handle rounding errors in divide(multiply(...)) early
+            term_lower = guarantee_arg_within_expr_bounds(
+                lambda term_lower: np.divide(term_lower, constv),
+                exprv,
+                termv,
+                term_lower,
+                expr_lower,
+                expr_upper,
+            )
+            term_upper = guarantee_arg_within_expr_bounds(
+                lambda term_upper: np.divide(term_upper, constv),
+                exprv,
+                termv,
+                term_upper,
+                expr_lower,
+                expr_upper,
+            )
+
+            return term.compute_data_bounds(
+                term_lower,
+                term_upper,
+                X,
+                Xs,
+                late_bound,
+            )
+
+        return compute_left_associative_product_data_bounds(
+            self, exprv, expr_lower, expr_upper, X, Xs, late_bound
+        )
 
     def __repr__(self) -> str:
         return f"{self._a!r} / {self._b!r}"
+
+
+def compute_left_associative_product_data_bounds(
+    expr: ScalarMultiply | ScalarDivide,
+    exprv: np.ndarray[Ps, np.dtype[F]],
+    expr_lower: np.ndarray[Ps, np.dtype[F]],
+    expr_upper: np.ndarray[Ps, np.dtype[F]],
+    X: np.ndarray[Ps, np.dtype[F]],
+    Xs: np.ndarray[Ns, np.dtype[F]],
+    late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+    # inlined outer ScalarFakeAbs
+    # flip the lower/upper bounds if the result is negative
+    #  since our rewrite below only works with non-negative exprv
+    expr_lower, expr_upper = (
+        _where(_is_negative(exprv), -expr_upper, expr_lower),
+        _where(_is_negative(exprv), -expr_lower, expr_upper),
+    )
+
+    # rewrite a * b * ... * z as
+    #  fake_abs(e^(ln(fake_abs(a)) + ln(fake_abs(b)) + ... + ln(fake_abs(z))))
+    # this is mathematically incorrect for any negative product terms but works
+    #  for deriving error bounds since fake_abs handles the error bound flips
+    rewritten = rewrite_left_associative_product_as_exp_sum_of_logs(expr)
+    exprv_rewritten = rewritten.eval(X.shape, Xs, late_bound)
+
+    # ensure that the bounds at least contain the rewritten expression
+    #  result
+    expr_lower = _minimum(expr_lower, exprv_rewritten)
+    expr_upper = _maximum(expr_upper, exprv_rewritten)
+
+    # bail out and just use the rewritten expression result as an exact
+    #  bound in case isnan was changed by the rewrite
+    expr_lower = _where(
+        _isnan(exprv) != _isnan(exprv_rewritten), exprv_rewritten, expr_lower
+    )
+    expr_upper = _where(
+        _isnan(exprv) != _isnan(exprv_rewritten), exprv_rewritten, expr_upper
+    )
+
+    return rewritten.compute_data_bounds(
+        expr_lower,
+        expr_upper,
+        X,
+        Xs,
+        late_bound,
+    )
 
 
 def rewrite_left_associative_product_as_exp_sum_of_logs(
@@ -336,30 +587,27 @@ def rewrite_left_associative_product_as_exp_sum_of_logs(
 ) -> Expr:
     from .power import ScalarFakeAbs
 
-    terms_stack: list[tuple[Expr, bool]] = []
+    terms_stack: list[tuple[Expr, type[ScalarAdd] | type[ScalarSubtract]]] = []
 
     while True:
         terms_stack.append(
             (
                 ScalarLog(Logarithm.ln, ScalarFakeAbs(expr._b)),
-                isinstance(expr, ScalarMultiply),
+                ScalarAdd if isinstance(expr, ScalarMultiply) else ScalarSubtract,
             )
         )
 
         if isinstance(expr._a, (ScalarMultiply, ScalarDivide)):
             expr = expr._a
         else:
-            terms_stack.append((ScalarLog(Logarithm.ln, ScalarFakeAbs(expr._a)), True))
+            terms_stack.append(
+                (ScalarLog(Logarithm.ln, ScalarFakeAbs(expr._a)), ScalarAdd)
+            )
             break
 
     while len(terms_stack) > 1:
-        (a, _), (b, is_mul) = terms_stack.pop(), terms_stack.pop()
-        terms_stack.append(
-            (
-                (ScalarAdd if is_mul else ScalarSubtract)(a, b),
-                True,
-            )
-        )
+        (a, _), (b, ty) = terms_stack.pop(), terms_stack.pop()
+        terms_stack.append((ty(a, b), ScalarAdd))
 
     [(sum_of_lns, _)] = terms_stack
 

@@ -80,9 +80,8 @@ class ScalarAdd(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        terms = as_left_associative_sum(self)
         return compute_left_associate_sum_data_bounds(
-            terms, expr_lower, expr_upper, X, Xs, late_bound
+            self, expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:
@@ -149,76 +148,16 @@ class ScalarSubtract(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        terms = as_left_associative_sum(self)
         return compute_left_associate_sum_data_bounds(
-            terms, expr_lower, expr_upper, X, Xs, late_bound
+            self, expr_lower, expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:
         return f"{self._a!r} - {self._b!r}"
 
 
-def as_left_associative_sum(
-    expr: ScalarAdd | ScalarSubtract,
-) -> tuple[Expr, ...]:
-    from .neg import ScalarNegate
-
-    terms_rev: list[Expr] = []
-
-    while True:
-        # rewrite ( a - b ) as ( a + (-b) ), which is equivalent for
-        #  floating point numbers
-        terms_rev.append(
-            ScalarNegate(expr._b) if isinstance(expr, ScalarSubtract) else expr._b
-        )
-
-        if isinstance(expr._a, (ScalarAdd, ScalarSubtract)):
-            expr = expr._a
-        else:
-            terms_rev.append(expr._a)
-            break
-
-    return tuple(terms_rev[::-1])
-
-
-def get_expr_left_associative_abs_factor_approximate(expr: Expr) -> None | Expr:
-    from .divmul import ScalarDivide, ScalarMultiply
-
-    if not expr.has_data:
-        return None
-
-    if not isinstance(expr, (ScalarMultiply, ScalarDivide)):
-        return Number.ONE
-
-    factor_stack: list[tuple[Expr, type[ScalarMultiply] | type[ScalarDivide]]] = []
-
-    while True:
-        factor_stack.append((expr._b, type(expr)))
-
-        if isinstance(expr._a, (ScalarMultiply, ScalarDivide)):
-            expr = expr._a
-        else:
-            factor_stack.append(
-                (Number.ONE if expr._a.has_data else expr._a, ScalarMultiply)
-            )
-            break
-
-    while len(factor_stack) > 1:
-        (a, _), (b, ty) = factor_stack.pop(), factor_stack.pop()
-        factor_stack.append(
-            (
-                ty(a, Number.ONE if b.has_data else b),
-                ScalarMultiply,
-            )
-        )
-
-    [(factor, _)] = factor_stack
-
-    return ScalarAbs(factor)
-
-
 def compute_left_associate_sum_data_bounds(
-    left_associative_sum: tuple[Expr, ...],
+    expr: ScalarAdd | ScalarSubtract,
     expr_lower: np.ndarray[Ps, np.dtype[F]],
     expr_upper: np.ndarray[Ps, np.dtype[F]],
     X: np.ndarray[Ps, np.dtype[F]],
@@ -229,6 +168,8 @@ def compute_left_associate_sum_data_bounds(
         a: np.ndarray[Ps, np.dtype[F]], b: np.ndarray[Ps, np.dtype[F]]
     ) -> np.ndarray[Ps, np.dtype[F]]:
         return _where(b == 0, a, a + b)
+
+    left_associative_sum = as_left_associative_sum(expr)
 
     termvs: list[np.ndarray[Ps, np.dtype[F]]] = []
     abs_factorvs: list[None | np.ndarray[Ps, np.dtype[F]]] = []
@@ -435,3 +376,62 @@ def compute_left_associate_sum_data_bounds(
     Xs_upper = _maximum(Xs_upper, Xs)
 
     return Xs_lower, Xs_upper
+
+
+def as_left_associative_sum(
+    expr: ScalarAdd | ScalarSubtract,
+) -> tuple[Expr, ...]:
+    from .neg import ScalarNegate
+
+    terms_rev: list[Expr] = []
+
+    while True:
+        # rewrite ( a - b ) as ( a + (-b) ), which is bitwsie equivalent for
+        #  floating point numbers
+        terms_rev.append(
+            ScalarNegate(expr._b) if isinstance(expr, ScalarSubtract) else expr._b
+        )
+
+        if isinstance(expr._a, (ScalarAdd, ScalarSubtract)):
+            expr = expr._a
+        else:
+            terms_rev.append(expr._a)
+            break
+
+    return tuple(terms_rev[::-1])
+
+
+def get_expr_left_associative_abs_factor_approximate(expr: Expr) -> None | Expr:
+    from .divmul import ScalarDivide, ScalarMultiply
+
+    if not expr.has_data:
+        return None
+
+    if not isinstance(expr, (ScalarMultiply, ScalarDivide)):
+        return Number.ONE
+
+    factor_stack: list[tuple[Expr, type[ScalarMultiply] | type[ScalarDivide]]] = []
+
+    while True:
+        factor_stack.append((expr._b, type(expr)))
+
+        if isinstance(expr._a, (ScalarMultiply, ScalarDivide)):
+            expr = expr._a
+        else:
+            factor_stack.append(
+                (Number.ONE if expr._a.has_data else expr._a, ScalarMultiply)
+            )
+            break
+
+    while len(factor_stack) > 1:
+        (a, _), (b, ty) = factor_stack.pop(), factor_stack.pop()
+        factor_stack.append(
+            (
+                ty(a, Number.ONE if b.has_data else b),
+                ScalarMultiply,
+            )
+        )
+
+    [(factor, _)] = factor_stack
+
+    return ScalarAbs(factor)

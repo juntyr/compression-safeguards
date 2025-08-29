@@ -323,8 +323,8 @@ def test_rounding(check):
 @pytest.mark.parametrize("check", CHECKS)
 def test_inverse(check):
     check("1 / x")
-    check("1 / x**2")
-    check("1 / x**3")
+    check("2 / x**2")
+    check("-3 / x**3")
 
     check("reciprocal(x)")
     check("reciprocal(x - 1)")

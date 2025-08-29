@@ -3,7 +3,6 @@ from collections.abc import Mapping
 import numpy as np
 
 from ....utils._compat import (
-    _floating_smallest_subnormal,
     _is_negative,
     _maximum,
     _minimum,
@@ -103,17 +102,6 @@ class ScalarReciprocal(Expr):
         # we need to force argv if expr_lower == expr_upper
         arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
         arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
-
-        smallest_subnormal = _floating_smallest_subnormal(X.dtype)
-
-        # FIXME: since we use reciprocal to rewrite division, we need to ensure
-        #        that 1/x for x != 0 cannot include x = 0
-        arg_lower = _where(
-            (arg_lower == 0) & (argv != 0), smallest_subnormal, arg_lower
-        )
-        arg_upper = _where(
-            (arg_upper == 0) & (argv != 0), -smallest_subnormal, arg_upper
-        )
 
         # handle rounding errors in reciprocal(reciprocal(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
