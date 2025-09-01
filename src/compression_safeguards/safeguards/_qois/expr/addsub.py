@@ -166,7 +166,7 @@ def compute_left_associate_sum_data_bounds(
     def _zero_add(
         a: np.ndarray[Ps, np.dtype[F]], b: np.ndarray[Ps, np.dtype[F]]
     ) -> np.ndarray[Ps, np.dtype[F]]:
-        sum_: np.ndarray[Ps, np.dtype[F]] = np.array(a + b, copy=None)
+        sum_: np.ndarray[Ps, np.dtype[F]] = np.array(np.add(a, b), copy=None)
         np.copyto(sum_, a, where=(b == 0), casting="no")
         return sum_
 
@@ -216,10 +216,10 @@ def compute_left_associate_sum_data_bounds(
     #  (b) -inf - inf and inf - -inf are +-inf, so expr_[lower|upper]_diff is
     #      the same infinity as expr_[lower|upper]
     tfl: np.ndarray[Ps, np.dtype[F]] = np.array(
-        expr_lower_diff / total_abs_factor, copy=None
+        np.divide(expr_lower_diff, total_abs_factor), copy=None
     )
     tfu: np.ndarray[Ps, np.dtype[F]] = np.array(
-        expr_upper_diff / total_abs_factor, copy=None
+        np.divide(expr_upper_diff, total_abs_factor), copy=None
     )
 
     fmax = _floating_max(X.dtype)

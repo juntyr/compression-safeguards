@@ -311,7 +311,9 @@ def _tanh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
     # explicitly set tanh(huge) = 1 where overflow to inf/inf = NaN might occur
     # propagate tanh(-0.0) = -0.0
     expa: np.ndarray[S, np.dtype[F]] = np.exp(a * 2)
-    out: np.ndarray[S, np.dtype[F]] = np.array((expa - 1) / (expa + 1), copy=None)
+    out: np.ndarray[S, np.dtype[F]] = np.array(
+        np.divide(np.subtract(expa, 1), np.add(expa, 1)), copy=None
+    )
     out[expa == np.inf] = 1
     np.copyto(out, a, where=(out == a), casting="no")
     return out
