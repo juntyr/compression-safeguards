@@ -13,7 +13,6 @@ from ....utils._compat import (
     _nextafter,
     _sinh,
     _tanh,
-    _where,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
@@ -87,8 +86,8 @@ class ScalarSinh(Expr):
         arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(argv, _asinh(expr_upper))
 
         # we need to force argv if expr_lower == expr_upper
-        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
-        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+        np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(arg_upper, argv, where=(expr_lower == expr_upper), casting="no")
 
         # handle rounding errors in sinh(asinh(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
@@ -189,16 +188,27 @@ class ScalarCosh(Expr):
         #  - el <= 1 -> al = -eu, au = eu
         # TODO: an interval union could represent that the two sometimes-
         #       disjoint intervals in the future
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum(
-            argv, _where(np.less_equal(expr_lower, 1) | _is_negative(argv), -au, al)
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(al, copy=True)
+        np.copyto(
+            arg_lower,
+            -au,
+            where=(np.less_equal(expr_lower, 1) | _is_negative(argv)),
+            casting="no",
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(
-            argv, _where(np.greater(expr_lower, 1) & _is_negative(argv), -al, au)
+        arg_lower = _minimum(argv, arg_lower)
+
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(au, copy=True)
+        np.copyto(
+            arg_upper,
+            -al,
+            where=(np.greater(expr_lower, 1) & _is_negative(argv)),
+            casting="no",
         )
+        arg_upper = _maximum(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
-        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
-        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+        np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(arg_upper, argv, where=(expr_lower == expr_upper), casting="no")
 
         # handle rounding errors in cosh(acosh(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
@@ -300,8 +310,8 @@ class ScalarTanh(Expr):
         )
 
         # we need to force argv if expr_lower == expr_upper
-        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
-        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+        np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(arg_upper, argv, where=(expr_lower == expr_upper), casting="no")
 
         # handle rounding errors in tanh(atanh(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
@@ -398,8 +408,8 @@ class ScalarAsinh(Expr):
         arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(argv, _sinh(expr_upper))
 
         # we need to force argv if expr_lower == expr_upper
-        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
-        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+        np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(arg_upper, argv, where=(expr_lower == expr_upper), casting="no")
 
         # handle rounding errors in asinh(sinh(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
@@ -495,20 +505,19 @@ class ScalarAcosh(Expr):
         # acosh(...) is NaN for values smaller than 1 and can then take any
         #  value smaller than one
         # otherwise ensure that the bounds on acosh(...) are non-negative
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
-            np.less(argv, 1),
-            X.dtype.type(-np.inf),
-            _minimum(argv, _cosh(_maximum(X.dtype.type(0), expr_lower))),
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
+            _cosh(_maximum(X.dtype.type(0), expr_lower)), copy=None
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
-            np.less(argv, 1),
-            eps_one,
-            _maximum(argv, _cosh(expr_upper)),
-        )
+        arg_lower[np.less(argv, 1)] = -np.inf
+        arg_lower = _minimum(argv, arg_lower)
+
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(_cosh(expr_upper), copy=None)
+        arg_upper[np.less(argv, 1)] = eps_one
+        arg_upper = _maximum(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
-        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
-        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+        np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(arg_upper, argv, where=(expr_lower == expr_upper), casting="no")
 
         # handle rounding errors in acosh(cosh(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
@@ -604,28 +613,19 @@ class ScalarAtanh(Expr):
         # atanh(...) is NaN when abs(...) > 1 and can then take any value > 1
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
-            np.less(argv, -1),
-            X.dtype.type(-np.inf),
-            _where(
-                np.greater(argv, 1),
-                one_eps,
-                _minimum(argv, _tanh(expr_lower)),
-            ),
-        )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
-            np.less(argv, -1),
-            -one_eps,
-            _where(
-                np.greater(argv, 1),
-                X.dtype.type(np.inf),
-                _maximum(argv, _tanh(expr_upper)),
-            ),
-        )
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(_tanh(expr_lower), copy=None)
+        arg_lower[np.greater(argv, 1)] = one_eps
+        arg_lower[np.less(argv, -1)] = -np.inf
+        arg_lower = _minimum(argv, arg_lower)
+
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(_tanh(expr_upper), copy=None)
+        arg_upper[np.greater(argv, 1)] = np.inf
+        arg_upper[np.less(argv, -1)] = -one_eps
+        arg_upper = _maximum(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
-        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
-        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+        np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(arg_upper, argv, where=(expr_lower == expr_upper), casting="no")
 
         # handle rounding errors in atanh(tanh(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
