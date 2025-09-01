@@ -95,9 +95,9 @@ class PointwiseQuantityOfInterest:
             The pointwise quantity of interest values.
         """
 
-        X = np.array(X)
+        X = np.array(X, copy=None)
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, X.dtype)
-        exprv = np.array(expr.eval(X.shape, X, late_bound))
+        exprv = np.array(expr.eval(X.shape, X, late_bound), copy=None)
         assert exprv.dtype == X.dtype
         assert exprv.shape == X.shape
         return exprv
@@ -132,13 +132,15 @@ class PointwiseQuantityOfInterest:
             The pointwise lower and upper bounds on the data `X`.
         """
 
-        qoi_lower, qoi_upper = np.array(qoi_lower), np.array(qoi_upper)
-        X = np.array(X)
+        qoi_lower = np.array(qoi_lower, copy=None)
+        qoi_upper = np.array(qoi_upper, copy=None)
+        X = np.array(X, copy=None)
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, X.dtype)
         X_lower, X_upper = expr.compute_data_bounds(
             qoi_lower, qoi_upper, X, X, late_bound
         )
-        X_lower, X_upper = np.array(X_lower), np.array(X_upper)
+        X_lower = np.array(X_lower, copy=None)
+        X_upper = np.array(X_upper, copy=None)
         assert X_lower.dtype == X.dtype
         assert X_upper.dtype == X.dtype
         assert X_lower.shape == X.shape
@@ -259,12 +261,12 @@ class StencilQuantityOfInterest:
             The pointwise quantity of interest values.
         """
 
-        Xs = np.array(Xs)
+        Xs = np.array(Xs, copy=None)
         X_shape: Ps = Xs.shape[: -len(self._stencil_shape)]  # type: ignore
         stencil_shape = Xs.shape[-len(self._stencil_shape) :]
         assert stencil_shape == self._stencil_shape
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, Xs.dtype)
-        exprv = np.array(expr.eval(X_shape, Xs, late_bound))
+        exprv = np.array(expr.eval(X_shape, Xs, late_bound), copy=None)
         assert exprv.dtype == Xs.dtype
         assert exprv.shape == X_shape
         return exprv
@@ -305,8 +307,9 @@ class StencilQuantityOfInterest:
             that contribute to the same QoI points.
         """
 
-        qoi_lower, qoi_upper = np.array(qoi_lower), np.array(qoi_upper)
-        Xs = np.array(Xs)
+        qoi_lower = np.array(qoi_lower, copy=None)
+        qoi_upper = np.array(qoi_upper, copy=None)
+        Xs = np.array(Xs, copy=None)
         X_shape, stencil_shape = (
             Xs.shape[: -len(self._stencil_shape)],
             Xs.shape[-len(self._stencil_shape) :],
@@ -318,7 +321,8 @@ class StencilQuantityOfInterest:
         Xs_lower, Xs_upper = expr.compute_data_bounds(
             qoi_lower, qoi_upper, X, Xs, late_bound
         )
-        Xs_lower, Xs_upper = np.array(Xs_lower), np.array(Xs_upper)
+        Xs_lower = np.array(Xs_lower, copy=None)
+        Xs_upper = np.array(Xs_upper, copy=None)
         assert Xs_lower.dtype == Xs.dtype
         assert Xs_upper.dtype == Xs.dtype
         assert Xs_lower.shape == Xs.shape

@@ -33,12 +33,12 @@ class Array(Expr):
                         f"elements must all have the consistent shape {el.shape}"
                     )
                 aels.append(e._array)
-            self._array = np.array(aels)
+            self._array = np.array(aels, copy=None)
         else:
             for e in els:
                 if isinstance(e, Array):
                     raise ValueError("elements must all be scalar")
-            self._array = np.array((el,) + els)
+            self._array = np.array((el,) + els, copy=None)
 
     @staticmethod
     def from_data_shape(shape: tuple[int, ...]) -> "Array":

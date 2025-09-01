@@ -2,9 +2,9 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _isfinite, _where
+from ....utils._compat import _isfinite
 from ....utils.bindings import Parameter
-from ..bound import guaranteed_data_bounds
+from ..bound import DataBounds, data_bounds
 from .abc import Expr
 from .typing import F, Ns, Ps, PsI
 
@@ -50,7 +50,7 @@ class Data(Expr):
         assert out.shape == x
         return out  # type: ignore
 
-    @guaranteed_data_bounds
+    @data_bounds(DataBounds.infallible)
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -59,14 +59,12 @@ class Data(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        X_lower: np.ndarray[Ns, np.dtype[F]] = _where(
-            _isfinite(Xs), X.dtype.type(-np.inf), Xs
-        )
-        X_upper: np.ndarray[Ns, np.dtype[F]] = _where(
-            _isfinite(Xs), X.dtype.type(np.inf), Xs
-        )
-
+        X_lower: np.ndarray[Ns, np.dtype[F]] = np.copy(Xs)
+        X_lower[_isfinite(Xs)] = -np.inf
         X_lower[(...,) + self._index] = expr_lower
+
+        X_upper: np.ndarray[Ns, np.dtype[F]] = np.copy(Xs)
+        X_upper[_isfinite(Xs)] = np.inf
         X_upper[(...,) + self._index] = expr_upper
 
         return X_lower, X_upper

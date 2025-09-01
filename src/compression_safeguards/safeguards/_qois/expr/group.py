@@ -3,7 +3,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from ....utils.bindings import Parameter
-from ..bound import guaranteed_data_bounds
+from ..bound import DataBounds, data_bounds
 from .abc import Expr
 from .literal import Number
 from .typing import F, Ns, Ps, PsI
@@ -55,7 +55,7 @@ class Group(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return self._expr.eval(x, Xs, late_bound)
 
-    @guaranteed_data_bounds
+    @data_bounds(DataBounds.infallible)
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],

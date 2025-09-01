@@ -11,10 +11,9 @@ from ....utils._compat import (
     _maximum,
     _minimum,
     _nan_to_zero,
-    _where,
 )
 from ....utils.bindings import Parameter
-from ..bound import guarantee_arg_within_expr_bounds, guaranteed_data_bounds
+from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
 from .abc import Expr
 from .abs import ScalarAbs
 from .constfold import ScalarFoldedConstant
@@ -71,7 +70,7 @@ class ScalarAdd(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.add(self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound))
 
-    @guaranteed_data_bounds
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -139,7 +138,7 @@ class ScalarSubtract(Expr):
             self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound)
         )
 
-    @guaranteed_data_bounds
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -167,7 +166,9 @@ def compute_left_associate_sum_data_bounds(
     def _zero_add(
         a: np.ndarray[Ps, np.dtype[F]], b: np.ndarray[Ps, np.dtype[F]]
     ) -> np.ndarray[Ps, np.dtype[F]]:
-        return _where(b == 0, a, a + b)
+        sum_: np.ndarray[Ps, np.dtype[F]] = np.array(a + b, copy=None)
+        np.copyto(sum_, a, where=(b == 0), casting="no")
+        return sum_
 
     left_associative_sum = as_left_associative_sum(expr)
 
@@ -182,9 +183,11 @@ def compute_left_associate_sum_data_bounds(
         )
 
     # evaluate the total expression sum
-    exprv: np.ndarray[Ps, np.dtype[F]] = np.array(sum(termvs[1:], start=termvs[0]))
-    expr_lower = np.array(expr_lower)
-    expr_upper = np.array(expr_upper)
+    exprv: np.ndarray[Ps, np.dtype[F]] = np.array(
+        sum(termvs[1:], start=termvs[0]), copy=None
+    )
+    expr_lower = np.array(expr_lower, copy=None)
+    expr_upper = np.array(expr_upper, copy=None)
 
     # compute the sum of absolute factors
     total_abs_factor_: None | np.ndarray[Ps, np.dtype[F]] = None
@@ -212,16 +215,20 @@ def compute_left_associate_sum_data_bounds(
     #      zero
     #  (b) -inf - inf and inf - -inf are +-inf, so expr_[lower|upper]_diff is
     #      the same infinity as expr_[lower|upper]
-    tfl: np.ndarray[Ps, np.dtype[F]] = expr_lower_diff / total_abs_factor
-    tfu: np.ndarray[Ps, np.dtype[F]] = expr_upper_diff / total_abs_factor
+    tfl: np.ndarray[Ps, np.dtype[F]] = np.array(
+        expr_lower_diff / total_abs_factor, copy=None
+    )
+    tfu: np.ndarray[Ps, np.dtype[F]] = np.array(
+        expr_upper_diff / total_abs_factor, copy=None
+    )
 
     fmax = _floating_max(X.dtype)
 
     # ensure that the bounds never contain both -inf and +inf since that would
     #  allow NaN to sneak in
     inf_clash = (tfl == -np.inf) & (tfu == np.inf)
-    tfl = _where(inf_clash, -fmax, tfl)
-    tfu = _where(inf_clash, fmax, tfu)
+    tfl[inf_clash] = -fmax
+    tfu[inf_clash] = fmax
 
     any_nan: np.ndarray[Ps, np.dtype[np.bool]] = _isnan(termvs[0])
     for termv in termvs[1:]:
@@ -235,36 +242,40 @@ def compute_left_associate_sum_data_bounds(
     # if total_abs_factor is zero, all abs_factorv are also zero and we can
     #  allow the finite terms terms to have any finite value
     # otherwise we split up the error bound for the terms by their factors
-    tl_stack = np.stack(
-        [
-            _where(
-                ~_isfinite(total_abs_factor) | ~_isfinite(exprv),
-                _where(_isfinite(termv) & any_nan, -fmax, termv),  # type: ignore
-                _where(
-                    total_abs_factor == 0,
-                    -fmax,
-                    _zero_add(termv, tfl * abs_factorv),
-                ),
-            )
-            for termv, abs_factorv in zip(termvs, abs_factorvs)
-            if abs_factorv is not None
-        ]
-    )
-    tu_stack = np.stack(
-        [
-            _where(
-                ~_isfinite(total_abs_factor) | ~_isfinite(exprv),
-                _where(_isfinite(termv) & any_nan, fmax, termv),  # type: ignore
-                _where(
-                    total_abs_factor == 0,
-                    fmax,
-                    _zero_add(termv, tfu * abs_factorv),
-                ),
-            )
-            for termv, abs_factorv in zip(termvs, abs_factorvs)
-            if abs_factorv is not None
-        ]
-    )
+    tl_stack_: list[np.ndarray[Ps, np.dtype[F]]] = []
+    for termv, abs_factorv in zip(termvs, abs_factorvs):
+        if abs_factorv is None:
+            continue
+        tl: np.ndarray[Ps, np.dtype[F]] = np.array(termv, copy=True)
+        tl[_isfinite(termv) & any_nan] = -fmax
+        np.copyto(
+            tl,
+            _zero_add(termv, tfl * abs_factorv),
+            where=(_isfinite(total_abs_factor) & _isfinite(exprv)),
+            casting="no",
+        )
+        tl[
+            _isfinite(total_abs_factor) & _isfinite(exprv) & (total_abs_factor == 0)
+        ] = -fmax
+        tl_stack_.append(tl)
+    tl_stack = np.stack(tl_stack_)
+    tu_stack_: list[np.ndarray[Ps, np.dtype[F]]] = []
+    for termv, abs_factorv in zip(termvs, abs_factorvs):
+        if abs_factorv is None:
+            continue
+        tu: np.ndarray[Ps, np.dtype[F]] = np.array(termv, copy=True)
+        tu[_isfinite(termv) & any_nan] = fmax
+        np.copyto(
+            tu,
+            _zero_add(termv, tfu * abs_factorv),
+            where=(_isfinite(total_abs_factor) & _isfinite(exprv)),
+            casting="no",
+        )
+        tu[_isfinite(total_abs_factor) & _isfinite(exprv) & (total_abs_factor == 0)] = (
+            fmax
+        )
+        tu_stack_.append(tu)
+    tu_stack = np.stack(tu_stack_)
 
     def compute_term_sum(
         t_stack: np.ndarray[tuple[int, ...], np.dtype[F]],
@@ -287,7 +298,7 @@ def compute_left_associate_sum_data_bounds(
         assert total_sum is not None
 
         return _broadcast_to(
-            np.array(total_sum).reshape((1,) + exprv.shape),
+            np.array(total_sum, copy=None).reshape((1,) + exprv.shape),
             (t_stack.shape[0],) + exprv.shape,
         )
 

@@ -189,8 +189,12 @@ class SameValueSafeguard(PointwiseSafeguard):
         Lower(valuef) <= valid_below[dataf_bits == valuef_bits] <= Upper(valuef)
 
         with np.errstate(over="ignore", under="ignore"):
-            below_upper = np.array(from_total_order(valuef_total - 1, data.dtype))
-            above_lower = np.array(from_total_order(valuef_total + 1, data.dtype))
+            below_upper = np.array(
+                from_total_order(valuef_total - 1, data.dtype), copy=None
+            )
+            above_lower = np.array(
+                from_total_order(valuef_total + 1, data.dtype), copy=None
+            )
 
         # non-value elements must exclude value from their interval,
         #  leading to a union of two intervals, below and above value

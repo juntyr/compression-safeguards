@@ -2,9 +2,9 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _is_negative, _where
+from ....utils._compat import _is_negative
 from ....utils.bindings import Parameter
-from ..bound import guaranteed_data_bounds
+from ..bound import checked_data_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
@@ -51,7 +51,7 @@ class ScalarAbs(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.abs(self._a.eval(x, Xs, late_bound))
 
-    @guaranteed_data_bounds
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -71,11 +71,19 @@ class ScalarAbs(Expr):
         #  - el <= 0 -> al = -eu, au = eu
         # TODO: an interval union could represent that the two sometimes-
         #       disjoint intervals in the future
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
-            np.less_equal(expr_lower, 0) | _is_negative(argv), -expr_upper, expr_lower
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.copy(expr_lower)
+        np.copyto(
+            arg_lower,
+            -expr_upper,
+            where=(np.less_equal(expr_lower, 0) | _is_negative(argv)),
+            casting="no",
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
-            np.greater(expr_lower, 0) & _is_negative(argv), -expr_lower, expr_upper
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.copy(expr_upper)
+        np.copyto(
+            arg_upper,
+            -expr_lower,
+            where=(np.greater(expr_lower, 0) & _is_negative(argv)),
+            casting="no",
         )
 
         return arg.compute_data_bounds(

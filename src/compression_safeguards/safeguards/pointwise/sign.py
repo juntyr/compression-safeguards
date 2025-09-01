@@ -182,18 +182,24 @@ class SignPreservingSafeguard(PointwiseSafeguard):
                         offsetf == 0,
                         -smallest_subnormal,
                         from_total_order(offsetf_total - 1, data.dtype),
-                    )
+                    ),
+                    copy=None,
                 )
                 above_lower = np.array(
                     _where(
                         offsetf == 0,
                         smallest_subnormal,
                         from_total_order(offsetf_total + 1, data.dtype),
-                    )
+                    ),
+                    copy=None,
                 )
             else:
-                below_upper = np.array(from_total_order(offsetf_total - 1, data.dtype))
-                above_lower = np.array(from_total_order(offsetf_total + 1, data.dtype))
+                below_upper = np.array(
+                    from_total_order(offsetf_total - 1, data.dtype), copy=None
+                )
+                above_lower = np.array(
+                    from_total_order(offsetf_total + 1, data.dtype), copy=None
+                )
 
         dataf = data.flatten()
         valid = (

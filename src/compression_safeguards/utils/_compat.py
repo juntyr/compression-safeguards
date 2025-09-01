@@ -72,7 +72,7 @@ def _isnan(a):
         not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
     ):
         return np.isnan(a)  # type: ignore
-    return ~np.array(np.abs(a) <= np.inf)  # type: ignore
+    return ~np.array(np.abs(a) <= np.inf, copy=None)  # type: ignore
 
 
 # wrapper around np.isinf that also works for numpy_quaddtype
@@ -130,7 +130,9 @@ def _nan_to_zero(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
         not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
     ):
         return np.nan_to_num(a, nan=0, posinf=np.inf, neginf=-np.inf)  # type: ignore
-    return np.where(_isnan(a), _float128(0), a)  # type: ignore
+    out: np.ndarray[S, np.dtype[T]] = np.array(a, copy=True)
+    out[_isnan(a)] = 0
+    return out
 
 
 # wrapper around np.nan_to_num that also works for numpy_quaddtype
@@ -142,11 +144,11 @@ def _nan_to_zero_inf_to_finite(
         not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
     ):
         return np.nan_to_num(a, nan=0, posinf=None, neginf=None)  # type: ignore
-    return np.where(
-        _isnan(a),
-        _float128(0),
-        np.where(a == -np.inf, _float128_min, np.where(a == np.inf, _float128_max, a)),
-    )  # type: ignore
+    out: np.ndarray[S, np.dtype[T]] = np.array(a, copy=True)
+    out[_isnan(a)] = 0
+    out[a == -np.inf] = _float128_min
+    out[a == np.inf] = _float128_max
+    return out
 
 
 # wrapper around np.sign that also works for numpy_quaddtype
@@ -156,14 +158,11 @@ def _sign(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
         not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
     ):
         return np.sign(a)  # type: ignore
-    a = np.array(a)
-    return np.where(
-        _isnan(a),
-        a,
-        np.where(
-            a == 0, a.dtype.type(0), np.where(a < 0, a.dtype.type(-1), a.dtype.type(+1))
-        ),
-    )  # type: ignore
+    out: np.ndarray[S, np.dtype[T]] = np.array(a, copy=True)
+    out[a == 0] = 0
+    out[a < 0] = -1
+    out[a > 0] = +1
+    return out
 
 
 # wrapper around np.nextafter that also works for numpy_quaddtype
@@ -177,8 +176,8 @@ def _nextafter(
     ):
         return np.nextafter(a, b)  # type: ignore
 
-    a = np.array(a)
-    b = np.array(b, dtype=a.dtype)
+    a = np.array(a, copy=None)
+    b = np.array(b, dtype=a.dtype, copy=None)
 
     _float128_neg_zero = -_float128(0)
 
@@ -257,7 +256,8 @@ def _symmetric_modulo(
     q2: np.ndarray[S, np.dtype[F]] = np.divide(q, 2)
     res: np.ndarray[S, np.dtype[F]] = np.mod(p + q2, q)
     if (type(p) is _float128_type) or (p.dtype == _float128_dtype):
-        res = np.mod(res + q, q)
+        res += q
+        np.mod(res, q, out=res)
     return np.subtract(res, q2)
 
 
@@ -268,16 +268,14 @@ def _rint(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
     ):
         return np.rint(a)  # type: ignore
 
-    a = np.array(a)
+    halfway = np.array(np.trunc(a), copy=None)
+    halfway[halfway < 0] -= 0.5
+    halfway[halfway > 0] += 0.5
 
-    halfway = np.trunc(a) + np.where(a < 0, a.dtype.type(-0.5), a.dtype.type(0.5))
-
-    return np.where(  # type: ignore
-        a == halfway,
-        # we trust numpy_quaddtype on actual halfway cases
-        np.rint(a),
-        np.where(a < halfway, np.floor(a), np.ceil(a)),
-    )
+    out: np.ndarray[S, np.dtype[F]] = np.array(np.rint(a), copy=None)
+    np.copyto(out, np.floor(a), where=(a < halfway), casting="no")
+    np.copyto(out, np.ceil(a), where=(a > halfway), casting="no")
+    return out
 
 
 # wrapper around np.sinh(a) that also works for numpy_quaddtype
@@ -287,10 +285,10 @@ def _sinh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
     ):
         return np.sinh(a)  # type: ignore
 
-    sinh = (np.exp(a) - np.exp(-a)) / 2
-
     # propagate sinh(-0.0) = -0.0
-    return np.where(sinh == a, a, sinh)  # type: ignore
+    out: np.ndarray[S, np.dtype[F]] = np.array((np.exp(a) - np.exp(-a)) / 2, copy=None)
+    np.copyto(out, a, where=(out == a), casting="no")
+    return out
 
 
 # wrapper around np.cosh(a) that also works for numpy_quaddtype
@@ -310,10 +308,12 @@ def _tanh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
     ):
         return np.tanh(a)  # type: ignore
 
-    tanh = (np.exp(a * 2) - 1) / (np.exp(a * 2) + 1)
-
     # propagate tanh(-0.0) = -0.0
-    return np.where(tanh == a, a, tanh)  # type: ignore
+    out: np.ndarray[S, np.dtype[F]] = np.array(
+        (np.exp(a * 2) - 1) / (np.exp(a * 2) + 1), copy=None
+    )
+    np.copyto(out, a, where=(out == a), casting="no")
+    return out
 
 
 # wrapper around np.asinh(a) that also works for numpy_quaddtype
@@ -325,11 +325,13 @@ def _asinh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
 
     # evaluate asinh(abs(a)) first since it overflows correctly in
     #  sqrt(square(a)), then copy the sign of the input a
-    asinh_abs = np.log(np.abs(a) + np.sqrt(np.square(np.abs(a)) + 1))
-    asinh = np.where(a < 0, -asinh_abs, asinh_abs)
-
     # propagate asinh(-0.0) = -0.0
-    return np.where(asinh == a, a, asinh)  # type: ignore
+    out: np.ndarray[S, np.dtype[F]] = np.array(
+        np.log(np.abs(a) + np.sqrt(np.square(np.abs(a)) + 1)), copy=None
+    )
+    np.negative(out, out=out, where=(a < 0))
+    np.copyto(out, a, where=(out == a), casting="no")
+    return out
 
 
 # wrapper around np.acosh(a) that also works for numpy_quaddtype
@@ -339,10 +341,12 @@ def _acosh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
     ):
         return np.acosh(a)  # type: ignore
 
-    acosh = np.log(a + np.sqrt(np.square(a) - 1))
-
     # explicitly set acosh(<1) = NaN to avoid overflow in sqrt(square(a) - 1)
-    return np.where(np.less(a, 1), _float128(np.nan), acosh)  # type: ignore
+    out: np.ndarray[S, np.dtype[F]] = np.array(
+        np.log(a + np.sqrt(np.square(a) - 1)), copy=None
+    )
+    out[a < 1] = np.nan
+    return out
 
 
 # wrapper around np.atanh(a) that also works for numpy_quaddtype
@@ -352,10 +356,12 @@ def _atanh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
     ):
         return np.atanh(a)  # type: ignore
 
-    atanh = (np.log(1 + a) - np.log(1 - a)) / 2
-
     # propagate atanh(-0.0) = -0.0
-    return np.where(atanh == a, a, atanh)  # type: ignore
+    out: np.ndarray[S, np.dtype[F]] = np.array(
+        (np.log(1 + a) - np.log(1 - a)) / 2, copy=None
+    )
+    np.copyto(out, a, where=(out == a), casting="no")
+    return out
 
 
 # wrapper around np.signbit(a) that also works for numpy_quaddtype, but only
@@ -387,20 +393,27 @@ def _minimum(
 
 
 def _minimum(a, b):
-    a = np.array(a)
-    b = np.array(b)
+    a = np.array(a, copy=None)
+    b = np.array(b, copy=None)
     minimum = np.minimum(a, b)
     if np.issubdtype(a.dtype, np.integer) and np.issubdtype(b.dtype, np.integer):
         return minimum
-    minimum_array = np.array(minimum)
+    minimum_array = np.array(minimum, copy=None)
     a = _broadcast_to(a.astype(minimum_array.dtype), minimum_array.shape)
     b = _broadcast_to(b.astype(minimum_array.dtype), minimum_array.shape)
-    minimum = np.where(
-        minimum == 0,
-        np.where((a < b) | (_signbit_non_nan(a) > _signbit_non_nan(b)), a, b),
-        minimum,
+    np.copyto(
+        minimum_array,
+        a,
+        where=(_signbit_non_nan(a) > _signbit_non_nan(b)),
+        casting="no",
     )
-    return minimum  # type: ignore
+    np.copyto(
+        minimum_array,
+        b,
+        where=(_signbit_non_nan(a) < _signbit_non_nan(b)),
+        casting="no",
+    )
+    return minimum_array
 
 
 # wrapper around np.maximum that also works for +0.0 and -0.0
@@ -422,20 +435,27 @@ def _maximum(
 
 
 def _maximum(a, b):
-    a = np.array(a)
-    b = np.array(b)
+    a = np.array(a, copy=None)
+    b = np.array(b, copy=None)
     maximum = np.maximum(a, b)
     if np.issubdtype(a.dtype, np.integer) and np.issubdtype(b.dtype, np.integer):
         return maximum
-    maximum_array = np.array(maximum)
+    maximum_array = np.array(maximum, copy=None)
     a = _broadcast_to(a.astype(maximum_array.dtype), maximum_array.shape)
     b = _broadcast_to(b.astype(maximum_array.dtype), maximum_array.shape)
-    maximum = np.where(
-        maximum == 0,
-        np.where((a > b) | (_signbit_non_nan(a) < _signbit_non_nan(b)), a, b),
-        maximum,
+    np.copyto(
+        maximum_array,
+        a,
+        where=(_signbit_non_nan(a) < _signbit_non_nan(b)),
+        casting="no",
     )
-    return maximum  # type: ignore
+    np.copyto(
+        maximum_array,
+        b,
+        where=(_signbit_non_nan(a) > _signbit_non_nan(b)),
+        casting="no",
+    )
+    return maximum_array
 
 
 # wrapper around np.where but with better type hints

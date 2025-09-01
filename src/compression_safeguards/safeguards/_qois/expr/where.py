@@ -4,7 +4,7 @@ import numpy as np
 
 from ....utils._compat import _broadcast_to, _maximum, _minimum, _where
 from ....utils.bindings import Parameter
-from ..bound import guaranteed_data_bounds
+from ..bound import checked_data_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Fi, Ns, Ps, PsI
@@ -72,7 +72,7 @@ class ScalarWhere(Expr):
             self._b.eval(x, Xs, late_bound),
         )
 
-    @guaranteed_data_bounds
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -86,7 +86,8 @@ class ScalarWhere(Expr):
         condv: np.ndarray[Ps, np.dtype[F]] = cond.eval(X.shape, Xs, late_bound)
         condvb_Ps: np.ndarray[Ps, np.dtype[np.bool]] = condv != 0
         condvb_Ns: np.ndarray[Ns, np.dtype[np.bool]] = _broadcast_to(
-            np.array(condvb_Ps).reshape(X.shape + (1,) * (Xs.ndim - X.ndim)), Xs.shape
+            np.array(condvb_Ps, copy=None).reshape(X.shape + (1,) * (Xs.ndim - X.ndim)),
+            Xs.shape,
         )
         av = a.eval(X.shape, Xs, late_bound)
         bv = b.eval(X.shape, Xs, late_bound)
@@ -113,16 +114,8 @@ class ScalarWhere(Expr):
             )
 
             # combine the data bounds
-            Xs_lower = _where(
-                condvb_Ns,
-                _maximum(Xs_lower, al),
-                Xs_lower,
-            )
-            Xs_upper = _where(
-                condvb_Ns,
-                _minimum(Xs_upper, au),
-                Xs_upper,
-            )
+            np.copyto(Xs_lower, _maximum(Xs_lower, al), where=condvb_Ns, casting="no")
+            np.copyto(Xs_upper, _minimum(Xs_upper, au), where=condvb_Ns, casting="no")
 
         if (not np.all(condvb_Ps)) and b.has_data:
             # pass on the data bounds to b but only use its bounds on Xs if
@@ -136,16 +129,8 @@ class ScalarWhere(Expr):
             )
 
             # combine the data bounds
-            Xs_lower = _where(
-                condvb_Ns,
-                Xs_lower,
-                _maximum(Xs_lower, bl),
-            )
-            Xs_upper = _where(
-                condvb_Ns,
-                Xs_upper,
-                _minimum(Xs_upper, bu),
-            )
+            np.copyto(Xs_lower, _maximum(Xs_lower, bl), where=~condvb_Ns, casting="no")
+            np.copyto(Xs_upper, _minimum(Xs_upper, bu), where=~condvb_Ns, casting="no")
 
         return Xs_lower, Xs_upper
 

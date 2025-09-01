@@ -1,3 +1,4 @@
+from enum import Enum, auto
 from typing import Callable
 from warnings import warn
 
@@ -8,7 +9,6 @@ from ...utils._compat import (
     _isnan,
     _nan_to_zero_inf_to_finite,
     _nextafter,
-    _where,
 )
 from .expr.typing import Ci, F, Ns, Ps
 
@@ -105,11 +105,11 @@ def guarantee_data_within_expr_bounds(
         `isnan(exprv) & isnan(expr(Xs_bound_guess))`.
     """
 
-    exprv = np.array(exprv)
-    Xs = np.array(Xs)
-    Xs_bound_guess = np.array(Xs_bound_guess)
-    expr_lower = np.array(expr_lower)
-    expr_upper = np.array(expr_upper)
+    exprv = np.array(exprv, copy=None)
+    Xs = np.array(Xs, copy=None)
+    Xs_bound_guess = np.array(Xs_bound_guess, copy=True)
+    expr_lower = np.array(expr_lower, copy=None)
+    expr_upper = np.array(expr_upper, copy=None)
 
     assert exprv.dtype == Xs.dtype
     assert Xs_bound_guess.dtype == Xs.dtype
@@ -122,15 +122,11 @@ def guarantee_data_within_expr_bounds(
     ) -> np.ndarray[Ns, np.dtype[np.bool]]:
         exprv_Xs_bound_guess = expr(Xs_bound_guess)
 
-        in_bounds: np.ndarray[Ps, np.dtype[np.bool]] = _where(
-            # NaN expressions must be preserved as NaN
-            _isnan(exprv),
-            _isnan(exprv_Xs_bound_guess),
-            # otherwise check that the expression result is in bounds
-            (
-                np.greater_equal(exprv_Xs_bound_guess, expr_lower)
-                & np.less_equal(exprv_Xs_bound_guess, expr_upper)
-            ),
+        in_bounds: np.ndarray[Ps, np.dtype[np.bool]] = (
+            _isnan(exprv) & _isnan(exprv_Xs_bound_guess)
+        ) | (
+            np.greater_equal(exprv_Xs_bound_guess, expr_lower)
+            & np.less_equal(exprv_Xs_bound_guess, expr_upper)
         )
 
         bounds_exceeded: np.ndarray[Ns, np.dtype[np.bool]] = _broadcast_to(
@@ -145,15 +141,20 @@ def guarantee_data_within_expr_bounds(
         bounds_exceeded = exceeds_expr_bounds(Xs_bound_guess)
 
         if not np.any(bounds_exceeded):
-            return _where(Xs_bound_guess == Xs, Xs, Xs_bound_guess)
+            np.copyto(Xs_bound_guess, Xs, where=(Xs_bound_guess == Xs), casting="no")
+            return Xs_bound_guess
 
         if warn_on_bounds_exceeded:
             warn_on_bounds_exceeded = False
             warn("guaranteed data bounds do not meet the expression bounds")
 
         # nudge the guess towards the data by 1 ULP
-        Xs_bound_guess = _where(
-            bounds_exceeded, _nextafter(Xs_bound_guess, Xs), Xs_bound_guess
+        # TODO: np.nextafter(out=...) once possible
+        np.copyto(
+            Xs_bound_guess,
+            _nextafter(Xs_bound_guess, Xs),
+            where=bounds_exceeded,
+            casting="no",
         )
 
     Xs_diff = _nan_to_zero_inf_to_finite(Xs_bound_guess - Xs)
@@ -161,23 +162,46 @@ def guarantee_data_within_expr_bounds(
     # exponential backoff for the distance
     backoff = Xs.dtype.type(0.5)
 
+    i: int = 0
+
     while True:
         bounds_exceeded = exceeds_expr_bounds(Xs_bound_guess)
 
         if not np.any(bounds_exceeded):
-            return _where(Xs_bound_guess == Xs, Xs, Xs_bound_guess)
+            np.copyto(Xs_bound_guess, Xs, where=(Xs_bound_guess == Xs), casting="no")
+            return Xs_bound_guess
 
         # shove the guess towards the data by exponentially reducing the
         #  difference
         Xs_diff *= backoff
         backoff = np.divide(backoff, 2)
-        Xs_bound_guess = _where(bounds_exceeded, Xs + Xs_diff, Xs_bound_guess)
+        np.copyto(Xs_bound_guess, Xs + Xs_diff, where=bounds_exceeded, casting="no")
+
+        i += 1
+        assert i < 10
 
 
-def guaranteed_data_bounds(func: Ci) -> Ci:
-    setattr(func, "_guaranteed_data_bounds", True)
+class DataBounds(Enum):
+    # not yet checked, will likely need to be corrected
+    unchecked = auto()
+    # already checked, check should succeed
+    checked = auto()
+    # it is impossible for anything to go wrong, only use for wrappers that forward
+    infallible = auto()
+
+
+def checked_data_bounds(func: Ci) -> Ci:
+    setattr(func, "_checked_data_bounds", DataBounds.checked)
     return func
 
 
-def are_data_bounds_guaranteed(func: Callable) -> bool:
-    return getattr(func, "_guaranteed_data_bounds", False)
+def data_bounds(bounds: DataBounds) -> Callable[[Ci], Ci]:
+    def data_bounds(func: Ci) -> Ci:
+        setattr(func, "_checked_data_bounds", bounds)
+        return func
+
+    return data_bounds
+
+
+def data_bounds_checks(func: Callable) -> DataBounds:
+    return getattr(func, "_checked_data_bounds", DataBounds.unchecked)

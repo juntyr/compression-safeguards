@@ -11,7 +11,7 @@ from ....utils._compat import (
     _where,
 )
 from ....utils.bindings import Parameter
-from ..bound import guaranteed_data_bounds
+from ..bound import checked_data_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
@@ -61,7 +61,7 @@ class ScalarSign(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return _sign(self._a.eval(x, Xs, late_bound))
 
-    @guaranteed_data_bounds
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],

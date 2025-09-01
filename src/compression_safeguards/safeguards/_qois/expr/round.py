@@ -8,10 +8,9 @@ from ....utils._compat import (
     _nextafter,
     _reciprocal,
     _rint,
-    _where,
 )
 from ....utils.bindings import Parameter
-from ..bound import guarantee_arg_within_expr_bounds, guaranteed_data_bounds
+from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
@@ -58,7 +57,7 @@ class ScalarFloor(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.floor(self._a.eval(x, Xs, late_bound))
 
-    @guaranteed_data_bounds
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -89,11 +88,10 @@ class ScalarFloor(Expr):
         #  to -0.0
         # if expr_upper is +0.0, floor(+0.0) = +0.0, and floor(1-eps) = +0.0
         arg_lower: np.ndarray[Ps, np.dtype[F]] = expr_lower
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
-            is_negative_zero(expr_upper),
-            X.dtype.type(-0.0),
-            _nextafter(expr_upper + 1, expr_upper),
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
+            _nextafter(expr_upper + 1, expr_upper), copy=None
         )
+        arg_upper[is_negative_zero(expr_upper)] = X.dtype.type(-0.0)
 
         return arg.compute_data_bounds(
             arg_lower,
@@ -148,7 +146,7 @@ class ScalarCeil(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.ceil(self._a.eval(x, Xs, late_bound))
 
-    @guaranteed_data_bounds
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -178,11 +176,10 @@ class ScalarCeil(Expr):
         # if expr_upper is -0.0, floor(-0.0) = -0.0, there is nothing above
         #  -0.0 for which ceil(...) = -0.0
         # if expr_upper is +0.0, floor(+0.0) = +0.0, only ceil(+0.0) = +0.0
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
-            is_positive_zero(expr_lower),
-            X.dtype.type(+0.0),
-            _nextafter(expr_lower - 1, expr_lower),
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
+            _nextafter(expr_lower - 1, expr_lower), copy=None
         )
+        arg_lower[is_positive_zero(expr_lower)] = X.dtype.type(+0.0)
         arg_upper: np.ndarray[Ps, np.dtype[F]] = expr_upper
 
         return arg.compute_data_bounds(
@@ -238,7 +235,7 @@ class ScalarTrunc(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.trunc(self._a.eval(x, Xs, late_bound))
 
-    @guaranteed_data_bounds
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -263,12 +260,14 @@ class ScalarTrunc(Expr):
         # if expr_upper is -0.0, floor(-0.0) = -0.0, there is nothing above
         #  -0.0 for which trunc(...) = -0.0
         # if expr_upper is +0.0, floor(+0.0) = +0.0, and trunc(1-eps) = +0.0
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
-            _is_negative(expr_lower), _nextafter(expr_lower - 1, expr_lower), expr_lower
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
+            _nextafter(expr_lower - 1, expr_lower), copy=None
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
-            _is_positive(expr_upper), _nextafter(expr_upper + 1, expr_upper), expr_upper
+        np.copyto(arg_lower, expr_lower, where=~_is_negative(expr_lower), casting="no")
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
+            _nextafter(expr_upper + 1, expr_upper), copy=None
         )
+        np.copyto(arg_upper, expr_upper, where=~_is_positive(expr_upper), casting="no")
 
         return arg.compute_data_bounds(
             arg_lower,
@@ -326,7 +325,7 @@ class ScalarRoundTiesEven(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return _rint(self._a.eval(x, Xs, late_bound))
 
-    @guaranteed_data_bounds
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -365,16 +364,14 @@ class ScalarRoundTiesEven(Expr):
         # if expr_upper is -0.0, floor(-0.0) = -0.0, we need to force arg_upper
         #  to -0.0
         # if expr_upper is +0.0, floor(+0.0) = +0.0, and rint(+0.5) = +0.0
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
-            is_positive_zero(expr_lower),
-            X.dtype.type(+0.0),
-            np.subtract(expr_lower, X.dtype.type(0.5)),
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
+            np.subtract(expr_lower, X.dtype.type(0.5)), copy=None
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
-            is_negative_zero(expr_upper),
-            X.dtype.type(-0.0),
-            np.add(expr_upper, X.dtype.type(0.5)),
+        arg_lower[is_positive_zero(expr_lower)] = X.dtype.type(+0.0)
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
+            np.add(expr_upper, X.dtype.type(0.5)), copy=None
         )
+        arg_upper[is_negative_zero(expr_upper)] = X.dtype.type(-0.0)
 
         # handle rounding errors in round_ties_even(...) early
         # which can occur since our +-0.5 estimate doesn't account for the even

@@ -3,9 +3,9 @@ from typing import Callable
 
 import numpy as np
 
-from ....utils._compat import _floating_max, _isfinite, _isinf, _isnan, _where
+from ....utils._compat import _floating_max, _isfinite, _isinf, _isnan
 from ....utils.bindings import Parameter
-from ..bound import guaranteed_data_bounds
+from ..bound import checked_data_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Fi, Ns, Ps, PsI
@@ -53,7 +53,7 @@ class ScalarIsFinite(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return classify_to_dtype(_isfinite, self._a.eval(x, Xs, late_bound), Xs.dtype)
 
-    @guaranteed_data_bounds
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -70,32 +70,15 @@ class ScalarIsFinite(Expr):
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, isfinite(Xs) = True, so Xs must be finite
-        # if expr_upper < 0, isfinite(Xs) = False, Xs must stay non-finite
+        # if expr_upper < 1, isfinite(Xs) = False, Xs must stay non-finite
         # otherwise, isfinite(Xs) in [True, False] and Xs can be anything
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
-            np.greater(expr_lower, 0),
-            # must be finite
-            -fmax,
-            _where(
-                np.less(expr_upper, 1),
-                # must be non-finite, i.e. stay the same
-                argv,
-                # can be finite or non-finite
-                X.dtype.type(-np.inf),
-            ),
-        )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
-            np.greater(expr_lower, 0),
-            # must be finite
-            fmax,
-            _where(
-                np.less(expr_upper, 1),
-                # must be non-finite, i.e. stay the same
-                argv,
-                # can be finite or non-finite
-                X.dtype.type(np.inf),
-            ),
-        )
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, -fmax)
+        arg_lower[np.less_equal(expr_lower, 0)] = -np.inf
+        np.copyto(arg_lower, argv, where=np.less(expr_upper, 1), casting="no")
+
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, fmax)
+        arg_upper[np.less_equal(expr_lower, 0)] = np.inf
+        np.copyto(arg_upper, argv, where=np.less(expr_upper, 1), casting="no")
 
         return arg.compute_data_bounds(
             arg_lower,
@@ -151,7 +134,7 @@ class ScalarIsInf(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return classify_to_dtype(_isinf, self._a.eval(x, Xs, late_bound), Xs.dtype)
 
-    @guaranteed_data_bounds
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -170,30 +153,13 @@ class ScalarIsInf(Expr):
         # if expr_lower > 0, isinf(Xs) = True, so Xs must stay infinite
         # if expr_upper < 0, isinf(Xs) = False, Xs must be non-infinite
         # otherwise, isinf(Xs) in [True, False] and Xs can be anything
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
-            np.greater(expr_lower, 0),
-            # must be infinite, i.e. stay the same
-            argv,
-            _where(
-                np.less(expr_upper, 1),
-                # must be non-infinite
-                -fmax,
-                # can be infinite or non-infinite
-                X.dtype.type(-np.inf),
-            ),
-        )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
-            np.greater(expr_lower, 0),
-            # must be infinite, i.e. stay the same
-            argv,
-            _where(
-                np.less(expr_upper, 1),
-                # must be non-infinite
-                fmax,
-                # can be infinite or non-infinite
-                X.dtype.type(np.inf),
-            ),
-        )
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, -fmax)
+        arg_lower[np.greater_equal(expr_upper, 1)] = -np.inf
+        np.copyto(arg_lower, argv, where=np.greater(expr_lower, 0), casting="no")
+
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, fmax)
+        arg_upper[np.greater_equal(expr_upper, 1)] = np.inf
+        np.copyto(arg_upper, argv, where=np.greater(expr_lower, 0), casting="no")
 
         return arg.compute_data_bounds(
             arg_lower,
@@ -249,7 +215,7 @@ class ScalarIsNaN(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return classify_to_dtype(_isnan, self._a.eval(x, Xs, late_bound), Xs.dtype)
 
-    @guaranteed_data_bounds
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -266,30 +232,11 @@ class ScalarIsNaN(Expr):
         # if expr_lower > 0, isnan(Xs) = True, so Xs must stay NaN
         # if expr_upper < 0, isnan(Xs) = False, Xs must be non-NaN
         # otherwise, isnan(Xs) in [True, False] and Xs can be anything
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
-            np.greater(expr_lower, 0),
-            # must be NaN, i.e. stay the same
-            argv,
-            _where(
-                np.less(expr_upper, 1),
-                # must be non-NaN
-                X.dtype.type(-np.inf),
-                # can be NaN or non-NaN
-                X.dtype.type(-np.inf),
-            ),
-        )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
-            np.greater(expr_lower, 0),
-            # must be NaN, i.e. stay the same
-            argv,
-            _where(
-                np.less(expr_upper, 1),
-                # must be non-NaN
-                X.dtype.type(np.inf),
-                # can be NaN or non-NaN
-                X.dtype.type(np.inf),
-            ),
-        )
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, X.dtype.type(-np.inf))
+        np.copyto(arg_lower, argv, where=np.greater(expr_lower, 0), casting="no")
+
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, X.dtype.type(np.inf))
+        np.copyto(arg_upper, argv, where=np.greater(expr_lower, 0), casting="no")
 
         return arg.compute_data_bounds(
             arg_lower,
@@ -313,6 +260,6 @@ def classify_to_dtype(
     c = classify(a)
 
     if not isinstance(c, np.ndarray):
-        return np.array(c).astype(dtype)[()]  # type: ignore
+        return np.array(c, copy=None).astype(dtype)[()]  # type: ignore
 
     return c.astype(dtype)

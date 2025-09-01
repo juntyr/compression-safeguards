@@ -16,7 +16,7 @@ from ....utils._compat import (
     _where,
 )
 from ....utils.bindings import Parameter
-from ..bound import guarantee_arg_within_expr_bounds, guaranteed_data_bounds
+from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
@@ -66,7 +66,7 @@ class ScalarSinh(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return _sinh(self._a.eval(x, Xs, late_bound))
 
-    @guaranteed_data_bounds
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -164,7 +164,7 @@ class ScalarCosh(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return _cosh(self._a.eval(x, Xs, late_bound))
 
-    @guaranteed_data_bounds
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -274,7 +274,7 @@ class ScalarTanh(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return _tanh(self._a.eval(x, Xs, late_bound))
 
-    @guaranteed_data_bounds
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -377,7 +377,7 @@ class ScalarAsinh(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return _asinh(self._a.eval(x, Xs, late_bound))
 
-    @guaranteed_data_bounds
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -475,7 +475,7 @@ class ScalarAcosh(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return _acosh(self._a.eval(x, Xs, late_bound))
 
-    @guaranteed_data_bounds
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -584,7 +584,7 @@ class ScalarAtanh(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return _atanh(self._a.eval(x, Xs, late_bound))
 
-    @guaranteed_data_bounds
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],

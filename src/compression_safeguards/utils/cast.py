@@ -82,7 +82,7 @@ def from_float(
         The re-converted array with the original `dtype`.
     """
 
-    x = np.array(x)
+    x = np.array(x, copy=None)
 
     if x.dtype == dtype:
         return x  # type: ignore
@@ -265,7 +265,7 @@ def lossless_cast(
         If not all values could be losslessly converted.
     """
 
-    xa = np.array(x)
+    xa = np.array(x, copy=None)
     dtype_from = xa.dtype
 
     if np.issubdtype(dtype_from, np.floating) and not np.issubdtype(dtype, np.floating):
@@ -275,7 +275,7 @@ def lossless_cast(
 
     # we use unsafe casts here since we later check them for safety
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        xa_to = np.array(xa).astype(dtype, casting="unsafe")
+        xa_to = np.array(xa, copy=None).astype(dtype, casting="unsafe")
         xa_back = xa_to.astype(dtype_from, casting="unsafe")
 
     lossless_same = _where(_isnan(xa), _isnan(xa_back), xa == xa_back)
@@ -318,7 +318,7 @@ def saturating_finite_float_cast(
 
     assert np.issubdtype(dtype, np.floating) or (dtype == _float128_dtype)
 
-    xa = np.array(x)
+    xa = np.array(x, copy=None)
 
     if not isinstance(x, int) and not np.all(_isfinite(xa)):
         raise ValueError(
@@ -330,6 +330,6 @@ def saturating_finite_float_cast(
     # - we cast to float, where under- and overflows saturate to np.inf
     # - we later clamp the values to finite
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        xa_to = np.array(xa).astype(dtype, casting="unsafe")
+        xa_to = np.array(xa, copy=None).astype(dtype, casting="unsafe")
 
     return _nan_to_zero_inf_to_finite(xa_to)

@@ -5,7 +5,7 @@ import numpy as np
 
 from ....utils._compat import _is_negative, _isnan, _maximum, _minimum, _where
 from ....utils.bindings import Parameter
-from ..bound import guaranteed_data_bounds
+from ..bound import checked_data_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .divmul import ScalarMultiply
@@ -165,7 +165,7 @@ class ScalarFakeAbs(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.abs(self._a.eval(x, Xs, late_bound))
 
-    @guaranteed_data_bounds
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],

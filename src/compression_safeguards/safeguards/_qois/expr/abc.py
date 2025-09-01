@@ -3,10 +3,11 @@ from collections.abc import Mapping
 from typing import final
 
 import numpy as np
+from typing_extensions import assert_never  # MSPV 3.11
 
 from ....utils._compat import _maximum, _minimum
 from ....utils.bindings import Parameter
-from ..bound import are_data_bounds_guaranteed, guarantee_data_within_expr_bounds
+from ..bound import DataBounds, data_bounds_checks, guarantee_data_within_expr_bounds
 from .typing import F, Ns, Ps, PsI
 
 
@@ -208,6 +209,20 @@ class Expr:
             expr_lower, expr_upper, X, Xs, late_bound
         )
 
+        warn_on_bounds_exceeded: bool
+
+        match data_bounds_checked := data_bounds_checks(
+            self.compute_data_bounds_unchecked
+        ):
+            case DataBounds.infallible:
+                return Xs_lower, Xs_upper
+            case DataBounds.unchecked:
+                warn_on_bounds_exceeded = False
+            case DataBounds.checked:
+                warn_on_bounds_exceeded = True
+            case _:
+                assert_never(data_bounds_checked)
+
         # ensure that the original data values are within the data bounds
         Xs_lower = _minimum(Xs, Xs_lower)
         Xs_upper = _maximum(Xs, Xs_upper)
@@ -226,9 +241,7 @@ class Expr:
             Xs_lower,
             expr_lower,
             expr_upper,
-            warn_on_bounds_exceeded=are_data_bounds_guaranteed(
-                self.compute_data_bounds_unchecked
-            ),
+            warn_on_bounds_exceeded=warn_on_bounds_exceeded,
         )
         Xs_upper = guarantee_data_within_expr_bounds(
             lambda Xs_upper: self.eval(
@@ -241,9 +254,7 @@ class Expr:
             Xs_upper,
             expr_lower,
             expr_upper,
-            warn_on_bounds_exceeded=are_data_bounds_guaranteed(
-                self.compute_data_bounds_unchecked
-            ),
+            warn_on_bounds_exceeded=warn_on_bounds_exceeded,
         )
 
         return Xs_lower, Xs_upper
