@@ -4,10 +4,10 @@ import numpy as np
 
 from ....utils._compat import (
     _is_negative,
+    _is_positive,
     _maximum,
     _minimum,
     _reciprocal,
-    _where,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
@@ -79,29 +79,22 @@ class ScalarReciprocal(Expr):
         # TODO: an interval union could represent that the two disjoint
         #       intervals in the future
         arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum(
-            argv,
-            _reciprocal(
-                _where(
-                    _is_negative(exprv),
-                    _minimum(expr_upper, X.dtype.type(-0.0)),
-                    expr_upper,
-                )
-            ),
+            expr_upper, X.dtype.type(-0.0)
         )
+        np.copyto(arg_lower, expr_upper, where=_is_positive(exprv), casting="no")
+        arg_lower = _reciprocal(arg_lower)
+        arg_lower = _minimum(argv, arg_lower)
+
         arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(
-            argv,
-            _reciprocal(
-                _where(
-                    _is_negative(exprv),
-                    expr_lower,
-                    _maximum(X.dtype.type(+0.0), expr_lower),
-                )
-            ),
+            X.dtype.type(+0.0), expr_lower
         )
+        np.copyto(arg_upper, expr_lower, where=_is_negative(exprv), casting="no")
+        arg_upper = _reciprocal(arg_upper)
+        arg_upper = _maximum(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
-        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
-        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+        np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(arg_upper, argv, where=(expr_lower == expr_upper), casting="no")
 
         # handle rounding errors in reciprocal(reciprocal(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(

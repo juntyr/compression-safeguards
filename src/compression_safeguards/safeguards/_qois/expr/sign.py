@@ -2,14 +2,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import (
-    _floating_smallest_subnormal,
-    _isnan,
-    _maximum,
-    _minimum,
-    _sign,
-    _where,
-)
+from ....utils._compat import _floating_smallest_subnormal, _isnan, _sign
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from .abc import Expr
@@ -76,39 +69,22 @@ class ScalarSign(Expr):
         exprv: np.ndarray[Ps, np.dtype[F]] = _sign(argv)
 
         # evaluate the lower and upper sign bounds that satisfy the expression bound
-        expr_lower = _maximum(X.dtype.type(-1), np.ceil(expr_lower))
-        expr_upper = _minimum(np.floor(expr_upper), X.dtype.type(+1))
+        expr_lower = np.ceil(expr_lower)
+        expr_upper = np.floor(expr_upper)
 
         smallest_subnormal = _floating_smallest_subnormal(X.dtype)
 
         # compute the lower and upper arg bounds that produce the sign bounds
         # sign(-0.0) = +0.0 and sign(+0.0) = +0.0
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
-            _isnan(exprv),
-            exprv,
-            _where(
-                expr_lower == 0,
-                X.dtype.type(-0.0),
-                _where(
-                    np.less(expr_lower, 0),
-                    np.array(-np.inf, dtype=X.dtype),
-                    smallest_subnormal,
-                ),
-            ),
-        )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
-            _isnan(exprv),
-            exprv,
-            _where(
-                expr_upper == 0,
-                X.dtype.type(+0.0),
-                _where(
-                    np.less(expr_upper, 0),
-                    -smallest_subnormal,
-                    np.array(np.inf, dtype=X.dtype),
-                ),
-            ),
-        )
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, smallest_subnormal)
+        arg_lower[np.less_equal(expr_lower, -1)] = -np.inf
+        arg_lower[expr_lower == 0] = -0.0
+        np.copyto(arg_lower, exprv, where=_isnan(exprv), casting="no")
+
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, -smallest_subnormal)
+        arg_upper[np.greater_equal(expr_upper, +1)] = np.inf
+        arg_upper[expr_upper == 0] = +0.0
+        np.copyto(arg_upper, exprv, where=_isnan(exprv), casting="no")
 
         return arg.compute_data_bounds(
             arg_lower,

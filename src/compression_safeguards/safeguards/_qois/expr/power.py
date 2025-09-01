@@ -101,8 +101,8 @@ class ScalarPower(Expr):
         # powers of negative numbers are just too tricky since they easily
         #  become NaN, so let's enforce bounds that only contain the original
         #  expression value, but evaluated for the rewritten expression
-        expr_lower = _where(_is_negative(av), exprv_rewritten, expr_lower)
-        expr_upper = _where(_is_negative(av), exprv_rewritten, expr_upper)
+        np.copyto(expr_lower, exprv_rewritten, where=_is_negative(av), casting="no")
+        np.copyto(expr_upper, exprv_rewritten, where=_is_negative(av), casting="no")
 
         # ensure that the bounds at least contain the rewritten expression
         #  result
@@ -111,11 +111,17 @@ class ScalarPower(Expr):
 
         # bail out and just use the rewritten expression result as an exact
         #  bound in case isnan was changed by the rewrite
-        expr_lower = _where(
-            _isnan(exprv) != _isnan(exprv_rewritten), exprv_rewritten, expr_lower
+        np.copyto(
+            expr_lower,
+            exprv_rewritten,
+            where=(_isnan(exprv) != _isnan(exprv_rewritten)),
+            casting="no",
         )
-        expr_upper = _where(
-            _isnan(exprv) != _isnan(exprv_rewritten), exprv_rewritten, expr_upper
+        np.copyto(
+            expr_upper,
+            exprv_rewritten,
+            where=(_isnan(exprv) != _isnan(exprv_rewritten)),
+            casting="no",
         )
 
         return rewritten.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
@@ -179,16 +185,11 @@ class ScalarFakeAbs(Expr):
         argv = arg.eval(X.shape, Xs, late_bound)
 
         # flip the lower/upper bounds if the arg is negative
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
-            _is_negative(argv),
-            -expr_upper,
-            expr_lower,
-        )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
-            _is_negative(argv),
-            -expr_lower,
-            expr_upper,
-        )
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(expr_lower, copy=True)
+        np.copyto(arg_lower, -expr_upper, where=_is_negative(argv), casting="no")
+
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(expr_upper, copy=True)
+        np.copyto(arg_upper, -expr_lower, where=_is_negative(argv), casting="no")
 
         return arg.compute_data_bounds(
             arg_lower,

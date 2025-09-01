@@ -263,11 +263,11 @@ class ScalarTrunc(Expr):
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
             _nextafter(expr_lower - 1, expr_lower), copy=None
         )
-        np.copyto(arg_lower, expr_lower, where=~_is_negative(expr_lower), casting="no")
+        np.copyto(arg_lower, expr_lower, where=_is_positive(expr_lower), casting="no")
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
             _nextafter(expr_upper + 1, expr_upper), copy=None
         )
-        np.copyto(arg_upper, expr_upper, where=~_is_positive(expr_upper), casting="no")
+        np.copyto(arg_upper, expr_upper, where=_is_negative(expr_upper), casting="no")
 
         return arg.compute_data_bounds(
             arg_lower,

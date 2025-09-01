@@ -8,11 +8,13 @@ from ....utils._compat import (
     _floating_max,
     _floating_smallest_subnormal,
     _is_negative,
+    _is_positive,
     _isfinite,
     _isinf,
     _isnan,
     _maximum,
     _minimum,
+    _where,
 )
 from ....utils.bindings import Parameter
 from ..bound import guarantee_arg_within_expr_bounds
@@ -111,6 +113,9 @@ class ScalarMultiply(Expr):
             term_lower[_isnan(constv)] = -np.inf
             term_lower[_isinf(constv)] = smallest_subnormal
             term_lower[_isinf(constv) & _is_negative(termv)] = -np.inf
+            np.copyto(
+                term_lower, termv, where=(_isinf(constv) & (termv == 0)), casting="no"
+            )
             term_lower[constv == 0] = -fmax
             term_lower = _minimum(termv, term_lower)
 
@@ -120,6 +125,9 @@ class ScalarMultiply(Expr):
             term_upper[_isnan(constv)] = np.inf
             term_upper[_isinf(constv)] = np.inf
             term_upper[_isinf(constv) & _is_negative(termv)] = -smallest_subnormal
+            np.copyto(
+                term_upper, termv, where=(_isinf(constv) & (termv == 0)), casting="no"
+            )
             term_upper[constv == 0] = fmax
             term_upper = _maximum(termv, term_upper)
 
@@ -273,11 +281,13 @@ class ScalarDivide(Expr):
         if a_const:
             term, termv, constv = b, bv, av
 
+            expr_lower, expr_upper = np.copy(expr_lower), np.copy(expr_upper)
+
             # ensure that the expression keeps the same sign
             np.copyto(
                 expr_lower,
                 _maximum(X.dtype.type(+0.0), expr_lower),
-                where=~_is_negative(exprv),
+                where=_is_positive(exprv),
                 casting="no",
             )
             np.copyto(
@@ -293,8 +303,8 @@ class ScalarDivide(Expr):
             # for NaN/x, we can allow any x but only propagate [-inf, inf]
             #  since [-NaN, NaN] would be misunderstood as only NaN
             # otherwise ensure that the divisor keeps the same sign:
-            #  - c < 0, t >= +0: el <= e <= eu <= -0 -> tl = -el, tu = -eu
-            #  - c < 0, t <= -0: +0 <= el <= e <= eu -> tl = -el, tu = -eu
+            #  - c < 0, t >= +0: el <= e <= eu <= -0 -> tl = el, tu = eu
+            #  - c < 0, t <= -0: +0 <= el <= e <= eu -> tl = el, tu = eu
             #  - c > 0, t >= +0: +0 <= el <= e <= eu -> tl = eu, tu = el
             #  - c > 0, t <= -0: el <= e <= eu <= -0 -> tl = eu, tu = el
             # if term_lower == termv and termv == -0.0, we need to guarantee
@@ -302,21 +312,27 @@ class ScalarDivide(Expr):
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
             term_lower = np.array(expr_upper, copy=True)
-            np.copyto(term_lower, -expr_lower, where=_is_negative(constv), casting="no")
+            np.copyto(term_lower, expr_lower, where=_is_negative(constv), casting="no")
             np.divide(constv, term_lower, out=term_lower)
             term_lower[_isnan(constv)] = -np.inf
             term_lower[constv == 0] = smallest_subnormal
             term_lower[(constv == 0) & _is_negative(termv)] = -np.inf
+            np.copyto(
+                term_lower, termv, where=((constv == 0) & (termv == 0)), casting="no"
+            )
             term_lower[_isinf(constv)] = +0.0
             term_lower[_isinf(constv) & _is_negative(termv)] = -fmax
             term_lower = _minimum(termv, term_lower)
 
             term_upper = np.array(expr_lower, copy=True)
-            np.copyto(term_upper, -expr_upper, where=_is_negative(constv), casting="no")
+            np.copyto(term_upper, expr_upper, where=_is_negative(constv), casting="no")
             np.divide(constv, term_upper, out=term_upper)
             term_upper[_isnan(constv)] = np.inf
             term_upper[constv == 0] = np.inf
             term_upper[(constv == 0) & _is_negative(termv)] = -smallest_subnormal
+            np.copyto(
+                term_upper, termv, where=((constv == 0) & (termv == 0)), casting="no"
+            )
             term_upper[_isinf(constv)] = fmax
             term_upper[_isinf(constv) & _is_negative(termv)] = -0.0
             term_upper = _maximum(termv, term_upper)
@@ -366,6 +382,9 @@ class ScalarDivide(Expr):
             term_lower[_isnan(constv)] = -np.inf
             term_lower[constv == 0] = smallest_subnormal
             term_lower[(constv == 0) & _is_negative(termv)] = -np.inf
+            np.copyto(
+                term_lower, termv, where=((constv == 0) & (termv == 0)), casting="no"
+            )
             term_lower[_isinf(constv)] = -fmax
             term_lower = _minimum(termv, term_lower)
 
@@ -375,6 +394,9 @@ class ScalarDivide(Expr):
             term_upper[_isnan(constv)] = np.inf
             term_upper[constv == 0] = np.inf
             term_upper[(constv == 0) & _is_negative(termv)] = -smallest_subnormal
+            np.copyto(
+                term_upper, termv, where=((constv == 0) & (termv == 0)), casting="no"
+            )
             term_upper[_isinf(constv)] = fmax
             term_upper = _maximum(termv, term_upper)
 
@@ -439,9 +461,10 @@ def compute_left_associative_product_data_bounds(
     # inlined outer ScalarFakeAbs
     # flip the lower/upper bounds if the result is negative
     #  since our rewrite below only works with non-negative exprv
-    expr_temp = np.copy(expr_upper)
-    np.copyto(expr_lower, -expr_upper, where=_is_negative(exprv), casting="no")
-    np.copyto(expr_upper, -expr_temp, where=_is_negative(exprv), casting="no")
+    expr_lower, expr_upper = (
+        _where(_is_negative(exprv), -expr_upper, expr_lower),
+        _where(_is_negative(exprv), -expr_lower, expr_upper),
+    )
 
     # rewrite a * b * ... * z as
     #  fake_abs(e^(ln(fake_abs(a)) + ln(fake_abs(b)) + ... + ln(fake_abs(z))))

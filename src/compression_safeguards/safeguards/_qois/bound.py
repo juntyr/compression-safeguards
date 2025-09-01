@@ -157,14 +157,12 @@ def guarantee_data_within_expr_bounds(
             casting="no",
         )
 
-    Xs_diff = _nan_to_zero_inf_to_finite(Xs_bound_guess - Xs)
+    Xs_diff = np.array(_nan_to_zero_inf_to_finite(Xs_bound_guess - Xs), copy=None)
 
     # exponential backoff for the distance
     backoff = Xs.dtype.type(0.5)
 
-    i: int = 0
-
-    while True:
+    for _ in range(6):
         bounds_exceeded = exceeds_expr_bounds(Xs_bound_guess)
 
         if not np.any(bounds_exceeded):
@@ -177,8 +175,9 @@ def guarantee_data_within_expr_bounds(
         backoff = np.divide(backoff, 2)
         np.copyto(Xs_bound_guess, Xs + Xs_diff, where=bounds_exceeded, casting="no")
 
-        i += 1
-        assert i < 10
+    warn("data bounds required excessive nudging")
+
+    return np.copy(Xs)
 
 
 class DataBounds(Enum):

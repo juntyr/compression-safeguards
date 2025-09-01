@@ -269,8 +269,8 @@ def _rint(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
         return np.rint(a)  # type: ignore
 
     halfway = np.array(np.trunc(a), copy=None)
-    halfway[halfway < 0] -= 0.5
-    halfway[halfway > 0] += 0.5
+    halfway[_is_negative(a)] -= 0.5
+    halfway[_is_positive(a)] += 0.5
 
     out: np.ndarray[S, np.dtype[F]] = np.array(np.rint(a), copy=None)
     np.copyto(out, np.floor(a), where=(a < halfway), casting="no")
@@ -308,10 +308,11 @@ def _tanh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
     ):
         return np.tanh(a)  # type: ignore
 
+    # explicitly set tanh(huge) = 1 where overflow to inf/inf = NaN might occur
     # propagate tanh(-0.0) = -0.0
-    out: np.ndarray[S, np.dtype[F]] = np.array(
-        (np.exp(a * 2) - 1) / (np.exp(a * 2) + 1), copy=None
-    )
+    expa: np.ndarray[S, np.dtype[F]] = np.exp(a * 2)
+    out: np.ndarray[S, np.dtype[F]] = np.array((expa - 1) / (expa + 1), copy=None)
+    out[expa == np.inf] = 1
     np.copyto(out, a, where=(out == a), casting="no")
     return out
 
