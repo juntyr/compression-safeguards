@@ -254,7 +254,7 @@ def _symmetric_modulo(
     p: np.ndarray[S, np.dtype[F]], q: np.ndarray[S, np.dtype[F]]
 ) -> np.ndarray[S, np.dtype[F]]:
     q2: np.ndarray[S, np.dtype[F]] = np.divide(q, 2)
-    res: np.ndarray[S, np.dtype[F]] = np.mod(p + q2, q)
+    res: np.ndarray[S, np.dtype[F]] = np.array(np.mod(p + q2, q), copy=None)
     if (type(p) is _float128_type) or (p.dtype == _float128_dtype):
         res += q
         np.mod(res, q, out=res)

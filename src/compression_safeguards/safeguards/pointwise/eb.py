@@ -8,7 +8,7 @@ from collections.abc import Set
 
 import numpy as np
 
-from ...utils._compat import _isfinite, _isinf, _isnan, _where
+from ...utils._compat import _isfinite, _isnan
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import (
     as_bits,
@@ -136,23 +136,21 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         )
         _check_error_bound(self._type, eb)
 
-        finite_ok = _compute_finite_absolute_error(
-            self._type, data_float, decoded_float
-        ) <= _compute_finite_absolute_error_bound(self._type, eb, data_float)
+        finite_ok: np.ndarray[S, np.dtype[np.bool]] = np.less_equal(
+            _compute_finite_absolute_error(self._type, data_float, decoded_float),
+            _compute_finite_absolute_error_bound(self._type, eb, data_float),
+        )
 
         # bitwise equality for inf and NaNs (unless equal_nan)
         same_bits = as_bits(data) == as_bits(decoded)
         both_nan = self._equal_nan and (_isnan(data) & _isnan(decoded))
 
-        return _where(
-            _isfinite(data),
-            finite_ok,
-            _where(
-                _isinf(data),
-                same_bits,
-                both_nan if self._equal_nan else same_bits,
-            ),
-        )
+        ok: np.ndarray[S, np.dtype[np.bool]] = np.array(finite_ok, copy=None)  # type: ignore
+        np.copyto(ok, same_bits, where=~_isfinite(data), casting="no")
+        if self._equal_nan:
+            np.copyto(ok, both_nan, where=_isnan(data), casting="no")
+
+        return ok
 
     def compute_safe_intervals(
         self,

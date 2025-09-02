@@ -8,7 +8,7 @@ from collections.abc import Set
 
 import numpy as np
 
-from ....utils._compat import _isnan, _where
+from ....utils._compat import _isinf, _isnan
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import saturating_finite_float_cast, to_float
 from ....utils.intervals import IntervalUnion
@@ -225,13 +225,16 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         )
         _check_error_bound(self._type, eb)
 
-        finite_ok = _compute_finite_absolute_error(
-            self._type, qoi_data, qoi_decoded
-        ) <= _compute_finite_absolute_error_bound(self._type, eb, qoi_data)
-
-        return _where(
-            _isnan(qoi_data), _isnan(qoi_decoded), finite_ok | (qoi_data == qoi_decoded)
+        finite_ok: np.ndarray[S, np.dtype[np.bool]] = np.less_equal(
+            _compute_finite_absolute_error(self._type, qoi_data, qoi_decoded),
+            _compute_finite_absolute_error_bound(self._type, eb, qoi_data),
         )
+
+        ok: np.ndarray[S, np.dtype[np.bool]] = np.array(finite_ok, copy=None)  # type: ignore
+        np.copyto(ok, qoi_data == qoi_decoded, where=_isinf(qoi_data), casting="no")
+        np.copyto(ok, _isnan(qoi_decoded), where=_isnan(qoi_data), casting="no")
+
+        return ok
 
     def compute_safe_intervals(
         self,

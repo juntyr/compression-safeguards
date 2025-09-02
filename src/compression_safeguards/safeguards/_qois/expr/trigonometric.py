@@ -9,7 +9,6 @@ from ....utils._compat import (
     _minimum,
     _nextafter,
     _pi,
-    _where,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
@@ -111,44 +110,23 @@ class ScalarSin(Expr):
         #       expr_upper >= 1
         # TODO: since sin is periodic, an interval union could be used in the
         #       future
-        arg_lower = _where(
-            _isinf(argv),
-            argv,
-            _where(
-                full_domain,
-                -fmax,
-                _minimum(
-                    argv,
-                    argv
-                    + _where(
-                        needs_flip,
-                        -arg_upper_diff,
-                        arg_lower_diff,
-                    ),
-                ),
-            ),
-        )
-        arg_upper = _where(
-            _isinf(argv),
-            argv,
-            _where(
-                full_domain,
-                fmax,
-                _maximum(
-                    argv,
-                    argv
-                    + _where(
-                        needs_flip,
-                        -arg_lower_diff,
-                        arg_upper_diff,
-                    ),
-                ),
-            ),
-        )
+        arg_lower = np.array(arg_lower_diff, copy=True)
+        np.copyto(arg_lower, -arg_upper_diff, where=needs_flip, casting="no")
+        np.add(arg_lower, argv, out=arg_lower)
+        arg_lower[full_domain] = -fmax
+        np.copyto(arg_lower, argv, where=_isinf(argv), casting="no")
+        arg_lower = _minimum(argv, arg_lower)
+
+        arg_upper = np.array(arg_upper_diff, copy=True)
+        np.copyto(arg_upper, -arg_lower_diff, where=needs_flip, casting="no")
+        np.add(arg_upper, argv, out=arg_upper)
+        arg_upper[full_domain] = fmax
+        np.copyto(arg_upper, argv, where=_isinf(argv), casting="no")
+        arg_upper = _maximum(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
-        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
-        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+        np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(arg_upper, argv, where=(expr_lower == expr_upper), casting="no")
 
         # handle rounding errors in sin(asin(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
@@ -271,44 +249,23 @@ class ScalarCos(Expr):
         #       expr_upper >= 1
         # TODO: since cos is periodic, an interval union could be used in the
         #       future
-        arg_lower = _where(
-            _isinf(argv),
-            argv,
-            _where(
-                full_domain,
-                -fmax,
-                _minimum(
-                    argv,
-                    argv
-                    + _where(
-                        needs_flip,
-                        -arg_upper_diff,
-                        arg_lower_diff,
-                    ),
-                ),
-            ),
-        )
-        arg_upper = _where(
-            _isinf(argv),
-            argv,
-            _where(
-                full_domain,
-                fmax,
-                _maximum(
-                    argv,
-                    argv
-                    + _where(
-                        needs_flip,
-                        -arg_lower_diff,
-                        arg_upper_diff,
-                    ),
-                ),
-            ),
-        )
+        arg_lower = np.array(arg_lower_diff, copy=True)
+        np.copyto(arg_lower, -arg_upper_diff, where=needs_flip, casting="no")
+        np.add(arg_lower, argv, out=arg_lower)
+        arg_lower[full_domain] = -fmax
+        np.copyto(arg_lower, argv, where=_isinf(argv), casting="no")
+        arg_lower = _minimum(argv, arg_lower)
+
+        arg_upper = np.array(arg_upper_diff, copy=True)
+        np.copyto(arg_upper, -arg_lower_diff, where=needs_flip, casting="no")
+        np.add(arg_upper, argv, out=arg_upper)
+        arg_upper[full_domain] = fmax
+        np.copyto(arg_upper, argv, where=_isinf(argv), casting="no")
+        arg_upper = _maximum(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
-        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
-        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+        np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(arg_upper, argv, where=(expr_lower == expr_upper), casting="no")
 
         # handle rounding errors in cos(acos(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
@@ -421,24 +378,19 @@ class ScalarTan(Expr):
         #        expression bounds could be exceeded inside the interval?
         # TODO: since tan is periodic, an interval union could be used in the
         #       future
-        arg_lower = _where(
-            _isinf(argv),
-            argv,
-            _where(full_domain, -fmax, _minimum(argv, argv + arg_lower_diff)),
-        )
-        arg_upper = _where(
-            _isinf(argv),
-            argv,
-            _where(
-                full_domain,
-                fmax,
-                _maximum(argv, argv + arg_upper_diff),
-            ),
-        )
+        arg_lower = np.array(np.add(argv, arg_lower_diff), copy=None)
+        arg_lower[full_domain] = -fmax
+        np.copyto(arg_lower, argv, where=_isinf(argv), casting="no")
+        arg_lower = _minimum(argv, arg_lower)
+
+        arg_upper = np.array(np.add(argv, arg_upper_diff), copy=None)
+        arg_upper[full_domain] = fmax
+        np.copyto(arg_upper, argv, where=_isinf(argv), casting="no")
+        arg_upper = _maximum(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
-        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
-        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+        np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(arg_upper, argv, where=(expr_lower == expr_upper), casting="no")
 
         # handle rounding errors in tan(atan(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
@@ -533,31 +485,32 @@ class ScalarAsin(Expr):
         # otherwise ensure that the bounds on asin(...) are in [-pi/2, +pi/2]
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
-            np.less(argv, -1),
-            X.dtype.type(-np.inf),
-            _where(
-                np.greater(argv, 1),
-                one_eps,
-                _minimum(argv, np.sin(_maximum(np.divide(-pi, 2), expr_lower))),  # type: ignore
-            ),
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
+            np.sin(_maximum(np.divide(-pi, 2), expr_lower)), copy=None
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
-            np.less(argv, -1),
-            -one_eps,
-            _where(
-                np.greater(argv, 1),
-                X.dtype.type(np.inf),
-                _maximum(argv, np.sin(_minimum(expr_upper, np.divide(pi, 2)))),  # type: ignore
-            ),
+        arg_lower[np.greater(argv, 1)] = one_eps
+        arg_lower[np.less(argv, -1)] = -np.inf
+        arg_lower = _minimum(argv, arg_lower)
+
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
+            np.sin(_minimum(expr_upper, np.divide(pi, 2))), copy=None
         )
+        arg_upper[np.greater(argv, 1)] = np.inf
+        arg_upper[np.less(argv, -1)] = -one_eps
+        arg_upper = _maximum(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper and abs(argv) < 1
-        arg_lower = _where(
-            (expr_lower == expr_upper) & np.less(np.abs(argv), 1), argv, arg_lower
+        np.copyto(
+            arg_lower,
+            argv,
+            where=((expr_lower == expr_upper) & np.less(np.abs(argv), 1)),
+            casting="no",
         )
-        arg_upper = _where(
-            (expr_lower == expr_upper) & np.less(np.abs(argv), 1), argv, arg_upper
+        np.copyto(
+            arg_upper,
+            argv,
+            where=((expr_lower == expr_upper) & np.less(np.abs(argv), 1)),
+            casting="no",
         )
 
         # handle rounding errors in asin(sin(...)) early
@@ -655,31 +608,32 @@ class ScalarAcos(Expr):
         #  bounds get switched
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _where(
-            np.less(argv, -1),
-            X.dtype.type(-np.inf),
-            _where(
-                np.greater(argv, 1),
-                one_eps,
-                _minimum(argv, np.cos(_minimum(expr_upper, pi))),  # type: ignore
-            ),
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
+            np.cos(_minimum(expr_upper, pi)), copy=None
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _where(
-            np.less(argv, -1),
-            -one_eps,
-            _where(
-                np.greater(argv, 1),
-                X.dtype.type(np.inf),
-                _maximum(argv, np.cos(_maximum(X.dtype.type(0), expr_lower))),  # type: ignore
-            ),
+        arg_lower[np.greater(argv, 1)] = one_eps
+        arg_lower[np.less(argv, -1)] = -np.inf
+        arg_lower = _minimum(argv, arg_lower)
+
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
+            np.cos(_maximum(X.dtype.type(0), expr_lower)), copy=None
         )
+        arg_upper[np.greater(argv, 1)] = np.inf
+        arg_upper[np.less(argv, -1)] = -one_eps
+        arg_upper = _maximum(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper and abs(argv) < 1
-        arg_lower = _where(
-            (expr_lower == expr_upper) & np.less(np.abs(argv), 1), argv, arg_lower
+        np.copyto(
+            arg_lower,
+            argv,
+            where=((expr_lower == expr_upper) & np.less(np.abs(argv), 1)),
+            casting="no",
         )
-        arg_upper = _where(
-            (expr_lower == expr_upper) & np.less(np.abs(argv), 1), argv, arg_upper
+        np.copyto(
+            arg_upper,
+            argv,
+            where=((expr_lower == expr_upper) & np.less(np.abs(argv), 1)),
+            casting="no",
         )
 
         # handle rounding errors in acos(cos(...)) early
@@ -770,12 +724,16 @@ class ScalarAtan(Expr):
         # apply the inverse function to get the bounds on arg
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum(argv, np.tan(expr_lower))
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(argv, np.tan(expr_upper))
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(  # type: ignore
+            _minimum(argv, np.tan(expr_lower)), copy=None
+        )
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(  # type: ignore
+            _maximum(argv, np.tan(expr_upper)), copy=None
+        )
 
         # we need to force argv if expr_lower == expr_upper
-        arg_lower = _where(expr_lower == expr_upper, argv, arg_lower)
-        arg_upper = _where(expr_lower == expr_upper, argv, arg_upper)
+        np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(arg_upper, argv, where=(expr_lower == expr_upper), casting="no")
 
         # handle rounding errors in atan(tan(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(

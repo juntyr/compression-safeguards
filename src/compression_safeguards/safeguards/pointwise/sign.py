@@ -8,7 +8,7 @@ from collections.abc import Set
 
 import numpy as np
 
-from ...utils._compat import _floating_smallest_subnormal, _where
+from ...utils._compat import _floating_smallest_subnormal
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
@@ -122,19 +122,21 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         )
         assert np.all(~np.isnan(offset)), "offset must not contain NaNs"
 
-        return _where(
-            # NaN values keep their sign bit
-            np.isnan(data),
+        # values equal to the offset (sign=0) stay equal
+        # values below (sign=-1) stay below,
+        # values above (sign=+1) stay above
+        # NaN values keep their sign bit
+        ok: np.ndarray[S, np.dtype[np.bool]] = np.array(decoded == offset, copy=None)
+        np.copyto(ok, decoded < offset, where=(data < offset), casting="no")
+        np.copyto(ok, decoded > offset, where=(data > offset), casting="no")
+        np.copyto(
+            ok,
             np.isnan(decoded) & (np.signbit(data) == np.signbit(decoded)),
-            _where(
-                # values equal to the offset (sign=0) stay equal
-                data == offset,
-                decoded == offset,
-                # values below (sign=-1) stay below,
-                # values above (sign=+1) stay above
-                _where(data < offset, decoded < offset, decoded > offset),
-            ),
+            where=np.isnan(data),
+            casting="no",
         )
+
+        return ok
 
     def compute_safe_intervals(
         self,
@@ -178,21 +180,13 @@ class SignPreservingSafeguard(PointwiseSafeguard):
                 #  zero sign and thus have weird below / above intervals
                 smallest_subnormal = _floating_smallest_subnormal(data.dtype)  # type: ignore
                 below_upper = np.array(
-                    _where(
-                        offsetf == 0,
-                        -smallest_subnormal,
-                        from_total_order(offsetf_total - 1, data.dtype),
-                    ),
-                    copy=None,
+                    from_total_order(offsetf_total - 1, data.dtype), copy=None
                 )
+                below_upper[offsetf == 0] = -smallest_subnormal
                 above_lower = np.array(
-                    _where(
-                        offsetf == 0,
-                        smallest_subnormal,
-                        from_total_order(offsetf_total + 1, data.dtype),
-                    ),
-                    copy=None,
+                    from_total_order(offsetf_total + 1, data.dtype), copy=None
                 )
+                above_lower[offsetf == 0] = smallest_subnormal
             else:
                 below_upper = np.array(
                     from_total_order(offsetf_total - 1, data.dtype), copy=None

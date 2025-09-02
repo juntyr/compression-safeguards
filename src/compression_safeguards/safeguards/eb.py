@@ -243,19 +243,18 @@ def _compute_finite_absolute_error(
         case ErrorBound.abs | ErrorBound.rel:
             return np.abs(np.subtract(data_float, decoded_float))
         case ErrorBound.ratio:
-            return _where(
-                (data_float == 0) & (decoded_float == 0),
-                np.array(0, dtype=data_float.dtype),
-                _where(
-                    _sign(data_float) != _sign(decoded_float),
-                    np.array(np.inf, dtype=data_float.dtype),
-                    _where(
-                        np.abs(data_float) > np.abs(decoded_float),
-                        data_float / decoded_float,
-                        decoded_float / data_float,
-                    ),
-                ),
+            err_abs: np.ndarray[S, np.dtype[F]] = np.array(
+                np.divide(decoded_float, data_float), copy=None
             )
+            np.copyto(
+                err_abs,
+                np.divide(data_float, decoded_float),
+                where=(np.abs(data_float) > np.abs(decoded_float)),
+                casting="no",
+            )
+            err_abs[(data_float == 0) & (decoded_float == 0)] = 0
+            err_abs[_sign(data_float) != _sign(decoded_float)] = np.inf
+            return err_abs
         case _:
             assert_never(type)
 
@@ -318,19 +317,25 @@ def _apply_finite_error_bound(
                     to_float(upper) - data_float, eb_abs
                 )
 
-            lower = from_total_order(
-                np.add(to_total_order(lower), lower_outside_eb),  # type: ignore
-                data.dtype,
+            lower = np.array(
+                from_total_order(
+                    np.add(to_total_order(lower), lower_outside_eb),  # type: ignore
+                    data.dtype,
+                ),
+                copy=None,
             )
-            upper = from_total_order(
-                np.subtract(to_total_order(upper), upper_outside_eb),  # type: ignore
-                data.dtype,
+            upper = np.array(
+                from_total_order(
+                    np.subtract(to_total_order(upper), upper_outside_eb),  # type: ignore
+                    data.dtype,
+                ),
+                copy=None,
             )
 
             # a zero-error bound must preserve exactly, e.g. even for -0.0
             if np.any(eb == 0):
-                lower = _where(eb == 0, data, lower)
-                upper = _where(eb == 0, data, upper)
+                np.copyto(lower, data, where=(eb == 0), casting="no")
+                np.copyto(upper, data, where=(eb == 0), casting="no")
         case ErrorBound.ratio:
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
@@ -367,26 +372,32 @@ def _apply_finite_error_bound(
                     > eb_abs
                 )
 
-            lower = from_total_order(
-                np.add(to_total_order(lower), lower_outside_eb),  # type: ignore
-                data.dtype,
+            lower = np.array(
+                from_total_order(
+                    np.add(to_total_order(lower), lower_outside_eb),  # type: ignore
+                    data.dtype,
+                ),
+                copy=None,
             )
-            upper = from_total_order(
-                np.subtract(to_total_order(upper), upper_outside_eb),  # type: ignore
-                data.dtype,
+            upper = np.array(
+                from_total_order(
+                    np.subtract(to_total_order(upper), upper_outside_eb),  # type: ignore
+                    data.dtype,
+                ),
+                copy=None,
             )
 
             # a ratio of 1 bound must preserve exactly, e.g. even for -0.0
             if np.any(eb == 1):
-                lower = _where(eb == 1, data, lower)
-                upper = _where(eb == 1, data, upper)
+                np.copyto(lower, data, where=(eb == 1), casting="no")
+                np.copyto(upper, data, where=(eb == 1), casting="no")
         case _:
             assert_never(type)
 
     if type in (ErrorBound.rel, ErrorBound.ratio):
         # special case zero to handle +0.0 and -0.0
-        lower = _where(data == 0, data, lower)
-        upper = _where(data == 0, data, upper)
+        np.copyto(lower, data, where=(data == 0), casting="no")
+        np.copyto(upper, data, where=(data == 0), casting="no")
 
     return (lower, upper)
 
@@ -432,8 +443,12 @@ def _apply_finite_qoi_error_bound(
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
-                lower: np.ndarray[S, np.dtype[F]] = qoi_float - eb_abs
-                upper: np.ndarray[S, np.dtype[F]] = qoi_float + eb_abs
+                lower: np.ndarray[S, np.dtype[F]] = np.array(
+                    np.subtract(qoi_float, eb_abs), copy=None
+                )
+                upper: np.ndarray[S, np.dtype[F]] = np.array(
+                    np.add(qoi_float, eb_abs), copy=None
+                )
 
             # correct rounding errors in the lower and upper bound
             with np.errstate(
@@ -447,21 +462,23 @@ def _apply_finite_qoi_error_bound(
                 )
 
             # we can nudge with nextafter since the QoIs are floating point
-            lower = _where(
-                lower_outside_eb & _isfinite(qoi_float),  # type: ignore
-                _nextafter(lower, qoi_float),
+            np.copyto(
                 lower,
+                _nextafter(lower, qoi_float),
+                where=(lower_outside_eb & _isfinite(qoi_float)),
+                casting="no",
             )
-            upper = _where(
-                upper_outside_eb & _isfinite(qoi_float),  # type: ignore
-                _nextafter(upper, qoi_float),
+            np.copyto(
                 upper,
+                _nextafter(upper, qoi_float),
+                where=(upper_outside_eb & _isfinite(qoi_float)),
+                casting="no",
             )
 
             # a zero-error bound must preserve exactly, e.g. even for -0.0
             if np.any(eb == 0):
-                lower = _where(eb == 0, qoi_float, lower)
-                upper = _where(eb == 0, qoi_float, upper)
+                np.copyto(lower, qoi_float, where=(eb == 0), casting="no")
+                np.copyto(upper, qoi_float, where=(eb == 0), casting="no")
         case ErrorBound.ratio:
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
@@ -470,8 +487,12 @@ def _apply_finite_qoi_error_bound(
                     qoi_float * eb_abs,
                     qoi_float / eb_abs,
                 )
-            lower = _where(np.less(qoi_float, 0), data_mul, data_div)
-            upper = _where(np.less(qoi_float, 0), data_div, data_mul)
+            lower = np.array(
+                _where(np.less(qoi_float, 0), data_mul, data_div), copy=None
+            )
+            upper = np.array(
+                _where(np.less(qoi_float, 0), data_div, data_mul), copy=None
+            )
 
             # correct rounding errors in the lower and upper bound
             with np.errstate(
@@ -499,27 +520,29 @@ def _apply_finite_qoi_error_bound(
                 )
 
             # we can nudge with nextafter since the QoIs are floating point
-            lower = _where(
-                lower_outside_eb & _isfinite(qoi_float),  # type: ignore
-                _nextafter(lower, qoi_float),
+            np.copyto(
                 lower,
+                _nextafter(lower, qoi_float),
+                where=(lower_outside_eb & _isfinite(qoi_float)),
+                casting="no",
             )
-            upper = _where(
-                upper_outside_eb & _isfinite(qoi_float),  # type: ignore
-                _nextafter(upper, qoi_float),
+            np.copyto(
                 upper,
+                _nextafter(upper, qoi_float),
+                where=(upper_outside_eb & _isfinite(qoi_float)),
+                casting="no",
             )
 
             # a ratio of 1 bound must preserve exactly, e.g. even for -0.0
             if np.any(eb == 1):
-                lower = _where(eb == 1, qoi_float, lower)
-                upper = _where(eb == 1, qoi_float, upper)
+                np.copyto(lower, qoi_float, where=(eb == 1), casting="no")
+                np.copyto(upper, qoi_float, where=(eb == 1), casting="no")
         case _:
             assert_never(type)
 
     if type in (ErrorBound.rel, ErrorBound.ratio):
         # special case zero to handle +0.0 and -0.0
-        lower = _where(qoi_float == 0, qoi_float, lower)
-        upper = _where(qoi_float == 0, qoi_float, upper)
+        np.copyto(lower, qoi_float, where=(qoi_float == 0), casting="no")
+        np.copyto(upper, qoi_float, where=(qoi_float == 0), casting="no")
 
     return (lower, upper)

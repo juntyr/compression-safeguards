@@ -16,7 +16,7 @@ from typing import Any
 
 import numpy as np
 
-from ._compat import _isfinite, _isnan, _nan_to_zero_inf_to_finite, _rint, _where
+from ._compat import _isfinite, _isnan, _nan_to_zero_inf_to_finite, _rint
 from ._float128 import _float128_dtype
 from .typing import F, S, T, U
 
@@ -93,13 +93,13 @@ def from_float(
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         # lossy cast from floating point to integer
         # round first with rint (round to nearest, ties to nearest even)
-        return _where(
-            np.less(x, imin),
-            imin,
-            _where(
-                np.less_equal(x, imax), _rint(x).astype(dtype, casting="unsafe"), imax
-            ),
+        converted: np.ndarray[S, np.dtype[T]] = np.array(  # type: ignore
+            _rint(x).astype(dtype, casting="unsafe"), copy=None
         )
+    converted[np.greater(x, imax)] = imax
+    converted[np.less(x, imin)] = imin
+
+    return converted
 
 
 def as_bits(
@@ -278,7 +278,7 @@ def lossless_cast(
         xa_to = np.array(xa, copy=None).astype(dtype, casting="unsafe")
         xa_back = xa_to.astype(dtype_from, casting="unsafe")
 
-    lossless_same = _where(_isnan(xa), _isnan(xa_back), xa == xa_back)
+    lossless_same = (xa == xa_back) | (_isnan(xa) & _isnan(xa_back))
 
     if not np.all(lossless_same):
         raise ValueError(
