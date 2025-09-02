@@ -239,8 +239,9 @@ def compute_left_associate_sum_data_bounds(
     #  - non-finite values must be preserved exactly
     #  - if there is any NaN term, finite values can have any finite value
     #  - otherwise finite values are also preserved exactly, for simplicity
-    # if total_abs_factor is zero, all abs_factorv are also zero and we can
-    #  allow the finite terms terms to have any finite value
+    # if total_abs_factor is zero, all abs_factorv are also zero and the term
+    #  should keep the same value (unless the term is finite and there is any
+    #  NaN term, see above)
     # otherwise we split up the error bound for the terms by their factors
     tl_stack_: list[np.ndarray[Ps, np.dtype[F]]] = []
     for termv, abs_factorv in zip(termvs, abs_factorvs):
@@ -251,12 +252,11 @@ def compute_left_associate_sum_data_bounds(
         np.copyto(
             tl,
             _zero_add(termv, tfl * abs_factorv),
-            where=(_isfinite(total_abs_factor) & _isfinite(exprv)),
+            where=(
+                (total_abs_factor != 0) & _isfinite(total_abs_factor) & _isfinite(exprv)
+            ),
             casting="no",
         )
-        tl[
-            _isfinite(total_abs_factor) & _isfinite(exprv) & (total_abs_factor == 0)
-        ] = -fmax
         tl_stack_.append(tl)
     tl_stack = np.stack(tl_stack_)
     tu_stack_: list[np.ndarray[Ps, np.dtype[F]]] = []
@@ -268,11 +268,10 @@ def compute_left_associate_sum_data_bounds(
         np.copyto(
             tu,
             _zero_add(termv, tfu * abs_factorv),
-            where=(_isfinite(total_abs_factor) & _isfinite(exprv)),
+            where=(
+                (total_abs_factor != 0) & _isfinite(total_abs_factor) & _isfinite(exprv)
+            ),
             casting="no",
-        )
-        tu[_isfinite(total_abs_factor) & _isfinite(exprv) & (total_abs_factor == 0)] = (
-            fmax
         )
         tu_stack_.append(tu)
     tu_stack = np.stack(tu_stack_)
