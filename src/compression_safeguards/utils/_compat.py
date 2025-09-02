@@ -181,9 +181,8 @@ def _nextafter(
 
     _float128_neg_zero = -_float128(0)
 
-    _float128_incr_subnormal = np.where(
-        a < 0, -_float128_smallest_subnormal, _float128_smallest_subnormal
-    )
+    _float128_incr_subnormal = np.full(a.shape, _float128_smallest_subnormal)
+    np.negative(_float128_incr_subnormal, out=_float128_incr_subnormal, where=(a < 0))
 
     abs_a_zero_mantissa = (
         (
@@ -195,48 +194,58 @@ def _nextafter(
     )
     _float128_incr_normal = abs_a_zero_mantissa / (_float128(2) ** 112)
 
-    r = np.where(
-        _isnan(a) | _isnan(b),
-        a + b,  # unordered, at least one is NaN
-        np.where(
-            a == b,
-            b,  # equal
-            np.where(
-                _isinf(a),
-                np.where(a < 0, _float128_min, _float128_max),  # infinity
-                np.where(
-                    np.abs(a) > _float128_smallest_normal,
-                    # note: implementation deviates here since numpy_quaddtype
-                    #       divides/multiplies with error
-                    #       based on https://stackoverflow.com/a/70512041
-                    np.where(
-                        a < b,
-                        np.where(
-                            a == -abs_a_zero_mantissa,
-                            a + _float128_incr_normal / 2,
-                            a + _float128_incr_normal,
-                        ),
-                        np.where(
-                            a == abs_a_zero_mantissa,
-                            a - _float128_incr_normal / 2,
-                            a - _float128_incr_normal,
-                        ),
-                    ),  # normal
-                    np.where(  # zero, subnormal, or smallest normal
-                        (a < b) == (a >= 0),
-                        (a + _float128_incr_subnormal),
-                        np.where(
-                            a == (-_float128_smallest_subnormal),
-                            _float128_neg_zero,
-                            a - _float128_incr_subnormal,
-                        ),
-                    ),
-                ),
-            ),
-        ),
+    # zero, subnormal, or smallest normal
+    out_subnormal = np.array(np.subtract(a, _float128_incr_subnormal), copy=None)
+    out_subnormal[a == (-_float128_smallest_subnormal)] = -0.0
+    np.copyto(
+        out_subnormal,
+        np.add(a, _float128_incr_subnormal),
+        where=((a < b) == (a >= 0)),
+        casting="no",
     )
 
-    return r  # type: ignore
+    out: np.ndarray[S, np.dtype[F]] = np.array(a, copy=True)
+    # normal
+    # note: implementation deviates here since numpy_quaddtype
+    #       divides/multiplies with error
+    #       based on https://stackoverflow.com/a/70512041
+    np.add(
+        out,
+        _float128_incr_normal / 2,
+        out=out,
+        where=((a < b) & (a == -abs_a_zero_mantissa)),
+    )
+    np.add(
+        out,
+        _float128_incr_normal,
+        out=out,
+        where=((a < b) & (a != -abs_a_zero_mantissa)),
+    )
+    np.subtract(
+        out,
+        _float128_incr_normal / 2,
+        out=out,
+        where=((a >= b) & (a == abs_a_zero_mantissa)),
+    )
+    np.subtract(
+        out,
+        _float128_incr_normal,
+        out=out,
+        where=((a >= b) & (a != abs_a_zero_mantissa)),
+    )
+    # zero, subnormal, or smallest normal
+    np.copyto(
+        out, out_subnormal, where=(np.abs(a) <= _float128_smallest_normal), casting="no"
+    )
+    # infinity
+    out[_isinf(a)] = _float128_max
+    out[_isinf(a) & (a < 0)] = _float128_min
+    # equal
+    np.copyto(out, b, where=(a == b), casting="no")
+    # unordered, at least one is NaN
+    np.add(out, b, out=out, where=(_isnan(a) | _isnan(b)))
+
+    return out
 
 
 # wrapper around np.reciprocal that also works for numpy_quaddtype
