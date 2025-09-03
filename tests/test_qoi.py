@@ -16,7 +16,8 @@ from compression_safeguards.safeguards._qois.expr.hyperbolic import (
     ScalarAsinh,
     ScalarTanh,
 )
-from compression_safeguards.safeguards._qois.expr.literal import Number
+from compression_safeguards.safeguards._qois.expr.literal import Euler, Number
+from compression_safeguards.safeguards._qois.expr.logexp import Logarithm, ScalarLog
 from compression_safeguards.safeguards._qois.expr.power import ScalarPower
 from compression_safeguards.safeguards._qois.expr.reciprocal import ScalarReciprocal
 from compression_safeguards.safeguards._qois.expr.round import ScalarRoundTiesEven
@@ -911,28 +912,35 @@ def test_fuzzer_found_divide_tiny_hang():
     assert expr.eval((), np.array(X_upper), dict()) == np.array(0.0, dtype=np.float64)
 
 
-# def test_fuzzer_found_excessive_nudging():
-#     X = np.array(_float128(0.0))
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_asinh_excessive_nudging():
+    X = np.array(_float128(0.0))
 
-#     expr = ScalarDivide(
-#         ScalarMultiply(ScalarAsinh(Data(index=())), Data(index=())), Euler()
-#     )
+    expr = ScalarDivide(
+        ScalarMultiply(ScalarAsinh(Data(index=())), Data(index=())), Euler()
+    )
 
-#     assert expr.eval((), X, dict()) == np.array(_float128(0.0))
+    assert expr.eval((), X, dict()) == np.array(_float128(0.0))
 
-#     expr_lower = np.array(_float128(0.0))
-#     expr_upper = np.array(_float128(0.0))
+    expr_lower = np.array(_float128(0.0))
+    expr_upper = np.array(_float128(0.0))
 
-#     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(_float128(0.0))
+    assert X_upper == np.array(_float128(0.0))
 
 
-# ===
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_excessive_nudging_log_power():
+    X = np.array(0.0, dtype=np.float16)
 
-# dtype = dtype('float16')
-# X = array(0., dtype=float16)
-# expr = log10(x) ** e
-# exprv = np.float16(inf)
-# expr_lower = array(0., dtype=float16)
-# expr_upper = array(inf, dtype=float16)
+    expr = ScalarPower(ScalarLog(Logarithm.log10, Data(index=())), Euler())
 
-# ===
+    assert expr.eval((), X, dict()) == np.array(np.inf, dtype=np.float16)
+
+    expr_lower = np.array(0.0, dtype=np.float16)
+    expr_upper = np.array(np.inf, dtype=np.float16)
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(0.0, dtype=np.float16)
+    assert X_upper == np.array(0.0, dtype=np.float16)
