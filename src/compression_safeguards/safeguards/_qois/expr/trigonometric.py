@@ -4,9 +4,8 @@ import numpy as np
 
 from ....utils._compat import (
     _floating_max,
-    _isinf,
-    _maximum,
-    _minimum,
+    _maximum_zero_sign_sensitive,
+    _minimum_zero_sign_sensitive,
     _nextafter,
     _pi,
 )
@@ -61,10 +60,10 @@ class ScalarSin(Expr[Expr]):
         # apply the inverse function to get the bounds on arg
         # ensure that the bounds on sin(...) are in [-1, +1]
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.asin(
-            _maximum(X.dtype.type(-1), expr_lower)
+            _maximum_zero_sign_sensitive(X.dtype.type(-1), expr_lower)
         )
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.asin(
-            _minimum(expr_upper, X.dtype.type(1))
+            _minimum_zero_sign_sensitive(expr_upper, X.dtype.type(1))
         )
 
         # sin(...) is periodic, so we need to drop to difference bounds before
@@ -100,15 +99,15 @@ class ScalarSin(Expr[Expr]):
         np.copyto(arg_lower, -arg_upper_diff, where=needs_flip, casting="no")
         np.add(arg_lower, argv, out=arg_lower)
         arg_lower[full_domain] = -fmax
-        np.copyto(arg_lower, argv, where=_isinf(argv), casting="no")
-        arg_lower = _minimum(argv, arg_lower)
+        np.copyto(arg_lower, argv, where=np.isinf(argv), casting="no")
+        arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
 
         arg_upper = np.array(arg_upper_diff, copy=True)
         np.copyto(arg_upper, -arg_lower_diff, where=needs_flip, casting="no")
         np.add(arg_upper, argv, out=arg_upper)
         arg_upper[full_domain] = fmax
-        np.copyto(arg_upper, argv, where=_isinf(argv), casting="no")
-        arg_upper = _maximum(argv, arg_upper)
+        np.copyto(arg_upper, argv, where=np.isinf(argv), casting="no")
+        arg_upper = _maximum_zero_sign_sensitive(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
@@ -188,10 +187,10 @@ class ScalarCos(Expr[Expr]):
         # apply the inverse function to get the bounds on arg
         # ensure that the bounds on cos(...) are in [-1, +1]
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.acos(
-            _maximum(X.dtype.type(-1), expr_lower)
+            _maximum_zero_sign_sensitive(X.dtype.type(-1), expr_lower)
         )
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.acos(
-            _minimum(expr_upper, X.dtype.type(1))
+            _minimum_zero_sign_sensitive(expr_upper, X.dtype.type(1))
         )
 
         # cos(...) is periodic, so we need to drop to difference bounds before
@@ -225,15 +224,15 @@ class ScalarCos(Expr[Expr]):
         np.copyto(arg_lower, -arg_upper_diff, where=needs_flip, casting="no")
         np.add(arg_lower, argv, out=arg_lower)
         arg_lower[full_domain] = -fmax
-        np.copyto(arg_lower, argv, where=_isinf(argv), casting="no")
-        arg_lower = _minimum(argv, arg_lower)
+        np.copyto(arg_lower, argv, where=np.isinf(argv), casting="no")
+        arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
 
         arg_upper = np.array(arg_upper_diff, copy=True)
         np.copyto(arg_upper, -arg_lower_diff, where=needs_flip, casting="no")
         np.add(arg_upper, argv, out=arg_upper)
         arg_upper[full_domain] = fmax
-        np.copyto(arg_upper, argv, where=_isinf(argv), casting="no")
-        arg_upper = _maximum(argv, arg_upper)
+        np.copyto(arg_upper, argv, where=np.isinf(argv), casting="no")
+        arg_upper = _maximum_zero_sign_sensitive(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
@@ -338,13 +337,13 @@ class ScalarTan(Expr[Expr]):
         #       future
         arg_lower = np.array(np.add(argv, arg_lower_diff), copy=None)
         arg_lower[full_domain] = -fmax
-        np.copyto(arg_lower, argv, where=_isinf(argv), casting="no")
-        arg_lower = _minimum(argv, arg_lower)
+        np.copyto(arg_lower, argv, where=np.isinf(argv), casting="no")
+        arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
 
         arg_upper = np.array(np.add(argv, arg_upper_diff), copy=None)
         arg_upper[full_domain] = fmax
-        np.copyto(arg_upper, argv, where=_isinf(argv), casting="no")
-        arg_upper = _maximum(argv, arg_upper)
+        np.copyto(arg_upper, argv, where=np.isinf(argv), casting="no")
+        arg_upper = _maximum_zero_sign_sensitive(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
@@ -430,18 +429,20 @@ class ScalarAsin(Expr[Expr]):
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
-            np.sin(_maximum(np.divide(-pi, 2), expr_lower)), copy=None
+            np.sin(_maximum_zero_sign_sensitive(np.divide(-pi, 2), expr_lower)),
+            copy=None,
         )
         arg_lower[np.greater(argv, 1)] = one_eps
         arg_lower[np.less(argv, -1)] = -np.inf
-        arg_lower = _minimum(argv, arg_lower)
+        arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
 
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
-            np.sin(_minimum(expr_upper, np.divide(pi, 2))), copy=None
+            np.sin(_minimum_zero_sign_sensitive(expr_upper, np.divide(pi, 2))),
+            copy=None,
         )
         arg_upper[np.greater(argv, 1)] = np.inf
         arg_upper[np.less(argv, -1)] = -one_eps
-        arg_upper = _maximum(argv, arg_upper)
+        arg_upper = _maximum_zero_sign_sensitive(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper and abs(argv) < 1
         np.copyto(
@@ -539,18 +540,18 @@ class ScalarAcos(Expr[Expr]):
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
-            np.cos(_minimum(expr_upper, pi)), copy=None
+            np.cos(_minimum_zero_sign_sensitive(expr_upper, pi)), copy=None
         )
         arg_lower[np.greater(argv, 1)] = one_eps
         arg_lower[np.less(argv, -1)] = -np.inf
-        arg_lower = _minimum(argv, arg_lower)
+        arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
 
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
-            np.cos(_maximum(X.dtype.type(0), expr_lower)), copy=None
+            np.cos(_maximum_zero_sign_sensitive(X.dtype.type(0), expr_lower)), copy=None
         )
         arg_upper[np.greater(argv, 1)] = np.inf
         arg_upper[np.less(argv, -1)] = -one_eps
-        arg_upper = _maximum(argv, arg_upper)
+        arg_upper = _maximum_zero_sign_sensitive(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper and abs(argv) < 1
         np.copyto(
@@ -641,10 +642,10 @@ class ScalarAtan(Expr[Expr]):
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(  # type: ignore
-            _minimum(argv, np.tan(expr_lower)), copy=None
+            _minimum_zero_sign_sensitive(argv, np.tan(expr_lower)), copy=None
         )
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(  # type: ignore
-            _maximum(argv, np.tan(expr_upper)), copy=None
+            _maximum_zero_sign_sensitive(argv, np.tan(expr_upper)), copy=None
         )
 
         # we need to force argv if expr_lower == expr_upper

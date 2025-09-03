@@ -4,23 +4,18 @@ equivalent behaviour for all supported dtypes, e.g. numpy_quaddtype.
 """
 
 __all__ = [
-    "_isnan",
-    "_isinf",
-    "_isfinite",
     "_nan_to_zero",
     "_nan_to_zero_inf_to_finite",
-    "_sign",
     "_nextafter",
-    "_reciprocal",
     "_symmetric_modulo",
-    "_rint",
-    "_signbit_non_nan",
-    "_minimum",
-    "_maximum",
+    "_minimum_zero_sign_sensitive",
+    "_maximum_zero_sign_sensitive",
     "_where",
     "_broadcast_to",
     "_is_negative",
+    "_is_negative_zero",
     "_is_positive",
+    "_is_positive_zero",
     "_floating_max",
     "_floating_smallest_subnormal",
     "_pi",
@@ -45,117 +40,34 @@ from ._float128 import (
 from .typing import F, S, Si, T, Ti
 
 
-# wrapper around np.isnan that also works for numpy_quaddtype
-@overload
-def _isnan(
-    a: int | float,
-) -> bool:
-    pass
-
-
-@overload
-def _isnan(
-    a: np.ndarray[S, np.dtype[T]],
-) -> np.ndarray[S, np.dtype[np.bool]]:
-    pass
-
-
-@np.errstate(invalid="ignore")
-def _isnan(a):
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.isnan(a)  # type: ignore
-    return ~np.array(np.abs(a) <= np.inf, copy=None)  # type: ignore
-
-
-# wrapper around np.isinf that also works for numpy_quaddtype
-@overload
-def _isinf(
-    a: int | float,
-) -> bool:
-    pass
-
-
-@overload
-def _isinf(
-    a: np.ndarray[S, np.dtype[T]],
-) -> np.ndarray[S, np.dtype[np.bool]]:
-    pass
-
-
-@np.errstate(invalid="ignore")
-def _isinf(a):
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.isinf(a)  # type: ignore
-    return np.abs(a) == np.inf  # type: ignore
-
-
-# wrapper around np.isfinite that also works for numpy_quaddtype
-@overload
-def _isfinite(
-    a: int | float,
-) -> bool:
-    pass
-
-
-@overload
-def _isfinite(
-    a: np.ndarray[S, np.dtype[T]],
-) -> np.ndarray[S, np.dtype[np.bool]]:
-    pass
-
-
-@np.errstate(invalid="ignore")
-def _isfinite(a):
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.isfinite(a)  # type: ignore
-    return np.abs(a) < np.inf  # type: ignore
-
-
-# wrapper around np.nan_to_num that also works for numpy_quaddtype
+# reimplementation of np.nan_to_num that also works for numpy_quaddtype and
+#  keeps infinities intact
 @np.errstate(invalid="ignore")
 def _nan_to_zero(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.nan_to_num(a, nan=0, posinf=np.inf, neginf=-np.inf)  # type: ignore
-    out: np.ndarray[S, np.dtype[T]] = np.array(a, copy=True)
-    out[_isnan(a)] = 0
+    out = np.array(a, copy=True)
+    out[np.isnan(out)] = 0
     return out
 
 
-# wrapper around np.nan_to_num that also works for numpy_quaddtype
+# reimplementation of np.nan_to_num that also works for numpy_quaddtype and
+#  makes all values finite
 @np.errstate(invalid="ignore")
 def _nan_to_zero_inf_to_finite(
     a: np.ndarray[S, np.dtype[T]],
 ) -> np.ndarray[S, np.dtype[T]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.nan_to_num(a, nan=0, posinf=None, neginf=None)  # type: ignore
     out: np.ndarray[S, np.dtype[T]] = np.array(a, copy=True)
-    out[_isnan(a)] = 0
-    out[a == -np.inf] = _float128_min
-    out[a == np.inf] = _float128_max
-    return out
 
+    if out.dtype == _float128_dtype:
+        fmin, fmax = _float128_min, _float128_max
+    elif not np.issubdtype(out.dtype, np.floating):
+        return out
+    else:
+        finfo = np.finfo(out.dtype)  # type: ignore
+        fmin, fmax = finfo.min, finfo.max
 
-# wrapper around np.sign that also works for numpy_quaddtype
-@np.errstate(invalid="ignore")
-def _sign(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.sign(a)  # type: ignore
-    out: np.ndarray[S, np.dtype[T]] = np.array(a, copy=True)
-    out[a == 0] = 0
-    out[a < 0] = -1
-    out[a > 0] = +1
+    out[np.isnan(a)] = 0
+    out[a == -np.inf] = fmin
+    out[a == np.inf] = fmax
     return out
 
 
@@ -172,8 +84,6 @@ def _nextafter(
 
     a = np.array(a, copy=None)
     b = np.array(b, dtype=a.dtype, copy=None)
-
-    _float128_neg_zero = -_float128(0)
 
     _float128_incr_subnormal = np.full(a.shape, _float128_smallest_subnormal)
     np.negative(_float128_incr_subnormal, out=_float128_incr_subnormal, where=(a < 0))
@@ -232,24 +142,14 @@ def _nextafter(
         out, out_subnormal, where=(np.abs(a) <= _float128_smallest_normal), casting="no"
     )
     # infinity
-    out[_isinf(a)] = _float128_max
-    out[_isinf(a) & (a < 0)] = _float128_min
+    out[np.isinf(a)] = _float128_max
+    out[np.isinf(a) & (a < 0)] = _float128_min
     # equal
     np.copyto(out, b, where=(a == b), casting="no")
     # unordered, at least one is NaN
-    np.add(out, b, out=out, where=(_isnan(a) | _isnan(b)))
+    np.add(out, b, out=out, where=(np.isnan(a) | np.isnan(b)))
 
     return out
-
-
-# wrapper around np.reciprocal that also works for numpy_quaddtype
-@np.errstate(invalid="ignore")
-def _reciprocal(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.reciprocal(a)
-    return np.divide(1, a)
 
 
 # wrapper around np.mod(p, q) that guarantees that the result is in [-q/2, q/2]
@@ -257,59 +157,31 @@ def _symmetric_modulo(
     p: np.ndarray[S, np.dtype[F]], q: np.ndarray[S, np.dtype[F]]
 ) -> np.ndarray[S, np.dtype[F]]:
     q2: np.ndarray[S, np.dtype[F]] = np.divide(q, 2)
-    res: np.ndarray[S, np.dtype[F]] = np.array(np.mod(p + q2, q), copy=None)
-    if (type(p) is _float128_type) or (p.dtype == _float128_dtype):
-        res += q
-        np.mod(res, q, out=res)
-    return np.subtract(res, q2)
-
-
-# wrapper around np.rint(a) that also works for numpy_quaddtype
-def _rint(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.rint(a)  # type: ignore
-
-    halfway = np.array(np.trunc(a), copy=None)
-    halfway[_is_negative(a)] -= 0.5
-    halfway[_is_positive(a)] += 0.5
-
-    out: np.ndarray[S, np.dtype[F]] = np.array(np.rint(a), copy=None)
-    np.copyto(out, np.floor(a), where=(a < halfway), casting="no")
-    np.copyto(out, np.ceil(a), where=(a > halfway), casting="no")
+    out: np.ndarray[S, np.dtype[F]] = np.array(np.mod(p + q2, q), copy=None)
+    np.subtract(out, q2, out=out)
     return out
-
-
-# wrapper around np.signbit(a) that also works for numpy_quaddtype, but only
-#  for non-NaN values
-def _signbit_non_nan(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[np.bool]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.signbit(a)  # type: ignore
-    return (a < 0) | (_reciprocal(a) < 0)  # type: ignore
 
 
 # wrapper around np.minimum that also works for +0.0 and -0.0
 @overload
-def _minimum(a: Ti, b: np.ndarray[S, np.dtype[Ti]]) -> np.ndarray[S, np.dtype[Ti]]:
-    pass
+def _minimum_zero_sign_sensitive(
+    a: Ti, b: np.ndarray[S, np.dtype[Ti]]
+) -> np.ndarray[S, np.dtype[Ti]]: ...
 
 
 @overload
-def _minimum(a: np.ndarray[S, np.dtype[Ti]], b: Ti) -> np.ndarray[S, np.dtype[Ti]]:
-    pass
+def _minimum_zero_sign_sensitive(
+    a: np.ndarray[S, np.dtype[Ti]], b: Ti
+) -> np.ndarray[S, np.dtype[Ti]]: ...
 
 
 @overload
-def _minimum(
+def _minimum_zero_sign_sensitive(
     a: np.ndarray[S, np.dtype[T]], b: np.ndarray[S, np.dtype[T]]
-) -> np.ndarray[S, np.dtype[T]]:
-    pass
+) -> np.ndarray[S, np.dtype[T]]: ...
 
 
-def _minimum(a, b):
+def _minimum_zero_sign_sensitive(a, b):
     a = np.array(a, copy=None)
     b = np.array(b, copy=None)
     minimum = np.minimum(a, b)
@@ -321,13 +193,13 @@ def _minimum(a, b):
     np.copyto(
         minimum_array,
         a,
-        where=(_signbit_non_nan(a) > _signbit_non_nan(b)),
+        where=((minimum == 0) & (np.signbit(a) > np.signbit(b))),
         casting="no",
     )
     np.copyto(
         minimum_array,
         b,
-        where=(_signbit_non_nan(a) < _signbit_non_nan(b)),
+        where=((minimum == 0) & (np.signbit(a) < np.signbit(b))),
         casting="no",
     )
     return minimum_array
@@ -335,23 +207,24 @@ def _minimum(a, b):
 
 # wrapper around np.maximum that also works for +0.0 and -0.0
 @overload
-def _maximum(a: Ti, b: np.ndarray[S, np.dtype[Ti]]) -> np.ndarray[S, np.dtype[Ti]]:
-    pass
+def _maximum_zero_sign_sensitive(
+    a: Ti, b: np.ndarray[S, np.dtype[Ti]]
+) -> np.ndarray[S, np.dtype[Ti]]: ...
 
 
 @overload
-def _maximum(a: np.ndarray[S, np.dtype[Ti]], b: Ti) -> np.ndarray[S, np.dtype[Ti]]:
-    pass
+def _maximum_zero_sign_sensitive(
+    a: np.ndarray[S, np.dtype[Ti]], b: Ti
+) -> np.ndarray[S, np.dtype[Ti]]: ...
 
 
 @overload
-def _maximum(
+def _maximum_zero_sign_sensitive(
     a: np.ndarray[S, np.dtype[T]], b: np.ndarray[S, np.dtype[T]]
-) -> np.ndarray[S, np.dtype[T]]:
-    pass
+) -> np.ndarray[S, np.dtype[T]]: ...
 
 
-def _maximum(a, b):
+def _maximum_zero_sign_sensitive(a, b):
     a = np.array(a, copy=None)
     b = np.array(b, copy=None)
     maximum = np.maximum(a, b)
@@ -363,13 +236,13 @@ def _maximum(a, b):
     np.copyto(
         maximum_array,
         a,
-        where=(_signbit_non_nan(a) < _signbit_non_nan(b)),
+        where=((maximum == 0) & (np.signbit(a) < np.signbit(b))),
         casting="no",
     )
     np.copyto(
         maximum_array,
         b,
-        where=(_signbit_non_nan(a) > _signbit_non_nan(b)),
+        where=((maximum == 0) & (np.signbit(a) > np.signbit(b))),
         casting="no",
     )
     return maximum_array
@@ -381,8 +254,7 @@ def _where(
     cond: np.ndarray[S, np.dtype[np.bool]],
     a: np.ndarray[S, np.dtype[T]],
     b: np.ndarray[S, np.dtype[T]],
-) -> np.ndarray[S, np.dtype[T]]:
-    pass
+) -> np.ndarray[S, np.dtype[T]]: ...
 
 
 @overload
@@ -390,34 +262,29 @@ def _where(
     cond: np.ndarray[S, np.dtype[np.bool]],
     a: np.ndarray[S, np.dtype[np.bool]],
     b: np.ndarray[S, np.dtype[np.bool]],
-) -> np.ndarray[S, np.dtype[np.bool]]:
-    pass
+) -> np.ndarray[S, np.dtype[np.bool]]: ...
 
 
 @overload
 def _where(
     cond: np.ndarray[S, np.dtype[np.bool]], a: Ti, b: np.ndarray[S, np.dtype[Ti]]
-) -> np.ndarray[S, np.dtype[Ti]]:
-    pass
+) -> np.ndarray[S, np.dtype[Ti]]: ...
 
 
 @overload
 def _where(
     cond: np.ndarray[S, np.dtype[np.bool]], a: np.ndarray[S, np.dtype[Ti]], b: Ti
-) -> np.ndarray[S, np.dtype[Ti]]:
-    pass
+) -> np.ndarray[S, np.dtype[Ti]]: ...
 
 
 @overload
 def _where(
     cond: np.ndarray[S, np.dtype[np.bool]], a: Ti, b: Ti
-) -> np.ndarray[S, np.dtype[Ti]]:
-    pass
+) -> np.ndarray[S, np.dtype[Ti]]: ...
 
 
 @overload
-def _where(cond: bool, a: Ti, b: Ti) -> Ti:
-    pass
+def _where(cond: bool, a: Ti, b: Ti) -> Ti: ...
 
 
 def _where(cond, a, b):
@@ -428,20 +295,17 @@ def _where(cond, a, b):
 @overload
 def _broadcast_to(
     a: np.ndarray[tuple[int, ...], np.dtype[T]], shape: Si
-) -> np.ndarray[Si, np.dtype[T]]:
-    pass
+) -> np.ndarray[Si, np.dtype[T]]: ...
 
 
 @overload
 def _broadcast_to(
     a: np.ndarray[tuple[int, ...], np.dtype[np.bool]], shape: Si
-) -> np.ndarray[Si, np.dtype[np.bool]]:
-    pass
+) -> np.ndarray[Si, np.dtype[np.bool]]: ...
 
 
 @overload
-def _broadcast_to(a: Ti, shape: Si) -> np.ndarray[Si, np.dtype[Ti]]:
-    pass
+def _broadcast_to(a: Ti, shape: Si) -> np.ndarray[Si, np.dtype[Ti]]: ...
 
 
 def _broadcast_to(a, shape):
@@ -453,15 +317,29 @@ def _is_negative(
     a: np.ndarray[S, np.dtype[F]],
 ) -> np.ndarray[S, np.dtype[np.bool]]:
     # check not just for a < 0 but also for a == -0.0
-    return np.less(a, 0) | np.less(_reciprocal(a), 0)
+    return np.less_equal(a, 0) & (np.copysign(a, 1) == -1)
+
+
+# check for x == -0.0
+def _is_negative_zero(
+    a: np.ndarray[S, np.dtype[F]],
+) -> np.ndarray[S, np.dtype[np.bool]]:
+    return (a == 0) & (np.copysign(a, 1) == -1)
 
 
 # wrapper around a > 0 that also works for -0.0 (is not positive)
 def _is_positive(
-    x: np.ndarray[S, np.dtype[F]],
+    a: np.ndarray[S, np.dtype[F]],
 ) -> np.ndarray[S, np.dtype[np.bool]]:
-    # check not just for x > 0 but also for x == +0.0
-    return np.greater(x, 0) | np.greater(_reciprocal(x), 0)
+    # check not just for a > 0 but also for a == +0.0
+    return np.greater_equal(a, 0) & (np.copysign(a, 1) == +1)
+
+
+# check for x == +0.0
+def _is_positive_zero(
+    a: np.ndarray[S, np.dtype[F]],
+) -> np.ndarray[S, np.dtype[np.bool]]:
+    return (a == 0) & (np.copysign(a, 1) == +1)
 
 
 # wrapper around np.finfo(dtype).max that also works for numpy_quaddtype

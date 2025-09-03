@@ -16,7 +16,7 @@ from typing import Any
 
 import numpy as np
 
-from ._compat import _isfinite, _isnan, _nan_to_zero_inf_to_finite, _rint
+from ._compat import _nan_to_zero_inf_to_finite
 from ._float128 import _float128_dtype
 from .typing import F, S, T, U
 
@@ -94,7 +94,7 @@ def from_float(
         # lossy cast from floating point to integer
         # round first with rint (round to nearest, ties to nearest even)
         converted: np.ndarray[S, np.dtype[T]] = np.array(  # type: ignore
-            _rint(x).astype(dtype, casting="unsafe"), copy=None
+            np.array(np.rint(x), copy=None).astype(dtype, casting="unsafe"), copy=None
         )
     converted[np.greater(x, imax)] = imax
     converted[np.less(x, imin)] = imin
@@ -278,7 +278,7 @@ def lossless_cast(
         xa_to = np.array(xa, copy=None).astype(dtype, casting="unsafe")
         xa_back = xa_to.astype(dtype_from, casting="unsafe")
 
-    lossless_same = (xa == xa_back) | (_isnan(xa) & _isnan(xa_back))
+    lossless_same = (xa == xa_back) | (np.isnan(xa) & np.isnan(xa_back))
 
     if not np.all(lossless_same):
         raise ValueError(
@@ -320,7 +320,7 @@ def saturating_finite_float_cast(
 
     xa = np.array(x, copy=None)
 
-    if not isinstance(x, int) and not np.all(_isfinite(xa)):
+    if not isinstance(x, int) and not np.all(np.isfinite(xa)):
         raise ValueError(
             f"cannot cast non-finite {context} values from {xa.dtype} to saturating finite {dtype}"
         )

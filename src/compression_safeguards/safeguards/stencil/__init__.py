@@ -7,7 +7,10 @@ __all__ = ["BoundaryCondition", "NeighbourhoodAxis", "NeighbourhoodBoundaryAxis"
 from enum import Enum, auto
 
 import numpy as np
-from typing_extensions import Self, assert_never  # MSPV 3.11
+from typing_extensions import (
+    Self,  # MSPV 3.11
+    assert_never,  # MSPV 3.11
+)
 
 from ...utils.bindings import Parameter
 from ...utils.typing import S, T

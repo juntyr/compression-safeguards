@@ -1,6 +1,6 @@
 import numpy as np
 
-from compression_safeguards.utils._compat import _isnan, _nextafter
+from compression_safeguards.utils._compat import _nextafter
 from compression_safeguards.utils._float128 import (
     _float128,
     _float128_max,
@@ -123,8 +123,8 @@ def test_nextafter_float128():
     )
     assert _nextafter(np.array(_float128(-np.inf)), -np.inf)[()] == _float128(-np.inf)
 
-    assert _isnan(np.array(_nextafter(np.array(_float128(np.nan)), 0)[()]))
-    assert _isnan(np.array(_nextafter(np.array(_float128(np.nan)), np.inf)[()]))
-    assert _isnan(np.array(_nextafter(np.array(_float128(0)), np.nan)[()]))
-    assert _isnan(np.array(_nextafter(np.array(_float128(np.inf)), np.nan)[()]))
-    assert _isnan(np.array(_nextafter(np.array(_float128(np.nan)), np.nan)[()]))
+    assert np.isnan(np.array(_nextafter(np.array(_float128(np.nan)), 0)[()]))
+    assert np.isnan(np.array(_nextafter(np.array(_float128(np.nan)), np.inf)[()]))
+    assert np.isnan(np.array(_nextafter(np.array(_float128(0)), np.nan)[()]))
+    assert np.isnan(np.array(_nextafter(np.array(_float128(np.inf)), np.nan)[()]))
+    assert np.isnan(np.array(_nextafter(np.array(_float128(np.nan)), np.nan)[()]))

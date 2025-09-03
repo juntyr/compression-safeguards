@@ -4,8 +4,8 @@ import numpy as np
 
 from ....utils._compat import (
     _is_negative,
-    _maximum,
-    _minimum,
+    _maximum_zero_sign_sensitive,
+    _minimum_zero_sign_sensitive,
     _nextafter,
 )
 from ....utils.bindings import Parameter
@@ -62,8 +62,12 @@ class ScalarSinh(Expr[Expr]):
         # apply the inverse function to get the bounds on arg
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum(argv, np.asinh(expr_lower))
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(argv, np.asinh(expr_upper))
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum_zero_sign_sensitive(
+            argv, np.asinh(expr_lower)
+        )
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum_zero_sign_sensitive(
+            argv, np.asinh(expr_upper)
+        )
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
@@ -144,7 +148,7 @@ class ScalarCosh(Expr[Expr]):
         exprv = np.cosh(argv)
 
         # apply the inverse function to get the bounds on arg
-        al = np.acosh(_maximum(expr_lower, X.dtype.type(1)))
+        al = np.acosh(_maximum_zero_sign_sensitive(expr_lower, X.dtype.type(1)))
         au = np.acosh(expr_upper)
 
         # flip and swap the expr bounds to get the bounds on arg
@@ -161,7 +165,7 @@ class ScalarCosh(Expr[Expr]):
             where=(np.less_equal(expr_lower, 1) | _is_negative(argv)),
             casting="no",
         )
-        arg_lower = _minimum(argv, arg_lower)
+        arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
 
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(au, copy=True)
         np.copyto(
@@ -170,7 +174,7 @@ class ScalarCosh(Expr[Expr]):
             where=(np.greater(expr_lower, 1) & _is_negative(argv)),
             casting="no",
         )
-        arg_upper = _maximum(argv, arg_upper)
+        arg_upper = _maximum_zero_sign_sensitive(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
@@ -254,11 +258,11 @@ class ScalarTanh(Expr[Expr]):
         # ensure that the bounds on tanh(...) are in [-1, +1]
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum(
-            argv, np.atanh(_maximum(X.dtype.type(-1), expr_lower))
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum_zero_sign_sensitive(
+            argv, np.atanh(_maximum_zero_sign_sensitive(X.dtype.type(-1), expr_lower))
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(
-            argv, np.atanh(_minimum(expr_upper, X.dtype.type(1)))
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum_zero_sign_sensitive(
+            argv, np.atanh(_minimum_zero_sign_sensitive(expr_upper, X.dtype.type(1)))
         )
 
         # we need to force argv if expr_lower == expr_upper
@@ -342,8 +346,12 @@ class ScalarAsinh(Expr[Expr]):
         # apply the inverse function to get the bounds on arg
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum(argv, np.sinh(expr_lower))
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(argv, np.sinh(expr_upper))
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum_zero_sign_sensitive(
+            argv, np.sinh(expr_lower)
+        )
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum_zero_sign_sensitive(
+            argv, np.sinh(expr_upper)
+        )
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
@@ -430,16 +438,17 @@ class ScalarAcosh(Expr[Expr]):
         #  value smaller than one
         # otherwise ensure that the bounds on acosh(...) are non-negative
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
-            np.cosh(_maximum(X.dtype.type(0), expr_lower)), copy=None
+            np.cosh(_maximum_zero_sign_sensitive(X.dtype.type(0), expr_lower)),
+            copy=None,
         )
         arg_lower[np.less(argv, 1)] = -np.inf
-        arg_lower = _minimum(argv, arg_lower)
+        arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
 
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
             np.cosh(expr_upper), copy=None
         )
         arg_upper[np.less(argv, 1)] = eps_one
-        arg_upper = _maximum(argv, arg_upper)
+        arg_upper = _maximum_zero_sign_sensitive(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
@@ -530,14 +539,14 @@ class ScalarAtanh(Expr[Expr]):
         )
         arg_lower[np.greater(argv, 1)] = one_eps
         arg_lower[np.less(argv, -1)] = -np.inf
-        arg_lower = _minimum(argv, arg_lower)
+        arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
 
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
             np.tanh(expr_upper), copy=None
         )
         arg_upper[np.greater(argv, 1)] = np.inf
         arg_upper[np.less(argv, -1)] = -one_eps
-        arg_upper = _maximum(argv, arg_upper)
+        arg_upper = _maximum_zero_sign_sensitive(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")

@@ -12,7 +12,7 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 from typing_extensions import assert_never  # MSPV 3.11
 
-from ...utils._compat import _isnan, _maximum, _minimum
+from ...utils._compat import _maximum_zero_sign_sensitive, _minimum_zero_sign_sensitive
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
@@ -508,14 +508,14 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                         elem_lt_left[s_inner] |= elem_lt_left[s_boundary]
                         elem_lt_right[s_inner] |= elem_lt_right[s_boundary]
                         valid_lt_lower[s_inner] = from_total_order(
-                            _maximum(
+                            _maximum_zero_sign_sensitive(
                                 to_total_order(valid_lt_lower[s_inner]),
                                 to_total_order(valid_lt_lower[s_boundary]),
                             ),
                             dtype=data.dtype,
                         )
                         valid_lt_upper[s_inner] = from_total_order(
-                            _minimum(
+                            _minimum_zero_sign_sensitive(
                                 to_total_order(valid_lt_upper[s_inner]),
                                 to_total_order(valid_lt_upper[s_boundary]),
                             ),
@@ -588,14 +588,14 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                         elem_gt_left[s_inner] |= elem_gt_left[s_boundary]
                         elem_gt_right[s_inner] |= elem_gt_right[s_boundary]
                         valid_gt_lower[s_inner] = from_total_order(
-                            _maximum(
+                            _maximum_zero_sign_sensitive(
                                 to_total_order(valid_gt_lower[s_inner]),
                                 to_total_order(valid_gt_lower[s_boundary]),
                             ),
                             dtype=data.dtype,
                         )
                         valid_gt_upper[s_inner] = from_total_order(
-                            _minimum(
+                            _minimum_zero_sign_sensitive(
                                 to_total_order(valid_gt_upper[s_inner]),
                                 to_total_order(valid_gt_upper[s_boundary]),
                             ),
@@ -708,7 +708,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         # NaN values cannot participate in monotonic sequences
         # NaN: any(isnan(x[i]))
-        monotonic[np.any(_isnan(x), axis=-1)] = np.nan
+        monotonic[np.any(np.isnan(x), axis=-1)] = np.nan
 
         # return the result in a shape that's broadcastable to x
         return monotonic[..., np.newaxis]
@@ -720,11 +720,11 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         match self._monotonicity:
             case Monotonicity.strict | Monotonicity.strict_with_consts:
-                return ~_isnan(data_monotonic) & (decoded_monotonic != data_monotonic)
+                return ~np.isnan(data_monotonic) & (decoded_monotonic != data_monotonic)
             case Monotonicity.strict_to_weak | Monotonicity.weak:
                 # having the opposite sign or no sign are both not equal
-                return ~_isnan(data_monotonic) & (
-                    (decoded_monotonic == -data_monotonic) | _isnan(decoded_monotonic)
+                return ~np.isnan(data_monotonic) & (
+                    (decoded_monotonic == -data_monotonic) | np.isnan(decoded_monotonic)
                 )
             case _:
                 assert_never(self._monotonicity)

@@ -8,7 +8,6 @@ from collections.abc import Set
 
 import numpy as np
 
-from ....utils._compat import _isinf, _isnan
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import saturating_finite_float_cast, to_float
 from ....utils.intervals import IntervalUnion
@@ -231,8 +230,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         )
 
         ok: np.ndarray[S, np.dtype[np.bool]] = np.array(finite_ok, copy=None)  # type: ignore
-        np.copyto(ok, qoi_data == qoi_decoded, where=_isinf(qoi_data), casting="no")
-        np.copyto(ok, _isnan(qoi_decoded), where=_isnan(qoi_data), casting="no")
+        np.copyto(ok, qoi_data == qoi_decoded, where=np.isinf(qoi_data), casting="no")
+        np.copyto(ok, np.isnan(qoi_decoded), where=np.isnan(qoi_data), casting="no")
 
         return ok
 

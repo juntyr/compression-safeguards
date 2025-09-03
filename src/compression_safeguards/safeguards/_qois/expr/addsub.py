@@ -6,10 +6,8 @@ import numpy as np
 from ....utils._compat import (
     _broadcast_to,
     _floating_max,
-    _isfinite,
-    _isnan,
-    _maximum,
-    _minimum,
+    _maximum_zero_sign_sensitive,
+    _minimum_zero_sign_sensitive,
     _nan_to_zero,
 )
 from ....utils.bindings import Parameter
@@ -200,9 +198,9 @@ def compute_left_associate_sum_data_bounds(
     tfl[inf_clash] = -fmax
     tfu[inf_clash] = fmax
 
-    any_nan: np.ndarray[Ps, np.dtype[np.bool]] = _isnan(termvs[0])
+    any_nan: np.ndarray[Ps, np.dtype[np.bool]] = np.isnan(termvs[0])
     for termv in termvs[1:]:
-        any_nan |= _isnan(termv)
+        any_nan |= np.isnan(termv)
 
     # stack the lower and upper bounds for each term factor
     # if total_abs_factor or exprv is non-finite:
@@ -218,12 +216,14 @@ def compute_left_associate_sum_data_bounds(
         if abs_factorv is None:
             continue
         tl: np.ndarray[Ps, np.dtype[F]] = np.array(termv, copy=True)
-        tl[_isfinite(termv) & any_nan] = -fmax
+        tl[np.isfinite(termv) & any_nan] = -fmax
         np.copyto(
             tl,
             _zero_add(termv, tfl * abs_factorv),
             where=(
-                (total_abs_factor != 0) & _isfinite(total_abs_factor) & _isfinite(exprv)
+                (total_abs_factor != 0)
+                & np.isfinite(total_abs_factor)
+                & np.isfinite(exprv)
             ),
             casting="no",
         )
@@ -234,12 +234,14 @@ def compute_left_associate_sum_data_bounds(
         if abs_factorv is None:
             continue
         tu: np.ndarray[Ps, np.dtype[F]] = np.array(termv, copy=True)
-        tu[_isfinite(termv) & any_nan] = fmax
+        tu[np.isfinite(termv) & any_nan] = fmax
         np.copyto(
             tu,
             _zero_add(termv, tfu * abs_factorv),
             where=(
-                (total_abs_factor != 0) & _isfinite(total_abs_factor) & _isfinite(exprv)
+                (total_abs_factor != 0)
+                & np.isfinite(total_abs_factor)
+                & np.isfinite(exprv)
             ),
             casting="no",
         )
@@ -339,11 +341,11 @@ def compute_left_associate_sum_data_bounds(
         if Xs_lower_ is None:
             Xs_lower_ = xl
         else:
-            Xs_lower_ = _maximum(Xs_lower_, xl)
+            Xs_lower_ = _maximum_zero_sign_sensitive(Xs_lower_, xl)
         if Xs_upper_ is None:
             Xs_upper_ = xu
         else:
-            Xs_upper_ = _minimum(Xs_upper_, xu)
+            Xs_upper_ = _minimum_zero_sign_sensitive(Xs_upper_, xu)
 
         i += 1
 
@@ -352,8 +354,8 @@ def compute_left_associate_sum_data_bounds(
     Xs_lower: np.ndarray[Ns, np.dtype[F]] = Xs_lower_
     Xs_upper: np.ndarray[Ns, np.dtype[F]] = Xs_upper_
 
-    Xs_lower = _minimum(Xs_lower, Xs)
-    Xs_upper = _maximum(Xs_upper, Xs)
+    Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
+    Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
 
     return Xs_lower, Xs_upper
 

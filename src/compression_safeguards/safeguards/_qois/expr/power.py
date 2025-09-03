@@ -3,7 +3,12 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _is_negative, _isnan, _maximum, _minimum, _where
+from ....utils._compat import (
+    _is_negative,
+    _maximum_zero_sign_sensitive,
+    _minimum_zero_sign_sensitive,
+    _where,
+)
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from .abc import Expr
@@ -91,21 +96,21 @@ class ScalarPower(Expr[Expr, Expr]):
 
         # ensure that the bounds at least contain the rewritten expression
         #  result
-        expr_lower = _minimum(expr_lower, exprv_rewritten)
-        expr_upper = _maximum(expr_upper, exprv_rewritten)
+        expr_lower = _minimum_zero_sign_sensitive(expr_lower, exprv_rewritten)
+        expr_upper = _maximum_zero_sign_sensitive(expr_upper, exprv_rewritten)
 
         # bail out and just use the rewritten expression result as an exact
         #  bound in case isnan was changed by the rewrite
         np.copyto(
             expr_lower,
             exprv_rewritten,
-            where=(_isnan(exprv) != _isnan(exprv_rewritten)),
+            where=(np.isnan(exprv) != np.isnan(exprv_rewritten)),
             casting="no",
         )
         np.copyto(
             expr_upper,
             exprv_rewritten,
-            where=(_isnan(exprv) != _isnan(exprv_rewritten)),
+            where=(np.isnan(exprv) != np.isnan(exprv_rewritten)),
             casting="no",
         )
 

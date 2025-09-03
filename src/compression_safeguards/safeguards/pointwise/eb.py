@@ -8,13 +8,8 @@ from collections.abc import Set
 
 import numpy as np
 
-from ...utils._compat import _isfinite, _isnan
 from ...utils.bindings import Bindings, Parameter
-from ...utils.cast import (
-    as_bits,
-    saturating_finite_float_cast,
-    to_float,
-)
+from ...utils.cast import as_bits, saturating_finite_float_cast, to_float
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import S, T
 from ..eb import (
@@ -143,12 +138,12 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
 
         # bitwise equality for inf and NaNs (unless equal_nan)
         same_bits = as_bits(data) == as_bits(decoded)
-        both_nan = self._equal_nan and (_isnan(data) & _isnan(decoded))
+        both_nan = self._equal_nan and (np.isnan(data) & np.isnan(decoded))
 
         ok: np.ndarray[S, np.dtype[np.bool]] = np.array(finite_ok, copy=None)  # type: ignore
-        np.copyto(ok, same_bits, where=~_isfinite(data), casting="no")
+        np.copyto(ok, same_bits, where=~np.isfinite(data), casting="no")
         if self._equal_nan:
-            np.copyto(ok, both_nan, where=_isnan(data), casting="no")
+            np.copyto(ok, both_nan, where=np.isnan(data), casting="no")
 
         return ok
 
@@ -196,7 +191,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
 
         lower, upper = _apply_finite_error_bound(self._type, eb, data, to_float(data))
 
-        Lower(lower.flatten()) <= valid[_isfinite(dataf)] <= Upper(upper.flatten())
+        Lower(lower.flatten()) <= valid[np.isfinite(dataf)] <= Upper(upper.flatten())
 
         return valid.preserve_any_nan(dataf, equal_nan=self._equal_nan)
 

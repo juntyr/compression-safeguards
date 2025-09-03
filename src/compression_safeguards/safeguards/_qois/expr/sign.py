@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _floating_smallest_subnormal, _isnan, _sign
+from ....utils._compat import _floating_smallest_subnormal
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from .abc import Expr
@@ -28,7 +28,7 @@ class ScalarSign(Expr[Expr]):
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
-            _sign,  # type: ignore
+            np.sign,
             ScalarSign,
         )
 
@@ -38,7 +38,7 @@ class ScalarSign(Expr[Expr]):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
-        return _sign(self._a.eval(x, Xs, late_bound))
+        return np.sign(self._a.eval(x, Xs, late_bound))
 
     @checked_data_bounds
     def compute_data_bounds_unchecked(
@@ -52,7 +52,7 @@ class ScalarSign(Expr[Expr]):
         # evaluate arg and sign(arg)
         arg = self._a
         argv = arg.eval(X.shape, Xs, late_bound)
-        exprv: np.ndarray[Ps, np.dtype[F]] = _sign(argv)
+        exprv: np.ndarray[Ps, np.dtype[F]] = np.sign(argv)
 
         # evaluate the lower and upper sign bounds that satisfy the expression bound
         expr_lower = np.ceil(expr_lower)
@@ -65,12 +65,12 @@ class ScalarSign(Expr[Expr]):
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, smallest_subnormal)
         arg_lower[np.less_equal(expr_lower, -1)] = -np.inf
         arg_lower[expr_lower == 0] = -0.0
-        np.copyto(arg_lower, exprv, where=_isnan(exprv), casting="no")
+        np.copyto(arg_lower, exprv, where=np.isnan(exprv), casting="no")
 
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, -smallest_subnormal)
         arg_upper[np.greater_equal(expr_upper, +1)] = np.inf
         arg_upper[expr_upper == 0] = +0.0
-        np.copyto(arg_upper, exprv, where=_isnan(exprv), casting="no")
+        np.copyto(arg_upper, exprv, where=np.isnan(exprv), casting="no")
 
         return arg.compute_data_bounds(
             arg_lower,

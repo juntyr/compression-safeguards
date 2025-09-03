@@ -67,7 +67,10 @@ with atheris.instrument_imports():
         ScalarTan,
     )
     from compression_safeguards.safeguards._qois.expr.where import ScalarWhere
-    from compression_safeguards.utils._compat import _isnan, _maximum, _minimum, _where
+    from compression_safeguards.utils._compat import (
+        _maximum_zero_sign_sensitive,
+        _minimum_zero_sign_sensitive,
+    )
     from compression_safeguards.utils._float128 import _float128_dtype
     from compression_safeguards.utils.typing import T
 
@@ -225,7 +228,7 @@ def check_one_input(data) -> None:
 
     # NaN data values are always preserved externally by the QoI safeguards, so
     #  the expressions don't need to handle them
-    if _isnan(X):
+    if np.isnan(X):
         return
 
     # evaluate the expression on the data
@@ -236,13 +239,15 @@ def check_one_input(data) -> None:
     expr_upper = np.array(ConsumeDtypeElement(data, dtype))
 
     # skip if exprv and its bounds disagree on NaNs
-    if (_isnan(exprv) != _isnan(expr_lower)) or (_isnan(exprv) != _isnan(expr_upper)):
+    if (np.isnan(exprv) != np.isnan(expr_lower)) or (
+        np.isnan(exprv) != np.isnan(expr_upper)
+    ):
         return
 
     # ensure that expr_lower <= exprv <= expr_upper
     # and that -0.0 bounds are handled correctly
-    expr_lower = _minimum(expr_lower, exprv)
-    expr_upper = _maximum(exprv, expr_upper)
+    expr_lower = _minimum_zero_sign_sensitive(expr_lower, exprv)
+    expr_upper = _maximum_zero_sign_sensitive(exprv, expr_upper)
     expr_lower, expr_upper = np.array(expr_lower), np.array(expr_upper)
 
     # compute the lower and upper bounds on the data
@@ -276,11 +281,13 @@ def check_one_input(data) -> None:
     X_test = np.array(ConsumeDtypeElement(data, dtype))
 
     # ensure that X and X_test agree on NaN
-    X_test = _where(_isnan(X) != _isnan(X_test), X, X_test)
+    X_test = np.where(np.isnan(X) != np.isnan(X_test), X, X_test)
 
     # ensure that X_lower <= X_test <= X_upper
     # and that -0.0 bounds are handled correctly
-    X_test = _maximum(X_lower, _minimum(X_test, X_upper))
+    X_test = _maximum_zero_sign_sensitive(
+        X_lower, _minimum_zero_sign_sensitive(X_test, X_upper)
+    )
     X_test = np.array(X_test)
 
     # evaluate the expression on X_test
@@ -289,33 +296,37 @@ def check_one_input(data) -> None:
     try:
         # ASSERT: X bounds must only be NaN if X is NaN
         #         (they can be of any value if X is NaN)
-        assert (not _isnan(X_lower)) or _isnan(X), "X_lower isnan mismatch"
-        assert (not _isnan(X_upper)) or _isnan(X), "X_upper isnan mismatch"
+        assert (not np.isnan(X_lower)) or np.isnan(X), "X_lower isnan mismatch"
+        assert (not np.isnan(X_upper)) or np.isnan(X), "X_upper isnan mismatch"
 
         # ASSERT: X must be within the computed X bounds
-        assert _isnan(X) or ((X >= X_lower) and (X <= X_upper)), "X outside bounds"
+        assert np.isnan(X) or ((X >= X_lower) and (X <= X_upper)), "X outside bounds"
 
         # ASSERT: exprv bounds must be NaN iff exprv is NaN
-        assert _isnan(exprv) == _isnan(exprv_X_lower), "exprv_X_lower isnan mismatch"
-        assert _isnan(exprv) == _isnan(exprv_X_upper), "exprv_X_upper isnan mismatch"
+        assert np.isnan(exprv) == np.isnan(exprv_X_lower), (
+            "exprv_X_lower isnan mismatch"
+        )
+        assert np.isnan(exprv) == np.isnan(exprv_X_upper), (
+            "exprv_X_upper isnan mismatch"
+        )
 
         # ASSERT: exprv, exprv_X_lower, and exprv_X_upper must be within the
         #         expr bounds
-        assert _isnan(exprv) or ((exprv >= expr_lower) and (exprv <= expr_upper)), (
+        assert np.isnan(exprv) or ((exprv >= expr_lower) and (exprv <= expr_upper)), (
             "exprv outside bounds"
         )
-        assert _isnan(exprv) or (
+        assert np.isnan(exprv) or (
             (exprv_X_lower >= expr_lower) and (exprv_X_lower <= expr_upper)
         ), "exprv_X_lower outside bounds"
-        assert _isnan(exprv) or (
+        assert np.isnan(exprv) or (
             (exprv_X_upper >= expr_lower) and (exprv_X_upper <= expr_upper)
         ), "exprv_X_upper outside bounds"
 
         # ASSERT: exprv_X_test bounds must be NaN iff exprv is NaN
-        assert _isnan(exprv) == _isnan(exprv_X_test), "exprv_X_test isnan mismatch"
+        assert np.isnan(exprv) == np.isnan(exprv_X_test), "exprv_X_test isnan mismatch"
 
         # ASSERT: exprv_X_test must be within the expr bounds
-        assert _isnan(exprv) or (
+        assert np.isnan(exprv) or (
             (exprv_X_test >= expr_lower) and (exprv_X_test <= expr_upper)
         ), "exprv_X_test outside bounds"
     except Exception as err:

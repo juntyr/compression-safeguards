@@ -20,19 +20,9 @@ from typing import Any, Generic, Literal, TypeVar
 import numpy as np
 from typing_extensions import Self  # MSPV 3.11
 
-from ._compat import (
-    _isfinite,
-    _isinf,
-    _isnan,
-    _nextafter,
-    _where,
-)
-from ._compat import (
-    _maximum as _np_maximum,
-)
-from ._compat import (
-    _minimum as _np_minimum,
-)
+from ._compat import _maximum_zero_sign_sensitive as _np_maximum
+from ._compat import _minimum_zero_sign_sensitive as _np_minimum
+from ._compat import _nextafter, _where
 from .cast import as_bits, from_total_order, to_total_order
 from .typing import S, T
 
@@ -253,7 +243,7 @@ class Interval(Generic[T, N]):
             return self
 
         # bitwise preserve infinite values
-        Lower(a) <= self[_isinf(a)] <= Upper(a)
+        Lower(a) <= self[np.isinf(a)] <= Upper(a)
 
         return self
 
@@ -288,7 +278,7 @@ class Interval(Generic[T, N]):
 
         if not equal_nan:
             # bitwise preserve NaN values
-            Lower(a) <= self[_isnan(a)] <= Upper(a)
+            Lower(a) <= self[np.isnan(a)] <= Upper(a)
             return self
 
         # smallest (positive) NaN bit pattern: 0b s 1..1 0..0
@@ -305,7 +295,7 @@ class Interval(Generic[T, N]):
                 np.copysign(nan_max, -1),
                 np.copysign(nan_min, +1),
             )
-        ) <= self[_isnan(a)] <= Upper(
+        ) <= self[np.isnan(a)] <= Upper(
             _where(
                 np.signbit(a),
                 np.copysign(nan_min, -1),
@@ -352,11 +342,11 @@ class Interval(Generic[T, N]):
 
         lower: Interval[T, N] = Interval.empty(a.dtype, n)
         # copy over the intervals for non-NaN elements
-        Lower(self._lower) <= lower[~_isnan(a)] <= Upper(self._upper)
+        Lower(self._lower) <= lower[~np.isnan(a)] <= Upper(self._upper)
 
-        if (not equal_nan) or (not np.any(_isnan(a))):
+        if (not equal_nan) or (not np.any(np.isnan(a))):
             # bitwise preserve NaN values
-            Lower(a) <= lower[_isnan(a)] <= Upper(a)
+            Lower(a) <= lower[np.isnan(a)] <= Upper(a)
             return lower.into_union()
 
         # smallest (positive) NaN bit pattern: 0b s 1..1 0..0
@@ -367,11 +357,11 @@ class Interval(Generic[T, N]):
         upper: Interval[T, N] = Interval.empty(a.dtype, n)
 
         # create lower interval of all negative NaNs
-        Lower(np.array(np.copysign(nan_max, -1))) <= lower[_isnan(a)] <= Upper(
+        Lower(np.array(np.copysign(nan_max, -1))) <= lower[np.isnan(a)] <= Upper(
             np.array(np.copysign(nan_min, -1))
         )
         # create upper interval of all positive NaNs
-        Lower(np.array(np.copysign(nan_min, +1))) <= upper[_isnan(a)] <= Upper(
+        Lower(np.array(np.copysign(nan_min, +1))) <= upper[np.isnan(a)] <= Upper(
             np.array(np.copysign(nan_max, +1))
         )
 
@@ -403,7 +393,7 @@ class Interval(Generic[T, N]):
         # nextafter produces the largest and smallest finite floating point
         #  values
         Lower(np.array(_nextafter(np.array(-np.inf, dtype=a.dtype), 0))) <= self[
-            _isfinite(a)
+            np.isfinite(a)
         ] <= Upper(np.array(_nextafter(np.array(np.inf, dtype=a.dtype), 0)))
 
         return self
@@ -430,7 +420,7 @@ class Interval(Generic[T, N]):
             Minimum <= self[:] <= Maximum
             return self
 
-        Lower(np.array(-np.inf, dtype=a.dtype)) <= self[~_isnan(a)] <= Upper(
+        Lower(np.array(-np.inf, dtype=a.dtype)) <= self[~np.isnan(a)] <= Upper(
             np.array(np.inf, dtype=a.dtype)
         )
 

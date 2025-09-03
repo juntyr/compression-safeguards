@@ -3,7 +3,10 @@ from collections.abc import Iterator, Mapping
 from typing import Callable
 
 import numpy as np
-from typing_extensions import TypeVarTuple, Unpack  # MSPV 3.11
+from typing_extensions import (
+    TypeVarTuple,  # MSPV 3.11
+    Unpack,  # MSPV 3.11
+)
 
 from ....utils.bindings import Parameter
 from .abc import Expr

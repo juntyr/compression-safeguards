@@ -9,11 +9,8 @@ from ....utils._compat import (
     _floating_smallest_subnormal,
     _is_negative,
     _is_positive,
-    _isfinite,
-    _isinf,
-    _isnan,
-    _maximum,
-    _minimum,
+    _maximum_zero_sign_sensitive,
+    _minimum_zero_sign_sensitive,
     _where,
 )
 from ....utils.bindings import Parameter
@@ -95,39 +92,43 @@ class ScalarMultiply(Expr[Expr, Expr]):
             term_lower: np.ndarray[Ps, np.dtype[F]] = np.array(expr_lower, copy=True)
             np.copyto(term_lower, expr_upper, where=_is_negative(constv), casting="no")
             np.divide(term_lower, constv, out=term_lower)
-            term_lower[_isnan(constv)] = -np.inf
-            term_lower[_isinf(constv)] = smallest_subnormal
-            term_lower[_isinf(constv) & _is_negative(termv)] = -np.inf
+            term_lower[np.isnan(constv)] = -np.inf
+            term_lower[np.isinf(constv)] = smallest_subnormal
+            term_lower[np.isinf(constv) & _is_negative(termv)] = -np.inf
             np.copyto(
-                term_lower, termv, where=(_isinf(constv) & (termv == 0)), casting="no"
+                term_lower, termv, where=(np.isinf(constv) & (termv == 0)), casting="no"
             )
             term_lower[constv == 0] = -fmax
-            term_lower = _minimum(termv, term_lower)
+            term_lower = _minimum_zero_sign_sensitive(termv, term_lower)
 
             term_upper: np.ndarray[Ps, np.dtype[F]] = np.array(expr_upper, copy=True)
             np.copyto(term_upper, expr_lower, where=_is_negative(constv), casting="no")
             np.divide(term_upper, constv, out=term_upper)
-            term_upper[_isnan(constv)] = np.inf
-            term_upper[_isinf(constv)] = np.inf
-            term_upper[_isinf(constv) & _is_negative(termv)] = -smallest_subnormal
+            term_upper[np.isnan(constv)] = np.inf
+            term_upper[np.isinf(constv)] = np.inf
+            term_upper[np.isinf(constv) & _is_negative(termv)] = -smallest_subnormal
             np.copyto(
-                term_upper, termv, where=(_isinf(constv) & (termv == 0)), casting="no"
+                term_upper, termv, where=(np.isinf(constv) & (termv == 0)), casting="no"
             )
             term_upper[constv == 0] = fmax
-            term_upper = _maximum(termv, term_upper)
+            term_upper = _maximum_zero_sign_sensitive(termv, term_upper)
 
             # we need to force argv if expr_lower == expr_upper and constv is
             #  finite non-zero (in other cases we explicitly expand ranges)
             np.copyto(
                 term_lower,
                 termv,
-                where=((expr_lower == expr_upper) & _isfinite(constv) & (constv != 0)),
+                where=(
+                    (expr_lower == expr_upper) & np.isfinite(constv) & (constv != 0)
+                ),
                 casting="no",
             )
             np.copyto(
                 term_upper,
                 termv,
-                where=((expr_lower == expr_upper) & _isfinite(constv) & (constv != 0)),
+                where=(
+                    (expr_lower == expr_upper) & np.isfinite(constv) & (constv != 0)
+                ),
                 casting="no",
             )
 
@@ -256,13 +257,13 @@ class ScalarDivide(Expr[Expr, Expr]):
             # ensure that the expression keeps the same sign
             np.copyto(
                 expr_lower,
-                _maximum(X.dtype.type(+0.0), expr_lower),
+                _maximum_zero_sign_sensitive(X.dtype.type(+0.0), expr_lower),
                 where=_is_positive(exprv),
                 casting="no",
             )
             np.copyto(
                 expr_upper,
-                _minimum(X.dtype.type(-0.0), expr_upper),
+                _minimum_zero_sign_sensitive(X.dtype.type(-0.0), expr_upper),
                 where=_is_negative(exprv),
                 casting="no",
             )
@@ -284,28 +285,28 @@ class ScalarDivide(Expr[Expr, Expr]):
             term_lower = np.array(expr_upper, copy=True)
             np.copyto(term_lower, expr_lower, where=_is_negative(constv), casting="no")
             np.divide(constv, term_lower, out=term_lower)
-            term_lower[_isnan(constv)] = -np.inf
+            term_lower[np.isnan(constv)] = -np.inf
             term_lower[constv == 0] = smallest_subnormal
             term_lower[(constv == 0) & _is_negative(termv)] = -np.inf
             np.copyto(
                 term_lower, termv, where=((constv == 0) & (termv == 0)), casting="no"
             )
-            term_lower[_isinf(constv)] = +0.0
-            term_lower[_isinf(constv) & _is_negative(termv)] = -fmax
-            term_lower = _minimum(termv, term_lower)
+            term_lower[np.isinf(constv)] = +0.0
+            term_lower[np.isinf(constv) & _is_negative(termv)] = -fmax
+            term_lower = _minimum_zero_sign_sensitive(termv, term_lower)
 
             term_upper = np.array(expr_lower, copy=True)
             np.copyto(term_upper, expr_upper, where=_is_negative(constv), casting="no")
             np.divide(constv, term_upper, out=term_upper)
-            term_upper[_isnan(constv)] = np.inf
+            term_upper[np.isnan(constv)] = np.inf
             term_upper[constv == 0] = np.inf
             term_upper[(constv == 0) & _is_negative(termv)] = -smallest_subnormal
             np.copyto(
                 term_upper, termv, where=((constv == 0) & (termv == 0)), casting="no"
             )
-            term_upper[_isinf(constv)] = fmax
-            term_upper[_isinf(constv) & _is_negative(termv)] = -0.0
-            term_upper = _maximum(termv, term_upper)
+            term_upper[np.isinf(constv)] = fmax
+            term_upper[np.isinf(constv) & _is_negative(termv)] = -0.0
+            term_upper = _maximum_zero_sign_sensitive(termv, term_upper)
 
             # we need to force termv if expr_lower == expr_upper
             np.copyto(term_lower, termv, where=(expr_lower == expr_upper), casting="no")
@@ -349,39 +350,43 @@ class ScalarDivide(Expr[Expr, Expr]):
             term_lower = np.array(expr_lower, copy=True)
             np.copyto(term_lower, expr_upper, where=_is_negative(constv), casting="no")
             np.multiply(term_lower, constv, out=term_lower)
-            term_lower[_isnan(constv)] = -np.inf
+            term_lower[np.isnan(constv)] = -np.inf
             term_lower[constv == 0] = smallest_subnormal
             term_lower[(constv == 0) & _is_negative(termv)] = -np.inf
             np.copyto(
                 term_lower, termv, where=((constv == 0) & (termv == 0)), casting="no"
             )
-            term_lower[_isinf(constv)] = -fmax
-            term_lower = _minimum(termv, term_lower)
+            term_lower[np.isinf(constv)] = -fmax
+            term_lower = _minimum_zero_sign_sensitive(termv, term_lower)
 
             term_upper = np.array(expr_upper, copy=True)
             np.copyto(term_upper, expr_lower, where=_is_negative(constv), casting="no")
             np.multiply(term_upper, constv, out=term_upper)
-            term_upper[_isnan(constv)] = np.inf
+            term_upper[np.isnan(constv)] = np.inf
             term_upper[constv == 0] = np.inf
             term_upper[(constv == 0) & _is_negative(termv)] = -smallest_subnormal
             np.copyto(
                 term_upper, termv, where=((constv == 0) & (termv == 0)), casting="no"
             )
-            term_upper[_isinf(constv)] = fmax
-            term_upper = _maximum(termv, term_upper)
+            term_upper[np.isinf(constv)] = fmax
+            term_upper = _maximum_zero_sign_sensitive(termv, term_upper)
 
             # we need to force termv if expr_lower == expr_upper and constv is
             #  finite non-zero (in other cases we explicitly expand ranges)
             np.copyto(
                 term_lower,
                 termv,
-                where=((expr_lower == expr_upper) & _isfinite(constv) & (constv != 0)),
+                where=(
+                    (expr_lower == expr_upper) & np.isfinite(constv) & (constv != 0)
+                ),
                 casting="no",
             )
             np.copyto(
                 term_upper,
                 termv,
-                where=((expr_lower == expr_upper) & _isfinite(constv) & (constv != 0)),
+                where=(
+                    (expr_lower == expr_upper) & np.isfinite(constv) & (constv != 0)
+                ),
                 casting="no",
             )
 
@@ -445,21 +450,21 @@ def compute_left_associative_product_data_bounds(
 
     # ensure that the bounds at least contain the rewritten expression
     #  result
-    expr_lower = _minimum(expr_lower, exprv_rewritten)
-    expr_upper = _maximum(expr_upper, exprv_rewritten)
+    expr_lower = _minimum_zero_sign_sensitive(expr_lower, exprv_rewritten)
+    expr_upper = _maximum_zero_sign_sensitive(expr_upper, exprv_rewritten)
 
     # bail out and just use the rewritten expression result as an exact
     #  bound in case isnan was changed by the rewrite
     np.copyto(
         expr_lower,
         exprv_rewritten,
-        where=(_isnan(exprv) != _isnan(exprv_rewritten)),
+        where=(np.isnan(exprv) != np.isnan(exprv_rewritten)),
         casting="no",
     )
     np.copyto(
         expr_upper,
         exprv_rewritten,
-        where=(_isnan(exprv) != _isnan(exprv_rewritten)),
+        where=(np.isnan(exprv) != np.isnan(exprv_rewritten)),
         casting="no",
     )
 

@@ -603,9 +603,7 @@ def test_gaussian_kernel():
 def test_constant_fold():
     from compression_safeguards.safeguards._qois.expr.data import Data
     from compression_safeguards.safeguards._qois.expr.literal import Number
-    from compression_safeguards.safeguards._qois.expr.logexp import (
-        ScalarLogWithBase,
-    )
+    from compression_safeguards.safeguards._qois.expr.logexp import ScalarLogWithBase
 
     expr = ScalarLogWithBase(
         Number.from_symbolic_int(100), Number.from_symbolic_int(10)

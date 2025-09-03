@@ -2,7 +2,6 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _isfinite
 from ....utils.bindings import Parameter
 from ..bound import DataBounds, data_bounds
 from .abc import Expr
@@ -63,11 +62,11 @@ class Data(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         X_lower: np.ndarray[Ns, np.dtype[F]] = np.copy(Xs)
-        X_lower[_isfinite(Xs)] = -np.inf
+        X_lower[np.isfinite(Xs)] = -np.inf
         X_lower[(...,) + self._index] = expr_lower
 
         X_upper: np.ndarray[Ns, np.dtype[F]] = np.copy(Xs)
-        X_upper[_isfinite(Xs)] = np.inf
+        X_upper[np.isfinite(Xs)] = np.inf
         X_upper[(...,) + self._index] = expr_upper
 
         return X_lower, X_upper

@@ -4,12 +4,7 @@ from warnings import warn
 
 import numpy as np
 
-from ...utils._compat import (
-    _broadcast_to,
-    _isnan,
-    _nan_to_zero_inf_to_finite,
-    _nextafter,
-)
+from ...utils._compat import _broadcast_to, _nan_to_zero_inf_to_finite, _nextafter
 from .expr.typing import Ci, F, Ns, Ps
 
 
@@ -123,7 +118,7 @@ def guarantee_data_within_expr_bounds(
         exprv_Xs_bound_guess = expr(Xs_bound_guess)
 
         in_bounds: np.ndarray[Ps, np.dtype[np.bool]] = (
-            _isnan(exprv) & _isnan(exprv_Xs_bound_guess)
+            np.isnan(exprv) & np.isnan(exprv_Xs_bound_guess)
         ) | (
             np.greater_equal(exprv_Xs_bound_guess, expr_lower)
             & np.less_equal(exprv_Xs_bound_guess, expr_upper)

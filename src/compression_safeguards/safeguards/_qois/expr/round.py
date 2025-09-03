@@ -4,10 +4,10 @@ import numpy as np
 
 from ....utils._compat import (
     _is_negative,
+    _is_negative_zero,
     _is_positive,
+    _is_positive_zero,
     _nextafter,
-    _reciprocal,
-    _rint,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
@@ -52,11 +52,6 @@ class ScalarFloor(Expr[Expr]):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        def is_negative_zero(
-            x: np.ndarray[Ps, np.dtype[F]],
-        ) -> np.ndarray[Ps, np.dtype[np.bool]]:
-            return (x == 0) & (_reciprocal(x) < 0)
-
         arg = self._a
 
         # compute the rounded result that meets the expr bounds
@@ -77,7 +72,7 @@ class ScalarFloor(Expr[Expr]):
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
             _nextafter(expr_upper + 1, expr_upper), copy=None
         )
-        arg_upper[is_negative_zero(expr_upper)] = X.dtype.type(-0.0)
+        arg_upper[_is_negative_zero(expr_upper)] = X.dtype.type(-0.0)
 
         return arg.compute_data_bounds(
             arg_lower,
@@ -127,11 +122,6 @@ class ScalarCeil(Expr[Expr]):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        def is_positive_zero(
-            x: np.ndarray[Ps, np.dtype[F]],
-        ) -> np.ndarray[Ps, np.dtype[np.bool]]:
-            return (x == 0) & (_reciprocal(x) > 0)
-
         arg = self._a
 
         # compute the rounded result that meets the expr bounds
@@ -151,7 +141,7 @@ class ScalarCeil(Expr[Expr]):
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
             _nextafter(expr_lower - 1, expr_lower), copy=None
         )
-        arg_lower[is_positive_zero(expr_lower)] = X.dtype.type(+0.0)
+        arg_lower[_is_positive_zero(expr_lower)] = X.dtype.type(+0.0)
         arg_upper: np.ndarray[Ps, np.dtype[F]] = expr_upper
 
         return arg.compute_data_bounds(
@@ -257,7 +247,7 @@ class ScalarRoundTiesEven(Expr[Expr]):
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
-            _rint,  # type: ignore
+            np.rint,
             ScalarRoundTiesEven,
         )
 
@@ -267,7 +257,7 @@ class ScalarRoundTiesEven(Expr[Expr]):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
-        return _rint(self._a.eval(x, Xs, late_bound))
+        return np.rint(self._a.eval(x, Xs, late_bound))
 
     @checked_data_bounds
     def compute_data_bounds_unchecked(
@@ -278,20 +268,10 @@ class ScalarRoundTiesEven(Expr[Expr]):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        def is_positive_zero(
-            x: np.ndarray[Ps, np.dtype[F]],
-        ) -> np.ndarray[Ps, np.dtype[np.bool]]:
-            return (x == 0) & (_reciprocal(x) > 0)
-
-        def is_negative_zero(
-            x: np.ndarray[Ps, np.dtype[F]],
-        ) -> np.ndarray[Ps, np.dtype[np.bool]]:
-            return (x == 0) & (_reciprocal(x) < 0)
-
         # evaluate arg and round_ties_even(arg)
         arg = self._a
         argv = arg.eval(X.shape, Xs, late_bound)
-        exprv = _rint(argv)
+        exprv = np.rint(argv)
 
         # compute the rounded result that meets the expr bounds
         # rounding uses integer steps, so e.g. round_ties_even(...) in
@@ -311,17 +291,17 @@ class ScalarRoundTiesEven(Expr[Expr]):
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
             np.subtract(expr_lower, X.dtype.type(0.5)), copy=None
         )
-        arg_lower[is_positive_zero(expr_lower)] = X.dtype.type(+0.0)
+        arg_lower[_is_positive_zero(expr_lower)] = X.dtype.type(+0.0)
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
             np.add(expr_upper, X.dtype.type(0.5)), copy=None
         )
-        arg_upper[is_negative_zero(expr_upper)] = X.dtype.type(-0.0)
+        arg_upper[_is_negative_zero(expr_upper)] = X.dtype.type(-0.0)
 
         # handle rounding errors in round_ties_even(...) early
         # which can occur since our +-0.5 estimate doesn't account for the even
         #  tie breaking cases
         arg_lower = guarantee_arg_within_expr_bounds(
-            lambda arg_lower: _rint(arg_lower),
+            lambda arg_lower: np.rint(arg_lower),
             exprv,
             argv,
             arg_lower,
@@ -329,7 +309,7 @@ class ScalarRoundTiesEven(Expr[Expr]):
             expr_upper,
         )
         arg_upper = guarantee_arg_within_expr_bounds(
-            lambda arg_upper: _rint(arg_upper),
+            lambda arg_upper: np.rint(arg_upper),
             exprv,
             argv,
             arg_upper,

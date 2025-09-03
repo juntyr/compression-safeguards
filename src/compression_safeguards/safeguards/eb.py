@@ -9,19 +9,8 @@ from enum import Enum, auto
 import numpy as np
 from typing_extensions import assert_never  # MSPV 3.11
 
-from ..utils._compat import (
-    _isfinite,
-    _nan_to_zero_inf_to_finite,
-    _nextafter,
-    _sign,
-    _where,
-)
-from ..utils.cast import (
-    from_float,
-    from_total_order,
-    to_float,
-    to_total_order,
-)
+from ..utils._compat import _nan_to_zero_inf_to_finite, _nextafter, _where
+from ..utils.cast import from_float, from_total_order, to_float, to_total_order
 from ..utils.typing import F, S, T
 
 
@@ -158,7 +147,7 @@ def _check_error_bound(
         case _:
             assert_never(type)
 
-    assert isinstance(eb, int) or np.all(_isfinite(eb)), "eb must be finite"
+    assert isinstance(eb, int) or np.all(np.isfinite(eb)), "eb must be finite"
 
 
 def _compute_finite_absolute_error_bound(
@@ -200,7 +189,7 @@ def _compute_finite_absolute_error_bound(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
                 eb_rel_as_abs = _nan_to_zero_inf_to_finite(np.abs(data_float) * eb)
-            assert np.all((eb_rel_as_abs >= 0) & _isfinite(eb_rel_as_abs))
+            assert np.all((eb_rel_as_abs >= 0) & np.isfinite(eb_rel_as_abs))
             return eb_rel_as_abs
         case ErrorBound.ratio:
             return eb
@@ -253,7 +242,7 @@ def _compute_finite_absolute_error(
                 casting="no",
             )
             err_abs[(data_float == 0) & (decoded_float == 0)] = 0
-            err_abs[_sign(data_float) != _sign(decoded_float)] = np.inf
+            err_abs[np.sign(data_float) != np.sign(decoded_float)] = np.inf
             return err_abs
         case _:
             assert_never(type)
@@ -465,13 +454,13 @@ def _apply_finite_qoi_error_bound(
             np.copyto(
                 lower,
                 _nextafter(lower, qoi_float),
-                where=(lower_outside_eb & _isfinite(qoi_float)),
+                where=(lower_outside_eb & np.isfinite(qoi_float)),
                 casting="no",
             )
             np.copyto(
                 upper,
                 _nextafter(upper, qoi_float),
-                where=(upper_outside_eb & _isfinite(qoi_float)),
+                where=(upper_outside_eb & np.isfinite(qoi_float)),
                 casting="no",
             )
 
@@ -523,13 +512,13 @@ def _apply_finite_qoi_error_bound(
             np.copyto(
                 lower,
                 _nextafter(lower, qoi_float),
-                where=(lower_outside_eb & _isfinite(qoi_float)),
+                where=(lower_outside_eb & np.isfinite(qoi_float)),
                 casting="no",
             )
             np.copyto(
                 upper,
                 _nextafter(upper, qoi_float),
-                where=(upper_outside_eb & _isfinite(qoi_float)),
+                where=(upper_outside_eb & np.isfinite(qoi_float)),
                 casting="no",
             )
 

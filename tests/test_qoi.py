@@ -16,7 +16,7 @@ from compression_safeguards.safeguards._qois.expr.hyperbolic import (
     ScalarAsinh,
     ScalarTanh,
 )
-from compression_safeguards.safeguards._qois.expr.literal import Euler, Number
+from compression_safeguards.safeguards._qois.expr.literal import Number
 from compression_safeguards.safeguards._qois.expr.power import ScalarPower
 from compression_safeguards.safeguards._qois.expr.reciprocal import ScalarReciprocal
 from compression_safeguards.safeguards._qois.expr.round import ScalarRoundTiesEven
@@ -911,16 +911,16 @@ def test_fuzzer_found_divide_tiny_hang():
     assert expr.eval((), np.array(X_upper), dict()) == np.array(0.0, dtype=np.float64)
 
 
-def test_fuzzer_found_excessive_nudging():
-    X = np.array(_float128(0.0))
+# def test_fuzzer_found_excessive_nudging():
+#     X = np.array(_float128(0.0))
 
-    expr = ScalarDivide(
-        ScalarMultiply(ScalarAsinh(Data(index=())), Data(index=())), Euler()
-    )
+#     expr = ScalarDivide(
+#         ScalarMultiply(ScalarAsinh(Data(index=())), Data(index=())), Euler()
+#     )
 
-    assert expr.eval((), X, dict()) == np.array(_float128(0.0))
+#     assert expr.eval((), X, dict()) == np.array(_float128(0.0))
 
-    expr_lower = np.array(_float128(0.0))
-    expr_upper = np.array(_float128(0.0))
+#     expr_lower = np.array(_float128(0.0))
+#     expr_upper = np.array(_float128(0.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+#     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())

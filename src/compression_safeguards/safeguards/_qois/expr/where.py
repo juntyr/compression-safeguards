@@ -2,7 +2,12 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _broadcast_to, _maximum, _minimum, _where
+from ....utils._compat import (
+    _broadcast_to,
+    _maximum_zero_sign_sensitive,
+    _minimum_zero_sign_sensitive,
+    _where,
+)
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from .abc import Expr
@@ -77,8 +82,8 @@ class ScalarWhere(Expr[Expr, Expr, Expr]):
             # for simplicity, we assume that the condition must always be
             #  preserved exactly
             cl, cu = cond.compute_data_bounds(condv, condv, X, Xs, late_bound)
-            Xs_lower = _maximum(Xs_lower, cl)
-            Xs_upper = _minimum(Xs_upper, cu)
+            Xs_lower = _maximum_zero_sign_sensitive(Xs_lower, cl)
+            Xs_upper = _minimum_zero_sign_sensitive(Xs_upper, cu)
 
         if np.any(condvb_Ps) and a.has_data:
             # pass on the data bounds to a but only use its bounds on Xs if
@@ -92,8 +97,18 @@ class ScalarWhere(Expr[Expr, Expr, Expr]):
             )
 
             # combine the data bounds
-            np.copyto(Xs_lower, _maximum(Xs_lower, al), where=condvb_Ns, casting="no")
-            np.copyto(Xs_upper, _minimum(Xs_upper, au), where=condvb_Ns, casting="no")
+            np.copyto(
+                Xs_lower,
+                _maximum_zero_sign_sensitive(Xs_lower, al),
+                where=condvb_Ns,
+                casting="no",
+            )
+            np.copyto(
+                Xs_upper,
+                _minimum_zero_sign_sensitive(Xs_upper, au),
+                where=condvb_Ns,
+                casting="no",
+            )
 
         if (not np.all(condvb_Ps)) and b.has_data:
             # pass on the data bounds to b but only use its bounds on Xs if
@@ -107,8 +122,18 @@ class ScalarWhere(Expr[Expr, Expr, Expr]):
             )
 
             # combine the data bounds
-            np.copyto(Xs_lower, _maximum(Xs_lower, bl), where=~condvb_Ns, casting="no")
-            np.copyto(Xs_upper, _minimum(Xs_upper, bu), where=~condvb_Ns, casting="no")
+            np.copyto(
+                Xs_lower,
+                _maximum_zero_sign_sensitive(Xs_lower, bl),
+                where=~condvb_Ns,
+                casting="no",
+            )
+            np.copyto(
+                Xs_upper,
+                _minimum_zero_sign_sensitive(Xs_upper, bu),
+                where=~condvb_Ns,
+                casting="no",
+            )
 
         return Xs_lower, Xs_upper
 

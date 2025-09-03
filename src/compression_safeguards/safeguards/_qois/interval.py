@@ -1,12 +1,7 @@
 import numpy as np
 
-from ...utils._compat import _isfinite, _maximum, _minimum
-from ...utils.cast import (
-    from_float,
-    from_total_order,
-    to_float,
-    to_total_order,
-)
+from ...utils._compat import _maximum_zero_sign_sensitive, _minimum_zero_sign_sensitive
+from ...utils.cast import from_float, from_total_order, to_float, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import F, S, T
 
@@ -42,9 +37,15 @@ def compute_safe_data_lower_upper_interval_union(
 
     valid = Interval.empty_like(dataf).preserve_inf(dataf).preserve_finite(dataf)
 
-    Lower(_maximum(valid._lower, from_float(dataf_float_lower, dataf.dtype))) <= valid[
-        _isfinite(dataf)
-    ] <= Upper(_minimum(from_float(dataf_float_upper, dataf.dtype), valid._upper))
+    Lower(
+        _maximum_zero_sign_sensitive(
+            valid._lower, from_float(dataf_float_lower, dataf.dtype)
+        )
+    ) <= valid[np.isfinite(dataf)] <= Upper(
+        _minimum_zero_sign_sensitive(
+            from_float(dataf_float_upper, dataf.dtype), valid._upper
+        )
+    )
 
     # correct rounding errors in the lower and upper bound
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
@@ -56,7 +57,7 @@ def compute_safe_data_lower_upper_interval_union(
             to_total_order(valid._lower) + lower_outside_bound,
             data.dtype,
         )
-    ) <= valid[_isfinite(dataf)] <= Upper(
+    ) <= valid[np.isfinite(dataf)] <= Upper(
         from_total_order(
             to_total_order(valid._upper) - upper_outside_bound,
             data.dtype,

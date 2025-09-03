@@ -5,8 +5,8 @@ import numpy as np
 from ....utils._compat import (
     _floating_smallest_subnormal,
     _is_negative,
-    _maximum,
-    _minimum,
+    _maximum_zero_sign_sensitive,
+    _minimum_zero_sign_sensitive,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
@@ -55,7 +55,7 @@ class ScalarSqrt(Expr[Expr]):
         # this ensures that 1/sqrt(-0.0) doesn't become 1/sqrt(0.0)
         def _sqrt_inv(x: np.ndarray[Ps, np.dtype[F]]) -> np.ndarray[Ps, np.dtype[F]]:
             out: np.ndarray[Ps, np.dtype[F]] = np.array(
-                np.square(_maximum(X.dtype.type(0), x)), copy=None
+                np.square(_maximum_zero_sign_sensitive(X.dtype.type(0), x)), copy=None
             )
             np.copyto(out, x, where=(x == 0), casting="no")
             return out
@@ -75,12 +75,12 @@ class ScalarSqrt(Expr[Expr]):
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
-            _minimum(argv, _sqrt_inv(expr_lower)), copy=None
+            _minimum_zero_sign_sensitive(argv, _sqrt_inv(expr_lower)), copy=None
         )
         arg_lower[np.less(argv, 0)] = -np.inf
 
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
-            _maximum(argv, _sqrt_inv(expr_upper)), copy=None
+            _maximum_zero_sign_sensitive(argv, _sqrt_inv(expr_upper)), copy=None
         )
         arg_upper[np.less(argv, 0)] = -smallest_subnormal
 
@@ -160,7 +160,7 @@ class ScalarSquare(Expr[Expr]):
         exprv = np.square(argv)
 
         # apply the inverse function to get the bounds on arg
-        al = np.sqrt(_maximum(expr_lower, X.dtype.type(0)))
+        al = np.sqrt(_maximum_zero_sign_sensitive(expr_lower, X.dtype.type(0)))
         au = np.sqrt(expr_upper)
 
         # flip and swap the expr bounds to get the bounds on arg
@@ -177,7 +177,7 @@ class ScalarSquare(Expr[Expr]):
             where=(np.less_equal(expr_lower, 0) | _is_negative(argv)),
             casting="no",
         )
-        arg_lower = _minimum(argv, arg_lower)
+        arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
 
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(au, copy=True)
         np.copyto(
@@ -186,7 +186,7 @@ class ScalarSquare(Expr[Expr]):
             where=(np.greater(expr_lower, 0) & _is_negative(argv)),
             casting="no",
         )
-        arg_upper = _maximum(argv, arg_upper)
+        arg_upper = _maximum_zero_sign_sensitive(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")

@@ -4,7 +4,11 @@ from typing import Callable
 
 import numpy as np
 
-from ....utils._compat import _floating_smallest_subnormal, _maximum, _minimum
+from ....utils._compat import (
+    _floating_smallest_subnormal,
+    _maximum_zero_sign_sensitive,
+    _minimum_zero_sign_sensitive,
+)
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
 from .abc import Expr
@@ -72,13 +76,17 @@ class ScalarLog(Expr[Expr]):
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
-            _minimum(argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_lower)),
+            _minimum_zero_sign_sensitive(
+                argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_lower)
+            ),
             copy=None,
         )
         arg_lower[np.less(argv, 0)] = -np.inf
 
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
-            _maximum(argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_upper)),
+            _maximum_zero_sign_sensitive(
+                argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_upper)
+            ),
             copy=None,
         )
         arg_upper[np.less(argv, 0)] = -smallest_subnormal
@@ -180,13 +188,13 @@ class ScalarExp(Expr[Expr]):
         # exp(...) cannot be negative, so ensure the bounds on expr also cannot
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum(
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum_zero_sign_sensitive(
             argv,
             (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(
-                _maximum(X.dtype.type(0), expr_lower)
+                _maximum_zero_sign_sensitive(X.dtype.type(0), expr_lower)
             ),
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum(
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum_zero_sign_sensitive(
             argv, (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(expr_upper)
         )
 

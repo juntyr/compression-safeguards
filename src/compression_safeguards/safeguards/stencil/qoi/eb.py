@@ -9,13 +9,8 @@ from collections.abc import Sequence, Set
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
-from ....utils._compat import _isinf, _isnan
 from ....utils.bindings import Bindings, Parameter
-from ....utils.cast import (
-    lossless_cast,
-    saturating_finite_float_cast,
-    to_float,
-)
+from ....utils.cast import lossless_cast, saturating_finite_float_cast, to_float
 from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import F, S, T
 from ..._qois import StencilQuantityOfInterest
@@ -529,9 +524,11 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             finite_ok, copy=None
         )
         np.copyto(
-            windows_ok, qoi_data == qoi_decoded, where=_isinf(qoi_data), casting="no"
+            windows_ok, qoi_data == qoi_decoded, where=np.isinf(qoi_data), casting="no"
         )
-        np.copyto(windows_ok, _isnan(qoi_decoded), where=_isnan(qoi_data), casting="no")
+        np.copyto(
+            windows_ok, np.isnan(qoi_decoded), where=np.isnan(qoi_data), casting="no"
+        )
 
         s = [slice(None)] * data.ndim
         for axis in self._neighbourhood:

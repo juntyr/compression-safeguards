@@ -3,9 +3,13 @@ from collections.abc import Mapping
 from typing import Generic, final
 
 import numpy as np
-from typing_extensions import Self, Unpack, assert_never  # MSPV 3.11
+from typing_extensions import (
+    Self,  # MSPV 3.11
+    Unpack,  # MSPV 3.11
+    assert_never,  # MSPV 3.11
+)
 
-from ....utils._compat import _maximum, _minimum
+from ....utils._compat import _maximum_zero_sign_sensitive, _minimum_zero_sign_sensitive
 from ....utils.bindings import Parameter
 from ..bound import DataBounds, data_bounds_checks, guarantee_data_within_expr_bounds
 from .typing import Es, F, Ns, Ps, PsI
@@ -300,8 +304,8 @@ class Expr(Generic[Unpack[Es]]):
                 assert_never(data_bounds_checked)
 
         # ensure that the original data values are within the data bounds
-        Xs_lower = _minimum(Xs, Xs_lower)
-        Xs_upper = _maximum(Xs, Xs_upper)
+        Xs_lower = _minimum_zero_sign_sensitive(Xs, Xs_lower)
+        Xs_upper = _maximum_zero_sign_sensitive(Xs, Xs_upper)
 
         exprv = self.eval(X.shape, Xs, late_bound)
 
