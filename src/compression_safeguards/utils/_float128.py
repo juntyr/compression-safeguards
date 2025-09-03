@@ -38,8 +38,8 @@ except (AttributeError, AssertionError):
         _float128_dtype = numpy_quaddtype.SleefQuadPrecDType()
         _float128_min = -numpy_quaddtype.max_value
         _float128_max = numpy_quaddtype.max_value
-        _float128_smallest_normal = numpy_quaddtype.min_value
-        # taken from https://sleef.org/quad.xhtml
+        _float128_smallest_normal = numpy_quaddtype.smallest_normal
+        # FIXME: taken from https://sleef.org/quad.xhtml
         _float128_smallest_subnormal = _float128(2) ** (-16494)
         _float128_pi = numpy_quaddtype.pi
         _float128_e = numpy_quaddtype.e

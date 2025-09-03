@@ -2,7 +2,10 @@ import numpy as np
 
 from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
 from compression_safeguards.safeguards._qois.expr.addsub import ScalarSubtract
-from compression_safeguards.safeguards._qois.expr.classification import ScalarIsInf
+from compression_safeguards.safeguards._qois.expr.classification import (
+    ScalarIsInf,
+    ScalarIsNaN,
+)
 from compression_safeguards.safeguards._qois.expr.data import Data
 from compression_safeguards.safeguards._qois.expr.divmul import (
     ScalarDivide,
@@ -13,7 +16,7 @@ from compression_safeguards.safeguards._qois.expr.hyperbolic import (
     ScalarAsinh,
     ScalarTanh,
 )
-from compression_safeguards.safeguards._qois.expr.literal import Number
+from compression_safeguards.safeguards._qois.expr.literal import Euler, Number
 from compression_safeguards.safeguards._qois.expr.power import ScalarPower
 from compression_safeguards.safeguards._qois.expr.reciprocal import ScalarReciprocal
 from compression_safeguards.safeguards._qois.expr.round import ScalarRoundTiesEven
@@ -806,7 +809,7 @@ def test_fuzzer_found_inconsistent_where():
     X = np.array(_float128("-1.797693134862315708145274237317044e+308"))
 
     expr = ScalarWhere(
-        ScalarAcos(Data(index=())),
+        ScalarSubtract(Number.ONE, ScalarIsNaN(ScalarAcos(Data(index=())))),
         ScalarRoundTiesEven(Data(index=())),
         ScalarAtan(ScalarReciprocal(Data(index=()))),  # acot(x)
     )
@@ -848,8 +851,7 @@ def test_fuzzer_found_asinh_overflow():
     X = np.array(_float128("-4.237431194812790058760014731131757e+4778"))
 
     expr = ScalarAsinh(Data(index=()))
-
-    assert expr.eval((), X, dict()) == np.array(_float128("-inf"))
+    assert np.rint(expr.eval((), X, dict())) == np.array(_float128("-11004"))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -907,3 +909,18 @@ def test_fuzzer_found_divide_tiny_hang():
 
     assert expr.eval((), np.array(X_lower), dict()) == np.array(0.0, dtype=np.float64)
     assert expr.eval((), np.array(X_upper), dict()) == np.array(0.0, dtype=np.float64)
+
+
+def test_fuzzer_found_excessive_nudging():
+    X = np.array(_float128(0.0))
+
+    expr = ScalarDivide(
+        ScalarMultiply(ScalarAsinh(Data(index=())), Data(index=())), Euler()
+    )
+
+    assert expr.eval((), X, dict()) == np.array(_float128(0.0))
+
+    expr_lower = np.array(_float128(0.0))
+    expr_upper = np.array(_float128(0.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())

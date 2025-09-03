@@ -14,12 +14,6 @@ __all__ = [
     "_reciprocal",
     "_symmetric_modulo",
     "_rint",
-    "_sinh",
-    "_cosh",
-    "_tanh",
-    "_asinh",
-    "_acosh",
-    "_atanh",
     "_signbit_non_nan",
     "_minimum",
     "_maximum",
@@ -284,95 +278,6 @@ def _rint(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
     out: np.ndarray[S, np.dtype[F]] = np.array(np.rint(a), copy=None)
     np.copyto(out, np.floor(a), where=(a < halfway), casting="no")
     np.copyto(out, np.ceil(a), where=(a > halfway), casting="no")
-    return out
-
-
-# wrapper around np.sinh(a) that also works for numpy_quaddtype
-def _sinh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.sinh(a)  # type: ignore
-
-    # propagate sinh(-0.0) = -0.0
-    out: np.ndarray[S, np.dtype[F]] = np.array((np.exp(a) - np.exp(-a)) / 2, copy=None)
-    np.copyto(out, a, where=(out == a), casting="no")
-    return out
-
-
-# wrapper around np.cosh(a) that also works for numpy_quaddtype
-def _cosh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.cosh(a)  # type: ignore
-
-    return np.divide(np.add(np.exp(a), np.exp(-a)), 2)
-
-
-# wrapper around np.tanh(a) that also works for numpy_quaddtype
-def _tanh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.tanh(a)  # type: ignore
-
-    # explicitly set tanh(huge) = 1 where overflow to inf/inf = NaN might occur
-    # propagate tanh(-0.0) = -0.0
-    expa: np.ndarray[S, np.dtype[F]] = np.exp(a * 2)
-    out: np.ndarray[S, np.dtype[F]] = np.array(
-        np.divide(np.subtract(expa, 1), np.add(expa, 1)), copy=None
-    )
-    out[expa == np.inf] = 1
-    np.copyto(out, a, where=(out == a), casting="no")
-    return out
-
-
-# wrapper around np.asinh(a) that also works for numpy_quaddtype
-def _asinh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.asinh(a)  # type: ignore
-
-    # evaluate asinh(abs(a)) first since it overflows correctly in
-    #  sqrt(square(a)), then copy the sign of the input a
-    # propagate asinh(-0.0) = -0.0
-    out: np.ndarray[S, np.dtype[F]] = np.array(
-        np.log(np.abs(a) + np.sqrt(np.square(np.abs(a)) + 1)), copy=None
-    )
-    np.negative(out, out=out, where=(a < 0))
-    np.copyto(out, a, where=(out == a), casting="no")
-    return out
-
-
-# wrapper around np.acosh(a) that also works for numpy_quaddtype
-def _acosh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.acosh(a)  # type: ignore
-
-    # explicitly set acosh(<1) = NaN to avoid overflow in sqrt(square(a) - 1)
-    out: np.ndarray[S, np.dtype[F]] = np.array(
-        np.log(a + np.sqrt(np.square(a) - 1)), copy=None
-    )
-    out[a < 1] = np.nan
-    return out
-
-
-# wrapper around np.atanh(a) that also works for numpy_quaddtype
-def _atanh(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.atanh(a)  # type: ignore
-
-    # propagate atanh(-0.0) = -0.0
-    out: np.ndarray[S, np.dtype[F]] = np.array(
-        (np.log(1 + a) - np.log(1 - a)) / 2, copy=None
-    )
-    np.copyto(out, a, where=(out == a), casting="no")
     return out
 
 
