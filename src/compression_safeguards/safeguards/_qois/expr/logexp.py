@@ -18,7 +18,7 @@ class Logarithm(Enum):
     log10 = auto()
 
 
-class ScalarLog(Expr):
+class ScalarLog(Expr[Expr]):
     __slots__ = ("_log", "_a")
     _log: Logarithm
     _a: Expr
@@ -28,26 +28,11 @@ class ScalarLog(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarLog(
-            self._log,
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarLog":
+        return ScalarLog(self._log, a)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
@@ -145,7 +130,7 @@ class Exponential(Enum):
     exp10 = auto()
 
 
-class ScalarExp(Expr):
+class ScalarExp(Expr[Expr]):
     __slots__ = ("_exp", "_a")
     _exp: Exponential
     _a: Expr
@@ -155,26 +140,11 @@ class ScalarExp(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarExp(
-            self._exp,
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarExp":
+        return ScalarExp(self._exp, a)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
@@ -275,7 +245,7 @@ EXPONENTIAL_LOGARITHM_UFUNC: dict[Exponential, Callable[[np.ndarray], np.ndarray
 }
 
 
-class ScalarLogWithBase(Expr):
+class ScalarLogWithBase(Expr[Expr, Expr]):
     __slots__ = ("_a", "_b")
     _a: Expr
     _b: Expr
@@ -285,26 +255,11 @@ class ScalarLogWithBase(Expr):
         self._b = b
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data or self._b.has_data
+    def args(self) -> tuple[Expr, Expr]:
+        return (self._a, self._b)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices | self._b.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarLogWithBase(
-            self._a.apply_array_element_offset(axis, offset),
-            self._b.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants | self._b.late_bound_constants
+    def with_args(self, a: Expr, b: Expr) -> "ScalarLogWithBase":
+        return ScalarLogWithBase(a, b)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         from .divmul import ScalarDivide

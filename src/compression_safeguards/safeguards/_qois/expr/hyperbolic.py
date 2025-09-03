@@ -21,7 +21,7 @@ from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
 
 
-class ScalarSinh(Expr):
+class ScalarSinh(Expr[Expr]):
     __slots__ = ("_a",)
     _a: Expr
 
@@ -29,25 +29,11 @@ class ScalarSinh(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarSinh(
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarSinh":
+        return ScalarSinh(a)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
@@ -119,7 +105,7 @@ class ScalarSinh(Expr):
         return f"sinh({self._a!r})"
 
 
-class ScalarCosh(Expr):
+class ScalarCosh(Expr[Expr]):
     __slots__ = ("_a",)
     _a: Expr
 
@@ -127,25 +113,11 @@ class ScalarCosh(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarCosh(
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarCosh":
+        return ScalarCosh(a)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
@@ -240,7 +212,7 @@ class ScalarCosh(Expr):
         return f"cosh({self._a!r})"
 
 
-class ScalarTanh(Expr):
+class ScalarTanh(Expr[Expr]):
     __slots__ = ("_a",)
     _a: Expr
 
@@ -248,25 +220,11 @@ class ScalarTanh(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarTanh(
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarTanh":
+        return ScalarTanh(a)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
@@ -343,7 +301,7 @@ class ScalarTanh(Expr):
         return f"tanh({self._a!r})"
 
 
-class ScalarAsinh(Expr):
+class ScalarAsinh(Expr[Expr]):
     __slots__ = ("_a",)
     _a: Expr
 
@@ -351,25 +309,11 @@ class ScalarAsinh(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarAsinh(
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarAsinh":
+        return ScalarAsinh(a)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
@@ -441,7 +385,7 @@ class ScalarAsinh(Expr):
         return f"asinh({self._a!r})"
 
 
-class ScalarAcosh(Expr):
+class ScalarAcosh(Expr[Expr]):
     __slots__ = ("_a",)
     _a: Expr
 
@@ -449,25 +393,11 @@ class ScalarAcosh(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarAcosh(
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarAcosh":
+        return ScalarAcosh(a)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
@@ -549,7 +479,7 @@ class ScalarAcosh(Expr):
         return f"acosh({self._a!r})"
 
 
-class ScalarAtanh(Expr):
+class ScalarAtanh(Expr[Expr]):
     __slots__ = ("_a",)
     _a: Expr
 
@@ -557,25 +487,11 @@ class ScalarAtanh(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarAtanh(
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarAtanh":
+        return ScalarAtanh(a)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_unary(

@@ -17,25 +17,28 @@ class Data(Expr):
         self._index = index
 
     @property
+    def args(self) -> tuple[()]:
+        return ()
+
+    def with_args(self) -> "Data":
+        return Data(self._index)
+
+    @property  # type: ignore
     def has_data(self) -> bool:
         return True
 
-    @property
+    @property  # type: ignore
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return frozenset([self._index])
 
-    def apply_array_element_offset(
+    def apply_array_element_offset(  # type: ignore
         self,
         axis: int,
         offset: int,
-    ) -> Expr:
+    ) -> "Data":
         index = list(self._index)
         index[axis] += offset
         return Data(index=tuple(index))
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return frozenset()
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return self
@@ -93,23 +96,22 @@ class LateBoundConstant(Expr):
         return self._name
 
     @property
-    def has_data(self) -> bool:
-        return False
+    def args(self) -> tuple[()]:
+        return ()
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return frozenset()
+    def with_args(self) -> "LateBoundConstant":  # type: ignore
+        return LateBoundConstant(self._name, self._index)
 
-    def apply_array_element_offset(
+    def apply_array_element_offset(  # type: ignore
         self,
         axis: int,
         offset: int,
-    ) -> Expr:
+    ) -> "LateBoundConstant":
         index = list(self._index)
         index[axis] += offset
         return LateBoundConstant(self._name, index=tuple(index))
 
-    @property
+    @property  # type: ignore
     def late_bound_constants(self) -> frozenset[Parameter]:
         return frozenset([self.name])
 

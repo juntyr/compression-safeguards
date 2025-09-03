@@ -1,8 +1,9 @@
-__all__ = ["F", "Fi", "Ps", "PsI", "Ns", "Ci"]
+__all__ = ["F", "Fi", "Ps", "PsI", "Ns", "Ci", "Es"]
 
 from typing import Callable, TypeVar
 
 import numpy as np
+from typing_extensions import TypeVarTuple  # MSPV 3.11
 
 F = TypeVar("F", bound=np.floating, covariant=True)
 """ Any numpy [`floating`][numpy.floating] data type (covariant). """
@@ -21,3 +22,8 @@ Ns = TypeVar("Ns", bound=tuple[int, ...], covariant=True)
 
 Ci = TypeVar("Ci", bound=Callable)
 """ Any callable type (invariant). """
+
+# FIXME: actually bound the types to be Expr
+# https://discuss.python.org/t/how-to-use-typevartuple/67502
+Es = TypeVarTuple("Es")
+""" Tuple of [`Expr`][compression_safeguards.safeguards._qois.expr.abc.Expr]s. """

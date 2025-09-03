@@ -10,7 +10,7 @@ from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
 
 
-class ScalarSign(Expr):
+class ScalarSign(Expr[Expr]):
     __slots__ = ("_a",)
     _a: Expr
 
@@ -18,25 +18,11 @@ class ScalarSign(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarSign(
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarSign":
+        return ScalarSign(a)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_unary(

@@ -14,7 +14,7 @@ from .logexp import Exponential, Logarithm, ScalarExp, ScalarLog
 from .typing import F, Ns, Ps, PsI
 
 
-class ScalarPower(Expr):
+class ScalarPower(Expr[Expr, Expr]):
     __slots__ = ("_a", "_b")
     _a: Expr
     _b: Expr
@@ -29,26 +29,11 @@ class ScalarPower(Expr):
         return this
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data or self._b.has_data
+    def args(self) -> tuple[Expr, Expr]:
+        return (self._a, self._b)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices | self._b.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarPower(
-            self._a.apply_array_element_offset(axis, offset),
-            self._b.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants | self._b.late_bound_constants
+    def with_args(self, a: Expr, b: Expr) -> "ScalarPower":
+        return ScalarPower(a, b)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_binary(
@@ -130,7 +115,7 @@ class ScalarPower(Expr):
         return f"{self._a!r} ** {self._b!r}"
 
 
-class ScalarFakeAbs(Expr):
+class ScalarFakeAbs(Expr[Expr]):
     __slots__ = ("_a",)
     _a: Expr
 
@@ -138,25 +123,11 @@ class ScalarFakeAbs(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarFakeAbs(
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarFakeAbs":
+        return ScalarFakeAbs(a)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_unary(

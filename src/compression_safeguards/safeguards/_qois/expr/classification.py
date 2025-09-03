@@ -11,7 +11,7 @@ from .constfold import ScalarFoldedConstant
 from .typing import F, Fi, Ns, Ps, PsI
 
 
-class ScalarIsFinite(Expr):
+class ScalarIsFinite(Expr[Expr]):
     __slots__ = ("_a",)
     _a: Expr
 
@@ -19,23 +19,11 @@ class ScalarIsFinite(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarIsFinite(self._a.apply_array_element_offset(axis, offset))
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarIsFinite":
+        return ScalarIsFinite(a)
 
     def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
@@ -92,7 +80,7 @@ class ScalarIsFinite(Expr):
         return f"isfinite({self._a!r})"
 
 
-class ScalarIsInf(Expr):
+class ScalarIsInf(Expr[Expr]):
     __slots__ = ("_a",)
     _a: Expr
 
@@ -100,23 +88,11 @@ class ScalarIsInf(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarIsInf(self._a.apply_array_element_offset(axis, offset))
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarIsInf":
+        return ScalarIsInf(a)
 
     def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
@@ -173,7 +149,7 @@ class ScalarIsInf(Expr):
         return f"isinf({self._a!r})"
 
 
-class ScalarIsNaN(Expr):
+class ScalarIsNaN(Expr[Expr]):
     __slots__ = ("_a",)
     _a: Expr
 
@@ -181,23 +157,11 @@ class ScalarIsNaN(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarIsNaN(self._a.apply_array_element_offset(axis, offset))
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarIsNaN":
+        return ScalarIsNaN(a)
 
     def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | Expr:
         return ScalarFoldedConstant.constant_fold_unary(

@@ -16,7 +16,7 @@ from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
 
 
-class ScalarFloor(Expr):
+class ScalarFloor(Expr[Expr]):
     __slots__ = ("_a",)
     _a: Expr
 
@@ -24,25 +24,11 @@ class ScalarFloor(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarFloor(
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarFloor":
+        return ScalarFloor(a)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
@@ -105,7 +91,7 @@ class ScalarFloor(Expr):
         return f"floor({self._a!r})"
 
 
-class ScalarCeil(Expr):
+class ScalarCeil(Expr[Expr]):
     __slots__ = ("_a",)
     _a: Expr
 
@@ -113,25 +99,11 @@ class ScalarCeil(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarCeil(
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarCeil":
+        return ScalarCeil(a)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
@@ -194,7 +166,7 @@ class ScalarCeil(Expr):
         return f"ceil({self._a!r})"
 
 
-class ScalarTrunc(Expr):
+class ScalarTrunc(Expr[Expr]):
     __slots__ = ("_a",)
     _a: Expr
 
@@ -202,25 +174,11 @@ class ScalarTrunc(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarTrunc(
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarTrunc":
+        return ScalarTrunc(a)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
@@ -281,7 +239,7 @@ class ScalarTrunc(Expr):
         return f"trunc({self._a!r})"
 
 
-class ScalarRoundTiesEven(Expr):
+class ScalarRoundTiesEven(Expr[Expr]):
     __slots__ = ("_a",)
     _a: Expr
 
@@ -289,25 +247,11 @@ class ScalarRoundTiesEven(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarRoundTiesEven(
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarRoundTiesEven":
+        return ScalarRoundTiesEven(a)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_unary(

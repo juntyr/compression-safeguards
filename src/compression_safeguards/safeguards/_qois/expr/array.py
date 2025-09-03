@@ -12,15 +12,15 @@ from .constfold import ScalarFoldedConstant
 from .data import Data
 from .divmul import ScalarMultiply
 from .group import Group
-from .typing import F, Ns, Ps, PsI
+from .typing import Es, F, Ns, Ps, PsI
 
 # FIXME: actually bound the types to be Expr
 # https://discuss.python.org/t/how-to-use-typevartuple/67502
-Es = TypeVarTuple("Es")
+Es2 = TypeVarTuple("Es2")
 """ Tuple of [`Expr`][compression_safeguards.safeguards._qois.expr.abc.Expr]s. """
 
 
-class Array(Expr):
+class Array(Expr[Expr, Unpack[Es]]):
     __slots__ = ("_array",)
     _array: np.ndarray
 
@@ -51,33 +51,18 @@ class Array(Expr):
         return out
 
     @property
-    def has_data(self) -> bool:
-        return any(e.has_data for e in self._array.flat)
+    def args(self) -> tuple[Expr, Unpack[Es]]:
+        if self._array.ndim == 1:
+            return tuple(self._array)
+        return tuple(a for a in self._array)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        indices = set()
-        for e in self._array.flat:
-            indices.update(e.data_indices)
-        return frozenset(indices)
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return Array.map(lambda e: e.apply_array_element_offset(axis, offset), self)
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        late_bound = set()
-        for e in self._array.flat:
-            late_bound.update(e.late_bound_constants)
-        return frozenset(late_bound)
+    def with_args(self, el: Expr, *els: Unpack[Es]) -> "Array":
+        return Array(el, *els)  # type: ignore
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return Array.map(
-            lambda e: ScalarFoldedConstant.constant_fold_expr(e, dtype), self
+            lambda e: ScalarFoldedConstant.constant_fold_expr(e, dtype),  # type: ignore
+            self,
         )
 
     def eval(
@@ -103,7 +88,7 @@ class Array(Expr):
         return self._array.shape
 
     @staticmethod
-    def map(map: Callable[[Unpack[Es]], Expr], *exprs: Unpack[Es]) -> Expr:
+    def map(map: Callable[[Unpack[Es2]], Expr], *exprs: Unpack[Es2]) -> Expr:
         if not any(isinstance(e, Array) for e in exprs):
             return map(*exprs)
 

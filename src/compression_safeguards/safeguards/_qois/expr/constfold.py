@@ -17,23 +17,11 @@ class ScalarFoldedConstant(Expr):
         self._const = const[()] if isinstance(const, np.ndarray) else const  # type: ignore
 
     @property
-    def has_data(self) -> bool:
-        return False
+    def args(self) -> tuple[()]:
+        return ()
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return frozenset()
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return self
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return frozenset()
+    def with_args(self) -> "ScalarFoldedConstant":
+        return ScalarFoldedConstant(self._const)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         assert isinstance(self._const, dtype.type)

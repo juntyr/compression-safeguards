@@ -57,23 +57,11 @@ class Number(Expr):
         return expr
 
     @property
-    def has_data(self) -> bool:
-        return False
+    def args(self) -> tuple[()]:
+        return ()
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return frozenset()
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return self
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return frozenset()
+    def with_args(self) -> "Number":
+        return Number(self._n)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return dtype.type(self._n)
@@ -163,23 +151,11 @@ class Pi(Expr):
     __slots__ = ()
 
     @property
-    def has_data(self) -> bool:
-        return False
+    def args(self) -> tuple[()]:
+        return ()
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return frozenset()
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return self
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return frozenset()
+    def with_args(self) -> "Pi":
+        return Pi()
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return _pi(dtype)
@@ -211,23 +187,11 @@ class Euler(Expr):
     __slots__ = ()
 
     @property
-    def has_data(self) -> bool:
-        return False
+    def args(self) -> tuple[()]:
+        return ()
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return frozenset()
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return self
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return frozenset()
+    def with_args(self) -> "Euler":
+        return Euler()
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return _e(dtype)

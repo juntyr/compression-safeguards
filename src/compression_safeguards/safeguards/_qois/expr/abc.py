@@ -1,17 +1,17 @@
 from abc import abstractmethod
 from collections.abc import Mapping
-from typing import final
+from typing import Generic, final
 
 import numpy as np
-from typing_extensions import assert_never  # MSPV 3.11
+from typing_extensions import Self, Unpack, assert_never  # MSPV 3.11
 
 from ....utils._compat import _maximum, _minimum
 from ....utils.bindings import Parameter
 from ..bound import DataBounds, data_bounds_checks, guarantee_data_within_expr_bounds
-from .typing import F, Ns, Ps, PsI
+from .typing import Es, F, Ns, Ps, PsI
 
 
-class Expr:
+class Expr(Generic[Unpack[Es]]):
     """
     Abstract base class for the quantity of interest expression abstract syntax
     tree.
@@ -21,24 +21,80 @@ class Expr:
 
     @property
     @abstractmethod
+    def args(self) -> tuple[Unpack[Es]]:
+        """
+        The sub-expression arguments of this expression.
+        """
+
+    @abstractmethod
+    def with_args(self, *args: Unpack[Es]) -> Self:
+        """
+        Reconstruct this expression with different sub-expression arguments.
+        """
+
+    @final
+    @property
+    def expr_size(self) -> int:
+        """
+        The size of the expression tree, counting the number of nodes.
+        """
+
+        args: tuple[Expr, ...] = self.args  # type: ignore
+
+        return sum(a.expr_size for a in args) + 1
+
+    @final
+    @property
+    def data_expr_size(self) -> int:
+        """
+        The size of the expression tree, counting the number of data-dependent
+        nodes.
+        """
+
+        args: tuple[Expr, ...] = self.args  # type: ignore
+
+        if args == 0:
+            return int(self.has_data)
+
+        return sum(a.expr_size for a in args if a.has_data) + 1
+
+    @final
+    @property
     def has_data(self) -> bool:
         """
         Does this expression reference the data `x` or `X[i]`?
         """
 
+        args: tuple[Expr, ...] = self.args  # type: ignore
+
+        return any(a.has_data for a in args)
+
+    @final
     @property
-    @abstractmethod
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         """
         The set of data indices `X[is]` that this expression uses.
         """
 
-    @abstractmethod
+        args: tuple[Expr, ...] = self.args  # type: ignore
+
+        match args:
+            case ():
+                return frozenset()
+            case (a,):
+                return a.data_indices
+            case _:
+                indices: set[tuple[int, ...]] = set()
+                for a in args:
+                    indices.update(a.data_indices)
+                return frozenset(indices)
+
+    @final
     def apply_array_element_offset(
         self,
         axis: int,
         offset: int,
-    ) -> "Expr":
+    ) -> Self:
         """
         Apply an `offset` to the array element indices along the given `axis`.
 
@@ -57,13 +113,33 @@ class Expr:
             The modified expression.
         """
 
+        return self.with_args(
+            *(a.apply_array_element_offset(axis, offset) for a in self.args)  # type: ignore
+        )
+
+    @final
     @property
-    @abstractmethod
     def late_bound_constants(self) -> frozenset[Parameter]:
         """
         The set of late-bound constant parameters that this expression uses.
         """
 
+        args: tuple[Expr, ...] = self.args  # type: ignore
+
+        match args:
+            case ():
+                return frozenset()
+            case (a,):
+                return a.late_bound_constants
+            case _:
+                late_bound: set[Parameter] = set()
+                for a in args:
+                    late_bound.update(a.late_bound_constants)
+                return frozenset(late_bound)
+
+    # FIXME: constant_fold based on self.args and self.with_args is blocked on
+    #        not being able to relate on TypeVarTuple to another, here *Expr to
+    #        *F, see e.g. https://github.com/python/typing/issues/1216
     @abstractmethod
     def constant_fold(self, dtype: np.dtype[F]) -> F | "Expr":
         """

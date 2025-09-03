@@ -9,7 +9,7 @@ from .literal import Number
 from .typing import F, Ns, Ps, PsI
 
 
-class Group(Expr):
+class Group(Expr[Expr]):
     __slots__ = ("_expr",)
     _expr: Expr
 
@@ -21,23 +21,11 @@ class Group(Expr):
         return this
 
     @property
-    def has_data(self) -> bool:
-        return self._expr.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._expr,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._expr.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return Group(self._expr.apply_array_element_offset(axis, offset))
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._expr.late_bound_constants
+    def with_args(self, expr: Expr) -> "Group":
+        return Group(expr)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | "Expr":
         fexpr = self._expr.constant_fold(dtype)

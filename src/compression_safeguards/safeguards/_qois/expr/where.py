@@ -10,7 +10,7 @@ from .constfold import ScalarFoldedConstant
 from .typing import F, Fi, Ns, Ps, PsI
 
 
-class ScalarWhere(Expr):
+class ScalarWhere(Expr[Expr, Expr, Expr]):
     __slots__ = ("_condition", "_a", "_b")
     _condition: Expr
     _a: Expr
@@ -22,33 +22,11 @@ class ScalarWhere(Expr):
         self._b = b
 
     @property
-    def has_data(self) -> bool:
-        return self._condition.has_data or self._a.has_data or self._b.has_data
+    def args(self) -> tuple[Expr, Expr, Expr]:
+        return (self._condition, self._a, self._b)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return (
-            self._condition.data_indices | self._a.data_indices | self._b.data_indices
-        )
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarWhere(
-            self._condition.apply_array_element_offset(axis, offset),
-            self._a.apply_array_element_offset(axis, offset),
-            self._b.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return (
-            self._condition.late_bound_constants
-            | self._a.late_bound_constants
-            | self._b.late_bound_constants
-        )
+    def with_args(self, condition: Expr, a: Expr, b: Expr) -> "ScalarWhere":
+        return ScalarWhere(condition, a, b)
 
     def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | Expr:
         return ScalarFoldedConstant.constant_fold_ternary(
