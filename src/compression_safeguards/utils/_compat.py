@@ -317,14 +317,14 @@ def _is_negative(
     a: np.ndarray[S, np.dtype[F]],
 ) -> np.ndarray[S, np.dtype[np.bool]]:
     # check not just for a < 0 but also for a == -0.0
-    return np.less_equal(a, 0) & (np.copysign(a, 1) == -1)
+    return np.less_equal(a, 0) & (np.copysign(1, a) == -1)
 
 
 # check for x == -0.0
 def _is_negative_zero(
     a: np.ndarray[S, np.dtype[F]],
 ) -> np.ndarray[S, np.dtype[np.bool]]:
-    return (a == 0) & (np.copysign(a, 1) == -1)
+    return (a == 0) & (np.copysign(1, a) == -1)
 
 
 # wrapper around a > 0 that also works for -0.0 (is not positive)
@@ -332,14 +332,14 @@ def _is_positive(
     a: np.ndarray[S, np.dtype[F]],
 ) -> np.ndarray[S, np.dtype[np.bool]]:
     # check not just for a > 0 but also for a == +0.0
-    return np.greater_equal(a, 0) & (np.copysign(a, 1) == +1)
+    return np.greater_equal(a, 0) & (np.copysign(1, a) == +1)
 
 
 # check for x == +0.0
 def _is_positive_zero(
     a: np.ndarray[S, np.dtype[F]],
 ) -> np.ndarray[S, np.dtype[np.bool]]:
-    return (a == 0) & (np.copysign(a, 1) == +1)
+    return (a == 0) & (np.copysign(1, a) == +1)
 
 
 # wrapper around np.finfo(dtype).max that also works for numpy_quaddtype

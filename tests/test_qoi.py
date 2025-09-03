@@ -924,3 +924,15 @@ def test_fuzzer_found_divide_tiny_hang():
 #     expr_upper = np.array(_float128(0.0))
 
 #     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+
+
+# ===
+
+# dtype = dtype('float16')
+# X = array(0., dtype=float16)
+# expr = log10(x) ** e
+# exprv = np.float16(inf)
+# expr_lower = array(0., dtype=float16)
+# expr_upper = array(inf, dtype=float16)
+
+# ===
