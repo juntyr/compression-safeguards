@@ -250,7 +250,7 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
     > Use the `eb` safeguard and configure it with the `type` and range of the error bound.
 
-- ... a pointwise normalised or range-relative absolute error bound?
+- ... a pointwise normalised (NOA) or range-relative absolute error bound?
 
     > Use the `eb` safeguard for an absolute error bound but provide a late-bound parameter for the bound value. Since the data range is tightly tied to the data itself, it makes sense to only fill in the actual when applying the safeguards to the actual data. You can either compute the range yourself and then provide it as a `late_bound` binding when computing the safeguard corrections. Alternatively, you can also use the `qoi_eb_pw` safeguard with the `'(x - c["$x_min"]) / (c["$x_max"] - c["$x_min"])'` QoI. Note that we are using the late-bound constants `c["$x_min"]` and `c["$x_max"]` for the data minimum and maximum, which are automatically provided by `numcodecs-safeguards`.
 

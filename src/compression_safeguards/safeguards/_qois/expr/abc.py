@@ -1,6 +1,6 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from typing import Generic, final
+from typing import Callable, Generic, final
 
 import numpy as np
 from typing_extensions import (
@@ -15,7 +15,7 @@ from ..bound import DataBounds, data_bounds_checks, guarantee_data_within_expr_b
 from .typing import Es, F, Ns, Ps, PsI
 
 
-class Expr(Generic[Unpack[Es]]):
+class Expr(ABC, Generic[Unpack[Es]]):
     """
     Abstract base class for the quantity of interest expression abstract syntax
     tree.
@@ -34,7 +34,42 @@ class Expr(Generic[Unpack[Es]]):
     def with_args(self, *args: Unpack[Es]) -> Self:
         """
         Reconstruct this expression with different sub-expression arguments.
+
+        Parameters
+        ----------
+        *args : Unpack[Es]
+            The modified sub-expression arguments, derived from
+            [`self.args`][compression_safeguards.safeguards._qois.expr.abc.Expr.abc].
+
+        Returns
+        -------
+        expr : Self
+            The modified expression.
         """
+
+    @final
+    def map_expr(self, m: "Callable[[Expr], Expr]") -> "Expr":
+        """
+        Recursively maps the expression mapping function `m` over this
+        expression and its sub-expression arguments.
+
+        Parameters
+        ----------
+        m : Callable[[Expr], Expr]
+            The expression mapper, which is applied to an expression whose
+            sub-expression arguments have already been mapped, i.e. the mapper
+            is *not* responsible for recursion.
+
+        Returns
+        -------
+        expr : Self
+            The mapped expression.
+        """
+
+        args: tuple[Expr, ...] = self.args  # type: ignore
+        mapped_args: tuple[Expr, ...] = tuple(a.map_expr(m) for a in args)
+        mapped_self: Self = self.with_args(*mapped_args)  # type: ignore
+        return m(mapped_self)
 
     @final
     @property
