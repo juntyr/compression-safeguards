@@ -131,12 +131,12 @@ class Number(Expr):
 
     @staticmethod
     def symbolic_fold_binary(
-        left: Expr, right: Expr, m: Callable[[int, int], int]
+        a: Expr, b: Expr, m: Callable[[int, int], int]
     ) -> None | Expr:
-        if not isinstance(left, Number) or not isinstance(right, Number):
+        if not isinstance(a, Number) or not isinstance(b, Number):
             return None
-        ai = left.as_int()
-        bi = right.as_int()
+        ai = a.as_int()
+        bi = b.as_int()
         if (ai is None) or (bi is None):
             return None
         return Number.from_symbolic_int(m(ai, bi))

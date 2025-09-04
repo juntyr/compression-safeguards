@@ -1,4 +1,3 @@
-import operator
 from collections.abc import Mapping
 
 import numpy as np
@@ -25,9 +24,13 @@ class ScalarPower(Expr[Expr, Expr]):
     _b: Expr
 
     def __new__(cls, a: Expr, b: Expr):
-        ab = Number.symbolic_fold_binary(a, b, operator.pow)
-        if ab is not None:
-            return ab
+        if isinstance(a, Number) and isinstance(b, Number):
+            # symbolical constant propagation for int ** int
+            # where the exponent is non-negative and the result thus is an int
+            ai, bi = a.as_int(), b.as_int()
+            if (ai is not None) and (bi is not None):
+                if bi >= 0:
+                    return Number.from_symbolic_int(ai**bi)
         this = super(ScalarPower, cls).__new__(cls)
         this._a = a
         this._b = b

@@ -944,3 +944,27 @@ def test_fuzzer_found_excessive_nudging_log_power():
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
     assert X_lower == np.array(0.0, dtype=np.float16)
     assert X_upper == np.array(0.0, dtype=np.float16)
+
+
+def test_fuzzer_found_negative_power_symbolic_const_propagation():
+    a = ScalarPower(Number("2"), Number("2"))
+    assert isinstance(a, Number)
+    assert a.as_int() == 4
+
+    a = ScalarPower(Number("-2"), Number("3"))
+    assert isinstance(a, Number)
+    assert a.as_int() == -8
+
+    a = ScalarPower(Number("-5"), Number("0"))
+    assert isinstance(a, Number)
+    assert a.as_int() == 1
+
+    a = ScalarPower(Number("0"), Number("0"))
+    assert isinstance(a, Number)
+    assert a.as_int() == 1
+
+    a = ScalarPower(Number("-5"), Number("-1"))
+    assert isinstance(a, ScalarPower)
+
+    a = ScalarPower(Number("0"), Number("-1"))
+    assert isinstance(a, ScalarPower)
