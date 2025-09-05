@@ -15,7 +15,7 @@ from .constfold import ScalarFoldedConstant
 from .divmul import ScalarMultiply
 from .literal import Number
 from .logexp import Exponential, Logarithm, ScalarExp, ScalarLog
-from .typing import F, Ns, Ps, PsI
+from .typing import F, Fi, Ns, Ps, PsI
 
 
 class ScalarPower(Expr[Expr, Expr]):
@@ -74,14 +74,32 @@ class ScalarPower(Expr[Expr, Expr]):
 
         # TODO: handle a^const and const^b more efficiently
 
+        # we need to full-force-force a and b to stay the same when
+        #  (a) av is negative: powers of negative numbers are just too tricky
+        #  (b) av is NaN and bv is zero: NaN ** 0 = 1 ... why???
+        force_same: np.ndarray[Ps, np.dtype[np.bool]] = _is_negative(av)
+        force_same |= np.isnan(av) & (bv == 0)
+
         # rewrite a ** b as fake_abs(e^(b*ln(fake_abs(a))))
         # this is mathematically incorrect for a <= 0 but works for deriving
         #  error bounds since fake_abs handles the error bound flips
         rewritten = ScalarExp(
             Exponential.exp,
-            ScalarMultiply(self._b, ScalarLog(Logarithm.ln, ScalarFakeAbs(self._a))),
+            ScalarMultiply(
+                ForceEquivalent(self._b, force_same),
+                ScalarLog(
+                    Logarithm.ln,
+                    ScalarFakeAbs(
+                        ForceEquivalent(self._a, force_same),
+                    ),
+                ),
+            ),
         )
         exprv_rewritten = rewritten.eval(X.shape, Xs, late_bound)
+
+        # we also need to full-force-force a and b to stay the same when
+        #  (c) isnan(exprv) != isnan(exprv_rewritten): bail out
+        force_same |= np.isnan(exprv) != np.isnan(exprv_rewritten)
 
         # inlined outer ScalarFakeAbs
         # flip the lower/upper bounds if the result is negative
@@ -91,31 +109,15 @@ class ScalarPower(Expr[Expr, Expr]):
             _where(_is_negative(exprv), -expr_lower, expr_upper),
         )
 
-        # powers of negative numbers are just too tricky since they easily
-        #  become NaN, so let's enforce bounds that only contain the original
-        #  expression value, but evaluated for the rewritten expression
-        np.copyto(expr_lower, exprv_rewritten, where=_is_negative(av), casting="no")
-        np.copyto(expr_upper, exprv_rewritten, where=_is_negative(av), casting="no")
-
         # ensure that the bounds at least contain the rewritten expression
         #  result
         expr_lower = _minimum_zero_sign_sensitive(expr_lower, exprv_rewritten)
         expr_upper = _maximum_zero_sign_sensitive(expr_upper, exprv_rewritten)
 
-        # bail out and just use the rewritten expression result as an exact
-        #  bound in case isnan was changed by the rewrite
-        np.copyto(
-            expr_lower,
-            exprv_rewritten,
-            where=(np.isnan(exprv) != np.isnan(exprv_rewritten)),
-            casting="no",
-        )
-        np.copyto(
-            expr_upper,
-            exprv_rewritten,
-            where=(np.isnan(exprv) != np.isnan(exprv_rewritten)),
-            casting="no",
-        )
+        # enforce bounds that only contain the rewritten expression value when
+        #  we also force a and b to stay the same
+        np.copyto(expr_lower, exprv_rewritten, where=force_same, casting="no")
+        np.copyto(expr_upper, exprv_rewritten, where=force_same, casting="no")
 
         return rewritten.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 
@@ -180,3 +182,64 @@ class ScalarFakeAbs(Expr[Expr]):
 
     def __repr__(self) -> str:
         return f"fake_abs({self._a!r})"
+
+
+class ForceEquivalent(Expr[Expr]):
+    __slots__ = ("_a", "_force")
+    _a: Expr
+    _force: np.ndarray[tuple[int, ...], np.dtype[np.bool]]
+
+    def __init__(self, a: Expr, force: np.ndarray[tuple[int, ...], np.dtype[np.bool]]):
+        self._a = a
+        self._force = force
+
+    @property
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
+
+    def with_args(self, a: Expr) -> "ForceEquivalent":
+        return ForceEquivalent(a, self._force)
+
+    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | Expr:
+        return ScalarFoldedConstant.constant_fold_unary(
+            self._a, dtype, lambda x: x, lambda a: ForceEquivalent(a, self._force)
+        )
+
+    def eval(
+        self,
+        x: PsI,
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> np.ndarray[PsI, np.dtype[F]]:
+        return self._a.eval(x, Xs, late_bound)
+
+    @checked_data_bounds
+    def compute_data_bounds_unchecked(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        # evaluate arg
+        arg = self._a
+        argv = arg.eval(X.shape, Xs, late_bound)
+
+        # force the argument bounds if requested
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(expr_lower, copy=True)
+        np.copyto(arg_lower, argv, where=self._force, casting="no")
+
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(expr_upper, copy=True)
+        np.copyto(arg_upper, argv, where=self._force, casting="no")
+
+        return arg.compute_data_bounds(
+            arg_lower,
+            arg_upper,
+            X,
+            Xs,
+            late_bound,
+        )
+
+    def __repr__(self) -> str:
+        return f"force_equivalent({self._a!r})"

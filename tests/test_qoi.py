@@ -968,3 +968,25 @@ def test_fuzzer_found_negative_power_symbolic_const_propagation():
 
     a = ScalarPower(Number("0"), Number("-1"))
     assert isinstance(a, ScalarPower)
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_nan_power_zero():
+    X = np.array(_float128("1.65e-4963"))
+
+    expr = ScalarPower(
+        Number("nan"),
+        ScalarRoundTiesEven(Data(index=())),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(_float128(1.0))
+
+    expr_lower = np.array(_float128(0.0))
+    expr_upper = np.array(_float128(1.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(_float128(0.0))
+    assert X_upper == np.array(_float128(0.5))
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(_float128(1.0))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(_float128(1.0))
