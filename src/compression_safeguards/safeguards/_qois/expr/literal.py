@@ -5,12 +5,8 @@ from warnings import warn
 
 import numpy as np
 
+from ....utils._compat import _broadcast_to, _e, _pi
 from ....utils.bindings import Parameter
-from ....utils.cast import (
-    _float128_dtype,
-    _float128_e,
-    _float128_pi,
-)
 from .abc import Expr
 from .typing import F, Ns, Ps, PsI
 
@@ -61,23 +57,11 @@ class Number(Expr):
         return expr
 
     @property
-    def has_data(self) -> bool:
-        return False
+    def args(self) -> tuple[()]:
+        return ()
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return frozenset()
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return self
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return frozenset()
+    def with_args(self) -> "Number":
+        return Number(self._n)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return dtype.type(self._n)
@@ -89,20 +73,25 @@ class Number(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
         n: F = Xs.dtype.type(self._n)
-        return np.broadcast_to(n, x)  # type: ignore
+        return _broadcast_to(n, x)
 
-    def compute_data_error_bound_unchecked(
+    def compute_data_bounds_unchecked(
         self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
         X: np.ndarray[Ps, np.dtype[F]],
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        assert False, "number literals have no error bounds"
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        assert False, "number literals have no data bounds"
 
     def as_int(self) -> None | int:
-        if ("." in self._n) or ("e" in self._n):
+        if (
+            ("." in self._n)
+            or ("e" in self._n)
+            or ("inf" in self._n)
+            or ("nan" in self._n)
+        ):
             return None
         try:
             return int(self._n)
@@ -142,12 +131,12 @@ class Number(Expr):
 
     @staticmethod
     def symbolic_fold_binary(
-        left: Expr, right: Expr, m: Callable[[int, int], int]
+        a: Expr, b: Expr, m: Callable[[int, int], int]
     ) -> None | Expr:
-        if not isinstance(left, Number) or not isinstance(right, Number):
+        if not isinstance(a, Number) or not isinstance(b, Number):
             return None
-        ai = left.as_int()
-        bi = right.as_int()
+        ai = a.as_int()
+        bi = b.as_int()
         if (ai is None) or (bi is None):
             return None
         return Number.from_symbolic_int(m(ai, bi))
@@ -162,28 +151,14 @@ class Pi(Expr):
     __slots__ = ()
 
     @property
-    def has_data(self) -> bool:
-        return False
+    def args(self) -> tuple[()]:
+        return ()
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return frozenset()
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return self
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return frozenset()
+    def with_args(self) -> "Pi":
+        return Pi()
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        if dtype == _float128_dtype:
-            return _float128_pi  # type: ignore
-        return dtype.type(np.pi)
+        return _pi(dtype)
 
     def eval(
         self,
@@ -191,18 +166,18 @@ class Pi(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
-        pi: F = _float128_pi if Xs.dtype == _float128_dtype else Xs.dtype.type(np.pi)  # type: ignore
-        return np.broadcast_to(pi, x)  # type: ignore
+        pi: F = _pi(Xs.dtype)
+        return _broadcast_to(pi, x)
 
-    def compute_data_error_bound_unchecked(
+    def compute_data_bounds_unchecked(
         self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
         X: np.ndarray[Ps, np.dtype[F]],
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        assert False, "pi has no error bounds"
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        assert False, "pi has no data bounds"
 
     def __repr__(self) -> str:
         return "pi"
@@ -212,28 +187,14 @@ class Euler(Expr):
     __slots__ = ()
 
     @property
-    def has_data(self) -> bool:
-        return False
+    def args(self) -> tuple[()]:
+        return ()
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return frozenset()
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return self
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return frozenset()
+    def with_args(self) -> "Euler":
+        return Euler()
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        if dtype == _float128_dtype:
-            return _float128_e  # type: ignore
-        return dtype.type(np.e)
+        return _e(dtype)
 
     def eval(
         self,
@@ -241,18 +202,18 @@ class Euler(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
-        e: F = _float128_e if Xs.dtype == _float128_dtype else Xs.dtype.type(np.e)  # type: ignore
-        return np.broadcast_to(e, x)  # type: ignore
+        e: F = _e(Xs.dtype)
+        return _broadcast_to(e, x)
 
-    def compute_data_error_bound_unchecked(
+    def compute_data_bounds_unchecked(
         self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
         X: np.ndarray[Ps, np.dtype[F]],
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        assert False, "Euler's e has no error bounds"
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        assert False, "Euler's e has no data bounds"
 
     def __repr__(self) -> str:
         return "e"

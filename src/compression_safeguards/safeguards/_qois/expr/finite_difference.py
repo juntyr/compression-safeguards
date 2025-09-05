@@ -5,8 +5,8 @@ from typing import Callable
 import numpy as np
 from typing_extensions import assert_never  # MSPV 3.11
 
+from ....utils._compat import _symmetric_modulo
 from ....utils.bindings import Parameter
-from ....utils.cast import _symmetric_modulo
 from .abc import Expr
 from .addsub import ScalarSubtract
 from .constfold import ScalarFoldedConstant
@@ -14,10 +14,10 @@ from .divmul import ScalarDivide, ScalarMultiply
 from .group import Group
 from .literal import Number
 from .neg import ScalarNegate
-from .typing import F, Ns, Ps, PsI
+from .typing import F, Fi, Ns, Ps, PsI
 
 
-class ScalarSymmetricModulo(Expr):
+class ScalarSymmetricModulo(Expr[Expr, Expr]):
     __slots__ = ("_a", "_b")
     _a: Expr
     _b: Expr
@@ -27,28 +27,13 @@ class ScalarSymmetricModulo(Expr):
         self._b = b
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data or self._b.has_data
+    def args(self) -> tuple[Expr, Expr]:
+        return (self._a, self._b)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices | self._b.data_indices
+    def with_args(self, a: Expr, b: Expr) -> "ScalarSymmetricModulo":
+        return ScalarSymmetricModulo(a, b)
 
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarSymmetricModulo(
-            self._a.apply_array_element_offset(axis, offset),
-            self._b.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants | self._b.late_bound_constants
-
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:  # type: ignore
+    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | Expr:
         return ScalarFoldedConstant.constant_fold_binary(
             self._a,
             self._b,
@@ -67,15 +52,15 @@ class ScalarSymmetricModulo(Expr):
             self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound)
         )
 
-    def compute_data_error_bound_unchecked(
+    def compute_data_bounds_unchecked(
         self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
         X: np.ndarray[Ps, np.dtype[F]],
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        assert False, "cannot compute the error bounds for symmetric_modulo"
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        assert False, "cannot compute the data bounds for symmetric_modulo"
 
     def __repr__(self) -> str:
         return f"symmetric_modulo({self._a!r}, {self._b!r})"

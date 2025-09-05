@@ -10,22 +10,11 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
 from ....utils.bindings import Bindings, Parameter
-from ....utils.cast import (
-    _isfinite,
-    _isinf,
-    _isnan,
-    _nan_to_zero,
-    _nan_to_zero_inf_to_finite,
-    _nextafter,
-    as_bits,
-    lossless_cast,
-    saturating_finite_float_cast,
-    to_float,
-)
+from ....utils.cast import lossless_cast, saturating_finite_float_cast, to_float
 from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import F, S, T
 from ..._qois import StencilQuantityOfInterest
-from ..._qois.interval import compute_safe_eb_lower_upper_interval_union
+from ..._qois.interval import compute_safe_data_lower_upper_interval_union
 from ...eb import (
     ErrorBound,
     _apply_finite_qoi_error_bound,
@@ -531,20 +520,15 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             self._type, qoi_data, qoi_decoded
         ) <= _compute_finite_absolute_error_bound(self._type, eb, qoi_data)
 
-        same_bits = as_bits(qoi_data, kind="V") == as_bits(qoi_decoded, kind="V")
-        both_nan = _isnan(qoi_data) & _isnan(qoi_decoded)
-
-        windows_ok = np.where(
-            _isfinite(qoi_data),
-            finite_ok,
-            np.where(
-                _isinf(qoi_data),
-                same_bits,
-                both_nan,
-            ),
+        windows_ok: np.ndarray[tuple[int, ...], np.dtype[np.bool]] = np.array(
+            finite_ok, copy=None
         )
-
-        ok = np.ones_like(data, dtype=np.bool)
+        np.copyto(
+            windows_ok, qoi_data == qoi_decoded, where=np.isinf(qoi_data), casting="no"
+        )
+        np.copyto(
+            windows_ok, np.isnan(qoi_decoded), where=np.isnan(qoi_data), casting="no"
+        )
 
         s = [slice(None)] * data.ndim
         for axis in self._neighbourhood:
@@ -553,10 +537,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 end = None if axis.after == 0 else -axis.after
                 s[axis.axis] = slice(start, end)
 
-        ok = np.ones_like(data, dtype=np.bool)
+        ok: np.ndarray[S, np.dtype[np.bool]] = np.ones_like(data, dtype=np.bool)  # type: ignore
         ok[tuple(s)] = windows_ok
 
-        return ok  # type: ignore
+        return ok
 
     def compute_safe_intervals(
         self,
@@ -693,59 +677,15 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         )
         qoi_lower, qoi_upper = qoi_lower_upper
 
-        # ensure the error bounds are representable in QoI space
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            # compute the adjusted error bound
-            eb_qoi_lower = _nan_to_zero(qoi_lower - data_qoi)
-            eb_qoi_upper = _nan_to_zero(qoi_upper - data_qoi)
-
-            # check if they're representable within the error bound
-            eb_qoi_lower_outside = (data_qoi + eb_qoi_lower) < qoi_lower
-            eb_qoi_upper_outside = (data_qoi + eb_qoi_upper) > qoi_upper
-
-            # otherwise nudge the error-bound adjusted QoIs
-            # we can nudge with nextafter since the QoIs are floating point
-            eb_qoi_lower = np.where(
-                eb_qoi_lower_outside & _isfinite(qoi_lower),
-                _nextafter(eb_qoi_lower, 0),
-                eb_qoi_lower,
+        # compute the bounds in data space
+        data_windows_float_lower, data_windows_float_upper = (
+            self._qoi_expr.compute_data_bounds(
+                qoi_lower,
+                qoi_upper,
+                data_windows_float,
+                late_bound_constants,
             )
-            eb_qoi_upper = np.where(
-                eb_qoi_upper_outside & _isfinite(qoi_upper),
-                _nextafter(eb_qoi_upper, 0),
-                eb_qoi_upper,
-            )
-
-        # check that the adjusted error bounds fulfil all requirements
-        assert eb_qoi_lower.ndim == data.ndim
-        assert eb_qoi_lower.dtype == data_windows_float.dtype
-        assert eb_qoi_upper.ndim == data.ndim
-        assert eb_qoi_upper.dtype == data_windows_float.dtype
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            assert np.all(
-                (eb_qoi_lower <= 0)
-                & (((data_qoi + eb_qoi_lower) >= qoi_lower) | ~_isfinite(data_qoi))
-                & _isfinite(eb_qoi_lower)
-            )
-            assert np.all(
-                (eb_qoi_upper >= 0)
-                & (((data_qoi + eb_qoi_upper) <= qoi_upper) | ~_isfinite(data_qoi))
-                & _isfinite(eb_qoi_upper)
-            )
-
-        # compute the error bound in data space
-        eb_x_lower, eb_x_upper = self._qoi_expr.compute_data_error_bound(
-            eb_qoi_lower,
-            eb_qoi_upper,
-            data_windows_float,
-            late_bound_constants,
         )
-        assert np.all((eb_x_lower <= 0) & _isfinite(eb_x_lower))
-        assert np.all((eb_x_upper >= 0) & _isfinite(eb_x_upper))
 
         # compute how the data indices are distributed into windows
         # i.e. for each QoI element, which data does it depend on
@@ -775,7 +715,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         # i.e. for each data element, which QoI elements does it contribute to
         #      and thus which error bounds affect it
         reverse_indices_windows = np.full(
-            (data.size, np.sum(window_used)), indices_windows.shape[0]
+            (data.size, np.sum(window_used)), indices_windows.size
         )
         reverse_indices_counter = np.zeros(data.size, dtype=int)
         for i, u in enumerate(window_used.flat):
@@ -792,47 +732,46 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     if reverse_indices_counter[idx] >= reverse_indices_windows.shape[1]:
                         new_reverse_indices_windows = np.full(
                             (data.size, reverse_indices_windows.shape[1] * 2),
-                            indices_windows.shape[0],
+                            indices_windows.size,
                         )
                         new_reverse_indices_windows[
                             :, : reverse_indices_windows.shape[1]
                         ] = reverse_indices_windows
                         reverse_indices_windows = new_reverse_indices_windows
                     # update the reverse mapping
-                    reverse_indices_windows[idx][reverse_indices_counter[idx]] = j
+                    reverse_indices_windows[idx][reverse_indices_counter[idx]] = (
+                        j * window_used.size
+                    ) + i
                     reverse_indices_counter[idx] += 1
 
         data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
 
-        # flatten the QoI error bounds and append an infinite value,
+        # flatten the QoI data bounds and append an infinite value,
         # which is indexed if an element did not contribute to the maximum
         # number of windows
         with np.errstate(invalid="ignore"):
-            eb_x_lower_flat = np.full(eb_x_lower.size + 1, -np.inf, data_float.dtype)
-            eb_x_lower_flat[:-1] = eb_x_lower.flatten()
-            eb_x_upper_flat = np.full(eb_x_upper.size + 1, np.inf, data_float.dtype)
-            eb_x_upper_flat[:-1] = eb_x_upper.flatten()
+            data_windows_float_lower_flat = np.full(
+                data_windows_float_lower.size + 1, -np.inf, data_float.dtype
+            )
+            data_windows_float_lower_flat[:-1] = data_windows_float_lower.flatten()
+            data_windows_float_upper_flat = np.full(
+                data_windows_float_upper.size + 1, np.inf, data_float.dtype
+            )
+            data_windows_float_upper_flat[:-1] = data_windows_float_upper.flatten()
 
-        # for each data element, reduce over the error bounds that affect it
-        # since some data elements may have no error bounds that affect them,
+        # for each data element, reduce over the data bounds that affect it
+        # since some data elements may have no data bounds that affect them,
         #  e.g. because of the valid boundary condition, they may have infinite
-        #  bounds that we need to map back to huge finite bounds
-        eb_x_orig_lower: np.ndarray[S, np.dtype[np.floating]] = (
-            _nan_to_zero_inf_to_finite(  # type: ignore
-                np.amax(eb_x_lower_flat[reverse_indices_windows], axis=1)
-            ).reshape(data.shape)
-        )
-        eb_x_orig_upper: np.ndarray[S, np.dtype[np.floating]] = (
-            _nan_to_zero_inf_to_finite(  # type: ignore
-                np.amin(eb_x_upper_flat[reverse_indices_windows], axis=1)
-            ).reshape(data.shape)
-        )
+        #  bounds
+        data_float_lower: np.ndarray[S, np.dtype[np.floating]] = np.amax(
+            data_windows_float_lower_flat[reverse_indices_windows], axis=1
+        ).reshape(data.shape)
+        data_float_upper: np.ndarray[S, np.dtype[np.floating]] = np.amin(
+            data_windows_float_upper_flat[reverse_indices_windows], axis=1
+        ).reshape(data.shape)
 
-        return compute_safe_eb_lower_upper_interval_union(
-            data,
-            data_float,
-            eb_x_orig_lower,
-            eb_x_orig_upper,
+        return compute_safe_data_lower_upper_interval_union(
+            data, data_float_lower, data_float_upper
         )
 
     def get_config(self) -> dict:

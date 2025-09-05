@@ -1,10 +1,4 @@
 import atheris
-
-with atheris.instrument_imports():
-    import numcodecs
-    import numcodecs.compat
-    import numpy as np
-
 from timeoutcontext import timeout
 
 with atheris.instrument_imports():
@@ -16,6 +10,8 @@ with atheris.instrument_imports():
     from enum import Enum
     from inspect import signature
 
+    import numcodecs
+    import numcodecs.compat
     import numcodecs.registry
     import numpy as np
     from numcodecs.abc import Codec
@@ -121,6 +117,10 @@ def generate_parameter(
         PointwiseQuantityOfInterestExpression,
         StencilQuantityOfInterestExpression,
     ):
+
+        def consume_float_str(data: atheris.FuzzedDataProvider) -> str:
+            return str(data.ConsumeFloat()).replace("nan", "NaN").replace("inf", "Inf")
+
         ATOMS = [
             # number literals
             int,
@@ -168,28 +168,22 @@ def generate_parameter(
             "sin": 1,
             "cos": 1,
             "tan": 1,
-            "cot": 1,
-            "sec": 1,
-            "csc": 1,
             "asin": 1,
             "acos": 1,
             "atan": 1,
-            "acot": 1,
-            "asec": 1,
-            "acsc": 1,
             # hyperbolic
             "sinh": 1,
             "cosh": 1,
             "tanh": 1,
-            "coth": 1,
-            "sech": 1,
-            "csch": 1,
             "asinh": 1,
             "acosh": 1,
             "atanh": 1,
-            "acoth": 1,
-            "asech": 1,
-            "acsch": 1,
+            # classification
+            "isfinite": 1,
+            "isinf": 1,
+            "isnan": 1,
+            # conditional
+            "where": 3,
         }
 
         if ty is StencilQuantityOfInterestExpression:
@@ -220,7 +214,7 @@ def generate_parameter(
             if atom is int:
                 atom = str(data.ConsumeInt(2))
             elif atom is float:
-                atom = str(data.ConsumeRegularFloat())
+                atom = consume_float_str(data)
             elif atom == "variable":
                 atom = f'{"v" if ty is PointwiseQuantityOfInterestExpression else "V"}["{data.ConsumeString(2)}"]'
             atoms.append(atom)
@@ -257,7 +251,7 @@ def generate_parameter(
                 atoms.append(f"({atom1}).T")
             elif op == "finite_difference":
                 atoms.append(
-                    f"finite_difference({atom1}, order={data.ConsumeIntInRange(0, 3)}, accuracy={data.ConsumeIntInRange(1, 4)}, type={data.ConsumeIntInRange(-1, 1)}, axis={data.ConsumeIntInRange(0, 1)}, grid_spacing={data.ConsumeRegularFloat()})"
+                    f"finite_difference({atom1}, order={data.ConsumeIntInRange(0, 3)}, accuracy={data.ConsumeIntInRange(1, 4)}, type={data.ConsumeIntInRange(-1, 1)}, axis={data.ConsumeIntInRange(0, 1)}, grid_spacing={consume_float_str(data)})"
                 )
             else:
                 atoms.append(f"{op}({atom1}, {', '.join(atomn)})")

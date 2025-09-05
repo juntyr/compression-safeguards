@@ -57,6 +57,8 @@ expr =
 number =
     integer
   | float
+  | "Inf"  (* infinity *)
+  | "NaN"  (* not a number *)
 ;
 
 integer =
@@ -165,27 +167,19 @@ functions =
   | "sin", "(", expr, [","], ")"  (* sine sin(x) *)
   | "cos", "(", expr, [","], ")"  (* cosine cos(x) *)
   | "tan", "(", expr, [","], ")"  (* tangent tan(x) *)
-  | "cot", "(", expr, [","], ")"  (* cotangent cot(x) *)
-  | "sec", "(", expr, [","], ")"  (* secant sec(x) *)
-  | "csc", "(", expr, [","], ")"  (* cosecant csc(x) *)
   | "asin", "(", expr, [","], ")"  (* inverse sine asin(x) *)
   | "acos", "(", expr, [","], ")"  (* inverse cosine acos(x) *)
   | "atan", "(", expr, [","], ")"  (* inverse tangent atan(x) *)
-  | "acot", "(", expr, [","], ")"  (* inverse cotangent acot(x) *)
-  | "asec", "(", expr, [","], ")"  (* inverse secant asec(x) *)
-  | "acsc", "(", expr, [","], ")"  (* inverse cosecant acsc(x) *)
   | "sinh", "(", expr, [","], ")"  (* hyperbolic sine sinh(x) *)
   | "cosh", "(", expr, [","], ")"  (* hyperbolic cosine cosh(x) *)
   | "tanh", "(", expr, [","], ")"  (* hyperbolic tangent tanh(x) *)
-  | "coth", "(", expr, [","], ")"  (* hyperbolic cotangent coth(x) *)
-  | "sech", "(", expr, [","], ")"  (* hyperbolic secant sech(x) *)
-  | "csch", "(", expr, [","], ")"  (* hyperbolic cosecant csch(x) *)
   | "asinh", "(", expr, [","], ")"  (* inverse hyperbolic sine asinh(x) *)
   | "acosh", "(", expr, [","], ")"  (* inverse hyperbolic cosine acosh(x) *)
   | "atanh", "(", expr, [","], ")"  (* inverse hyperbolic tangent atanh(x) *)
-  | "acoth", "(", expr, [","], ")"  (* inverse hyperbolic cotangent acoth(x) *)
-  | "asech", "(", expr, [","], ")"  (* inverse hyperbolic secant asech(x) *)
-  | "acsch", "(", expr, [","], ")"  (* inverse hyperbolic cosecant acsch(x) *)
+  | "isfinite", "(", expr, [","], ")"  (* 1 if finite, 0 if inf or NaN *)
+  | "isinf", "(", expr, [","], ")"  (* 1 if inf, 0 if finite or NaN *)
+  | "isnan", "(", expr, [","], ")"  (* 1 if NaN, 0 if finite or inf *)
+  | "where", "(", expr, ",", expr, ",", expr, [","], ")"  (* where(c, x, y) = x if (c != 0) else y *)
   | "sum", "(", expr, [","], ")"  (* array sum *)
   | "matmul", "(", expr, ",", expr, [","], ")"  (* matrix (2d array) multiplication *)
   | "finite_difference", "("  (* finite difference over an expression, only available in stencil QoIs *)
@@ -289,57 +283,52 @@ safeguards can better understand their meaning and provide better corrections
 and higher compression ratios for them.
 
 The operators and functions in the above QoI grammar are evaluated using
-`numpy` ufuncs as follows:
+`numpy` ufuncs and follow the specification of the `math.h` ISO C standard
+(see e.g. <https://pubs.opengroup.org/onlinepubs/9799919799/>):
 
-| QoI function | `numpy` ufunc |
-| ------------ | ------------- |
-| `+a` | no-op |
-| `-a` | `np.negative` |
-| `a + b` | `np.add` |
-| `a - b` | `np.subtract` |
-| `a * b` | `np.multiply` |
-| `a / b` | `np.divide` |
-| `a ** b` | `np.power` |
-| `ln` | `np.log` |
-| `log2` | `np.log2` |
-| `log10` | `np.log10` |
-| `log(a, base=b)` | `np.divide(np.log(a), np.log(b))` |
-| `exp` | `np.exp` |
-| `exp2` | `np.exp2` |
-| `exp10` | `np.power(10, a)` |
-| `sqrt` | `np.sqrt` |
-| `square` | `np.square` |
-| `reciprocal` | `np.reciprocal` |
-| `abs` | `np.abs` |
-| `sign` | `np.sign` |
-| `floor` | `np.floor` |
-| `ceil` | `np.ceil` |
-| `trunc` | `np.trunc` |
-| `round_ties_even` | `np.rint` |
-| `sin` | `np.sin` |
-| `cos` | `np.cos` |
-| `tan` | `np.tan` |
-| `cot` | `np.reciprocal(np.tan(a))` |
-| `sec` | `np.reciprocal(np.cos(a))` |
-| `csc` | `np.reciprocal(np.sin(a))` |
-| `asin` | `np.arcsin` |
-| `acos` | `np.arccos` |
-| `atan` | `np.arctan` |
-| `acot` | `np.arctan(np.reciprocal(a))` |
-| `asec` | `np.arccos(np.reciprocal(a))` |
-| `acsc` | `np.arcsin(np.reciprocal(a))` |
-| `sinh` | `np.sinh` |
-| `cosh` | `np.cosh` |
-| `tanh` | `np.tanh` |
-| `coth` | `np.reciprocal(np.tanh(a))` |
-| `sech` | `np.reciprocal(np.cosh(a))` |
-| `csch` | `np.reciprocal(np.sinh(a))` |
-| `asinh` | `np.arcsinh` |
-| `acosh` | `np.arccosh` |
-| `atanh` | `np.arctanh` |
-| `acoth` | `np.arctanh(np.reciprocal(a))` |
-| `asech` | `np.arccosh(np.reciprocal(a))` |
-| `acsch` | `np.arcsinh(np.reciprocal(a))` |
+| QoI function | `numpy` ufunc | `math.h` equivalent |
+| ------------ | ------------- | ------------------- |
+| `+a` | no-op | |
+| `-a` | `np.negative` | |
+| `a + b` | `np.add` | |
+| `a - b` | `np.subtract` | |
+| `a * b` | `np.multiply` | |
+| `a / b` | `np.divide` | |
+| `a ** b` | `np.power` | `pow` |
+| `ln` | `np.log` | `log` |
+| `log2` | `np.log2` | `log2` |
+| `log10` | `np.log10` | `log10` |
+| `log(a, base=b)` | `np.divide(np.log(a), np.log(b))` | |
+| `exp` | `np.exp` | `exp` |
+| `exp2` | `np.exp2` | `exp2` |
+| `exp10` | `np.power(10, a)` | |
+| `sqrt` | `np.sqrt` | `sqrt` |
+| `square` | `np.square` | |
+| `reciprocal` | `np.reciprocal` | |
+| `abs` | `np.abs` | |
+| `sign` | `np.sign` | |
+| `floor` | `np.floor` | `floor` |
+| `ceil` | `np.ceil` | `ceil` |
+| `trunc` | `np.trunc` | `trunc` |
+| `round_ties_even` | `np.rint` | `rint`[^4] |
+| `sin` | `np.sin` | `sin` |
+| `cos` | `np.cos` | `cos` |
+| `tan` | `np.tan` | `tan` |
+| `asin` | `np.arcsin` | `asin` |
+| `acos` | `np.arccos` | `acos` |
+| `atan` | `np.arctan` | `atan` |
+| `sinh` | `np.sinh` | `sinh` |
+| `cosh` | `np.cosh` | `cosh` |
+| `tanh` | `np.tanh` | `tanh` |
+| `asinh` | `np.arcsinh` | `asinh` |
+| `acosh` | `np.arccosh` | `acosh` |
+| `atanh` | `np.arctanh` | `atanh` |
+| `isfinite` | `np.isfinite` | `isfinite` |
+| `isinf` | `np.isinf` | `isinf` |
+| `isnan` | `np.isnan` | `isnan` |
+| `where` | `np.where` | |
+
+[^4]: with the round-to-nearest rounding mode
 
 Furthermore, the array `sum` and `matmul` functions are implemented as explicit
 sums over the array elements in natural order, e.g.

@@ -51,9 +51,9 @@ class PointwiseQuantityOfInterest:
         ):
             # check if the expression is well-formed and if an error bound can
             #  be computed
-            _canary_data_eb = ScalarFoldedConstant.constant_fold_expr(
+            _canary_data_bounds = ScalarFoldedConstant.constant_fold_expr(
                 expr, np.dtype(np.float64)
-            ).compute_data_error_bound(
+            ).compute_data_bounds(
                 np.empty(0, dtype=np.float64),
                 np.empty(0, dtype=np.float64),
                 np.empty(0, dtype=np.float64),
@@ -95,27 +95,31 @@ class PointwiseQuantityOfInterest:
             The pointwise quantity of interest values.
         """
 
+        X = np.array(X, copy=None)
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, X.dtype)
-        return expr.eval(X.shape, X, late_bound)
+        exprv = np.array(expr.eval(X.shape, X, late_bound), copy=None)
+        assert exprv.dtype == X.dtype
+        assert exprv.shape == X.shape
+        return exprv
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def compute_data_error_bound(
+    def compute_data_bounds(
         self,
-        eb_qoi_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_qoi_upper: np.ndarray[Ps, np.dtype[F]],
+        qoi_lower: np.ndarray[Ps, np.dtype[F]],
+        qoi_upper: np.ndarray[Ps, np.dtype[F]],
         X: np.ndarray[Ps, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ps, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
         """
-        Compute the lower-upper error bound on the data `X` that satisfies the
-        lower-upper error bounds `eb_qoi_lower` and `eb_qoi_lower` on the QoI.
+        Compute the lower-upper bounds on the data `X` that satisfy the
+        lower-upper bounds `qoi_lower` and `qoi_lower` on the QoI.
 
         Parameters
         ----------
-        eb_qoi_lower : np.ndarray[Ps, np.dtype[F]]
-            The pointwise lower bound on the error on the QoI.
-        eb_qoi_upper : np.ndarray[Ps, np.dtype[F]]
-            The pointwise upper bound on the error on the QoI.
+        qoi_lower : np.ndarray[Ps, np.dtype[F]]
+            The pointwise lower bound on the QoI.
+        qoi_upper : np.ndarray[Ps, np.dtype[F]]
+            The pointwise upper bound on the QoI.
         X : np.ndarray[Ps, np.dtype[F]]
             The pointwise data, in floating point format.
         late_bound : Mapping[Parameter, np.ndarray[Ps, np.dtype[F]]]
@@ -124,14 +128,24 @@ class PointwiseQuantityOfInterest:
 
         Returns
         -------
-        eb_X_lower, eb_X_upper : tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]
-            The pointwise lower and upper bounds on the error on the data `X`.
+        X_lower, X_upper : tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]
+            The pointwise lower and upper bounds on the data `X`.
         """
 
+        qoi_lower = np.array(qoi_lower, copy=None)
+        qoi_upper = np.array(qoi_upper, copy=None)
+        X = np.array(X, copy=None)
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, X.dtype)
-        return expr.compute_data_error_bound(
-            eb_qoi_lower, eb_qoi_upper, X, X, late_bound
+        X_lower, X_upper = expr.compute_data_bounds(
+            qoi_lower, qoi_upper, X, X, late_bound
         )
+        X_lower = np.array(X_lower, copy=None)
+        X_upper = np.array(X_upper, copy=None)
+        assert X_lower.dtype == X.dtype
+        assert X_upper.dtype == X.dtype
+        assert X_lower.shape == X.shape
+        assert X_upper.shape == X.shape
+        return X_lower, X_upper
 
     def __repr__(self) -> str:
         return repr(self._expr)
@@ -190,9 +204,9 @@ class StencilQuantityOfInterest:
         ):
             # check if the expression is well-formed and if an error bound can
             #  be computed
-            _canary_data_eb = ScalarFoldedConstant.constant_fold_expr(
+            _canary_data_bounds = ScalarFoldedConstant.constant_fold_expr(
                 expr, np.dtype(np.float64)
-            ).compute_data_error_bound(
+            ).compute_data_bounds(
                 np.empty((0,), dtype=np.float64),
                 np.empty((0,), dtype=np.float64),
                 np.empty((0,), dtype=np.float64),
@@ -247,31 +261,35 @@ class StencilQuantityOfInterest:
             The pointwise quantity of interest values.
         """
 
+        Xs = np.array(Xs, copy=None)
         X_shape: Ps = Xs.shape[: -len(self._stencil_shape)]  # type: ignore
         stencil_shape = Xs.shape[-len(self._stencil_shape) :]
         assert stencil_shape == self._stencil_shape
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, Xs.dtype)
-        return expr.eval(X_shape, Xs, late_bound)
+        exprv = np.array(expr.eval(X_shape, Xs, late_bound), copy=None)
+        assert exprv.dtype == Xs.dtype
+        assert exprv.shape == X_shape
+        return exprv
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-    def compute_data_error_bound(
+    def compute_data_bounds(
         self,
-        eb_qoi_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_qoi_upper: np.ndarray[Ps, np.dtype[F]],
+        qoi_lower: np.ndarray[Ps, np.dtype[F]],
+        qoi_upper: np.ndarray[Ps, np.dtype[F]],
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         """
-        Compute the lower-upper error bound on the stencil-extended data `Xs`
-        that satisfies the lower-upper error bounds `eb_qoi_lower` and
-        `eb_qoi_lower` on the QoI.
+        Compute the lower-upper bounds on the stencil-extended data `Xs` that
+        satisfy the lower-upper error bounds `qoi_lower` and `qoi_lower` on the
+        QoI.
 
         Parameters
         ----------
-        eb_qoi_lower : np.ndarray[Ps, np.dtype[F]]
-            The pointwise lower bound on the error on the QoI.
-        eb_qoi_upper : np.ndarray[Ps, np.dtype[F]]
-            The pointwise upper bound on the error on the QoI.
+        qoi_lower : np.ndarray[Ps, np.dtype[F]]
+            The pointwise lower bound on the QoI.
+        qoi_upper : np.ndarray[Ps, np.dtype[F]]
+            The pointwise upper bound on the QoI.
         Xs : np.ndarray[Ps, np.dtype[F]]
             The stencil-extended data, in floating point format, which must be
             of shape [...Ps, ...stencil_shape].
@@ -281,25 +299,35 @@ class StencilQuantityOfInterest:
 
         Returns
         -------
-        eb_X_lower, eb_X_upper : tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]
-            The pointwise lower and upper bounds on the error on the data `X`.
+        Xs_lower, Xs_upper : tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]
+            The stencil-extended lower and upper bounds on the stencil-extended
+            data `Xs`.
 
-            The error bounds have not yet reduced across neighbouring points
-            that contribute to the same QoI points and thus need combine their
-            error bounds.
+            The bounds have not yet been combined across neighbouring points
+            that contribute to the same QoI points.
         """
 
+        qoi_lower = np.array(qoi_lower, copy=None)
+        qoi_upper = np.array(qoi_upper, copy=None)
+        Xs = np.array(Xs, copy=None)
         X_shape, stencil_shape = (
             Xs.shape[: -len(self._stencil_shape)],
             Xs.shape[-len(self._stencil_shape) :],
         )
-        assert X_shape == eb_qoi_lower.shape
+        assert X_shape == qoi_lower.shape
         assert stencil_shape == self._stencil_shape
         X: np.ndarray[Ps, np.dtype[F]] = Xs[(...,) + self._stencil_I]  # type: ignore
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, Xs.dtype)
-        return expr.compute_data_error_bound(
-            eb_qoi_lower, eb_qoi_upper, X, Xs, late_bound
+        Xs_lower, Xs_upper = expr.compute_data_bounds(
+            qoi_lower, qoi_upper, X, Xs, late_bound
         )
+        Xs_lower = np.array(Xs_lower, copy=None)
+        Xs_upper = np.array(Xs_upper, copy=None)
+        assert Xs_lower.dtype == Xs.dtype
+        assert Xs_upper.dtype == Xs.dtype
+        assert Xs_lower.shape == Xs.shape
+        assert Xs_upper.shape == Xs.shape
+        return Xs_lower, Xs_upper
 
     def __repr__(self) -> str:
         return repr(self._expr)

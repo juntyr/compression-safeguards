@@ -3,12 +3,13 @@ from collections.abc import Mapping
 import numpy as np
 
 from ....utils.bindings import Parameter
+from ..bound import DataBounds, data_bounds
 from .abc import Expr
 from .literal import Number
 from .typing import F, Ns, Ps, PsI
 
 
-class Group(Expr):
+class Group(Expr[Expr]):
     __slots__ = ("_expr",)
     _expr: Expr
 
@@ -20,23 +21,11 @@ class Group(Expr):
         return this
 
     @property
-    def has_data(self) -> bool:
-        return self._expr.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._expr,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._expr.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return Group(self._expr.apply_array_element_offset(axis, offset))
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._expr.late_bound_constants
+    def with_args(self, expr: Expr) -> "Group":
+        return Group(expr)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | "Expr":
         fexpr = self._expr.constant_fold(dtype)
@@ -54,30 +43,16 @@ class Group(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return self._expr.eval(x, Xs, late_bound)
 
-    def compute_data_error_bound_unchecked(
+    @data_bounds(DataBounds.infallible)
+    def compute_data_bounds_unchecked(
         self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
         X: np.ndarray[Ps, np.dtype[F]],
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        return self._expr.compute_data_error_bound(
-            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
-        )
-
-    def compute_data_error_bound(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # group just passes on the arguments
-        return self.compute_data_error_bound_unchecked(
-            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
-        )
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        return self._expr.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 
     def __repr__(self) -> str:
         return f"({self._expr!r})"

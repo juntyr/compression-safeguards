@@ -13,6 +13,7 @@ from typing import TypeAlias
 import numpy as np
 from typing_extensions import Self  # MSPV 3.11
 
+from ._compat import _broadcast_to
 from .cast import lossless_cast, saturating_finite_float_cast
 from .typing import F, Si, T
 
@@ -169,7 +170,7 @@ class Bindings:
 
         # cast first then broadcast to allow zero-copy broadcasts of scalars
         #  to arrays of any shape
-        view = np.broadcast_to(
+        view = _broadcast_to(
             lossless_cast(
                 self._bindings[param], dtype, f"late-bound parameter {param}"
             ),
@@ -211,7 +212,7 @@ class Bindings:
 
         # cast first then broadcast to allow zero-copy broadcasts of scalars
         #  to arrays of any shape
-        view = np.broadcast_to(
+        view = _broadcast_to(
             saturating_finite_float_cast(
                 self._bindings[param], dtype, f"late-bound parameter {param}"
             ),

@@ -9,20 +9,11 @@ from collections.abc import Set
 import numpy as np
 
 from ....utils.bindings import Bindings, Parameter
-from ....utils.cast import (
-    _isfinite,
-    _isinf,
-    _isnan,
-    _nan_to_zero,
-    _nextafter,
-    as_bits,
-    saturating_finite_float_cast,
-    to_float,
-)
+from ....utils.cast import saturating_finite_float_cast, to_float
 from ....utils.intervals import IntervalUnion
 from ....utils.typing import F, S, T
 from ..._qois import PointwiseQuantityOfInterest
-from ..._qois.interval import compute_safe_eb_lower_upper_interval_union
+from ..._qois.interval import compute_safe_data_lower_upper_interval_union
 from ...eb import (
     ErrorBound,
     _apply_finite_qoi_error_bound,
@@ -233,24 +224,16 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         )
         _check_error_bound(self._type, eb)
 
-        finite_ok = _compute_finite_absolute_error(
-            self._type, qoi_data, qoi_decoded
-        ) <= _compute_finite_absolute_error_bound(self._type, eb, qoi_data)
-
-        same_bits = as_bits(qoi_data, kind="V") == as_bits(qoi_decoded, kind="V")
-        both_nan = _isnan(qoi_data) & _isnan(qoi_decoded)
-
-        ok = np.where(
-            _isfinite(qoi_data),
-            finite_ok,
-            np.where(
-                _isinf(qoi_data),
-                same_bits,
-                both_nan,
-            ),
+        finite_ok: np.ndarray[S, np.dtype[np.bool]] = np.less_equal(
+            _compute_finite_absolute_error(self._type, qoi_data, qoi_decoded),
+            _compute_finite_absolute_error_bound(self._type, eb, qoi_data),
         )
 
-        return ok  # type: ignore
+        ok: np.ndarray[S, np.dtype[np.bool]] = np.array(finite_ok, copy=None)  # type: ignore
+        np.copyto(ok, qoi_data == qoi_decoded, where=np.isinf(qoi_data), casting="no")
+        np.copyto(ok, np.isnan(qoi_decoded), where=np.isnan(qoi_data), casting="no")
+
+        return ok
 
     def compute_safe_intervals(
         self,
@@ -308,71 +291,16 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         )
         qoi_lower, qoi_upper = qoi_lower_upper
 
-        # ensure the error bounds are representable in QoI space
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            # compute the adjusted error bound
-            eb_qoi_lower: np.ndarray[S, np.dtype[np.floating]] = _nan_to_zero(
-                qoi_lower - data_qoi
-            )
-            eb_qoi_upper: np.ndarray[S, np.dtype[np.floating]] = _nan_to_zero(
-                qoi_upper - data_qoi
-            )
-
-            # check if they're representable within the error bound
-            eb_qoi_lower_outside = (data_qoi + eb_qoi_lower) < qoi_lower
-            eb_qoi_upper_outside = (data_qoi + eb_qoi_upper) > qoi_upper
-
-            # otherwise nudge the error-bound adjusted QoIs
-            # we can nudge with nextafter since the QoIs are floating point
-            eb_qoi_lower = np.where(
-                eb_qoi_lower_outside & _isfinite(qoi_lower),
-                _nextafter(eb_qoi_lower, 0),
-                eb_qoi_lower,
-            )  # type: ignore
-            eb_qoi_upper = np.where(
-                eb_qoi_upper_outside & _isfinite(qoi_upper),
-                _nextafter(eb_qoi_upper, 0),
-                eb_qoi_upper,
-            )  # type: ignore
-
-        # check that the adjusted error bounds fulfil all requirements
-        assert eb_qoi_lower.shape == data.shape
-        assert eb_qoi_lower.dtype == data_float.dtype
-        assert eb_qoi_upper.shape == data.shape
-        assert eb_qoi_upper.dtype == data_float.dtype
-        with np.errstate(
-            divide="ignore", over="ignore", under="ignore", invalid="ignore"
-        ):
-            assert np.all(
-                (eb_qoi_lower <= 0)
-                & (((data_qoi + eb_qoi_lower) >= qoi_lower) | ~_isfinite(data_qoi))
-                & _isfinite(eb_qoi_lower)
-            )
-            assert np.all(
-                (eb_qoi_upper >= 0)
-                & (((data_qoi + eb_qoi_upper) <= qoi_upper) | ~_isfinite(data_qoi))
-                & _isfinite(eb_qoi_upper)
-            )
-
-        # compute the error bound in data space
-        eb_x_lower_upper: tuple[
-            np.ndarray[S, np.dtype[np.floating]],
-            np.ndarray[S, np.dtype[np.floating]],
-        ] = self._qoi_expr.compute_data_error_bound(
-            eb_qoi_lower,
-            eb_qoi_upper,
+        # compute the bounds in data space
+        data_float_lower, data_float_upper = self._qoi_expr.compute_data_bounds(
+            qoi_lower,
+            qoi_upper,
             data_float,
             late_bound_constants,
         )
-        eb_x_lower, eb_x_upper = eb_x_lower_upper
 
-        return compute_safe_eb_lower_upper_interval_union(
-            data,
-            data_float,
-            eb_x_lower,
-            eb_x_upper,
+        return compute_safe_data_lower_upper_interval_union(
+            data, data_float_lower, data_float_upper
         )
 
     def get_config(self) -> dict:

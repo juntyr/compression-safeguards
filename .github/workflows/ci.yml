@@ -108,11 +108,13 @@ jobs:
         run: |
           mkdir -p ./corpus/safeguards
           mkdir -p ./corpus/intervals
+          mkdir -p ./corpus/qois
 
       - name: Run the fuzzers
         run: |
-          uv run fuzz/fuzz_safeguards.py ./corpus/safeguards -max_total_time=45
-          uv run fuzz/fuzz_safeguards.py ./corpus/intervals -max_total_time=15
+          uv run fuzz/fuzz_safeguards.py ./corpus/safeguards -max_total_time=60
+          uv run fuzz/fuzz_intervals.py ./corpus/intervals -max_total_time=30
+          uv run fuzz/fuzz_qois.py ./corpus/qois -max_total_time=60
 
       - name: Delete the previous fuzzer corpus
         if: always() && steps.fuzzer-corpus-restore.outputs.cache-hit == 'true'

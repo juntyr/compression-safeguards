@@ -3,6 +3,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from ....utils.bindings import Parameter
+from ..bound import DataBounds, data_bounds
 from .abc import Expr
 from .typing import F, Ns, Ps, PsI
 
@@ -15,25 +16,28 @@ class Data(Expr):
         self._index = index
 
     @property
+    def args(self) -> tuple[()]:
+        return ()
+
+    def with_args(self) -> "Data":
+        return Data(self._index)
+
+    @property  # type: ignore
     def has_data(self) -> bool:
         return True
 
-    @property
+    @property  # type: ignore
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return frozenset([self._index])
 
-    def apply_array_element_offset(
+    def apply_array_element_offset(  # type: ignore
         self,
         axis: int,
         offset: int,
-    ) -> Expr:
+    ) -> "Data":
         index = list(self._index)
         index[axis] += offset
         return Data(index=tuple(index))
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return frozenset()
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return self
@@ -48,28 +52,24 @@ class Data(Expr):
         assert out.shape == x
         return out  # type: ignore
 
-    def compute_data_error_bound_unchecked(
+    @data_bounds(DataBounds.infallible)
+    def compute_data_bounds_unchecked(
         self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
         X: np.ndarray[Ps, np.dtype[F]],
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        return (eb_expr_lower, eb_expr_upper)
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        X_lower: np.ndarray[Ns, np.dtype[F]] = np.copy(Xs)
+        X_lower[np.isfinite(Xs)] = -np.inf
+        X_lower[(...,) + self._index] = expr_lower
 
-    def compute_data_error_bound(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # data just returns the computed error bounds
-        return self.compute_data_error_bound_unchecked(
-            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
-        )
+        X_upper: np.ndarray[Ns, np.dtype[F]] = np.copy(Xs)
+        X_upper[np.isfinite(Xs)] = np.inf
+        X_upper[(...,) + self._index] = expr_upper
+
+        return X_lower, X_upper
 
     def __repr__(self) -> str:
         if self._index == ():
@@ -95,23 +95,22 @@ class LateBoundConstant(Expr):
         return self._name
 
     @property
-    def has_data(self) -> bool:
-        return False
+    def args(self) -> tuple[()]:
+        return ()
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return frozenset()
+    def with_args(self) -> "LateBoundConstant":  # type: ignore
+        return LateBoundConstant(self._name, self._index)
 
-    def apply_array_element_offset(
+    def apply_array_element_offset(  # type: ignore
         self,
         axis: int,
         offset: int,
-    ) -> Expr:
+    ) -> "LateBoundConstant":
         index = list(self._index)
         index[axis] += offset
         return LateBoundConstant(self._name, index=tuple(index))
 
-    @property
+    @property  # type: ignore
     def late_bound_constants(self) -> frozenset[Parameter]:
         return frozenset([self.name])
 
@@ -130,15 +129,15 @@ class LateBoundConstant(Expr):
         assert out.shape == x
         return out  # type: ignore
 
-    def compute_data_error_bound_unchecked(
+    def compute_data_bounds_unchecked(
         self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
         X: np.ndarray[Ps, np.dtype[F]],
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        assert False, "late-bound constants have no error bounds"
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        assert False, "late-bound constants have no data bounds"
 
     def __repr__(self) -> str:
         if self._index == ():

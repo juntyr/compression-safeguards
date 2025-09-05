@@ -1,14 +1,21 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections.abc import Mapping
+from typing import Callable, Generic, final
 
 import numpy as np
+from typing_extensions import (
+    Self,  # MSPV 3.11
+    Unpack,  # MSPV 3.11
+    assert_never,  # MSPV 3.11
+)
 
+from ....utils._compat import _maximum_zero_sign_sensitive, _minimum_zero_sign_sensitive
 from ....utils.bindings import Parameter
-from ..eb import ensure_bounded_derived_error
-from .typing import F, Ns, Ps, PsI
+from ..bound import DataBounds, data_bounds_checks, guarantee_data_within_expr_bounds
+from .typing import Es, F, Ns, Ps, PsI
 
 
-class Expr:
+class Expr(ABC, Generic[Unpack[Es]]):
     """
     Abstract base class for the quantity of interest expression abstract syntax
     tree.
@@ -18,24 +25,115 @@ class Expr:
 
     @property
     @abstractmethod
+    def args(self) -> tuple[Unpack[Es]]:
+        """
+        The sub-expression arguments of this expression.
+        """
+
+    @abstractmethod
+    def with_args(self, *args: Unpack[Es]) -> Self:
+        """
+        Reconstruct this expression with different sub-expression arguments.
+
+        Parameters
+        ----------
+        *args : Unpack[Es]
+            The modified sub-expression arguments, derived from
+            [`self.args`][compression_safeguards.safeguards._qois.expr.abc.Expr.abc].
+
+        Returns
+        -------
+        expr : Self
+            The modified expression.
+        """
+
+    @final
+    def map_expr(self, m: "Callable[[Expr], Expr]") -> "Expr":
+        """
+        Recursively maps the expression mapping function `m` over this
+        expression and its sub-expression arguments.
+
+        Parameters
+        ----------
+        m : Callable[[Expr], Expr]
+            The expression mapper, which is applied to an expression whose
+            sub-expression arguments have already been mapped, i.e. the mapper
+            is *not* responsible for recursion.
+
+        Returns
+        -------
+        expr : Self
+            The mapped expression.
+        """
+
+        args: tuple[Expr, ...] = self.args  # type: ignore
+        mapped_args: tuple[Expr, ...] = tuple(a.map_expr(m) for a in args)
+        mapped_self: Self = self.with_args(*mapped_args)  # type: ignore
+        return m(mapped_self)
+
+    @final
+    @property
+    def expr_size(self) -> int:
+        """
+        The size of the expression tree, counting the number of nodes.
+        """
+
+        args: tuple[Expr, ...] = self.args  # type: ignore
+
+        return sum(a.expr_size for a in args) + 1
+
+    @final
+    @property
+    def data_expr_size(self) -> int:
+        """
+        The size of the expression tree, counting the number of data-dependent
+        nodes.
+        """
+
+        args: tuple[Expr, ...] = self.args  # type: ignore
+
+        if args == 0:
+            return int(self.has_data)
+
+        return sum(a.expr_size for a in args if a.has_data) + 1
+
+    @final
+    @property
     def has_data(self) -> bool:
         """
         Does this expression reference the data `x` or `X[i]`?
         """
 
+        args: tuple[Expr, ...] = self.args  # type: ignore
+
+        return any(a.has_data for a in args)
+
+    @final
     @property
-    @abstractmethod
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         """
         The set of data indices `X[is]` that this expression uses.
         """
 
-    @abstractmethod
+        args: tuple[Expr, ...] = self.args  # type: ignore
+
+        match args:
+            case ():
+                return frozenset()
+            case (a,):
+                return a.data_indices
+            case _:
+                indices: set[tuple[int, ...]] = set()
+                for a in args:
+                    indices.update(a.data_indices)
+                return frozenset(indices)
+
+    @final
     def apply_array_element_offset(
         self,
         axis: int,
         offset: int,
-    ) -> "Expr":
+    ) -> Self:
         """
         Apply an `offset` to the array element indices along the given `axis`.
 
@@ -54,13 +152,33 @@ class Expr:
             The modified expression.
         """
 
+        return self.with_args(
+            *(a.apply_array_element_offset(axis, offset) for a in self.args)  # type: ignore
+        )
+
+    @final
     @property
-    @abstractmethod
     def late_bound_constants(self) -> frozenset[Parameter]:
         """
         The set of late-bound constant parameters that this expression uses.
         """
 
+        args: tuple[Expr, ...] = self.args  # type: ignore
+
+        match args:
+            case ():
+                return frozenset()
+            case (a,):
+                return a.late_bound_constants
+            case _:
+                late_bound: set[Parameter] = set()
+                for a in args:
+                    late_bound.update(a.late_bound_constants)
+                return frozenset(late_bound)
+
+    # FIXME: constant_fold based on self.args and self.with_args is blocked on
+    #        not being able to relate on TypeVarTuple to another, here *Expr to
+    #        *F, see e.g. https://github.com/python/typing/issues/1216
     @abstractmethod
     def constant_fold(self, dtype: np.dtype[F]) -> F | "Expr":
         """
@@ -106,29 +224,35 @@ class Expr:
         """
 
     @abstractmethod
-    def compute_data_error_bound_unchecked(
+    def compute_data_bounds_unchecked(
         self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
         X: np.ndarray[Ps, np.dtype[F]],
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         """
-        Compute the lower-upper error bound on the stencil-extended data `Xs`
-        that satisfies the lower-upper error bounds `eb_expr_lower` and
-        `eb_expr_lower` on this expression.
+        Compute the lower-upper bounds on the stencil-extended data `Xs` that
+        that satisfy the lower-upper bounds `expr_lower` and `expr_lower` on
+        this expression.
+
+        This method should *not* be called manually.
 
         This method is allowed to return slightly wrongly-rounded results
         that are then corrected by
-        [`compute_data_error_bound`][compression_safeguards.safeguards._qois.expr.abc.Expr.compute_data_error_bound].
+        [`compute_data_bounds`][compression_safeguards.safeguards._qois.expr.abc.Expr.compute_data_bounds].
+
+        If this method is known to have no rounding errors and always return
+        the correct data bounds, it can be decorated with
+        [`@guaranteed_data_bounds`][compression_safeguards.safeguards._qois.bound.guaranteed_data_bounds].
 
         Parameters
         ----------
-        eb_expr_lower : np.ndarray[Ps, np.dtype[F]]
-            The pointwise lower bound on the error on this expression.
-        eb_expr_upper : np.ndarray[Ps, np.dtype[F]]
-            The pointwise upper bound on the error on this expression.
+        expr_lower : np.ndarray[Ps, np.dtype[F]]
+            The pointwise lower bound on this expression.
+        expr_upper : np.ndarray[Ps, np.dtype[F]]
+            The pointwise upper bound on this expression.
         X : np.ndarray[Ps, np.dtype[F]]
             The pointwise data, in floating point format, which must be
             of shape Ps.
@@ -141,43 +265,39 @@ class Expr:
 
         Returns
         -------
-        eb_X_lower, eb_X_upper : tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]
-            The pointwise lower and upper bounds on the error on the data `X`.
+        Xs_lower, Xs_upper : tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]
+            The stencil-extended lower and upper bounds on the stencil-extended
+            data `Xs`.
 
-            The error bounds have not yet reduced across neighbouring points
-            that contribute to the same expression points and thus need combine
-            their error bounds.
+            The bounds have not yet been combined across neighbouring points
+            that contribute to the same QoI points.
         """
 
-    def compute_data_error_bound(
+    @final
+    def compute_data_bounds(
         self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
         X: np.ndarray[Ps, np.dtype[F]],
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         """
-        Compute the lower-upper error bound on the stencil-extended data `Xs`
-        that satisfies the lower-upper error bounds `eb_expr_lower` and
-        `eb_expr_lower` on this expression.
+        Compute the lower-upper bounds on the stencil-extended data `Xs` that
+        that satisfy the lower-upper bounds `expr_lower` and `expr_lower` on
+        this expression.
 
         This method, by default, calls into
-        [`compute_data_error_bound_unchecked`][compression_safeguards.safeguards._qois.expr.abc.Expr.compute_data_error_bound_unchecked]
+        [`compute_data_bounds_unchecked`][compression_safeguards.safeguards._qois.expr.abc.Expr.compute_data_bounds_unchecked]
         and then applies extensive rounding checks to ensure that the returned
-        error bounds satisfy the error bounds on this expression.
-
-        If an implementation of
-        [`compute_data_error_bound_unchecked`][compression_safeguards.safeguards._qois.expr.abc.Expr.compute_data_error_bound_unchecked]
-        is known to have no rounding errors, this default implementation can be
-        overridden to forward its results without further rounding checks.
+        bounds satisfy the bounds on this expression.
 
         Parameters
         ----------
-        eb_expr_lower : np.ndarray[Ps, np.dtype[F]]
-            The pointwise lower bound on the error on this expression.
-        eb_expr_upper : np.ndarray[Ps, np.dtype[F]]
-            The pointwise upper bound on the error on this expression.
+        expr_lower : np.ndarray[Ps, np.dtype[F]]
+            The pointwise lower bound on this expression.
+        expr_upper : np.ndarray[Ps, np.dtype[F]]
+            The pointwise upper bound on this expression.
         X : np.ndarray[Ps, np.dtype[F]]
             The pointwise data, in floating point format, which must be
             of shape Ps.
@@ -190,54 +310,70 @@ class Expr:
 
         Returns
         -------
-        eb_X_lower, eb_X_upper : tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]
-            The pointwise lower and upper bounds on the error on the data `X`.
+        Xs_lower, Xs_upper : tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]
+            The stencil-extended lower and upper bounds on the stencil-extended
+            data `Xs`.
 
-            The error bounds have not yet reduced across neighbouring points
-            that contribute to the same expression points and thus need combine
-            their error bounds.
+            The bounds have not yet been combined across neighbouring points
+            that contribute to the same QoI points.
         """
 
-        tl: np.ndarray[Ps, np.dtype[F]]
-        tu: np.ndarray[Ps, np.dtype[F]]
-        tl, tu = self.compute_data_error_bound_unchecked(
-            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
+        Xs_lower: np.ndarray[Ns, np.dtype[F]]
+        Xs_upper: np.ndarray[Ns, np.dtype[F]]
+        Xs_lower, Xs_upper = self.compute_data_bounds_unchecked(
+            expr_lower, expr_upper, X, Xs, late_bound
         )
+
+        warn_on_bounds_exceeded: bool
+
+        match data_bounds_checked := data_bounds_checks(
+            self.compute_data_bounds_unchecked
+        ):
+            case DataBounds.infallible:
+                return Xs_lower, Xs_upper
+            case DataBounds.unchecked:
+                warn_on_bounds_exceeded = False
+            case DataBounds.checked:
+                warn_on_bounds_exceeded = True
+            case _:
+                assert_never(data_bounds_checked)
+
+        # ensure that the original data values are within the data bounds
+        Xs_lower = _minimum_zero_sign_sensitive(Xs, Xs_lower)
+        Xs_upper = _maximum_zero_sign_sensitive(Xs, Xs_upper)
 
         exprv = self.eval(X.shape, Xs, late_bound)
 
         # handle rounding errors in the lower error bound computation
-        tl = ensure_bounded_derived_error(
-            lambda tl: np.where(  # type: ignore
-                tl == 0,
-                exprv,
-                self.eval(
-                    X.shape,
-                    Xs + tl.reshape(list(X.shape) + [1] * (Xs.ndim - X.ndim)),
-                    late_bound,
-                ),
+        Xs_lower = guarantee_data_within_expr_bounds(
+            lambda Xs_lower: self.eval(
+                X.shape,
+                Xs_lower,
+                late_bound,
             ),
             exprv,
-            X,
-            tl,
-            eb_expr_lower,
-            eb_expr_upper,
+            Xs,
+            Xs_lower,
+            expr_lower,
+            expr_upper,
+            warn_on_bounds_exceeded=warn_on_bounds_exceeded,
         )
-        tu = ensure_bounded_derived_error(
-            lambda tu: np.where(  # type: ignore
-                tu == 0,
-                exprv,
-                self.eval(
-                    X.shape,
-                    Xs + tu.reshape(list(X.shape) + [1] * (Xs.ndim - X.ndim)),
-                    late_bound,
-                ),
+        Xs_upper = guarantee_data_within_expr_bounds(
+            lambda Xs_upper: self.eval(
+                X.shape,
+                Xs_upper,
+                late_bound,
             ),
             exprv,
-            X,
-            tu,
-            eb_expr_lower,
-            eb_expr_upper,
+            Xs,
+            Xs_upper,
+            expr_lower,
+            expr_upper,
+            warn_on_bounds_exceeded=warn_on_bounds_exceeded,
         )
 
-        return tl, tu
+        return Xs_lower, Xs_upper
+
+    @abstractmethod
+    def __repr__(self) -> str:
+        pass

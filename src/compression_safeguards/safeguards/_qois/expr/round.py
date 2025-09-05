@@ -2,15 +2,21 @@ from collections.abc import Mapping
 
 import numpy as np
 
+from ....utils._compat import (
+    _is_negative,
+    _is_negative_zero,
+    _is_positive,
+    _is_positive_zero,
+    _nextafter,
+)
 from ....utils.bindings import Parameter
-from ....utils.cast import _nan_to_zero_inf_to_finite, _nextafter
-from ..eb import ensure_bounded_derived_error
+from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
 
 
-class ScalarFloor(Expr):
+class ScalarFloor(Expr[Expr]):
     __slots__ = ("_a",)
     _a: Expr
 
@@ -18,25 +24,11 @@ class ScalarFloor(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarFloor(
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarFloor":
+        return ScalarFloor(a)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
@@ -51,83 +43,50 @@ class ScalarFloor(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.floor(self._a.eval(x, Xs, late_bound))
 
-    def compute_data_error_bound_unchecked(
+    @checked_data_bounds
+    def compute_data_bounds_unchecked(
         self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
         X: np.ndarray[Ps, np.dtype[F]],
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # evaluate arg and floor(arg)
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
-        exprv = np.floor(argv)
 
-        # compute the rounded result that meets the error bounds
-        exprv_lower = np.trunc(exprv + eb_expr_lower)
-        exprv_upper = np.trunc(exprv + eb_expr_upper)
+        # compute the rounded result that meets the expr bounds
+        # rounding uses integer steps, so e.g. floor(...) in [-3.1, 4.7] means
+        #  that floor(...) in [-3, 4]
+        expr_lower = np.ceil(expr_lower)
+        expr_upper = np.floor(expr_upper)
 
-        # compute the argv that will round to meet the error bounds
-        argv_lower = exprv_lower
-        argv_upper = _nextafter(exprv_upper + 1, exprv_upper)
-
-        # update the error bounds
-        # rounding allows zero error bounds on the expression to expand into
-        #  non-zero error bounds on the argument
-        eal = np.minimum(argv_lower - argv, 0)
-        eal = _nan_to_zero_inf_to_finite(eal)
-
-        eau = np.maximum(0, argv_upper - argv)
-        eau = _nan_to_zero_inf_to_finite(eau)
-
-        # handle rounding errors in floor(...) early
-        eal = ensure_bounded_derived_error(
-            lambda eal: np.floor(argv + eal),
-            exprv,
-            argv,
-            eal,
-            eb_expr_lower,
-            eb_expr_upper,
+        # compute the arg bound that will round to meet the expr bounds
+        # floor rounds down
+        # if expr_lower is -0.0, ceil(-0.0) = -0.0, only floor(-0.0) = -0.0
+        # if expr_lower is +0.0, ceil(+0.0) = +0.0, there is nothing below +0.0
+        #  for which floor(...) = +0.0
+        # if expr_upper is -0.0, floor(-0.0) = -0.0, we need to force arg_upper
+        #  to -0.0
+        # if expr_upper is +0.0, floor(+0.0) = +0.0, and floor(1-eps) = +0.0
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = expr_lower
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
+            _nextafter(expr_upper + 1, expr_upper), copy=None
         )
-        eau = ensure_bounded_derived_error(
-            lambda eau: np.floor(argv + eau),
-            exprv,
-            argv,
-            eau,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eb_arg_lower, eb_arg_upper = eal, eau
+        arg_upper[_is_negative_zero(expr_upper)] = X.dtype.type(-0.0)
 
-        # composition using Lemma 3 from Jiao et al.
-        return arg.compute_data_error_bound(
-            eb_arg_lower,
-            eb_arg_upper,
+        return arg.compute_data_bounds(
+            arg_lower,
+            arg_upper,
             X,
             Xs,
             late_bound,
-        )
-
-    def compute_data_error_bound(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # the unchecked method already handles rounding errors for floor,
-        #  which is weakly monotonic
-        return self.compute_data_error_bound_unchecked(
-            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:
         return f"floor({self._a!r})"
 
 
-class ScalarCeil(Expr):
+class ScalarCeil(Expr[Expr]):
     __slots__ = ("_a",)
     _a: Expr
 
@@ -135,25 +94,11 @@ class ScalarCeil(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarCeil(
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarCeil":
+        return ScalarCeil(a)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
@@ -168,83 +113,50 @@ class ScalarCeil(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.ceil(self._a.eval(x, Xs, late_bound))
 
-    def compute_data_error_bound_unchecked(
+    @checked_data_bounds
+    def compute_data_bounds_unchecked(
         self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
         X: np.ndarray[Ps, np.dtype[F]],
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # evaluate arg and ceil(arg)
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
-        exprv = np.ceil(argv)
 
-        # compute the rounded result that meets the error bounds
-        exprv_lower = np.trunc(exprv + eb_expr_lower)
-        exprv_upper = np.trunc(exprv + eb_expr_upper)
+        # compute the rounded result that meets the expr bounds
+        # rounding uses integer steps, so e.g. ceil(...) in [-3.1, 4.7] means
+        #  that ceil(...) in [-3, 4]
+        expr_lower = np.ceil(expr_lower)
+        expr_upper = np.floor(expr_upper)
 
-        # compute the argv that will round to meet the error bounds
-        argv_lower = _nextafter(exprv_lower - 1, exprv_lower)
-        argv_upper = exprv_upper
-
-        # update the error bounds
-        # rounding allows zero error bounds on the expression to expand into
-        #  non-zero error bounds on the argument
-        eal = np.minimum(argv_lower - argv, 0)
-        eal = _nan_to_zero_inf_to_finite(eal)
-
-        eau = np.maximum(0, argv_upper - argv)
-        eau = _nan_to_zero_inf_to_finite(eau)
-
-        # handle rounding errors in ceil(...) early
-        eal = ensure_bounded_derived_error(
-            lambda eal: np.ceil(argv + eal),
-            exprv,
-            argv,
-            eal,
-            eb_expr_lower,
-            eb_expr_upper,
+        # compute the arg bound that will round to meet the expr bounds
+        # ceil rounds up
+        # if expr_lower is -0.0, ceil(-0.0) = -0.0, and ceil(-1+eps) = -0.0
+        # if expr_lower is +0.0, ceil(+0.0) = +0.0, we need to force arg_lower
+        #  to +0.0
+        # if expr_upper is -0.0, floor(-0.0) = -0.0, there is nothing above
+        #  -0.0 for which ceil(...) = -0.0
+        # if expr_upper is +0.0, floor(+0.0) = +0.0, only ceil(+0.0) = +0.0
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
+            _nextafter(expr_lower - 1, expr_lower), copy=None
         )
-        eau = ensure_bounded_derived_error(
-            lambda eau: np.ceil(argv + eau),
-            exprv,
-            argv,
-            eau,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eb_arg_lower, eb_arg_upper = eal, eau
+        arg_lower[_is_positive_zero(expr_lower)] = X.dtype.type(+0.0)
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = expr_upper
 
-        # composition using Lemma 3 from Jiao et al.
-        return arg.compute_data_error_bound(
-            eb_arg_lower,
-            eb_arg_upper,
+        return arg.compute_data_bounds(
+            arg_lower,
+            arg_upper,
             X,
             Xs,
             late_bound,
-        )
-
-    def compute_data_error_bound(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # the unchecked method already handles rounding errors for ceil,
-        #  which is weakly monotonic
-        return self.compute_data_error_bound_unchecked(
-            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:
         return f"ceil({self._a!r})"
 
 
-class ScalarTrunc(Expr):
+class ScalarTrunc(Expr[Expr]):
     __slots__ = ("_a",)
     _a: Expr
 
@@ -252,25 +164,11 @@ class ScalarTrunc(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarTrunc(
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarTrunc":
+        return ScalarTrunc(a)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
@@ -285,87 +183,53 @@ class ScalarTrunc(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.trunc(self._a.eval(x, Xs, late_bound))
 
-    def compute_data_error_bound_unchecked(
+    @checked_data_bounds
+    def compute_data_bounds_unchecked(
         self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
         X: np.ndarray[Ps, np.dtype[F]],
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # evaluate arg and trunc(arg)
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
-        exprv = np.trunc(argv)
 
-        # compute the truncated result that meets the error bounds
-        exprv_lower = np.trunc(exprv + eb_expr_lower)
-        exprv_upper = np.trunc(exprv + eb_expr_upper)
+        # compute the rounded result that meets the expr bounds
+        # rounding uses integer steps, so e.g. trunc(...) in [-3.1, 4.7] means
+        #  that trunc(...) in [-3, 4]
+        expr_lower = np.ceil(expr_lower)
+        expr_upper = np.floor(expr_upper)
 
-        # compute the argv that will truncate to meet the error bounds
-        argv_lower: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            exprv_lower <= 0, _nextafter(exprv_lower - 1, exprv_lower), exprv_lower
+        # compute the arg bound that will round to meet the expr bounds
+        # trunc rounds towards zero
+        # if expr_lower is -0.0, ceil(-0.0) = -0.0, and trunc(-1+eps) = -0.0
+        # if expr_lower is +0.0, ceil(+0.0) = +0.0, there is nothing below +0.0
+        #  for which trunc(...) = +0.0
+        # if expr_upper is -0.0, floor(-0.0) = -0.0, there is nothing above
+        #  -0.0 for which trunc(...) = -0.0
+        # if expr_upper is +0.0, floor(+0.0) = +0.0, and trunc(1-eps) = +0.0
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
+            _nextafter(expr_lower - 1, expr_lower), copy=None
         )
-        argv_upper: np.ndarray[Ps, np.dtype[F]] = np.where(  # type: ignore
-            exprv_upper >= 0, _nextafter(exprv_upper + 1, exprv_upper), exprv_upper
+        np.copyto(arg_lower, expr_lower, where=_is_positive(expr_lower), casting="no")
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
+            _nextafter(expr_upper + 1, expr_upper), copy=None
         )
+        np.copyto(arg_upper, expr_upper, where=_is_negative(expr_upper), casting="no")
 
-        # update the error bounds
-        # rounding allows zero error bounds on the expression to expand into
-        #  non-zero error bounds on the argument
-        eal: np.ndarray[Ps, np.dtype[F]] = np.minimum(np.subtract(argv_lower, argv), 0)
-        eal = _nan_to_zero_inf_to_finite(eal)
-
-        eau: np.ndarray[Ps, np.dtype[F]] = np.maximum(0, np.subtract(argv_upper, argv))
-        eau = _nan_to_zero_inf_to_finite(eau)
-
-        # handle rounding errors in trunc(...) early
-        eal = ensure_bounded_derived_error(
-            lambda eal: np.trunc(np.add(argv, eal)),
-            exprv,
-            argv,
-            eal,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eau = ensure_bounded_derived_error(
-            lambda eau: np.trunc(np.add(argv, eau)),
-            exprv,
-            argv,
-            eau,
-            eb_expr_lower,
-            eb_expr_upper,
-        )
-        eb_arg_lower, eb_arg_upper = eal, eau
-
-        # composition using Lemma 3 from Jiao et al.
-        return arg.compute_data_error_bound(
-            eb_arg_lower,
-            eb_arg_upper,
+        return arg.compute_data_bounds(
+            arg_lower,
+            arg_upper,
             X,
             Xs,
             late_bound,
-        )
-
-    def compute_data_error_bound(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # the unchecked method already handles rounding errors for trunc,
-        #  which is weakly monotonic
-        return self.compute_data_error_bound_unchecked(
-            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:
         return f"trunc({self._a!r})"
 
 
-class ScalarRoundTiesEven(Expr):
+class ScalarRoundTiesEven(Expr[Expr]):
     __slots__ = ("_a",)
     _a: Expr
 
@@ -373,29 +237,18 @@ class ScalarRoundTiesEven(Expr):
         self._a = a
 
     @property
-    def has_data(self) -> bool:
-        return self._a.has_data
+    def args(self) -> tuple[Expr]:
+        return (self._a,)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._a.data_indices
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return ScalarRoundTiesEven(
-            self._a.apply_array_element_offset(axis, offset),
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._a.late_bound_constants
+    def with_args(self, a: Expr) -> "ScalarRoundTiesEven":
+        return ScalarRoundTiesEven(a)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         return ScalarFoldedConstant.constant_fold_unary(
-            self._a, dtype, np.rint, ScalarRoundTiesEven
+            self._a,
+            dtype,
+            np.rint,
+            ScalarRoundTiesEven,
         )
 
     def eval(
@@ -406,76 +259,70 @@ class ScalarRoundTiesEven(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return np.rint(self._a.eval(x, Xs, late_bound))
 
-    def compute_data_error_bound_unchecked(
+    @checked_data_bounds
+    def compute_data_bounds_unchecked(
         self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
         X: np.ndarray[Ps, np.dtype[F]],
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         # evaluate arg and round_ties_even(arg)
         arg = self._a
         argv = arg.eval(X.shape, Xs, late_bound)
         exprv = np.rint(argv)
 
-        # compute the rounded result that meets the error bounds
-        exprv_lower = np.trunc(exprv + eb_expr_lower)
-        exprv_upper = np.trunc(exprv + eb_expr_upper)
+        # compute the rounded result that meets the expr bounds
+        # rounding uses integer steps, so e.g. round_ties_even(...) in
+        #  [-3.1, 4.7] means that round_ties_even(...) in [-3, 4]
+        expr_lower = np.ceil(expr_lower)
+        expr_upper = np.floor(expr_upper)
 
-        # compute the argv that will round to meet the error bounds
-        argv_lower = exprv_lower - 0.5
-        argv_upper = exprv_upper + 0.5
-
-        # update the error bounds
-        # rounding allows zero error bounds on the expression to expand into
-        #  non-zero error bounds on the argument
-        eal = np.minimum(argv_lower - argv, 0)
-        eal = _nan_to_zero_inf_to_finite(eal)
-
-        eau = np.maximum(0, argv_upper - argv)
-        eau = _nan_to_zero_inf_to_finite(eau)
+        # estimate the arg bound that will round to meet the expr bounds
+        # round_ties_even rounds to the nearest integer, with tie breaks
+        #  towards the nearest *even* integer
+        # if expr_lower is -0.0, ceil(-0.0) = -0.0, and rint(-0.5) = -0.0
+        # if expr_lower is +0.0, ceil(+0.0) = +0.0, we need to force arg_lower
+        #  to +0.0
+        # if expr_upper is -0.0, floor(-0.0) = -0.0, we need to force arg_upper
+        #  to -0.0
+        # if expr_upper is +0.0, floor(+0.0) = +0.0, and rint(+0.5) = +0.0
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
+            np.subtract(expr_lower, X.dtype.type(0.5)), copy=None
+        )
+        arg_lower[_is_positive_zero(expr_lower)] = X.dtype.type(+0.0)
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
+            np.add(expr_upper, X.dtype.type(0.5)), copy=None
+        )
+        arg_upper[_is_negative_zero(expr_upper)] = X.dtype.type(-0.0)
 
         # handle rounding errors in round_ties_even(...) early
-        eal = ensure_bounded_derived_error(
-            lambda eal: np.rint(argv + eal),
+        # which can occur since our +-0.5 estimate doesn't account for the even
+        #  tie breaking cases
+        arg_lower = guarantee_arg_within_expr_bounds(
+            lambda arg_lower: np.rint(arg_lower),
             exprv,
             argv,
-            eal,
-            eb_expr_lower,
-            eb_expr_upper,
+            arg_lower,
+            expr_lower,
+            expr_upper,
         )
-        eau = ensure_bounded_derived_error(
-            lambda eau: np.rint(argv + eau),
+        arg_upper = guarantee_arg_within_expr_bounds(
+            lambda arg_upper: np.rint(arg_upper),
             exprv,
             argv,
-            eau,
-            eb_expr_lower,
-            eb_expr_upper,
+            arg_upper,
+            expr_lower,
+            expr_upper,
         )
-        eb_arg_lower, eb_arg_upper = eal, eau
 
-        # composition using Lemma 3 from Jiao et al.
-        return arg.compute_data_error_bound(
-            eb_arg_lower,
-            eb_arg_upper,
+        return arg.compute_data_bounds(
+            arg_lower,
+            arg_upper,
             X,
             Xs,
             late_bound,
-        )
-
-    def compute_data_error_bound(
-        self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        # the unchecked method already handles rounding errors for
-        #  round_ties_even, which is weakly monotonic
-        return self.compute_data_error_bound_unchecked(
-            eb_expr_lower, eb_expr_upper, X, Xs, late_bound
         )
 
     def __repr__(self) -> str:

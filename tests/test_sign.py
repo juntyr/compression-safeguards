@@ -55,6 +55,14 @@ def test_empty():
     check_all_codecs(np.empty(0))
 
 
+def test_dimensions():
+    check_all_codecs(np.array(42.0))
+    check_all_codecs(np.array(42, dtype=np.int64))
+    check_all_codecs(np.array([42.0]))
+    check_all_codecs(np.array([[42.0]]))
+    check_all_codecs(np.array([[[42.0]]]))
+
+
 def test_arange():
     check_all_codecs(np.arange(100, dtype=float))
 
@@ -73,10 +81,12 @@ def test_edge_cases():
                 -np.nan,
                 np.finfo(float).min,
                 np.finfo(float).max,
-                np.finfo(float).tiny,
-                -np.finfo(float).tiny,
+                np.finfo(float).smallest_normal,
+                -np.finfo(float).smallest_normal,
+                np.finfo(float).smallest_subnormal,
+                -np.finfo(float).smallest_subnormal,
+                0.0,
                 -0.0,
-                +0.0,
             ]
         )
     )

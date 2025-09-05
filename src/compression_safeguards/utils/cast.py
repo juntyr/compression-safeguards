@@ -12,10 +12,12 @@ __all__ = [
     "saturating_finite_float_cast",
 ]
 
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 
+from ._compat import _nan_to_zero_inf_to_finite
+from ._float128 import _float128_dtype
 from .typing import F, S, T, U
 
 
@@ -80,6 +82,8 @@ def from_float(
         The re-converted array with the original `dtype`.
     """
 
+    x = np.array(x, copy=None)
+
     if x.dtype == dtype:
         return x  # type: ignore
 
@@ -89,11 +93,13 @@ def from_float(
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         # lossy cast from floating point to integer
         # round first with rint (round to nearest, ties to nearest even)
-        return np.where(
-            x < imin,
-            imin,
-            np.where(x <= imax, np.rint(x).astype(dtype, casting="unsafe"), imax),
-        )  # type: ignore
+        converted: np.ndarray[S, np.dtype[T]] = np.array(  # type: ignore
+            np.array(np.rint(x), copy=None).astype(dtype, casting="unsafe"), copy=None
+        )
+    converted[np.greater(x, imax)] = imax
+    converted[np.less(x, imin)] = imin
+
+    return converted
 
 
 def as_bits(
@@ -158,7 +164,9 @@ def to_total_order(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[U]]:
             over="ignore",
             under="ignore",
         ):
-            return a.view(utype) + np.array(shift, dtype=utype) + 1
+            return (
+                a.view(utype) + np.array(shift, dtype=utype) + np.array(1, dtype=utype)
+            )
 
     if not np.issubdtype(a.dtype, np.floating):
         raise TypeError(f"unsupported interval type {a.dtype}")
@@ -200,12 +208,12 @@ def from_total_order(
         return a  # type: ignore
 
     if np.issubdtype(dtype, np.signedinteger):
-        shift = np.iinfo(dtype).max  # type: ignore
+        shift = np.array(np.iinfo(dtype).max, dtype=dtype)  # type: ignore
         with np.errstate(
             over="ignore",
             under="ignore",
         ):
-            return a.view(dtype) + shift + 1
+            return a.view(dtype) + shift + dtype.type(1)
 
     if not np.issubdtype(dtype, np.floating):
         raise TypeError(f"unsupported interval type {dtype}")
@@ -257,7 +265,7 @@ def lossless_cast(
         If not all values could be losslessly converted.
     """
 
-    xa = np.array(x)
+    xa = np.array(x, copy=None)
     dtype_from = xa.dtype
 
     if np.issubdtype(dtype_from, np.floating) and not np.issubdtype(dtype, np.floating):
@@ -267,10 +275,10 @@ def lossless_cast(
 
     # we use unsafe casts here since we later check them for safety
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        xa_to = np.array(xa).astype(dtype, casting="unsafe")
+        xa_to = np.array(xa, copy=None).astype(dtype, casting="unsafe")
         xa_back = xa_to.astype(dtype_from, casting="unsafe")
 
-    lossless_same = np.where(_isnan(xa), _isnan(xa_back), xa == xa_back)
+    lossless_same = (xa == xa_back) | (np.isnan(xa) & np.isnan(xa_back))
 
     if not np.all(lossless_same):
         raise ValueError(
@@ -310,9 +318,9 @@ def saturating_finite_float_cast(
 
     assert np.issubdtype(dtype, np.floating) or (dtype == _float128_dtype)
 
-    xa = np.array(x)
+    xa = np.array(x, copy=None)
 
-    if not isinstance(x, int) and not np.all(_isfinite(xa)):
+    if not isinstance(x, int) and not np.all(np.isfinite(xa)):
         raise ValueError(
             f"cannot cast non-finite {context} values from {xa.dtype} to saturating finite {dtype}"
         )
@@ -322,212 +330,6 @@ def saturating_finite_float_cast(
     # - we cast to float, where under- and overflows saturate to np.inf
     # - we later clamp the values to finite
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        xa_to = np.array(xa).astype(dtype, casting="unsafe")
+        xa_to = np.array(xa, copy=None).astype(dtype, casting="unsafe")
 
     return _nan_to_zero_inf_to_finite(xa_to)
-
-
-# wrapper around np.isnan that also works for numpy_quaddtype
-@np.errstate(invalid="ignore")
-def _isnan(
-    a: int | float | np.ndarray[S, np.dtype[T]],
-) -> bool | np.ndarray[S, np.dtype[np.bool]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.isnan(a)  # type: ignore
-    return ~np.array(np.abs(a) <= np.inf)  # type: ignore
-
-
-# wrapper around np.isinf that also works for numpy_quaddtype
-@np.errstate(invalid="ignore")
-def _isinf(
-    a: int | float | np.ndarray[S, np.dtype[T]],
-) -> bool | np.ndarray[S, np.dtype[np.bool]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.isinf(a)  # type: ignore
-    return np.abs(a) == np.inf  # type: ignore
-
-
-# wrapper around np.isfinite that also works for numpy_quaddtype
-@np.errstate(invalid="ignore")
-def _isfinite(
-    a: int | float | np.ndarray[S, np.dtype[T]],
-) -> bool | np.ndarray[S, np.dtype[np.bool]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.isfinite(a)  # type: ignore
-    return np.abs(a) < np.inf  # type: ignore
-
-
-# wrapper around np.nan_to_num that also works for numpy_quaddtype
-@np.errstate(invalid="ignore")
-def _nan_to_zero(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.nan_to_num(a, nan=0, posinf=np.inf, neginf=-np.inf)  # type: ignore
-    return np.where(_isnan(a), _float128(0), a)  # type: ignore
-
-
-# wrapper around np.nan_to_num that also works for numpy_quaddtype
-@np.errstate(invalid="ignore")
-def _nan_to_zero_inf_to_finite(
-    a: np.ndarray[S, np.dtype[T]],
-) -> np.ndarray[S, np.dtype[T]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.nan_to_num(a, nan=0, posinf=None, neginf=None)  # type: ignore
-    return np.where(
-        _isnan(a),
-        _float128(0),
-        np.where(a == -np.inf, _float128_min, np.where(a == np.inf, _float128_max, a)),
-    )  # type: ignore
-
-
-# wrapper around np.sign that also works for numpy_quaddtype
-@np.errstate(invalid="ignore")
-def _sign(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.sign(a)  # type: ignore
-    return np.where(_isnan(a), a, np.where(a == 0, 0, np.where(a < 0, -1, +1)))  # type: ignore
-
-
-# wrapper around np.nextafter that also works for numpy_quaddtype
-# Implementation is variant 2 from https://stackoverflow.com/a/70512834
-@np.errstate(invalid="ignore")
-def _nextafter(
-    a: np.ndarray[S, np.dtype[F]], b: int | float | np.ndarray[S, np.dtype[F]]
-) -> np.ndarray[S, np.dtype[F]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.nextafter(a, b)  # type: ignore
-
-    a = np.array(a)
-    b = np.array(b, dtype=a.dtype)
-
-    _float128_neg_zero = -_float128(0)
-
-    _float128_incr_subnormal = np.where(
-        a < 0, -_float128_smallest_subnormal, _float128_smallest_subnormal
-    )
-
-    abs_a_zero_mantissa = (
-        (
-            np.atleast_1d(a).view(np.uint8)
-            & np.atleast_1d(np.full_like(a, np.inf)).view(np.uint8)
-        )
-        .view(a.dtype)
-        .reshape(a.shape)
-    )
-    _float128_incr_normal = abs_a_zero_mantissa / (
-        numpy_quaddtype.QuadPrecision(2) ** 112
-    )
-
-    r = np.where(
-        _isnan(a) | _isnan(b),
-        a + b,  # unordered, at least one is NaN
-        np.where(
-            a == b,
-            b,  # equal
-            np.where(
-                _isinf(a),
-                np.where(a < 0, _float128_min, _float128_max),  # infinity
-                np.where(
-                    np.abs(a) > _float128_smallest_normal,
-                    # note: implementation deviates here since numpy_quaddtype
-                    #       divides/multiplies with error
-                    #       based on https://stackoverflow.com/a/70512041
-                    np.where(
-                        a < b,
-                        np.where(
-                            a == -abs_a_zero_mantissa,
-                            a + _float128_incr_normal / 2,
-                            a + _float128_incr_normal,
-                        ),
-                        np.where(
-                            a == abs_a_zero_mantissa,
-                            a - _float128_incr_normal / 2,
-                            a - _float128_incr_normal,
-                        ),
-                    ),  # normal
-                    np.where(  # zero, subnormal, or smallest normal
-                        (a < b) == (a >= 0),
-                        (a + _float128_incr_subnormal),
-                        np.where(
-                            a == (-_float128_smallest_subnormal),
-                            _float128_neg_zero,
-                            a - _float128_incr_subnormal,
-                        ),
-                    ),
-                ),
-            ),
-        ),
-    )
-
-    return r  # type: ignore
-
-
-# wrapper around np.reciprocal that also works for numpy_quaddtype
-@np.errstate(invalid="ignore")
-def _reciprocal(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.reciprocal(a)
-    return np.divide(1, a)
-
-
-# wrapper around np.mod(p, q) that guarantees that the result is in [-q/2, q/2]
-def _symmetric_modulo(
-    p: np.ndarray[S, np.dtype[F]], q: np.ndarray[S, np.dtype[F]]
-) -> np.ndarray[S, np.dtype[F]]:
-    q2: np.ndarray[S, np.dtype[F]] = np.divide(q, 2)
-    res: np.ndarray[S, np.dtype[F]] = np.mod(p + q2, q)
-    if (type(p) is _float128_type) or (p.dtype == _float128_dtype):
-        res = np.mod(res + q, q)
-    return np.subtract(res, q2)
-
-
-try:
-    _float128: Callable = np.float128
-    _float128_type: Callable = np.float128
-    _float128_dtype: np.dtype = np.dtype(np.float128)
-    assert (np.finfo(np.float128).nmant + np.finfo(np.float128).nexp + 1) == 128
-    _float128_min = np.finfo(np.float128).min
-    _float128_max = np.finfo(np.float128).max
-    _float128_eps = np.finfo(np.float128).eps
-    _float128_smallest_normal = np.finfo(np.float128).smallest_normal
-    _float128_smallest_subnormal = np.finfo(np.float128).smallest_subnormal
-    _float128_precision = np.finfo(np.float128).precision
-    _float128_pi = np.float128("3.14159265358979323846264338327950288")
-    _float128_e = np.float128("2.71828182845904523536028747135266249")
-except (AttributeError, AssertionError):
-    try:
-        import numpy_quaddtype
-
-        _float128 = numpy_quaddtype.SleefQuadPrecision
-        _float128_type = numpy_quaddtype.QuadPrecision
-        _float128_dtype = numpy_quaddtype.SleefQuadPrecDType()
-        _float128_min = -numpy_quaddtype.max_value
-        _float128_max = numpy_quaddtype.max_value
-        _float128_eps = numpy_quaddtype.epsilon
-        _float128_smallest_normal = numpy_quaddtype.min_value
-        # taken from https://sleef.org/quad.xhtml
-        _float128_smallest_subnormal = _float128(2) ** (-16494)
-        _float128_precision = 33
-        _float128_pi = numpy_quaddtype.pi
-        _float128_e = numpy_quaddtype.e
-    except ImportError:
-        raise TypeError("""
-compression_safeguards requires float128 support:
-- numpy.float128 either does not exist is does not offer true 128 bit precision
-- numpy_quaddtype is not installed
-""") from None

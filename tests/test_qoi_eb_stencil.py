@@ -8,8 +8,9 @@ from compression_safeguards.safeguards.stencil import BoundaryCondition
 from compression_safeguards.safeguards.stencil.qoi.eb import (
     StencilQuantityOfInterestErrorBoundSafeguard,
 )
+from compression_safeguards.utils._float128 import _float128_dtype
 from compression_safeguards.utils.bindings import Bindings
-from compression_safeguards.utils.cast import _float128_dtype, to_float
+from compression_safeguards.utils.cast import to_float
 
 from .codecs import (
     encode_decode_identity,
@@ -87,6 +88,20 @@ def check_empty(qoi: str):
     check_all_codecs(data, qoi, [(1, 1)])
 
 
+def check_dimensions(qoi: str):
+    check_all_codecs(np.array(42.0), qoi, [(0, 0)])
+    check_all_codecs(np.array(42, dtype=np.int64), qoi, [(0, 0)])
+    check_all_codecs(np.array([42.0]), qoi, [(0, 0)])
+    check_all_codecs(np.array([[42.0]]), qoi, [(0, 0)])
+    check_all_codecs(np.array([[[42.0]]]), qoi, [(0, 0)])
+
+    check_all_codecs(np.array(42.0), qoi, [(1, 1)])
+    check_all_codecs(np.array(42, dtype=np.int64), qoi, [(1, 1)])
+    check_all_codecs(np.array([42.0]), qoi, [(1, 1)])
+    check_all_codecs(np.array([[42.0]]), qoi, [(1, 1)])
+    check_all_codecs(np.array([[[42.0]]]), qoi, [(1, 1)])
+
+
 def check_unit(qoi: str):
     check_all_codecs(np.linspace(-1.0, 1.0, 100, dtype=np.float16), qoi, [(0, 0)])
     check_all_codecs(np.linspace(-1.0, 1.0, 100, dtype=np.float16), qoi, [(1, 1)])
@@ -122,10 +137,12 @@ def check_edge_cases(qoi: str):
             -np.nan,
             np.finfo(float).min,
             np.finfo(float).max,
-            np.finfo(float).tiny,
-            -np.finfo(float).tiny,
+            np.finfo(float).smallest_normal,
+            -np.finfo(float).smallest_normal,
+            np.finfo(float).smallest_subnormal,
+            -np.finfo(float).smallest_subnormal,
+            0.0,
             -0.0,
-            +0.0,
         ]
     )
     check_all_codecs(
@@ -142,59 +159,13 @@ def check_edge_cases(qoi: str):
 
 CHECKS = [
     check_empty,
+    check_dimensions,
     check_unit,
     check_circle,
     check_arange,
     check_linspace,
     check_edge_cases,
 ]
-
-
-def test_sandbox():
-    with pytest.raises(AssertionError, match="failed to parse stencil QoI expression"):
-        # sandbox escape based on https://stackoverflow.com/q/35804961 and
-        #  https://stackoverflow.com/a/35806044
-        check_all_codecs(
-            np.empty(0),
-            "f\"{[c for c in ().__class__.__base__.__subclasses__() if c.__name__ == 'catch_warnings'][0]()._module.__builtins__['quit']()}\"",
-            [(0, 0)],
-        )
-
-
-@pytest.mark.parametrize("check", CHECKS)
-def test_empty(check):
-    with pytest.raises(AssertionError, match="empty"):
-        check("")
-    with pytest.raises(AssertionError, match="empty"):
-        check("  \t   \n   ")
-    with pytest.raises(AssertionError, match="empty"):
-        check(" # just a comment ")
-
-
-def test_non_expression():
-    with pytest.raises(AssertionError, match="EOF"):
-        check_all_codecs(np.empty(0), "exp", [(0, 0)])
-    with pytest.raises(AssertionError, match="unexpected token `x`"):
-        check_all_codecs(np.empty(0), "e x p", [(0, 0)])
-
-
-def test_whitespace():
-    check_all_codecs(np.array([]), "  \n \t x   \t\n  ", [(0, 0)])
-    check_all_codecs(np.array([]), "  \n \t x \t \n  - \t \n 3  \t\n  ", [(0, 0)])
-    check_all_codecs(np.array([]), "x    -    3", [(0, 0)])
-    check_all_codecs(np.array([]), "sqrt   \n (x)", [(0, 0)])
-    check_all_codecs(np.array([]), "log ( x , base \t = \n 2 )", [(0, 0)])
-
-
-def test_comment():
-    check_all_codecs(np.array([]), "x # great variable", [(0, 0)])
-    check_all_codecs(np.array([]), "# great variable\nx", [(0, 0)])
-    check_all_codecs(np.array([]), "x # nothing 3+4 really matters 1/0", [(0, 0)])
-    check_all_codecs(
-        np.array([]),
-        "log #1\n ( #2\n x #3\n , #4\n base #5\n = #6\n 2 #7\n )",
-        [(0, 0)],
-    )
 
 
 def test_variables():
@@ -260,18 +231,6 @@ def test_variables():
     check_all_codecs(np.array([]), 'V["a"] = X; return V["a"][0,0];', [(0, 0), (0, 0)])
     check_all_codecs(np.array([]), 'V["a"] = X; return V["a"][I];', [(0, 0), (0, 0)])
     check_all_codecs(np.array([]), 'sum(C["$X"] * X)', [(1, 1)])
-
-
-@pytest.mark.parametrize("check", CHECKS)
-def test_constant(check):
-    with pytest.raises(AssertionError, match="constant"):
-        check("0")
-    with pytest.raises(AssertionError, match="constant"):
-        check("pi")
-    with pytest.raises(AssertionError, match="constant"):
-        check("e")
-    with pytest.raises(AssertionError, match="constant"):
-        check("-(-(-e))")
 
 
 def test_invalid_array():
@@ -1021,7 +980,7 @@ def test_fuzzer_list_assignment_out_of_range():
         safeguards=[
             dict(
                 kind="qoi_eb_stencil",
-                qoi="acsc((x-e))",
+                qoi="asin(reciprocal(x-e))",  # acsc
                 neighbourhood=[
                     dict(
                         axis=-1,
@@ -1255,6 +1214,7 @@ def test_finite_difference_dx():
 
 
 def test_late_bound_constant():
+    # with a valid stencil and some neighbours that are only multiplied by zero
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         qoi='X[0,0] * c["zero"] + X[I] / C["f"][I]',
         neighbourhood=[
@@ -1273,6 +1233,35 @@ def test_late_bound_constant():
 
     late_bound = Bindings(
         f=np.array([16, 8, 4]),
+        zero=0,
+    )
+
+    imin, imax = np.iinfo(data.dtype).min, np.iinfo(data.dtype).max
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+    assert np.all(valid._lower == np.array([imin, imin, imin, 3 - 16, 4 - 8, 5 - 4]))
+    assert np.all(valid._upper == np.array([imax, imax, imax, 3 + 16, 4 + 8, 5 + 4]))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
+    assert np.all(ok == np.array([True, True, True, True, True, False]).reshape(2, 3))
+
+    # with an edge stencil so that all points have bounds
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='X[0,0] * c["zero"] + X[I] / C["f"][I]',
+        neighbourhood=[
+            dict(axis=0, before=1, after=0, boundary="edge"),
+            dict(axis=1, before=0, after=0, boundary="edge"),
+        ],
+        type="abs",
+        eb=1,
+    )
+    assert safeguard.late_bound == {"f", "zero"}
+    assert (
+        f"{safeguard._qoi_expr!r}" == 'X[0,0] * C["zero"][1,0] + X[1,0] / C["f"][1,0]'
+    )
+
+    late_bound = Bindings(
+        f=np.array([[16, 8, 4], [16, 8, 4]]),
         zero=0,
     )
 

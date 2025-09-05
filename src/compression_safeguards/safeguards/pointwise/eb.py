@@ -9,14 +9,7 @@ from collections.abc import Set
 import numpy as np
 
 from ...utils.bindings import Bindings, Parameter
-from ...utils.cast import (
-    _isfinite,
-    _isinf,
-    _isnan,
-    as_bits,
-    saturating_finite_float_cast,
-    to_float,
-)
+from ...utils.cast import as_bits, saturating_finite_float_cast, to_float
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import S, T
 from ..eb import (
@@ -138,25 +131,21 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         )
         _check_error_bound(self._type, eb)
 
-        finite_ok = _compute_finite_absolute_error(
-            self._type, data_float, decoded_float
-        ) <= _compute_finite_absolute_error_bound(self._type, eb, data_float)
+        finite_ok: np.ndarray[S, np.dtype[np.bool]] = np.less_equal(
+            _compute_finite_absolute_error(self._type, data_float, decoded_float),
+            _compute_finite_absolute_error_bound(self._type, eb, data_float),
+        )
 
         # bitwise equality for inf and NaNs (unless equal_nan)
         same_bits = as_bits(data) == as_bits(decoded)
-        both_nan = self._equal_nan and (_isnan(data) & _isnan(decoded))
+        both_nan = self._equal_nan and (np.isnan(data) & np.isnan(decoded))
 
-        ok = np.where(
-            _isfinite(data),
-            finite_ok,
-            np.where(
-                _isinf(data),
-                same_bits,
-                both_nan if self._equal_nan else same_bits,
-            ),
-        )
+        ok: np.ndarray[S, np.dtype[np.bool]] = np.array(finite_ok, copy=None)  # type: ignore
+        np.copyto(ok, same_bits, where=~np.isfinite(data), casting="no")
+        if self._equal_nan:
+            np.copyto(ok, both_nan, where=np.isnan(data), casting="no")
 
-        return ok  # type: ignore
+        return ok
 
     def compute_safe_intervals(
         self,
@@ -202,7 +191,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
 
         lower, upper = _apply_finite_error_bound(self._type, eb, data, to_float(data))
 
-        Lower(lower.flatten()) <= valid[_isfinite(dataf)] <= Upper(upper.flatten())
+        Lower(lower.flatten()) <= valid[np.isfinite(dataf)] <= Upper(upper.flatten())
 
         return valid.preserve_any_nan(dataf, equal_nan=self._equal_nan)
 

@@ -54,6 +54,14 @@ def check_empty(qoi: str):
     check_all_codecs(np.empty(0), qoi)
 
 
+def check_dimensions(qoi: str):
+    check_all_codecs(np.array(42.0), qoi)
+    check_all_codecs(np.array(42, dtype=np.int64), qoi)
+    check_all_codecs(np.array([42.0]), qoi)
+    check_all_codecs(np.array([[42.0]]), qoi)
+    check_all_codecs(np.array([[[42.0]]]), qoi)
+
+
 def check_unit(qoi: str):
     check_all_codecs(np.linspace(-1.0, 1.0, 100, dtype=np.float16), qoi)
 
@@ -70,6 +78,7 @@ def check_linspace(qoi: str):
     check_all_codecs(np.linspace(-1024, 1024, 2831, dtype=np.float32), qoi)
 
 
+# FIXME: could we also test the float128 edge cases, somehow?
 def check_edge_cases(qoi: str):
     check_all_codecs(
         np.array(
@@ -80,10 +89,12 @@ def check_edge_cases(qoi: str):
                 -np.nan,
                 np.finfo(float).min,
                 np.finfo(float).max,
-                np.finfo(float).tiny,
-                -np.finfo(float).tiny,
+                np.finfo(float).smallest_normal,
+                -np.finfo(float).smallest_normal,
+                np.finfo(float).smallest_subnormal,
+                -np.finfo(float).smallest_subnormal,
+                0.0,
                 -0.0,
-                +0.0,
             ]
         ),
         qoi,
@@ -92,6 +103,7 @@ def check_edge_cases(qoi: str):
 
 CHECKS = [
     check_empty,
+    check_dimensions,
     check_unit,
     check_circle,
     check_arange,
@@ -197,6 +209,12 @@ def test_constant(check):
     with pytest.raises(AssertionError, match="constant"):
         check("0")
     with pytest.raises(AssertionError, match="constant"):
+        check("NaN")
+    with pytest.raises(AssertionError, match="constant"):
+        check("Inf")
+    with pytest.raises(AssertionError, match="constant"):
+        check("-Inf")
+    with pytest.raises(AssertionError, match="constant"):
         check("pi")
     with pytest.raises(AssertionError, match="constant"):
         check("e")
@@ -220,8 +238,42 @@ def test_abs(check):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_polynomial(check):
+    # identities
     check("x")
+    check("x + 0")
+    check("x * 1")
+
+    # x * 0
+    check("x * 0")
+
+    # x + (inf / -inf, NaN)
+    check("x + (1/0)")
+    check("x + (-1/0)")
+    check("x + (0/0)")
+
+    # x * (inf / -inf, NaN)
+    check("x * (1/0)")
+    check("x * (-1/0)")
+    check("x * (0/0)")
+
+    # x / (inf / -inf, NaN)
+    check("x / (1/0)")
+    check("x / (-1/0)")
+    check("x / (0/0)")
+
+    # (inf / -inf, NaN) / x
+    check("(1/0) / x")
+    check("(-1/0) / x")
+    check("(0/0) / x")
+
+    # sum(x * (inf / -inf, NaN), 0)
+    check("x * (1/0) + 0")
+    check("x * (-1/0) + 0")
+    check("x * (0/0) + 0")
+
+    # some simple polynomials
     check("2*x")
+    check("x + x")
     check("3*x + pi")
     check("x**2")
     check("x**3")
@@ -260,12 +312,18 @@ def test_logarithm(check):
 @pytest.mark.parametrize("check", CHECKS)
 def test_sign(check):
     check("sign(x)")
+    check("sign(x + 1)")
     check("sign(x * 2)")
     check("sign(e**x)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_rounding(check):
+    check("floor(x)")
+    check("ceil(x)")
+    check("trunc(x)")
+    check("round_ties_even(x)")
+
     check("floor(x) * floor(1.5)")
     check("ceil(x) * ceil(1.5)")
     check("trunc(x) * trunc(1.5)")
@@ -275,8 +333,8 @@ def test_rounding(check):
 @pytest.mark.parametrize("check", CHECKS)
 def test_inverse(check):
     check("1 / x")
-    check("1 / x**2")
-    check("1 / x**3")
+    check("2 / x**2")
+    check("-3 / x**3")
 
     check("reciprocal(x)")
     check("reciprocal(x - 1)")
@@ -294,6 +352,7 @@ def test_power_function(check):
 def test_sqrt(check):
     check("sqrt(x)")
     check("1 / sqrt(x)")
+    check("reciprocal(sqrt(x))")
     check("sqrt(sqrt(x))")
 
 
@@ -319,16 +378,18 @@ def test_trigonometric(check):
     check("sin(x)")
     check("cos(x)")
     check("tan(x)")
-    check("cot(x)")
-    check("sec(x)")
-    check("csc(x)")
 
     check("asin(x)")
     check("acos(x)")
     check("atan(x)")
-    check("acot(x)")
-    check("asec(x)")
-    check("acsc(x)")
+
+    check("sin(x) * sin(1.5)")
+    check("cos(x) * cos(1.5)")
+    check("tan(x) * tan(1.5)")
+
+    check("asin(x) * asin(0.5)")
+    check("acos(x) * acos(0.5)")
+    check("atan(x) * atan(0.5)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -336,16 +397,37 @@ def test_hyperbolic(check):
     check("sinh(x)")
     check("cosh(x)")
     check("tanh(x)")
-    check("coth(x)")
-    check("sech(x)")
-    check("csch(x)")
 
     check("asinh(x)")
     check("acosh(x)")
     check("atanh(x)")
-    check("acoth(x)")
-    check("asech(x)")
-    check("acsch(x)")
+
+    check("sinh(x) * sinh(1.5)")
+    check("cosh(x) * cosh(1.5)")
+    check("tanh(x) * tanh(1.5)")
+
+    check("asinh(x) * asinh(1.5)")
+    check("acosh(x) * acosh(1.5)")
+    check("atanh(x) * atanh(0.5)")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_classification(check):
+    check("isfinite(x)")
+    check("isinf(x)")
+    check("isnan(x)")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_where(check):
+    check("where(x, 1, 0)")
+    check("where(0, x*2, 0)")
+    check("where(0, 1, x/2)")
+    check("where(1, x*2, 0)")
+    check("where(1, 1, x/2)")
+    check("where(0, x*2, x/2)")
+    check("where(1, x*2, x/2)")
+    check("where(x, x*2, x/2)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -468,9 +550,11 @@ def test_late_bound_constant():
         f=np.array([16, 8, 4, 2, 1, 0]).reshape(2, 3),
     )
 
+    imax = np.iinfo(data.dtype).max
+
     valid = safeguard.compute_safe_intervals(data, late_bound=late_bound)
-    assert np.all(valid._lower == (data.flatten() - np.array([16, 8, 4, 2, 1, 0])))
-    assert np.all(valid._upper == (data.flatten() + np.array([16, 8, 4, 2, 1, 0])))
+    assert np.all(valid._lower == np.array([0 - 16, 1 - 8, 2 - 4, 3 - 2, 4 - 1, 1]))
+    assert np.all(valid._upper == np.array([0 + 16, 1 + 8, 2 + 4, 3 + 2, 4 + 1, imax]))
 
     ok = safeguard.check_pointwise(data, -data, late_bound=late_bound)
     assert np.all(ok == np.array([True, True, True, False, False, False]).reshape(2, 3))
@@ -519,9 +603,7 @@ def test_gaussian_kernel():
 def test_constant_fold():
     from compression_safeguards.safeguards._qois.expr.data import Data
     from compression_safeguards.safeguards._qois.expr.literal import Number
-    from compression_safeguards.safeguards._qois.expr.logexp import (
-        ScalarLogWithBase,
-    )
+    from compression_safeguards.safeguards._qois.expr.logexp import ScalarLogWithBase
 
     expr = ScalarLogWithBase(
         Number.from_symbolic_int(100), Number.from_symbolic_int(10)
@@ -574,3 +656,35 @@ def test_fuzzer_found_logarithm_noise():
 
     encoded = codec.encode(data)
     codec.decode(encoded)
+
+
+def test_fuzzer_found_classification():
+    data = np.array([], dtype=np.int16)
+    decoded = np.array([], dtype=np.int16)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            PointwiseQuantityOfInterestErrorBoundSafeguard(
+                qoi="isinf(log(exp2(exp10(isnan(exp10(e)))), base=x))",
+                type="rel",
+                eb=0,
+            ),
+        ],
+    )
+
+    data = np.array([], dtype=np.int64)
+    decoded = np.array([], dtype=np.int64)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            PointwiseQuantityOfInterestErrorBoundSafeguard(
+                qoi="exp10(exp10(isinf(exp2(1.5298016088828333e+308))) - x)",
+                type="rel",
+                eb=0,
+            ),
+        ],
+    )

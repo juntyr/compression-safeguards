@@ -1,8 +1,12 @@
 import itertools
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from typing import Callable
 
 import numpy as np
+from typing_extensions import (
+    TypeVarTuple,  # MSPV 3.11
+    Unpack,  # MSPV 3.11
+)
 
 from ....utils.bindings import Parameter
 from .abc import Expr
@@ -11,10 +15,15 @@ from .constfold import ScalarFoldedConstant
 from .data import Data
 from .divmul import ScalarMultiply
 from .group import Group
-from .typing import F, Ns, Ps, PsI
+from .typing import Es, F, Ns, Ps, PsI
+
+# FIXME: actually bound the types to be Expr
+# https://discuss.python.org/t/how-to-use-typevartuple/67502
+Es2 = TypeVarTuple("Es2")
+""" Tuple of [`Expr`][compression_safeguards.safeguards._qois.expr.abc.Expr]s. """
 
 
-class Array(Expr):
+class Array(Expr[Expr, Unpack[Es]]):
     __slots__ = ("_array",)
     _array: np.ndarray
 
@@ -27,12 +36,12 @@ class Array(Expr):
                         f"elements must all have the consistent shape {el.shape}"
                     )
                 aels.append(e._array)
-            self._array = np.array(aels)
+            self._array = np.array(aels, copy=None)
         else:
             for e in els:
                 if isinstance(e, Array):
                     raise ValueError("elements must all be scalar")
-            self._array = np.array((el,) + els)
+            self._array = np.array((el,) + els, copy=None)
 
     @staticmethod
     def from_data_shape(shape: tuple[int, ...]) -> "Array":
@@ -45,35 +54,18 @@ class Array(Expr):
         return out
 
     @property
-    def has_data(self) -> bool:
-        return any(e.has_data for e in self._array.flat)
+    def args(self) -> tuple[Expr, Unpack[Es]]:
+        if self._array.ndim == 1:
+            return tuple(self._array)
+        return tuple(a for a in self._array)
 
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        indices = set()
-        for e in self._array.flat:
-            indices.update(e.data_indices)
-        return frozenset(indices)
-
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> Expr:
-        return Array.map_unary(
-            self, lambda e: e.apply_array_element_offset(axis, offset)
-        )
-
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        late_bound = set()
-        for e in self._array.flat:
-            late_bound.update(e.late_bound_constants)
-        return frozenset(late_bound)
+    def with_args(self, el: Expr, *els: Unpack[Es]) -> "Array":
+        return Array(el, *els)  # type: ignore
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return Array.map_unary(
-            self, lambda e: ScalarFoldedConstant.constant_fold_expr(e, dtype)
+        return Array.map(
+            lambda e: ScalarFoldedConstant.constant_fold_expr(e, dtype),  # type: ignore
+            self,
         )
 
     def eval(
@@ -84,64 +76,48 @@ class Array(Expr):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         assert False, "cannot evaluate an array expression"
 
-    def compute_data_error_bound_unchecked(
+    def compute_data_bounds_unchecked(
         self,
-        eb_expr_lower: np.ndarray[Ps, np.dtype[F]],
-        eb_expr_upper: np.ndarray[Ps, np.dtype[F]],
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
         X: np.ndarray[Ps, np.dtype[F]],
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ps, np.dtype[F]], np.ndarray[Ps, np.dtype[F]]]:
-        assert False, "cannot derive error bounds over an array expression"
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        assert False, "cannot derive data bounds over an array expression"
 
     @property
     def shape(self) -> tuple[int, ...]:
         return self._array.shape
 
     @staticmethod
-    def map_unary(expr: Expr, m: Callable[[Expr], Expr]) -> Expr:
-        if isinstance(expr, Array):
-            out = Array.__new__(Array)
-            out._array = np.fromiter(
-                (m(e) for e in expr._array.flat), dtype=object, count=expr._array.size
-            ).reshape(expr._array.shape)
-            return out
-        return m(expr)
+    def map(map: Callable[[Unpack[Es2]], Expr], *exprs: Unpack[Es2]) -> Expr:
+        if not any(isinstance(e, Array) for e in exprs):
+            return map(*exprs)
 
-    @staticmethod
-    def map_binary(left: Expr, right: Expr, m: Callable[[Expr, Expr], Expr]) -> Expr:
-        if isinstance(left, Array):
-            if isinstance(right, Array):
-                if left.shape != right.shape:
+        shape = None
+        size = 0
+        iters: list[Iterator[Expr]] = []
+
+        for i, expr in enumerate(exprs):  # type: ignore
+            if isinstance(expr, Array):
+                if shape is not None and expr.shape != shape:
                     raise ValueError(
-                        f"shape mismatch between operands {left.shape} and {right.shape}"
+                        f"shape mismatch between operands, expected {shape} but found {expr.shape} for operand {i + 1}"
                     )
-                out = Array.__new__(Array)
-                out._array = np.fromiter(
-                    (m(le, ri) for le, ri in zip(left._array.flat, right._array.flat)),
-                    dtype=object,
-                    count=left._array.size,
-                ).reshape(left._array.shape)
-                return out
+                shape = expr.shape
+                size = expr._array.size
+                iters.append(expr._array.flat)
+            else:
+                iters.append(itertools.repeat(expr))
 
-            out = Array.__new__(Array)
-            out._array = np.fromiter(
-                (m(le, right) for le in left._array.flat),
-                dtype=object,
-                count=left._array.size,
-            ).reshape(left._array.shape)
-            return out
-
-        if isinstance(right, Array):
-            out = Array.__new__(Array)
-            out._array = np.fromiter(
-                (m(left, ri) for ri in right._array.flat),
-                dtype=object,
-                count=right._array.size,
-            ).reshape(right._array.shape)
-            return out
-
-        return m(left, right)
+        out = Array.__new__(Array)
+        out._array = np.fromiter(
+            (map(*its) for its in zip(*iters)),
+            dtype=object,
+            count=size,
+        ).reshape(shape)
+        return out
 
     def index(self, index: tuple[int | slice, ...]) -> Expr:
         a = self._array[index]
@@ -159,7 +135,10 @@ class Array(Expr):
     def sum(self) -> Expr:
         acc = None
         for e in self._array.flat:
-            acc = e if acc is None else ScalarAdd(acc, e)  # type: ignore
+            if acc is None:
+                acc = e
+            else:
+                acc = ScalarAdd(acc, e)
         assert acc is not None
         # we can return a group here since acc is not an array
         assert not isinstance(acc, Array)
@@ -179,10 +158,13 @@ class Array(Expr):
         out._array = np.empty((left.shape[0], right.shape[1]), dtype=object)
         for n in range(left.shape[0]):
             for m in range(right.shape[1]):
-                acc = None
+                acc: None | Expr = None
                 for k in range(left.shape[1]):
                     kk = ScalarMultiply(left._array[n, k], right._array[k, m])
-                    acc = kk if acc is None else ScalarAdd(acc, kk)  # type: ignore
+                    if acc is None:
+                        acc = kk
+                    else:
+                        acc = ScalarAdd(acc, kk)
                 assert acc is not None
                 # we can apply a group here since acc is not an array
                 assert not isinstance(acc, Array)

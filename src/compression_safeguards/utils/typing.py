@@ -2,7 +2,7 @@
 Commonly used type variables.
 """
 
-__all__ = ["C", "F", "S", "Si", "T", "U"]
+__all__ = ["C", "F", "S", "Si", "T", "Ti", "U"]
 
 from typing import TypeVar
 
@@ -22,6 +22,9 @@ Si = TypeVar("Si", bound=tuple[int, ...])
 
 T = TypeVar("T", bound=np.number, covariant=True)
 """ Any numpy [`number`][numpy.number] data type (covariant). """
+
+Ti = TypeVar("Ti", bound=np.number)
+""" Any numpy [`number`][numpy.number] data type (invariant). """
 
 U = TypeVar("U", bound=np.unsignedinteger, covariant=True)
 """ Any numpy [`unsignedinteger`][numpy.unsignedinteger] data type (covariant). """

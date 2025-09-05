@@ -1,0 +1,201 @@
+from enum import Enum, auto
+from typing import Callable
+from warnings import warn
+
+import numpy as np
+
+from ...utils._compat import _broadcast_to, _nan_to_zero_inf_to_finite, _nextafter
+from .expr.typing import Ci, F, Ns, Ps
+
+
+def guarantee_arg_within_expr_bounds(
+    expr: Callable[[np.ndarray[Ps, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]],
+    exprv: np.ndarray[Ps, np.dtype[F]],
+    argv: np.ndarray[Ps, np.dtype[F]],
+    argv_bound_guess: np.ndarray[Ps, np.dtype[F]],
+    expr_lower: np.ndarray[Ps, np.dtype[F]],
+    expr_upper: np.ndarray[Ps, np.dtype[F]],
+) -> np.ndarray[Ps, np.dtype[F]]:
+    """
+    Ensure that `argv_bound_guess`, a guess for a lower or upper bound on
+    argument `argv`, meets the lower and upper bounds `expr_lower` and
+    `expr_upper` on the expression `expr`, where `exprv = expr(argv)`.
+
+    Parameters
+    ----------
+    expr : Callable[[np.ndarray[Ps, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]]
+        Evaluate the expression, given the argument `argv`.
+    exprv : np.ndarray[Ps, np.dtype[F]]
+        Evaluation of the expression on the argument `argv`.
+    argv : np.ndarray[Ps, np.dtype[F]]
+        Pointwise expression argument.
+    argv_bound_guess : np.ndarray[Ps, np.dtype[F]]
+        Provided guess for the bound on the argument `argv`.
+    expr_lower : np.ndarray[Ps, np.dtype[F]]
+        Pointwise lower bound on the expression, must be less than or equal to
+        `exprv`.
+    expr_upper : np.ndarray[Ps, np.dtype[F]]
+        Pointwise upper bound on the expression, must be greater than or equal
+        to `exprv`.
+
+    Returns
+    -------
+    argv_bound_guess : np.ndarray[Ns, np.dtype[F]]
+        Refined bound that guarantees that
+        `expr_lower <= expr(argv_bound_guess) <= expr_upper` or
+        `isnan(exprv) & isnan(expr(argv_bound_guess))`.
+    """
+
+    return guarantee_data_within_expr_bounds(
+        expr,
+        exprv,
+        argv,
+        argv_bound_guess,
+        expr_lower,
+        expr_upper,
+        warn_on_bounds_exceeded=False,
+    )
+
+
+def guarantee_data_within_expr_bounds(
+    expr: Callable[[np.ndarray[Ns, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]],
+    exprv: np.ndarray[Ps, np.dtype[F]],
+    Xs: np.ndarray[Ns, np.dtype[F]],
+    Xs_bound_guess: np.ndarray[Ns, np.dtype[F]],
+    expr_lower: np.ndarray[Ps, np.dtype[F]],
+    expr_upper: np.ndarray[Ps, np.dtype[F]],
+    *,
+    warn_on_bounds_exceeded: bool,
+) -> np.ndarray[Ns, np.dtype[F]]:
+    """
+    Ensure that `Xs_bound_guess`, a guess for a lower or upper bound on `Xs`,
+    meets the lower and upper bounds `expr_lower` and `expr_upper` on the
+    expression `expr`, where `exprv = expr(Xs)`.
+
+    Parameters
+    ----------
+    expr : Callable[[np.ndarray[Ns, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]]
+        Evaluate the expression, given the stencil-extended data `Xs`.
+    exprv : np.ndarray[Ps, np.dtype[F]]
+        Evaluation of the expression on the stencil-extended data `Xs`.
+    Xs : np.ndarray[Ns, np.dtype[F]]
+        Stencil-extended data.
+    Xs_bound_guess : np.ndarray[Ns, np.dtype[F]]
+        Provided guess for the bound on the stencil-extended data `Xs`.
+    expr_lower : np.ndarray[Ps, np.dtype[F]]
+        Pointwise lower bound on the expression, must be less than or equal to
+        `exprv`.
+    expr_upper : np.ndarray[Ps, np.dtype[F]]
+        Pointwise upper bound on the expression, must be greater than or equal
+        to `exprv`.
+    warn_on_bounds_exceeded : bool
+        If [`True`][True], a warning is emitted when the `Xs_bound_guess` does
+        not already meet the `expr_lower` and `expr_upper` bounds.
+
+    Returns
+    -------
+    Xs_bound_guess : np.ndarray[Ns, np.dtype[F]]
+        Refined bound that guarantees that
+        `expr_lower <= expr(Xs_bound_guess) <= expr_upper` or
+        `isnan(exprv) & isnan(expr(Xs_bound_guess))`.
+    """
+
+    exprv = np.array(exprv, copy=None)
+    Xs = np.array(Xs, copy=None)
+    Xs_bound_guess = np.array(Xs_bound_guess, copy=True)
+    expr_lower = np.array(expr_lower, copy=None)
+    expr_upper = np.array(expr_upper, copy=None)
+
+    assert exprv.dtype == Xs.dtype
+    assert Xs_bound_guess.dtype == Xs.dtype
+    assert expr_lower.dtype == Xs.dtype
+    assert expr_upper.dtype == Xs.dtype
+
+    # check if any derived expression exceeds the expression bounds
+    def exceeds_expr_bounds(
+        Xs_bound_guess: np.ndarray[Ns, np.dtype[F]],
+    ) -> np.ndarray[Ns, np.dtype[np.bool]]:
+        exprv_Xs_bound_guess = expr(Xs_bound_guess)
+
+        in_bounds: np.ndarray[Ps, np.dtype[np.bool]] = (
+            np.isnan(exprv) & np.isnan(exprv_Xs_bound_guess)
+        ) | (
+            np.greater_equal(exprv_Xs_bound_guess, expr_lower)
+            & np.less_equal(exprv_Xs_bound_guess, expr_upper)
+        )
+
+        bounds_exceeded: np.ndarray[Ns, np.dtype[np.bool]] = _broadcast_to(
+            (~in_bounds).reshape(exprv.shape + (1,) * (Xs.ndim - exprv.ndim)),
+            Xs.shape,
+        )
+        return bounds_exceeded
+
+    # FIXME: what to do about NaNs?
+
+    for _ in range(3):
+        bounds_exceeded = exceeds_expr_bounds(Xs_bound_guess)
+
+        if not np.any(bounds_exceeded):
+            np.copyto(Xs_bound_guess, Xs, where=(Xs_bound_guess == Xs), casting="no")
+            return Xs_bound_guess
+
+        if warn_on_bounds_exceeded:
+            warn_on_bounds_exceeded = False
+            warn("guaranteed data bounds do not meet the expression bounds")
+
+        # nudge the guess towards the data by 1 ULP
+        # TODO: np.nextafter(out=...) once possible
+        np.copyto(
+            Xs_bound_guess,
+            _nextafter(Xs_bound_guess, Xs),
+            where=bounds_exceeded,
+            casting="no",
+        )
+
+    Xs_diff = np.array(_nan_to_zero_inf_to_finite(Xs_bound_guess - Xs), copy=None)
+
+    # exponential backoff for the distance
+    backoff = Xs.dtype.type(0.5)
+
+    for _ in range(6):
+        bounds_exceeded = exceeds_expr_bounds(Xs_bound_guess)
+
+        if not np.any(bounds_exceeded):
+            np.copyto(Xs_bound_guess, Xs, where=(Xs_bound_guess == Xs), casting="no")
+            return Xs_bound_guess
+
+        # shove the guess towards the data by exponentially reducing the
+        #  difference
+        Xs_diff *= backoff
+        backoff = np.divide(backoff, 2)
+        np.copyto(Xs_bound_guess, Xs + Xs_diff, where=bounds_exceeded, casting="no")
+
+    warn("data bounds required excessive nudging")
+
+    return np.copy(Xs)
+
+
+class DataBounds(Enum):
+    # not yet checked, will likely need to be corrected
+    unchecked = auto()
+    # already checked, check should succeed
+    checked = auto()
+    # it is impossible for anything to go wrong, only use for wrappers that forward
+    infallible = auto()
+
+
+def checked_data_bounds(func: Ci) -> Ci:
+    setattr(func, "_checked_data_bounds", DataBounds.checked)
+    return func
+
+
+def data_bounds(bounds: DataBounds) -> Callable[[Ci], Ci]:
+    def data_bounds(func: Ci) -> Ci:
+        setattr(func, "_checked_data_bounds", bounds)
+        return func
+
+    return data_bounds
+
+
+def data_bounds_checks(func: Callable) -> DataBounds:
+    return getattr(func, "_checked_data_bounds", DataBounds.unchecked)

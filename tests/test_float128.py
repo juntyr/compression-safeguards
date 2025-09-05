@@ -1,27 +1,22 @@
 import numpy as np
 
-from compression_safeguards.utils.cast import (
+from compression_safeguards.utils._compat import _nextafter
+from compression_safeguards.utils._float128 import (
     _float128,
-    _float128_eps,
     _float128_max,
     _float128_min,
-    _float128_precision,
     _float128_smallest_normal,
     _float128_smallest_subnormal,
-    _isnan,
-    _nextafter,
 )
 
 
 def test_float128():
     assert _float128_max == _float128("1.189731495357231765085759326628007e+4932")
     assert _float128_min == _float128("-1.189731495357231765085759326628007e+4932")
-    assert _float128_precision == 33
     assert _float128_smallest_subnormal == _float128("6e-4966")
     assert _float128_smallest_normal == _float128(
         "3.3621031431120935062626778173217526e-4932"
     )
-    assert _float128_eps == _float128("1.9259299443872358530559779425849273e-34")
 
 
 def test_nextafter_float128():
@@ -128,8 +123,8 @@ def test_nextafter_float128():
     )
     assert _nextafter(np.array(_float128(-np.inf)), -np.inf)[()] == _float128(-np.inf)
 
-    assert _isnan(np.array(_nextafter(np.array(_float128(np.nan)), 0)[()]))
-    assert _isnan(np.array(_nextafter(np.array(_float128(np.nan)), np.inf)[()]))
-    assert _isnan(np.array(_nextafter(np.array(_float128(0)), np.nan)[()]))
-    assert _isnan(np.array(_nextafter(np.array(_float128(np.inf)), np.nan)[()]))
-    assert _isnan(np.array(_nextafter(np.array(_float128(np.nan)), np.nan)[()]))
+    assert np.isnan(np.array(_nextafter(np.array(_float128(np.nan)), 0)[()]))
+    assert np.isnan(np.array(_nextafter(np.array(_float128(np.nan)), np.inf)[()]))
+    assert np.isnan(np.array(_nextafter(np.array(_float128(0)), np.nan)[()]))
+    assert np.isnan(np.array(_nextafter(np.array(_float128(np.inf)), np.nan)[()]))
+    assert np.isnan(np.array(_nextafter(np.array(_float128(np.nan)), np.nan)[()]))

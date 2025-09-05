@@ -1,13 +1,11 @@
 import atheris
 
 with atheris.instrument_imports():
+    import sys
+    import warnings
     from typing import Any
 
     import numpy as np
-
-with atheris.instrument_imports():
-    import sys
-    import warnings
 
     from compression_safeguards.utils.intervals import (
         Interval,

@@ -59,7 +59,7 @@ plugins:
       source_dirs:
         - nav_heading: [API Reference]
           base: src
-          ignore: ["_qois"]
+          ignore: ["_compat.py", "_float128.py", "_qois"]
         - nav_heading: [API Reference]
           base: packages/numcodecs-safeguards/src
   - mkdocs-jupyter:

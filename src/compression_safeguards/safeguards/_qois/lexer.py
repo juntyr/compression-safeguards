@@ -11,6 +11,8 @@ class QoILexer(Lexer):
         # literals
         INTEGER,  # type: ignore[name-defined]  # noqa: F821
         FLOAT,  # type: ignore[name-defined]  # noqa: F821
+        INF,  # type: ignore[name-defined]  # noqa: F821
+        NAN,  # type: ignore[name-defined]  # noqa: F821
         STRING,  # type: ignore[name-defined]  # noqa: F821
         # operators
         PLUS,  # type: ignore[name-defined]  # noqa: F821
@@ -70,28 +72,22 @@ class QoILexer(Lexer):
         SIN,  # type: ignore[name-defined]  # noqa: F821
         COS,  # type: ignore[name-defined]  # noqa: F821
         TAN,  # type: ignore[name-defined]  # noqa: F821
-        COT,  # type: ignore[name-defined]  # noqa: F821
-        SEC,  # type: ignore[name-defined]  # noqa: F821
-        CSC,  # type: ignore[name-defined]  # noqa: F821
         ASIN,  # type: ignore[name-defined]  # noqa: F821
         ACOS,  # type: ignore[name-defined]  # noqa: F821
         ATAN,  # type: ignore[name-defined]  # noqa: F821
-        ACOT,  # type: ignore[name-defined]  # noqa: F821
-        ASEC,  # type: ignore[name-defined]  # noqa: F821
-        ACSC,  # type: ignore[name-defined]  # noqa: F821
         # hyperbolic
         SINH,  # type: ignore[name-defined]  # noqa: F821
         COSH,  # type: ignore[name-defined]  # noqa: F821
         TANH,  # type: ignore[name-defined]  # noqa: F821
-        COTH,  # type: ignore[name-defined]  # noqa: F821
-        SECH,  # type: ignore[name-defined]  # noqa: F821
-        CSCH,  # type: ignore[name-defined]  # noqa: F821
         ASINH,  # type: ignore[name-defined]  # noqa: F821
         ACOSH,  # type: ignore[name-defined]  # noqa: F821
         ATANH,  # type: ignore[name-defined]  # noqa: F821
-        ACOTH,  # type: ignore[name-defined]  # noqa: F821
-        ASECH,  # type: ignore[name-defined]  # noqa: F821
-        ACSCH,  # type: ignore[name-defined]  # noqa: F821
+        # classification
+        ISFINITE,  # type: ignore[name-defined]  # noqa: F821
+        ISINF,  # type: ignore[name-defined]  # noqa: F821
+        ISNAN,  # type: ignore[name-defined]  # noqa: F821
+        # conditional
+        WHERE,  # type: ignore[name-defined]  # noqa: F821
         # array operations
         SUM,  # type: ignore[name-defined]  # noqa: F821
         MATMUL,  # type: ignore[name-defined]  # noqa: F821
@@ -171,6 +167,10 @@ class QoILexer(Lexer):
     # statements
     ID["return"] = RETURN  # type: ignore[index, name-defined]  # noqa: F821
 
+    # literals
+    ID["Inf"] = INF  # type: ignore[index, name-defined]  # noqa: F821
+    ID["NaN"] = NAN  # type: ignore[index, name-defined]  # noqa: F821
+
     # constants
     ID["e"] = EULER  # type: ignore[index, name-defined]  # noqa: F821
     ID["pi"] = PI  # type: ignore[index, name-defined]  # noqa: F821
@@ -211,28 +211,22 @@ class QoILexer(Lexer):
     ID["sin"] = SIN  # type: ignore[index, name-defined]  # noqa: F821
     ID["cos"] = COS  # type: ignore[index, name-defined]  # noqa: F821
     ID["tan"] = TAN  # type: ignore[index, name-defined]  # noqa: F821
-    ID["cot"] = COT  # type: ignore[index, name-defined]  # noqa: F821
-    ID["sec"] = SEC  # type: ignore[index, name-defined]  # noqa: F821
-    ID["csc"] = CSC  # type: ignore[index, name-defined]  # noqa: F821
     ID["asin"] = ASIN  # type: ignore[index, name-defined]  # noqa: F821
     ID["acos"] = ACOS  # type: ignore[index, name-defined]  # noqa: F821
     ID["atan"] = ATAN  # type: ignore[index, name-defined]  # noqa: F821
-    ID["acot"] = ACOT  # type: ignore[index, name-defined]  # noqa: F821
-    ID["asec"] = ASEC  # type: ignore[index, name-defined]  # noqa: F821
-    ID["acsc"] = ACSC  # type: ignore[index, name-defined]  # noqa: F821
     # hyperbolic
     ID["sinh"] = SINH  # type: ignore[index, name-defined]  # noqa: F821
     ID["cosh"] = COSH  # type: ignore[index, name-defined]  # noqa: F821
     ID["tanh"] = TANH  # type: ignore[index, name-defined]  # noqa: F821
-    ID["coth"] = COTH  # type: ignore[index, name-defined]  # noqa: F821
-    ID["sech"] = SECH  # type: ignore[index, name-defined]  # noqa: F821
-    ID["csch"] = CSCH  # type: ignore[index, name-defined]  # noqa: F821
     ID["asinh"] = ASINH  # type: ignore[index, name-defined]  # noqa: F821
     ID["acosh"] = ACOSH  # type: ignore[index, name-defined]  # noqa: F821
     ID["atanh"] = ATANH  # type: ignore[index, name-defined]  # noqa: F821
-    ID["acoth"] = ACOTH  # type: ignore[index, name-defined]  # noqa: F821
-    ID["asech"] = ASECH  # type: ignore[index, name-defined]  # noqa: F821
-    ID["acsch"] = ACSCH  # type: ignore[index, name-defined]  # noqa: F821
+    # classification
+    ID["isfinite"] = ISFINITE  # type: ignore[index, name-defined]  # noqa: F821
+    ID["isinf"] = ISINF  # type: ignore[index, name-defined]  # noqa: F821
+    ID["isnan"] = ISNAN  # type: ignore[index, name-defined]  # noqa: F821
+    # conditional
+    ID["where"] = WHERE  # type: ignore[index, name-defined]  # noqa: F821
     # array operations
     ID["sum"] = SUM  # type: ignore[index, name-defined]  # noqa: F821
     ID["matmul"] = MATMUL  # type: ignore[index, name-defined]  # noqa: F821
@@ -280,6 +274,8 @@ class QoILexer(Lexer):
             # literals
             "INTEGER": "integer",
             "FLOAT": "floating-point number",
+            "Inf": "`Inf`",
+            "NaN": "`NaN`",
             "STRING": "string",
             # operators
             "PLUS": "`+`",
@@ -339,28 +335,22 @@ class QoILexer(Lexer):
             "SIN": "`sin`",
             "COS": "`cos`",
             "TAN": "`tan`",
-            "COT": "`cot`",
-            "SEC": "`sec`",
-            "CSC": "`csc`",
             "ASIN": "`asin`",
             "ACOS": "`acos`",
             "ATAN": "`atan`",
-            "ACOT": "`acot`",
-            "ASEC": "`asec`",
-            "ACSC": "`acsc`",
             # hyperbolic
             "SINH": "`sinh`",
             "COSH": "`cosh`",
             "TANH": "`tanh`",
-            "COTH": "`coth`",
-            "SECH": "`sech`",
-            "CSCH": "`csch`",
             "ASINH": "`asinh`",
             "ACOSH": "`acosh`",
             "ATANH": "`atanh`",
-            "ACOTH": "`acoth`",
-            "ASECH": "`asech`",
-            "ACSCH": "`acsch`",
+            # classification
+            "ISFINITE": "`isfinite`",
+            "ISINF": "`isinf`",
+            "ISNAN": "`isnan`",
+            # conditional
+            "WHERE": "`where`",
             # array operations
             "SUM": "`sum`",
             "MATMUL": "`matmul`",

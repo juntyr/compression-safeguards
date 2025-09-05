@@ -18,7 +18,7 @@ from compression_safeguards.safeguards._qois.expr.finite_difference import (
     finite_difference_coefficients,
 )
 from compression_safeguards.safeguards._qois.expr.literal import Number
-from compression_safeguards.utils.cast import _float128_dtype
+from compression_safeguards.utils._float128 import _float128_dtype
 
 
 def F(p: int, q: int = 1) -> int | float:
