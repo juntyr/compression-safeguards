@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _is_negative
+from ....utils._compat import _is_sign_negative_number
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from .abc import Expr
@@ -61,14 +61,14 @@ class ScalarAbs(Expr[Expr]):
         np.copyto(
             arg_lower,
             -expr_upper,
-            where=(np.less_equal(expr_lower, 0) | _is_negative(argv)),
+            where=(np.less_equal(expr_lower, 0) | _is_sign_negative_number(argv)),
             casting="no",
         )
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.copy(expr_upper)
         np.copyto(
             arg_upper,
             -expr_lower,
-            where=(np.greater(expr_lower, 0) & _is_negative(argv)),
+            where=(np.greater(expr_lower, 0) & _is_sign_negative_number(argv)),
             casting="no",
         )
 

@@ -4,7 +4,7 @@ import numpy as np
 
 from ....utils._compat import (
     _floating_smallest_subnormal,
-    _is_negative,
+    _is_sign_negative_number,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
 )
@@ -174,7 +174,7 @@ class ScalarSquare(Expr[Expr]):
         np.copyto(
             arg_lower,
             -au,
-            where=(np.less_equal(expr_lower, 0) | _is_negative(argv)),
+            where=(np.less_equal(expr_lower, 0) | _is_sign_negative_number(argv)),
             casting="no",
         )
         arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
@@ -183,7 +183,7 @@ class ScalarSquare(Expr[Expr]):
         np.copyto(
             arg_upper,
             -al,
-            where=(np.greater(expr_lower, 0) & _is_negative(argv)),
+            where=(np.greater(expr_lower, 0) & _is_sign_negative_number(argv)),
             casting="no",
         )
         arg_upper = _maximum_zero_sign_sensitive(argv, arg_upper)

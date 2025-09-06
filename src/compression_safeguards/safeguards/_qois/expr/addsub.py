@@ -8,7 +8,6 @@ from ....utils._compat import (
     _floating_max,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
-    _nan_to_zero,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
@@ -172,8 +171,14 @@ def compute_left_associate_sum_data_bounds(
     # drop into expression difference bounds to divide up the bound
     # for NaN sums, we use a zero difference to ensure NaNs don't
     #  accidentally propagate into the term error bounds
-    expr_lower_diff: np.ndarray[Ps, np.dtype[F]] = _nan_to_zero(expr_lower - exprv)
-    expr_upper_diff: np.ndarray[Ps, np.dtype[F]] = _nan_to_zero(expr_upper - exprv)
+    expr_lower_diff: np.ndarray[Ps, np.dtype[F]] = np.array(
+        np.subtract(expr_lower, exprv), copy=None
+    )
+    expr_lower_diff[np.isnan(expr_lower_diff)] = 0
+    expr_upper_diff: np.ndarray[Ps, np.dtype[F]] = np.array(
+        np.subtract(expr_upper, exprv), copy=None
+    )
+    expr_upper_diff[np.isnan(expr_upper_diff)] = 0
 
     # if exprv is NaN, expr_[lower|upper]_diff are zero
     # if expr_[lower|upper] is infinite but exprv is finite,

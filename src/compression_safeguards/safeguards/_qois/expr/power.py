@@ -3,7 +3,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from ....utils._compat import (
-    _is_negative,
+    _is_sign_negative_number,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
     _where,
@@ -77,7 +77,7 @@ class ScalarPower(Expr[Expr, Expr]):
         # we need to full-force-force a and b to stay the same when
         #  (a) av is negative: powers of negative numbers are just too tricky
         #  (b) av is NaN and bv is zero: NaN ** 0 = 1 ... why???
-        force_same: np.ndarray[Ps, np.dtype[np.bool]] = _is_negative(av)
+        force_same: np.ndarray[Ps, np.dtype[np.bool]] = _is_sign_negative_number(av)
         force_same |= np.isnan(av) & (bv == 0)
 
         # rewrite a ** b as fake_abs(e^(b*ln(fake_abs(a))))
@@ -105,8 +105,8 @@ class ScalarPower(Expr[Expr, Expr]):
         # flip the lower/upper bounds if the result is negative
         #  since our rewrite below only works with non-negative exprv
         expr_lower, expr_upper = (
-            _where(_is_negative(exprv), -expr_upper, expr_lower),
-            _where(_is_negative(exprv), -expr_lower, expr_upper),
+            _where(_is_sign_negative_number(exprv), -expr_upper, expr_lower),
+            _where(_is_sign_negative_number(exprv), -expr_lower, expr_upper),
         )
 
         # ensure that the bounds at least contain the rewritten expression
@@ -167,10 +167,14 @@ class ScalarFakeAbs(Expr[Expr]):
 
         # flip the lower/upper bounds if the arg is negative
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(expr_lower, copy=True)
-        np.copyto(arg_lower, -expr_upper, where=_is_negative(argv), casting="no")
+        np.copyto(
+            arg_lower, -expr_upper, where=_is_sign_negative_number(argv), casting="no"
+        )
 
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(expr_upper, copy=True)
-        np.copyto(arg_upper, -expr_lower, where=_is_negative(argv), casting="no")
+        np.copyto(
+            arg_upper, -expr_lower, where=_is_sign_negative_number(argv), casting="no"
+        )
 
         return arg.compute_data_bounds(
             arg_lower,

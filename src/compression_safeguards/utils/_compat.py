@@ -4,7 +4,6 @@ equivalent behaviour for all supported dtypes, e.g. numpy_quaddtype.
 """
 
 __all__ = [
-    "_nan_to_zero",
     "_nan_to_zero_inf_to_finite",
     "_nextafter",
     "_symmetric_modulo",
@@ -12,9 +11,9 @@ __all__ = [
     "_maximum_zero_sign_sensitive",
     "_where",
     "_broadcast_to",
-    "_is_negative",
+    "_is_sign_negative_number",
     "_is_negative_zero",
-    "_is_positive",
+    "_is_sign_positive_number",
     "_is_positive_zero",
     "_floating_max",
     "_floating_smallest_subnormal",
@@ -38,15 +37,6 @@ from ._float128 import (
     _float128_type,
 )
 from .typing import F, S, Si, T, Ti
-
-
-# reimplementation of np.nan_to_num that also works for numpy_quaddtype and
-#  keeps infinities intact
-@np.errstate(invalid="ignore")
-def _nan_to_zero(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]:
-    out = np.array(a, copy=True)
-    out[np.isnan(out)] = 0
-    return out
 
 
 # reimplementation of np.nan_to_num that also works for numpy_quaddtype and
@@ -157,7 +147,8 @@ def _symmetric_modulo(
     p: np.ndarray[S, np.dtype[F]], q: np.ndarray[S, np.dtype[F]]
 ) -> np.ndarray[S, np.dtype[F]]:
     q2: np.ndarray[S, np.dtype[F]] = np.divide(q, 2)
-    out: np.ndarray[S, np.dtype[F]] = np.array(np.mod(p + q2, q), copy=None)
+    out: np.ndarray[S, np.dtype[F]] = np.array(np.add(p, q2), copy=None)
+    np.mod(out, q, out=out)
     np.subtract(out, q2, out=out)
     return out
 
@@ -258,32 +249,6 @@ def _where(
 
 
 @overload
-def _where(
-    cond: np.ndarray[S, np.dtype[np.bool]],
-    a: np.ndarray[S, np.dtype[np.bool]],
-    b: np.ndarray[S, np.dtype[np.bool]],
-) -> np.ndarray[S, np.dtype[np.bool]]: ...
-
-
-@overload
-def _where(
-    cond: np.ndarray[S, np.dtype[np.bool]], a: Ti, b: np.ndarray[S, np.dtype[Ti]]
-) -> np.ndarray[S, np.dtype[Ti]]: ...
-
-
-@overload
-def _where(
-    cond: np.ndarray[S, np.dtype[np.bool]], a: np.ndarray[S, np.dtype[Ti]], b: Ti
-) -> np.ndarray[S, np.dtype[Ti]]: ...
-
-
-@overload
-def _where(
-    cond: np.ndarray[S, np.dtype[np.bool]], a: Ti, b: Ti
-) -> np.ndarray[S, np.dtype[Ti]]: ...
-
-
-@overload
 def _where(cond: bool, a: Ti, b: Ti) -> Ti: ...
 
 
@@ -312,8 +277,8 @@ def _broadcast_to(a, shape):
     return np.broadcast_to(a, shape)
 
 
-# wrapper around a < 0 that also works for -0.0 (is negative)
-def _is_negative(
+# wrapper around a < 0 that also works for -0.0 (is negative) but excludes NaNs
+def _is_sign_negative_number(
     a: np.ndarray[S, np.dtype[F]],
 ) -> np.ndarray[S, np.dtype[np.bool]]:
     # check not just for a < 0 but also for a == -0.0
@@ -327,8 +292,9 @@ def _is_negative_zero(
     return (a == 0) & (np.copysign(1, a) == -1)
 
 
-# wrapper around a > 0 that also works for -0.0 (is not positive)
-def _is_positive(
+# wrapper around a > 0 that also works for -0.0 (is not positive) but excludes
+#  NaNs
+def _is_sign_positive_number(
     a: np.ndarray[S, np.dtype[F]],
 ) -> np.ndarray[S, np.dtype[np.bool]]:
     # check not just for a > 0 but also for a == +0.0

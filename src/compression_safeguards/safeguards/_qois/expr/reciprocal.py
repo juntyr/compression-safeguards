@@ -3,8 +3,8 @@ from collections.abc import Mapping
 import numpy as np
 
 from ....utils._compat import (
-    _is_negative,
-    _is_positive,
+    _is_sign_negative_number,
+    _is_sign_positive_number,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
 )
@@ -66,14 +66,18 @@ class ScalarReciprocal(Expr[Expr]):
         arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum_zero_sign_sensitive(
             expr_upper, X.dtype.type(-0.0)
         )
-        np.copyto(arg_lower, expr_upper, where=_is_positive(exprv), casting="no")
+        np.copyto(
+            arg_lower, expr_upper, where=_is_sign_positive_number(exprv), casting="no"
+        )
         arg_lower = np.reciprocal(arg_lower)
         arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
 
         arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum_zero_sign_sensitive(
             X.dtype.type(+0.0), expr_lower
         )
-        np.copyto(arg_upper, expr_lower, where=_is_negative(exprv), casting="no")
+        np.copyto(
+            arg_upper, expr_lower, where=_is_sign_negative_number(exprv), casting="no"
+        )
         arg_upper = np.reciprocal(arg_upper)
         arg_upper = _maximum_zero_sign_sensitive(argv, arg_upper)
 
