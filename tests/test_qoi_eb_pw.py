@@ -613,7 +613,7 @@ def test_constant_fold():
 
     assert expr.constant_fold(np.dtype(np.float64)) == 2
 
-    expr = ScalarLogWithBase(Data(index=()), Number.from_symbolic_int(10))
+    expr = ScalarLogWithBase(Data.SCALAR, Number.from_symbolic_int(10))
     assert f"{expr!r}" == "log(x, base=10)"
     assert expr.eval((), np.array(100, dtype=np.float64), {}) == 2
 

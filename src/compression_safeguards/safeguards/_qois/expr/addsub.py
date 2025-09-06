@@ -232,6 +232,14 @@ def compute_left_associate_sum_data_bounds(
             ),
             casting="no",
         )
+        # ensure that finite terms don't overflow into infinity unless allowed
+        #  by the difference bounds
+        tl[
+            (tl == -np.inf)
+            & np.isfinite(termv)
+            & np.isfinite(tfl)
+            & np.isfinite(abs_factorv)
+        ] = -fmax
         tl_stack_.append(tl)
     tl_stack = np.stack(tl_stack_)
     tu_stack_: list[np.ndarray[Ps, np.dtype[F]]] = []
@@ -250,6 +258,14 @@ def compute_left_associate_sum_data_bounds(
             ),
             casting="no",
         )
+        # ensure that finite terms don't overflow into infinity unless allowed
+        #  by the difference bounds
+        tu[
+            (tu == np.inf)
+            & np.isfinite(termv)
+            & np.isfinite(tfl)
+            & np.isfinite(abs_factorv)
+        ] = fmax
         tu_stack_.append(tu)
     tu_stack = np.stack(tu_stack_)
 

@@ -15,12 +15,12 @@ class Number(Expr):
     __slots__ = ("_n",)
     _n: str
 
-    def __init__(self, n: str):
-        self._n = n
-
     ZERO: "Number"
     ONE: "Number"
     TWO: "Number"
+
+    def __init__(self, n: str):
+        self._n = n
 
     @staticmethod
     def from_symbolic_int(n: int) -> "Number":

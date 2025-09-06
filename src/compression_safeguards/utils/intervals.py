@@ -999,6 +999,68 @@ class IntervalUnion(Generic[T, N, U]):
         np.copyto(pick, prediction, where=self.contains(prediction), casting="no")
         return pick
 
+    def _pick_random(
+        self,
+        prediction: np.ndarray[S, np.dtype[T]],
+        rng: np.random.Generator,
+    ) -> np.ndarray[S, np.dtype[T]]:
+        # random pick: pick a random member of the interval union
+        if prediction.size == 0:
+            return prediction
+
+        (u, n) = self._lower.shape
+        interval_size_acc: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
+            np.zeros((n,), dtype=to_total_order(self._lower).dtype)
+        )
+
+        for i in range(u):
+            lt: np.ndarray[tuple[N], np.dtype[np.unsignedinteger]] = to_total_order(
+                self._lower[i]
+            )
+            ut: np.ndarray[tuple[N], np.dtype[np.unsignedinteger]] = to_total_order(
+                self._upper[i]
+            )
+            np.add(
+                interval_size_acc, ut - lt + 1, out=interval_size_acc, where=(ut >= lt)
+            )
+
+        # if lt = 0 and ut = max, a full interval, (ut - lt + 1) overflows
+        # so we subtract 1 from the accumulated size and use endpoint-inclusive
+        #  sampling to undo any overflow from a full interval
+        pick_indices: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
+            rng.integers(
+                interval_size_acc - 1, dtype=interval_size_acc.dtype, endpoint=True
+            )
+        )
+
+        interval_size_acc[:] = 0
+
+        pick_flat: np.ndarray[tuple[N], np.dtype[T]] = np.empty(
+            (n,), dtype=self._lower.dtype
+        )
+
+        for i in range(u):
+            lt = to_total_order(self._lower[i])
+            ut = to_total_order(self._upper[i])
+            np.copyto(
+                pick_flat,
+                from_total_order(
+                    lt + (pick_indices - interval_size_acc), dtype=self._lower.dtype
+                ),
+                where=(
+                    (ut >= lt)
+                    & (pick_indices >= interval_size_acc)
+                    & (pick_indices <= (interval_size_acc + (ut - lt)))
+                ),
+                casting="no",
+            )
+            np.add(
+                interval_size_acc, ut - lt + 1, out=interval_size_acc, where=(ut >= lt)
+            )
+
+        pick: np.ndarray[S, np.dtype[T]] = pick_flat.reshape(prediction.shape)  # type: ignore
+        return pick
+
     def _pick_more_zeros(
         self, prediction: np.ndarray[S, np.dtype[T]]
     ) -> np.ndarray[S, np.dtype[T]]:
@@ -1133,6 +1195,13 @@ class IntervalUnion(Generic[T, N, U]):
         member : np.ndarray[S, np.dtype[T]]
             A member of the interval union
         """
+
+        # ensure that the prediction size and dtype match the interval union
+        assert prediction.size == self._lower.shape[1]
+        assert prediction.dtype == self._lower.dtype
+
+        # ensure that every element has a non-empty interval
+        assert np.all(to_total_order(self._lower[0]) <= to_total_order(self._upper[0]))
 
         return self._pick_more_zeros(prediction)
 

@@ -12,6 +12,8 @@ class Data(Expr):
     __slots__ = ("_index",)
     _index: tuple[int, ...]
 
+    SCALAR: "Data"
+
     def __init__(self, index: tuple[int, ...]):
         self._index = index
 
@@ -75,6 +77,9 @@ class Data(Expr):
         if self._index == ():
             return "x"
         return f"X[{','.join(str(i) for i in self._index)}]"
+
+
+Data.SCALAR = Data(index=())
 
 
 class LateBoundConstant(Expr):

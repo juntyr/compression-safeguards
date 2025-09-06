@@ -35,7 +35,7 @@ class PointwiseQuantityOfInterest:
 
     def __init__(self, qoi: PointwiseQuantityOfInterestExpression):
         lexer = QoILexer()
-        parser = QoIParser(x=Data(index=()), X=None, I=None)
+        parser = QoIParser(x=Data.SCALAR, X=None, I=None)
 
         expr = parser.parse(qoi, lexer.tokenize(qoi))
         assert isinstance(expr, Expr)

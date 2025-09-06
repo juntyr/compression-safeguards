@@ -94,7 +94,7 @@ NULLARY_EXPRESSIONS: list[Callable[[atheris.FuzzedDataProvider, np.dtype], Expr]
     lambda data, dtype: Number(f"{data.ConsumeInt(4)}"),
     lambda data, dtype: Number(f"{data.ConsumeFloat()}"),
     lambda data, dtype: ScalarFoldedConstant(ConsumeDtypeElement(data, dtype)),
-    lambda data, dtype: Data(index=()),
+    lambda data, dtype: Data.SCALAR,
 ]
 UNARY_EXPRESSIONS: list[Callable[[Expr], Expr]] = [
     ScalarAbs,
@@ -164,7 +164,7 @@ def check_one_input(data) -> None:
     # build the shallow unary/binary/ternary expression to test
     try:
         with timeout(1):
-            dataexpr = Data(index=())
+            dataexpr = Data.SCALAR
             exprid = data.ConsumeIntInRange(
                 0,
                 len(UNARY_EXPRESSIONS)
