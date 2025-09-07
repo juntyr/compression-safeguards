@@ -43,7 +43,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
     bit pattern.
 
     The error bound can be verified by evaluating the QoI in the floating-point
-    data type selected by `dtype` parameter using the
+    data type selected by `qoi_dtype` parameter using the
     [`evaluate_qoi`][compression_safeguards.safeguards.pointwise.qoi.eb.PointwiseQuantityOfInterestErrorBoundSafeguard.evaluate_qoi]
     method.
 
@@ -150,7 +150,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
     ) -> np.ndarray[S, np.dtype[F]]:
         """
         Evaluate the derived quantity of interest on the `data` in the
-        floating-point data type selected by the `dtype` parameter.
+        floating-point data type selected by the `qoi_dtype` parameter.
 
         Parameters
         ----------
