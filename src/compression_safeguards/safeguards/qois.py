@@ -479,7 +479,7 @@ class QuantityOfInterestEvaluationDType(Enum):
                     np.dtype(np.float16),
                 ):
                     return np.dtype(np.float16)
-                raise ValueError(f"cannot losslessly convert {dtype.name} to float16")
+                raise ValueError(f"cannot losslessly cast {dtype.name} to float16")
             case QuantityOfInterestEvaluationDType.float32:
                 if dtype in (
                     np.dtype(np.int8),
@@ -490,7 +490,7 @@ class QuantityOfInterestEvaluationDType(Enum):
                     np.dtype(np.float32),
                 ):
                     return np.dtype(np.float32)
-                raise ValueError(f"cannot losslessly convert {dtype.name} to float32")
+                raise ValueError(f"cannot losslessly cast {dtype.name} to float32")
             case QuantityOfInterestEvaluationDType.float64:
                 if dtype in (
                     np.dtype(np.int8),
@@ -504,7 +504,7 @@ class QuantityOfInterestEvaluationDType(Enum):
                     np.dtype(np.float64),
                 ):
                     return np.dtype(np.float64)
-                raise ValueError(f"cannot losslessly convert {dtype.name} to float64")
+                raise ValueError(f"cannot losslessly cast {dtype.name} to float64")
             case QuantityOfInterestEvaluationDType.float128:
                 if dtype in (
                     np.dtype(np.int8),
@@ -520,6 +520,6 @@ class QuantityOfInterestEvaluationDType(Enum):
                     np.dtype(np.float64),
                 ):
                     return _float128_dtype
-                raise ValueError(f"cannot losslessly convert {dtype.name} to float128")
+                raise ValueError(f"cannot losslessly cast {dtype.name} to float128")
             case _:
                 assert_never(self)
