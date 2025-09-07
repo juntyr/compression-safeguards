@@ -2,8 +2,14 @@ from contextlib import nullcontext as does_not_raise
 
 import numpy as np
 import pytest
+from numcodecs_combinators.framed import FramedCodecStack
+from numcodecs_safeguards import SafeguardsCodec
 
 from compression_safeguards import Safeguards
+from compression_safeguards.safeguards._qois.expr.addsub import ScalarAdd
+from compression_safeguards.safeguards._qois.expr.data import Data
+from compression_safeguards.safeguards._qois.expr.literal import Euler, Number, Pi
+from compression_safeguards.safeguards._qois.expr.logexp import ScalarLogWithBase
 from compression_safeguards.safeguards.pointwise.qoi.eb import (
     PointwiseQuantityOfInterestErrorBoundSafeguard,
 )
@@ -11,6 +17,7 @@ from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.cast import ToFloatMode
 
 from .codecs import (
+    NoiseCodec,
     encode_decode_identity,
     encode_decode_mock,
     encode_decode_neg,
@@ -49,7 +56,7 @@ def check_all_codecs(data: np.ndarray, qoi: str):
                     safeguards=[dict(kind="qoi_eb_pw", qoi=qoi, type=type, eb=eb)],
                 )
             except Exception as err:
-                print(encode_decode, qoi, type, eb)
+                print(encode_decode, qoi, type, eb)  # noqa: T201
                 raise err
 
 
@@ -464,10 +471,6 @@ def test_fuzzer_found(check):
 
 
 def test_evaluate_expr_with_dtype():
-    from compression_safeguards.safeguards._qois.expr.addsub import ScalarAdd
-    from compression_safeguards.safeguards._qois.expr.data import Data
-    from compression_safeguards.safeguards._qois.expr.literal import Euler, Pi
-
     expr = ScalarAdd(ScalarAdd(Data(()), Pi()), Euler())
 
     assert f"{expr!r}" == "x + pi + e"
@@ -604,10 +607,6 @@ def test_gaussian_kernel():
 
 
 def test_constant_fold():
-    from compression_safeguards.safeguards._qois.expr.data import Data
-    from compression_safeguards.safeguards._qois.expr.literal import Number
-    from compression_safeguards.safeguards._qois.expr.logexp import ScalarLogWithBase
-
     expr = ScalarLogWithBase(
         Number.from_symbolic_int(100), Number.from_symbolic_int(10)
     )
@@ -641,11 +640,6 @@ def test_fuzzer_found_sign_constant_fold():
 
 
 def test_fuzzer_found_logarithm_noise():
-    from numcodecs_combinators.framed import FramedCodecStack
-    from numcodecs_safeguards import SafeguardsCodec
-
-    from .codecs import NoiseCodec
-
     data = np.linspace(-1.0, 1.0, 100, dtype=np.float16)
 
     codec = SafeguardsCodec(

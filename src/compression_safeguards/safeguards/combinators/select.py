@@ -63,7 +63,7 @@ class SelectSafeguard(Safeguard):
         selector: str | Parameter,
         safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard],
     ) -> "_SelectPointwiseSafeguard | _SelectStencilSafeguard":
-        from ... import SafeguardKind
+        from ... import SafeguardKind  # noqa: PLC0415
 
         selector = selector if isinstance(selector, Parameter) else Parameter(selector)
 
@@ -71,7 +71,7 @@ class SelectSafeguard(Safeguard):
 
         safeguards_ = tuple(
             safeguard
-            if isinstance(safeguard, (PointwiseSafeguard, StencilSafeguard))
+            if isinstance(safeguard, PointwiseSafeguard | StencilSafeguard)
             else SafeguardKind[safeguard["kind"]].value(
                 **{p: v for p, v in safeguard.items() if p != "kind"}
             )
@@ -79,7 +79,7 @@ class SelectSafeguard(Safeguard):
         )
 
         for safeguard in safeguards_:
-            assert isinstance(safeguard, (PointwiseSafeguard, StencilSafeguard)), (
+            assert isinstance(safeguard, PointwiseSafeguard | StencilSafeguard), (
                 f"{safeguard!r} is not a pointwise or stencil safeguard"
             )
 
@@ -315,7 +315,7 @@ class _SelectStencilSafeguard(_SelectSafeguardBase, StencilSafeguard):
         self._selector = selector
 
         for safeguard in safeguards:
-            assert isinstance(safeguard, (PointwiseSafeguard, StencilSafeguard)), (
+            assert isinstance(safeguard, PointwiseSafeguard | StencilSafeguard), (
                 f"{safeguard!r} is not a pointwise or stencil safeguard"
             )
         self._safeguards = safeguards

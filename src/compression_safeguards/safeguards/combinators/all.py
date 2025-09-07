@@ -49,13 +49,13 @@ class AllSafeguards(Safeguard):
     def __new__(  # type: ignore
         cls, *, safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard]
     ) -> "_AllPointwiseSafeguards | _AllStencilSafeguards":
-        from ... import SafeguardKind
+        from ... import SafeguardKind  # noqa: PLC0415
 
         assert len(safeguards) > 0, "can only combine over at least one safeguard"
 
         safeguards_ = tuple(
             safeguard
-            if isinstance(safeguard, (PointwiseSafeguard, StencilSafeguard))
+            if isinstance(safeguard, PointwiseSafeguard | StencilSafeguard)
             else SafeguardKind[safeguard["kind"]].value(
                 **{p: v for p, v in safeguard.items() if p != "kind"}
             )
@@ -63,7 +63,7 @@ class AllSafeguards(Safeguard):
         )
 
         for safeguard in safeguards_:
-            assert isinstance(safeguard, (PointwiseSafeguard, StencilSafeguard)), (
+            assert isinstance(safeguard, PointwiseSafeguard | StencilSafeguard), (
                 f"{safeguard!r} is not a pointwise or stencil safeguard"
             )
 
@@ -236,7 +236,7 @@ class _AllStencilSafeguards(_AllSafeguardsBase, StencilSafeguard):
 
     def __init__(self, *safeguards: PointwiseSafeguard | StencilSafeguard) -> None:
         for safeguard in safeguards:
-            assert isinstance(safeguard, (PointwiseSafeguard, StencilSafeguard)), (
+            assert isinstance(safeguard, PointwiseSafeguard | StencilSafeguard), (
                 f"{safeguard!r} is not a pointwise or stencil safeguard"
             )
         self._safeguards = safeguards

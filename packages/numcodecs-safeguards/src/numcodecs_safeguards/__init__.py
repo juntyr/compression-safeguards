@@ -71,9 +71,8 @@ for an enumeration of all supported safeguards.
 
 __all__ = ["SafeguardsCodec"]
 
-from collections.abc import Collection, Mapping, Set
+from collections.abc import Callable, Collection, Mapping, Set
 from io import BytesIO
-from typing import Callable
 
 import numcodecs
 import numcodecs.compat

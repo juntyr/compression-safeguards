@@ -1,5 +1,5 @@
+from collections.abc import Callable
 from enum import Enum, auto
-from typing import Callable
 from warnings import warn
 
 import numpy as np

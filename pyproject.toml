@@ -63,7 +63,12 @@ where = ["src"]
 "compression_safeguards" = ["py.typed"]
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F", "I", "NPY"]
+select = ["E4", "E7", "E9", "F", "I", "NPY", "T20", "SLOT", "TC", "PLC", "UP", "FURB"]
+ignore = ["PLC0105"]
+
+[tool.ruff.lint.per-file-ignores]
+"bench/*" = ["T20"]
+"examples/*" = ["T20", "PLC"]
 
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]

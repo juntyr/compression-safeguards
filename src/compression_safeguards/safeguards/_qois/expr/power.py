@@ -31,7 +31,7 @@ class ScalarPower(Expr[Expr, Expr]):
             if (ai is not None) and (bi is not None):
                 if bi >= 0:
                     return Number.from_symbolic_int(ai**bi)
-        this = super(ScalarPower, cls).__new__(cls)
+        this = super().__new__(cls)
         this._a = a
         this._b = b
         return this

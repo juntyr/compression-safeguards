@@ -14,9 +14,9 @@ class Group(Expr[Expr]):
     _expr: Expr
 
     def __new__(cls, expr: Expr):
-        if isinstance(expr, (Number, Group)):
+        if isinstance(expr, Number | Group):
             return expr
-        this = super(Group, cls).__new__(cls)
+        this = super().__new__(cls)
         this._expr = expr
         return this
 
@@ -27,7 +27,7 @@ class Group(Expr[Expr]):
     def with_args(self, expr: Expr) -> "Group":
         return Group(expr)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | "Expr":
+    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         fexpr = self._expr.constant_fold(dtype)
         # partially / not constant folded -> stop further folding
         if isinstance(fexpr, Expr):

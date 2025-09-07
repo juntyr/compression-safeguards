@@ -1,6 +1,5 @@
 import itertools
-from collections.abc import Iterator, Mapping
-from typing import Callable
+from collections.abc import Callable, Iterator, Mapping
 
 import numpy as np
 from typing_extensions import (

@@ -36,10 +36,10 @@ class Parameter(str):
     def __new__(cls, param: str) -> "Parameter":
         if isinstance(param, Parameter):
             return param
-        assert (param[1:] if param.startswith("$") else param).isidentifier(), (
+        assert param.removeprefix("$").isidentifier(), (
             f"parameter `{param}` must be a valid identifier"
         )
-        return super(Parameter, cls).__new__(cls, param)
+        return super().__new__(cls, param)
 
     @property
     def is_builtin(self) -> bool:
@@ -268,7 +268,7 @@ def _encode_value(p: Parameter, v: Value) -> int | float | str:
 
 
 def _decode_value(p: Parameter, v: int | float | str) -> Value:
-    if isinstance(v, (int, float)):
+    if isinstance(v, int | float):
         return v
 
     assert v.startswith(_NPZ_DATA_URI_BASE64), (

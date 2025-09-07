@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Callable
 
 import numcodecs
 import numcodecs.compat

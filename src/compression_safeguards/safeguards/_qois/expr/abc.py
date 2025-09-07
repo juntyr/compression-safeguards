@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
-from typing import Callable, Generic, final
+from collections.abc import Callable, Mapping
+from typing import Generic, final
 
 import numpy as np
 from typing_extensions import (
@@ -180,7 +180,7 @@ class Expr(ABC, Generic[Unpack[Es]]):
     #        not being able to relate on TypeVarTuple to another, here *Expr to
     #        *F, see e.g. https://github.com/python/typing/issues/1216
     @abstractmethod
-    def constant_fold(self, dtype: np.dtype[F]) -> F | "Expr":
+    def constant_fold(self, dtype: np.dtype[F]) -> "F | Expr":
         """
         Apply scalar constant folding for the given `dtype` to this expression.
 

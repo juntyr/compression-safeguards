@@ -1,6 +1,5 @@
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from enum import Enum, auto
-from typing import Callable
 
 import numpy as np
 from typing_extensions import assert_never  # MSPV 3.11

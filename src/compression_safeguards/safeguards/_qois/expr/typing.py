@@ -1,6 +1,7 @@
 __all__ = ["F", "Fi", "Ps", "PsI", "Ns", "Ci", "Es"]
 
-from typing import Callable, TypeVar
+from collections.abc import Callable
+from typing import TypeVar
 
 import numpy as np
 from typing_extensions import TypeVarTuple  # MSPV 3.11

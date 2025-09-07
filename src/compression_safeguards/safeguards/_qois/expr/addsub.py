@@ -15,6 +15,7 @@ from .abc import Expr
 from .abs import ScalarAbs
 from .constfold import ScalarFoldedConstant
 from .literal import Number
+from .neg import ScalarNegate
 from .typing import F, Ns, Ps, PsI
 
 
@@ -27,7 +28,7 @@ class ScalarAdd(Expr[Expr, Expr]):
         ab = Number.symbolic_fold_binary(a, b, operator.add)
         if ab is not None:
             return ab
-        this = super(ScalarAdd, cls).__new__(cls)
+        this = super().__new__(cls)
         this._a = a
         this._b = b
         return this
@@ -78,7 +79,7 @@ class ScalarSubtract(Expr[Expr, Expr]):
         ab = Number.symbolic_fold_binary(a, b, operator.sub)
         if ab is not None:
             return ab
-        this = super(ScalarSubtract, cls).__new__(cls)
+        this = super().__new__(cls)
         this._a = a
         this._b = b
         return this
@@ -384,8 +385,6 @@ def compute_left_associate_sum_data_bounds(
 def as_left_associative_sum(
     expr: ScalarAdd | ScalarSubtract,
 ) -> tuple[Expr, ...]:
-    from .neg import ScalarNegate
-
     terms_rev: list[Expr] = []
 
     while True:
@@ -395,7 +394,7 @@ def as_left_associative_sum(
             ScalarNegate(expr._b) if isinstance(expr, ScalarSubtract) else expr._b
         )
 
-        if isinstance(expr._a, (ScalarAdd, ScalarSubtract)):
+        if isinstance(expr._a, ScalarAdd | ScalarSubtract):
             expr = expr._a
         else:
             terms_rev.append(expr._a)
@@ -405,12 +404,12 @@ def as_left_associative_sum(
 
 
 def get_expr_left_associative_abs_factor_approximate(expr: Expr) -> None | Expr:
-    from .divmul import ScalarDivide, ScalarMultiply
+    from .divmul import ScalarDivide, ScalarMultiply  # noqa: PLC0415
 
     if not expr.has_data:
         return None
 
-    if not isinstance(expr, (ScalarMultiply, ScalarDivide)):
+    if not isinstance(expr, ScalarMultiply | ScalarDivide):
         return Number.ONE
 
     factor_stack: list[tuple[Expr, type[ScalarMultiply] | type[ScalarDivide]]] = []
@@ -418,7 +417,7 @@ def get_expr_left_associative_abs_factor_approximate(expr: Expr) -> None | Expr:
     while True:
         factor_stack.append((expr._b, type(expr)))
 
-        if isinstance(expr._a, (ScalarMultiply, ScalarDivide)):
+        if isinstance(expr._a, ScalarMultiply | ScalarDivide):
             expr = expr._a
         else:
             factor_stack.append(

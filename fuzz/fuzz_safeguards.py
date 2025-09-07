@@ -373,7 +373,7 @@ def check_one_input(data) -> None:
                 and ("for array of shape" in str(err))
             )
             or (
-                isinstance(err, (TypeError, ValueError))
+                isinstance(err, TypeError | ValueError)
                 and ("cannot losslessly cast" in str(err))
             )
             or (
@@ -397,7 +397,7 @@ def check_one_input(data) -> None:
             )
         ):
             return
-        print(f"\n===\n\ncodec = {grepr}\n\n===\n")
+        print(f"\n===\n\ncodec = {grepr}\n\n===\n")  # noqa: T201
         raise err
 
     # test using the safeguards with the zero codec
@@ -417,7 +417,7 @@ def check_one_input(data) -> None:
         encoded = safeguard.encode(raw)
         safeguard.decode(encoded, out=np.empty_like(raw))
     except Exception as err:
-        print(f"\n===\n\ncodec = {grepr}\n\ndata = {raw!r}\n\n===\n")
+        print(f"\n===\n\ncodec = {grepr}\n\ndata = {raw!r}\n\n===\n")  # noqa: T201
         raise err
 
 

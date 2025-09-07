@@ -71,7 +71,7 @@ class Safeguards:
         unsupported_safeguards = [
             safeguard
             for safeguard in safeguards
-            if not isinstance(safeguard, (PointwiseSafeguard, StencilSafeguard))
+            if not isinstance(safeguard, PointwiseSafeguard | StencilSafeguard)
         ]
 
         assert len(unsupported_safeguards) == 0, (

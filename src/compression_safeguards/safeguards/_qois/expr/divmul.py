@@ -32,7 +32,7 @@ class ScalarMultiply(Expr[Expr, Expr]):
         ab = Number.symbolic_fold_binary(a, b, operator.mul)
         if ab is not None:
             return ab
-        this = super(ScalarMultiply, cls).__new__(cls)
+        this = super().__new__(cls)
         this._a = a
         this._b = b
         return this
@@ -210,7 +210,7 @@ class ScalarDivide(Expr[Expr, Expr]):
                 if d != 0:
                     a = Number.from_symbolic_int(ai)
                     b = Number.from_symbolic_int(bi)
-        this = super(ScalarDivide, cls).__new__(cls)
+        this = super().__new__(cls)
         this._a = a
         this._b = b
         return this
@@ -516,7 +516,7 @@ def compute_left_associative_product_data_bounds(
 def rewrite_left_associative_product_as_exp_sum_of_logs(
     expr: ScalarMultiply | ScalarDivide,
 ) -> Expr:
-    from .power import ScalarFakeAbs
+    from .power import ScalarFakeAbs  # noqa: PLC0415
 
     terms_stack: list[tuple[Expr, type[ScalarAdd] | type[ScalarSubtract]]] = []
 
@@ -528,7 +528,7 @@ def rewrite_left_associative_product_as_exp_sum_of_logs(
             )
         )
 
-        if isinstance(expr._a, (ScalarMultiply, ScalarDivide)):
+        if isinstance(expr._a, ScalarMultiply | ScalarDivide):
             expr = expr._a
         else:
             terms_stack.append(

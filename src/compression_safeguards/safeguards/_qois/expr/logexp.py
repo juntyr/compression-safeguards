@@ -1,6 +1,5 @@
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from enum import Enum, auto
-from typing import Callable
 
 import numpy as np
 
@@ -277,7 +276,7 @@ class ScalarLogWithBase(Expr[Expr, Expr]):
         return ScalarLogWithBase(a, b)
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        from .divmul import ScalarDivide
+        from .divmul import ScalarDivide  # noqa: PLC0415
 
         return ScalarDivide(
             ScalarLog(
@@ -296,7 +295,7 @@ class ScalarLogWithBase(Expr[Expr, Expr]):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
-        from .divmul import ScalarDivide
+        from .divmul import ScalarDivide  # noqa: PLC0415
 
         return ScalarDivide(
             ScalarLog(
@@ -317,7 +316,7 @@ class ScalarLogWithBase(Expr[Expr, Expr]):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        from .divmul import ScalarDivide
+        from .divmul import ScalarDivide  # noqa: PLC0415
 
         return ScalarDivide(
             ScalarLog(

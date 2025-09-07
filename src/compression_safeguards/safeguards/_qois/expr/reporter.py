@@ -59,9 +59,9 @@ class ReportingExpr(Expr[Expr]):
     _reporter: Reporter
 
     def __new__(cls, expr: Expr, reporter: Reporter):
-        if isinstance(expr, (ReportingExpr, Number)):
+        if isinstance(expr, ReportingExpr | Number):
             return expr
-        this = super(ReportingExpr, cls).__new__(cls)
+        this = super().__new__(cls)
         this._expr = expr
         this._reporter = reporter
         return this

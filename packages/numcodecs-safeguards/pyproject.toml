@@ -30,7 +30,7 @@ where = ["src"]
 "numcodecs_safeguards" = ["py.typed"]
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F", "I"]
+select = ["E4", "E7", "E9", "F", "I", "NPY", "T20", "SLOT", "TC", "PLC", "UP", "FURB"]
 
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]

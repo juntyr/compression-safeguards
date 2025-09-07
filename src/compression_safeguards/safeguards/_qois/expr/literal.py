@@ -1,6 +1,5 @@
 import sys
-from collections.abc import Mapping
-from typing import Callable
+from collections.abc import Callable, Mapping
 from warnings import warn
 
 import numpy as np

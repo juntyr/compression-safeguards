@@ -6,8 +6,8 @@ spaced grids. Mathematics of Computation, 51(184), 699-706. Available from:
 [doi:10.1090/s0025-5718-1988-0935077-0](https://doi.org/10.1090/s0025-5718-1988-0935077-0).
 """
 
+from collections.abc import Callable
 from functools import partial
-from typing import Callable
 
 import numpy as np
 

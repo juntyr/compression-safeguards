@@ -1,5 +1,5 @@
-from collections.abc import Mapping
-from typing import Callable, overload
+from collections.abc import Callable, Mapping
+from typing import overload
 
 import numpy as np
 

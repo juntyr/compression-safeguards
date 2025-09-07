@@ -79,7 +79,7 @@ def test_codec_stack_stencil():
     sys.version_info < (3, 11), reason="zarr v3 requires >= Python 3.11"
 )
 def test_zarr_pointwise():
-    import zarr
+    import zarr  # noqa: PLC0415
 
     data = np.arange(100, dtype=float)
 
@@ -115,7 +115,7 @@ def test_zarr_pointwise():
     sys.version_info < (3, 11), reason="zarr v3 requires >= Python 3.11"
 )
 def test_zarr_stencil():
-    import zarr
+    import zarr  # noqa: PLC0415
 
     data = np.arange(100, dtype=float)
 

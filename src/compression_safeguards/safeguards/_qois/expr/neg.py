@@ -19,7 +19,7 @@ class ScalarNegate(Expr[Expr]):
         na = Number.symbolic_fold_unary(a, operator.neg)
         if na is not None:
             return na
-        this = super(ScalarNegate, cls).__new__(cls)
+        this = super().__new__(cls)
         this._a = a
         return this
 

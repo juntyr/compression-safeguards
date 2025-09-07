@@ -4,7 +4,7 @@ from timeoutcontext import timeout
 with atheris.instrument_imports():
     import sys
     import warnings
-    from typing import Callable
+    from collections.abc import Callable
 
     import numpy as np
 
@@ -258,7 +258,7 @@ def check_one_input(data) -> None:
                 expr_lower, expr_upper, X, X, dict()
             )
     except Exception as err:
-        print(
+        print(  # noqa: T201
             "\n===\n\n"
             + "\n".join(
                 [
@@ -330,7 +330,7 @@ def check_one_input(data) -> None:
             (exprv_X_test >= expr_lower) and (exprv_X_test <= expr_upper)
         ), "exprv_X_test outside bounds"
     except Exception as err:
-        print(
+        print(  # noqa: T201
             "\n===\n\n"
             + "\n".join(
                 [

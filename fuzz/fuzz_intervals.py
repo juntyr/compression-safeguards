@@ -107,7 +107,7 @@ def check_one_input(data) -> None:
 
         assert sorted(elems) == sorted(check_elems)
     except Exception as err:
-        print("\n===\n\n" + "\n".join(repr(i) for i in info) + "\n\n===\n")
+        print("\n===\n\n" + "\n".join(repr(i) for i in info) + "\n\n===\n")  # noqa: T201
         raise err
 
 

@@ -102,7 +102,7 @@ def encode_decode_identity(data: np.ndarray, **kwargs) -> np.ndarray:
 
 def encode_decode_noise(data: np.ndarray, **kwargs) -> np.ndarray:
     seed = np.random.randint(2**31)  # noqa: NPY002
-    print(f"noise seed = {seed}")
+    print(f"noise seed = {seed}")  # noqa: T201
     codec = SafeguardsCodec(codec=FramedCodecStack(NoiseCodec(seed=seed)), **kwargs)
 
     encoded = codec.encode(data)
