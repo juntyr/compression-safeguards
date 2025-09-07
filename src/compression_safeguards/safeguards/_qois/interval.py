@@ -21,9 +21,9 @@ def compute_safe_data_lower_upper_interval_union(
     data : np.ndarray[S, np.dtype[T]]
         Data for which to compute the safe interval.
     data_float_lower : np.ndarray[S, np.dtype[F]]
-        Pointwise lower bounds for the floating point version of `data`.
+        Pointwise lower bounds for the floating-point version of `data`.
     data_float_upper : np.ndarray[S, np.dtype[F]]
-        Pointwise upper bounds for the floating point version of `data`.
+        Pointwise upper bounds for the floating-point version of `data`.
 
     Returns
     -------

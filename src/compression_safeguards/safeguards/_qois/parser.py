@@ -178,7 +178,7 @@ class QoIParser(Parser):
 
     # expressions
 
-    # integer and floating point literals
+    # integer and floating-point literals
     @_("INTEGER")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Number.from_symbolic_int(p.INTEGER)

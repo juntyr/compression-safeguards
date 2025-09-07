@@ -12,7 +12,7 @@ C = TypeVar("C", bound=np.unsignedinteger, covariant=True)
 """ The numpy data type for safeguard corrections (covariant). """
 
 F = TypeVar("F", bound=np.floating, covariant=True)
-""" Any numpy [`floating`][numpy.floating] data type (covariant). """
+""" Any numpy [`floating`][numpy.floating]-point data type (covariant). """
 
 S = TypeVar("S", bound=tuple[int, ...], covariant=True)
 """ Any array shape (covariant). """

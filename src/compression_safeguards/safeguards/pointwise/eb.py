@@ -32,7 +32,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
     [`False`][False], NaN values are also preserved with the same bit pattern.
 
     The error bound can be verified by casting the data and error bound to a
-    sufficiently large floating point type (keep the same dtype for floating
+    sufficiently large floating-point type (keep the same dtype for floating
     point data, choose a dtype with a mantissa that has at least as many bits
     as / for the integer dtype).
 
@@ -166,7 +166,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
 
         Returns
         -------
-        intervals : IntervalUnion
+        intervals : IntervalUnion[T, int, int]
             Union of intervals in which the error bound is upheld.
         """
 

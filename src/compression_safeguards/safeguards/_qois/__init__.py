@@ -84,10 +84,10 @@ class PointwiseQuantityOfInterest:
         Parameters
         ----------
         X : np.ndarray[Ps, np.dtype[F]]
-            The pointwise data, in floating point format.
+            The pointwise data, in floating-point format.
         late_bound : Mapping[Parameter, np.ndarray[Ps, np.dtype[F]]]
             The late-bound constants parameters for this QoI, with the same
-            shape and floating point dtype as the data.
+            shape and floating-point dtype as the data.
 
         Returns
         -------
@@ -121,10 +121,10 @@ class PointwiseQuantityOfInterest:
         qoi_upper : np.ndarray[Ps, np.dtype[F]]
             The pointwise upper bound on the QoI.
         X : np.ndarray[Ps, np.dtype[F]]
-            The pointwise data, in floating point format.
+            The pointwise data, in floating-point format.
         late_bound : Mapping[Parameter, np.ndarray[Ps, np.dtype[F]]]
             The late-bound constants parameters for this QoI, with the same
-            shape and floating point dtype as the data.
+            shape and floating-point dtype as the data.
 
         Returns
         -------
@@ -249,11 +249,11 @@ class StencilQuantityOfInterest:
         Parameters
         ----------
         Xs : np.ndarray[Ns, np.dtype[F]]
-            The stencil-extended data, in floating point format, which must be
+            The stencil-extended data, in floating-point format, which must be
             of shape [...Ps, ...stencil_shape].
         late_bound : Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]]
             The late-bound constants parameters for this QoI, with the same
-            shape and floating point dtype as the stencil-extended data.
+            shape and floating-point dtype as the stencil-extended data.
 
         Returns
         -------
@@ -291,11 +291,11 @@ class StencilQuantityOfInterest:
         qoi_upper : np.ndarray[Ps, np.dtype[F]]
             The pointwise upper bound on the QoI.
         Xs : np.ndarray[Ps, np.dtype[F]]
-            The stencil-extended data, in floating point format, which must be
+            The stencil-extended data, in floating-point format, which must be
             of shape [...Ps, ...stencil_shape].
         late_bound : Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]]
             The late-bound constants parameters for this QoI, with the same
-            shape and floating point dtype as the stencil-extended data.
+            shape and floating-point dtype as the stencil-extended data.
 
         Returns
         -------

@@ -6,10 +6,10 @@ import numpy as np
 from typing_extensions import TypeVarTuple  # MSPV 3.11
 
 F = TypeVar("F", bound=np.floating, covariant=True)
-""" Any numpy [`floating`][numpy.floating] data type (covariant). """
+""" Any numpy [`floating`][numpy.floating]-point data type (covariant). """
 
 Fi = TypeVar("Fi", bound=np.floating)
-""" Any numpy [`floating`][numpy.floating] data type (invariant). """
+""" Any numpy [`floating`][numpy.floating]-point data type (invariant). """
 
 Ps = TypeVar("Ps", bound=tuple[int, ...], covariant=True)
 """ Any pointwise array shape [...X] (covariant). """

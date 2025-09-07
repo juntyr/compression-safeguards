@@ -122,7 +122,7 @@ class QoILexer(Lexer):
             self.assert_or_error(
                 t.value[-1] in "0123456789",
                 t,
-                f"invalid floating point literal `{t.value}` requires at least one digit after '.' and 'e'",
+                f"invalid floating-point literal `{t.value}` requires at least one digit after '.' and 'e'",
             )
             return t
         else:

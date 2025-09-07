@@ -21,7 +21,10 @@ from ...eb import (
     _compute_finite_absolute_error,
     _compute_finite_absolute_error_bound,
 )
-from ...qois import PointwiseQuantityOfInterestExpression
+from ...qois import (
+    PointwiseQuantityOfInterestExpression,
+    QuantityOfInterestEvaluationDType,
+)
 from ..abc import PointwiseSafeguard
 
 
@@ -42,19 +45,17 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
     decoded value is also NaN, but does not guarantee that it has the same
     bit pattern.
 
-    The error bound can be verified by evaluating the QoI using the
+    The error bound can be verified by evaluating the QoI in the floating-point
+    data type selected by `dtype` parameter using the
     [`evaluate_qoi`][compression_safeguards.safeguards.pointwise.qoi.eb.PointwiseQuantityOfInterestErrorBoundSafeguard.evaluate_qoi]
-    method, which returns the the QoI in a sufficiently large floating point
-    type (keeps the same dtype for floating point data, chooses a dtype with a
-    mantissa that has at least as many bits as / for the integer dtype).
+    method.
 
     Please refer to the
     [`PointwiseQuantityOfInterestExpression`][compression_safeguards.safeguards.qois.PointwiseQuantityOfInterestExpression]
     for the EBNF grammar that specifies the language in which the quantities of
     interest are written.
 
-    The implementation of the error bound on pointwise quantities of interest
-    is inspired by:
+    The implementation was originally inspired by:
 
     > Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
     Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
@@ -73,17 +74,23 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
     eb : int | float | str | Parameter
         The value of or late-bound parameter name for the error bound on the
         quantity of interest that is enforced by this safeguard.
+    dtype : str | QuantityOfInterestEvaluationDType
+        The floating-point data type in which the quantity of interest is
+        evaluated. By default, the smallest floating-point data type that can
+        losslessly represent all input data values is chosen.
     """
 
     __slots__ = (
         "_qoi",
         "_type",
         "_eb",
+        "_dtype",
         "_qoi_expr",
     )
     _qoi: PointwiseQuantityOfInterestExpression
     _type: ErrorBound
     _eb: int | float | Parameter
+    _dtype: QuantityOfInterestEvaluationDType
     _qoi_expr: PointwiseQuantityOfInterest
 
     kind = "qoi_eb_pw"
@@ -93,6 +100,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         qoi: PointwiseQuantityOfInterestExpression,
         type: str | ErrorBound,
         eb: int | float | str | Parameter,
+        dtype: str
+        | QuantityOfInterestEvaluationDType = QuantityOfInterestEvaluationDType.lossless,
     ) -> None:
         self._type = type if isinstance(type, ErrorBound) else ErrorBound[type]
 
@@ -103,6 +112,12 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         else:
             _check_error_bound(self._type, eb)
             self._eb = eb
+
+        self._dtype = (
+            dtype
+            if isinstance(dtype, QuantityOfInterestEvaluationDType)
+            else QuantityOfInterestEvaluationDType[dtype]
+        )
 
         try:
             qoi_expr = PointwiseQuantityOfInterest(qoi)
@@ -140,11 +155,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[F]]:
         """
-        Evaluate the derived quantity of interest on the `data`.
-
-        If the `data` is of integer dtype, the quantity of interest is
-        evaluated in floating point with sufficient precision to represent all
-        integer values.
+        Evaluate the derived quantity of interest on the `data` in the
+        floating-point data type selected by the `dtype` parameter.
 
         Parameters
         ----------
@@ -156,7 +168,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         Returns
         -------
         qoi : np.ndarray[S, np.dtype[F]]
-            Evaluated quantity of interest, in floating point.
+            Evaluated quantity of interest, in floating-point.
         """
 
         data_float: np.ndarray[S, np.dtype[F]] = to_float(data)
@@ -254,7 +266,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         Returns
         -------
-        intervals : IntervalUnion
+        intervals : IntervalUnion[T, int, int]
             Union of intervals in which the error bound is upheld.
         """
 
@@ -314,5 +326,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         """
 
         return dict(
-            kind=type(self).kind, qoi=self._qoi, type=self._type.name, eb=self._eb
+            kind=type(self).kind,
+            qoi=self._qoi,
+            type=self._type.name,
+            eb=self._eb,
+            dtype=self._dtype.name,
         )

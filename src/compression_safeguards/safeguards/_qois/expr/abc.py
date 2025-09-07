@@ -211,11 +211,11 @@ class Expr(ABC, Generic[Unpack[Es]]):
         x : PsI
             The shape of the pointwise data.
         Xs : np.ndarray[Ns, np.dtype[F]]
-            The stencil-extended data, in floating point format, which must be
+            The stencil-extended data, in floating-point format, which must be
             of shape [...PsI, ...stencil_shape].
         late_bound : Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]]
             The late-bound constants parameters for this expression, with the
-            same shape and floating point dtype as the stencil-extended data.
+            same shape and floating-point dtype as the stencil-extended data.
 
         Returns
         -------
@@ -254,14 +254,14 @@ class Expr(ABC, Generic[Unpack[Es]]):
         expr_upper : np.ndarray[Ps, np.dtype[F]]
             The pointwise upper bound on this expression.
         X : np.ndarray[Ps, np.dtype[F]]
-            The pointwise data, in floating point format, which must be
+            The pointwise data, in floating-point format, which must be
             of shape Ps.
         Xs : np.ndarray[Ps, np.dtype[F]]
-            The stencil-extended data, in floating point format, which must be
+            The stencil-extended data, in floating-point format, which must be
             of shape [...Ps, ...stencil_shape].
         late_bound : Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]]
             The late-bound constants parameters for this expression, with the
-            same shape and floating point dtype as the stencil-extended data.
+            same shape and floating-point dtype as the stencil-extended data.
 
         Returns
         -------
@@ -299,14 +299,14 @@ class Expr(ABC, Generic[Unpack[Es]]):
         expr_upper : np.ndarray[Ps, np.dtype[F]]
             The pointwise upper bound on this expression.
         X : np.ndarray[Ps, np.dtype[F]]
-            The pointwise data, in floating point format, which must be
+            The pointwise data, in floating-point format, which must be
             of shape Ps.
         Xs : np.ndarray[Ps, np.dtype[F]]
-            The stencil-extended data, in floating point format, which must be
+            The stencil-extended data, in floating-point format, which must be
             of shape [...Ps, ...stencil_shape].
         late_bound : Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]]
             The late-bound constants parameters for this expression, with the
-            same shape and floating point dtype as the stencil-extended data.
+            same shape and floating-point dtype as the stencil-extended data.
 
         Returns
         -------

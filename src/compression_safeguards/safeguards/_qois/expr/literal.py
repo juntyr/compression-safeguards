@@ -30,7 +30,7 @@ class Number(Expr):
             pass
 
         warn(
-            "symbolic integer evaluation, likely a**b, resulted in excessive number of digits, try making one operand a floating point literal"
+            "symbolic integer evaluation, likely a**b, resulted in excessive number of digits, try making one operand a floating-point literal"
         )
 
         int_max_str_digits = None
@@ -99,7 +99,7 @@ class Number(Expr):
             pass
 
         warn(
-            "symbolic integer evaluation, likely a**b, resulted in excessive number of digits, try making one operand a floating point literal"
+            "symbolic integer evaluation, likely a**b, resulted in excessive number of digits, try making one operand a floating-point literal"
         )
 
         int_max_str_digits = None

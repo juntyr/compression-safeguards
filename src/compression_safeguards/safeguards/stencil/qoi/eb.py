@@ -22,7 +22,10 @@ from ...eb import (
     _compute_finite_absolute_error,
     _compute_finite_absolute_error_bound,
 )
-from ...qois import StencilQuantityOfInterestExpression
+from ...qois import (
+    QuantityOfInterestEvaluationDType,
+    StencilQuantityOfInterestExpression,
+)
 from .. import (
     BoundaryCondition,
     NeighbourhoodAxis,
@@ -77,19 +80,17 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     of interest on the decoded data neighbourhood is also NaN, but does not
     guarantee that it has the same bit pattern.
 
-    The error bound can be verified by evaluating the QoI using the
+    The error bound can be verified by evaluating the QoI in the floating-point
+    data type selected by `dtype` parameter using the
     [`evaluate_qoi`][compression_safeguards.safeguards.stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard.evaluate_qoi]
-    method, which returns the the QoI in a sufficiently large floating point
-    type (keeps the same dtype for floating point data, chooses a dtype with a
-    mantissa that has at least as many bits as / for the integer dtype).
+    method.
 
     Please refer to the
     [`StencilQuantityOfInterestExpression`][compression_safeguards.safeguards.qois.StencilQuantityOfInterestExpression]
     for the EBNF grammar that specifies the language in which the quantities of
     interest are written.
 
-    The implementation of the error bound on pointwise quantities of interest
-    is inspired by:
+    The implementation was originally inspired by:
 
     > Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
     Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
@@ -116,6 +117,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     eb : int | float | str | Parameter
         The value of or late-bound parameter name for the error bound on the
         quantity of interest that is enforced by this safeguard.
+    dtype : str | QuantityOfInterestEvaluationDType
+        The floating-point data type in which the quantity of interest is
+        evaluated. By default, the smallest floating-point data type that can
+        losslessly represent all input data values is chosen.
     """
 
     __slots__ = (
@@ -123,12 +128,14 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         "_neighbourhood",
         "_type",
         "_eb",
+        "_dtype",
         "_qoi_expr",
     )
     _qoi: StencilQuantityOfInterestExpression
     _neighbourhood: tuple[NeighbourhoodBoundaryAxis, ...]
     _type: ErrorBound
     _eb: int | float | Parameter
+    _dtype: QuantityOfInterestEvaluationDType
     _qoi_expr: StencilQuantityOfInterest
 
     kind = "qoi_eb_stencil"
@@ -139,6 +146,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         neighbourhood: Sequence[dict | NeighbourhoodBoundaryAxis],
         type: str | ErrorBound,
         eb: int | float | str | Parameter,
+        dtype: str
+        | QuantityOfInterestEvaluationDType = QuantityOfInterestEvaluationDType.lossless,
     ) -> None:
         self._neighbourhood = tuple(
             axis
@@ -160,6 +169,12 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         else:
             _check_error_bound(self._type, eb)
             self._eb = eb
+
+        self._dtype = (
+            dtype
+            if isinstance(dtype, QuantityOfInterestEvaluationDType)
+            else QuantityOfInterestEvaluationDType[dtype]
+        )
 
         shape = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
         I = tuple(axis.before for axis in self._neighbourhood)  # noqa: E741
@@ -249,15 +264,12 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         late_bound: Bindings,
     ) -> np.ndarray[tuple[int, ...], np.dtype[F]]:
         """
-        Evaluate the derived quantity of interest on the `data`.
+        Evaluate the derived quantity of interest on the `data` in the
+        floating-point data type selected by the `dtype` parameter.
 
         The quantity of interest may have a different shape if the
         [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
         boundary condition is used along any axis.
-
-        If the `data` is of integer dtype, the quantity of interest is
-        evaluated in floating point with sufficient precision to represent all
-        integer values.
 
         Parameters
         ----------
@@ -269,7 +281,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         Returns
         -------
         qoi : np.ndarray[tuple[int, ...], np.dtype[F]]
-            Evaluated quantity of interest, in floating point.
+            Evaluated quantity of interest, in floating-point.
         """
 
         # check that the data shape is compatible with the neighbourhood shape
@@ -561,7 +573,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         Returns
         -------
-        intervals : IntervalUnion
+        intervals : IntervalUnion[T, int, int]
             Union of intervals in which the error bound is upheld.
         """
 
@@ -790,4 +802,5 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             neighbourhood=[axis.get_config() for axis in self._neighbourhood],
             type=self._type.name,
             eb=self._eb,
+            dtype=self._dtype.name,
         )

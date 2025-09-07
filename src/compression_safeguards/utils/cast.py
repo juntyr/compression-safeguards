@@ -1,5 +1,5 @@
 """
-Utility functions to cast arrays to floating point, binary, and total-order representations.
+Utility functions to cast arrays to floating-point, binary, and total-order representations.
 """
 
 __all__ = [
@@ -23,9 +23,9 @@ from .typing import F, S, T, U
 
 def to_float(x: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[F]]:
     """
-    Losslessly convert the array `x` to floating point.
+    Losslessly convert the array `x` to floating-point.
 
-    Floating point arrays are passed through, integer arrays are cast to a
+    Floating-point arrays are passed through, integer arrays are cast to a
     dtype that can represent all integer values without loss in precision.
 
     Parameters
@@ -36,7 +36,7 @@ def to_float(x: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[F]]:
     Returns
     -------
     converted : np.ndarray[S, np.dtype[F]]
-        The converted array with a floating dtype.
+        The converted array with a floating-point dtype.
     """
 
     if np.issubdtype(x.dtype, np.floating):
@@ -53,7 +53,7 @@ def to_float(x: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[F]]:
         np.dtype(np.uint64): _float128_dtype,
     }[x.dtype]
 
-    # lossless cast from integer to floating point with a sufficiently large
+    # lossless cast from integer to floating-point with a sufficiently large
     #  mantissa
     return x.astype(ftype, casting="safe")  # type: ignore
 
@@ -91,7 +91,7 @@ def from_float(
     imin, imax = np.array(info.min, dtype=dtype), np.array(info.max, dtype=dtype)
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        # lossy cast from floating point to integer
+        # lossy cast from floating-point to integer
         # round first with rint (round to nearest, ties to nearest even)
         converted: np.ndarray[S, np.dtype[T]] = np.array(  # type: ignore
             np.array(np.rint(x), copy=None).astype(dtype, casting="unsafe"), copy=None
@@ -139,7 +139,7 @@ def to_total_order(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[U]]:
     unsigned zero, and the largest value is mapped to the largest unsigned
     value.
 
-    For floating point values, this implementation is based on Michael Herf's
+    For floating-point values, this implementation is based on Michael Herf's
     `FloatFlip` function, see <http://stereopsis.com/radix.html>.
 
     Parameters
@@ -188,7 +188,7 @@ def from_total_order(
     Reverses the reinterpretation of the array `a` back from total-order
     unsigned binary to the provided `dtype`.
 
-    For floating point values, this implementation is based on Michael Herf's
+    For floating-point values, this implementation is based on Michael Herf's
     `IFloatFlip` function, see <http://stereopsis.com/radix.html>.
 
     Parameters
@@ -239,8 +239,8 @@ def lossless_cast(
 
     A lossless conversion is one that can be reversed while preserving the
     original value. Integer values can be losslessly converted to integer or
-    floating point types with sufficient precision. Floating point values
-    can only be converted to floating point types.
+    floating-point types with sufficient precision. Floating-point values
+    can only be converted to floating-point types.
 
     Parameters
     ----------
@@ -257,7 +257,7 @@ def lossless_cast(
     Raises
     ------
     TypeError
-        If floating point values are converted to integer values.
+        If floating-point values are converted to integer values.
 
     Raises
     ------

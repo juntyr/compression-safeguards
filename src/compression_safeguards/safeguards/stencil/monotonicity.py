@@ -343,7 +343,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         Returns
         -------
-        intervals : IntervalUnion
+        intervals : IntervalUnion[T, int, int]
             Union of intervals in which the monotonicity is preserved.
         """
 
