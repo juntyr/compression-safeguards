@@ -4,14 +4,13 @@ import numpy as np
 import pytest
 
 from compression_safeguards import Safeguards
-from compression_safeguards.safeguards.qois import QuantityOfInterestEvaluationDType
 from compression_safeguards.safeguards.stencil import BoundaryCondition
 from compression_safeguards.safeguards.stencil.qoi.eb import (
     StencilQuantityOfInterestErrorBoundSafeguard,
 )
 from compression_safeguards.utils._float128 import _float128_dtype
 from compression_safeguards.utils.bindings import Bindings
-from compression_safeguards.utils.cast import to_float
+from compression_safeguards.utils.cast import ToFloatMode, to_float
 
 from .codecs import (
     encode_decode_identity,
@@ -607,9 +606,9 @@ def test_periodic_delta_transform(dtype):
         else:
             return np.mod(p + q2, q) - q2
 
-    ftype: np.dtype[np.floating] = (
-        QuantityOfInterestEvaluationDType.lossless.floating_point_dtype_for(dtype)
-    )
+    dtype = np.dtype(dtype)
+
+    ftype: np.dtype[np.floating] = ToFloatMode.lossless.floating_point_dtype_for(dtype)
 
     assert delta_transform(np.array(-0.75, dtype=ftype), np.array(1, dtype=ftype)) > 0
     assert delta_transform(np.array(-0.25, dtype=ftype), np.array(1, dtype=ftype)) < 0

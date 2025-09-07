@@ -9,7 +9,7 @@ from collections.abc import Set
 import numpy as np
 
 from ...utils.bindings import Bindings, Parameter
-from ...utils.cast import as_bits, saturating_finite_float_cast, to_float
+from ...utils.cast import ToFloatMode, as_bits, saturating_finite_float_cast, to_float
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import S, T
 from ..eb import (
@@ -19,7 +19,6 @@ from ..eb import (
     _compute_finite_absolute_error,
     _compute_finite_absolute_error_bound,
 )
-from ..qois import QuantityOfInterestEvaluationDType
 from .abc import PointwiseSafeguard
 
 
@@ -33,9 +32,9 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
     [`False`][False], NaN values are also preserved with the same bit pattern.
 
     The error bound can be verified by casting the data and error bound to a
-    sufficiently large floating-point type (keep the same dtype for floating
-    point data, choose a dtype with a mantissa that has at least as many bits
-    as / for the integer dtype).
+    sufficiently large floating-point type, selected by
+    [`ToFloatMode.lossless.floating_point_dtype_for`][compression_safeguards.utils.cast.ToFloatMode.floating_point_dtype_for],
+    using [`to_float`][compression_safeguards.utils.cast.to_float].
 
     Parameters
     ----------
@@ -116,10 +115,8 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        ftype: np.dtype[np.floating] = (
-            QuantityOfInterestEvaluationDType.lossless.floating_point_dtype_for(
-                data.dtype
-            )
+        ftype: np.dtype[np.floating] = ToFloatMode.lossless.floating_point_dtype_for(
+            data.dtype
         )
         data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
         decoded_float: np.ndarray[S, np.dtype[np.floating]] = to_float(
@@ -182,10 +179,8 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
 
         valid = Interval.empty_like(dataf).preserve_inf(dataf)
 
-        ftype: np.dtype[np.floating] = (
-            QuantityOfInterestEvaluationDType.lossless.floating_point_dtype_for(
-                data.dtype
-            )
+        ftype: np.dtype[np.floating] = ToFloatMode.lossless.floating_point_dtype_for(
+            data.dtype
         )
         data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
 

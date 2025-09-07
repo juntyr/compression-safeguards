@@ -207,10 +207,27 @@ newline `\\n`) and single-line inline comments starting with a hash `#`.
 
 ### Floating-point data type
 
-The quantities of interest are evaluated using floating-point arithmetic.
-Please refer to the documentation of the
-[`QuantityOfInterestEvaluationDType`][compression_safeguards.safeguards.qois.QuantityOfInterestEvaluationDType]
-for details on how the floating point data type for evaluation is chosen.
+QoIs can be evaluated on any data type supported by the safeguards (see
+[`Safeguards.supported_dtypes`][compression_safeguards.api.Safeguards.supported_dtypes]).
+Since the QoIs support many functions with floating-point outputs, they
+are evaluated using floating-point arithmetic.
+
+Importantly, the floating-point evaluation data type *must* be able to
+represent all values of the input data type losslessly.
+
+* For floating-point data, this is at least the input data type.
+
+* For integer data, the data is first losslessly upcast to a floating-point
+type with sufficient precision to represent all integer values, i.e. a type
+whose mantissa has more bits than the integer type. For the below floating-
+point types, this corresponds to choosing a floating-point data type with a
+larger bit width (e.g. at least [`np.float64`][numpy.float64] for
+[`np.int32`][numpy.int32] or [`np.uint32`][numpy.uint32] data).
+
+The specific floating-point data type in which the quantities of interest are
+evaluated is configured using the
+[`ToFloatMode`][compression_safeguards.utils.cast.ToFloatMode]
+enum, please refer to its documentation for further information.
 
 ### Literals
 
@@ -354,17 +371,9 @@ specified.
 __all__ = [
     "PointwiseQuantityOfInterestExpression",
     "StencilQuantityOfInterestExpression",
-    "QuantityOfInterestEvaluationDType",
 ]
 
-from enum import Enum, auto
 from typing import NewType
-
-import numpy as np
-from typing_extensions import assert_never  # MSPV 3.11
-
-from ..utils._float128 import _float128_dtype
-from ..utils.typing import T
 
 PointwiseQuantityOfInterestExpression = NewType(
     "PointwiseQuantityOfInterestExpression", str
@@ -382,144 +391,3 @@ StencilQuantityOfInterestExpression = NewType(
 Stencil quantity of interest expression in [`str`][str]ing form, following
 the above EBNF grammar for stencil QoIs.
 """
-
-
-class QuantityOfInterestEvaluationDType(Enum):
-    """
-    Floating-point data type in which a quantity of interest is evaluated.
-
-    QoIs can be evaluated on any data type supported by the safeguards (see
-    [`Safeguards.supported_dtypes`][compression_safeguards.api.Safeguards.supported_dtypes]).
-    Since the QoIs support many functions with floating-point outputs, they
-    are evaluated using floating-point arithmetic.
-
-    Importantly, the floating-point evaluation data type *must* be able to
-    represent all values of the input data type losslessly.
-
-    * For floating-point data, this is at least the input data type.
-    * For integer data, the data is first losslessly upcast to a floating-point
-    type with sufficient precision to represent all integer values, i.e. a type
-    whose mantissa has more bits than the integer type. For the below floating-
-    point types, this corresponds to choosing a floating-point data type with a
-    larger bit width (e.g. at least [`np.float64`][numpy.float64] for
-    [`np.int32`][numpy.int32] or [`np.uint32`][numpy.uint32] data).
-
-    On platforms where the [`np.float128`][numpy.float128] type does *not*
-    refer to a floating-point type with true 128 bits of precision, the
-    [`numpy_quaddtype`](https://pypi.org/project/numpy-quaddtype/) package is
-    used to provide a true 128 bit floating-point data type.
-    """
-
-    lossless = auto()
-    """
-    Automatically select the smallest floating-point data type that can
-    losslessly represent the input data.
-    """
-
-    float16 = auto()
-    """
-    Enforce that the QoI is evaluated in 16 bit floating-point precision, if
-    lossless.
-    """
-
-    float32 = auto()
-    """
-    Enforce that the QoI is evaluated in 32 bit floating-point precision, if
-    lossless.
-    """
-
-    float64 = auto()
-    """
-    Enforce that the QoI is evaluated in 64 bit floating-point precision, if
-    lossless.
-    """
-
-    float128 = auto()
-    """
-    Enforce that the QoI is evaluated in 128 bit floating-point precision, if
-    lossless.
-    """
-
-    def floating_point_dtype_for(self, dtype: np.dtype[T]) -> np.dtype[np.floating]:
-        """
-        Select the floating-point dtype for the input `dtype`.
-
-        Parameters
-        ----------
-        dtype : np.dtype[T]
-            Data type of the input data.
-
-        Returns
-        -------
-        ftype : np.dtype[np.floating]
-            Floating-point data type that can losslessly represent all values
-            from the input `dtype`.
-        """
-
-        match self:
-            case QuantityOfInterestEvaluationDType.lossless:
-                DTYPES: dict[np.dtype[np.number], np.dtype[np.floating]] = {
-                    np.dtype(np.int8): np.dtype(np.float16),
-                    np.dtype(np.int16): np.dtype(np.float32),
-                    np.dtype(np.int32): np.dtype(np.float64),
-                    np.dtype(np.int64): _float128_dtype,
-                    np.dtype(np.uint8): np.dtype(np.float16),
-                    np.dtype(np.uint16): np.dtype(np.float32),
-                    np.dtype(np.uint32): np.dtype(np.float64),
-                    np.dtype(np.uint64): _float128_dtype,
-                    np.dtype(np.float16): np.dtype(np.float16),
-                    np.dtype(np.float32): np.dtype(np.float32),
-                    np.dtype(np.float64): np.dtype(np.float64),
-                }
-                return DTYPES[dtype]
-            case QuantityOfInterestEvaluationDType.float16:
-                if dtype in (
-                    np.dtype(np.int8),
-                    np.dtype(np.uint8),
-                    np.dtype(np.float16),
-                ):
-                    return np.dtype(np.float16)
-                raise ValueError(f"cannot losslessly cast {dtype.name} to float16")
-            case QuantityOfInterestEvaluationDType.float32:
-                if dtype in (
-                    np.dtype(np.int8),
-                    np.dtype(np.uint8),
-                    np.dtype(np.int16),
-                    np.dtype(np.uint16),
-                    np.dtype(np.float16),
-                    np.dtype(np.float32),
-                ):
-                    return np.dtype(np.float32)
-                raise ValueError(f"cannot losslessly cast {dtype.name} to float32")
-            case QuantityOfInterestEvaluationDType.float64:
-                if dtype in (
-                    np.dtype(np.int8),
-                    np.dtype(np.uint8),
-                    np.dtype(np.int16),
-                    np.dtype(np.uint16),
-                    np.dtype(np.int32),
-                    np.dtype(np.uint32),
-                    np.dtype(np.float16),
-                    np.dtype(np.float32),
-                    np.dtype(np.float64),
-                ):
-                    return np.dtype(np.float64)
-                raise ValueError(f"cannot losslessly cast {dtype.name} to float64")
-            case QuantityOfInterestEvaluationDType.float128:
-                if dtype in (
-                    np.dtype(np.int8),
-                    np.dtype(np.uint8),
-                    np.dtype(np.int16),
-                    np.dtype(np.uint16),
-                    np.dtype(np.int32),
-                    np.dtype(np.uint32),
-                    np.dtype(np.int64),
-                    np.dtype(np.uint64),
-                    np.dtype(np.float16),
-                    np.dtype(np.float32),
-                    np.dtype(np.float64),
-                ):
-                    return _float128_dtype
-                raise ValueError(f"cannot losslessly cast {dtype.name} to float128")
-            case _:
-                assert_never(self)

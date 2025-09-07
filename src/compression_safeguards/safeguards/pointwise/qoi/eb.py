@@ -9,7 +9,7 @@ from collections.abc import Set
 import numpy as np
 
 from ....utils.bindings import Bindings, Parameter
-from ....utils.cast import saturating_finite_float_cast, to_float
+from ....utils.cast import ToFloatMode, saturating_finite_float_cast, to_float
 from ....utils.intervals import IntervalUnion
 from ....utils.typing import F, S, T
 from ..._qois import PointwiseQuantityOfInterest
@@ -21,10 +21,7 @@ from ...eb import (
     _compute_finite_absolute_error,
     _compute_finite_absolute_error_bound,
 )
-from ...qois import (
-    PointwiseQuantityOfInterestExpression,
-    QuantityOfInterestEvaluationDType,
-)
+from ...qois import PointwiseQuantityOfInterestExpression
 from ..abc import PointwiseSafeguard
 
 
@@ -74,7 +71,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
     eb : int | float | str | Parameter
         The value of or late-bound parameter name for the error bound on the
         quantity of interest that is enforced by this safeguard.
-    dtype : str | QuantityOfInterestEvaluationDType
+    qoi_dtype : str | ToFloatMode
         The floating-point data type in which the quantity of interest is
         evaluated. By default, the smallest floating-point data type that can
         losslessly represent all input data values is chosen.
@@ -84,13 +81,13 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         "_qoi",
         "_type",
         "_eb",
-        "_dtype",
+        "_qoi_dtype",
         "_qoi_expr",
     )
     _qoi: PointwiseQuantityOfInterestExpression
     _type: ErrorBound
     _eb: int | float | Parameter
-    _dtype: QuantityOfInterestEvaluationDType
+    _qoi_dtype: ToFloatMode
     _qoi_expr: PointwiseQuantityOfInterest
 
     kind = "qoi_eb_pw"
@@ -100,8 +97,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         qoi: PointwiseQuantityOfInterestExpression,
         type: str | ErrorBound,
         eb: int | float | str | Parameter,
-        dtype: str
-        | QuantityOfInterestEvaluationDType = QuantityOfInterestEvaluationDType.lossless,
+        qoi_dtype: str | ToFloatMode = ToFloatMode.lossless,
     ) -> None:
         self._type = type if isinstance(type, ErrorBound) else ErrorBound[type]
 
@@ -113,10 +109,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             _check_error_bound(self._type, eb)
             self._eb = eb
 
-        self._dtype = (
-            dtype
-            if isinstance(dtype, QuantityOfInterestEvaluationDType)
-            else QuantityOfInterestEvaluationDType[dtype]
+        self._qoi_dtype = (
+            qoi_dtype if isinstance(qoi_dtype, ToFloatMode) else ToFloatMode[qoi_dtype]
         )
 
         try:
@@ -171,7 +165,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             Evaluated quantity of interest, in floating-point.
         """
 
-        ftype: np.dtype[F] = self._dtype.floating_point_dtype_for(data.dtype)  # type: ignore
+        ftype: np.dtype[F] = self._qoi_dtype.floating_point_dtype_for(data.dtype)  # type: ignore
         data_float: np.ndarray[S, np.dtype[F]] = to_float(data, ftype=ftype)
 
         late_bound_constants: dict[Parameter, np.ndarray[S, np.dtype[F]]] = {
@@ -212,7 +206,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        ftype: np.dtype[np.floating] = self._dtype.floating_point_dtype_for(data.dtype)
+        ftype: np.dtype[np.floating] = self._qoi_dtype.floating_point_dtype_for(
+            data.dtype
+        )
         data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
 
         late_bound_constants: dict[Parameter, np.ndarray[S, np.dtype[np.floating]]] = {
@@ -274,7 +270,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             Union of intervals in which the error bound is upheld.
         """
 
-        ftype: np.dtype[np.floating] = self._dtype.floating_point_dtype_for(data.dtype)
+        ftype: np.dtype[np.floating] = self._qoi_dtype.floating_point_dtype_for(
+            data.dtype
+        )
         data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
 
         late_bound_constants: dict[Parameter, np.ndarray[S, np.dtype[np.floating]]] = {
@@ -335,5 +333,5 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             qoi=self._qoi,
             type=self._type.name,
             eb=self._eb,
-            dtype=self._dtype.name,
+            qoi_dtype=self._qoi_dtype.name,
         )

@@ -3,6 +3,7 @@ Utility functions to cast arrays to floating-point, binary, and total-order repr
 """
 
 __all__ = [
+    "ToFloatMode",
     "to_float",
     "from_float",
     "as_bits",
@@ -12,13 +13,142 @@ __all__ = [
     "saturating_finite_float_cast",
 ]
 
+from enum import Enum, auto
 from typing import Any
 
 import numpy as np
+from typing_extensions import assert_never  # MSPV 3.11
 
-from ._compat import _nan_to_zero_inf_to_finite
+from ._compat import _astype, _nan_to_zero_inf_to_finite
 from ._float128 import _float128_dtype
 from .typing import F, S, T, U
+
+
+class ToFloatMode(Enum):
+    """
+    Mode for losslessly converting numeric data to floating-point.
+    """
+
+    lossless = auto()
+    """
+    Automatically select the smallest floating-point data type that can
+    losslessly represent the input data.
+    """
+
+    float16 = auto()
+    """
+    Use 16 bit floating-point precision, if lossless.
+    """
+
+    float32 = auto()
+    """
+    Use 32 bit floating-point precision, if lossless.
+    """
+
+    float64 = auto()
+    """
+    Use 64 bit floating-point precision, if lossless.
+    """
+
+    float128 = auto()
+    """
+    Use 128 bit floating-point precision, if lossless.
+    """
+
+    def floating_point_dtype_for(self, dtype: np.dtype[T]) -> np.dtype[np.floating]:
+        """
+        Select the floating-point dtype for the input `dtype`.
+
+        Only data type supported by the safeguards (see
+        [`Safeguards.supported_dtypes`][compression_safeguards.api.Safeguards.supported_dtypes])
+        are supported by this method.
+
+        On platforms where the [`np.float128`][numpy.float128] type does *not*
+        refer to a floating-point type with true 128 bits of precision, the
+        [`numpy_quaddtype`](https://pypi.org/project/numpy-quaddtype/) package
+        is used to provide a true 128 bit floating-point data type.
+
+        Parameters
+        ----------
+        dtype : np.dtype[T]
+            Data type of the input data.
+
+        Returns
+        -------
+        ftype : np.dtype[np.floating]
+            Floating-point data type that can losslessly represent all values
+            from the input `dtype`.
+        """
+
+        match self:
+            case ToFloatMode.lossless:
+                SMALLEST_LOSSLESS_FTYPE: dict[
+                    np.dtype[np.number], np.dtype[np.floating]
+                ] = {
+                    np.dtype(np.int8): np.dtype(np.float16),
+                    np.dtype(np.int16): np.dtype(np.float32),
+                    np.dtype(np.int32): np.dtype(np.float64),
+                    np.dtype(np.int64): _float128_dtype,
+                    np.dtype(np.uint8): np.dtype(np.float16),
+                    np.dtype(np.uint16): np.dtype(np.float32),
+                    np.dtype(np.uint32): np.dtype(np.float64),
+                    np.dtype(np.uint64): _float128_dtype,
+                    np.dtype(np.float16): np.dtype(np.float16),
+                    np.dtype(np.float32): np.dtype(np.float32),
+                    np.dtype(np.float64): np.dtype(np.float64),
+                }
+                return SMALLEST_LOSSLESS_FTYPE[dtype]
+            case ToFloatMode.float16:
+                if dtype in (
+                    np.dtype(np.int8),
+                    np.dtype(np.uint8),
+                    np.dtype(np.float16),
+                ):
+                    return np.dtype(np.float16)
+                raise ValueError(f"cannot losslessly cast {dtype.name} to float16")
+            case ToFloatMode.float32:
+                if dtype in (
+                    np.dtype(np.int8),
+                    np.dtype(np.uint8),
+                    np.dtype(np.int16),
+                    np.dtype(np.uint16),
+                    np.dtype(np.float16),
+                    np.dtype(np.float32),
+                ):
+                    return np.dtype(np.float32)
+                raise ValueError(f"cannot losslessly cast {dtype.name} to float32")
+            case ToFloatMode.float64:
+                if dtype in (
+                    np.dtype(np.int8),
+                    np.dtype(np.uint8),
+                    np.dtype(np.int16),
+                    np.dtype(np.uint16),
+                    np.dtype(np.int32),
+                    np.dtype(np.uint32),
+                    np.dtype(np.float16),
+                    np.dtype(np.float32),
+                    np.dtype(np.float64),
+                ):
+                    return np.dtype(np.float64)
+                raise ValueError(f"cannot losslessly cast {dtype.name} to float64")
+            case ToFloatMode.float128:
+                if dtype in (
+                    np.dtype(np.int8),
+                    np.dtype(np.uint8),
+                    np.dtype(np.int16),
+                    np.dtype(np.uint16),
+                    np.dtype(np.int32),
+                    np.dtype(np.uint32),
+                    np.dtype(np.int64),
+                    np.dtype(np.uint64),
+                    np.dtype(np.float16),
+                    np.dtype(np.float32),
+                    np.dtype(np.float64),
+                ):
+                    return _float128_dtype
+                raise ValueError(f"cannot losslessly cast {dtype.name} to float128")
+            case _:
+                assert_never(self)
 
 
 def to_float(
@@ -28,7 +158,21 @@ def to_float(
     Losslessly convert the array `x` to the floating-point data type `ftype`.
 
     `ftype` must be a floating-point data type that can represent all values
-    of the data type of `x` without loss in precision.
+    of the data type of `x` without loss in precision:
+
+    * For floating-point data, it is at least the input data type.
+
+    * For integer data, it is a floating-point type with sufficient precision
+    to represent all integer values, i.e. a type whose mantissa has more bits
+    than the integer type. For the supported floating-point types, this
+    corresponds to choosing a floating-point data type with a larger bit width
+    (e.g. at least [`np.float64`][numpy.float64] for [`np.int32`][numpy.int32]
+    or [`np.uint32`][numpy.uint32] data).
+
+    The
+    [`ToFloatMode.floating_point_dtype_for`][compression_safeguards.utils.cast.ToFloatMode.floating_point_dtype_for]
+    method can be used to select a floating-point data type that fits the above
+    criteria.
 
     Parameters
     ----------
@@ -56,7 +200,7 @@ def to_float(
 
     # lossless cast to floating-point data type with a sufficiently large
     #  mantissa
-    return x.astype(ftype, casting="safe")
+    return _astype(x, ftype, casting="safe")
 
 
 def from_float(
@@ -93,9 +237,9 @@ def from_float(
     if x.dtype == dtype:
         return x  # type: ignore
 
-    if np.issubdtype(x.dtype, np.floating):
+    if np.issubdtype(dtype, np.floating):
         # lossy cast to lower-precision floating-point number
-        return x.astype(dtype, casting="unsafe")
+        return _astype(x, dtype, casting="unsafe")
 
     info = np.iinfo(dtype)  # type: ignore
     imin, imax = np.array(info.min, dtype=dtype), np.array(info.max, dtype=dtype)
@@ -104,7 +248,7 @@ def from_float(
         # lossy cast from floating-point to integer
         # round first with rint (round to nearest, ties to nearest even)
         converted: np.ndarray[S, np.dtype[T]] = np.array(  # type: ignore
-            np.array(np.rint(x), copy=None).astype(dtype, casting="unsafe"), copy=None
+            _astype(np.array(np.rint(x), copy=None), dtype, casting="unsafe"), copy=None
         )
     converted[np.greater(x, imax)] = imax
     converted[np.less(x, imin)] = imin
@@ -285,8 +429,8 @@ def lossless_cast(
 
     # we use unsafe casts here since we later check them for safety
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        xa_to = np.array(xa, copy=None).astype(dtype, casting="unsafe")
-        xa_back = xa_to.astype(dtype_from, casting="unsafe")
+        xa_to = _astype(np.array(xa, copy=None), dtype, casting="unsafe")
+        xa_back = _astype(xa_to, dtype_from, casting="unsafe")
 
     lossless_same = (xa == xa_back) | (np.isnan(xa) & np.isnan(xa_back))
 
@@ -340,6 +484,6 @@ def saturating_finite_float_cast(
     # - we cast to float, where under- and overflows saturate to np.inf
     # - we later clamp the values to finite
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        xa_to = np.array(xa, copy=None).astype(dtype, casting="unsafe")
+        xa_to = _astype(np.array(xa, copy=None), dtype, casting="unsafe")
 
     return _nan_to_zero_inf_to_finite(xa_to)
