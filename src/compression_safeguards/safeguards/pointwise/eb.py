@@ -19,6 +19,7 @@ from ..eb import (
     _compute_finite_absolute_error,
     _compute_finite_absolute_error_bound,
 )
+from ..qois import QuantityOfInterestEvaluationDType
 from .abc import PointwiseSafeguard
 
 
@@ -115,8 +116,15 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
-        decoded_float: np.ndarray[S, np.dtype[np.floating]] = to_float(decoded)
+        ftype: np.dtype[np.floating] = (
+            QuantityOfInterestEvaluationDType.lossless.floating_point_dtype_for(
+                data.dtype
+            )
+        )
+        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
+        decoded_float: np.ndarray[S, np.dtype[np.floating]] = to_float(
+            decoded, ftype=ftype
+        )
 
         eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
@@ -174,7 +182,12 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
 
         valid = Interval.empty_like(dataf).preserve_inf(dataf)
 
-        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
+        ftype: np.dtype[np.floating] = (
+            QuantityOfInterestEvaluationDType.lossless.floating_point_dtype_for(
+                data.dtype
+            )
+        )
+        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
 
         eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
@@ -189,7 +202,9 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         )
         _check_error_bound(self._type, eb)
 
-        lower, upper = _apply_finite_error_bound(self._type, eb, data, to_float(data))
+        lower, upper = _apply_finite_error_bound(
+            self._type, eb, data, to_float(data, ftype=ftype)
+        )
 
         Lower(lower.flatten()) <= valid[np.isfinite(dataf)] <= Upper(upper.flatten())
 

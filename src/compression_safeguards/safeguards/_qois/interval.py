@@ -49,8 +49,12 @@ def compute_safe_data_lower_upper_interval_union(
 
     # correct rounding errors in the lower and upper bound
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        lower_outside_bound = to_float(valid._lower) < dataf_float_lower
-        upper_outside_bound = to_float(valid._upper) > dataf_float_upper
+        lower_outside_bound = (
+            to_float(valid._lower, ftype=dataf_float_lower.dtype) < dataf_float_lower
+        )
+        upper_outside_bound = (
+            to_float(valid._upper, ftype=dataf_float_lower.dtype) > dataf_float_upper
+        )
 
     Lower(
         from_total_order(

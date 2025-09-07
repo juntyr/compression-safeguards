@@ -300,10 +300,10 @@ def _apply_finite_error_bound(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
                 lower_outside_eb: np.ndarray[S, np.dtype[np.bool]] = np.greater(
-                    data_float - to_float(lower), eb_abs
+                    data_float - to_float(lower, ftype=data_float.dtype), eb_abs
                 )
                 upper_outside_eb: np.ndarray[S, np.dtype[np.bool]] = np.greater(
-                    to_float(upper) - data_float, eb_abs
+                    to_float(upper, ftype=data_float.dtype) - data_float, eb_abs
                 )
 
             lower = np.array(
@@ -344,8 +344,8 @@ def _apply_finite_error_bound(
                     np.abs(
                         _where(
                             np.less(data, 0),
-                            to_float(lower) / data_float,
-                            data_float / to_float(lower),
+                            to_float(lower, ftype=data_float.dtype) / data_float,
+                            data_float / to_float(lower, ftype=data_float.dtype),
                         )
                     )
                     > eb_abs
@@ -354,8 +354,8 @@ def _apply_finite_error_bound(
                     np.abs(
                         _where(
                             np.less(data, 0),
-                            data_float / to_float(upper),
-                            to_float(upper) / data_float,
+                            data_float / to_float(upper, ftype=data_float.dtype),
+                            to_float(upper, ftype=data_float.dtype) / data_float,
                         )
                     )
                     > eb_abs

@@ -171,7 +171,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             Evaluated quantity of interest, in floating-point.
         """
 
-        data_float: np.ndarray[S, np.dtype[F]] = to_float(data)
+        ftype: np.dtype[F] = self._dtype.floating_point_dtype_for(data.dtype)  # type: ignore
+        data_float: np.ndarray[S, np.dtype[F]] = to_float(data, ftype=ftype)
 
         late_bound_constants: dict[Parameter, np.ndarray[S, np.dtype[F]]] = {
             c: late_bound.resolve_ndarray_with_lossless_cast(
@@ -211,7 +212,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
+        ftype: np.dtype[np.floating] = self._dtype.floating_point_dtype_for(data.dtype)
+        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
 
         late_bound_constants: dict[Parameter, np.ndarray[S, np.dtype[np.floating]]] = {
             c: late_bound.resolve_ndarray_with_lossless_cast(
@@ -221,7 +223,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         }
 
         qoi_data = self._qoi_expr.eval(data_float, late_bound_constants)
-        qoi_decoded = self._qoi_expr.eval(to_float(decoded), late_bound_constants)
+        qoi_decoded = self._qoi_expr.eval(
+            to_float(decoded, ftype=ftype), late_bound_constants
+        )
 
         eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
@@ -270,7 +274,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             Union of intervals in which the error bound is upheld.
         """
 
-        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
+        ftype: np.dtype[np.floating] = self._dtype.floating_point_dtype_for(data.dtype)
+        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
 
         late_bound_constants: dict[Parameter, np.ndarray[S, np.dtype[np.floating]]] = {
             c: late_bound.resolve_ndarray_with_lossless_cast(

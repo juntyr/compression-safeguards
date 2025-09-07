@@ -21,41 +21,42 @@ from ._float128 import _float128_dtype
 from .typing import F, S, T, U
 
 
-def to_float(x: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[F]]:
+def to_float(
+    x: np.ndarray[S, np.dtype[T]], ftype: np.dtype[F]
+) -> np.ndarray[S, np.dtype[F]]:
     """
-    Losslessly convert the array `x` to floating-point.
+    Losslessly convert the array `x` to the floating-point data type `ftype`.
 
-    Floating-point arrays are passed through, integer arrays are cast to a
-    dtype that can represent all integer values without loss in precision.
+    `ftype` must be a floating-point data type that can represent all values
+    of the data type of `x` without loss in precision.
 
     Parameters
     ----------
     x : np.ndarray[S, np.dtype[T]]
         The array to convert.
+    ftype : np.dtype[F]
+        The floating-point data type to convert to, which must be able to
+        losslessly represent all values of the data type of `x`.
 
     Returns
     -------
     converted : np.ndarray[S, np.dtype[F]]
-        The converted array with a floating-point dtype.
+        The converted array with the chosen floating-point data type.
     """
 
+    assert np.issubdtype(ftype, np.floating) or (ftype == _float128_dtype)
+
     if np.issubdtype(x.dtype, np.floating):
+        assert ftype.itemsize >= x.dtype.itemsize
+    elif ftype != _float128_dtype:
+        assert np.finfo(ftype).nmant >= x.dtype.itemsize
+
+    if x.dtype == ftype:
         return x  # type: ignore
 
-    ftype = {
-        np.dtype(np.int8): np.float16,
-        np.dtype(np.int16): np.float32,
-        np.dtype(np.int32): np.float64,
-        np.dtype(np.int64): _float128_dtype,
-        np.dtype(np.uint8): np.float16,
-        np.dtype(np.uint16): np.float32,
-        np.dtype(np.uint32): np.float64,
-        np.dtype(np.uint64): _float128_dtype,
-    }[x.dtype]
-
-    # lossless cast from integer to floating-point with a sufficiently large
+    # lossless cast to floating-point data type with a sufficiently large
     #  mantissa
-    return x.astype(ftype, casting="safe")  # type: ignore
+    return x.astype(ftype, casting="safe")
 
 
 def from_float(
@@ -66,13 +67,16 @@ def from_float(
     [`to_float`][compression_safeguards.utils.cast.to_float], back to the
     original `dtype`.
 
+    If the original `dtype` was floating-point with lower precision, the
+    conversion is lossy.
+
     If the original `dtype` was integer, the rounding conversion is lossy.
     Infinite values are clamped to the minimum/maximum integer values.
 
     Parameters
     ----------
     x : np.ndarray[S, np.dtype[F]]
-        The array to re-convert.
+        The floating-point array to re-convert.
     dtype : np.dtype
         The original dtype.
 
@@ -84,8 +88,14 @@ def from_float(
 
     x = np.array(x, copy=None)
 
+    assert np.issubdtype(x.dtype, np.floating) or (x.dtype == _float128_dtype)
+
     if x.dtype == dtype:
         return x  # type: ignore
+
+    if np.issubdtype(x.dtype, np.floating):
+        # lossy cast to lower-precision floating-point number
+        return x.astype(dtype, casting="unsafe")
 
     info = np.iinfo(dtype)  # type: ignore
     imin, imax = np.array(info.min, dtype=dtype), np.array(info.max, dtype=dtype)
