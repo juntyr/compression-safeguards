@@ -18,7 +18,11 @@ from compression_safeguards.safeguards._qois.expr.hyperbolic import (
     ScalarTanh,
 )
 from compression_safeguards.safeguards._qois.expr.literal import Euler, Number
-from compression_safeguards.safeguards._qois.expr.logexp import Logarithm, ScalarLog
+from compression_safeguards.safeguards._qois.expr.logexp import (
+    Logarithm,
+    ScalarLog,
+    ScalarLogWithBase,
+)
 from compression_safeguards.safeguards._qois.expr.power import ScalarPower
 from compression_safeguards.safeguards._qois.expr.reciprocal import ScalarReciprocal
 from compression_safeguards.safeguards._qois.expr.round import ScalarRoundTiesEven
@@ -992,7 +996,7 @@ def test_fuzzer_found_nan_power_zero():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_foo():
+def test_fuzzer_found_addsub_bound_overflow():
     X = np.array(np.float16(6.0e-08))
 
     expr = ScalarMultiply(
@@ -1011,3 +1015,25 @@ def test_fuzzer_found_foo():
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
     assert X_lower == np.array(np.float16(6.0e-08))
     assert X_upper == np.array(np.float16(6.0e-08))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_log_upper_bound_negative_zero():
+    X = np.array(np.float32(7.47605e-27))
+
+    expr = ScalarLogWithBase(
+        Number("-0.0"),
+        ScalarTanh(Data.SCALAR),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float32(np.inf))
+
+    expr_lower = np.array(np.float32(7.47605e-27))
+    expr_upper = np.array(np.float32(np.inf))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float32(1.0e-45))
+    assert X_upper == np.array(np.float32(8.66434))
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float32(np.inf))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float32(np.inf))
