@@ -11,6 +11,7 @@ __all__ = [
     "_maximum_zero_sign_sensitive",
     "_where",
     "_broadcast_to",
+    "_astype",
     "_is_sign_negative_number",
     "_is_negative_zero",
     "_is_sign_positive_number",
@@ -21,7 +22,7 @@ __all__ = [
     "_e",
 ]
 
-from typing import overload
+from typing import Literal, overload
 
 import numpy as np
 
@@ -179,8 +180,12 @@ def _minimum_zero_sign_sensitive(a, b):
     if np.issubdtype(a.dtype, np.integer) and np.issubdtype(b.dtype, np.integer):
         return minimum
     minimum_array = np.array(minimum, copy=None)
-    a = _broadcast_to(a.astype(minimum_array.dtype), minimum_array.shape)
-    b = _broadcast_to(b.astype(minimum_array.dtype), minimum_array.shape)
+    a = _broadcast_to(
+        _astype(a, minimum_array.dtype, casting="safe"), minimum_array.shape
+    )
+    b = _broadcast_to(
+        _astype(b, minimum_array.dtype, casting="safe"), minimum_array.shape
+    )
     np.copyto(
         minimum_array,
         a,
@@ -222,8 +227,12 @@ def _maximum_zero_sign_sensitive(a, b):
     if np.issubdtype(a.dtype, np.integer) and np.issubdtype(b.dtype, np.integer):
         return maximum
     maximum_array = np.array(maximum, copy=None)
-    a = _broadcast_to(a.astype(maximum_array.dtype), maximum_array.shape)
-    b = _broadcast_to(b.astype(maximum_array.dtype), maximum_array.shape)
+    a = _broadcast_to(
+        _astype(a, maximum_array.dtype, casting="safe"), maximum_array.shape
+    )
+    b = _broadcast_to(
+        _astype(b, maximum_array.dtype, casting="safe"), maximum_array.shape
+    )
     np.copyto(
         maximum_array,
         a,
@@ -275,6 +284,30 @@ def _broadcast_to(a: Ti, shape: Si) -> np.ndarray[Si, np.dtype[Ti]]: ...
 
 def _broadcast_to(a, shape):
     return np.broadcast_to(a, shape)
+
+
+# wrapper around np.astype that also works for numpy_quaddtype
+def _astype(
+    a: np.ndarray[S, np.dtype[np.number]],
+    dtype: np.dtype[T],
+    casting: Literal["safe", "unsafe"],
+) -> np.ndarray[S, np.dtype[T]]:
+    if (a.dtype != _float128_dtype) and (dtype != _float128_dtype):
+        return a.astype(dtype, casting=casting)
+
+    if (a.dtype == np.dtype(np.uint8)) and (dtype == _float128_dtype):
+        return a.astype(np.uint16, casting="safe").astype(dtype, casting=casting)
+
+    if (a.dtype == _float128_dtype) and (dtype == np.dtype(np.uint8)):
+        return a.astype(np.float32, casting=casting).astype(dtype, casting="unsafe")
+
+    if (a.dtype == np.dtype(np.float16)) and (dtype == _float128_dtype):
+        return a.astype(np.float32, casting="safe").astype(dtype, casting=casting)
+
+    if (a.dtype == _float128_dtype) and (dtype == np.dtype(np.float16)):
+        return a.astype(np.float32, casting=casting).astype(dtype, casting="unsafe")
+
+    return a.astype(dtype, casting=casting)
 
 
 # wrapper around a < 0 that also works for -0.0 (is negative) but excludes NaNs

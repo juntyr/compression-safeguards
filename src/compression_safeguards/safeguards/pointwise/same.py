@@ -31,7 +31,7 @@ class SameValueSafeguard(PointwiseSafeguard):
     missing values in the input have the missing value bitpattern in the
     output.
 
-    Beware that +0.0 and -0.0 are semantically equivalent in floating point but
+    Beware that +0.0 and -0.0 are semantically equivalent in floating-point but
     have different bitwise patterns. To preserve both, two same value
     safeguards are needed, one for each bitpattern.
 
@@ -150,7 +150,7 @@ class SameValueSafeguard(PointwiseSafeguard):
 
         Returns
         -------
-        intervals : IntervalUnion
+        intervals : IntervalUnion[T, int, int]
             Union of intervals in which the same value guarantee is upheld.
         """
 

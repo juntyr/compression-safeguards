@@ -163,7 +163,7 @@ class SelectSafeguard(Safeguard):
 
         Returns
         -------
-        intervals : IntervalUnion
+        intervals : IntervalUnion[T, int, int]
             The safe intervals.
         """
 

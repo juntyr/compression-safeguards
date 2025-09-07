@@ -156,7 +156,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
 
         Returns
         -------
-        intervals : IntervalUnion
+        intervals : IntervalUnion[T, int, int]
             Union of intervals in which the `data`'s sign is preserved.
         """
 
@@ -176,7 +176,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
 
         with np.errstate(over="ignore", under="ignore"):
             if np.issubdtype(data.dtype, np.floating):
-                # special case for floating point -0.0 / +0.0 which both have
+                # special case for floating-point -0.0 / +0.0 which both have
                 #  zero sign and thus have weird below / above intervals
                 smallest_subnormal = _floating_smallest_subnormal(data.dtype)  # type: ignore
                 below_upper = np.array(

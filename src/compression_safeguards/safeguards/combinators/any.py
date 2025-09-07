@@ -143,7 +143,7 @@ class AnySafeguard(Safeguard):
 
         Returns
         -------
-        intervals : IntervalUnion
+        intervals : IntervalUnion[T, int, int]
             Union of safe intervals.
         """
 

@@ -130,8 +130,6 @@ def guarantee_data_within_expr_bounds(
         )
         return bounds_exceeded
 
-    # FIXME: what to do about NaNs?
-
     for _ in range(3):
         bounds_exceeded = exceeds_expr_bounds(Xs_bound_guess)
 

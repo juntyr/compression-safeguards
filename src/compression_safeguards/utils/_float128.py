@@ -1,5 +1,5 @@
 """
-float128, a floating point dtype for numpy with true 128bit precision.
+float128, a floating-point dtype for numpy with true 128bit precision.
 """
 
 __all__ = [

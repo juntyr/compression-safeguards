@@ -93,7 +93,7 @@ class AssumeAlwaysSafeguard(PointwiseSafeguard):
 
         Returns
         -------
-        intervals : IntervalUnion
+        intervals : IntervalUnion[T, int, int]
             Union of intervals that cover all possible values, since all are
             always safe.
         """

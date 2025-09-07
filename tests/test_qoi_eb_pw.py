@@ -1,3 +1,5 @@
+from contextlib import nullcontext as does_not_raise
+
 import numpy as np
 import pytest
 
@@ -6,6 +8,7 @@ from compression_safeguards.safeguards.pointwise.qoi.eb import (
     PointwiseQuantityOfInterestErrorBoundSafeguard,
 )
 from compression_safeguards.utils.bindings import Bindings
+from compression_safeguards.utils.cast import ToFloatMode
 
 from .codecs import (
     encode_decode_identity,
@@ -688,3 +691,66 @@ def test_fuzzer_found_classification():
             ),
         ],
     )
+
+
+@pytest.mark.parametrize("dtype", sorted(d.name for d in Safeguards.supported_dtypes()))
+@pytest.mark.parametrize("mode", sorted(m.name for m in ToFloatMode))
+def test_fuzzer_found_to_float_modes(dtype, mode):
+    data = np.array([], dtype=np.dtype(dtype))
+    decoded = np.array([], dtype=np.dtype(dtype))
+
+    if mode == "lossless":
+        expectation = does_not_raise()
+    elif mode == "float16" and dtype in ("uint8", "int8", "float16"):
+        expectation = does_not_raise()
+    elif mode == "float32" and dtype in (
+        "uint8",
+        "int8",
+        "uint16",
+        "int16",
+        "float16",
+        "float32",
+    ):
+        expectation = does_not_raise()
+    elif mode == "float64" and dtype in (
+        "uint8",
+        "int8",
+        "uint16",
+        "int16",
+        "uint32",
+        "int32",
+        "float16",
+        "float32",
+        "float64",
+    ):
+        expectation = does_not_raise()
+    elif mode == "float128" and dtype in (
+        "uint8",
+        "int8",
+        "uint16",
+        "int16",
+        "uint32",
+        "int32",
+        "uint64",
+        "int64",
+        "float16",
+        "float32",
+        "float64",
+    ):
+        expectation = does_not_raise()
+    else:
+        expectation = pytest.raises(ValueError, match="cannot losslessly cast")
+
+    with expectation:
+        encode_decode_mock(
+            data,
+            decoded,
+            safeguards=[
+                PointwiseQuantityOfInterestErrorBoundSafeguard(
+                    qoi="cos(log(e, base=x))",
+                    type="abs",
+                    eb="$x_max",
+                    qoi_dtype=mode,
+                ),
+            ],
+        )

@@ -6,8 +6,10 @@ import numpy as np
 
 from ....utils._compat import (
     _floating_smallest_subnormal,
+    _is_negative_zero,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
+    _nextafter,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
@@ -90,6 +92,11 @@ class ScalarLog(Expr[Expr]):
             copy=None,
         )
         arg_upper[np.less(argv, 0)] = -smallest_subnormal
+
+        # an upper bound of -0.0 must be nudged downwards from 1 to 1-eps
+        arg_upper[_is_negative_zero(expr_upper)] = _nextafter(
+            np.array(X.dtype.type(1)), np.array(X.dtype.type(0))
+        )
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")

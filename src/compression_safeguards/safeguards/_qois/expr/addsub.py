@@ -390,7 +390,7 @@ def as_left_associative_sum(
 
     while True:
         # rewrite ( a - b ) as ( a + (-b) ), which is bitwsie equivalent for
-        #  floating point numbers
+        #  floating-point numbers
         terms_rev.append(
             ScalarNegate(expr._b) if isinstance(expr, ScalarSubtract) else expr._b
         )

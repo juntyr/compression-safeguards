@@ -21,9 +21,9 @@ def compute_safe_data_lower_upper_interval_union(
     data : np.ndarray[S, np.dtype[T]]
         Data for which to compute the safe interval.
     data_float_lower : np.ndarray[S, np.dtype[F]]
-        Pointwise lower bounds for the floating point version of `data`.
+        Pointwise lower bounds for the floating-point version of `data`.
     data_float_upper : np.ndarray[S, np.dtype[F]]
-        Pointwise upper bounds for the floating point version of `data`.
+        Pointwise upper bounds for the floating-point version of `data`.
 
     Returns
     -------
@@ -49,8 +49,12 @@ def compute_safe_data_lower_upper_interval_union(
 
     # correct rounding errors in the lower and upper bound
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        lower_outside_bound = to_float(valid._lower) < dataf_float_lower
-        upper_outside_bound = to_float(valid._upper) > dataf_float_upper
+        lower_outside_bound = (
+            to_float(valid._lower, ftype=dataf_float_lower.dtype) < dataf_float_lower
+        )
+        upper_outside_bound = (
+            to_float(valid._upper, ftype=dataf_float_lower.dtype) > dataf_float_upper
+        )
 
     Lower(
         from_total_order(

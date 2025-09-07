@@ -10,7 +10,12 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
 from ....utils.bindings import Bindings, Parameter
-from ....utils.cast import lossless_cast, saturating_finite_float_cast, to_float
+from ....utils.cast import (
+    ToFloatMode,
+    lossless_cast,
+    saturating_finite_float_cast,
+    to_float,
+)
 from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import F, S, T
 from ..._qois import StencilQuantityOfInterest
@@ -77,19 +82,17 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     of interest on the decoded data neighbourhood is also NaN, but does not
     guarantee that it has the same bit pattern.
 
-    The error bound can be verified by evaluating the QoI using the
+    The error bound can be verified by evaluating the QoI in the floating-point
+    data type selected by `qoi_dtype` parameter using the
     [`evaluate_qoi`][compression_safeguards.safeguards.stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard.evaluate_qoi]
-    method, which returns the the QoI in a sufficiently large floating point
-    type (keeps the same dtype for floating point data, chooses a dtype with a
-    mantissa that has at least as many bits as / for the integer dtype).
+    method.
 
     Please refer to the
     [`StencilQuantityOfInterestExpression`][compression_safeguards.safeguards.qois.StencilQuantityOfInterestExpression]
     for the EBNF grammar that specifies the language in which the quantities of
     interest are written.
 
-    The implementation of the error bound on pointwise quantities of interest
-    is inspired by:
+    The implementation was originally inspired by:
 
     > Pu Jiao, Sheng Di, Hanqi Guo, Kai Zhao, Jiannan Tian, Dingwen Tao, Xin
     Liang, and Franck Cappello. (2022). Toward Quantity-of-Interest Preserving
@@ -116,6 +119,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     eb : int | float | str | Parameter
         The value of or late-bound parameter name for the error bound on the
         quantity of interest that is enforced by this safeguard.
+    qoi_dtype : str | ToFloatMode
+        The floating-point data type in which the quantity of interest is
+        evaluated. By default, the smallest floating-point data type that can
+        losslessly represent all input data values is chosen.
     """
 
     __slots__ = (
@@ -123,12 +130,14 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         "_neighbourhood",
         "_type",
         "_eb",
+        "_qoi_dtype",
         "_qoi_expr",
     )
     _qoi: StencilQuantityOfInterestExpression
     _neighbourhood: tuple[NeighbourhoodBoundaryAxis, ...]
     _type: ErrorBound
     _eb: int | float | Parameter
+    _qoi_dtype: ToFloatMode
     _qoi_expr: StencilQuantityOfInterest
 
     kind = "qoi_eb_stencil"
@@ -139,6 +148,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         neighbourhood: Sequence[dict | NeighbourhoodBoundaryAxis],
         type: str | ErrorBound,
         eb: int | float | str | Parameter,
+        qoi_dtype: str | ToFloatMode = ToFloatMode.lossless,
     ) -> None:
         self._neighbourhood = tuple(
             axis
@@ -160,6 +170,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         else:
             _check_error_bound(self._type, eb)
             self._eb = eb
+
+        self._qoi_dtype = (
+            qoi_dtype if isinstance(qoi_dtype, ToFloatMode) else ToFloatMode[qoi_dtype]
+        )
 
         shape = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
         I = tuple(axis.before for axis in self._neighbourhood)  # noqa: E741
@@ -249,15 +263,12 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         late_bound: Bindings,
     ) -> np.ndarray[tuple[int, ...], np.dtype[F]]:
         """
-        Evaluate the derived quantity of interest on the `data`.
+        Evaluate the derived quantity of interest on the `data` in the
+        floating-point data type selected by the `qoi_dtype` parameter.
 
         The quantity of interest may have a different shape if the
         [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
         boundary condition is used along any axis.
-
-        If the `data` is of integer dtype, the quantity of interest is
-        evaluated in floating point with sufficient precision to represent all
-        integer values.
 
         Parameters
         ----------
@@ -269,7 +280,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         Returns
         -------
         qoi : np.ndarray[tuple[int, ...], np.dtype[F]]
-            Evaluated quantity of interest, in floating point.
+            Evaluated quantity of interest, in floating-point.
         """
 
         # check that the data shape is compatible with the neighbourhood shape
@@ -285,11 +296,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     0, empty_shape[axis.axis] - axis.before - axis.after
                 )
 
+        ftype: np.dtype[F] = self._qoi_dtype.floating_point_dtype_for(data.dtype)  # type: ignore
+
         if any(s == 0 for s in empty_shape):
-            float_dtype: np.dtype[F] = to_float(
-                np.array([0, 1], dtype=data.dtype)
-            ).dtype
-            return np.zeros(empty_shape, dtype=float_dtype)
+            return np.zeros(empty_shape, dtype=ftype)
 
         constant_boundaries = [
             None
@@ -327,7 +337,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 window,
                 axis=tuple(axis.axis for axis in self._neighbourhood),
                 writeable=False,
-            )  # type: ignore
+            ),  # type: ignore
+            ftype=ftype,
         )
 
         late_bound_constants: dict[
@@ -354,7 +365,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     window,
                     axis=tuple(axis.axis for axis in self._neighbourhood),
                     writeable=False,
-                )  # type: ignore
+                ),  # type: ignore
+                ftype=ftype,
             )
             late_bound_constants[c] = late_windows_float
 
@@ -439,6 +451,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 axis.axis,
             )
 
+        ftype: np.dtype[np.floating] = self._qoi_dtype.floating_point_dtype_for(
+            data.dtype
+        )
         data_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
             to_float(
                 sliding_window_view(
@@ -446,7 +461,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     window,
                     axis=tuple(axis.axis for axis in self._neighbourhood),
                     writeable=False,
-                )  # type: ignore
+                ),  # type: ignore
+                ftype=ftype,
             )
         )
         decoded_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
@@ -456,7 +472,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     window,
                     axis=tuple(axis.axis for axis in self._neighbourhood),
                     writeable=False,
-                )  # type: ignore
+                ),  # type: ignore
+                ftype=ftype,
             )
         )
 
@@ -485,7 +502,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                         window,
                         axis=tuple(axis.axis for axis in self._neighbourhood),
                         writeable=False,
-                    )  # type: ignore
+                    ),  # type: ignore
+                    ftype=ftype,
                 )
             )
             late_bound_constants[c] = late_windows_float
@@ -561,7 +579,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         Returns
         -------
-        intervals : IntervalUnion
+        intervals : IntervalUnion[T, int, int]
             Union of intervals in which the error bound is upheld.
         """
 
@@ -606,6 +624,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 axis.axis,
             )
 
+        ftype: np.dtype[np.floating] = self._qoi_dtype.floating_point_dtype_for(
+            data.dtype
+        )
         data_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
             to_float(
                 sliding_window_view(
@@ -613,7 +634,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     window,
                     axis=tuple(axis.axis for axis in self._neighbourhood),
                     writeable=False,
-                )  # type: ignore
+                ),  # type: ignore
+                ftype=ftype,
             )
         )
 
@@ -642,7 +664,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                         window,
                         axis=tuple(axis.axis for axis in self._neighbourhood),
                         writeable=False,
-                    )  # type: ignore
+                    ),  # type: ignore
+                    ftype=ftype,
                 )
             )
             late_bound_constants[c] = late_windows_float
@@ -744,7 +767,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     ) + i
                     reverse_indices_counter[idx] += 1
 
-        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
+        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
 
         # flatten the QoI data bounds and append an infinite value,
         # which is indexed if an element did not contribute to the maximum
@@ -790,4 +813,5 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             neighbourhood=[axis.get_config() for axis in self._neighbourhood],
             type=self._type.name,
             eb=self._eb,
+            qoi_dtype=self._qoi_dtype.name,
         )

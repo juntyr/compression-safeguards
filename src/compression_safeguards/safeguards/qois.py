@@ -205,28 +205,40 @@ newline `\\n`) and single-line inline comments starting with a hash `#`.
 
 ## Numerical Evaluation
 
-### Floating point data type
+### Floating-point data type
 
-The quantities of interest are evaluated using floating point arithmetic. If
-the data has an integer data type, the data is first losslessly upcast to a
-floating point type with sufficient precision to represent all integer values
-(e.g. at least [`np.float64`][numpy.float64] for [`np.int32`][numpy.int32] or
-[`np.uint32`][numpy.uint32] data). On platforms where the
-[`np.float128`][numpy.float128] type does *not* refer to a floating point
-number with true 128 bits of precision, the
-[`numpy_quaddtype`](https://pypi.org/project/numpy-quaddtype/) package is used
-to provide a true 128 bit floating point data type.
+QoIs can be evaluated on any data type supported by the safeguards (see
+[`Safeguards.supported_dtypes`][compression_safeguards.api.Safeguards.supported_dtypes]).
+Since the QoIs support many functions with floating-point outputs, they
+are evaluated using floating-point arithmetic.
+
+Importantly, the floating-point evaluation data type *must* be able to
+represent all values of the input data type losslessly.
+
+* For floating-point data, this is at least the input data type.
+
+* For integer data, the data is first losslessly upcast to a floating-point
+type with sufficient precision to represent all integer values, i.e. a type
+whose mantissa has more bits than the integer type. For the below floating-
+point types, this corresponds to choosing a floating-point data type with a
+larger bit width (e.g. at least [`np.float64`][numpy.float64] for
+[`np.int32`][numpy.int32] or [`np.uint32`][numpy.uint32] data).
+
+The specific floating-point data type in which the quantities of interest are
+evaluated is configured using the
+[`ToFloatMode`][compression_safeguards.utils.cast.ToFloatMode]
+enum, please refer to its documentation for further information.
 
 ### Literals
 
 The quantities of interest can contain both integer and floating-point
 literals. During numerical evaluation, both are evaluated for the chosen
-floating point type. For instance, if evaluation occurs in
+floating-point type. For instance, if evaluation occurs in
 [`np.float64`][numpy.float64] format, a literal `0.33` is evaluated using
 [`np.float64("0.33")`], which returns the closest representable
 [`np.float64`][numpy.float64] value for the symbolic value `0.33`. The
 constants `e` and `pi` are provided as the closest representable value in the
-chosen floating point type.
+chosen floating-point type.
 
 ### Symbolic integer constant folding
 
@@ -254,7 +266,7 @@ constant-folding in general. However, if for `a / b` both `a` and `b` are
 integers and have a greatest common denominator / factor g, i.e. `a = g * c`
 and `b = g * d`, the division is symbolically simplified to `c / d`.
 Furthermore, `a / 1` is evaluated to `a.0` and `a / -1` to `-a.0`. Since `a.0`
-is a floating point literal, symbolic integer constant folding stops there.
+is a floating-point literal, symbolic integer constant folding stops there.
 
 ### Numerical evaluation order
 

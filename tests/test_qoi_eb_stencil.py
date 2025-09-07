@@ -10,7 +10,7 @@ from compression_safeguards.safeguards.stencil.qoi.eb import (
 )
 from compression_safeguards.utils._float128 import _float128_dtype
 from compression_safeguards.utils.bindings import Bindings
-from compression_safeguards.utils.cast import to_float
+from compression_safeguards.utils.cast import ToFloatMode, to_float
 
 from .codecs import (
     encode_decode_identity,
@@ -606,38 +606,15 @@ def test_periodic_delta_transform(dtype):
         else:
             return np.mod(p + q2, q) - q2
 
-    float_dtype = to_float(np.array((), dtype=dtype)).dtype
+    dtype = np.dtype(dtype)
 
-    assert (
-        delta_transform(
-            np.array(-0.75, dtype=float_dtype), np.array(1, dtype=float_dtype)
-        )
-        > 0
-    )
-    assert (
-        delta_transform(
-            np.array(-0.25, dtype=float_dtype), np.array(1, dtype=float_dtype)
-        )
-        < 0
-    )
-    assert (
-        delta_transform(
-            np.array(0.0, dtype=float_dtype), np.array(1, dtype=float_dtype)
-        )
-        == 0
-    )
-    assert (
-        delta_transform(
-            np.array(0.25, dtype=float_dtype), np.array(1, dtype=float_dtype)
-        )
-        > 0
-    )
-    assert (
-        delta_transform(
-            np.array(0.75, dtype=float_dtype), np.array(1, dtype=float_dtype)
-        )
-        < 0
-    )
+    ftype: np.dtype[np.floating] = ToFloatMode.lossless.floating_point_dtype_for(dtype)
+
+    assert delta_transform(np.array(-0.75, dtype=ftype), np.array(1, dtype=ftype)) > 0
+    assert delta_transform(np.array(-0.25, dtype=ftype), np.array(1, dtype=ftype)) < 0
+    assert delta_transform(np.array(0.0, dtype=ftype), np.array(1, dtype=ftype)) == 0
+    assert delta_transform(np.array(0.25, dtype=ftype), np.array(1, dtype=ftype)) > 0
+    assert delta_transform(np.array(0.75, dtype=ftype), np.array(1, dtype=ftype)) < 0
 
     for x, period in [
         (np.linspace(-15, 15), 10),
@@ -648,7 +625,7 @@ def test_periodic_delta_transform(dtype):
         assert np.all(periodic >= (-period / 2))
         assert np.all(periodic <= (period / 2))
 
-        periodic = delta_transform(to_float(x.astype(dtype)), period)
+        periodic = delta_transform(to_float(x.astype(dtype), ftype=ftype), period)
         assert np.all(periodic >= (-period / 2))
         assert np.all(periodic <= (period / 2))
 

@@ -102,7 +102,7 @@ class ErrorBound(Enum):
     bound, e.g. $\epsilon_{ratio} = 1.02$ corresponds to a $2\%$ relative-like
     error bound.
 
-    [^1]: Gustafson, J. L., & Yonemoto, I. T. (2017). Beating Floating Point at
+    [^1]: Gustafson, J. L., & Yonemoto, I. T. (2017). Beating floating-point at
         its Own Game: Posit Arithmetic. *Supercomputing Frontiers and
         Innovations*, 4(2). Available from:
         [doi:10.14529/jsfi170206](https://doi.org/10.14529/jsfi170206).
@@ -170,7 +170,7 @@ def _compute_finite_absolute_error_bound(
         The error bound value. It must have already been checked using
         `_check_error_bound`.
     data_float : np.ndarray[S, np.dtype[F]]
-        The original data array in floating point representation.
+        The original data array in floating-point representation.
 
     Returns
     -------
@@ -215,9 +215,9 @@ def _compute_finite_absolute_error(
     type : ErrorBound
         The error bound type.
     data_float : np.ndarray[S, np.dtype[F]]
-        The original data array in floating point representation.
+        The original data array in floating-point representation.
     decoded_float : np.ndarray[S, np.dtype[F]]
-        The decoded data array in floating point representation.
+        The decoded data array in floating-point representation.
 
     Returns
     -------
@@ -273,7 +273,7 @@ def _apply_finite_error_bound(
     data : np.ndarray[S, np.dtype[T]]
         The original data array.
     data_float : np.ndarray[S, np.dtype[F]]
-        The original data array in floating point representation.
+        The original data array in floating-point representation.
 
     Returns
     -------
@@ -300,10 +300,10 @@ def _apply_finite_error_bound(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
                 lower_outside_eb: np.ndarray[S, np.dtype[np.bool]] = np.greater(
-                    data_float - to_float(lower), eb_abs
+                    data_float - to_float(lower, ftype=data_float.dtype), eb_abs
                 )
                 upper_outside_eb: np.ndarray[S, np.dtype[np.bool]] = np.greater(
-                    to_float(upper) - data_float, eb_abs
+                    to_float(upper, ftype=data_float.dtype) - data_float, eb_abs
                 )
 
             lower = np.array(
@@ -344,8 +344,8 @@ def _apply_finite_error_bound(
                     np.abs(
                         _where(
                             np.less(data, 0),
-                            to_float(lower) / data_float,
-                            data_float / to_float(lower),
+                            to_float(lower, ftype=data_float.dtype) / data_float,
+                            data_float / to_float(lower, ftype=data_float.dtype),
                         )
                     )
                     > eb_abs
@@ -354,8 +354,8 @@ def _apply_finite_error_bound(
                     np.abs(
                         _where(
                             np.less(data, 0),
-                            data_float / to_float(upper),
-                            to_float(upper) / data_float,
+                            data_float / to_float(upper, ftype=data_float.dtype),
+                            to_float(upper, ftype=data_float.dtype) / data_float,
                         )
                     )
                     > eb_abs
@@ -403,7 +403,7 @@ def _apply_finite_qoi_error_bound(
     This function calls `_compute_finite_absolute_error_bound` internally.
 
     Unlike `_apply_finite_error_bound`, which is applied in the original data
-    space, this function is applied in floating point QoI space and uses a
+    space, this function is applied in floating-point QoI space and uses a
     different approach for correcting rounding errors with nudging.
 
     The computation is only defined for finite data elements, i.e. the produced
@@ -417,7 +417,7 @@ def _apply_finite_qoi_error_bound(
         The error bound value. It must have already been checked using
         `_check_error_bound`.
     qoi_float : np.ndarray[S, np.dtype[F]]
-        The floating point QoI array.
+        The floating-point QoI array.
 
     Returns
     -------
@@ -450,7 +450,7 @@ def _apply_finite_qoi_error_bound(
                     upper - qoi_float, eb_abs
                 )
 
-            # we can nudge with nextafter since the QoIs are floating point
+            # we can nudge with nextafter since the QoIs are floating-point
             np.copyto(
                 lower,
                 _nextafter(lower, qoi_float),
@@ -508,7 +508,7 @@ def _apply_finite_qoi_error_bound(
                     > eb_abs
                 )
 
-            # we can nudge with nextafter since the QoIs are floating point
+            # we can nudge with nextafter since the QoIs are floating-point
             np.copyto(
                 lower,
                 _nextafter(lower, qoi_float),

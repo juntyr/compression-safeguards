@@ -9,7 +9,7 @@ from collections.abc import Set
 import numpy as np
 
 from ...utils.bindings import Bindings, Parameter
-from ...utils.cast import as_bits, saturating_finite_float_cast, to_float
+from ...utils.cast import ToFloatMode, as_bits, saturating_finite_float_cast, to_float
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import S, T
 from ..eb import (
@@ -32,9 +32,9 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
     [`False`][False], NaN values are also preserved with the same bit pattern.
 
     The error bound can be verified by casting the data and error bound to a
-    sufficiently large floating point type (keep the same dtype for floating
-    point data, choose a dtype with a mantissa that has at least as many bits
-    as / for the integer dtype).
+    sufficiently large floating-point type, selected by
+    [`ToFloatMode.lossless.floating_point_dtype_for`][compression_safeguards.utils.cast.ToFloatMode.floating_point_dtype_for],
+    using [`to_float`][compression_safeguards.utils.cast.to_float].
 
     Parameters
     ----------
@@ -115,8 +115,13 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
-        decoded_float: np.ndarray[S, np.dtype[np.floating]] = to_float(decoded)
+        ftype: np.dtype[np.floating] = ToFloatMode.lossless.floating_point_dtype_for(
+            data.dtype
+        )
+        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
+        decoded_float: np.ndarray[S, np.dtype[np.floating]] = to_float(
+            decoded, ftype=ftype
+        )
 
         eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
@@ -166,7 +171,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
 
         Returns
         -------
-        intervals : IntervalUnion
+        intervals : IntervalUnion[T, int, int]
             Union of intervals in which the error bound is upheld.
         """
 
@@ -174,7 +179,10 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
 
         valid = Interval.empty_like(dataf).preserve_inf(dataf)
 
-        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data)
+        ftype: np.dtype[np.floating] = ToFloatMode.lossless.floating_point_dtype_for(
+            data.dtype
+        )
+        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
 
         eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
@@ -189,7 +197,9 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         )
         _check_error_bound(self._type, eb)
 
-        lower, upper = _apply_finite_error_bound(self._type, eb, data, to_float(data))
+        lower, upper = _apply_finite_error_bound(
+            self._type, eb, data, to_float(data, ftype=ftype)
+        )
 
         Lower(lower.flatten()) <= valid[np.isfinite(dataf)] <= Upper(upper.flatten())
 

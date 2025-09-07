@@ -186,7 +186,7 @@ class ScalarDivide(Expr[Expr, Expr]):
     def __new__(cls, a: Expr, b: Expr):
         if isinstance(a, Number) and isinstance(b, Number):
             # symbolical constant propagation for some cases of int / int
-            # division always produces a floating point number
+            # division always produces a floating-point number
             ai, bi = a.as_int(), b.as_int()
             if (ai is not None) and (bi is not None):
                 d = gcd(ai, bi)
@@ -198,10 +198,10 @@ class ScalarDivide(Expr[Expr, Expr]):
                     assert (ai % d == 0) and (bi % d == 0)
                     ai //= d
                     bi //= d
-                # int / 1 has an exact floating point result
+                # int / 1 has an exact floating-point result
                 if bi == 1:
                     return Number.from_symbolic_int_as_float(ai)
-                # int / -1 has an exact floating point result
+                # int / -1 has an exact floating-point result
                 if bi == -1:
                     assert ai >= 0
                     # ensure that 0/1 = 0.0 and 0/-1 = -0.0

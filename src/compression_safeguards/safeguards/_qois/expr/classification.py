@@ -3,7 +3,7 @@ from typing import Callable, overload
 
 import numpy as np
 
-from ....utils._compat import _floating_max
+from ....utils._compat import _astype, _floating_max
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from .abc import Expr
@@ -236,6 +236,6 @@ def classify_to_dtype(classify, a, dtype):
     c = classify(a)
 
     if not isinstance(c, np.ndarray):
-        return np.array(c, copy=None).astype(dtype)[()]
+        return _astype(np.array(c, copy=None), dtype, casting="safe")[()]
 
-    return c.astype(dtype)
+    return _astype(c, dtype, casting="safe")
