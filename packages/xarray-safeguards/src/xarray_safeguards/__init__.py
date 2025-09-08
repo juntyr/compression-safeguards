@@ -123,7 +123,10 @@ def produce_data_array_correction(
 
     # small safeguard against the printer problem
     assert "safeguards" not in data.attrs, (
-        "computing the safeguards correction relative to a `data` array that has *already* been safeguards-corrected before is unsafe as compression errors can accumulate when the original uncompressed data is not known"
+        "computing the safeguards correction relative to a `data` array that "
+        "has *already* been safeguards-corrected before is unsafe as "
+        "compression errors can accumulate when the original uncompressed data "
+        "is not known"
     )
 
     assert data.dims == prediction.dims
@@ -145,7 +148,8 @@ def produce_data_array_correction(
     late_bound_keys = frozenset(Parameter(k) for k in late_bound.keys())
 
     assert late_bound_reqs == late_bound_keys, (
-        f"late_bound is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} / has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
+        f"late_bound is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} "
+        f"/ has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
     )
 
     # create the global built-in late-bound bindings with $x_min and $x_max
@@ -371,6 +375,10 @@ def produce_data_array_correction(
 
         return np.array(chunk_is_ok).reshape(tuple(1 for _ in data_chunk.shape))
 
+    # first check each chunk to find out if any failed the check
+    # for stencil safeguards, one chunk failing requires all to be corrected
+    #  (since incremental corrections could spread)
+    # if no chunk check failed, the chunked correction can take a fast path
     any_chunk_check_failed = (
         not dask.array.map_overlap(
             _check_overlapping_stencil_chunk,
@@ -396,8 +404,6 @@ def produce_data_array_correction(
         .all()
         .compute()
     )
-
-    # TODO: first check each chunk to optimise the no-correction case
 
     def _compute_overlapping_stencil_chunk_correction(
         data_chunk: np.ndarray,
@@ -544,7 +550,7 @@ def apply_data_array_correction(
         safeguards: Safeguards,
     ) -> xr.DataArray:
         return prediction_chunk.copy(
-            data=safeguards.apply_correction(
+            data=safeguards.apply_chunked_correction(
                 prediction_chunk.values, correction_chunk.values
             )
         )

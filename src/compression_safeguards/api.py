@@ -190,7 +190,10 @@ class Safeguards:
 
         if len(self._stencil_safeguards) > 0:
             assert not getattr(data, "chunked", False), (
-                "checking the safeguards for an individual chunk in a chunked array is unsafe when using stencil safeguards since their safety requirements cannot be guaranteed across chunk boundaries"
+                "checking the safeguards for an individual chunk in a chunked "
+                "array is unsafe when using stencil safeguards since their "
+                "safety requirements cannot be guaranteed across chunk "
+                "boundaries; use check_chunk instead"
             )
 
         assert data.dtype == prediction.dtype
@@ -207,7 +210,8 @@ class Safeguards:
         late_bound_reqs = late_bound_reqs - late_bound_builtin.keys()
         late_bound_keys = frozenset(late_bound.parameters())
         assert late_bound_reqs == late_bound_keys, (
-            f"late_bound is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} / has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
+            f"late_bound is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} "
+            f"/ has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
         )
 
         if len(late_bound_builtin) > 0:
@@ -259,7 +263,10 @@ class Safeguards:
 
         if len(self._stencil_safeguards) > 0:
             assert not getattr(data, "chunked", False), (
-                "computing the safeguards correction for an individual chunk in a chunked array is unsafe when using stencil safeguards since their safety requirements cannot be guaranteed across chunk boundaries; use compute_chunked_correction instead"
+                "computing the safeguards correction for an individual chunk "
+                "in a chunked array is unsafe when using stencil safeguards "
+                "since their safety requirements cannot be guaranteed across "
+                "chunk boundaries; use compute_chunked_correction instead"
             )
 
         assert data.dtype == prediction.dtype
@@ -276,7 +283,8 @@ class Safeguards:
         late_bound_reqs = late_bound_reqs - late_bound_builtin.keys()
         late_bound_keys = frozenset(late_bound.parameters())
         assert late_bound_reqs == late_bound_keys, (
-            f"late_bound is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} / has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
+            f"late_bound is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} "
+            f"/ has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
         )
 
         if len(late_bound_builtin) > 0:
@@ -512,18 +520,13 @@ class Safeguards:
             data_shape
         )
 
-        # TODO: check that the chunk stencil is compatible with the required stencil
-        #       this is not trivial since we need to account for huge chunks where
-        #       downgrading the stencil can work out
-
-        # TODO: compute indices to extract just the needed data and data+stencil
-        #       again taking wrapping boundaries into account
-        #       also sometimes stencil needs to be removed near the data boundaries
-        #       so that the per-safeguard stencil correctly sees how points wrap
-
         stencil_indices = []
         non_stencil_indices = []
 
+        # (1): check that the chunk stencil is compatible with the required stencil
+        #      this is not trivial since we need to account for huge chunks where
+        #       downgrading the stencil can work out
+        # (2): compute indices to extract just the needed data and data+stencil
         for i, (c, r) in enumerate(zip(chunk_stencil, required_stencil)):
             # complete chunks that span the entire data along the axis are
             #  always allowed
@@ -566,7 +569,9 @@ class Safeguards:
                     )
                 case BoundaryCondition.wrap:
                     # a wrapping boundary is compatible with any other boundary
-                    # TODO
+                    # TODO: again taking wrapping boundaries into account
+                    #       also sometimes stencil needs to be removed near the data boundaries
+                    #       so that the per-safeguard stencil correctly sees how points wrap
                     raise NotImplementedError
                 case _:
                     assert_never(c[0])
@@ -589,7 +594,8 @@ class Safeguards:
         late_bound_reqs = late_bound_reqs - late_bound_builtin.keys()
         late_bound_keys = frozenset(late_bound_chunk.parameters())
         assert late_bound_reqs == late_bound_keys, (
-            f"late_bound_chunk is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} / has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
+            f"late_bound_chunk is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} "
+            f"/ has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
         )
 
         if len(late_bound_builtin) > 0:
@@ -645,18 +651,13 @@ class Safeguards:
             data_shape
         )
 
-        # TODO: check that the chunk stencil is compatible with the required stencil
-        #       this is not trivial since we need to account for huge chunks where
-        #       downgrading the stencil can work out
-
-        # TODO: compute indices to extract just the needed data and data+stencil
-        #       again taking wrapping boundaries into account
-        #       also sometimes stencil needs to be removed near the data boundaries
-        #       so that the per-safeguard stencil correctly sees how points wrap
-
         stencil_indices = []
         non_stencil_indices = []
 
+        # (1): check that the chunk stencil is compatible with the required stencil
+        #      this is not trivial since we need to account for huge chunks where
+        #       downgrading the stencil can work out
+        # (2): compute indices to extract just the needed data and data+stencil
         for i, (c, r) in enumerate(zip(chunk_stencil, required_stencil)):
             # complete chunks that span the entire data along the axis are
             #  always allowed
@@ -699,7 +700,9 @@ class Safeguards:
                     )
                 case BoundaryCondition.wrap:
                     # a wrapping boundary is compatible with any other boundary
-                    # TODO
+                    # TODO: again taking wrapping boundaries into account
+                    #       also sometimes stencil needs to be removed near the data boundaries
+                    #       so that the per-safeguard stencil correctly sees how points wrap
                     raise NotImplementedError
                 case _:
                     assert_never(c[0])
@@ -722,7 +725,8 @@ class Safeguards:
         late_bound_reqs = late_bound_reqs - late_bound_builtin.keys()
         late_bound_keys = frozenset(late_bound_chunk.parameters())
         assert late_bound_reqs == late_bound_keys, (
-            f"late_bound_chunk is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} / has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
+            f"late_bound_chunk is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} "
+            f"/ has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
         )
 
         if len(late_bound_builtin) > 0:
@@ -794,6 +798,20 @@ class Safeguards:
         return (prediction_chunk_bits - correction_chunk_bits)[
             tuple(non_stencil_indices)
         ]
+
+    def apply_chunked_correction(
+        self,
+        prediction_chunk: np.ndarray[S, np.dtype[T]],
+        correction_chunk: np.ndarray[S, np.dtype[C]],
+    ) -> np.ndarray[S, np.dtype[T]]:
+        assert correction_chunk.shape == prediction_chunk.shape
+
+        prediction_chunk_bits = as_bits(prediction_chunk)
+        correction_chunk_bits = as_bits(correction_chunk)
+
+        corrected_chunk = prediction_chunk_bits - correction_chunk_bits
+
+        return corrected_chunk.view(prediction_chunk.dtype)
 
     def get_config(self) -> dict:
         """
