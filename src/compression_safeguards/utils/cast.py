@@ -250,8 +250,8 @@ def from_float(
         converted: np.ndarray[S, np.dtype[T]] = np.array(  # type: ignore
             _astype(np.array(np.rint(x), copy=None), dtype, casting="unsafe"), copy=None
         )
-    converted[np.greater(x, imax)] = imax
-    converted[np.less(x, imin)] = imin
+    converted[np.greater(x, _astype(imax, x.dtype, casting="safe"))] = imax
+    converted[np.less(x, _astype(imin, x.dtype, casting="safe"))] = imin
 
     return converted
 

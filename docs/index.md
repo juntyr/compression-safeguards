@@ -269,6 +269,8 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
 - The `compression-safeguards` (and `numcodecs-safeguards` frontend) assume that they are applied to the entire data at once, i.e. that they are not applied to data chunks one by one. If you are only using pointwise safeguards, you can also safely apply the safeguards to chunks. However, if you are using stencil safeguard, which upholds safety guarantees over local neighbourhoods of points, compressing each chunk independently would likely violate the safety requirements around the chunk boundaries. For instance, cross-chunk-boundary monotonic sequences would might no longer be preserved as monotonic by the `monotonicity` safeguard. *Apply stencil safeguards to individual chunks at your own risk!* If you would like a peek at how safeguards can be safely applied to chunked data, you can have a look at the [`chunked.ipynb`](examples/chunked.ipynb) example. We are working on further frontends that will correctly handle cross-chunk safeguards out of the box.
 
+- The `compression-safeguards` do not provide a safeguard to guarantee that the compression errors after safeguarding are unbiased. For instance, if a compressor, which produces biased decompressed values that are within the safeguarded error bound, is safeguarded, the biased values are not corrected by the safeguards. Furthermore, the safeguard corrections themselves may introduce bias in the compression error. Please refer to the [`error-distribution.ipynb`](examples/error-distribution.ipynb) example for some examples. We are working on a bias safeguard that would optionally provide these guarantees.
+
 
 ## Related Projects
 

@@ -689,7 +689,7 @@ def test_fuzzer_found_classification():
 
 @pytest.mark.parametrize("dtype", sorted(d.name for d in Safeguards.supported_dtypes()))
 @pytest.mark.parametrize("mode", sorted(m.name for m in ToFloatMode))
-def test_fuzzer_found_to_float_modes(dtype, mode):
+def test_to_float_modes(dtype, mode):
     data = np.array([], dtype=np.dtype(dtype))
     decoded = np.array([], dtype=np.dtype(dtype))
 
@@ -748,3 +748,21 @@ def test_fuzzer_found_to_float_modes(dtype, mode):
                 ),
             ],
         )
+
+
+def test_fuzzer_found_uint8_to_float128_cast():
+    data = np.array([[0, 0, 0], [6, 0, 0], [78, 36, 10]], dtype=np.uint8)
+    decoded = np.array([[10, 36, 74], [255, 255, 255], [255, 255, 255]], dtype=np.uint8)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            PointwiseQuantityOfInterestErrorBoundSafeguard(
+                qoi="trunc(log(square(x), base=291))",
+                type="abs",
+                eb=0,
+                qoi_dtype="float128",
+            ),
+        ],
+    )

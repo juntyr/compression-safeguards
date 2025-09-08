@@ -31,8 +31,6 @@ nav:
           - NaN values: examples/nan.ipynb
           - Missing values: examples/missing.ipynb
           - Precipitation extrema: examples/precipitation.ipynb
-      - Error bound distributions:
-          - Compressor comparison: examples/error-distribution.ipynb
       - Regions of Interest (RoIs):
           - Latent Heat Flux: examples/latent-heat-flux.ipynb
       - Quantities of Interest (QoIs):
@@ -41,6 +39,8 @@ nav:
           - Higher-order derivatives: examples/derivative.ipynb
           - "Neighbourhood: Vorticity": examples/vorticity.ipynb
           - Bounding the dSSIM metric: examples/dssim.ipynb
+      - Error bound distributions:
+        - Absolute error bound: examples/error-distribution.ipynb
   - Links:
       - GitHub: https://github.com/juntyr/compression-safeguards
       - PyPI:
