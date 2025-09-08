@@ -77,6 +77,7 @@ from io import BytesIO
 import numcodecs
 import numcodecs.compat
 import numcodecs.registry
+import numcodecs_combinators
 import numpy as np
 import varint
 from compression_safeguards.api import Safeguards
@@ -211,8 +212,24 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         lossless: None | dict | Lossless = None,
         _version: None | str = None,
     ) -> None:
+        wraps_safeguards_codec = False
+
+        def check_for_safeguards_codec(codec: Codec) -> Codec:
+            nonlocal wraps_safeguards_codec
+            wraps_safeguards_codec |= isinstance(codec, SafeguardsCodec)
+            return codec
+
         self._codec = (
             codec if isinstance(codec, Codec) else numcodecs.registry.get_codec(codec)
+        )
+
+        numcodecs_combinators.map_codec(self._codec, check_for_safeguards_codec)
+
+        assert not wraps_safeguards_codec, (
+            "`SafeguardsCodec` should not wrap a codec containing another "
+            "`SafeguardsCodec` since the safeguards of one might not be upheld "
+            "by the other (printer problem); merge them into one combined "
+            "`SafeguardsCodec` instead"
         )
 
         self._safeguards = Safeguards(safeguards=safeguards, _version=_version)

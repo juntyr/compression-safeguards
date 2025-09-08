@@ -287,6 +287,7 @@ def _broadcast_to(a, shape):
 
 
 # wrapper around np.astype that also works for numpy_quaddtype
+@np.errstate(invalid="ignore")
 def _astype(
     a: np.ndarray[S, np.dtype[np.number]],
     dtype: np.dtype[T],
