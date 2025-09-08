@@ -766,3 +766,25 @@ def test_fuzzer_found_uint8_to_float128_cast():
             ),
         ],
     )
+
+
+def test_fuzzer_found_float16_to_float128_cast_invalid_value():
+    data = np.array([[0.1309], [0.0], [np.nan]], dtype=np.float16)
+    decoded = np.array([[1.52e-05], [0.00e00], [0.00e00]], dtype=np.float16)
+
+    with pytest.raises(
+        ValueError,
+        match=r"cannot cast non-finite late-bound parameter \$x values from float16 to saturating finite",
+    ):
+        encode_decode_mock(
+            data,
+            decoded,
+            safeguards=[
+                PointwiseQuantityOfInterestErrorBoundSafeguard(
+                    qoi="log(sign(x), base=e) - 1",
+                    type="abs",
+                    eb="$x",
+                    qoi_dtype="float128",
+                ),
+            ],
+        )

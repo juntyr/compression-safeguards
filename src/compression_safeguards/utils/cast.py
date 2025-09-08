@@ -238,8 +238,11 @@ def from_float(
         return x  # type: ignore
 
     if np.issubdtype(dtype, np.floating):
-        # lossy cast to lower-precision floating-point number
-        return _astype(x, dtype, casting="unsafe")
+        with np.errstate(
+            divide="ignore", over="ignore", under="ignore", invalid="ignore"
+        ):
+            # lossy cast to lower-precision floating-point number
+            return _astype(x, dtype, casting="unsafe")
 
     info = np.iinfo(dtype)  # type: ignore
     imin, imax = np.array(info.min, dtype=dtype), np.array(info.max, dtype=dtype)
