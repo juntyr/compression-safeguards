@@ -546,6 +546,7 @@ class Safeguards:
                     #  which is only compatible with itself
                     # and that the stencil is large enough
                     assert r[0] == BoundaryCondition.valid
+
                     # what is the required stencil after adjusting for near-
                     #  boundary stencil truncation?
                     rs = NeighbourhoodAxis(
@@ -569,10 +570,55 @@ class Safeguards:
                     )
                 case BoundaryCondition.wrap:
                     # a wrapping boundary is compatible with any other boundary
-                    # TODO: again taking wrapping boundaries into account
-                    #       also sometimes stencil needs to be removed near the data boundaries
-                    #       so that the per-safeguard stencil correctly sees how points wrap
-                    raise NotImplementedError
+                    assert r[0] in (BoundaryCondition.valid, BoundaryCondition.wrap)
+
+                    # what is the required stencil after adjusting for near-
+                    #  boundary stencil truncation?
+                    # (a) if the chunk is in the middle, where no boundary
+                    #     condition is applied, we just keep the stencil as-is
+                    # (b) if the chunk's stencil only overlaps with the boundary
+                    #     on one side, we keep the stencil on that side as-is
+                    # (c) otherwise, we have the full data and remove the
+                    #     stencil so that the per-safeguard stencil correctly
+                    #     sees how points wrap
+                    rs = NeighbourhoodAxis(
+                        before=(
+                            r[1].before  # (a)
+                            if r[1].before <= chunk_offset[i]
+                            else (
+                                r[1].before  # (b)
+                                if r[1].after
+                                <= (
+                                    data_shape[i]
+                                    - data_chunk.shape[i]
+                                    - chunk_offset[i]
+                                )
+                                else 0  # (c)
+                            )
+                        ),
+                        after=(
+                            r[1].after  # (a)
+                            if r[1].after
+                            <= (data_shape[i] - data_chunk.shape[i] - chunk_offset[i])
+                            else (
+                                r[1].after  # (b)
+                                if r[1].before <= chunk_offset[i]
+                                else 0  # (c)
+                            )
+                        ),
+                    )
+                    assert c[1].before >= rs.before
+                    assert c[1].after >= rs.after
+
+                    stencil_indices.append(
+                        slice(
+                            c[1].before - rs.before,
+                            None if c[1].after == rs.after else rs.after - c[1].after,
+                        )
+                    )
+                    non_stencil_indices.append(
+                        slice(rs.before, None if rs.after == 0 else -rs.after)
+                    )
                 case _:
                     assert_never(c[0])
 
@@ -677,6 +723,7 @@ class Safeguards:
                     #  which is only compatible with itself
                     # and that the stencil is large enough
                     assert r[0] == BoundaryCondition.valid
+
                     # what is the required stencil after adjusting for near-
                     #  boundary stencil truncation?
                     rs = NeighbourhoodAxis(
@@ -700,10 +747,55 @@ class Safeguards:
                     )
                 case BoundaryCondition.wrap:
                     # a wrapping boundary is compatible with any other boundary
-                    # TODO: again taking wrapping boundaries into account
-                    #       also sometimes stencil needs to be removed near the data boundaries
-                    #       so that the per-safeguard stencil correctly sees how points wrap
-                    raise NotImplementedError
+                    assert r[0] in (BoundaryCondition.valid, BoundaryCondition.wrap)
+
+                    # what is the required stencil after adjusting for near-
+                    #  boundary stencil truncation?
+                    # (a) if the chunk is in the middle, where no boundary
+                    #     condition is applied, we just keep the stencil as-is
+                    # (b) if the chunk's stencil only overlaps with the boundary
+                    #     on one side, we keep the stencil on that side as-is
+                    # (c) otherwise, we have the full data and remove the
+                    #     stencil so that the per-safeguard stencil correctly
+                    #     sees how points wrap
+                    rs = NeighbourhoodAxis(
+                        before=(
+                            r[1].before  # (a)
+                            if r[1].before <= chunk_offset[i]
+                            else (
+                                r[1].before  # (b)
+                                if r[1].after
+                                <= (
+                                    data_shape[i]
+                                    - data_chunk.shape[i]
+                                    - chunk_offset[i]
+                                )
+                                else 0  # (c)
+                            )
+                        ),
+                        after=(
+                            r[1].after  # (a)
+                            if r[1].after
+                            <= (data_shape[i] - data_chunk.shape[i] - chunk_offset[i])
+                            else (
+                                r[1].after  # (b)
+                                if r[1].before <= chunk_offset[i]
+                                else 0  # (c)
+                            )
+                        ),
+                    )
+                    assert c[1].before >= rs.before
+                    assert c[1].after >= rs.after
+
+                    stencil_indices.append(
+                        slice(
+                            c[1].before - rs.before,
+                            None if c[1].after == rs.after else rs.after - c[1].after,
+                        )
+                    )
+                    non_stencil_indices.append(
+                        slice(rs.before, None if rs.after == 0 else -rs.after)
+                    )
                 case _:
                     assert_never(c[0])
 
