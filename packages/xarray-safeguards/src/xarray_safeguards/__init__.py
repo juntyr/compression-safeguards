@@ -156,10 +156,10 @@ def produce_data_array_correction(
     else:
         assert allow_unsafe_safeguards_override is False
 
-    assert data.dims == prediction.dims
-    assert data.shape == prediction.shape
-    assert data.dtype == prediction.dtype
-    assert data.chunks == prediction.chunks
+    assert data.dims == prediction.dims, "data.dims != prediction.dims"
+    assert data.shape == prediction.shape, "data.shape != prediction.shape"
+    assert data.dtype == prediction.dtype, "data.dtype != prediction.dtype"
+    assert data.chunks == prediction.chunks, "data.chunks != prediction.chunks"
 
     safeguards_: Safeguards = Safeguards(safeguards=safeguards)
 
@@ -193,7 +193,9 @@ def produce_data_array_correction(
         if isinstance(v, int | float | np.number):
             late_bound_global[k] = v
         else:
-            assert frozenset(v.dims).issubset(data.dims)
+            assert frozenset(v.dims).issubset(data.dims), (
+                f"late-bound param {k} dims are not a subset of data dims"
+            )
             late_bound_data_arrays[k] = v
 
     correction_name = "sg" if data.name is None else f"{data.name}_sg"
@@ -272,7 +274,9 @@ def produce_data_array_correction(
             late_bound_global: dict[str, int | float | np.number],
             safeguards: Safeguards,
         ) -> np.ndarray:
-            assert len(late_bound_chunks) == len(late_bound_names)
+            assert len(late_bound_chunks) == len(late_bound_names), (
+                "late-bound chunks and names mismatch"
+            )
 
             late_bound_chunk: dict[str, Value] = dict(
                 **late_bound_global,
@@ -342,9 +346,11 @@ def produce_data_array_correction(
         boundary_: Literal["none", "periodic"],
         block_info=None,
     ) -> np.ndarray:
-        assert block_info is not None
-        assert len(late_bound_chunks) == len(late_bound_names)
-        assert len(depth_) == data_chunk.ndim
+        assert block_info is not None, "missing block info"
+        assert len(late_bound_chunks) == len(late_bound_names), (
+            "late-bound chunks and names mismatch"
+        )
+        assert len(depth_) == data_chunk.ndim, "overlap depth length mismatch"
 
         data_shape: tuple[int, ...] = tuple(block_info[None]["shape"])
         chunk_location: tuple[tuple[int, int], ...] = tuple(
@@ -444,9 +450,11 @@ def produce_data_array_correction(
         any_chunk_check_failed: bool,
         block_info=None,
     ) -> np.ndarray:
-        assert block_info is not None
-        assert len(late_bound_chunks) == len(late_bound_names)
-        assert len(depth_) == data_chunk.ndim
+        assert block_info is not None, "missing block info"
+        assert len(late_bound_chunks) == len(late_bound_names), (
+            "late-bound chunks and names mismatch"
+        )
+        assert len(depth_) == data_chunk.ndim, "overlap depth length mismatch"
 
         data_shape: tuple[int, ...] = tuple(block_info[None]["shape"])
         chunk_location: tuple[tuple[int, int], ...] = tuple(
@@ -560,16 +568,20 @@ def apply_data_array_correction(
         The corrected array, which satisfies the safeguards.
     """
 
-    assert correction.dims == prediction.dims
-    assert correction.shape == prediction.shape
-    assert correction.chunks == prediction.chunks
+    assert correction.dims == prediction.dims, "correction.dims != prediction.dims"
+    assert correction.shape == prediction.shape, "correction.shape != prediction.shape"
+    assert correction.chunks == prediction.chunks, (
+        "correction.chunks != prediction.chunks"
+    )
 
     assert "safeguards" in correction.attrs, (
         "correction does not contain metadata about the safeguards it was produced with"
     )
     safeguards = Safeguards.from_config(json.loads(correction.attrs["safeguards"]))
 
-    assert correction.dtype == safeguards.correction_dtype_for_data(prediction.dtype)
+    assert correction.dtype == safeguards.correction_dtype_for_data(prediction.dtype), (
+        "correction dtype mismatch"
+    )
 
     def _apply_independent_chunk_correction(
         prediction_chunk: xr.DataArray,
@@ -611,9 +623,11 @@ class DatasetSafeguardedAccessor:
         for v in ds.data_vars.values():
             if "safeguarded" in v.attrs:
                 kp = v.attrs["safeguarded"]
-                assert kp is not None
-                assert kp in ds.data_vars
-                assert "safeguards" in v.attrs
+                assert kp is not None, "safeguarded attr must not be None"
+                assert kp in ds.data_vars, (
+                    "safeguarded attr must refer to another variable"
+                )
+                assert "safeguards" in v.attrs, "safeguards attr must exist"
 
                 corrected[kp] = apply_data_array_correction(ds.data_vars[kp], v)
 
