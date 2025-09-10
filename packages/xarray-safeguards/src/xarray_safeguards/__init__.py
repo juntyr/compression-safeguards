@@ -44,6 +44,7 @@ __all__ = [
 ]
 
 import json
+import warnings
 from collections.abc import Collection, Mapping
 from typing import Literal, TypeAlias
 
@@ -71,6 +72,8 @@ def produce_data_array_correction(
     prediction: xr.DataArray,
     safeguards: Collection[dict | Safeguard],
     late_bound: Mapping[str, DataValue],
+    *,
+    allow_unsafe_safeguards_override: bool = False,
 ) -> xr.DataArray:
     """
     Produce the correction required to make the `prediction` data array satisfy the `safeguards` relative to the `data` array.
@@ -102,7 +105,7 @@ def produce_data_array_correction(
         Please refer to the
         [`SafeguardKind`][compression_safeguards.safeguards.SafeguardKind]
         for an enumeration of all supported safeguards.
-    late_bound : Mapping[str, Value]
+    late_bound : Mapping[str, DataValue]
         The bindings for all late-bound parameters of the `safeguards`.
 
         The bindings must resolve all late-bound parameters and include no
@@ -114,6 +117,9 @@ def produce_data_array_correction(
         - `$x` and `$X`: the original `data` as a constant
         - `$x_min` and `$x_max`: the global minimum/maximum of the data
         - `$d_DIM` for each dimension `DIM` of the `data` array
+    allow_unsafe_safeguards_override : bool
+        **WARNING:** This option is *unsafe* and must only be passed if
+        instructed. Do *not* pass this option otherwise.
 
     Returns
     -------
@@ -126,8 +132,29 @@ def produce_data_array_correction(
         "computing the safeguards correction relative to a `data` array that "
         "has *already* been safeguards-corrected before is unsafe as "
         "compression errors can accumulate when the original uncompressed data "
-        "is not known"
+        "is not known; this is also known as the printer problem; please pass "
+        "the original uncompressed and uncorrected `data` to ensure that the "
+        "safeguards can be applied correctly"
     )
+
+    if "safeguards" in prediction.attrs:
+        if allow_unsafe_safeguards_override:
+            warnings.warn("`allow_unsafe_safeguards_override`=True")
+        else:
+            assert "safeguards" not in prediction.attrs, (
+                "computing the safeguards correction for a `prediction` array "
+                "that has *already* been safeguards-corrected before is unsafe "
+                "as the safety guarantees provided by the previously applied "
+                "safeguards may not be provided by the newly applied "
+                "safeguards, thus violating the earlier guarantees; this is "
+                "also known as the printer problem; please manually inspect "
+                "the `.safeguards` property of the `prediction` array and "
+                "ensure that they are included in the new `safeguards` and "
+                "then pass `allow_unsafe_safeguards_override=True` to this "
+                "function"
+            )
+    else:
+        assert allow_unsafe_safeguards_override is False
 
     assert data.dims == prediction.dims
     assert data.shape == prediction.shape

@@ -520,8 +520,8 @@ class Safeguards:
             data_shape
         )
 
-        stencil_indices: list[slice[int, int, int]] = []
-        non_stencil_indices: list[slice[int, int, int]] = []
+        stencil_indices: list[slice] = []
+        non_stencil_indices: list[slice] = []
 
         # (1): check that the chunk stencil is compatible with the required stencil
         #      this is not trivial since we need to account for huge chunks where
@@ -697,8 +697,8 @@ class Safeguards:
             data_shape
         )
 
-        stencil_indices: list[slice[int, int, int]] = []
-        non_stencil_indices: list[slice[int, int, int]] = []
+        stencil_indices: list[slice] = []
+        non_stencil_indices: list[slice] = []
 
         # (1): check that the chunk stencil is compatible with the required stencil
         #      this is not trivial since we need to account for huge chunks where

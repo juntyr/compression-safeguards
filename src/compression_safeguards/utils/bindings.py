@@ -222,7 +222,7 @@ class Bindings:
 
         return view  # type: ignore
 
-    def apply_index(self, index: tuple[slice[int, int, int], ...]) -> Self:
+    def apply_index(self, index: tuple[slice, ...]) -> Self:
         def apply_index_to_value(value: Value) -> Value:
             if isinstance(value, int | float | np.number):
                 return value
