@@ -108,7 +108,7 @@ class Bindings:
             The updated bindings.
         """
 
-        return Bindings(**self._bindings, **kwargs)  # type: ignore
+        return type(self)(**self._bindings, **kwargs)  # type: ignore
 
     def __contains__(self, param: Parameter) -> bool:
         """
@@ -221,6 +221,32 @@ class Bindings:
         view.flags.writeable = False
 
         return view  # type: ignore
+
+    def apply_index(self, index: tuple[slice[int, int, int], ...]) -> Self:
+        def apply_index_to_value(value: Value) -> Value:
+            if isinstance(value, int | float | np.number):
+                return value
+
+            if not isinstance(value, np.ndarray):
+                # bail out
+                return value
+
+            if value.ndim != len(index):
+                # bail out
+                return value
+
+            # only apply the index along axes that cannot be broadcast
+            value_index = tuple(
+                i if a > 1 else slice(None, None) for i, a in zip(index, value.shape)
+            )
+            return value[value_index]
+
+        return type(self)(  # type: ignore
+            **{
+                param: apply_index_to_value(value)
+                for param, value in self._bindings.items()
+            }
+        )
 
     def get_config(self) -> dict:
         """

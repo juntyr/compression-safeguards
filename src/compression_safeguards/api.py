@@ -520,8 +520,8 @@ class Safeguards:
             data_shape
         )
 
-        stencil_indices = []
-        non_stencil_indices = []
+        stencil_indices: list[slice[int, int, int]] = []
+        non_stencil_indices: list[slice[int, int, int]] = []
 
         # (1): check that the chunk stencil is compatible with the required stencil
         #      this is not trivial since we need to account for huge chunks where
@@ -625,13 +625,13 @@ class Safeguards:
         data_chunk_ = data_chunk[tuple(stencil_indices)]
         prediction_chunk_ = prediction_chunk[tuple(stencil_indices)]
 
-        # TODO: somehow also apply this extraction to the bindings ...
-
+        # create the late-bound bindings for the chunk and apply the stencil
+        #  indices
         late_bound_chunk = (
             late_bound_chunk
             if isinstance(late_bound_chunk, Bindings)
             else Bindings(**late_bound_chunk)
-        )
+        ).apply_index(tuple(stencil_indices))
 
         late_bound_reqs = self.late_bound
         late_bound_builtin = {
@@ -697,8 +697,8 @@ class Safeguards:
             data_shape
         )
 
-        stencil_indices = []
-        non_stencil_indices = []
+        stencil_indices: list[slice[int, int, int]] = []
+        non_stencil_indices: list[slice[int, int, int]] = []
 
         # (1): check that the chunk stencil is compatible with the required stencil
         #      this is not trivial since we need to account for huge chunks where
@@ -802,13 +802,13 @@ class Safeguards:
         data_chunk_ = data_chunk[tuple(stencil_indices)]
         prediction_chunk_ = prediction_chunk[tuple(stencil_indices)]
 
-        # TODO: somehow also apply this extraction to the bindings ...
-
+        # create the late-bound bindings for the chunk and apply the stencil
+        #  indices
         late_bound_chunk = (
             late_bound_chunk
             if isinstance(late_bound_chunk, Bindings)
             else Bindings(**late_bound_chunk)
-        )
+        ).apply_index(tuple(stencil_indices))
 
         late_bound_reqs = self.late_bound
         late_bound_builtin = {
