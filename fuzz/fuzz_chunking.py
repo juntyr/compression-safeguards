@@ -80,8 +80,8 @@ def compute_safe_data_lower_upper_interval_union(
     data_float_upper: np.ndarray[S, np.dtype[F]],
 ) -> IntervalUnion[T, int, int]:
     valid = Interval.empty_like(data)
-    valid._lower[:] = from_float(data_float_lower, data.dtype)
-    valid._upper[:] = from_float(data_float_lower, data.dtype)
+    valid._lower[:] = from_float(data_float_lower, data.dtype).flatten()
+    valid._upper[:] = from_float(data_float_lower, data.dtype).flatten()
     return valid.into_union()
 
 

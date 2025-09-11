@@ -508,7 +508,7 @@ def produce_data_array_correction(
         # - map_overlap ensures we get chunks including their required stencil
         # - compute_chunked_correction only returns the correction for the non-
         #   overlapping non-stencil parts of the chunk
-        correction = safeguards.compute_chunked_correction(
+        correction: np.ndarray = safeguards.compute_chunked_correction(
             data_chunk,
             prediction_chunk,
             data_shape=data_shape,
