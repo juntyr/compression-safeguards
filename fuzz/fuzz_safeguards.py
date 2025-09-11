@@ -290,9 +290,11 @@ def check_one_input(data) -> None:
         for _ in range(data.ConsumeIntInRange(0, 8))
     ]
 
-    dtype: np.dtype = list(Safeguards.supported_dtypes())[
-        data.ConsumeIntInRange(0, len(Safeguards.supported_dtypes()) - 1)
-    ]
+    dtype: np.dtype = np.dtype(
+        sorted([d.name for d in Safeguards.supported_dtypes()])[
+            data.ConsumeIntInRange(0, len(Safeguards.supported_dtypes()) - 1)
+        ]
+    )
     sizea: int = data.ConsumeIntInRange(0, 20)
     sizeb: int = data.ConsumeIntInRange(0, 20 // max(1, sizea))
     size = sizea * sizeb

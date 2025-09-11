@@ -18,7 +18,7 @@ with atheris.instrument_imports():
 
     import compression_safeguards.safeguards.stencil.qoi.eb
     from compression_safeguards.api import Safeguards
-    from compression_safeguards.safeguards._qois.bound import data_bounds, DataBounds
+    from compression_safeguards.safeguards._qois.bound import DataBounds, data_bounds
     from compression_safeguards.safeguards._qois.expr.abc import Expr
     from compression_safeguards.safeguards._qois.expr.typing import F, Ns, Ps, PsI
     from compression_safeguards.safeguards.qois import (
@@ -67,6 +67,7 @@ IntervalUnion.contains = interval_union_contains
 def interval_union_pick(
     self, prediction: np.ndarray[S, np.dtype[T]]
 ) -> np.ndarray[S, np.dtype[T]]:
+    assert not np.all(self._lower == 0), "fuzzer hash is all zeros"
     return np.array(self._lower[0].reshape(prediction.shape), copy=True)
 
 
@@ -84,9 +85,7 @@ def compute_safe_data_lower_upper_interval_union(
     return valid.into_union()
 
 
-compression_safeguards.safeguards.stencil.qoi.eb.compute_safe_data_lower_upper_interval_union = (
-    compute_safe_data_lower_upper_interval_union
-)
+compression_safeguards.safeguards.stencil.qoi.eb.compute_safe_data_lower_upper_interval_union = compute_safe_data_lower_upper_interval_union
 
 
 class HashingExpr(Expr):
@@ -255,9 +254,11 @@ def check_one_input(data) -> None:
         if p != "qoi"
     }
 
-    dtype: np.dtype = list(Safeguards.supported_dtypes())[
-        data.ConsumeIntInRange(0, len(Safeguards.supported_dtypes()) - 1)
-    ]
+    dtype: np.dtype = np.dtype(
+        sorted([d.name for d in Safeguards.supported_dtypes()])[
+            data.ConsumeIntInRange(0, len(Safeguards.supported_dtypes()) - 1)
+        ]
+    )
     sizea: int = data.ConsumeIntInRange(0, 20)
     sizeb: int = data.ConsumeIntInRange(0, 20 // max(1, sizea))
     size = sizea * sizeb
@@ -332,6 +333,21 @@ def check_one_input(data) -> None:
     except (AssertionError, Warning, TimeoutError):
         return
 
+    # xarray-safeguards provides `$x_min` and `$x_max`,
+    #  but the compression-safeguards do not
+    if "$x_min" in safeguard.late_bound:
+        late_bound["$x_min"] = (
+            np.nanmin(raw)
+            if raw.size > 0 and not np.all(np.isnan(raw))
+            else np.array(0, dtype=raw.dtype)
+        )
+    if "$x_max" in safeguard.late_bound:
+        late_bound["$x_max"] = (
+            np.nanmax(raw)
+            if raw.size > 0 and not np.all(np.isnan(raw))
+            else np.array(0, dtype=raw.dtype)
+        )
+
     da = xr.DataArray(raw, dims=list(chunks.keys())).chunk(chunks)
     da_prediction = xr.DataArray(np.zeros_like(raw), dims=list(chunks.keys())).chunk(
         chunks
@@ -371,6 +387,10 @@ def check_one_input(data) -> None:
                 and ("to saturating finite" in str(err))
             )
             or (isinstance(err, AssertionError) and str(err).startswith("eb must be"))
+            or (
+                isinstance(err, AssertionError)
+                and ("fuzzer hash is all zeros" in str(err))
+            )
         ):
             return
         print(  # noqa: T201

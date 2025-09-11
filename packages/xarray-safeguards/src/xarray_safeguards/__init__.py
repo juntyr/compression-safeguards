@@ -353,6 +353,7 @@ def produce_data_array_correction(
         assert len(depth_) == data_chunk.ndim, "overlap depth length mismatch"
 
         data_shape: tuple[int, ...] = tuple(block_info[None]["shape"])
+        chunk_shape: tuple[int, ...] = tuple(block_info[None]["chunk-shape"])
         chunk_location: tuple[tuple[int, int], ...] = tuple(
             block_info[None]["array-location"]
         )
@@ -406,7 +407,8 @@ def produce_data_array_correction(
             late_bound_chunk=late_bound_chunk,
         )
 
-        return np.array(chunk_is_ok).reshape(tuple(1 for _ in data_chunk.shape))
+        # broadcast the boolean check scalar to the data chunk size
+        return np.broadcast_to(chunk_is_ok, chunk_shape)
 
     # first check each chunk to find out if any failed the check
     # for stencil safeguards, one chunk failing requires all to be corrected
@@ -419,7 +421,9 @@ def produce_data_array_correction(
             prediction.data,
             *chunked_late_bound.values(),
             dtype=np.bool,
-            chunks=tuple(1 for _ in data.shape),
+            # we cannot output 1x...x1 chunks here since we later use the block
+            #  info to compute the data size and chunk location
+            chunks=None,
             enforce_ndim=True,
             meta=np.array((), dtype=np.bool),
             depth=depth,
@@ -457,6 +461,7 @@ def produce_data_array_correction(
         assert len(depth_) == data_chunk.ndim, "overlap depth length mismatch"
 
         data_shape: tuple[int, ...] = tuple(block_info[None]["shape"])
+        chunk_shape: tuple[int, ...] = tuple(block_info[None]["chunk-shape"])
         chunk_location: tuple[tuple[int, int], ...] = tuple(
             block_info[None]["array-location"]
         )
@@ -503,7 +508,7 @@ def produce_data_array_correction(
         # - map_overlap ensures we get chunks including their required stencil
         # - compute_chunked_correction only returns the correction for the non-
         #   overlapping non-stencil parts of the chunk
-        return safeguards.compute_chunked_correction(
+        correction = safeguards.compute_chunked_correction(
             data_chunk,
             prediction_chunk,
             data_shape=data_shape,
@@ -512,6 +517,9 @@ def produce_data_array_correction(
             any_chunk_check_failed=any_chunk_check_failed,
             late_bound_chunk=late_bound_chunk,
         )
+        assert correction.shape == chunk_shape, "invalid correction chunk shape"
+
+        return correction
 
     return (
         data.copy(
