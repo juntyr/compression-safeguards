@@ -14,13 +14,11 @@ with atheris.instrument_imports():
 
     import numpy as np
     import xarray as xr
-    from xarray_safeguards import (
-        apply_data_array_correction,
-        produce_data_array_correction,
-    )
+    from xarray_safeguards import produce_data_array_correction
 
+    import compression_safeguards.safeguards.stencil.qoi.eb
     from compression_safeguards.api import Safeguards
-    from compression_safeguards.safeguards._qois.bound import checked_data_bounds
+    from compression_safeguards.safeguards._qois.bound import data_bounds, DataBounds
     from compression_safeguards.safeguards._qois.expr.abc import Expr
     from compression_safeguards.safeguards._qois.expr.typing import F, Ns, Ps, PsI
     from compression_safeguards.safeguards.qois import (
@@ -30,10 +28,65 @@ with atheris.instrument_imports():
     from compression_safeguards.safeguards.stencil.qoi.eb import (
         StencilQuantityOfInterestErrorBoundSafeguard,
     )
+    from compression_safeguards.utils._compat import _broadcast_to
     from compression_safeguards.utils.bindings import Bindings, Parameter
+    from compression_safeguards.utils.cast import from_float
+    from compression_safeguards.utils.intervals import Interval, IntervalUnion
+    from compression_safeguards.utils.typing import S, T
 
 
 warnings.filterwarnings("error")
+
+
+def stencil_qoi_check_pointwise(
+    self,
+    data: np.ndarray[S, np.dtype[T]],
+    decoded: np.ndarray[S, np.dtype[T]],
+    *,
+    late_bound: Bindings,
+) -> np.ndarray[S, np.dtype[np.bool]]:
+    if np.all(decoded == 0):
+        return np.zeros(data.shape, dtype=np.bool)
+    return np.ones(data.shape, dtype=np.bool)
+
+
+StencilQuantityOfInterestErrorBoundSafeguard.check_pointwise = (
+    stencil_qoi_check_pointwise
+)
+
+
+def interval_union_contains(
+    self, other: np.ndarray[S, np.dtype[T]]
+) -> np.ndarray[S, np.dtype[np.bool]]:
+    return np.ones(other.shape, dtype=np.bool)
+
+
+IntervalUnion.contains = interval_union_contains
+
+
+def interval_union_pick(
+    self, prediction: np.ndarray[S, np.dtype[T]]
+) -> np.ndarray[S, np.dtype[T]]:
+    return np.array(self._lower[0].reshape(prediction.shape), copy=True)
+
+
+IntervalUnion.pick = interval_union_pick
+
+
+def compute_safe_data_lower_upper_interval_union(
+    data: np.ndarray[S, np.dtype[T]],
+    data_float_lower: np.ndarray[S, np.dtype[F]],
+    data_float_upper: np.ndarray[S, np.dtype[F]],
+) -> IntervalUnion[T, int, int]:
+    valid = Interval.empty_like(data)
+    valid._lower[:] = from_float(data_float_lower, data.dtype)
+    valid._upper[:] = from_float(data_float_lower, data.dtype)
+    return valid.into_union()
+
+
+compression_safeguards.safeguards.stencil.qoi.eb.compute_safe_data_lower_upper_interval_union = (
+    compute_safe_data_lower_upper_interval_union
+)
 
 
 class HashingExpr(Expr):
@@ -100,7 +153,7 @@ class HashingExpr(Expr):
             for param, value in late_bound.items()
         }
 
-        out: np.ndarray[tuple[int], np.dtype[F]] = np.empty(x_size, dtype=Xs.dtype)
+        hash: np.ndarray[tuple[int], np.dtype[F]] = np.empty(x_size, dtype=Xs.dtype)
 
         # hash Xs and late_bound stencils for every element in X
         for i in range(x_size):
@@ -109,11 +162,11 @@ class HashingExpr(Expr):
             for param, value in late_bound_flat.items():
                 hasher.update(param.encode())
                 hasher.update(value.tobytes())
-            out[i] = np.frombuffer(hasher.digest(), dtype=Xs.dtype, count=1)[0]
+            hash[i] = np.frombuffer(hasher.digest(), dtype=Xs.dtype, count=1)[0]
 
-        return out.reshape(x)
+        return hash.reshape(x)
 
-    @checked_data_bounds
+    @data_bounds(DataBounds.infallible)
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -122,7 +175,11 @@ class HashingExpr(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        return np.copy(Xs), np.copy(Xs)
+        X_hash: np.ndarray[Ps, np.dtype[F]] = self.eval(X.shape, Xs, late_bound)
+        Xs_hash: np.ndarray[Ns, np.dtype[F]] = _broadcast_to(
+            X_hash.reshape(X.shape + (1,) * (Xs.ndim - X.ndim)), Xs.shape
+        )
+        return np.copy(Xs_hash), np.copy(Xs_hash)
 
     def __repr__(self) -> str:
         return "hashing"
@@ -217,6 +274,11 @@ def check_one_input(data) -> None:
 
     raw = np.frombuffer(raw, dtype=dtype)
 
+    # skip all-zero raw inputs since we use that to sidechannel-communicate in
+    #  the fuzzer if a prediction is already corrected
+    if np.all(raw == 0):
+        return
+
     if sizeb != 0:
         raw = raw.reshape((sizea, sizeb))
         chunks = dict(a=chunksa, b=chunksb)
@@ -276,18 +338,16 @@ def check_one_input(data) -> None:
     )
 
     try:
-        # FIXME: actually fuzz whether the chunked safeguards see the right hashes, ..., somehow
-        global_hash = safeguard.evaluate_qoi(
-            data=raw, late_bound=Bindings(**late_bound)
+        global_hash = Safeguards(safeguards=[safeguard]).compute_correction(
+            data=da.values, prediction=da_prediction.values, late_bound=late_bound
         )
-        da_correction = produce_data_array_correction(
-            da, da_prediction, [safeguard], late_bound=late_bound_da
+        chunked_hash = produce_data_array_correction(
+            data=da,
+            prediction=da_prediction,
+            safeguards=[safeguard],
+            late_bound=late_bound_da,
         )
-        da_corrected = apply_data_array_correction(da_prediction, da_correction)
-        chunked_hash = safeguard.evaluate_qoi(
-            data=da_corrected.values, late_bound=Bindings(**late_bound)
-        )
-        assert np.array_equal(global_hash, chunked_hash)
+        assert np.array_equal(global_hash, chunked_hash.values)
     except Exception as err:
         if (
             (
