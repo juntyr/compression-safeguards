@@ -516,6 +516,11 @@ class Safeguards:
         assert len(chunk_offset) == data_chunk.ndim
         assert len(chunk_stencil) == data_chunk.ndim
 
+        chunk_shape = tuple(
+            a - s[1].before - s[1].after
+            for a, s in zip(data_chunk.shape, chunk_stencil)
+        )
+
         required_stencil = self.compute_required_stencil_for_chunked_correction(
             data_shape
         )
@@ -534,7 +539,7 @@ class Safeguards:
                 c[0] == BoundaryCondition.valid
                 and c[1].before == 0
                 and c[1].after == 0
-                and data_chunk.shape[1] == data_shape[i]
+                and chunk_shape[i] == data_shape[i]
             ):
                 stencil_indices.append(slice(None))
                 non_stencil_indices.append(slice(None))
@@ -553,7 +558,7 @@ class Safeguards:
                         before=min(chunk_offset[i], r[1].before),
                         after=min(
                             r[1].after,
-                            data_shape[i] - data_chunk.shape[i] - chunk_offset[i],
+                            data_shape[i] - chunk_shape[i] - chunk_offset[i],
                         ),
                     )
                     assert c[1].before >= rs.before
@@ -588,18 +593,14 @@ class Safeguards:
                             else (
                                 r[1].before  # (b)
                                 if r[1].after
-                                <= (
-                                    data_shape[i]
-                                    - data_chunk.shape[i]
-                                    - chunk_offset[i]
-                                )
+                                <= (data_shape[i] - chunk_shape[i] - chunk_offset[i])
                                 else 0  # (c)
                             )
                         ),
                         after=(
                             r[1].after  # (a)
                             if r[1].after
-                            <= (data_shape[i] - data_chunk.shape[i] - chunk_offset[i])
+                            <= (data_shape[i] - chunk_shape[i] - chunk_offset[i])
                             else (
                                 r[1].after  # (b)
                                 if r[1].before <= chunk_offset[i]
@@ -693,6 +694,11 @@ class Safeguards:
         assert len(chunk_offset) == data_chunk.ndim
         assert len(chunk_stencil) == data_chunk.ndim
 
+        chunk_shape = tuple(
+            a - s[1].before - s[1].after
+            for a, s in zip(data_chunk.shape, chunk_stencil)
+        )
+
         required_stencil = self.compute_required_stencil_for_chunked_correction(
             data_shape
         )
@@ -711,7 +717,7 @@ class Safeguards:
                 c[0] == BoundaryCondition.valid
                 and c[1].before == 0
                 and c[1].after == 0
-                and data_chunk.shape[1] == data_shape[i]
+                and chunk_shape[i] == data_shape[i]
             ):
                 stencil_indices.append(slice(None))
                 non_stencil_indices.append(slice(None))
@@ -730,7 +736,7 @@ class Safeguards:
                         before=min(chunk_offset[i], r[1].before),
                         after=min(
                             r[1].after,
-                            data_shape[i] - data_chunk.shape[i] - chunk_offset[i],
+                            data_shape[i] - chunk_shape[i] - chunk_offset[i],
                         ),
                     )
                     assert c[1].before >= rs.before
@@ -765,18 +771,14 @@ class Safeguards:
                             else (
                                 r[1].before  # (b)
                                 if r[1].after
-                                <= (
-                                    data_shape[i]
-                                    - data_chunk.shape[i]
-                                    - chunk_offset[i]
-                                )
+                                <= (data_shape[i] - chunk_shape[i] - chunk_offset[i])
                                 else 0  # (c)
                             )
                         ),
                         after=(
                             r[1].after  # (a)
                             if r[1].after
-                            <= (data_shape[i] - data_chunk.shape[i] - chunk_offset[i])
+                            <= (data_shape[i] - chunk_shape[i] - chunk_offset[i])
                             else (
                                 r[1].after  # (b)
                                 if r[1].before <= chunk_offset[i]

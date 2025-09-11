@@ -24,7 +24,7 @@ def test_xarray_accessors():
     np.testing.assert_allclose(ds_safeguarded["da"].values, da.values, rtol=0, atol=0.1)
 
 
-def test_fuzzer_found_negative_slice():
+def test_fuzzer_found_chunked_check_invalid_block_info():
     chunks = dict(a=1, b=2)
     da = xr.DataArray(
         np.array([[0, 0], [0, 0]], dtype=np.uint8), name="da", dims=["a", "b"]
@@ -47,4 +47,32 @@ def test_fuzzer_found_negative_slice():
             )
         ],
         late_bound=dict(),
-    )
+    ).compute()
+
+
+def test_fuzzer_found_correction_shape_mismatch():
+    chunks = dict(a=2, b=1)
+    da = xr.DataArray(
+        np.array([[-547], [7421], [1015], [514], [0], [2], [-15868]], dtype=np.int16),
+        name="da",
+        dims=["a", "b"],
+    ).chunk(chunks)
+    da_prediction = xr.DataArray(
+        np.zeros_like(da.values), name="da", dims=["a", "b"]
+    ).chunk(chunks)
+
+    produce_data_array_correction(
+        da,
+        da_prediction,
+        safeguards=[
+            dict(
+                kind="qoi_eb_stencil",
+                qoi="x",
+                neighbourhood=[dict(axis=0, before=1, after=0, boundary="edge")],
+                type="abs",
+                eb=125,
+                qoi_dtype="lossless",
+            )
+        ],
+        late_bound=dict(),
+    ).compute()

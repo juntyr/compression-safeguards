@@ -338,10 +338,12 @@ def produce_data_array_correction(
     def _check_overlapping_stencil_chunk(
         data_chunk: np.ndarray,
         prediction_chunk: np.ndarray,
+        data_indices_chunk: np.ndarray,
         *late_bound_chunks: np.ndarray,
         late_bound_names: tuple[str],
         late_bound_global: dict[str, int | float | np.number],
         safeguards: Safeguards,
+        data_shape: tuple[int, ...],
         depth_: tuple[int | tuple[int, int], ...],
         boundary_: Literal["none", "periodic"],
         block_info=None,
@@ -351,12 +353,6 @@ def produce_data_array_correction(
             "late-bound chunks and names mismatch"
         )
         assert len(depth_) == data_chunk.ndim, "overlap depth length mismatch"
-
-        data_shape: tuple[int, ...] = tuple(block_info[None]["shape"])
-        chunk_shape: tuple[int, ...] = tuple(block_info[None]["chunk-shape"])
-        chunk_location: tuple[tuple[int, int], ...] = tuple(
-            block_info[None]["array-location"]
-        )
 
         late_bound_chunk: dict[str, Value] = dict(
             **late_bound_global,
@@ -369,6 +365,15 @@ def produce_data_array_correction(
 
         match boundary_:
             case "none":
+                # map_overlap passes the wrong block_info,
+                #  see https://github.com/dask/dask/issues/11349
+                # so we only trust it just enough to compute the effective
+                #  stencil size
+                extended_data_shape: tuple[int, ...] = tuple(block_info[None]["shape"])
+                extended_chunk_location: tuple[tuple[int, int], ...] = tuple(
+                    block_info[None]["array-location"]
+                )
+
                 # the none boundary does not extend beyond the data boundary,
                 #  so we need to check by how much the stencil was cut off
                 chunk_stencil: tuple[
@@ -384,7 +389,9 @@ def produce_data_array_correction(
                             before=s - max(0, s - b), after=min(e + a, d) - e
                         ),
                     )
-                    for (b, a), (s, e), d in zip(depth, chunk_location, data_shape)
+                    for (b, a), (s, e), d in zip(
+                        depth, extended_chunk_location, extended_data_shape
+                    )
                 )
             case "periodic":
                 # the periodic boundary guarantees that we always have the
@@ -396,19 +403,41 @@ def produce_data_array_correction(
             case _:
                 assert_never(boundary_)
 
+        # extract the indices of the non-stencil-extended data indices chunk
+        data_indices_chunk = data_indices_chunk[
+            tuple(
+                slice(a.before, None if a.after == 0 else -a.after)
+                for b, a in chunk_stencil
+            )
+        ]
+        chunk_shape = data_indices_chunk.shape
+
+        # extract the offset of the chunk from the data indices chunk
+        if data_indices_chunk.size > 0:
+            chunk_offset_index = int(data_indices_chunk.flatten()[0])
+            chunk_offset_ = []
+            for s in data_shape[::-1]:
+                chunk_offset_.append(chunk_offset_index % s)
+                chunk_offset_index //= s
+            chunk_offset: tuple[int, ...] = tuple(chunk_offset_[::-1])
+        else:
+            chunk_offset = tuple(0 for _ in data_shape)
+
         # this is safe because
         # - map_overlap ensures we get chunks including their required stencil
         chunk_is_ok = safeguards.check_chunk(
             data_chunk,
             prediction_chunk,
             data_shape=data_shape,
-            chunk_offset=tuple(f for f, t in chunk_location),
+            chunk_offset=chunk_offset,
             chunk_stencil=chunk_stencil,
             late_bound_chunk=late_bound_chunk,
         )
 
-        # broadcast the boolean check scalar to the data chunk size
+        # broadcast the boolean check scalar to the output chunk shape
         return np.broadcast_to(chunk_is_ok, chunk_shape)
+
+    data_indices = dask.array.arange(data.size).reshape(data.shape).rechunk(data.chunks)
 
     # first check each chunk to find out if any failed the check
     # for stencil safeguards, one chunk failing requires all to be corrected
@@ -419,6 +448,7 @@ def produce_data_array_correction(
             _check_overlapping_stencil_chunk,
             data.data,
             prediction.data,
+            data_indices,
             *chunked_late_bound.values(),
             dtype=np.bool,
             # we cannot output 1x...x1 chunks here since we later use the block
@@ -435,6 +465,7 @@ def produce_data_array_correction(
             late_bound_names=tuple(chunked_late_bound.keys()),
             late_bound_global=late_bound_global,
             safeguards=safeguards_,
+            data_shape=data.shape,
             depth_=depth,
             boundary_=boundary,
         )
@@ -445,10 +476,12 @@ def produce_data_array_correction(
     def _compute_overlapping_stencil_chunk_correction(
         data_chunk: np.ndarray,
         prediction_chunk: np.ndarray,
+        data_indices_chunk: np.ndarray,
         *late_bound_chunks: np.ndarray,
         late_bound_names: tuple[str],
         late_bound_global: dict[str, int | float | np.number],
         safeguards: Safeguards,
+        data_shape: tuple[int, ...],
         depth_: tuple[int | tuple[int, int], ...],
         boundary_: Literal["none", "periodic"],
         any_chunk_check_failed: bool,
@@ -459,12 +492,6 @@ def produce_data_array_correction(
             "late-bound chunks and names mismatch"
         )
         assert len(depth_) == data_chunk.ndim, "overlap depth length mismatch"
-
-        data_shape: tuple[int, ...] = tuple(block_info[None]["shape"])
-        chunk_shape: tuple[int, ...] = tuple(block_info[None]["chunk-shape"])
-        chunk_location: tuple[tuple[int, int], ...] = tuple(
-            block_info[None]["array-location"]
-        )
 
         late_bound_chunk: dict[str, Value] = dict(
             **late_bound_global,
@@ -477,6 +504,15 @@ def produce_data_array_correction(
 
         match boundary_:
             case "none":
+                # map_overlap passes the wrong block_info,
+                #  see https://github.com/dask/dask/issues/11349
+                # so we only trust it just enough to compute the effective
+                #  stencil size
+                extended_data_shape: tuple[int, ...] = tuple(block_info[None]["shape"])
+                extended_chunk_location: tuple[tuple[int, int], ...] = tuple(
+                    block_info[None]["array-location"]
+                )
+
                 # the none boundary does not extend beyond the data boundary,
                 #  so we need to check by how much the stencil was cut off
                 chunk_stencil: tuple[
@@ -492,7 +528,9 @@ def produce_data_array_correction(
                             before=s - max(0, s - b), after=min(e + a, d) - e
                         ),
                     )
-                    for (b, a), (s, e), d in zip(depth, chunk_location, data_shape)
+                    for (b, a), (s, e), d in zip(
+                        depth, extended_chunk_location, extended_data_shape
+                    )
                 )
             case "periodic":
                 # the periodic boundary guarantees that we always have the
@@ -504,6 +542,26 @@ def produce_data_array_correction(
             case _:
                 assert_never(boundary_)
 
+        # extract the indices of the non-stencil-extended data indices chunk
+        data_indices_chunk = data_indices_chunk[
+            tuple(
+                slice(a.before, None if a.after == 0 else -a.after)
+                for b, a in chunk_stencil
+            )
+        ]
+        chunk_shape = data_indices_chunk.shape
+
+        # extract the offset of the chunk from the data indices chunk
+        if data_indices_chunk.size > 0:
+            chunk_offset_index = int(data_indices_chunk.flatten()[0])
+            chunk_offset_ = []
+            for s in data_shape[::-1]:
+                chunk_offset_.append(chunk_offset_index % s)
+                chunk_offset_index //= s
+            chunk_offset: tuple[int, ...] = tuple(chunk_offset_[::-1])
+        else:
+            chunk_offset = tuple(0 for _ in data_shape)
+
         # this is safe because
         # - map_overlap ensures we get chunks including their required stencil
         # - compute_chunked_correction only returns the correction for the non-
@@ -512,7 +570,7 @@ def produce_data_array_correction(
             data_chunk,
             prediction_chunk,
             data_shape=data_shape,
-            chunk_offset=tuple(f for f, t in chunk_location),
+            chunk_offset=chunk_offset,
             chunk_stencil=chunk_stencil,
             any_chunk_check_failed=any_chunk_check_failed,
             late_bound_chunk=late_bound_chunk,
@@ -527,6 +585,7 @@ def produce_data_array_correction(
                 _compute_overlapping_stencil_chunk_correction,
                 data.data,
                 prediction.data,
+                data_indices,
                 *chunked_late_bound.values(),
                 dtype=correction_dtype,
                 chunks=None,
@@ -541,10 +600,13 @@ def produce_data_array_correction(
                 late_bound_names=tuple(chunked_late_bound.keys()),
                 late_bound_global=late_bound_global,
                 safeguards=safeguards_,
+                data_shape=data.shape,
                 depth_=depth,
                 boundary_=boundary,
                 any_chunk_check_failed=any_chunk_check_failed,
-            ).rechunk(data.chunks)  # undo temporary rechunking
+            )
+            .compute_chunk_sizes()  # shape and chunk size may be wrong, recompute
+            .rechunk(data.chunks)  # undo temporary rechunking
         )
         .rename(correction_name)
         .assign_attrs(**correction_attrs)
