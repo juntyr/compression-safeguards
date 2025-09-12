@@ -76,3 +76,54 @@ def test_fuzzer_found_correction_shape_mismatch():
         ],
         late_bound=dict(),
     ).compute()
+
+
+def test_fuzzer_found_hash():
+    chunks = dict(a=14, b=1)
+    da = xr.DataArray(
+        np.array(
+            [
+                [194],
+                [253],
+                [0],
+                [2],
+                [221],
+                [11],
+                [62],
+                [0],
+                [62],
+                [62],
+                [62],
+                [62],
+                [42],
+                [255],
+                [255],
+                [255],
+                [255],
+            ],
+            dtype=np.uint8,
+        ),
+        name="da",
+        dims=["a", "b"],
+    ).chunk(chunks)
+    da_prediction = xr.DataArray(
+        np.zeros_like(da.values), name="da", dims=["a", "b"]
+    ).chunk(chunks)
+
+    produce_data_array_correction(
+        da,
+        da_prediction,
+        safeguards=[
+            dict(
+                kind="qoi_eb_stencil",
+                qoi="x",
+                neighbourhood=[dict(axis=0, before=1, after=0, boundary="edge")],
+                type="abs",
+                eb=0,
+                qoi_dtype="float64",
+            )
+        ],
+        late_bound=dict(),
+    ).compute()
+
+    # TODO: use the hashing safeguard here
