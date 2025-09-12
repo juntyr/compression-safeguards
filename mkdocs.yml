@@ -41,6 +41,8 @@ nav:
           - Bounding the dSSIM metric: examples/dssim.ipynb
       - Error bound distributions:
         - Absolute error bound: examples/error-distribution.ipynb
+      - Safeguards on chunked data:
+        - xarray-safeguards: examples/chunked.ipynb
   - Links:
       - GitHub: https://github.com/juntyr/compression-safeguards
       - PyPI:

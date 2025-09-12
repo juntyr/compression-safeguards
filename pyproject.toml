@@ -42,6 +42,8 @@ examples = [
     "xarray~=2025.1",
     "netcdf4~=1.7.2",
     "matplotlib~=3.10.0",
+    # FIXME: https://github.com/dask/dask/issues/12072
+    "pyarrow~=21.0.0",
 ]
 fuzz = ["atheris~=2.3", "timeoutcontext~=1.2", "setuptools~=80.0"]
 test = [

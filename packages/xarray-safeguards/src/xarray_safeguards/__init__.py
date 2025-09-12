@@ -46,6 +46,7 @@ __all__ = [
 import json
 import warnings
 from collections.abc import Collection, Mapping
+from types import MappingProxyType
 from typing import Literal, TypeAlias
 
 import dask
@@ -71,7 +72,7 @@ def produce_data_array_correction(
     data: xr.DataArray,
     prediction: xr.DataArray,
     safeguards: Collection[dict | Safeguard],
-    late_bound: Mapping[str, DataValue],
+    late_bound: Mapping[str, DataValue] = MappingProxyType(dict()),
     *,
     allow_unsafe_safeguards_override: bool = False,
 ) -> xr.DataArray:
@@ -579,7 +580,7 @@ def produce_data_array_correction(
 
         return correction
 
-    return (
+    da_correction: xr.DataArray = (
         data.copy(
             data=dask.array.map_overlap(
                 _compute_overlapping_stencil_chunk_correction,
@@ -611,6 +612,9 @@ def produce_data_array_correction(
         .rename(correction_name)
         .assign_attrs(**correction_attrs)
     )
+
+    # drop the previous encoding from the variable but not the coords
+    return da_correction._replace(variable=da_correction.variable.drop_encoding())
 
 
 def apply_data_array_correction(
