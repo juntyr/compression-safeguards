@@ -374,7 +374,10 @@ class Safeguards:
 
     @functools.lru_cache
     def compute_required_stencil_for_chunked_correction(
-        self, data_shape: tuple[int, ...]
+        self,
+        data_shape: tuple[int, ...],
+        *,
+        smallest_chunk_shape: None | tuple[int, ...] = None,
     ) -> tuple[
         tuple[
             Literal[BoundaryCondition.valid, BoundaryCondition.wrap], NeighbourhoodAxis
@@ -397,12 +400,19 @@ class Safeguards:
         ----------
         data_shape : tuple[int, ...]
             The shape of the complete data.
+        smallest_chunk_shape : None | tuple[int, ...]
+            The shape of the smallest chunk over which the chunked corrections
+            will be computed, if known.
 
         Returns
         -------
         stencil_shape : tuple[tuple[Literal[BoundaryCondition.valid, BoundaryCondition.wrap], NeighbourhoodAxis], ...]
             The shape of the required stencil neighbourhood around each chunk.
         """
+
+        # if the shape of the smallest chunk is not known, assume the worst
+        if smallest_chunk_shape is None:
+            smallest_chunk_shape = tuple(0 for _ in data_shape)
 
         neighbourhood: list[
             tuple[
@@ -429,6 +439,19 @@ class Safeguards:
                         neighbourhood[i][1].after,
                     )
 
+                    # we now know that the safeguards have a stencil of
+                    #  [before, ..., x, ..., after]
+                    # this stencil is sufficient to compute the safeguards for x
+                    #
+                    # BUT the elements in before and after can also back-
+                    #  contribute to the safe intervals of x,
+                    # so we need to ensure that all elements in the stencil can
+                    #  also apply the safeguards, i.e. they also need their
+                    #  stencil supplied
+                    #
+                    # therefore we actually need to double the stencil to
+                    # [before-before, ..., before, ..., x, ..., after, ..., after+after]
+
                     match b:
                         case (
                             BoundaryCondition.valid
@@ -439,8 +462,8 @@ class Safeguards:
                             neighbourhood[i] = (
                                 neighbourhood[i][0],
                                 NeighbourhoodAxis(
-                                    before=max(n_before, s.before),
-                                    after=max(n_after, s.after),
+                                    before=max(n_before, s.before * 2),
+                                    after=max(n_after, s.after * 2),
                                 ),
                             )
                         case BoundaryCondition.reflect:
@@ -453,8 +476,20 @@ class Safeguards:
                             neighbourhood[i] = (
                                 neighbourhood[i][0],
                                 NeighbourhoodAxis(
-                                    before=max(n_before, max(s.before, s.after)),
-                                    after=max(n_after, max(s.before, s.after)),
+                                    before=max(
+                                        n_before,
+                                        max(
+                                            s.before * 2,
+                                            s.after * 2 - smallest_chunk_shape[i],
+                                        ),
+                                    ),
+                                    after=max(
+                                        n_after,
+                                        max(
+                                            s.before * 2 - smallest_chunk_shape[i],
+                                            s.after * 2,
+                                        ),
+                                    ),
                                 ),
                             )
                         case BoundaryCondition.symmetric:
@@ -464,8 +499,20 @@ class Safeguards:
                             neighbourhood[i] = (
                                 neighbourhood[i][0],
                                 NeighbourhoodAxis(
-                                    before=max(n_before, max(s.before, s.after - 1)),
-                                    after=max(n_after, max(s.before - 1, s.after)),
+                                    before=max(
+                                        n_before,
+                                        max(
+                                            s.before * 2,
+                                            s.after * 2 - 1 - smallest_chunk_shape[i],
+                                        ),
+                                    ),
+                                    after=max(
+                                        n_after,
+                                        max(
+                                            s.before * 2 - 1 - smallest_chunk_shape[i],
+                                            s.after * 2,
+                                        ),
+                                    ),
                                 ),
                             )
                         case BoundaryCondition.wrap:
@@ -475,31 +522,14 @@ class Safeguards:
                             neighbourhood[i] = (
                                 BoundaryCondition.wrap,
                                 NeighbourhoodAxis(
-                                    before=max(n_before, s.before),
-                                    after=max(n_after, s.after),
+                                    before=max(n_before, s.before * 2),
+                                    after=max(n_after, s.after * 2),
                                 ),
                             )
                         case _:
                             assert_never(b)
 
-        # we now know that the safeguards have a stencil of
-        #  [before, ..., x, ..., after]
-        # this stencil is sufficient to compute the safeguards for x,
-        #
-        # BUT the elements in before and after can also back-contribute to the
-        #  safe intervals of x,
-        # so we need to ensure that all elements in the stencil can also apply
-        #  the safeguards, i.e. they also need their stencil supplied
-        #
-        # therefore we actually need to double the stencil to
-        # [before-before, ..., before, ..., x, ..., after, ..., after+after]
-
-        # TODO: do we need to double everywhere, especially with reflective
-        #       boundaries?
-        return tuple(
-            (b, NeighbourhoodAxis(before=s.before * 2, after=s.after * 2))
-            for b, s in neighbourhood
-        )
+        return tuple(neighbourhood)
 
     def check_chunk(
         self,
@@ -578,13 +608,13 @@ class Safeguards:
         assert len(chunk_offset) == data_chunk.ndim
         assert len(chunk_stencil) == data_chunk.ndim
 
-        chunk_shape = tuple(
+        chunk_shape: tuple[int, ...] = tuple(
             a - s[1].before - s[1].after
             for a, s in zip(data_chunk.shape, chunk_stencil)
         )
 
         required_stencil = self.compute_required_stencil_for_chunked_correction(
-            data_shape
+            data_shape, smallest_chunk_shape=chunk_shape
         )
 
         stencil_indices: list[slice] = []
@@ -809,13 +839,13 @@ class Safeguards:
         assert len(chunk_offset) == data_chunk.ndim
         assert len(chunk_stencil) == data_chunk.ndim
 
-        chunk_shape = tuple(
+        chunk_shape: tuple[int, ...] = tuple(
             a - s[1].before - s[1].after
             for a, s in zip(data_chunk.shape, chunk_stencil)
         )
 
         required_stencil = self.compute_required_stencil_for_chunked_correction(
-            data_shape
+            data_shape, smallest_chunk_shape=chunk_shape
         )
 
         stencil_indices: list[slice] = []
