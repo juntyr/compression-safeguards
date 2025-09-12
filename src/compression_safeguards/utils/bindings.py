@@ -222,13 +222,45 @@ class Bindings:
 
         return view  # type: ignore
 
-    def apply_index(self, index: tuple[slice, ...]) -> Self:
+    def apply_slice_index(self, index: tuple[slice, ...]) -> Self:
+        """
+        Apply the slice `index` to the late-bound array values and return the sliced bindings.
+
+        The `index` is only applied to an array value if
+        - the value is not scalar (no effect)
+        - the value has the same number of dimensions as the `index` (bail out)
+
+        Furthermore, the index is only applied along dimensions with a size
+        greater than 1, since smaller dimensions can be broadcast.
+
+        Parameters
+        ----------
+        index : tuple[slice, ...]
+            The slice index that is applied to the late-bound array values.
+
+        Returns
+        -------
+        bindings : Bindings
+            The sliced bindings.
+
+        Raises
+        ======
+        IndexError
+            if an array value has the right number of dimensions but indexing
+            with `index` fails
+        """
+
         def apply_index_to_value(value: Value) -> Value:
             if isinstance(value, int | float | np.number):
+                # scalar
                 return value
 
             if not isinstance(value, np.ndarray):
                 # bail out
+                return value
+
+            if value.ndim == 0:
+                # scalar array
                 return value
 
             if value.ndim != len(index):

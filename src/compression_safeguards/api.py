@@ -160,8 +160,13 @@ class Safeguards:
         late_bound: Mapping[str | Parameter, Value] | Bindings = Bindings.empty(),
     ) -> bool:
         """
-        Check if the `prediction` array upholds the properties enforced by the
-        safeguards with respect to the `data` array.
+        Check if the `prediction` array upholds the properties enforced by the safeguards with respect to the `data` array.
+
+        The `data` array must contain the complete data, i.e. not just a chunk
+        of data, so that non-pointwise safeguards are correctly applied. Please
+        use the
+        [`check_chunk`][compression_safeguards.api.Safeguards.check_chunk]
+        method instead when working with individual chunks of data.
 
         Parameters
         ----------
@@ -169,7 +174,7 @@ class Safeguards:
             The data array, relative to which the safeguards are enforced.
         prediction : np.ndarray[S, np.dtype[T]]
             The prediction array for which the safeguards are checked.
-        late_bound : Mapping[str, Value] | Bindings
+        late_bound : Mapping[str | Parameter, Value] | Bindings
             The bindings for all late-bound parameters of the safeguards.
 
             The bindings must resolve all late-bound parameters and include no
@@ -234,7 +239,10 @@ class Safeguards:
         Compute the correction required to make the `prediction` array satisfy the safeguards relative to the `data` array.
 
         The `data` array must contain the complete data, i.e. not just a chunk
-        of data, so that non-pointwise safeguards are correctly applied.
+        of data, so that non-pointwise safeguards are correctly applied. Please
+        use the
+        [`compute_chunked_correction`][compression_safeguards.api.Safeguards.compute_chunked_correction]
+        method instead when working with individual chunks of data.
 
         Parameters
         ----------
@@ -242,7 +250,7 @@ class Safeguards:
             The data array, relative to which the safeguards are enforced.
         prediction : np.ndarray[S, np.dtype[T]]
             The prediction array for which the correction is computed.
-        late_bound : Mapping[str, Value] | Bindings
+        late_bound : Mapping[str | Parameter, Value] | Bindings
             The bindings for all late-bound parameters of the safeguards.
 
             The bindings must resolve all late-bound parameters and include no
@@ -338,6 +346,10 @@ class Safeguards:
         """
         Apply the `correction` to the `prediction` to satisfy the safeguards for which the `correction` was computed.
 
+        This method is guaranteed to work for chunked data as well, i.e.
+        applying a chunk of the `correction` to the corresponding chunk of the
+        `prediction` produces the correct result.
+
         Parameters
         ----------
         prediction : np.ndarray[S, np.dtype[T]]
@@ -370,8 +382,7 @@ class Safeguards:
         ...,
     ]:
         """
-        Compute the shape of the stencil neighbourhood around chunks of the
-        complete data that is required to compute the chunked corrections.
+        Compute the shape of the stencil neighbourhood around chunks of the complete data that is required to compute the chunked corrections.
 
         For each data dimension, the stencil might require either a
         [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
@@ -390,7 +401,7 @@ class Safeguards:
         Returns
         -------
         stencil_shape : tuple[tuple[Literal[BoundaryCondition.valid, BoundaryCondition.wrap], NeighbourhoodAxis], ...]
-            The shape of the required stencil neighbourhood.
+            The shape of the required stencil neighbourhood around each chunk.
         """
 
         neighbourhood: list[
@@ -506,6 +517,57 @@ class Safeguards:
         ],
         late_bound_chunk: Mapping[str | Parameter, Value] | Bindings = Bindings.empty(),
     ) -> bool:
+        """
+        Check if the `prediction_chunk` array chunk upholds the properties enforced by the safeguards with respect to the `data_chunk` array chunk.
+
+        This method should only be used when working with individual chunks of
+        data, otherwise please use the more efficient
+        [`check`][compression_safeguards.api.Safeguards.check]
+        method instead.
+
+        Parameters
+        ----------
+        data_chunk : np.ndarray[S, np.dtype[T]]
+            A chunk from the data array, relative to which the safeguards are
+            enforced.
+        prediction_chunk : np.ndarray[S, np.dtype[T]]
+            The corresponding chunk from the prediction array for which the
+            safeguards are checked.
+        data_shape : tuple[int, ...]
+            The shape of the entire data array, i.e. not just the chunk.
+        chunk_offset : tuple[int, ...]
+            The offset of the chunk inside the entire array. For arrays going
+            from left to right, bottom to top, ... the offset is the index of
+            the bottom left element in the entire array.
+        chunk_stencil : tuple[tuple[Literal[BoundaryCondition.valid, BoundaryCondition.wrap], NeighbourhoodAxis], ...]
+            The shape of the stencil neighbourhood around the chunk. This
+            stencil must be compatible with the required stencil returned by
+            [`compute_required_stencil_for_chunked_correction(data_shape)`][compression_safeguards.api.Safeguards.compute_required_stencil_for_chunked_correction]:
+            - a wrapping boundary is always compatible with a valid boundary.
+            - a larger stencil is always compatible with a smaller stencil.
+            - a smaller stencil is sometimes compatible with a larger stencil,
+              iff the smaller stencil is near the entire data boundary and
+              still includes all required elements; for instance, providing the
+              entire data as a single chunk with no stencil is always
+              compatible with any stencil
+        late_bound_chunk : Mapping[str | Parameter, Value] | Bindings
+            The bindings for all late-bound parameters of the safeguards.
+
+            The bindings must resolve all late-bound parameters and include no
+            extraneous parameters.
+
+            If a binding resolves to an array, it must be the corresponding
+            chunk of the entire late-bound array.
+
+            The safeguards automatically provide the `$x` and `$X` built-in
+            constants, which must not be included.
+
+        Returns
+        -------
+        chunk_ok : bool
+            `True` if the check succeeded for the chunk.
+        """
+
         assert data_chunk.dtype in _SUPPORTED_DTYPES, (
             f"can only safeguard arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
         )
@@ -632,7 +694,7 @@ class Safeguards:
             late_bound_chunk
             if isinstance(late_bound_chunk, Bindings)
             else Bindings(**late_bound_chunk)
-        ).apply_index(tuple(stencil_indices))
+        ).apply_slice_index(tuple(stencil_indices))
 
         late_bound_reqs = self.late_bound
         late_bound_builtin = {
@@ -684,6 +746,59 @@ class Safeguards:
         any_chunk_check_failed: bool,
         late_bound_chunk: Mapping[str | Parameter, Value] | Bindings = Bindings.empty(),
     ) -> np.ndarray[tuple[int, ...], np.dtype[C]]:
+        """
+        Compute the correction required to make the `prediction_chunk` array chunk satisfy the safeguards relative to the `data_chunk` array chunk.
+
+        This method should only be used when working with individual chunks of
+        data, otherwise please use the more efficient
+        [`compute_correction`][compression_safeguards.api.Safeguards.compute_correction]
+        method instead.
+
+        Parameters
+        ----------
+        data_chunk : np.ndarray[S, np.dtype[T]]
+            A chunk from the data array, relative to which the safeguards are
+            enforced.
+        prediction_chunk : np.ndarray[S, np.dtype[T]]
+            The corresponding chunk from the prediction array for which the
+            correction is computed.
+        data_shape : tuple[int, ...]
+            The shape of the entire data array, i.e. not just the chunk.
+        chunk_offset : tuple[int, ...]
+            The offset of the chunk inside the entire array. For arrays going
+            from left to right, bottom to top, ... the offset is the index of
+            the bottom left element in the entire array.
+        chunk_stencil : tuple[tuple[Literal[BoundaryCondition.valid, BoundaryCondition.wrap], NeighbourhoodAxis], ...]
+            The shape of the stencil neighbourhood around the chunk. This
+            stencil must be compatible with the required stencil returned by
+            [`compute_required_stencil_for_chunked_correction(data_shape)`][compression_safeguards.api.Safeguards.compute_required_stencil_for_chunked_correction]:
+            - a wrapping boundary is always compatible with a valid boundary.
+            - a larger stencil is always compatible with a smaller stencil.
+            - a smaller stencil is sometimes compatible with a larger stencil,
+              iff the smaller stencil is near the entire data boundary and
+              still includes all required elements; for instance, providing the
+              entire data as a single chunk with no stencil is always
+              compatible with any stencil
+        late_bound_chunk : Mapping[str | Parameter, Value] | Bindings
+            The bindings for all late-bound parameters of the safeguards.
+
+            The bindings must resolve all late-bound parameters and include no
+            extraneous parameters.
+
+            If a binding resolves to an array, it must be the corresponding
+            chunk of the entire late-bound array.
+
+            The safeguards automatically provide the `$x` and `$X` built-in
+            constants, which must not be included.
+
+        Returns
+        -------
+        correction_chunk : np.ndarray[tuple[int, ...], np.dtype[C]]
+            The correction array chunk. The correction chunk is truncated to
+            remove the stencil, i.e. it only contains the correction for the
+            non-stencil-extended chunk.
+        """
+
         assert data_chunk.dtype in _SUPPORTED_DTYPES, (
             f"can only safeguard arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
         )
@@ -810,7 +925,7 @@ class Safeguards:
             late_bound_chunk
             if isinstance(late_bound_chunk, Bindings)
             else Bindings(**late_bound_chunk)
-        ).apply_index(tuple(stencil_indices))
+        ).apply_slice_index(tuple(stencil_indices))
 
         late_bound_reqs = self.late_bound
         late_bound_builtin = {
@@ -892,20 +1007,6 @@ class Safeguards:
         return (prediction_chunk_bits - correction_chunk_bits)[
             tuple(non_stencil_indices)
         ]
-
-    def apply_chunked_correction(
-        self,
-        prediction_chunk: np.ndarray[S, np.dtype[T]],
-        correction_chunk: np.ndarray[S, np.dtype[C]],
-    ) -> np.ndarray[S, np.dtype[T]]:
-        assert correction_chunk.shape == prediction_chunk.shape
-
-        prediction_chunk_bits = as_bits(prediction_chunk)
-        correction_chunk_bits = as_bits(correction_chunk)
-
-        corrected_chunk = prediction_chunk_bits - correction_chunk_bits
-
-        return corrected_chunk.view(prediction_chunk.dtype)
 
     def get_config(self) -> dict:
         """

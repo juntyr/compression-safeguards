@@ -112,6 +112,11 @@ def produce_data_array_correction(
         The bindings must resolve all late-bound parameters and include no
         extraneous parameters.
 
+        If a binding resolves to a [`xr.DataArray`][xarray.DataArray], its
+        dimensions must be a subset of `data.dims` and the shape must be
+        broadcastable to the data shape, i.e. for each axis must either have
+        size 1 or the same size as the matching dimension in the `data`.
+
         This method automatically provides the following built-in constants
         to the safeguards, which must not be included:
 
@@ -197,6 +202,10 @@ def produce_data_array_correction(
             assert frozenset(v.dims).issubset(data.dims), (
                 f"late-bound param {k} dims are not a subset of data dims"
             )
+            for d, ds in v.sizes.items():
+                assert (ds == 1) or (ds == data.sizes[d]), (
+                    "late-bound param {k} dim {d} is not broadcastable to the data size"
+                )
             late_bound_data_arrays[k] = v
 
     correction_name = "sg" if data.name is None else f"{data.name}_sg"
@@ -624,7 +633,9 @@ def apply_data_array_correction(
     """
     Apply the `correction` to the `prediction` array to satisfy the safeguards for which the `correction` was produced.
 
-    The `prediction` and `correction` arrays must use the same chunking.
+    The `prediction` and `correction` arrays must use the same chunking, though
+    this chunking may differ from the one that was used to produce the
+    `correction`.
 
     If the the `prediction` array is chunked, the correction is applied lazily,
     otherwise it its application is computed eagerly.
@@ -663,7 +674,7 @@ def apply_data_array_correction(
         safeguards: Safeguards,
     ) -> xr.DataArray:
         return prediction_chunk.copy(
-            data=safeguards.apply_chunked_correction(
+            data=safeguards.apply_correction(
                 prediction_chunk.values, correction_chunk.values
             )
         )
