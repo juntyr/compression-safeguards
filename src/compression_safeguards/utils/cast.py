@@ -198,9 +198,10 @@ def to_float(
     if _is_of_dtype(x, ftype):
         return x
 
-    # lossless cast to floating-point data type with a sufficiently large
-    #  mantissa
-    return x.astype(ftype, casting="safe")
+    with np.errstate(invalid="ignore"):
+        # lossless cast to floating-point data type with a sufficiently large
+        #  mantissa
+        return x.astype(ftype, casting="safe")
 
 
 def from_float(
@@ -253,8 +254,8 @@ def from_float(
         converted: np.ndarray[S, np.dtype[T]] = np.array(np.rint(x), copy=None).astype(
             dtype, casting="unsafe"
         )
-    converted[np.greater(x, imax.astype(x.dtype, casting="safe"))] = imax
-    converted[np.less(x, imin.astype(x.dtype, casting="safe"))] = imin
+        converted[np.greater(x, imax.astype(x.dtype, casting="safe"))] = imax
+        converted[np.less(x, imin.astype(x.dtype, casting="safe"))] = imin
 
     return converted
 
