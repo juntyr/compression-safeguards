@@ -24,8 +24,7 @@ class ScalarFoldedConstant(Expr):
 
     def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
         assert isinstance(self._const, dtype.type)
-        const: F = self._const  # type: ignore
-        return const
+        return self._const
 
     def eval(
         self,
@@ -34,8 +33,7 @@ class ScalarFoldedConstant(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
         assert isinstance(self._const, Xs.dtype.type)
-        const: F = self._const  # type: ignore
-        return _broadcast_to(const, x)
+        return _broadcast_to(self._const, x)
 
     def compute_data_bounds_unchecked(
         self,

@@ -308,14 +308,14 @@ def _apply_finite_error_bound(
 
             lower = np.array(
                 from_total_order(
-                    np.add(to_total_order(lower), lower_outside_eb),  # type: ignore
+                    np.add(to_total_order(lower), lower_outside_eb),
                     data.dtype,
                 ),
                 copy=None,
             )
             upper = np.array(
                 from_total_order(
-                    np.subtract(to_total_order(upper), upper_outside_eb),  # type: ignore
+                    np.subtract(to_total_order(upper), upper_outside_eb),
                     data.dtype,
                 ),
                 copy=None,
@@ -363,14 +363,14 @@ def _apply_finite_error_bound(
 
             lower = np.array(
                 from_total_order(
-                    np.add(to_total_order(lower), lower_outside_eb),  # type: ignore
+                    np.add(to_total_order(lower), lower_outside_eb),
                     data.dtype,
                 ),
                 copy=None,
             )
             upper = np.array(
                 from_total_order(
-                    np.subtract(to_total_order(upper), upper_outside_eb),  # type: ignore
+                    np.subtract(to_total_order(upper), upper_outside_eb),
                     data.dtype,
                 ),
                 copy=None,

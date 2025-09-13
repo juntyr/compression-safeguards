@@ -2,6 +2,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
+from ....utils._compat import _is_of_shape
 from ....utils.bindings import Parameter
 from ..bound import DataBounds, data_bounds
 from .abc import Expr
@@ -51,8 +52,8 @@ class Data(Expr):
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
         out: np.ndarray[tuple[int, ...], np.dtype[F]] = Xs[(...,) + self._index]
-        assert out.shape == x
-        return out  # type: ignore
+        assert _is_of_shape(out, x)
+        return out
 
     @data_bounds(DataBounds.infallible)
     def compute_data_bounds_unchecked(
@@ -131,8 +132,8 @@ class LateBoundConstant(Expr):
         out: np.ndarray[tuple[int, ...], np.dtype[F]] = late_bound[self.name][
             (...,) + self._index
         ]
-        assert out.shape == x
-        return out  # type: ignore
+        assert _is_of_shape(out, x)
+        return out
 
     def compute_data_bounds_unchecked(
         self,

@@ -21,7 +21,7 @@ import numpy as np
 try:
     _float128: TypeAlias = np.float128
     _float128_type: TypeAlias = np.float128
-    _float128_dtype: np.dtype = np.dtype(np.float128)
+    _float128_dtype: np.dtype[_float128] = np.dtype(np.float128)
     assert (np.finfo(np.float128).nmant + np.finfo(np.float128).nexp + 1) == 128
     _float128_min: _float128 = np.finfo(np.float128).min
     _float128_max: _float128 = np.finfo(np.float128).max
@@ -39,8 +39,7 @@ except (AttributeError, AssertionError):
         _float128_min = -numpy_quaddtype.max_value
         _float128_max = numpy_quaddtype.max_value
         _float128_smallest_normal = numpy_quaddtype.smallest_normal
-        # FIXME: taken from https://sleef.org/quad.xhtml
-        _float128_smallest_subnormal = _float128(2) ** (-16494)
+        _float128_smallest_subnormal = numpy_quaddtype.smallest_subnormal
         _float128_pi = numpy_quaddtype.pi
         _float128_e = numpy_quaddtype.e
     except ImportError:

@@ -392,9 +392,15 @@ class Interval(Generic[T, N]):
 
         # nextafter produces the largest and smallest finite floating-point
         #  values
-        Lower(np.array(_nextafter(np.array(-np.inf, dtype=a.dtype), 0))) <= self[
-            np.isfinite(a)
-        ] <= Upper(np.array(_nextafter(np.array(np.inf, dtype=a.dtype), 0)))
+        Lower(
+            np.array(
+                _nextafter(np.array(-np.inf, dtype=a.dtype), np.array(0, dtype=a.dtype))
+            )
+        ) <= self[np.isfinite(a)] <= Upper(
+            np.array(
+                _nextafter(np.array(np.inf, dtype=a.dtype), np.array(0, dtype=a.dtype))
+            )
+        )
 
         return self
 
