@@ -19,7 +19,7 @@ from typing import Any
 import numpy as np
 from typing_extensions import assert_never  # MSPV 3.11
 
-from ._compat import _astype, _nan_to_zero_inf_to_finite
+from ._compat import _is_of_dtype, _nan_to_zero_inf_to_finite
 from ._float128 import _float128_dtype
 from .typing import F, S, T, U
 
@@ -195,12 +195,13 @@ def to_float(
     elif ftype != _float128_dtype:
         assert np.finfo(ftype).nmant >= x.dtype.itemsize
 
-    if x.dtype == ftype:
-        return x  # type: ignore
+    if _is_of_dtype(x, ftype):
+        return x
 
-    # lossless cast to floating-point data type with a sufficiently large
-    #  mantissa
-    return _astype(x, ftype, casting="safe")
+    with np.errstate(invalid="ignore"):
+        # lossless cast to floating-point data type with a sufficiently large
+        #  mantissa
+        return x.astype(ftype, casting="safe")
 
 
 def from_float(
@@ -234,15 +235,15 @@ def from_float(
 
     assert np.issubdtype(x.dtype, np.floating) or (x.dtype == _float128_dtype)
 
-    if x.dtype == dtype:
-        return x  # type: ignore
+    if _is_of_dtype(x, dtype):
+        return x
 
     if np.issubdtype(dtype, np.floating):
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
             # lossy cast to lower-precision floating-point number
-            return _astype(x, dtype, casting="unsafe")
+            return x.astype(dtype, casting="unsafe")
 
     info = np.iinfo(dtype)  # type: ignore
     imin, imax = np.array(info.min, dtype=dtype), np.array(info.max, dtype=dtype)
@@ -250,11 +251,11 @@ def from_float(
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         # lossy cast from floating-point to integer
         # round first with rint (round to nearest, ties to nearest even)
-        converted: np.ndarray[S, np.dtype[T]] = np.array(  # type: ignore
-            _astype(np.array(np.rint(x), copy=None), dtype, casting="unsafe"), copy=None
+        converted: np.ndarray[S, np.dtype[T]] = np.array(np.rint(x), copy=None).astype(
+            dtype, casting="unsafe"
         )
-    converted[np.greater(x, _astype(imax, x.dtype, casting="safe"))] = imax
-    converted[np.less(x, _astype(imin, x.dtype, casting="safe"))] = imin
+        converted[np.greater(x, imax.astype(x.dtype, casting="safe"))] = imax
+        converted[np.less(x, imin.astype(x.dtype, casting="safe"))] = imin
 
     return converted
 
@@ -284,7 +285,7 @@ def as_bits(
         .replace("u", kind)
         # numpy_quaddtype currently does not set its kind properly
         .replace(_float128_dtype.kind, kind)
-    )  # type: ignore
+    )
 
 
 def to_total_order(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[U]]:
@@ -432,8 +433,8 @@ def lossless_cast(
 
     # we use unsafe casts here since we later check them for safety
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        xa_to = _astype(np.array(xa, copy=None), dtype, casting="unsafe")
-        xa_back = _astype(xa_to, dtype_from, casting="unsafe")
+        xa_to = np.array(xa, copy=None).astype(dtype, casting="unsafe")
+        xa_back = xa_to.astype(dtype_from, casting="unsafe")
 
     lossless_same = (xa == xa_back) | (np.isnan(xa) & np.isnan(xa_back))
 
@@ -487,6 +488,6 @@ def saturating_finite_float_cast(
     # - we cast to float, where under- and overflows saturate to np.inf
     # - we later clamp the values to finite
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        xa_to = _astype(np.array(xa, copy=None), dtype, casting="unsafe")
+        xa_to = np.array(xa, copy=None).astype(dtype, casting="unsafe")
 
     return _nan_to_zero_inf_to_finite(xa_to)

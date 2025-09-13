@@ -11,18 +11,19 @@ __all__ = [
     "_maximum_zero_sign_sensitive",
     "_where",
     "_broadcast_to",
-    "_astype",
     "_is_sign_negative_number",
     "_is_negative_zero",
     "_is_sign_positive_number",
     "_is_positive_zero",
+    "_is_of_dtype",
+    "_is_of_shape",
     "_floating_max",
     "_floating_smallest_subnormal",
     "_pi",
     "_e",
 ]
 
-from typing import Literal, overload
+from typing import TypeGuard, overload
 
 import numpy as np
 
@@ -66,15 +67,15 @@ def _nan_to_zero_inf_to_finite(
 # Implementation is variant 2 from https://stackoverflow.com/a/70512834
 @np.errstate(invalid="ignore")
 def _nextafter(
-    a: np.ndarray[S, np.dtype[F]], b: int | float | np.ndarray[S, np.dtype[F]]
+    a: np.ndarray[S, np.dtype[F]], b: np.ndarray[S, np.dtype[F]]
 ) -> np.ndarray[S, np.dtype[F]]:
     if (type(a) is not _float128_type) and (
         not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
     ):
-        return np.nextafter(a, b)  # type: ignore
+        return np.nextafter(a, b)
 
     a = np.array(a, copy=None)
-    b = np.array(b, dtype=a.dtype, copy=None)
+    b = np.array(b, copy=None)
 
     _float128_incr_subnormal = np.full(a.shape, _float128_smallest_subnormal)
     np.negative(_float128_incr_subnormal, out=_float128_incr_subnormal, where=(a < 0))
@@ -181,10 +182,10 @@ def _minimum_zero_sign_sensitive(a, b):
         return minimum
     minimum_array = np.array(minimum, copy=None)
     a = _broadcast_to(
-        _astype(a, minimum_array.dtype, casting="safe"), minimum_array.shape
+        a.astype(minimum_array.dtype, casting="safe"), minimum_array.shape
     )
     b = _broadcast_to(
-        _astype(b, minimum_array.dtype, casting="safe"), minimum_array.shape
+        b.astype(minimum_array.dtype, casting="safe"), minimum_array.shape
     )
     np.copyto(
         minimum_array,
@@ -228,10 +229,10 @@ def _maximum_zero_sign_sensitive(a, b):
         return maximum
     maximum_array = np.array(maximum, copy=None)
     a = _broadcast_to(
-        _astype(a, maximum_array.dtype, casting="safe"), maximum_array.shape
+        a.astype(maximum_array.dtype, casting="safe"), maximum_array.shape
     )
     b = _broadcast_to(
-        _astype(b, maximum_array.dtype, casting="safe"), maximum_array.shape
+        b.astype(maximum_array.dtype, casting="safe"), maximum_array.shape
     )
     np.copyto(
         maximum_array,
@@ -286,31 +287,6 @@ def _broadcast_to(a, shape):
     return np.broadcast_to(a, shape)
 
 
-# wrapper around np.astype that also works for numpy_quaddtype
-@np.errstate(invalid="ignore")
-def _astype(
-    a: np.ndarray[S, np.dtype[np.number]],
-    dtype: np.dtype[T],
-    casting: Literal["safe", "unsafe"],
-) -> np.ndarray[S, np.dtype[T]]:
-    if (a.dtype != _float128_dtype) and (dtype != _float128_dtype):
-        return a.astype(dtype, casting=casting)
-
-    if (a.dtype == np.dtype(np.uint8)) and (dtype == _float128_dtype):
-        return a.astype(np.uint16, casting="safe").astype(dtype, casting=casting)
-
-    if (a.dtype == _float128_dtype) and (dtype == np.dtype(np.uint8)):
-        return a.astype(np.float32, casting=casting).astype(dtype, casting="unsafe")
-
-    if (a.dtype == np.dtype(np.float16)) and (dtype == _float128_dtype):
-        return a.astype(np.float32, casting="safe").astype(dtype, casting=casting)
-
-    if (a.dtype == _float128_dtype) and (dtype == np.dtype(np.float16)):
-        return a.astype(np.float32, casting=casting).astype(dtype, casting="unsafe")
-
-    return a.astype(dtype, casting=casting)
-
-
 # wrapper around a < 0 that also works for -0.0 (is negative) but excludes NaNs
 def _is_sign_negative_number(
     a: np.ndarray[S, np.dtype[F]],
@@ -342,30 +318,44 @@ def _is_positive_zero(
     return (a == 0) & (np.copysign(1, a) == +1)
 
 
+# type guard for x.dtype == dtype
+def _is_of_dtype(
+    x: np.ndarray[S, np.dtype], dtype: np.dtype[T]
+) -> TypeGuard[np.ndarray[S, np.dtype[T]]]:
+    return x.dtype == dtype
+
+
+# type guard for x.shape == shape
+def _is_of_shape(
+    x: np.ndarray[tuple[int, ...], np.dtype[T]], shape: Si
+) -> TypeGuard[np.ndarray[Si, np.dtype[T]]]:
+    return x.shape == shape
+
+
 # wrapper around np.finfo(dtype).max that also works for numpy_quaddtype
 def _floating_max(dtype: np.dtype[F]) -> F:
-    if dtype == _float128_dtype:
-        return _float128_max  # type: ignore
+    if isinstance(_float128_max, dtype.type):
+        return _float128_max
     return dtype.type(np.finfo(dtype).max)
 
 
 # wrapper around np.finfo(dtype).smallest_subnormal that also works for
 #  numpy_quaddtype
 def _floating_smallest_subnormal(dtype: np.dtype[F]) -> F:
-    if dtype == _float128_dtype:
-        return _float128_smallest_subnormal  # type: ignore
+    if isinstance(_float128_smallest_subnormal, dtype.type):
+        return _float128_smallest_subnormal
     return dtype.type(np.finfo(dtype).smallest_subnormal)
 
 
 # wrapper around np.pi, of the dtype, that also works for numpy_quaddtype
 def _pi(dtype: np.dtype[F]) -> F:
-    if dtype == _float128_dtype:
-        return _float128_pi  # type: ignore
+    if isinstance(_float128_pi, dtype.type):
+        return _float128_pi
     return dtype.type(np.pi)
 
 
 # wrapper around np.e, of the dtype, that also works for numpy_quaddtype
 def _e(dtype: np.dtype[F]) -> F:
-    if dtype == _float128_dtype:
-        return _float128_e  # type: ignore
+    if isinstance(_float128_e, dtype.type):
+        return _float128_e
     return dtype.type(np.e)

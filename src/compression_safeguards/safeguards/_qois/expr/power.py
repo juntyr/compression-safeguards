@@ -77,8 +77,10 @@ class ScalarPower(Expr[Expr, Expr]):
         # we need to full-force-force a and b to stay the same when
         #  (a) av is negative: powers of negative numbers are just too tricky
         #  (b) av is NaN and bv is zero: NaN ** 0 = 1 ... why???
+        #  (c) av is one and bv is NaN: 1 ** NaN = 1 ... why???
         force_same: np.ndarray[Ps, np.dtype[np.bool]] = _is_sign_negative_number(av)
         force_same |= np.isnan(av) & (bv == 0)
+        force_same |= (av == 1) & np.isnan(bv)
 
         # rewrite a ** b as fake_abs(e^(b*ln(fake_abs(a))))
         # this is mathematically incorrect for a <= 0 but works for deriving
@@ -98,7 +100,7 @@ class ScalarPower(Expr[Expr, Expr]):
         exprv_rewritten = rewritten.eval(X.shape, Xs, late_bound)
 
         # we also need to full-force-force a and b to stay the same when
-        #  (c) isnan(exprv) != isnan(exprv_rewritten): bail out
+        #  (d) isnan(exprv) != isnan(exprv_rewritten): bail out
         force_same |= np.isnan(exprv) != np.isnan(exprv_rewritten)
 
         # inlined outer ScalarFakeAbs
