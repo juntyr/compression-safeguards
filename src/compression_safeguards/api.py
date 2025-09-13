@@ -720,6 +720,7 @@ class Safeguards:
 
         # create the late-bound bindings for the chunk and apply the stencil
         #  indices
+        # TODO: check that the late-bound arrays have the same shape
         late_bound_chunk = (
             late_bound_chunk
             if isinstance(late_bound_chunk, Bindings)
@@ -951,6 +952,7 @@ class Safeguards:
 
         # create the late-bound bindings for the chunk and apply the stencil
         #  indices
+        # TODO: check that the late-bound arrays have the same shape
         late_bound_chunk = (
             late_bound_chunk
             if isinstance(late_bound_chunk, Bindings)

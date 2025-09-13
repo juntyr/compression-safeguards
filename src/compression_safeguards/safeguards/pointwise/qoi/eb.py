@@ -71,6 +71,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
     eb : int | float | str | Parameter
         The value of or late-bound parameter name for the error bound on the
         quantity of interest that is enforced by this safeguard.
+
+        The error bound is applied relative to the values of the quantity of
+        interest evaluated on the original data.
     qoi_dtype : str | ToFloatMode
         The floating-point data type in which the quantity of interest is
         evaluated. By default, the smallest floating-point data type that can
