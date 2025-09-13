@@ -19,7 +19,9 @@ from compression_safeguards.safeguards._qois.expr.hyperbolic import (
 )
 from compression_safeguards.safeguards._qois.expr.literal import Euler, Number
 from compression_safeguards.safeguards._qois.expr.logexp import (
+    Exponential,
     Logarithm,
+    ScalarExp,
     ScalarLog,
     ScalarLogWithBase,
 )
@@ -1037,3 +1039,25 @@ def test_fuzzer_found_log_upper_bound_negative_zero():
 
     assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float32(np.inf))
     assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float32(np.inf))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_excessive_nudging_one_power_nan():
+    X = np.array(np.float16(0.0))
+
+    expr = ScalarPower(
+        ScalarExp(Exponential.exp2, Data.SCALAR),
+        Number("nan"),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float16(1.0))
+
+    expr_lower = np.array(np.float16(0.0))
+    expr_upper = np.array(np.float16(1.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float16(0.0))
+    assert X_upper == np.array(np.float16(0.0))
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(1.0))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float16(1.0))
