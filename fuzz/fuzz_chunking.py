@@ -7,20 +7,19 @@ with atheris.instrument_imports():
     import types
     import typing
     import warnings
-    from collections.abc import Collection, Mapping, Sequence
+    from collections.abc import Collection, Sequence
     from enum import Enum
-    from hashlib import blake2b
     from inspect import signature
 
     import numpy as np
     import xarray as xr
     from xarray_safeguards import produce_data_array_correction
 
-    import compression_safeguards.safeguards.stencil.qoi.eb
     from compression_safeguards.api import Safeguards
-    from compression_safeguards.safeguards._qois.bound import DataBounds, data_bounds
-    from compression_safeguards.safeguards._qois.expr.abc import Expr
-    from compression_safeguards.safeguards._qois.expr.typing import F, Ns, Ps, PsI
+    from compression_safeguards.safeguards._qois.expr.hashing import (
+        HashingExpr,
+        _patch_for_hashing_qoi_dev_only,
+    )
     from compression_safeguards.safeguards.qois import (
         StencilQuantityOfInterestExpression,
     )
@@ -28,160 +27,13 @@ with atheris.instrument_imports():
     from compression_safeguards.safeguards.stencil.qoi.eb import (
         StencilQuantityOfInterestErrorBoundSafeguard,
     )
-    from compression_safeguards.utils._compat import _broadcast_to
-    from compression_safeguards.utils.bindings import Bindings, Parameter
-    from compression_safeguards.utils.cast import from_float
-    from compression_safeguards.utils.intervals import Interval, IntervalUnion
-    from compression_safeguards.utils.typing import S, T
+    from compression_safeguards.utils.bindings import Parameter
 
 
 warnings.filterwarnings("error")
 
 
-def stencil_qoi_check_pointwise(
-    self,
-    data: np.ndarray[S, np.dtype[T]],
-    decoded: np.ndarray[S, np.dtype[T]],
-    *,
-    late_bound: Bindings,
-) -> np.ndarray[S, np.dtype[np.bool]]:
-    if np.all(decoded == 0):
-        return np.zeros(data.shape, dtype=np.bool)
-    return np.ones(data.shape, dtype=np.bool)
-
-
-StencilQuantityOfInterestErrorBoundSafeguard.check_pointwise = (
-    stencil_qoi_check_pointwise
-)
-
-
-def interval_union_contains(
-    self, other: np.ndarray[S, np.dtype[T]]
-) -> np.ndarray[S, np.dtype[np.bool]]:
-    return np.ones(other.shape, dtype=np.bool)
-
-
-IntervalUnion.contains = interval_union_contains
-
-
-def interval_union_pick(
-    self, prediction: np.ndarray[S, np.dtype[T]]
-) -> np.ndarray[S, np.dtype[T]]:
-    assert not np.all(self._lower == 0), "fuzzer hash is all zeros"
-    return np.array(self._lower[0].reshape(prediction.shape), copy=True)
-
-
-IntervalUnion.pick = interval_union_pick
-
-
-def compute_safe_data_lower_upper_interval_union(
-    data: np.ndarray[S, np.dtype[T]],
-    data_float_lower: np.ndarray[S, np.dtype[F]],
-    data_float_upper: np.ndarray[S, np.dtype[F]],
-) -> IntervalUnion[T, int, int]:
-    valid = Interval.empty_like(data)
-    valid._lower[:] = from_float(data_float_lower, data.dtype).flatten()
-    valid._upper[:] = from_float(data_float_lower, data.dtype).flatten()
-    return valid.into_union()
-
-
-compression_safeguards.safeguards.stencil.qoi.eb.compute_safe_data_lower_upper_interval_union = compute_safe_data_lower_upper_interval_union
-
-
-class HashingExpr(Expr):
-    __slots__ = ("_data_indices", "_late_bound_constants")
-    _data_indices: frozenset[tuple[int, ...]]
-    _late_bound_constants: frozenset[Parameter]
-
-    def __init__(
-        self,
-        data_indices: frozenset[tuple[int, ...]],
-        late_bound_constants: frozenset[Parameter],
-    ):
-        self._data_indices = data_indices
-        self._late_bound_constants = late_bound_constants
-
-    @property
-    def args(self) -> tuple[Expr]:
-        return ()
-
-    def with_args(self) -> "HashingExpr":
-        return HashingExpr(self._data_indices, self._late_bound_constants)
-
-    @property  # type: ignore
-    def has_data(self) -> bool:
-        return True
-
-    @property  # type: ignore
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return self._data_indices
-
-    def apply_array_element_offset(  # type: ignore
-        self,
-        axis: int,
-        offset: int,
-    ) -> "HashingExpr":
-        data_indices = []
-        for index in self._data_indices:
-            index = list(self._index)
-            index[axis] += offset
-            data_indices.append(tuple(index))
-        return HashingExpr(
-            data_indices=frozenset(data_indices),
-            late_bound_constants=self._late_bound_constants,
-        )
-
-    @property  # type: ignore
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        return self._late_bound_constants
-
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
-        return self
-
-    def eval(
-        self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        x_size = int(np.prod(x, dtype=int))
-
-        Xs_flat = Xs.reshape((x_size, Xs.size // x_size))
-        late_bound_flat = {
-            param: value.reshape((x_size, Xs.size // x_size))
-            for param, value in late_bound.items()
-        }
-
-        hash: np.ndarray[tuple[int], np.dtype[F]] = np.empty(x_size, dtype=Xs.dtype)
-
-        # hash Xs and late_bound stencils for every element in X
-        for i in range(x_size):
-            hasher = blake2b(digest_size=Xs.dtype.itemsize)
-            hasher.update(Xs_flat[i].tobytes())
-            for param, value in late_bound_flat.items():
-                hasher.update(param.encode())
-                hasher.update(value.tobytes())
-            hash[i] = np.frombuffer(hasher.digest(), dtype=Xs.dtype, count=1)[0]
-
-        return hash.reshape(x)
-
-    @data_bounds(DataBounds.infallible)
-    def compute_data_bounds_unchecked(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        X_hash: np.ndarray[Ps, np.dtype[F]] = self.eval(X.shape, Xs, late_bound)
-        Xs_hash: np.ndarray[Ns, np.dtype[F]] = _broadcast_to(
-            X_hash.reshape(X.shape + (1,) * (Xs.ndim - X.ndim)), Xs.shape
-        )
-        return np.copy(Xs_hash), np.copy(Xs_hash)
-
-    def __repr__(self) -> str:
-        return "hashing"
+_patch_for_hashing_qoi_dev_only().__enter__()
 
 
 def generate_parameter(
@@ -244,7 +96,7 @@ def generate_parameter(
 def check_one_input(data) -> None:
     data = atheris.FuzzedDataProvider(data)
 
-    late_bound_params: set[str] = set()
+    late_bound_params: set[str] = {"foo"}
 
     safeguard_config = {
         p: generate_parameter(data, v.annotation, 0, late_bound_params)
@@ -328,7 +180,10 @@ def check_one_input(data) -> None:
                 ]
             )
             safeguard._qoi_expr._expr = HashingExpr(
-                data_indices=data_indices, late_bound_constants=frozenset()
+                data_indices=data_indices, late_bound_constants=frozenset(["foo"])
+            )
+            safeguard._qoi_expr._late_bound_constants = (
+                safeguard._qoi_expr._expr.late_bound_constants
             )
     except (AssertionError, Warning, TimeoutError):
         return
@@ -363,7 +218,7 @@ def check_one_input(data) -> None:
             safeguards=[safeguard],
             late_bound=late_bound_da,
         )
-        assert np.array_equal(global_hash, chunked_hash.values)
+        np.testing.assert_array_equal(global_hash, chunked_hash.values)
     except Exception as err:
         if (
             (

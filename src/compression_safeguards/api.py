@@ -718,14 +718,16 @@ class Safeguards:
         data_chunk_ = data_chunk[tuple(stencil_indices)]
         prediction_chunk_ = prediction_chunk[tuple(stencil_indices)]
 
-        # create the late-bound bindings for the chunk and apply the stencil
-        #  indices
-        # TODO: check that the late-bound arrays have the same shape
+        # create the late-bound bindings for the chunk
         late_bound_chunk = (
             late_bound_chunk
             if isinstance(late_bound_chunk, Bindings)
             else Bindings(**late_bound_chunk)
-        ).apply_slice_index(tuple(stencil_indices))
+        )
+        # check that all late-bound parameters have the right shape
+        late_bound_chunk.expect_broadcastable_to(data_chunk.shape)
+        # apply the stencil indices to the late-bound parameters
+        late_bound_chunk = late_bound_chunk.apply_slice_index(tuple(stencil_indices))
 
         late_bound_reqs = self.late_bound
         late_bound_builtin = {
@@ -950,14 +952,16 @@ class Safeguards:
         data_chunk_ = data_chunk[tuple(stencil_indices)]
         prediction_chunk_ = prediction_chunk[tuple(stencil_indices)]
 
-        # create the late-bound bindings for the chunk and apply the stencil
-        #  indices
-        # TODO: check that the late-bound arrays have the same shape
+        # create the late-bound bindings for the chunk
         late_bound_chunk = (
             late_bound_chunk
             if isinstance(late_bound_chunk, Bindings)
             else Bindings(**late_bound_chunk)
-        ).apply_slice_index(tuple(stencil_indices))
+        )
+        # check that all late-bound parameters have the right shape
+        late_bound_chunk.expect_broadcastable_to(data_chunk.shape)
+        # apply the stencil indices to the late-bound parameters
+        late_bound_chunk = late_bound_chunk.apply_slice_index(tuple(stencil_indices))
 
         late_bound_reqs = self.late_bound
         late_bound_builtin = {

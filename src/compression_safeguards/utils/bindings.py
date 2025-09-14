@@ -222,6 +222,43 @@ class Bindings:
 
         return view  # type: ignore
 
+    def expect_broadcastable_to(self, shape: tuple[int, ...]):
+        """
+        Check that all late-bound array parameters can be broadcast to the
+        given `shape`.
+
+        Parameters
+        ----------
+        shape : tuple[int, ...]
+            The shape that all array parameters should be broadcastable to.
+
+        Raises
+        ======
+        AssertionError
+            if an array parameter cannot be broadcast to the `shape`
+        """
+
+        for param, value in self._bindings.items():
+            if isinstance(value, int | float | np.number):
+                # scalar
+                continue
+
+            if not isinstance(value, np.ndarray):
+                # bail out
+                continue
+
+            if value.ndim == 0:
+                # scalar array
+                continue
+
+            assert value.ndim == len(shape), (
+                f"param {param} has dimension {value.ndim}, expected {len(shape)}"
+            )
+
+            assert all((v == 1) or (v == s) for v, s in zip(value.shape, shape)), (
+                f"param {param} has shape {value.shape}, expected {shape}"
+            )
+
     def apply_slice_index(self, index: tuple[slice, ...]) -> Self:
         """
         Apply the slice `index` to the late-bound array values and return the sliced bindings.
