@@ -187,7 +187,7 @@ class Bindings:
 
     def resolve_ndarray_with_saturating_finite_float_cast(
         self, param: Parameter, shape: Si, dtype: np.dtype[F]
-    ) -> np.ndarray[Si, np.dtype[T]]:
+    ) -> np.ndarray[Si, np.dtype[F]]:
         """
         Resolve the `param`eter to a numpy array with the given `shape` and
         floating-point `dtype`.
@@ -217,12 +217,12 @@ class Bindings:
 
         # cast first then broadcast to allow zero-copy broadcasts of scalars
         #  to arrays of any shape
-        value: np.ndarray[tuple[int, ...], np.dtype[T]] = saturating_finite_float_cast(
+        value: np.ndarray[tuple[int, ...], np.dtype[F]] = saturating_finite_float_cast(
             self._bindings[param], dtype, f"late-bound parameter {param}"
         )
 
         try:
-            value_view: np.ndarray[Si, np.dtype[T]] = _broadcast_to(value, shape).view()
+            value_view: np.ndarray[Si, np.dtype[F]] = _broadcast_to(value, shape).view()
         except ValueError:
             raise ValueError(
                 f"cannot broadcast late-bound parameter {param} with shape {value.shape} to shape {shape}"

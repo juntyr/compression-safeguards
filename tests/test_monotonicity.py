@@ -306,7 +306,8 @@ def test_fuzzer_found_broadcast():
     decoded = np.array([], dtype=np.int8)
 
     with pytest.raises(
-        ValueError, match="cannot broadcast late-bound parameter 䣿䡈 to shape ()"
+        ValueError,
+        match=r"cannot broadcast late-bound parameter 䣿䡈 with shape \(0,\) to shape \(\)",
     ):
         encode_decode_mock(
             data,

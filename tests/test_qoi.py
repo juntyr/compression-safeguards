@@ -1115,3 +1115,28 @@ def test_fuzzer_found_oh_no_multiplication():
     assert expr.eval((), np.array(X_test), dict()) == np.array(
         np.float64(1.0)
     )  # 1.0000000000000002))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_excessive_nudging_product():
+    X = np.array(np.float16(255.9))
+
+    expr = ScalarMultiply(
+        ScalarAbs(Data.SCALAR),
+        ScalarMultiply(
+            ScalarIsFinite(Data.SCALAR),
+            ScalarRoundTiesEven(Data.SCALAR),
+        ),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float16(65500.0))
+
+    expr_lower = np.array(np.float16(0.0))
+    expr_upper = np.array(np.float16(65504.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float16(0.5005))
+    assert X_upper == np.array(np.float16(255.9))
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(0.5005))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float16(65500.0))

@@ -1309,7 +1309,8 @@ def test_late_bound_constant_boundary():
     data = np.arange(6, dtype="uint8").reshape(2, 3)
 
     with pytest.raises(
-        ValueError, match="cannot broadcast a non-scalar to a scalar array"
+        ValueError,
+        match=r"cannot broadcast late-bound parameter const with shape \(2, 3\) to shape \(\)",
     ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(const=data, const2=4)
