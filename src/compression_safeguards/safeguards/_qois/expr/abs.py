@@ -58,19 +58,9 @@ class ScalarAbs(Expr[Expr]):
         # TODO: an interval union could represent that the two sometimes-
         #       disjoint intervals in the future
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.copy(expr_lower)
-        np.copyto(
-            arg_lower,
-            -expr_upper,
-            where=(np.less_equal(expr_lower, 0) | _is_sign_negative_number(argv)),
-            casting="no",
-        )
+        np.negative(expr_upper, out=arg_lower, where=(np.less_equal(expr_lower, 0) | _is_sign_negative_number(argv)))
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.copy(expr_upper)
-        np.copyto(
-            arg_upper,
-            -expr_lower,
-            where=(np.greater(expr_lower, 0) & _is_sign_negative_number(argv)),
-            casting="no",
-        )
+        np.negative(expr_lower, out=arg_upper, where=(np.greater(expr_lower, 0) & _is_sign_negative_number(argv)))
 
         return arg.compute_data_bounds(
             arg_lower,

@@ -245,8 +245,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         )
 
         ok: np.ndarray[S, np.dtype[np.bool]] = np.array(finite_ok, copy=None)  # type: ignore
-        np.copyto(ok, qoi_data == qoi_decoded, where=np.isinf(qoi_data), casting="no")
-        np.copyto(ok, np.isnan(qoi_decoded), where=np.isnan(qoi_data), casting="no")
+        np.equal(qoi_data, qoi_decoded, out=ok, where=np.isinf(qoi_data))
+        np.isnan(qoi_decoded, out=ok, where=np.isnan(qoi_data))
 
         return ok
 

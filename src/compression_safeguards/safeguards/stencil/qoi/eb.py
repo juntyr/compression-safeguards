@@ -559,12 +559,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         windows_ok: np.ndarray[tuple[int, ...], np.dtype[np.bool]] = np.array(
             finite_ok, copy=None
         )
-        np.copyto(
-            windows_ok, qoi_data == qoi_decoded, where=np.isinf(qoi_data), casting="no"
-        )
-        np.copyto(
-            windows_ok, np.isnan(qoi_decoded), where=np.isnan(qoi_data), casting="no"
-        )
+        np.equal(qoi_data, qoi_decoded, out=windows_ok, where=np.isinf(qoi_data))
+        np.isnan(qoi_decoded, out=windows_ok, where=np.isnan(qoi_data))
 
         s = [slice(None)] * data.ndim
         for axis in self._neighbourhood:

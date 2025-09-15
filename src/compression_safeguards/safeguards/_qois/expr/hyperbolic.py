@@ -159,21 +159,11 @@ class ScalarCosh(Expr[Expr]):
         # TODO: an interval union could represent that the two sometimes-
         #       disjoint intervals in the future
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(al, copy=True)
-        np.copyto(
-            arg_lower,
-            -au,
-            where=(np.less_equal(expr_lower, 1) | _is_sign_negative_number(argv)),
-            casting="no",
-        )
+        np.negative(au, out=arg_lower, where=(np.less_equal(expr_lower, 1) | _is_sign_negative_number(argv)))
         arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
 
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(au, copy=True)
-        np.copyto(
-            arg_upper,
-            -al,
-            where=(np.greater(expr_lower, 1) & _is_sign_negative_number(argv)),
-            casting="no",
-        )
+        np.negative(al, out=arg_upper, where=(np.greater(expr_lower, 1) & _is_sign_negative_number(argv)))
         arg_upper = _maximum_zero_sign_sensitive(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper

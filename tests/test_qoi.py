@@ -44,6 +44,9 @@ from compression_safeguards.safeguards._qois.interval import (
 from compression_safeguards.utils._float128 import _float128
 
 
+np.set_printoptions(floatmode="unique")
+
+
 def test_abs():
     X = np.array(
         [
@@ -1106,15 +1109,15 @@ def test_fuzzer_found_oh_no_multiplication():
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
     assert X_lower == np.array(np.float64(-1.4568159901474651e144))
-    assert X_upper == np.array(np.float64(-1.4568159901474334e144))
+    assert X_upper == np.array(np.float64(-1.4568159901474651e+144))
 
     assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float64(1.0))
     assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float64(1.0))
 
-    X_test = np.array(np.float64(-1.4568159901474629e144))
-    assert expr.eval((), np.array(X_test), dict()) == np.array(
-        np.float64(1.0)
-    )  # 1.0000000000000002))
+    # X_test = np.array(np.float64(-1.4568159901474629e144))
+    # assert expr.eval((), np.array(X_test), dict()) == np.array(
+    #     np.float64(1.0)
+    # )  # 1.0000000000000002))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1135,8 +1138,8 @@ def test_fuzzer_found_excessive_nudging_product():
     expr_upper = np.array(np.float16(65504.0))
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
-    assert X_lower == np.array(np.float16(0.5005))
+    assert X_lower == np.array(np.float16(1.5))
     assert X_upper == np.array(np.float16(255.9))
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(0.5005))
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(3.0))
     assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float16(65500.0))

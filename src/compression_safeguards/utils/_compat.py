@@ -93,12 +93,7 @@ def _nextafter(
     # zero, subnormal, or smallest normal
     out_subnormal = np.array(np.subtract(a, _float128_incr_subnormal), copy=None)
     out_subnormal[a == (-_float128_smallest_subnormal)] = -0.0
-    np.copyto(
-        out_subnormal,
-        np.add(a, _float128_incr_subnormal),
-        where=((a < b) == (a >= 0)),
-        casting="no",
-    )
+    np.add(a, _float128_incr_subnormal, out=out_subnormal, where=((a < b) == (a >= 0)))
 
     out: np.ndarray[S, np.dtype[F]] = np.array(a, copy=True)
     # normal

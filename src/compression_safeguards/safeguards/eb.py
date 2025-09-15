@@ -235,12 +235,7 @@ def _compute_finite_absolute_error(
             err_abs: np.ndarray[S, np.dtype[F]] = np.array(
                 np.divide(decoded_float, data_float), copy=None
             )
-            np.copyto(
-                err_abs,
-                np.divide(data_float, decoded_float),
-                where=(np.abs(data_float) > np.abs(decoded_float)),
-                casting="no",
-            )
+            np.divide(data_float, decoded_float, out=err_abs, where=(np.abs(data_float) > np.abs(decoded_float)))
             err_abs[(data_float == 0) & (decoded_float == 0)] = 0
             err_abs[np.sign(data_float) != np.sign(decoded_float)] = np.inf
             return err_abs

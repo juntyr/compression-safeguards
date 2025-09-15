@@ -96,14 +96,14 @@ class ScalarSin(Expr[Expr]):
         # TODO: since sin is periodic, an interval union could be used in the
         #       future
         arg_lower = np.array(arg_lower_diff, copy=True)
-        np.copyto(arg_lower, -arg_upper_diff, where=needs_flip, casting="no")
+        np.negative(arg_upper_diff, out=arg_lower, where=needs_flip)
         np.add(arg_lower, argv, out=arg_lower)
         arg_lower[full_domain] = -fmax
         np.copyto(arg_lower, argv, where=np.isinf(argv), casting="no")
         arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
 
         arg_upper = np.array(arg_upper_diff, copy=True)
-        np.copyto(arg_upper, -arg_lower_diff, where=needs_flip, casting="no")
+        np.negative(arg_lower_diff, out=arg_upper, where=needs_flip)
         np.add(arg_upper, argv, out=arg_upper)
         arg_upper[full_domain] = fmax
         np.copyto(arg_upper, argv, where=np.isinf(argv), casting="no")
@@ -221,14 +221,14 @@ class ScalarCos(Expr[Expr]):
         # TODO: since cos is periodic, an interval union could be used in the
         #       future
         arg_lower = np.array(arg_lower_diff, copy=True)
-        np.copyto(arg_lower, -arg_upper_diff, where=needs_flip, casting="no")
+        np.negative(arg_upper_diff, out=arg_lower, where=needs_flip)
         np.add(arg_lower, argv, out=arg_lower)
         arg_lower[full_domain] = -fmax
         np.copyto(arg_lower, argv, where=np.isinf(argv), casting="no")
         arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
 
         arg_upper = np.array(arg_upper_diff, copy=True)
-        np.copyto(arg_upper, -arg_lower_diff, where=needs_flip, casting="no")
+        np.negative(arg_lower_diff, out=arg_upper, where=needs_flip)
         np.add(arg_upper, argv, out=arg_upper)
         arg_upper[full_domain] = fmax
         np.copyto(arg_upper, argv, where=np.isinf(argv), casting="no")

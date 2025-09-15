@@ -169,14 +169,10 @@ class ScalarFakeAbs(Expr[Expr]):
 
         # flip the lower/upper bounds if the arg is negative
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(expr_lower, copy=True)
-        np.copyto(
-            arg_lower, -expr_upper, where=_is_sign_negative_number(argv), casting="no"
-        )
+        np.negative(expr_upper, out=arg_lower, where=_is_sign_negative_number(argv))
 
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(expr_upper, copy=True)
-        np.copyto(
-            arg_upper, -expr_lower, where=_is_sign_negative_number(argv), casting="no"
-        )
+        np.negative(expr_lower, out=arg_upper, where=_is_sign_negative_number(argv))
 
         return arg.compute_data_bounds(
             arg_lower,
