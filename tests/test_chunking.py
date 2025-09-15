@@ -191,3 +191,76 @@ def test_fuzzer_found_hash_with_late_bound():
             late_bound=late_bound,
         )
         np.testing.assert_array_equal(global_hash, chunked_hash.values)
+
+
+def test_fuzzer_found_hash_x_max():
+    chunks = dict(a=4, b=1)
+    da = xr.DataArray(
+        np.array(
+            [
+                [0],
+                [0],
+                [0],
+                [-15],
+                [-58],
+                [64],
+                [-15],
+                [-15],
+                [-15],
+                [-15],
+                [-38],
+                [-15],
+                [-7],
+                [-15],
+                [-15],
+                [-15],
+                [-15],
+                [-15],
+            ],
+            dtype=np.int8,
+        ),
+        name="da",
+        dims=["a", "b"],
+    ).chunk(chunks)
+    da_prediction = xr.DataArray(
+        np.zeros_like(da.values), name="da", dims=["a", "b"]
+    ).chunk(chunks)
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi="x",
+        neighbourhood=[
+            dict(
+                axis=0,
+                before=1,
+                after=0,
+                boundary="constant",
+                constant_boundary="$x_max",
+            )
+        ],
+        type="abs",
+        eb=0,
+        qoi_dtype="float128",
+    )
+    safeguard._qoi_expr._expr = HashingExpr.from_data_shape(
+        data_shape=safeguard._qoi_expr._stencil_shape,
+        late_bound_constants=frozenset(["foo"]),
+    )
+    safeguard._qoi_expr._late_bound_constants = (
+        safeguard._qoi_expr._expr.late_bound_constants
+    )
+
+    late_bound = dict(foo=-15)
+
+    with _patch_for_hashing_qoi_dev_only():
+        global_hash = Safeguards(safeguards=[safeguard]).compute_correction(
+            data=da.values,
+            prediction=da_prediction.values,
+            late_bound={**late_bound, "$x_max": np.amax(da.values)},
+        )
+        chunked_hash = produce_data_array_correction(
+            data=da,
+            prediction=da_prediction,
+            safeguards=[safeguard],
+            late_bound=late_bound,
+        )
+        np.testing.assert_array_equal(global_hash, chunked_hash.values)

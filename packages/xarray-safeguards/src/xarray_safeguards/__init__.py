@@ -193,7 +193,7 @@ def produce_data_array_correction(
         da_min = np.nanmin(data) if data.size > 0 else np.array(0, dtype=data.dtype)
         late_bound_global["$x_min"] = da_min  # type: ignore
     if "$x_max" in safeguards_late_bound_reqs:
-        da_max = np.nanmin(data) if data.size > 0 else np.array(0, dtype=data.dtype)
+        da_max = np.nanmax(data) if data.size > 0 else np.array(0, dtype=data.dtype)
         late_bound_global["$x_max"] = da_max  # type: ignore
     for k, v in late_bound.items():
         if isinstance(v, int | float | np.number):
