@@ -7,6 +7,7 @@ from compression_safeguards.safeguards._qois.expr.classification import (
     ScalarIsInf,
     ScalarIsNaN,
 )
+from compression_safeguards.safeguards._qois.expr.constfold import ScalarFoldedConstant
 from compression_safeguards.safeguards._qois.expr.data import Data
 from compression_safeguards.safeguards._qois.expr.divmul import (
     ScalarDivide,
@@ -25,6 +26,7 @@ from compression_safeguards.safeguards._qois.expr.logexp import (
     ScalarLog,
     ScalarLogWithBase,
 )
+from compression_safeguards.safeguards._qois.expr.neg import ScalarNegate
 from compression_safeguards.safeguards._qois.expr.power import ScalarPower
 from compression_safeguards.safeguards._qois.expr.reciprocal import ScalarReciprocal
 from compression_safeguards.safeguards._qois.expr.round import ScalarRoundTiesEven
@@ -1082,8 +1084,8 @@ def test_fuzzer_found_excessive_nudging_atan_product():
     expr_upper = np.array(np.float32(5.0197614e33))
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
-    assert X_lower == np.array(np.float32(33556004.0))
-    assert X_upper == np.array(np.float32(np.inf))
+    assert X_lower == np.array(np.float32(26501838.0))
+    assert X_upper == np.array(np.float32(33556004.0))
 
     assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float32(3.8757849))
     assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float32(3.8757849))
@@ -1137,8 +1139,33 @@ def test_fuzzer_found_excessive_nudging_product():
     expr_upper = np.array(np.float16(65504.0))
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
-    assert X_lower == np.array(np.float16(1.5))
+    assert X_lower == np.array(np.float16(0.0))
     assert X_upper == np.array(np.float16(255.9))
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(3.0))
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(0.0))
     assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float16(65500.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_excessive_nudging_product_v2():
+    X = np.array(np.float32(1.2830058e-22))
+
+    expr = ScalarMultiply(
+        ScalarNegate(Data.SCALAR),
+        ScalarMultiply(
+            ScalarFoldedConstant(np.float32(1.283019e-22)),
+            ScalarNegate(Data.SCALAR),
+        ),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float32(0.0))
+
+    expr_lower = np.array(np.float32(0.0))
+    expr_upper = np.array(np.float32(1.2630801e-38))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float32(0.0))
+    assert X_upper == np.array(np.float32(3.8519333e-19))
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float32(0.0))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float32(0.0))

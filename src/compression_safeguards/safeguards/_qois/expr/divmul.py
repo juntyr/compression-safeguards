@@ -171,7 +171,7 @@ class ScalarMultiply(Expr[Expr, Expr]):
                 late_bound,
             )
 
-        print(self, av, bv, exprv, expr_lower, expr_upper)
+        # print("expr", self, av, bv, exprv, expr_lower, expr_upper)
 
         expr_lower = np.array(expr_lower, copy=True)
         expr_lower[_is_sign_positive_number(exprv) & (expr_lower <= 0)] = X.dtype.type(
@@ -196,41 +196,71 @@ class ScalarMultiply(Expr[Expr, Expr]):
         bv_abs = np.abs(bv)
         exprv_abs = np.array(np.abs(exprv), copy=None)
 
-        print(expr_lower, expr_upper)
+        # print("expr_bounds", expr_lower, expr_upper, expr_abs_lower, expr_abs_upper)
 
         fmax = _floating_max(X.dtype)
+        smallest_subnormal = _floating_smallest_subnormal(X.dtype)
 
         expr_abs_lower_factor: np.ndarray[Ps, np.dtype[F]] = np.array(
             np.divide(exprv_abs, expr_abs_lower), copy=None
         )
-        np.sqrt(expr_abs_lower_factor, out=expr_abs_lower_factor)
         expr_abs_lower_factor[np.isinf(expr_abs_lower_factor)] = fmax
+        np.sqrt(expr_abs_lower_factor, out=expr_abs_lower_factor)
         expr_abs_lower_factor[np.isnan(expr_abs_lower_factor)] = X.dtype.type(1)
 
         expr_abs_upper_factor: np.ndarray[Ps, np.dtype[F]] = np.array(
-            np.divide(expr_abs_upper, exprv_abs), copy=None
+            np.divide(
+                expr_abs_upper,
+                _maximum_zero_sign_sensitive(exprv_abs, smallest_subnormal),
+            ),
+            copy=None,
         )
-        np.sqrt(expr_abs_upper_factor, out=expr_abs_upper_factor)
         expr_abs_upper_factor[np.isinf(expr_abs_upper_factor)] = fmax
+        np.sqrt(expr_abs_upper_factor, out=expr_abs_upper_factor)
         expr_abs_upper_factor[np.isnan(expr_abs_upper_factor)] = X.dtype.type(1)
 
-        print(expr_abs_lower_factor, expr_abs_upper_factor)
+        # print("expr_abs_bounds", expr_abs_lower_factor, expr_abs_upper_factor)
 
-        a_abs_lower = np.divide(av_abs, expr_abs_lower_factor)
-        a_abs_upper = np.multiply(av_abs, expr_abs_upper_factor)
+        a_abs_lower = np.array(np.divide(av_abs, expr_abs_lower_factor), copy=None)
+        a_abs_lower[expr_abs_lower == 0] = 0
+        a_abs_upper = np.array(np.multiply(av_abs, expr_abs_upper_factor), copy=None)
+        # np.copyto(a_abs_upper, expr_abs_upper, where=(exprv_abs == 0), casting="no")
+        a_abs_upper[np.isinf(a_abs_upper) & ~np.isinf(av_abs)] = fmax
 
-        print("av", av_abs, a_abs_lower, a_abs_upper)
+        b_abs_lower = np.array(np.divide(bv_abs, expr_abs_lower_factor), copy=None)
+        b_abs_lower[expr_abs_lower == 0] = 0
+        b_abs_upper = np.array(np.multiply(bv_abs, expr_abs_upper_factor), copy=None)
+        # np.copyto(b_abs_upper, expr_abs_upper, where=(exprv_abs == 0), casting="no")
+        b_abs_upper[np.isinf(b_abs_upper) & ~np.isinf(bv_abs)] = fmax
 
-        b_abs_lower = np.divide(bv_abs, expr_abs_lower_factor)
-        b_abs_upper = np.multiply(bv_abs, expr_abs_upper_factor)
+        any_zero = a_abs_lower == 0
+        any_zero |= b_abs_lower == 0
+        any_inf = np.isinf(a_abs_upper)
+        any_inf |= np.isinf(b_abs_upper)
+        zero_inf_clash = any_zero & any_inf
 
-        print("bv", bv_abs, b_abs_lower, b_abs_upper)
+        a_abs_lower[zero_inf_clash & (a_abs_lower == 0)] = smallest_subnormal
+        a_abs_upper[zero_inf_clash & np.isinf(a_abs_upper)] = fmax
+
+        b_abs_lower[zero_inf_clash & (b_abs_lower == 0)] = smallest_subnormal
+        b_abs_upper[zero_inf_clash & np.isinf(b_abs_upper)] = fmax
+
+        a_abs_lower = _minimum_zero_sign_sensitive(av_abs, a_abs_lower)
+        a_abs_upper = _maximum_zero_sign_sensitive(av_abs, a_abs_upper)
+
+        b_abs_lower = _minimum_zero_sign_sensitive(bv_abs, b_abs_lower)
+        b_abs_upper = _maximum_zero_sign_sensitive(bv_abs, b_abs_upper)
+
+        # print("av", av_abs, a_abs_lower, a_abs_upper)
+        # print("bv", bv_abs, b_abs_lower, b_abs_upper)
+
+        # print("lu", a_abs_lower * b_abs_lower, a_abs_upper * b_abs_upper)
 
         tl_abs_stack = np.stack([a_abs_lower, b_abs_lower])
         tu_abs_stack = np.stack([a_abs_upper, b_abs_upper])
 
-        print("tl", tl_abs_stack)
-        print("tu", tu_abs_stack)
+        # print("tl", tl_abs_stack)
+        # print("tu", tu_abs_stack)
 
         def compute_term_product(
             t_stack: np.ndarray[tuple[int, ...], np.dtype[F]],
@@ -250,7 +280,7 @@ class ScalarMultiply(Expr[Expr, Expr]):
                 exprv_abs.reshape((1,) + exprv_abs.shape),
                 (tl_abs_stack.shape[0],) + exprv_abs.shape,
             ),
-            np.stack([av, bv]),
+            np.stack([av_abs, bv_abs]),
             tl_abs_stack,
             _broadcast_to(
                 expr_abs_lower.reshape((1,) + exprv_abs.shape),
@@ -267,7 +297,7 @@ class ScalarMultiply(Expr[Expr, Expr]):
                 exprv_abs.reshape((1,) + exprv_abs.shape),
                 (tu_abs_stack.shape[0],) + exprv_abs.shape,
             ),
-            np.stack([av, bv]),
+            np.stack([av_abs, bv_abs]),
             tu_abs_stack,
             _broadcast_to(
                 expr_abs_lower.reshape((1,) + exprv_abs.shape),
@@ -279,8 +309,8 @@ class ScalarMultiply(Expr[Expr, Expr]):
             ),
         )
 
-        print("tl2", tl_abs_stack)
-        print("tu2", tu_abs_stack)
+        # print("tl2", tl_abs_stack)
+        # print("tu2", tu_abs_stack)
 
         a_lower = _where(
             _is_sign_negative_number(av), -tu_abs_stack[0], tl_abs_stack[0]
@@ -296,8 +326,8 @@ class ScalarMultiply(Expr[Expr, Expr]):
             _is_sign_negative_number(bv), -tl_abs_stack[1], tu_abs_stack[1]
         )
 
-        print("av2", av, a_lower, a_upper)
-        print("bv2", bv, b_lower, b_upper)
+        # print("av2", av, a_lower, a_upper)
+        # print("bv2", bv, b_lower, b_upper)
 
         Xs_lower, Xs_upper = a.compute_data_bounds(
             a_lower,
