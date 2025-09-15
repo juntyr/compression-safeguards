@@ -879,7 +879,7 @@ def test_fuzzer_found_invalid_divide_rewrite():
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
     assert X_lower == np.array(2.9e-322, dtype=np.float64)
-    assert X_upper == np.array(2.9e-322, dtype=np.float64)
+    assert X_upper == np.array(1.7976931348623157e308, dtype=np.float64)
 
     assert expr.eval((), np.array(X_lower), dict()) == np.array(0.0, dtype=np.float64)
     assert expr.eval((), np.array(X_upper), dict()) == np.array(0.0, dtype=np.float64)
@@ -1084,8 +1084,8 @@ def test_fuzzer_found_excessive_nudging_atan_product():
     expr_upper = np.array(np.float32(5.0197614e33))
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
-    assert X_lower == np.array(np.float32(26501838.0))
-    assert X_upper == np.array(np.float32(33556004.0))
+    assert X_lower == np.array(np.float32(33556004.0))
+    assert X_upper == np.array(np.float32(np.inf))
 
     assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float32(3.8757849))
     assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float32(3.8757849))
@@ -1115,11 +1115,6 @@ def test_fuzzer_found_oh_no_multiplication():
     assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float64(1.0))
     assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float64(1.0))
 
-    # X_test = np.array(np.float64(-1.4568159901474629e144))
-    # assert expr.eval((), np.array(X_test), dict()) == np.array(
-    #     np.float64(1.0)
-    # )  # 1.0000000000000002))
-
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 def test_fuzzer_found_excessive_nudging_product():
@@ -1147,7 +1142,7 @@ def test_fuzzer_found_excessive_nudging_product():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_excessive_nudging_product_v2():
+def test_fuzzer_found_excessive_nudging_zero_product():
     X = np.array(np.float32(1.2830058e-22))
 
     expr = ScalarMultiply(
@@ -1169,3 +1164,32 @@ def test_fuzzer_found_excessive_nudging_product_v2():
 
     assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float32(0.0))
     assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float32(0.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_excessive_nudging_division():
+    X = np.array(np.float64(3.7921287488073535e146))
+
+    expr = ScalarDivide(
+        ScalarMultiply(
+            ScalarAbs(Data.SCALAR),
+            ScalarAcosh(Data.SCALAR),
+        ),
+        ScalarAbs(Data.SCALAR),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float64(338.2034982942516))
+
+    expr_lower = np.array(np.float64(338.2034982942516))
+    expr_upper = np.array(np.float64(3.7921287488073793e146))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float64(3.7921287488073535e146))
+    assert X_upper == np.array(np.float64(3.7921287488073535e146))
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(
+        np.float64(338.2034982942516)
+    )
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(
+        np.float64(338.2034982942516)
+    )
