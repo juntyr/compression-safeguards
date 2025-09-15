@@ -154,6 +154,9 @@ TERNARY_EXPRESSIONS: list[Callable[[Expr, Expr, Expr], Expr]] = [
 warnings.filterwarnings("error")
 
 
+np.set_printoptions(floatmode="unique")
+
+
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 def check_one_input(data) -> None:
     data = atheris.FuzzedDataProvider(data)

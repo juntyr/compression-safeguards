@@ -233,7 +233,7 @@ class Bindings:
             The shape that all array parameters should be broadcastable to.
 
         Raises
-        ======
+        ------
         AssertionError
             if an array parameter cannot be broadcast to the `shape`
         """
@@ -281,7 +281,7 @@ class Bindings:
             The sliced bindings.
 
         Raises
-        ======
+        ------
         IndexError
             if an array value has the right number of dimensions but indexing
             with `index` fails

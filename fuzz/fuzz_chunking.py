@@ -32,6 +32,9 @@ with atheris.instrument_imports():
 warnings.filterwarnings("error")
 
 
+np.set_printoptions(floatmode="unique")
+
+
 _patch_for_hashing_qoi_dev_only().__enter__()
 
 

@@ -30,6 +30,9 @@ with atheris.instrument_imports():
 warnings.filterwarnings("error")
 
 
+np.set_printoptions(floatmode="unique")
+
+
 class FuzzCodec(Codec):
     __slots__ = ("data", "decoded")
 
