@@ -1082,3 +1082,36 @@ def test_fuzzer_found_excessive_nudging_atan_product():
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
     assert X_lower == np.array(np.float32(26501838.0))
     assert X_upper == np.array(np.float32(33556004.0))
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float32(3.8757849))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float32(3.8757849))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_oh_no_multiplication():
+    X = np.array(np.float64(-1.4568159901474651e144))
+
+    expr = ScalarMultiply(
+        ScalarReciprocal(Data.SCALAR),
+        ScalarMultiply(
+            ScalarReciprocal(Data.SCALAR),
+            ScalarSquare(Data.SCALAR),
+        ),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float64(1.0))
+
+    expr_lower = np.array(np.float64(-1.4568159901474629e144))
+    expr_upper = np.array(np.float64(1.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float64(-1.4568159901474651e144))
+    assert X_upper == np.array(np.float64(-1.4568159901474334e144))
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float64(1.0))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float64(1.0))
+
+    X_test = np.array(np.float64(-1.4568159901474629e144))
+    assert expr.eval((), np.array(X_test), dict()) == np.array(
+        np.float64(1.0)
+    )  # 1.0000000000000002))

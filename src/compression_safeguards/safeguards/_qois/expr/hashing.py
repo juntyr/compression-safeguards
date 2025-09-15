@@ -95,9 +95,11 @@ class HashingExpr(Expr):
         for i in range(x_size):
             hasher = blake2b(digest_size=Xs.dtype.itemsize)
             hasher.update(Xs_flat[i].tobytes())
-            for param, value in late_bound_flat.items():
+            for param, value_flat in sorted(
+                late_bound_flat.items(), key=lambda pv: pv[0]
+            ):
                 hasher.update(param.encode())
-                hasher.update(value.tobytes())
+                hasher.update(value_flat[i].tobytes())
             hash_[i] = np.frombuffer(hasher.digest(), dtype=Xs.dtype, count=1)[0]
 
         hash = hash_.reshape(x)

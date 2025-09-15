@@ -299,3 +299,27 @@ def test_late_bound_constant_boundary():
         correction = safeguards.compute_correction(
             data, decoded, late_bound=Bindings(const=-1)
         )
+
+
+def test_fuzzer_found_broadcast():
+    data = np.array([], dtype=np.int8)
+    decoded = np.array([], dtype=np.int8)
+
+    with pytest.raises(
+        ValueError, match="cannot broadcast late-bound parameter 䣿䡈 to shape ()"
+    ):
+        encode_decode_mock(
+            data,
+            decoded,
+            safeguards=[
+                dict(
+                    kind="monotonicity",
+                    monotonicity="strict",
+                    window=33,
+                    boundary="constant",
+                    constant_boundary="䣿䡈",
+                ),
+                dict(kind="sign"),
+            ],
+            fixed_constants={"䣿䡈": np.array([], dtype=np.int64)},
+        )

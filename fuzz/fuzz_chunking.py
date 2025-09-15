@@ -35,7 +35,8 @@ warnings.filterwarnings("error")
 np.set_printoptions(floatmode="unique")
 
 
-_patch_for_hashing_qoi_dev_only().__enter__()
+_patch = _patch_for_hashing_qoi_dev_only()
+_patch.__enter__()
 
 
 def generate_parameter(
@@ -244,7 +245,7 @@ def check_one_input(data) -> None:
         ):
             return
         print(  # noqa: T201
-            f"\n===\n\nsafeguard = {safeguard!r}\n\ndata = {raw!r}\n\nchunks = {chunks!r}\n\n===\n"
+            f"\n===\n\nsafeguard = {safeguard!r}\n\ndata = {raw!r}\n\nlate_bound = {late_bound!r}\n\nchunks = {chunks!r}\n\n===\n"
         )
         raise err
 

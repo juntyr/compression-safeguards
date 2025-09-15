@@ -170,15 +170,20 @@ class Bindings:
 
         # cast first then broadcast to allow zero-copy broadcasts of scalars
         #  to arrays of any shape
-        view = _broadcast_to(
-            lossless_cast(
-                self._bindings[param], dtype, f"late-bound parameter {param}"
-            ),
-            shape,
-        ).view()
-        view.flags.writeable = False
+        value: np.ndarray[tuple[int, ...], np.dtype[T]] = lossless_cast(
+            self._bindings[param], dtype, f"late-bound parameter {param}"
+        )
 
-        return view  # type: ignore
+        try:
+            value_view: np.ndarray[Si, np.dtype[T]] = _broadcast_to(value, shape).view()
+        except ValueError:
+            raise ValueError(
+                f"cannot broadcast late-bound parameter {param} with shape {value.shape} to shape {shape}"
+            )
+
+        value_view.flags.writeable = False
+
+        return value_view
 
     def resolve_ndarray_with_saturating_finite_float_cast(
         self, param: Parameter, shape: Si, dtype: np.dtype[F]
@@ -212,15 +217,20 @@ class Bindings:
 
         # cast first then broadcast to allow zero-copy broadcasts of scalars
         #  to arrays of any shape
-        view = _broadcast_to(
-            saturating_finite_float_cast(
-                self._bindings[param], dtype, f"late-bound parameter {param}"
-            ),
-            shape,
-        ).view()
-        view.flags.writeable = False
+        value: np.ndarray[tuple[int, ...], np.dtype[T]] = saturating_finite_float_cast(
+            self._bindings[param], dtype, f"late-bound parameter {param}"
+        )
 
-        return view  # type: ignore
+        try:
+            value_view: np.ndarray[Si, np.dtype[T]] = _broadcast_to(value, shape).view()
+        except ValueError:
+            raise ValueError(
+                f"cannot broadcast late-bound parameter {param} with shape {value.shape} to shape {shape}"
+            )
+
+        value_view.flags.writeable = False
+
+        return value_view
 
     def expect_broadcastable_to(self, shape: tuple[int, ...]):
         """

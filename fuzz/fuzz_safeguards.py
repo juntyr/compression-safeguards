@@ -400,6 +400,12 @@ def check_one_input(data) -> None:
                 isinstance(err, AssertionError)
                 and (str(err) == "offset must not contain NaNs")
             )
+            or (
+                isinstance(err, ValueError)
+                and ("cannot broadcast late-bound parameter" in str(err))
+                and ("with shape" in str(err))
+                and ("to shape" in str(err))
+            )
         ):
             return
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")  # noqa: T201
