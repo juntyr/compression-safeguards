@@ -126,8 +126,8 @@ def test_fuzzer_found_hash():
         eb=0,
         qoi_dtype="float64",
     )
-    safeguard._qoi_expr._expr = HashingExpr(
-        data_indices=frozenset([(1,)]), late_bound_constants=frozenset()
+    safeguard._qoi_expr._expr = HashingExpr.from_data_shape(
+        data_shape=safeguard._qoi_expr._stencil_shape, late_bound_constants=frozenset()
     )
 
     with _patch_for_hashing_qoi_dev_only():
@@ -165,8 +165,8 @@ def test_fuzzer_found_hash_v2():
         eb=10,
         qoi_dtype="float32",
     )
-    safeguard._qoi_expr._expr = HashingExpr(
-        data_indices=frozenset([(1,)]), late_bound_constants=frozenset()
+    safeguard._qoi_expr._expr = HashingExpr.from_data_shape(
+        data_shape=safeguard._qoi_expr._stencil_shape, late_bound_constants=frozenset()
     )
 
     with _patch_for_hashing_qoi_dev_only():

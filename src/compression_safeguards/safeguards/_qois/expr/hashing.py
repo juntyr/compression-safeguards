@@ -1,3 +1,4 @@
+import itertools
 from collections.abc import Mapping
 from contextlib import contextmanager
 from hashlib import blake2b
@@ -26,6 +27,16 @@ class HashingExpr(Expr):
     ):
         self._data_indices = data_indices
         self._late_bound_constants = late_bound_constants
+
+    @staticmethod
+    def from_data_shape(
+        data_shape: tuple[int, ...], late_bound_constants: frozenset[Parameter]
+    ) -> "HashingExpr":
+        data_indices = frozenset(
+            [tuple(i) for i in itertools.product(*[range(a) for a in data_shape])]
+        )
+
+        return HashingExpr(data_indices, late_bound_constants)
 
     @property
     def args(self) -> tuple[()]:

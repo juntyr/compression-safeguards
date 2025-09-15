@@ -268,10 +268,8 @@ def produce_data_array_correction(
             meta=np.array((), dtype=v.dtype),
         )
 
-    smallest_chunk_shape = tuple(min(c) for c in data.chunks)
-
     required_stencil = safeguards_.compute_required_stencil_for_chunked_correction(
-        data.shape, smallest_chunk_shape=smallest_chunk_shape
+        data.shape
     )
     correction_dtype: np.dtype = safeguards_.correction_dtype_for_data(data.dtype)
 

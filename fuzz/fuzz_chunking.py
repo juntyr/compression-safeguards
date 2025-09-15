@@ -2,7 +2,6 @@ import atheris
 from timeoutcontext import timeout
 
 with atheris.instrument_imports():
-    import itertools
     import sys
     import types
     import typing
@@ -171,16 +170,9 @@ def check_one_input(data) -> None:
                 qoi="x",
                 **safeguard_config,
             )
-            data_indices = frozenset(
-                [
-                    tuple(i)
-                    for i in itertools.product(
-                        *[range(a) for a in safeguard._qoi_expr._stencil_shape]
-                    )
-                ]
-            )
-            safeguard._qoi_expr._expr = HashingExpr(
-                data_indices=data_indices, late_bound_constants=frozenset(["foo"])
+            safeguard._qoi_expr._expr = HashingExpr.from_data_shape(
+                data_shape=safeguard._qoi_expr._stencil_shape,
+                late_bound_constants=frozenset(["foo"]),
             )
             safeguard._qoi_expr._late_bound_constants = (
                 safeguard._qoi_expr._expr.late_bound_constants
