@@ -172,123 +172,129 @@ class ScalarMultiply(Expr[Expr, Expr]):
             )
 
         print(self, av, bv, exprv, expr_lower, expr_upper)
-        
+
         expr_lower = np.array(expr_lower, copy=True)
-        expr_lower[_is_sign_positive_number(exprv) & (expr_lower <= 0)] = X.dtype.type(+0.0)
+        expr_lower[_is_sign_positive_number(exprv) & (expr_lower <= 0)] = X.dtype.type(
+            +0.0
+        )
         expr_upper = np.array(expr_upper, copy=True)
-        expr_upper[_is_sign_negative_number(exprv) & (expr_upper >= 0)] = X.dtype.type(-0.0)
+        expr_upper[_is_sign_negative_number(exprv) & (expr_upper >= 0)] = X.dtype.type(
+            -0.0
+        )
+        expr_abs_lower, expr_abs_upper = (
+            np.array(
+                _where(_is_sign_negative_number(exprv), -expr_upper, expr_lower),
+                copy=None,
+            ),
+            np.array(
+                _where(_is_sign_negative_number(exprv), -expr_lower, expr_upper),
+                copy=None,
+            ),
+        )
+
+        av_abs = np.abs(av)
+        bv_abs = np.abs(bv)
+        exprv_abs = np.array(np.abs(exprv), copy=None)
 
         print(expr_lower, expr_upper)
 
         fmax = _floating_max(X.dtype)
-        
-        expr_lower_factor: np.ndarray[Ps, np.dtype[F]] = np.array(
-            np.divide(expr_lower, exprv), copy=None
+
+        expr_abs_lower_factor: np.ndarray[Ps, np.dtype[F]] = np.array(
+            np.divide(exprv_abs, expr_abs_lower), copy=None
         )
-        np.divide(exprv, expr_lower, out=expr_lower_factor, where=_is_sign_positive_number(exprv))
-        np.sqrt(expr_lower_factor, out=expr_lower_factor)
-        expr_lower_factor[np.isinf(expr_lower_factor)] = fmax
-        expr_lower_factor[np.isnan(expr_lower_factor)] = X.dtype.type(1)
+        np.sqrt(expr_abs_lower_factor, out=expr_abs_lower_factor)
+        expr_abs_lower_factor[np.isinf(expr_abs_lower_factor)] = fmax
+        expr_abs_lower_factor[np.isnan(expr_abs_lower_factor)] = X.dtype.type(1)
 
-        expr_upper_factor: np.ndarray[Ps, np.dtype[F]] = np.array(
-            np.divide(expr_upper, exprv), copy=None
+        expr_abs_upper_factor: np.ndarray[Ps, np.dtype[F]] = np.array(
+            np.divide(expr_abs_upper, exprv_abs), copy=None
         )
-        np.divide(exprv, expr_upper, out=expr_upper_factor, where=_is_sign_negative_number(exprv))
-        np.sqrt(expr_upper_factor, out=expr_upper_factor)
-        expr_upper_factor[np.isinf(expr_upper_factor)] = fmax
-        expr_upper_factor[np.isnan(expr_upper_factor)] = X.dtype.type(1)
+        np.sqrt(expr_abs_upper_factor, out=expr_abs_upper_factor)
+        expr_abs_upper_factor[np.isinf(expr_abs_upper_factor)] = fmax
+        expr_abs_upper_factor[np.isnan(expr_abs_upper_factor)] = X.dtype.type(1)
 
-        print(expr_lower_factor, expr_upper_factor)
+        print(expr_abs_lower_factor, expr_abs_upper_factor)
 
-        a_lower = np.array(np.multiply(av, expr_lower_factor), copy=None)
-        np.divide(av, expr_lower_factor, out=a_lower, where=_is_sign_positive_number(exprv))
-        a_upper = np.array(np.multiply(av, expr_upper_factor), copy=None)
-        np.divide(av, expr_upper_factor, out=a_upper, where=_is_sign_negative_number(exprv))
-        a_lower, a_upper = (
-            _where(_is_sign_negative_number(av), a_upper, a_lower),
-            _where(_is_sign_negative_number(av), a_lower, a_upper)
-        )
+        a_abs_lower = np.divide(av_abs, expr_abs_lower_factor)
+        a_abs_upper = np.multiply(av_abs, expr_abs_upper_factor)
 
-        print("av", av, a_lower, a_upper)
+        print("av", av_abs, a_abs_lower, a_abs_upper)
 
-        b_lower = np.array(np.multiply(bv, expr_lower_factor), copy=None)
-        np.divide(bv, expr_lower_factor, out=b_lower, where=_is_sign_positive_number(exprv))
-        b_upper = np.array(np.multiply(bv, expr_upper_factor), copy=None)
-        np.divide(bv, expr_upper_factor, out=b_upper, where=_is_sign_negative_number(exprv))
-        b_lower, b_upper = (
-            _where(_is_sign_negative_number(bv), b_upper, b_lower),
-            _where(_is_sign_negative_number(bv), b_lower, b_upper)
-        )
+        b_abs_lower = np.divide(bv_abs, expr_abs_lower_factor)
+        b_abs_upper = np.multiply(bv_abs, expr_abs_upper_factor)
 
-        print("bv", bv, b_lower, b_upper)
+        print("bv", bv_abs, b_abs_lower, b_abs_upper)
 
-        tl_stack = np.stack([
-            _where(_is_sign_positive_number(av) == _is_sign_positive_number(exprv), a_lower, a_upper),
-            _where(_is_sign_positive_number(bv) == _is_sign_positive_number(exprv), b_lower, b_upper)
-        ])
-        tu_stack = np.stack([
-            _where(_is_sign_positive_number(av) == _is_sign_positive_number(exprv), a_upper, a_lower),
-            _where(_is_sign_positive_number(bv) == _is_sign_positive_number(exprv), b_upper, b_lower)
-        ])
+        tl_abs_stack = np.stack([a_abs_lower, b_abs_lower])
+        tu_abs_stack = np.stack([a_abs_upper, b_abs_upper])
 
-        print("tl", tl_stack)
-        print("tu", tu_stack)
-
-        exprv = np.array(exprv, copy=None)
-        expr_lower = np.array(expr_lower, copy=None)
-        expr_upper = np.array(expr_upper, copy=None)
+        print("tl", tl_abs_stack)
+        print("tu", tu_abs_stack)
 
         def compute_term_product(
             t_stack: np.ndarray[tuple[int, ...], np.dtype[F]],
         ) -> np.ndarray[tuple[int, ...], np.dtype[F]]:
-            total_product: np.ndarray[tuple[int, ...], np.dtype[F]] = np.multiply(t_stack[0], t_stack[1])
-
-            return _broadcast_to(
-                np.array(total_product, copy=None).reshape((1,) + exprv.shape),
-                (t_stack.shape[0],) + exprv.shape,
+            total_product: np.ndarray[tuple[int, ...], np.dtype[F]] = np.multiply(
+                t_stack[0], t_stack[1]
             )
 
-        tl_stack = guarantee_arg_within_expr_bounds(
+            return _broadcast_to(
+                np.array(total_product, copy=None).reshape((1,) + exprv_abs.shape),
+                (t_stack.shape[0],) + exprv_abs.shape,
+            )
+
+        tl_abs_stack = guarantee_arg_within_expr_bounds(
             compute_term_product,
             _broadcast_to(
-                exprv.reshape((1,) + exprv.shape), (tl_stack.shape[0],) + exprv.shape
+                exprv_abs.reshape((1,) + exprv_abs.shape),
+                (tl_abs_stack.shape[0],) + exprv_abs.shape,
             ),
             np.stack([av, bv]),
-            tl_stack,
+            tl_abs_stack,
             _broadcast_to(
-                expr_lower.reshape((1,) + exprv.shape),
-                (tl_stack.shape[0],) + exprv.shape,
+                expr_abs_lower.reshape((1,) + exprv_abs.shape),
+                (tl_abs_stack.shape[0],) + exprv_abs.shape,
             ),
             _broadcast_to(
-                expr_upper.reshape((1,) + exprv.shape),
-                (tl_stack.shape[0],) + exprv.shape,
+                expr_abs_upper.reshape((1,) + exprv_abs.shape),
+                (tl_abs_stack.shape[0],) + exprv_abs.shape,
             ),
         )
-        tu_stack = guarantee_arg_within_expr_bounds(
+        tu_abs_stack = guarantee_arg_within_expr_bounds(
             compute_term_product,
             _broadcast_to(
-                exprv.reshape((1,) + exprv.shape), (tu_stack.shape[0],) + exprv.shape
+                exprv_abs.reshape((1,) + exprv_abs.shape),
+                (tu_abs_stack.shape[0],) + exprv_abs.shape,
             ),
             np.stack([av, bv]),
-            tu_stack,
+            tu_abs_stack,
             _broadcast_to(
-                expr_lower.reshape((1,) + exprv.shape),
-                (tu_stack.shape[0],) + exprv.shape,
+                expr_abs_lower.reshape((1,) + exprv_abs.shape),
+                (tu_abs_stack.shape[0],) + exprv_abs.shape,
             ),
             _broadcast_to(
-                expr_upper.reshape((1,) + exprv.shape),
-                (tu_stack.shape[0],) + exprv.shape,
+                expr_abs_upper.reshape((1,) + exprv_abs.shape),
+                (tu_abs_stack.shape[0],) + exprv_abs.shape,
             ),
         )
 
-        print("tl2", tl_stack)
-        print("tu2", tu_stack)
+        print("tl2", tl_abs_stack)
+        print("tu2", tu_abs_stack)
 
-        a_lower = _where(_is_sign_positive_number(av) == _is_sign_positive_number(exprv), tl_stack[0], tu_stack[0])
-        a_upper = _where(_is_sign_positive_number(av) == _is_sign_positive_number(exprv), tu_stack[0], tl_stack[0])
+        a_lower = _where(
+            _is_sign_negative_number(av), -tu_abs_stack[0], tl_abs_stack[0]
+        )
+        a_upper = _where(
+            _is_sign_negative_number(av), -tl_abs_stack[0], tu_abs_stack[0]
+        )
 
-        b_lower = _where(_is_sign_positive_number(bv) == _is_sign_positive_number(exprv), tl_stack[1], tu_stack[1])
-        b_upper = _where(_is_sign_positive_number(bv) == _is_sign_positive_number(exprv), tu_stack[1], tl_stack[1])
+        b_lower = _where(
+            _is_sign_negative_number(bv), -tu_abs_stack[1], tl_abs_stack[1]
+        )
+        b_upper = _where(
+            _is_sign_negative_number(bv), -tl_abs_stack[1], tu_abs_stack[1]
+        )
 
         print("av2", av, a_lower, a_upper)
         print("bv2", bv, b_lower, b_upper)

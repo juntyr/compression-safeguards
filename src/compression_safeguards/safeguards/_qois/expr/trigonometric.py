@@ -638,15 +638,25 @@ class ScalarAtan(Expr[Expr]):
         argv = arg.eval(X.shape, Xs, late_bound)
         exprv = np.atan(argv)
 
+        pi_2: F = _pi(X.dtype) / 2
+
         # apply the inverse function to get the bounds on arg
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(  # type: ignore
-            _minimum_zero_sign_sensitive(argv, np.tan(expr_lower)), copy=None
-        )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(  # type: ignore
-            _maximum_zero_sign_sensitive(argv, np.tan(expr_upper)), copy=None
-        )
+        # expr_lower and expr_upper may be outside [-pi/2, +pi/2], force
+        #  arg_lower and arg_upper to -inf and +inf in these cases
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(np.tan(expr_lower), copy=None)
+        arg_lower[expr_lower < -pi_2] = -np.inf
+        arg_lower[expr_lower > pi_2] = np.inf
+        arg_lower[(arg_lower < 0) & (expr_lower > 1)] = np.inf
+        arg_lower[(arg_lower > 0) & (expr_lower < -1)] = -np.inf
+        arg_lower = np.array(_minimum_zero_sign_sensitive(argv, arg_lower), copy=None)
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(np.tan(expr_upper), copy=None)
+        arg_upper[expr_upper < -pi_2] = -np.inf
+        arg_upper[expr_upper > pi_2] = np.inf
+        arg_upper[(arg_upper < 0) & (expr_upper > 1)] = np.inf
+        arg_upper[(arg_upper > 0) & (expr_upper < -1)] = -np.inf
+        arg_upper = np.array(_maximum_zero_sign_sensitive(argv, arg_upper), copy=None)
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")

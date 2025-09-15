@@ -139,7 +139,6 @@ def guarantee_data_within_expr_bounds(
 
         if warn_on_bounds_exceeded:
             warn_on_bounds_exceeded = False
-            assert False
             warn("guaranteed data bounds do not meet the expression bounds")
 
         # nudge the guess towards the data by 1 ULP
