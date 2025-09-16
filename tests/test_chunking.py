@@ -2,7 +2,7 @@ from itertools import product
 
 import numpy as np
 import xarray as xr
-from xarray_safeguards import produce_data_array_correction
+from xarray_safeguards import apply_data_array_correction, produce_data_array_correction
 
 from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards._qois.expr.hashing import (
@@ -465,7 +465,121 @@ def test_fuzzer_found_all_nan_xmin():
     ).compute()
 
 
-# TODO:
-# - test late-bound eb
-# - combine several stencils, incl wrapping and non-wrapping
-# - rechunk before the correction
+def test_stencil_qoi_valid_boundary_late_bound_eb():
+    chunks = dict(a=9)
+    da = xr.DataArray(np.linspace(0, 10), name="da", dims=["a"]).chunk(chunks)
+    da_prediction = xr.DataArray(np.zeros_like(da.values), name="da", dims=["a"]).chunk(
+        chunks
+    )
+
+    produce_data_array_correction(
+        da,
+        da_prediction,
+        safeguards=[
+            dict(
+                kind="qoi_eb_stencil",
+                qoi="finite_difference(x, order=3, accuracy=4, type=0, axis=0, grid_spacing=1)",
+                neighbourhood=[dict(axis=0, before=3, after=3, boundary="valid")],
+                type="rel",
+                eb="eb",
+            )
+        ],
+        late_bound=dict(eb=xr.DataArray(np.full(da.shape, 0.1), name="eb", dims=["a"])),
+    ).compute()
+
+
+def test_stencil_qoi_valid_boundary_late_bound_dimension():
+    for chunks in [dict(a=9), dict()]:
+        da = xr.DataArray(
+            np.linspace(0, 10, num=50), name="da", coords=dict(a=np.arange(50))
+        ).chunk(chunks)
+        da_prediction = xr.DataArray(
+            np.zeros_like(da.values), name="da", coords=dict(a=np.arange(50))
+        ).chunk(chunks)
+
+        produce_data_array_correction(
+            da,
+            da_prediction,
+            safeguards=[
+                dict(
+                    kind="qoi_eb_stencil",
+                    qoi='x + sum(C["$d_a"])',
+                    neighbourhood=[dict(axis=0, before=1, after=1, boundary="valid")],
+                    type="rel",
+                    eb="$d_a",
+                )
+            ],
+            late_bound=dict(),
+        ).compute()
+
+
+def test_rechunk_correction():
+    chunks = dict(a=9)
+    da = xr.DataArray(np.linspace(0, 10), name="da", dims=["a"]).chunk(chunks)
+    da_prediction = xr.DataArray(np.zeros_like(da.values), name="da", dims=["a"]).chunk(
+        chunks
+    )
+
+    da_correction = produce_data_array_correction(
+        da,
+        da_prediction,
+        safeguards=[
+            dict(
+                kind="qoi_eb_stencil",
+                qoi="finite_difference(x, order=3, accuracy=4, type=0, axis=0, grid_spacing=1)",
+                neighbourhood=[dict(axis=0, before=3, after=3, boundary="valid")],
+                type="rel",
+                eb="eb",
+            )
+        ],
+        late_bound=dict(eb=xr.DataArray(np.full(da.shape, 0.1), name="eb", dims=["a"])),
+    )
+
+    rechunks = dict(a=7)
+
+    da_corrected = apply_data_array_correction(da_prediction, da_correction)
+    da_corrected_rechunked = apply_data_array_correction(
+        da_prediction.chunk(rechunks), da_correction.chunk(rechunks)
+    )
+
+    np.testing.assert_array_equal(da_corrected_rechunked.values, da_corrected.values)
+
+
+def test_different_chunks_and_safeguards():
+    for chunks in [dict(), dict(a=9)]:
+        da = xr.DataArray(np.linspace(0, 10), name="da", dims=["a"]).chunk(chunks)
+        da_prediction = xr.DataArray(
+            np.zeros_like(da.values), name="da", dims=["a"]
+        ).chunk(chunks)
+
+        for safeguards in [
+            [],
+            [dict(kind="same", value=10)],
+            [
+                dict(kind="same", value=10),
+                dict(
+                    kind="monotonicity",
+                    monotonicity="strict",
+                    window=2,
+                    boundary="valid",
+                ),
+            ],
+            [
+                dict(kind="same", value=10),
+                dict(
+                    kind="monotonicity",
+                    monotonicity="strict",
+                    window=2,
+                    boundary="valid",
+                ),
+                dict(
+                    kind="monotonicity", monotonicity="weak", window=1, boundary="wrap"
+                ),
+            ],
+        ]:
+            produce_data_array_correction(
+                da,
+                da_prediction,
+                safeguards=safeguards,
+                late_bound=dict(),
+            ).compute()

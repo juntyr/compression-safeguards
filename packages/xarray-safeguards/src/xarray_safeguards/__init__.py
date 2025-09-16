@@ -207,6 +207,9 @@ def produce_data_array_correction(
         if isinstance(v, int | float | np.number):
             late_bound_global[k] = v
         else:
+            assert isinstance(v, xr.DataArray), (
+                f"late-bound param {k} must be a scalar or `xarray.DataArray`"
+            )
             assert frozenset(v.dims).issubset(data.dims), (
                 f"late-bound param {k} dims are not a subset of data dims"
             )
@@ -220,6 +223,8 @@ def produce_data_array_correction(
     correction_attrs = dict(
         safeguarded=data.name, safeguards=json.dumps(safeguards_.get_config())
     )
+
+    da_correction: xr.DataArray
 
     # special case for no chunking: just compute eagerly
     if data.chunks is None:
@@ -241,7 +246,7 @@ def produce_data_array_correction(
                 shape[i] = data.shape[i]
             late_bound_chunk[k] = dv.values.transpose(axes).reshape(shape)
 
-        return (
+        da_correction = (
             data.copy(
                 data=safeguards_.compute_correction(
                     data.values, prediction.values, late_bound=late_bound_chunk
@@ -251,18 +256,20 @@ def produce_data_array_correction(
             .assign_attrs(**correction_attrs)
         )
 
+        # drop the previous encoding from the variable but not the coords
+        return da_correction._replace(variable=da_correction.variable.drop_encoding())
+
     # provide built-in late-bound bindings $d for the data dimensions
     chunked_late_bound: dict[str, dask.array.Array] = dict()
     for i, d in enumerate(data.dims):
-        if f"$d_{d}" in late_bound_reqs:
+        if f"$d_{d}" in safeguards_late_bound_reqs:
             shape = [1 for _ in range(len(data.dims))]
             shape[i] = data.shape[i]
             chunked_late_bound[f"$d_{d}"] = dask.array.broadcast_to(
                 data[d].data,
                 shape=shape,
-                chunks=data.chunks,
                 meta=np.array((), dtype=data[d].dtype),
-            )
+            ).rechunk(data.chunks)
     for k, v in late_bound_data_arrays.items():
         dims = sorted(v.dims, key=lambda i: data.dims.index(i))
         shape = [1 for _ in range(len(data.dims))]
@@ -272,9 +279,8 @@ def produce_data_array_correction(
         chunked_late_bound[k] = dask.array.broadcast_to(
             v.transpose(*dims, transpose_coords=False).data,
             shape=shape,
-            chunks=data.chunks,
             meta=np.array((), dtype=v.dtype),
-        )
+        ).rechunk(data.chunks)
 
     required_stencil = safeguards_.compute_required_stencil_for_chunked_correction(
         data.shape
@@ -305,7 +311,7 @@ def produce_data_array_correction(
                 data_chunk, prediction_chunk, late_bound=late_bound_chunk
             )
 
-        return (
+        da_correction = (
             data.copy(
                 data=data.data.map_blocks(
                     _compute_independent_chunk_correction,
@@ -323,6 +329,9 @@ def produce_data_array_correction(
             .rename(correction_name)
             .assign_attrs(**correction_attrs)
         )
+
+        # drop the previous encoding from the variable but not the coords
+        return da_correction._replace(variable=da_correction.variable.drop_encoding())
 
     boundary: Literal["none", "periodic"] = "none"
     depth_: list[tuple[int, int]] = []
@@ -597,7 +606,7 @@ def produce_data_array_correction(
 
         return correction
 
-    da_correction: xr.DataArray = (
+    da_correction = (
         data.copy(
             data=dask.array.map_overlap(
                 _compute_overlapping_stencil_chunk_correction,
