@@ -130,9 +130,9 @@ def check_one_input(data) -> None:
 
     raw = np.frombuffer(raw, dtype=dtype)
 
-    # skip all-zero raw inputs since we use that to sidechannel-communicate in
+    # skip all-ones raw inputs since we use that to sidechannel-communicate in
     #  the fuzzer if a prediction is already corrected
-    if np.all(raw == 0):
+    if np.all(raw == 1):
         return
 
     if sizeb != 0:
@@ -200,7 +200,7 @@ def check_one_input(data) -> None:
         )
 
     da = xr.DataArray(raw, dims=list(chunks.keys())).chunk(chunks)
-    da_prediction = xr.DataArray(np.zeros_like(raw), dims=list(chunks.keys())).chunk(
+    da_prediction = xr.DataArray(np.ones_like(raw), dims=list(chunks.keys())).chunk(
         chunks
     )
 
@@ -214,7 +214,7 @@ def check_one_input(data) -> None:
             safeguards=[safeguard],
             late_bound=late_bound_da,
         )
-        np.testing.assert_array_equal(global_hash, chunked_hash.values)
+        np.testing.assert_array_equal(chunked_hash.values, global_hash)
     except Exception as err:
         if (
             (
@@ -240,7 +240,13 @@ def check_one_input(data) -> None:
             or (isinstance(err, AssertionError) and str(err).startswith("eb must be"))
             or (
                 isinstance(err, AssertionError)
-                and ("fuzzer hash is all zeros" in str(err))
+                and ("fuzzer hash is all ones" in str(err))
+            )
+            or (
+                isinstance(err, ValueError)
+                and ("cannot broadcast late-bound parameter" in str(err))
+                and ("with shape" in str(err))
+                and ("to shape ()" in str(err))
             )
         ):
             return

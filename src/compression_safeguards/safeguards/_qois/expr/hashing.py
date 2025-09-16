@@ -172,7 +172,7 @@ def _interval_union_contains(
 def _interval_union_pick(
     self, prediction: np.ndarray[S, np.dtype[T]]
 ) -> np.ndarray[S, np.dtype[T]]:
-    assert not np.all(self._lower == 0), "fuzzer hash is all zeros"
+    assert not np.all(self._lower == 1), "fuzzer hash is all ones"
     return np.array(self._lower[0].reshape(prediction.shape), copy=True)
 
 
@@ -183,7 +183,7 @@ def _stencil_qoi_check_pointwise(
     *,
     late_bound: Bindings,
 ) -> np.ndarray[S, np.dtype[np.bool]]:
-    if np.all(decoded == 0):
+    if np.all(decoded == 1):
         return np.zeros(data.shape, dtype=np.bool)  # type: ignore
     return np.ones(data.shape, dtype=np.bool)  # type: ignore
 

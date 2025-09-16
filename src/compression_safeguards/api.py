@@ -441,7 +441,8 @@ class Safeguards:
                     # in particular, we need to ensure that the elements before
                     #  x, which will look after elements to the right, get
                     #  their stencil, and that the elements after x, which will
-                    #  look before elements to the left, get their stencil too
+                    #  look before elements to the left, get their stencil too,
+                    #  since they will back-contribute their intervals to x
                     #
                     # therefore we actually need to ~double~ the stencil to
                     # [after+before, ..., before, ..., x, ..., after, ..., before+after]
@@ -467,20 +468,40 @@ class Safeguards:
                             #  chunk on the right, and same for on the right
                             # so we need to extend with max(before, after) at
                             #  both ends
+                            # if we have before=1 and after=0 and focus on x=3,
+                            #  this would give us the stencil 2, 3|
+                            # however, when the reflect boundary is applied, it
+                            #  would be 3, 2, 3| and 2 would now look at 3 and
+                            #  back-contribute to 3 even though it should not
+                            # if we have before=2 and after=0 and focus on x=3
+                            #  in -1, 0, 1, 2, 3 then 1, 2, 3| would become
+                            #  3, 2, 1, 2, 3| which is incorrect; 0, 1, 2, 3|
+                            #  would become 2, 1, 0, 1, 2, 3 which is also
+                            #  incorrect but good enough to no longer back-
+                            #  contribute
+                            # therefore, we need to extend by at least one
+                            #  beyond the stencil if the stencil is non-zero
                             # but since we need before+after on both sides, the
                             #  max cancels out (and we also cannot optimise
                             #  based on the size of the chunk)
                             neighbourhood[i] = (
                                 neighbourhood[i][0],
                                 NeighbourhoodAxis(
-                                    before=max(n_before, s.after + s.before),
-                                    after=max(n_after, s.before + s.after),
+                                    before=max(
+                                        n_before,
+                                        max(s.after, bool(s.before)) + s.before,
+                                    ),
+                                    after=max(
+                                        n_after, max(s.before, bool(s.after)) + s.after
+                                    ),
                                 ),
                             )
                         case BoundaryCondition.symmetric:
                             # symmetric:         [ 1, 2, 3 ]
                             #       -> [..., 2, 1, 1, 2, 3, 3, 2, ...]
-                            # similar to reflect, but the edge is repeated
+                            # similar to reflect, but the edge is repeated,
+                            #  meaning that accidental back-contribution is not
+                            #  possible
                             # worst case, the symmetry on the left exits the
                             #  chunk on the right, and same for on the right
                             # but since we need before+after on both sides, the

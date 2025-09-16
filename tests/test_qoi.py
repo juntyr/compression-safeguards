@@ -38,6 +38,7 @@ from compression_safeguards.safeguards._qois.expr.trigonometric import (
     ScalarAtan,
     ScalarCos,
     ScalarSin,
+    ScalarTan,
 )
 from compression_safeguards.safeguards._qois.expr.where import ScalarWhere
 from compression_safeguards.safeguards._qois.interval import (
@@ -1193,3 +1194,28 @@ def test_fuzzer_found_excessive_nudging_division():
     assert expr.eval((), np.array(X_upper), dict()) == np.array(
         np.float64(338.2034982942516)
     )
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_tan_upper_negative_zero():
+    X = np.array(np.float16(-0.841))
+
+    expr = ScalarMultiply(
+        ScalarDivide(
+            Number("-56809"),
+            ScalarTan(Data.SCALAR),
+        ),
+        Number("255"),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float16(np.inf))
+
+    expr_lower = np.array(np.float16(-0.841))
+    expr_upper = np.array(np.float16(np.inf))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float16(-1.57))
+    assert X_upper == np.array(np.float16(-0.0))
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(7012.0))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float16(np.inf))

@@ -4,6 +4,7 @@ import numpy as np
 
 from ....utils._compat import (
     _floating_max,
+    _is_negative_zero,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
     _nextafter,
@@ -89,6 +90,8 @@ class ScalarSin(Expr[Expr]):
         #  [-1, +1] is allowed
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
+        # if expr_upper == -0.0 and arg_upper == 0, we need to guarantee that
+        #  arg_upper is also -0.0
         # FIXME: how do we handle bounds right next to the peak where the
         #        expression bounds could be exceeded inside the interval?
         # TODO: the intervals can sometimes be extended if expr_lower <= -1 or
@@ -107,6 +110,7 @@ class ScalarSin(Expr[Expr]):
         np.add(arg_upper, argv, out=arg_upper)
         arg_upper[full_domain] = fmax
         np.copyto(arg_upper, argv, where=np.isinf(argv), casting="no")
+        arg_upper[(arg_upper == 0) & _is_negative_zero(expr_upper)] = -0.0
         arg_upper = _maximum_zero_sign_sensitive(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
@@ -331,6 +335,8 @@ class ScalarTan(Expr[Expr]):
         #  [-inf, +inf] is allowed
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
+        # if expr_upper == -0.0 and arg_upper == 0, we need to guarantee that
+        #  arg_upper is also -0.0
         # FIXME: how do we handle bounds right next to the peak where the
         #        expression bounds could be exceeded inside the interval?
         # TODO: since tan is periodic, an interval union could be used in the
@@ -343,6 +349,7 @@ class ScalarTan(Expr[Expr]):
         arg_upper = np.array(np.add(argv, arg_upper_diff), copy=None)
         arg_upper[full_domain] = fmax
         np.copyto(arg_upper, argv, where=np.isinf(argv), casting="no")
+        arg_upper[(arg_upper == 0) & _is_negative_zero(expr_upper)] = -0.0
         arg_upper = _maximum_zero_sign_sensitive(argv, arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
