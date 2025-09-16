@@ -489,13 +489,17 @@ def test_stencil_qoi_valid_boundary_late_bound_eb():
 
 
 def test_stencil_qoi_valid_boundary_late_bound_dimension():
-    for chunks in [dict(a=9), dict()]:
+    for chunks in [None, dict(), dict(a=9)]:
         da = xr.DataArray(
             np.linspace(0, 10, num=50), name="da", coords=dict(a=np.arange(50))
-        ).chunk(chunks)
+        )
         da_prediction = xr.DataArray(
             np.zeros_like(da.values), name="da", coords=dict(a=np.arange(50))
-        ).chunk(chunks)
+        )
+
+        if chunks is not None:
+            da = da.chunk(chunks)
+            da_prediction = da_prediction.chunk(chunks)
 
         produce_data_array_correction(
             da,
@@ -546,11 +550,13 @@ def test_rechunk_correction():
 
 
 def test_different_chunks_and_safeguards():
-    for chunks in [dict(), dict(a=9)]:
-        da = xr.DataArray(np.linspace(0, 10), name="da", dims=["a"]).chunk(chunks)
-        da_prediction = xr.DataArray(
-            np.zeros_like(da.values), name="da", dims=["a"]
-        ).chunk(chunks)
+    for chunks in [None, dict(), dict(a=9)]:
+        da = xr.DataArray(np.linspace(0, 10), name="da", dims=["a"])
+        da_prediction = xr.DataArray(np.zeros_like(da.values), name="da", dims=["a"])
+
+        if chunks is not None:
+            da = da.chunk(chunks)
+            da_prediction = da_prediction.chunk(chunks)
 
         for safeguards in [
             [],

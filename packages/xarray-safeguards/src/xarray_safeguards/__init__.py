@@ -33,6 +33,52 @@ By applying the corrections produced by `produce_data_array_correction`, data
 that was compressed with badly-behaving lossy compressors can be safely used,
 at the cost of potentially less efficient compression, and lossy compression
 can be applied *without fear*.
+
+## Example
+
+You can produce the corrections to uphold an absolute error bound of
+$eb_{abs} = 0.1$ for an already-compressed data array as follows:
+
+```py
+import numpy as np
+import xarray as xr
+from xarray_safeguards import apply_data_array_correction, produce_data_array_correction
+
+# some (chunked) n-dimensional data array
+da = xr.DataArray(np.linspace(-10, 10, 21), name="da").chunk(10)
+# lossy-compressed prediction for the data, here all zeros
+da_prediction = xr.DataArray(np.zeros_like(da.values), name="da").chunk(10)
+
+da_correction = produce_data_array_correction(
+    data=da,
+    prediction=da_prediction,
+    # guarantee an absolute error bound of 0.1:
+    #   |x - x'| <= 0.1
+    safeguards=[dict(kind="eb", type="abs", eb=0.1)],
+)
+
+## (a) manual correction ##
+
+da_corrected = apply_data_array_correction(da_prediction, da_correction)
+np.testing.assert_allclose(da_corrected.values, da.values, rtol=0, atol=0.1)
+
+## (b) automatic correction with xarray accessors ##
+
+# combine the lossy prediction and the correction into one dataset
+#  e.g. by loading them from different files using `xarray.open_mfdataset`
+ds = xr.Dataset({
+    da_prediction.name: da_prediction,
+    da_correction.name: da_correction,
+})
+
+# access the safeguarded dataset that applies all corrections
+ds_safeguarded: xr.Dataset = ds.safeguarded
+np.testing.assert_allclose(ds_safeguarded["da"].values, da.values, rtol=0, atol=0.1)
+```
+
+Please refer to the
+[`compression_safeguards.SafeguardKind`][compression_safeguards.SafeguardKind]
+for an enumeration of all supported safeguards.
 """
 
 __all__ = [

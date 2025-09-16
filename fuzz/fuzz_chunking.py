@@ -118,9 +118,12 @@ def check_one_input(data) -> None:
     sizeb: int = data.ConsumeIntInRange(0, 20 // max(1, sizea))
     size = sizea * sizeb
 
-    chunksa: int = data.ConsumeIntInRange(1, sizea) if sizea > 0 else 0
-    chunksb: int = data.ConsumeIntInRange(1, sizeb) if sizeb > 0 else 0
-    chunks = dict(a=chunksa)
+    chunksa: int = data.ConsumeIntInRange(0, sizea) if sizea > 0 else 0
+    chunksb: int = data.ConsumeIntInRange(0, sizeb) if sizeb > 0 else 0
+    chunks = {
+        **(dict(a=chunksa) if chunksa > 0 else {}),
+        **(dict(b=chunksb) if chunksb > 0 else {}),
+    }
 
     # input data and the decoded data
     raw = data.ConsumeBytes(size * dtype.itemsize)
@@ -137,7 +140,9 @@ def check_one_input(data) -> None:
 
     if sizeb != 0:
         raw = raw.reshape((sizea, sizeb))
-        chunks = dict(a=chunksa, b=chunksb)
+        dims = ["a", "b"]
+    else:
+        dims = ["a"]
 
     late_bound = dict()
     for p in late_bound_params:
@@ -162,9 +167,7 @@ def check_one_input(data) -> None:
                 return
             late_bound[p] = np.frombuffer(b, dtype=dtype).reshape(raw.shape)
     late_bound_da = {
-        p: xr.DataArray(v, dims=list(chunks.keys())).chunk(chunks)
-        if isinstance(v, np.ndarray)
-        else v
+        p: xr.DataArray(v, dims=dims) if isinstance(v, np.ndarray) else v
         for p, v in late_bound.items()
     }
 
@@ -199,10 +202,12 @@ def check_one_input(data) -> None:
             else np.array(0, dtype=raw.dtype)
         )
 
-    da = xr.DataArray(raw, dims=list(chunks.keys())).chunk(chunks)
-    da_prediction = xr.DataArray(np.ones_like(raw), dims=list(chunks.keys())).chunk(
-        chunks
-    )
+    da = xr.DataArray(raw, dims=dims)
+    da_prediction = xr.DataArray(np.ones_like(raw), dims=dims)
+
+    if chunks is not None:
+        da = da.chunk(chunks)
+        da_prediction = da_prediction.chunk(chunks)
 
     try:
         global_hash = Safeguards(safeguards=[safeguard]).compute_correction(
@@ -212,7 +217,12 @@ def check_one_input(data) -> None:
             data=da,
             prediction=da_prediction,
             safeguards=[safeguard],
-            late_bound=late_bound_da,
+            late_bound={
+                p: v.chunk(chunks)
+                if isinstance(v, xr.DataArray) and chunks is not None
+                else v
+                for p, v in late_bound_da.items()
+            },
         )
         np.testing.assert_array_equal(chunked_hash.values, global_hash)
     except Exception as err:

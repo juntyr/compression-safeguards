@@ -56,7 +56,7 @@ We also provide the following integrations of the safeguards with popular compre
 
 - *parameter*: A configuration option for a safeguard that is provided when declaring the safeguard and cannot be changed
 
-- *late-bound parameter*: A configuration option for a safeguard that is not constant but depends on the data being compressed. At declaration time, a late-bound parameter is only given a name but not a value. When the safeguards are later applied to data, all late-bound parameters must be resolved by providing their values. The `compression-safeguards` and `numcodecs-safeguards` frontend also provide a few built-in late-bound constants automatically, including `$x` to refer to the data as a constant. When configuring a `numcodecs_safeguards.SafeguardsCodec`, late-bound parameters are provided as *fixed constants* that must be compatible with any data that is encoded by the codec.
+- *late-bound parameter*: A configuration option for a safeguard that is not constant but depends on the data being compressed. At declaration time, a late-bound parameter is only given a name but not a value. When the safeguards are later applied to data, all late-bound parameters must be resolved by providing their values. The `compression-safeguards`, `numcodecs-safeguards`, and `xarray-safeguards` frontends also provide a few built-in late-bound constants automatically, including `$x` to refer to the data as a constant. When configuring a `numcodecs_safeguards.SafeguardsCodec`, late-bound parameters are provided as *fixed constants* that must be compatible with any data that is encoded by the codec.
 
 - *quantity of interest* (*QoI*): We are often not just interested in data itself, but also in quantities derived from it. For instance, we might later plot the data logarithm, compute a derivative, or apply a smoothing kernel. In these cases, we often want to safeguard not just properties on the data but also on these derived quantities of interest.
 
@@ -146,6 +146,7 @@ The integrations can be installed similarly:
 <!--pytest.mark.skip-->
 ```sh
 pip install numcodecs-safeguards
+pip install xarray-safeguards
 ```
 
 
@@ -153,7 +154,9 @@ pip install numcodecs-safeguards
 
 ### (a) Safeguards for users of lossy compression
 
-We recommend using the safeguards through one of their integrations with popular compression APIs, e.g. `numcodecs-safeguards`:
+#### `numcodecs-safeguards`
+
+We recommend using the safeguards through one of their integrations with popular compression APIs, e.g. `numcodecs-safeguards` for non-chunked data:
 
 ```py
 import numpy as np
@@ -188,9 +191,54 @@ assert np.all(np.abs(data - decoded) <= np.abs(data) * 0.01)
 assert np.all(np.sign(data) == np.sign(decoded))
 ```
 
-Please refer to the [`numcodecs_safeguards` documentation](https://juntyr.github.io/numcodecs-safeguards/_ref/numcodecs_safeguards/) for further information.
+Please refer to the [`numcodecs-safeguards` documentation](https://juntyr.github.io/compression-safeguards/_ref/numcodecs_safeguards/) for further information.
 
-You can also use the lower-level `compression_safeguards` API directly:
+#### `xarray-safeguards`
+
+If you are working with large chunked datasets, want to post-hoc adopt safeguards for existing already-compressed data, or need extra control over how the safeguards-produced corrections are stored, you can use the `xarray-safeguards` frontend:
+
+```py
+import numpy as np
+import xarray as xr
+from xarray_safeguards import apply_data_array_correction, produce_data_array_correction
+
+# some (chunked) n-dimensional data array
+da = xr.DataArray(np.linspace(-10, 10, 21), name="da").chunk(10)
+# lossy-compressed prediction for the data, here all zeros
+da_prediction = xr.DataArray(np.zeros_like(da.values), name="da").chunk(10)
+
+da_correction = produce_data_array_correction(
+    data=da,
+    prediction=da_prediction,
+    # guarantee an absolute error bound of 0.1:
+    #   |x - x'| <= 0.1
+    safeguards=[dict(kind="eb", type="abs", eb=0.1)],
+)
+
+## (a) manual correction ##
+
+da_corrected = apply_data_array_correction(da_prediction, da_correction)
+np.testing.assert_allclose(da_corrected.values, da.values, rtol=0, atol=0.1)
+
+## (b) automatic correction with xarray accessors ##
+
+# combine the lossy prediction and the correction into one dataset
+#  e.g. by loading them from different files using `xarray.open_mfdataset`
+ds = xr.Dataset({
+    da_prediction.name: da_prediction,
+    da_correction.name: da_correction,
+})
+
+# access the safeguarded dataset that applies all corrections
+ds_safeguarded: xr.Dataset = ds.safeguarded
+np.testing.assert_allclose(ds_safeguarded["da"].values, da.values, rtol=0, atol=0.1)
+```
+
+Please also refer to the [`xarray-safeguards` documentation](https://juntyr.github.io/compression-safeguards/_ref/xarray_safeguards/) and the [`chunked.ipynb`](examples/chunked.ipynb) example for further information.
+
+#### `compression-safeguards`
+
+You can also use the lower-level `compression-safeguards` API directly:
 
 <!--
 ```py
@@ -238,7 +286,7 @@ decompressed = sg.apply_correction(decompressed, correction)
 assert np.all(np.abs(data - decompressed) <= 0.1)
 ```
 
-Please refer to the [`compression_safeguards` documentation](https://juntyr.github.io/compression-safeguards/_ref/compression_safeguards/) for further examples.
+Please refer to the [`compression-safeguards` documentation](https://juntyr.github.io/compression-safeguards/_ref/compression_safeguards/) for further examples.
 
 ### (b) Safeguards for developers of lossy compressors
 
@@ -253,7 +301,7 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
 - ... a pointwise normalised (NOA) or range-relative absolute error bound?
 
-    > Use the `eb` safeguard for an absolute error bound but provide a late-bound parameter for the bound value. Since the data range is tightly tied to the data itself, it makes sense to only fill in the actual when applying the safeguards to the actual data. You can either compute the range yourself and then provide it as a `late_bound` binding when computing the safeguard corrections. Alternatively, you can also use the `qoi_eb_pw` safeguard with the `'(x - c["$x_min"]) / (c["$x_max"] - c["$x_min"])'` QoI. Note that we are using the late-bound constants `c["$x_min"]` and `c["$x_max"]` for the data minimum and maximum, which are automatically provided by `numcodecs-safeguards`.
+    > Use the `eb` safeguard for an absolute error bound but provide a late-bound parameter for the bound value. Since the data range is tightly tied to the data itself, it makes sense to only fill in the actual when applying the safeguards to the actual data. You can either compute the range yourself and then provide it as a `late_bound` binding when computing the safeguard corrections. Alternatively, you can also use the `qoi_eb_pw` safeguard with the `'(x - c["$x_min"]) / (c["$x_max"] - c["$x_min"])'` QoI. Note that we are using the late-bound constants `c["$x_min"]` and `c["$x_max"]` for the data minimum and maximum, which are automatically provided by `numcodecs-safeguards` and `xarray-safeguards`.
 
 - ... a global error bound, e.g. a mean error, mean squared error, root mean square error, or peak signal to noise ratio?
 
@@ -278,7 +326,7 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
 - ... a data distribution histogram?
 
-    > The `compression-safeguards` do not currently support global safeguards. However, we can preserve the histogram bin that each data element falls into using the `qoi_eb_pw` safeguard, which provides a stricter guarantee. For instance, the `'round(100 * (x - c["$x_min"]) / (c["$x_max"] - c["$x_min"]))'` QoI would preserve the index amongst 100 bins. Note that we are using the late-bound constants `c["$x_min"]` and `c["$x_max"]` for the data minimum and maximum, which are automatically provided by `numcodecs-safeguards`.
+    > The `compression-safeguards` do not currently support global safeguards. However, we can preserve the histogram bin that each data element falls into using the `qoi_eb_pw` safeguard, which provides a stricter guarantee. For instance, the `'round(100 * (x - c["$x_min"]) / (c["$x_max"] - c["$x_min"]))'` QoI would preserve the index amongst 100 bins. Note that we are using the late-bound constants `c["$x_min"]` and `c["$x_max"]` for the data minimum and maximum, which are automatically provided by `numcodecs-safeguards` and `xarray-safeguards`.
 
 
 ## Limitations
@@ -328,6 +376,6 @@ Licensed under the Mozilla Public License, Version 2.0 ([LICENSE](LICENSE) or ht
 
 ## Funding
 
-The `compression-safeguards` and `numcodecs-safeguards` packages have been developed as part of [ESiWACE3](https://www.esiwace.eu), the third phase of the Centre of Excellence in Simulation of Weather and Climate in Europe.
+The `compression-safeguards`, `numcodecs-safeguards`, and `xarray-safeguards` packages have been developed as part of [ESiWACE3](https://www.esiwace.eu), the third phase of the Centre of Excellence in Simulation of Weather and Climate in Europe.
 
 Funded by the European Union. This work has received funding from the European High Performance Computing Joint Undertaking (JU) under grant agreement No 101093054.
