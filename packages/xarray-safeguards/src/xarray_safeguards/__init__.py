@@ -190,10 +190,18 @@ def produce_data_array_correction(
     late_bound_global: dict[str, int | float | np.number] = dict()
     late_bound_data_arrays: dict[str, xr.DataArray] = dict()
     if "$x_min" in safeguards_late_bound_reqs:
-        da_min = np.nanmin(data) if data.size > 0 else np.array(0, dtype=data.dtype)
+        da_min = (
+            np.nanmin(data)
+            if data.size > 0 and not np.all(np.isnan(data))
+            else np.array(0, dtype=data.dtype)
+        )
         late_bound_global["$x_min"] = da_min  # type: ignore
     if "$x_max" in safeguards_late_bound_reqs:
-        da_max = np.nanmax(data) if data.size > 0 else np.array(0, dtype=data.dtype)
+        da_max = (
+            np.nanmax(data)
+            if data.size > 0 and not np.all(np.isnan(data))
+            else np.array(0, dtype=data.dtype)
+        )
         late_bound_global["$x_max"] = da_max  # type: ignore
     for k, v in late_bound.items():
         if isinstance(v, int | float | np.number):

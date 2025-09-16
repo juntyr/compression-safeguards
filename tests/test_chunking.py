@@ -126,7 +126,7 @@ def test_edge_cases():
 
 def test_xarray_accessors():
     da = xr.DataArray(np.linspace(0, 1), name="da").chunk(10)
-    da_prediction = xr.DataArray(np.ones_like(da.values), name="da").chunk(10)
+    da_prediction = xr.DataArray(np.zeros_like(da.values), name="da").chunk(10)
 
     da_correction = produce_data_array_correction(
         da,
@@ -151,7 +151,7 @@ def test_fuzzer_found_chunked_check_invalid_block_info():
         np.array([[0, 0], [0, 0]], dtype=np.uint8), name="da", dims=["a", "b"]
     ).chunk(chunks)
     da_prediction = xr.DataArray(
-        np.ones_like(da.values), name="da", dims=["a", "b"]
+        np.zeros_like(da.values), name="da", dims=["a", "b"]
     ).chunk(chunks)
 
     produce_data_array_correction(
@@ -179,7 +179,7 @@ def test_fuzzer_found_correction_shape_mismatch():
         dims=["a", "b"],
     ).chunk(chunks)
     da_prediction = xr.DataArray(
-        np.ones_like(da.values), name="da", dims=["a", "b"]
+        np.zeros_like(da.values), name="da", dims=["a", "b"]
     ).chunk(chunks)
 
     produce_data_array_correction(
@@ -435,3 +435,37 @@ def test_fuzzer_found_hash_reflect_boundary():
             late_bound=late_bound,
         )
         np.testing.assert_array_equal(chunked_hash.values, global_hash)
+
+
+def test_fuzzer_found_all_nan_xmin():
+    chunks = dict(a=1, b=1)
+    da = xr.DataArray(
+        np.array([[np.nan], [np.nan]], dtype=np.float16),
+        name="da",
+        dims=["a", "b"],
+    ).chunk(chunks)
+    da_prediction = xr.DataArray(
+        np.zeros_like(da.values), name="da", dims=["a", "b"]
+    ).chunk(chunks)
+
+    produce_data_array_correction(
+        da,
+        da_prediction,
+        safeguards=[
+            dict(
+                kind="qoi_eb_stencil",
+                qoi="x",
+                neighbourhood=[dict(axis=0, before=0, after=0, boundary="reflect")],
+                type="abs",
+                eb="$x_min",
+                qoi_dtype="float128",
+            )
+        ],
+        late_bound=dict(),
+    ).compute()
+
+
+# TODO:
+# - test late-bound eb
+# - combine several stencils, incl wrapping and non-wrapping
+# - rechunk before the correction
