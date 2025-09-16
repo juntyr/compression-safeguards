@@ -589,3 +589,61 @@ def test_different_chunks_and_safeguards():
                 safeguards=safeguards,
                 late_bound=dict(),
             ).compute()
+
+
+def test_fuzzer_found_global_late_bound_max():
+    chunks = dict(a=3, b=3)
+    da = xr.DataArray(
+        np.array(
+            [
+                [-1.7014118e38, -7.7297928e-37, -3.7617555e-37],
+                [-7.7296816e-37, -4.2360169e09, 2.8973772e-14],
+                [np.nan, np.nan, 8.6081765e-42],
+            ],
+            dtype=np.float32,
+        ),
+        name="da",
+        dims=["a", "b"],
+    ).chunk(chunks)
+    da_prediction = xr.DataArray(
+        np.ones_like(da.values), name="da", dims=["a", "b"]
+    ).chunk(chunks)
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi="x",
+        neighbourhood=[
+            dict(
+                axis=1,
+                before=0,
+                after=61,
+                boundary="constant",
+                constant_boundary="$x_max",
+            )
+        ],
+        type="rel",
+        eb="$x_max",
+        qoi_dtype="lossless",
+    )
+    safeguard._qoi_expr._expr = HashingExpr.from_data_shape(
+        data_shape=safeguard._qoi_expr._stencil_shape,
+        late_bound_constants=frozenset(["foo"]),
+    )
+    safeguard._qoi_expr._late_bound_constants = (
+        safeguard._qoi_expr._expr.late_bound_constants
+    )
+
+    late_bound = dict(foo=0)
+
+    with _patch_for_hashing_qoi_dev_only():
+        global_hash = Safeguards(safeguards=[safeguard]).compute_correction(
+            data=da.values,
+            prediction=da_prediction.values,
+            late_bound={**late_bound, "$x_max": np.nanmax(da.values)},
+        )
+        chunked_hash = produce_data_array_correction(
+            data=da,
+            prediction=da_prediction,
+            safeguards=[safeguard],
+            late_bound=late_bound,
+        )
+        np.testing.assert_array_equal(chunked_hash.values, global_hash)

@@ -187,23 +187,23 @@ def check_one_input(data) -> None:
     except (AssertionError, Warning, TimeoutError):
         return
 
+    da = xr.DataArray(raw, dims=dims)
+    da_prediction = xr.DataArray(np.ones_like(raw), dims=dims)
+
     # xarray-safeguards provides `$x_min` and `$x_max`,
     #  but the compression-safeguards do not
     if "$x_min" in safeguard.late_bound:
         late_bound["$x_min"] = (
-            np.nanmin(raw)
-            if raw.size > 0 and not np.all(np.isnan(raw))
-            else np.array(0, dtype=raw.dtype)
+            np.nanmin(da)
+            if da.size > 0 and not np.all(np.isnan(da))
+            else np.array(0, dtype=da.dtype)
         )
     if "$x_max" in safeguard.late_bound:
         late_bound["$x_max"] = (
-            np.nanmax(raw)
-            if raw.size > 0 and not np.all(np.isnan(raw))
-            else np.array(0, dtype=raw.dtype)
+            np.nanmax(da)
+            if da.size > 0 and not np.all(np.isnan(da))
+            else np.array(0, dtype=da.dtype)
         )
-
-    da = xr.DataArray(raw, dims=dims)
-    da_prediction = xr.DataArray(np.ones_like(raw), dims=dims)
 
     if chunks is not None:
         da = da.chunk(chunks)
