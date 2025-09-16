@@ -1219,3 +1219,26 @@ def test_fuzzer_found_tan_upper_negative_zero():
 
     assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(7012.0))
     assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float16(np.inf))
+
+
+def test_fuzzer_found_power_excessive_nudging():
+    X = np.array(np.float32(13323083.0))
+
+    expr = ScalarPower(
+        Number("1263225675"),
+        ScalarAtan(Data.SCALAR),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float32(197957600000000.0))
+
+    expr_lower = np.array(np.float32(13323083.0))
+    expr_upper = np.array(np.float32(1.979576e14))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float32(0.9948097))
+    assert X_upper == np.array(np.float32(13323083.0))
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float32(13323100.0))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(
+        np.float32(197957600000000.0)
+    )
