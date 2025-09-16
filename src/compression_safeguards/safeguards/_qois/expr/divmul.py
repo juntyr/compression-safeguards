@@ -15,7 +15,7 @@ from ....utils._compat import (
     _where,
 )
 from ....utils.bindings import Parameter
-from ..bound import guarantee_arg_within_expr_bounds
+from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
 from .abc import Expr
 from .constfold import ScalarFoldedConstant
 from .literal import Number
@@ -58,6 +58,7 @@ class ScalarMultiply(Expr[Expr, Expr]):
             self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound)
         )
 
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -169,8 +170,13 @@ class ScalarMultiply(Expr[Expr, Expr]):
                 late_bound,
             )
 
-        # print("expr", self, av, bv, exprv, expr_lower, expr_upper)
+        # if neither a not b is const, we simplify by not allowing the sign of
+        #  a*b to change
+        # we further simplify the code by working with abs(a*b) = abs(a)*abs(b)
+        #  and only taking the sign of a and b into account at the end
 
+        # limit expr_lower and expr_upper to keep the same sign
+        # then compute the lower and upper bounds for the abs(expr)
         expr_lower = np.array(expr_lower, copy=True)
         expr_lower[_is_sign_positive_number(exprv) & (expr_lower <= 0)] = X.dtype.type(
             +0.0
@@ -194,11 +200,13 @@ class ScalarMultiply(Expr[Expr, Expr]):
         bv_abs = np.abs(bv)
         exprv_abs = np.array(np.abs(exprv), copy=None)
 
-        # print("expr_bounds", expr_lower, expr_upper, expr_abs_lower, expr_abs_upper)
-
         fmax = _floating_max(X.dtype)
         smallest_subnormal = _floating_smallest_subnormal(X.dtype)
 
+        # we are given l <= e <= u, which we translate into e/lf <= e <= e*uf
+        # - if the factor is infinite, we limit it to fmax
+        # - if the factor is NaN, e.g. from 0/0, we set the factor to 1
+        # finally we split the factor geometrically in two using the sqrt
         expr_abs_lower_factor: np.ndarray[Ps, np.dtype[F]] = np.array(
             np.divide(exprv_abs, expr_abs_lower), copy=None
         )
@@ -209,6 +217,7 @@ class ScalarMultiply(Expr[Expr, Expr]):
         expr_abs_upper_factor: np.ndarray[Ps, np.dtype[F]] = np.array(
             np.divide(
                 expr_abs_upper,
+                # we avoid division by zero here
                 _maximum_zero_sign_sensitive(exprv_abs, smallest_subnormal),
             ),
             copy=None,
@@ -217,48 +226,54 @@ class ScalarMultiply(Expr[Expr, Expr]):
         np.sqrt(expr_abs_upper_factor, out=expr_abs_upper_factor)
         expr_abs_upper_factor[np.isnan(expr_abs_upper_factor)] = X.dtype.type(1)
 
-        # print("expr_abs_bounds", expr_abs_lower_factor, expr_abs_upper_factor)
+        # TODO: for infinite a*b that includes finite bounds, allow them
+        # TODO: we could peek at a and b if they're powers with a constant
+        #       exponent to weigh the factor split
 
+        # compute the bounds for abs(a) and abs(b)
+        # - a lower bound of zero is always passed through
+        # - we ensure that the upper bound does not overflow into inf
         a_abs_lower = np.array(np.divide(av_abs, expr_abs_lower_factor), copy=None)
-        a_abs_lower[expr_abs_lower == 0] = 0
+        a_abs_lower[(expr_abs_lower == 0) & ~np.isnan(av_abs)] = 0
         a_abs_upper = np.array(np.multiply(av_abs, expr_abs_upper_factor), copy=None)
-        # np.copyto(a_abs_upper, expr_abs_upper, where=(exprv_abs == 0), casting="no")
-        a_abs_upper[np.isinf(a_abs_upper) & ~np.isinf(av_abs)] = fmax
+        a_abs_upper[np.isinf(a_abs_upper) & ~np.isinf(expr_abs_upper)] = fmax
 
         b_abs_lower = np.array(np.divide(bv_abs, expr_abs_lower_factor), copy=None)
-        b_abs_lower[expr_abs_lower == 0] = 0
+        b_abs_lower[(expr_abs_lower == 0) & ~np.isnan(bv_abs)] = 0
         b_abs_upper = np.array(np.multiply(bv_abs, expr_abs_upper_factor), copy=None)
-        # np.copyto(b_abs_upper, expr_abs_upper, where=(exprv_abs == 0), casting="no")
-        b_abs_upper[np.isinf(b_abs_upper) & ~np.isinf(bv_abs)] = fmax
+        b_abs_upper[np.isinf(b_abs_upper) & ~np.isinf(expr_abs_upper)] = fmax
 
+        any_nan = np.isnan(av_abs)
+        any_nan |= np.isnan(bv_abs)
         any_zero = a_abs_lower == 0
         any_zero |= b_abs_lower == 0
         any_inf = np.isinf(a_abs_upper)
         any_inf |= np.isinf(b_abs_upper)
         zero_inf_clash = any_zero & any_inf
 
+        # we cannot allow 0*inf, so truncate the bounds to not include them
+        # if any term is NaN, other terms can have any value
         a_abs_lower[zero_inf_clash & (a_abs_lower == 0)] = smallest_subnormal
         a_abs_upper[zero_inf_clash & np.isinf(a_abs_upper)] = fmax
+        a_abs_lower[any_nan & ~np.isnan(av_abs)] = 0
+        a_abs_upper[any_nan & ~np.isnan(av_abs)] = np.inf
 
         b_abs_lower[zero_inf_clash & (b_abs_lower == 0)] = smallest_subnormal
         b_abs_upper[zero_inf_clash & np.isinf(b_abs_upper)] = fmax
+        b_abs_lower[any_nan & ~np.isnan(bv_abs)] = 0
+        b_abs_upper[any_nan & ~np.isnan(bv_abs)] = np.inf
 
+        # ensure that the bounds on abs(a) and abs(b) include their values
         a_abs_lower = _minimum_zero_sign_sensitive(av_abs, a_abs_lower)
         a_abs_upper = _maximum_zero_sign_sensitive(av_abs, a_abs_upper)
 
         b_abs_lower = _minimum_zero_sign_sensitive(bv_abs, b_abs_lower)
         b_abs_upper = _maximum_zero_sign_sensitive(bv_abs, b_abs_upper)
 
-        # print("av", av_abs, a_abs_lower, a_abs_upper)
-        # print("bv", bv_abs, b_abs_lower, b_abs_upper)
-
-        # print("lu", a_abs_lower * b_abs_lower, a_abs_upper * b_abs_upper)
-
+        # stack the bounds on a and b so that we can nudge their bounds, if
+        #  necessary, together
         tl_abs_stack = np.stack([a_abs_lower, b_abs_lower])
         tu_abs_stack = np.stack([a_abs_upper, b_abs_upper])
-
-        # print("tl", tl_abs_stack)
-        # print("tu", tu_abs_stack)
 
         def compute_term_product(
             t_stack: np.ndarray[tuple[int, ...], np.dtype[F]],
@@ -307,9 +322,7 @@ class ScalarMultiply(Expr[Expr, Expr]):
             ),
         )
 
-        # print("tl2", tl_abs_stack)
-        # print("tu2", tu_abs_stack)
-
+        # derive the bounds on a and b based on the bounds on abs(a) and abs(b)
         a_lower = _where(
             _is_sign_negative_number(av), -tu_abs_stack[0], tl_abs_stack[0]
         )
@@ -324,9 +337,8 @@ class ScalarMultiply(Expr[Expr, Expr]):
             _is_sign_negative_number(bv), -tl_abs_stack[1], tu_abs_stack[1]
         )
 
-        # print("av2", av, a_lower, a_upper)
-        # print("bv2", bv, b_lower, b_upper)
-
+        # recurse into a and b to propagate their bounds, then combine their
+        #  bounds on Xs
         Xs_lower, Xs_upper = a.compute_data_bounds(
             a_lower,
             a_upper,
@@ -345,6 +357,7 @@ class ScalarMultiply(Expr[Expr, Expr]):
         Xs_lower = _maximum_zero_sign_sensitive(Xs_lower, bl)
         Xs_upper = _minimum_zero_sign_sensitive(Xs_upper, bu)
 
+        # ensure that the bounds on Xs include Xs
         Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
         Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
 
@@ -413,6 +426,7 @@ class ScalarDivide(Expr[Expr, Expr]):
             self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound)
         )
 
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -628,8 +642,13 @@ class ScalarDivide(Expr[Expr, Expr]):
                 late_bound,
             )
 
-        # print("expr", self, av, bv, exprv, expr_lower, expr_upper)
+        # if neither a not b is const, we simplify by not allowing the sign of
+        #  a/b to change
+        # we further simplify the code by working with abs(a/b) = abs(a)/abs(b)
+        #  and only taking the sign of a and b into account at the end
 
+        # limit expr_lower and expr_upper to keep the same sign
+        # then compute the lower and upper bounds for the abs(expr)
         expr_lower = np.array(expr_lower, copy=True)
         expr_lower[_is_sign_positive_number(exprv) & (expr_lower <= 0)] = X.dtype.type(
             +0.0
@@ -653,11 +672,13 @@ class ScalarDivide(Expr[Expr, Expr]):
         bv_abs = np.abs(bv)
         exprv_abs = np.array(np.abs(exprv), copy=None)
 
-        # print("expr_bounds", expr_lower, expr_upper, expr_abs_lower, expr_abs_upper)
-
         fmax = _floating_max(X.dtype)
         smallest_subnormal = _floating_smallest_subnormal(X.dtype)
 
+        # we are given l <= e <= u, which we translate into e/lf <= e <= e*uf
+        # - if the factor is infinite, we limit it to fmax
+        # - if the factor is NaN, e.g. from 0/0, we set the factor to 1
+        # finally we split the factor geometrically in two using the sqrt
         expr_abs_lower_factor: np.ndarray[Ps, np.dtype[F]] = np.array(
             np.divide(exprv_abs, expr_abs_lower), copy=None
         )
@@ -668,6 +689,7 @@ class ScalarDivide(Expr[Expr, Expr]):
         expr_abs_upper_factor: np.ndarray[Ps, np.dtype[F]] = np.array(
             np.divide(
                 expr_abs_upper,
+                # we avoid division by zero here
                 _maximum_zero_sign_sensitive(exprv_abs, smallest_subnormal),
             ),
             copy=None,
@@ -676,48 +698,55 @@ class ScalarDivide(Expr[Expr, Expr]):
         np.sqrt(expr_abs_upper_factor, out=expr_abs_upper_factor)
         expr_abs_upper_factor[np.isnan(expr_abs_upper_factor)] = X.dtype.type(1)
 
-        # print("expr_abs_bounds", expr_abs_lower_factor, expr_abs_upper_factor)
+        # TODO: for infinite a/b that includes finite bounds, allow them
+        # TODO: we could peek at a and b if they're powers with a constant
+        #       exponent to weigh the factor split
 
+        # compute the bounds for abs(a) and abs(b)
+        # - a lower bound of zero is always passed through
+        # - we ensure that the upper bound does not overflow into inf
         a_abs_lower = np.array(np.divide(av_abs, expr_abs_lower_factor), copy=None)
-        a_abs_lower[expr_abs_lower == 0] = 0
+        a_abs_lower[(expr_abs_lower == 0) & ~np.isnan(av_abs)] = 0
         a_abs_upper = np.array(np.multiply(av_abs, expr_abs_upper_factor), copy=None)
-        # np.copyto(a_abs_upper, expr_abs_upper, where=(exprv_abs == 0), casting="no")
-        a_abs_upper[np.isinf(a_abs_upper) & ~np.isinf(av_abs)] = fmax
+        a_abs_upper[np.isinf(a_abs_upper) & ~np.isinf(expr_abs_upper)] = fmax
 
         b_abs_lower = np.array(np.multiply(bv_abs, expr_abs_lower_factor), copy=None)
-        b_abs_lower[expr_abs_lower == 0] = np.inf
+        b_abs_lower[(expr_abs_lower == 0) & ~np.isnan(av_abs)] = np.inf
         b_abs_upper = np.array(np.divide(bv_abs, expr_abs_upper_factor), copy=None)
-        # np.copyto(b_abs_upper, expr_abs_upper, where=(exprv_abs == 0), casting="no")
-        # b_abs_upper[np.isinf(b_abs_upper) & ~np.isinf(bv_abs)] = fmax
+        b_abs_upper[(b_abs_upper == 0) & ~np.isinf(expr_abs_upper)] = smallest_subnormal
 
+        any_nan = np.isnan(av_abs)
+        any_nan |= np.isnan(bv_abs)
         both_zero = a_abs_lower == 0
         both_zero &= b_abs_lower == 0
         both_inf = np.isinf(a_abs_upper)
         both_inf &= np.isinf(b_abs_upper)
         zero_inf_clash = both_zero | both_inf
 
+        # we cannot allow 0/0 or inf/inf, so truncate the bounds to not include
+        #  them
+        # if any term is NaN, other terms can have any value
         a_abs_lower[zero_inf_clash & (a_abs_lower == 0)] = smallest_subnormal
         a_abs_upper[zero_inf_clash & np.isinf(a_abs_upper)] = fmax
+        a_abs_lower[any_nan & ~np.isnan(av_abs)] = 0
+        a_abs_upper[any_nan & ~np.isnan(av_abs)] = np.inf
 
         b_abs_lower[zero_inf_clash & (b_abs_lower == 0)] = smallest_subnormal
         b_abs_upper[zero_inf_clash & np.isinf(b_abs_upper)] = fmax
+        b_abs_lower[any_nan & ~np.isnan(bv_abs)] = 0
+        b_abs_upper[any_nan & ~np.isnan(bv_abs)] = np.inf
 
+        # ensure that the bounds on abs(a) and abs(b) include their values
         a_abs_lower = _minimum_zero_sign_sensitive(av_abs, a_abs_lower)
         a_abs_upper = _maximum_zero_sign_sensitive(av_abs, a_abs_upper)
 
         b_abs_lower = _minimum_zero_sign_sensitive(bv_abs, b_abs_lower)
         b_abs_upper = _maximum_zero_sign_sensitive(bv_abs, b_abs_upper)
 
-        # print("av", av_abs, a_abs_lower, a_abs_upper)
-        # print("bv", bv_abs, b_abs_lower, b_abs_upper)
-
-        # print("lu", a_abs_lower * b_abs_lower, a_abs_upper * b_abs_upper)
-
+        # stack the bounds on a and b so that we can nudge their bounds, if
+        #  necessary, together
         tl_abs_stack = np.stack([a_abs_lower, b_abs_lower])
         tu_abs_stack = np.stack([a_abs_upper, b_abs_upper])
-
-        # print("tl", tl_abs_stack)
-        # print("tu", tu_abs_stack)
 
         def compute_term_product(
             t_stack: np.ndarray[tuple[int, ...], np.dtype[F]],
@@ -766,9 +795,7 @@ class ScalarDivide(Expr[Expr, Expr]):
             ),
         )
 
-        # print("tl2", tl_abs_stack)
-        # print("tu2", tu_abs_stack)
-
+        # derive the bounds on a and b based on the bounds on abs(a) and abs(b)
         a_lower = _where(
             _is_sign_negative_number(av), -tu_abs_stack[0], tl_abs_stack[0]
         )
@@ -783,9 +810,8 @@ class ScalarDivide(Expr[Expr, Expr]):
             _where(_is_sign_negative_number(bv), -b_lower, b_upper),
         )
 
-        # print("av2", av, a_lower, a_upper)
-        # print("bv2", bv, b_lower, b_upper)
-
+        # recurse into a and b to propagate their bounds, then combine their
+        #  bounds on Xs
         Xs_lower, Xs_upper = a.compute_data_bounds(
             a_lower,
             a_upper,
@@ -804,6 +830,7 @@ class ScalarDivide(Expr[Expr, Expr]):
         Xs_lower = _maximum_zero_sign_sensitive(Xs_lower, bl)
         Xs_upper = _minimum_zero_sign_sensitive(Xs_upper, bu)
 
+        # ensure that the bounds on Xs include Xs
         Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
         Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
 
