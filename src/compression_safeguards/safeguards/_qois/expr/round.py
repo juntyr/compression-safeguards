@@ -72,7 +72,7 @@ class ScalarFloor(Expr[Expr]):
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
             _nextafter(expr_upper + 1, expr_upper), copy=None
         )
-        arg_upper[_is_negative_zero(expr_upper)] = X.dtype.type(-0.0)
+        arg_upper[_is_negative_zero(expr_upper)] = -0.0
 
         return arg.compute_data_bounds(
             arg_lower,
@@ -141,7 +141,7 @@ class ScalarCeil(Expr[Expr]):
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
             _nextafter(expr_lower - 1, expr_lower), copy=None
         )
-        arg_lower[_is_positive_zero(expr_lower)] = X.dtype.type(+0.0)
+        arg_lower[_is_positive_zero(expr_lower)] = +0.0
         arg_upper: np.ndarray[Ps, np.dtype[F]] = expr_upper
 
         return arg.compute_data_bounds(
@@ -301,11 +301,11 @@ class ScalarRoundTiesEven(Expr[Expr]):
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
             np.subtract(expr_lower, X.dtype.type(0.5)), copy=None
         )
-        arg_lower[_is_positive_zero(expr_lower)] = X.dtype.type(+0.0)
+        arg_lower[_is_positive_zero(expr_lower)] = +0.0
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
             np.add(expr_upper, X.dtype.type(0.5)), copy=None
         )
-        arg_upper[_is_negative_zero(expr_upper)] = X.dtype.type(-0.0)
+        arg_upper[_is_negative_zero(expr_upper)] = -0.0
 
         # handle rounding errors in round_ties_even(...) early
         # which can occur since our +-0.5 estimate doesn't account for the even

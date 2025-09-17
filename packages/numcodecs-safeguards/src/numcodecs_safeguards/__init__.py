@@ -458,7 +458,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 **{
                     "$x_min": np.nanmin(data)
                     if data.size > 0 and not np.all(np.isnan(data))
-                    else np.array(0, dtype=data.dtype)
+                    else data.dtype.type(0)
                 }
             )
         if "$x_max" in late_bound_reqs:
@@ -466,7 +466,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 **{
                     "$x_max": np.nanmax(data)
                     if data.size > 0 and not np.all(np.isnan(data))
-                    else np.array(0, dtype=data.dtype)
+                    else data.dtype.type(0)
                 }
             )
 

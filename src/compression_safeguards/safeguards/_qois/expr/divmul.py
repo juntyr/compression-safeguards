@@ -178,13 +178,9 @@ class ScalarMultiply(Expr[Expr, Expr]):
         # limit expr_lower and expr_upper to keep the same sign
         # then compute the lower and upper bounds for the abs(expr)
         expr_lower = np.array(expr_lower, copy=True)
-        expr_lower[_is_sign_positive_number(exprv) & (expr_lower <= 0)] = X.dtype.type(
-            +0.0
-        )
+        expr_lower[_is_sign_positive_number(exprv) & (expr_lower <= 0)] = +0.0
         expr_upper = np.array(expr_upper, copy=True)
-        expr_upper[_is_sign_negative_number(exprv) & (expr_upper >= 0)] = X.dtype.type(
-            -0.0
-        )
+        expr_upper[_is_sign_negative_number(exprv) & (expr_upper >= 0)] = -0.0
         expr_abs_lower, expr_abs_upper = (
             np.array(
                 _where(_is_sign_negative_number(exprv), -expr_upper, expr_lower),
@@ -212,7 +208,7 @@ class ScalarMultiply(Expr[Expr, Expr]):
         )
         expr_abs_lower_factor[np.isinf(expr_abs_lower_factor)] = fmax
         np.sqrt(expr_abs_lower_factor, out=expr_abs_lower_factor)
-        expr_abs_lower_factor[np.isnan(expr_abs_lower_factor)] = X.dtype.type(1)
+        expr_abs_lower_factor[np.isnan(expr_abs_lower_factor)] = 1
 
         expr_abs_upper_factor: np.ndarray[Ps, np.dtype[F]] = np.array(
             np.divide(
@@ -224,7 +220,7 @@ class ScalarMultiply(Expr[Expr, Expr]):
         )
         expr_abs_upper_factor[np.isinf(expr_abs_upper_factor)] = fmax
         np.sqrt(expr_abs_upper_factor, out=expr_abs_upper_factor)
-        expr_abs_upper_factor[np.isnan(expr_abs_upper_factor)] = X.dtype.type(1)
+        expr_abs_upper_factor[np.isnan(expr_abs_upper_factor)] = 1
 
         # TODO: for infinite a*b that includes finite bounds, allow them
         # TODO: we could peek at a and b if they're powers with a constant
@@ -457,18 +453,8 @@ class ScalarDivide(Expr[Expr, Expr]):
             expr_lower, expr_upper = np.copy(expr_lower), np.copy(expr_upper)
 
             # ensure that the expression keeps the same sign
-            np.copyto(
-                expr_lower,
-                _maximum_zero_sign_sensitive(X.dtype.type(+0.0), expr_lower),
-                where=_is_sign_positive_number(exprv),
-                casting="no",
-            )
-            np.copyto(
-                expr_upper,
-                _minimum_zero_sign_sensitive(X.dtype.type(-0.0), expr_upper),
-                where=_is_sign_negative_number(exprv),
-                casting="no",
-            )
+            expr_lower[(expr_lower <= 0) & _is_sign_positive_number(exprv)] = +0.0
+            expr_upper[(expr_upper >= 0) & _is_sign_negative_number(exprv)] = -0.0
 
             # compute the divisor bounds
             # for Inf/x, we can allow any finite x with the same sign
@@ -650,13 +636,9 @@ class ScalarDivide(Expr[Expr, Expr]):
         # limit expr_lower and expr_upper to keep the same sign
         # then compute the lower and upper bounds for the abs(expr)
         expr_lower = np.array(expr_lower, copy=True)
-        expr_lower[_is_sign_positive_number(exprv) & (expr_lower <= 0)] = X.dtype.type(
-            +0.0
-        )
+        expr_lower[_is_sign_positive_number(exprv) & (expr_lower <= 0)] = +0.0
         expr_upper = np.array(expr_upper, copy=True)
-        expr_upper[_is_sign_negative_number(exprv) & (expr_upper >= 0)] = X.dtype.type(
-            -0.0
-        )
+        expr_upper[_is_sign_negative_number(exprv) & (expr_upper >= 0)] = -0.0
         expr_abs_lower, expr_abs_upper = (
             np.array(
                 _where(_is_sign_negative_number(exprv), -expr_upper, expr_lower),
@@ -684,7 +666,7 @@ class ScalarDivide(Expr[Expr, Expr]):
         )
         expr_abs_lower_factor[np.isinf(expr_abs_lower_factor)] = fmax
         np.sqrt(expr_abs_lower_factor, out=expr_abs_lower_factor)
-        expr_abs_lower_factor[np.isnan(expr_abs_lower_factor)] = X.dtype.type(1)
+        expr_abs_lower_factor[np.isnan(expr_abs_lower_factor)] = 1
 
         expr_abs_upper_factor: np.ndarray[Ps, np.dtype[F]] = np.array(
             np.divide(
@@ -696,7 +678,7 @@ class ScalarDivide(Expr[Expr, Expr]):
         )
         expr_abs_upper_factor[np.isinf(expr_abs_upper_factor)] = fmax
         np.sqrt(expr_abs_upper_factor, out=expr_abs_upper_factor)
-        expr_abs_upper_factor[np.isnan(expr_abs_upper_factor)] = X.dtype.type(1)
+        expr_abs_upper_factor[np.isnan(expr_abs_upper_factor)] = 1
 
         # TODO: for infinite a/b that includes finite bounds, allow them
         # TODO: we could peek at a and b if they're powers with a constant
