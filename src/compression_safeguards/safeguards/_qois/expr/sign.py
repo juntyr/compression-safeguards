@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from ....utils._compat import _floating_smallest_subnormal
+from ....utils._compat import _floating_smallest_subnormal, _is_positive_zero
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from .abc import Expr
@@ -64,12 +64,12 @@ class ScalarSign(Expr[Expr]):
         # sign(-0.0) = +0.0 and sign(+0.0) = +0.0
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, smallest_subnormal)
         arg_lower[np.less_equal(expr_lower, -1)] = -np.inf
-        arg_lower[expr_lower == 0] = -0.0
+        arg_lower[_is_positive_zero(expr_lower)] = -0.0
         np.copyto(arg_lower, exprv, where=np.isnan(exprv), casting="no")
 
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, -smallest_subnormal)
         arg_upper[np.greater_equal(expr_upper, +1)] = np.inf
-        arg_upper[expr_upper == 0] = +0.0
+        arg_upper[_is_positive_zero(expr_upper)] = +0.0
         np.copyto(arg_upper, exprv, where=np.isnan(exprv), casting="no")
 
         return arg.compute_data_bounds(
