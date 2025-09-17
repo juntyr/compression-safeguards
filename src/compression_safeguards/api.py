@@ -632,6 +632,7 @@ class Safeguards:
         )
 
         stencil_indices: list[slice] = []
+        stencil_roll: list[int] = []
         non_stencil_indices: list[slice] = []
 
         # (1): check that the chunk stencil is compatible with the required stencil
@@ -648,6 +649,7 @@ class Safeguards:
                 and chunk_shape[i] == data_shape[i]
             ):
                 stencil_indices.append(slice(None))
+                stencil_roll.append(0)
                 non_stencil_indices.append(slice(None))
                 continue
 
@@ -676,6 +678,7 @@ class Safeguards:
                             None if c[1].after == rs.after else rs.after - c[1].after,
                         )
                     )
+                    stencil_roll.append(0)
                     non_stencil_indices.append(
                         slice(rs.before, None if rs.after == 0 else -rs.after)
                     )
@@ -688,19 +691,30 @@ class Safeguards:
                     # (a) if the chunk is in the middle, where no boundary
                     #     condition is applied, we just keep the stencil as-is
                     # (b) if the chunk's stencil only overlaps with the boundary
-                    #     on one side, we keep the stencil on that side as-is
-                    # (c) otherwise, we have the full data and remove the
-                    #     stencil so that the per-safeguard stencil correctly
-                    #     sees how points wrap
+                    #     on one side, we keep the stencil on that side as-is,
+                    #     as long as it does not overlap, after wrap-around,
+                    #     with the stencil on the other side
+                    #     in this case, we also need to roll the stencil on the
+                    #     side of the data boundary to the other side, to ensure
+                    #     that other boundary conditions also see a boundary
+                    # (c) otherwise, we can have the full data and remove any
+                    #     excessive stencil so that the per-safeguard stencil
+                    #     correctly sees how points wrap
                     rs = NeighbourhoodAxis(
                         before=(
                             r[1].before  # (a)
                             if r[1].before <= chunk_offset[i]
                             else (
-                                r[1].before  # (b)
+                                min(  # (b)
+                                    r[1].before - chunk_offset[i],
+                                    data_shape[i]
+                                    - chunk_offset[i]
+                                    - chunk_shape[i]
+                                    - r[1].after,
+                                )
                                 if r[1].after
                                 <= (data_shape[i] - chunk_shape[i] - chunk_offset[i])
-                                else 0  # (c)
+                                else min(chunk_offset[i], r[1].before)  # (c)
                             )
                         ),
                         after=(
@@ -708,14 +722,30 @@ class Safeguards:
                             if r[1].after
                             <= (data_shape[i] - chunk_shape[i] - chunk_offset[i])
                             else (
-                                r[1].after  # (b)
+                                min(  # (b)
+                                    chunk_offset[i]
+                                    + chunk_shape[i]
+                                    + r[1].after
+                                    - data_shape[i],
+                                    chunk_offset[i] - r[1].before,
+                                )
                                 if r[1].before <= chunk_offset[i]
-                                else 0  # (c)
+                                else min(  # (c)
+                                    r[1].after,
+                                    data_shape[i] - chunk_shape[i] - chunk_offset[i],
+                                )
                             )
                         ),
                     )
                     assert c[1].before >= rs.before
                     assert c[1].after >= rs.after
+
+                    roll_before = max(0, rs.before - chunk_offset[i])
+                    roll_after = max(
+                        0, chunk_offset[i] + chunk_shape[i] + rs.after - data_shape[i]
+                    )
+                    if (roll_before > 0) and (roll_after > 0):
+                        roll_before, roll_after = 0, 0
 
                     stencil_indices.append(
                         slice(
@@ -723,14 +753,25 @@ class Safeguards:
                             None if c[1].after == rs.after else rs.after - c[1].after,
                         )
                     )
+                    stencil_roll.append(-roll_before + roll_after)
+                    nsi_before = rs.before + roll_after - roll_before
+                    nsi_after = rs.after + roll_before - roll_after
                     non_stencil_indices.append(
-                        slice(rs.before, None if rs.after == 0 else -rs.after)
+                        slice(nsi_before, None if nsi_after == 0 else -nsi_after)
                     )
                 case _:
                     assert_never(c[0])
 
-        data_chunk_ = data_chunk[tuple(stencil_indices)]
-        prediction_chunk_ = prediction_chunk[tuple(stencil_indices)]
+        data_chunk_ = np.roll(
+            data_chunk[tuple(stencil_indices)],
+            shift=tuple(stencil_roll),
+            axis=tuple(range(data_chunk.ndim)),
+        )
+        prediction_chunk_ = np.roll(
+            prediction_chunk[tuple(stencil_indices)],
+            shift=tuple(stencil_roll),
+            axis=tuple(range(prediction_chunk.ndim)),
+        )
 
         # create the late-bound bindings for the chunk
         late_bound_chunk = (
@@ -742,6 +783,7 @@ class Safeguards:
         late_bound_chunk.expect_broadcastable_to(data_chunk.shape)
         # apply the stencil indices to the late-bound parameters
         late_bound_chunk = late_bound_chunk.apply_slice_index(tuple(stencil_indices))
+        late_bound_chunk = late_bound_chunk.apply_roll(tuple(stencil_roll))
 
         late_bound_reqs = self.late_bound
         late_bound_builtin = {
@@ -872,6 +914,7 @@ class Safeguards:
         )
 
         stencil_indices: list[slice] = []
+        stencil_roll: list[int] = []
         non_stencil_indices: list[slice] = []
 
         # (1): check that the chunk stencil is compatible with the required stencil
@@ -888,6 +931,7 @@ class Safeguards:
                 and chunk_shape[i] == data_shape[i]
             ):
                 stencil_indices.append(slice(None))
+                stencil_roll.append(0)
                 non_stencil_indices.append(slice(None))
                 continue
 
@@ -916,6 +960,7 @@ class Safeguards:
                             None if c[1].after == rs.after else rs.after - c[1].after,
                         )
                     )
+                    stencil_roll.append(0)
                     non_stencil_indices.append(
                         slice(rs.before, None if rs.after == 0 else -rs.after)
                     )
@@ -928,19 +973,30 @@ class Safeguards:
                     # (a) if the chunk is in the middle, where no boundary
                     #     condition is applied, we just keep the stencil as-is
                     # (b) if the chunk's stencil only overlaps with the boundary
-                    #     on one side, we keep the stencil on that side as-is
-                    # (c) otherwise, we have the full data and remove the
-                    #     stencil so that the per-safeguard stencil correctly
-                    #     sees how points wrap
+                    #     on one side, we keep the stencil on that side as-is,
+                    #     as long as it does not overlap, after wrap-around,
+                    #     with the stencil on the other side
+                    #     in this case, we also need to roll the stencil on the
+                    #     side of the data boundary to the other side, to ensure
+                    #     that other boundary conditions also see a boundary
+                    # (c) otherwise, we can have the full data and remove any
+                    #     excessive stencil so that the per-safeguard stencil
+                    #     correctly sees how points wrap
                     rs = NeighbourhoodAxis(
                         before=(
                             r[1].before  # (a)
                             if r[1].before <= chunk_offset[i]
                             else (
-                                r[1].before  # (b)
+                                min(  # (b)
+                                    r[1].before - chunk_offset[i],
+                                    data_shape[i]
+                                    - chunk_offset[i]
+                                    - chunk_shape[i]
+                                    - r[1].after,
+                                )
                                 if r[1].after
                                 <= (data_shape[i] - chunk_shape[i] - chunk_offset[i])
-                                else 0  # (c)
+                                else min(chunk_offset[i], r[1].before)  # (c)
                             )
                         ),
                         after=(
@@ -948,14 +1004,30 @@ class Safeguards:
                             if r[1].after
                             <= (data_shape[i] - chunk_shape[i] - chunk_offset[i])
                             else (
-                                r[1].after  # (b)
+                                min(  # (b)
+                                    chunk_offset[i]
+                                    + chunk_shape[i]
+                                    + r[1].after
+                                    - data_shape[i],
+                                    chunk_offset[i] - r[1].before,
+                                )
                                 if r[1].before <= chunk_offset[i]
-                                else 0  # (c)
+                                else min(  # (c)
+                                    r[1].after,
+                                    data_shape[i] - chunk_shape[i] - chunk_offset[i],
+                                )
                             )
                         ),
                     )
                     assert c[1].before >= rs.before
                     assert c[1].after >= rs.after
+
+                    roll_before = max(0, rs.before - chunk_offset[i])
+                    roll_after = max(
+                        0, chunk_offset[i] + chunk_shape[i] + rs.after - data_shape[i]
+                    )
+                    if (roll_before > 0) and (roll_after > 0):
+                        roll_before, roll_after = 0, 0
 
                     stencil_indices.append(
                         slice(
@@ -963,14 +1035,25 @@ class Safeguards:
                             None if c[1].after == rs.after else rs.after - c[1].after,
                         )
                     )
+                    stencil_roll.append(-roll_before + roll_after)
+                    nsi_before = rs.before + roll_after - roll_before
+                    nsi_after = rs.after + roll_before - roll_after
                     non_stencil_indices.append(
-                        slice(rs.before, None if rs.after == 0 else -rs.after)
+                        slice(nsi_before, None if nsi_after == 0 else -nsi_after)
                     )
                 case _:
                     assert_never(c[0])
 
-        data_chunk_ = data_chunk[tuple(stencil_indices)]
-        prediction_chunk_ = prediction_chunk[tuple(stencil_indices)]
+        data_chunk_ = np.roll(
+            data_chunk[tuple(stencil_indices)],
+            shift=tuple(stencil_roll),
+            axis=tuple(range(data_chunk.ndim)),
+        )
+        prediction_chunk_ = np.roll(
+            prediction_chunk[tuple(stencil_indices)],
+            shift=tuple(stencil_roll),
+            axis=tuple(range(prediction_chunk.ndim)),
+        )
 
         # create the late-bound bindings for the chunk
         late_bound_chunk = (
@@ -982,6 +1065,7 @@ class Safeguards:
         late_bound_chunk.expect_broadcastable_to(data_chunk.shape)
         # apply the stencil indices to the late-bound parameters
         late_bound_chunk = late_bound_chunk.apply_slice_index(tuple(stencil_indices))
+        late_bound_chunk = late_bound_chunk.apply_roll(tuple(stencil_roll))
 
         late_bound_reqs = self.late_bound
         late_bound_builtin = {

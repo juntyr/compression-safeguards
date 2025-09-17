@@ -327,6 +327,56 @@ class Bindings:
             }
         )
 
+    def apply_roll(self, shift: tuple[int, ...]) -> Self:
+        """
+        Apply the roll `shift` to the late-bound array values and return the rolled bindings.
+
+        The `shift` is only applied to an array value if
+        - the value is not scalar (no effect)
+        - the value has the same number of dimensions as the `shift` (bail out)
+
+        Furthermore, the shift is only applied along dimensions with a size
+        greater than 1, since smaller dimensions can be broadcast.
+
+        Parameters
+        ----------
+        shift : tuple[int, ...]
+            The roll shift that is applied to the late-bound array values.
+
+        Returns
+        -------
+        bindings : Bindings
+            The rolled bindings.
+        """
+
+        def apply_roll_to_value(value: Value) -> Value:
+            if isinstance(value, int | float | np.number):
+                # scalar
+                return value
+
+            if not isinstance(value, np.ndarray):
+                # bail out
+                return value
+
+            if value.ndim == 0:
+                # scalar array
+                return value
+
+            if value.ndim != len(shift):
+                # bail out
+                return value
+
+            # only apply the roll along axes that cannot be broadcast
+            value_shift = tuple(s if a > 1 else 0 for s, a in zip(shift, value.shape))
+            return np.roll(value, value_shift, axis=tuple(range(value.ndim)))
+
+        return type(self)(  # type: ignore
+            **{
+                param: apply_roll_to_value(value)
+                for param, value in self._bindings.items()
+            }
+        )
+
     def get_config(self) -> dict:
         """
         Returns the configuration of the bindings in a JSON compatible format.

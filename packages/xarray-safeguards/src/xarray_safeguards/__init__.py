@@ -445,17 +445,16 @@ def produce_data_array_correction(
 
         match boundary_:
             case "none":
-                # map_overlap passes the wrong block_info,
+                # map_overlap passes the incorrect block_info,
                 #  see https://github.com/dask/dask/issues/11349
-                # so we only trust it just enough to compute the effective
-                #  stencil size
-                extended_data_shape: tuple[int, ...] = tuple(block_info[None]["shape"])
-                extended_chunk_location: tuple[tuple[int, int], ...] = tuple(
-                    block_info[None]["array-location"]
-                )
+                # so we only trust chunk locations (but not array locations)
+                chunk_index: tuple[int, ...] = block_info[None]["chunk-location"]
+                num_chunks: tuple[int, ...] = block_info[None]["num-chunks"]
 
-                # the none boundary does not extend beyond the data boundary,
-                #  so we need to check by how much the stencil was cut off
+                # the none boundary does not extend beyond the data boundary
+                #  and so some stencils may be truncated
+                # dask guarantees that the chunks are at least as large as the
+                #  stencil, so only the edge chunks have truncated stencils
                 chunk_stencil: tuple[
                     tuple[
                         Literal[BoundaryCondition.valid, BoundaryCondition.wrap],
@@ -466,12 +465,10 @@ def produce_data_array_correction(
                     (
                         BoundaryCondition.valid,
                         NeighbourhoodAxis(
-                            before=s - max(0, s - b), after=min(e + a, d) - e
+                            before=b if ci > 0 else 0, after=a if (ci + 1) < cn else 0
                         ),
                     )
-                    for (b, a), (s, e), d in zip(
-                        depth, extended_chunk_location, extended_data_shape
-                    )
+                    for (b, a), ci, cn in zip(depth, chunk_index, num_chunks)
                 )
             case "periodic":
                 # the periodic boundary guarantees that we always have the
