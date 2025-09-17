@@ -645,28 +645,35 @@ class ScalarAtan(Expr[Expr]):
         argv = arg.eval(X.shape, Xs, late_bound)
         exprv = np.atan(argv)
 
-        pi = _pi(X.dtype)
+        # compute pi/2 but guard against rounding error to ensure that
+        #  tan(pi/2) >> 0
+        atan_max: F = np.atan(X.dtype.type(np.inf))
+        if np.tan(atan_max) < 0:
+            atan_max = X.dtype.type(
+                _nextafter(np.array(atan_max), np.array(X.dtype.type(0)))
+            )
+        assert np.tan(atan_max) > 0
 
         # apply the inverse function to get the bounds on arg
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
         # ensure that the bounds on atan(...) are in [-pi/2, +pi/2]
         # since tan is discontinuous at +-pi/2, we need to be extra careful
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
-            np.tan(_maximum_zero_sign_sensitive(np.divide(-pi, 2), expr_lower)),
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.tan(
+            _maximum_zero_sign_sensitive(-atan_max, expr_lower)
+        )
+        arg_lower = np.array(
+            _minimum_zero_sign_sensitive(argv, arg_lower),
             copy=None,
         )
-        arg_lower[(arg_lower < 0) & (expr_lower > 1)] = np.inf
-        arg_lower[(arg_lower > 0) & (expr_lower < -1)] = -np.inf
-        arg_lower = np.array(_minimum_zero_sign_sensitive(argv, arg_lower), copy=None)
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
-            np.tan(_minimum_zero_sign_sensitive(np.divide(+pi, 2), expr_upper)),
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.tan(
+            _minimum_zero_sign_sensitive(atan_max, expr_upper)
+        )
+        arg_upper = np.array(
+            _maximum_zero_sign_sensitive(argv, arg_upper),
             copy=None,
         )
-        arg_upper[(arg_upper < 0) & (expr_upper > 1)] = np.inf
-        arg_upper[(arg_upper > 0) & (expr_upper < -1)] = -np.inf
-        arg_upper = np.array(_maximum_zero_sign_sensitive(argv, arg_upper), copy=None)
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")

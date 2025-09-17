@@ -1085,8 +1085,8 @@ def test_fuzzer_found_excessive_nudging_atan_product():
     expr_upper = np.array(np.float32(5.0197614e33))
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
-    assert X_lower == np.array(np.float32(33556004.0))
-    assert X_upper == np.array(np.float32(np.inf))
+    assert X_lower == np.array(np.float32(26501838.0))
+    assert X_upper == np.array(np.float32(33556004.0))
 
     assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float32(3.8757849))
     assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float32(3.8757849))
