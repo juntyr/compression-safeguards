@@ -659,7 +659,13 @@ def test_fuzzer_found_global_late_bound_max():
 def test_fuzzer_found_wrapping_constant_boundary_clash():
     chunks = dict(a=1, b=3)
     da = xr.DataArray(
-        np.array([[0.0, 0.0, 0.0664, -0.05594, -0.0599]], dtype=np.float16),
+        np.array(
+            [
+                [0.0, 0.0, 0.0664, -0.05594, -0.0599],
+                [0.0, 0.0, 0.0664, -0.05594, -0.0599],
+            ],
+            dtype=np.float32,
+        ),
         name="da",
         dims=["a", "b"],
     ).chunk(chunks)
@@ -683,7 +689,7 @@ def test_fuzzer_found_wrapping_constant_boundary_clash():
             ),
             dict(
                 axis=0,
-                before=0,
+                before=1,
                 after=0,
                 boundary="wrap",
             ),

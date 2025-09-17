@@ -167,7 +167,7 @@ def check_one_input(data) -> None:
                 return
             late_bound[p] = np.frombuffer(b, dtype=dtype).reshape(raw.shape)
     late_bound_da = {
-        p: xr.DataArray(v, dims=dims) if isinstance(v, np.ndarray) else v
+        p: xr.DataArray(v, name=p, dims=dims) if isinstance(v, np.ndarray) else v
         for p, v in late_bound.items()
     }
 
@@ -187,8 +187,8 @@ def check_one_input(data) -> None:
     except (AssertionError, Warning, TimeoutError):
         return
 
-    da = xr.DataArray(raw, dims=dims)
-    da_prediction = xr.DataArray(np.ones_like(raw), dims=dims)
+    da = xr.DataArray(raw, name="da", dims=dims)
+    da_prediction = xr.DataArray(np.ones_like(raw), name="da", dims=dims)
 
     # xarray-safeguards provides `$x_min` and `$x_max`,
     #  but the compression-safeguards do not

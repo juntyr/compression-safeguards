@@ -135,6 +135,9 @@ def produce_data_array_correction(
     If the the `data` array is chunked, the correction is produced lazily,
     otherwise it is computed eagerly.
 
+    The `data` array must have a name and the `prediction` array must use the
+    same name.
+
     [^1]: At the moment, only chunking with `dask` is supported.
 
     Parameters
@@ -214,6 +217,8 @@ def produce_data_array_correction(
     assert data.shape == prediction.shape, "data.shape != prediction.shape"
     assert data.dtype == prediction.dtype, "data.dtype != prediction.dtype"
     assert data.chunks == prediction.chunks, "data.chunks != prediction.chunks"
+    assert data.name is not None, "data.name is None"
+    assert data.name == prediction.name, "data.name != prediction.name"
 
     safeguards_: Safeguards = Safeguards(safeguards=safeguards)
 
@@ -267,7 +272,7 @@ def produce_data_array_correction(
                 )
             late_bound_data_arrays[k] = v
 
-    correction_name = "sg" if data.name is None else f"{data.name}_sg"
+    correction_name = f"{data.name}_sg"
     correction_attrs = dict(
         safeguarded=data.name, safeguards=json.dumps(safeguards_.get_config())
     )
@@ -277,12 +282,12 @@ def produce_data_array_correction(
     # special case for no chunking: just compute eagerly
     if data.chunks is None:
         # provide built-in late-bound bindings $d for the data dimensions
-        late_bound_chunk: dict[str, Value] = dict(**late_bound_global)
+        late_bound_full: dict[str, Value] = dict(**late_bound_global)
         for i, d in enumerate(data.dims):
             if f"$d_{d}" in safeguards_late_bound_reqs:
                 shape = [1 for _ in range(len(data.dims))]
                 shape[i] = data.shape[i]
-                late_bound_chunk[f"$d_{d}"] = data[d].values.reshape(shape)
+                late_bound_full[f"$d_{d}"] = data[d].values.reshape(shape)
         for k, dv in late_bound_data_arrays.items():
             axes = sorted(
                 [i for i in range(len(dv.dims))],
@@ -292,12 +297,12 @@ def produce_data_array_correction(
             for d in dv.dims:
                 i = data.dims.index(d)
                 shape[i] = data.shape[i]
-            late_bound_chunk[k] = dv.values.transpose(axes).reshape(shape)
+            late_bound_full[k] = dv.values.transpose(axes).reshape(shape)
 
         da_correction = (
             data.copy(
                 data=safeguards_.compute_correction(
-                    data.values, prediction.values, late_bound=late_bound_chunk
+                    data.values, prediction.values, late_bound=late_bound_full
                 )
             )
             .rename(correction_name)
@@ -698,12 +703,16 @@ def apply_data_array_correction(
     """
     Apply the `correction` to the `prediction` array to satisfy the safeguards for which the `correction` was produced.
 
-    The `prediction` and `correction` arrays must use the same chunking, though
-    this chunking may differ from the one that was used to produce the
-    `correction`.
+    The `prediction` array may be chunked[^2] and the `correction` array must
+    use the same chunking, though this chunking may differ from the one that
+    was used to produce the `correction`.
 
     If the the `prediction` array is chunked, the correction is applied lazily,
     otherwise it its application is computed eagerly.
+
+    [^2]: Any chunking supported by `xarray` is supported, including but not
+    limited to `dask`, please see
+    <https://docs.xarray.dev/en/stable/internals/chunked-arrays.html>.
 
     Parameters
     ----------

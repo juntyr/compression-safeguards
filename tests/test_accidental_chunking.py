@@ -31,11 +31,11 @@ def test_codec_stack_pointwise():
     encoded_decoded = stack.encode_decode(data)
     assert np.all(encoded_decoded == decoded)
 
-    encoded_decoded_da = stack.encode_decode_data_array(xr.DataArray(data))
+    encoded_decoded_da = stack.encode_decode_data_array(xr.DataArray(data, name="da"))
     assert np.all(encoded_decoded_da.values == decoded)
 
     encoded_decoded_da = stack.encode_decode_data_array(
-        xr.DataArray(data).chunk(10)
+        xr.DataArray(data, name="da").chunk(10)
     ).compute()
     assert np.all(encoded_decoded_da.values == decoded)
 
@@ -66,12 +66,12 @@ def test_codec_stack_stencil():
     encoded_decoded = stack.encode_decode(data)
     assert np.all(encoded_decoded == decoded)
 
-    encoded_decoded_da = stack.encode_decode_data_array(xr.DataArray(data))
+    encoded_decoded_da = stack.encode_decode_data_array(xr.DataArray(data, name="da"))
     assert np.all(encoded_decoded_da.values == decoded)
 
     with pytest.raises(AssertionError, match="chunked array"):
         encoded_decoded_da = stack.encode_decode_data_array(
-            xr.DataArray(data).chunk(10)
+            xr.DataArray(data, name="da").chunk(10)
         ).compute()
 
 

@@ -171,7 +171,7 @@ class Safeguards:
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            The data array, relative to which the safeguards are enforced.
+            The data array, relative to which the safeguards are checked.
         prediction : np.ndarray[S, np.dtype[T]]
             The prediction array for which the safeguards are checked.
         late_bound : Mapping[str | Parameter, Value] | Bindings
@@ -191,6 +191,11 @@ class Safeguards:
 
         assert data.dtype in _SUPPORTED_DTYPES, (
             f"can only safeguard arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
+        )
+
+        # ensure we don't accidentally forget to handle new kinds of safeguards here
+        assert len(self.safeguards) == len(self._pointwise_safeguards) + len(
+            self._stencil_safeguards
         )
 
         if len(self._stencil_safeguards) > 0:
@@ -519,7 +524,11 @@ class Safeguards:
                             #  remember that we will need a wrapping / periodic
                             #  boundary
                             neighbourhood[i] = (
-                                BoundaryCondition.wrap,
+                                # only require the wrapping boundary condition
+                                #  if there actually is a boundary
+                                BoundaryCondition.wrap
+                                if s.before > 0 or s.after > 0
+                                else neighbourhood[i][0],
                                 NeighbourhoodAxis(
                                     before=max(n_before, s.after + s.before),
                                     after=max(n_after, s.before + s.after),
@@ -550,15 +559,15 @@ class Safeguards:
         Check if the `prediction_chunk` array chunk upholds the properties enforced by the safeguards with respect to the `data_chunk` array chunk.
 
         This advanced method should only be used when working with individual
-        chunks of data, otherwise please use the simpler and more efficient
-        [`check`][compression_safeguards.api.Safeguards.check]
-        method instead.
+        chunks of data, for non-chunked data please use the simpler and more
+        efficient [`check`][compression_safeguards.api.Safeguards.check] method
+        instead.
 
         Parameters
         ----------
         data_chunk : np.ndarray[S, np.dtype[T]]
             A chunk from the data array, relative to which the safeguards are
-            enforced.
+            checked.
         prediction_chunk : np.ndarray[S, np.dtype[T]]
             The corresponding chunk from the prediction array for which the
             safeguards are checked.
@@ -627,7 +636,7 @@ class Safeguards:
             # complete chunks that span the entire data along the axis are
             #  always allowed
             if (
-                c[0] == BoundaryCondition.valid
+                c[0] in (BoundaryCondition.valid, BoundaryCondition.wrap)
                 and c[1].before == 0
                 and c[1].after == 0
                 and chunk_shape[i] == data_shape[i]
@@ -782,7 +791,8 @@ class Safeguards:
         Compute the correction required to make the `prediction_chunk` array chunk satisfy the safeguards relative to the `data_chunk` array chunk.
 
         This advanced method should only be used when working with individual
-        chunks of data, otherwise please use the simpler and more efficient
+        chunks of data, for non-chunked data please use the simpler and more
+        efficient
         [`compute_correction`][compression_safeguards.api.Safeguards.compute_correction]
         method instead.
 
