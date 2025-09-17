@@ -490,11 +490,18 @@ def test_stencil_qoi_valid_boundary_late_bound_eb():
 
 def test_stencil_qoi_valid_boundary_late_bound_dimension():
     for chunks in [None, dict(), dict(a=9)]:
+        # test both dimensions with and without coordinates
         da = xr.DataArray(
-            np.linspace(0, 10, num=50), name="da", coords=dict(a=np.arange(50))
+            np.linspace(0, 10, num=50).reshape(25, 2),
+            name="da",
+            coords=dict(a=np.arange(25)),
+            dims=["a", "b"],
         )
         da_prediction = xr.DataArray(
-            np.zeros_like(da.values), name="da", coords=dict(a=np.arange(50))
+            np.zeros_like(da.values),
+            name="da",
+            coords=dict(a=np.arange(25)),
+            dims=["a", "b"],
         )
 
         if chunks is not None:
@@ -507,7 +514,7 @@ def test_stencil_qoi_valid_boundary_late_bound_dimension():
             safeguards=[
                 dict(
                     kind="qoi_eb_stencil",
-                    qoi='x + sum(C["$d_a"])',
+                    qoi='x + sum(C["$d_a"]) + c["$d_b"]',
                     neighbourhood=[dict(axis=0, before=1, after=1, boundary="valid")],
                     type="rel",
                     eb="$d_a",

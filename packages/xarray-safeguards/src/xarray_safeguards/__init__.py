@@ -11,7 +11,9 @@ your safety requirements, lossy compression can be applied safely and
 ## Overview
 
 This package provides functionality to use safeguards with (chunked)
-[`xarray.DataArray`][xarray.DataArray]s.
+[`xarray.DataArray`][xarray.DataArray]s. Since applying safeguards to chunked
+data by yourself is very difficult and error-prone, this package handles all of
+the complexity for you with a simple and safe API.
 
 In particular, `xarray-safeguards` provides the
 [`produce_data_array_correction`][xarray_safeguards.produce_data_array_correction]
@@ -36,7 +38,7 @@ can be applied *without fear*.
 
 ## Example
 
-You can produce the corrections to uphold an absolute error bound of
+You can produce and apply the corrections to uphold an absolute error bound of
 $eb_{abs} = 0.1$ for an already-compressed data array as follows:
 
 ```py
@@ -110,7 +112,7 @@ from typing_extensions import assert_never  # MSPV 3.11
 
 DataValue: TypeAlias = int | float | np.number | xr.DataArray
 """
-Parameter value type that includes scalar numbers and arrays thereof.
+Parameter value type that includes scalar numbers and data arrays thereof.
 """
 
 
@@ -160,7 +162,7 @@ def produce_data_array_correction(
 
         If a binding resolves to a [`xr.DataArray`][xarray.DataArray], its
         dimensions must be a subset of `data.dims` and the shape must be
-        broadcastable to the data shape, i.e. for each axis must either have
+        broadcastable to the data shape, i.e. each axis must have either
         size 1 or the same size as the matching dimension in the `data`.
 
         This method automatically provides the following built-in constants
@@ -312,8 +314,8 @@ def produce_data_array_correction(
             shape = [1 for _ in range(len(data.dims))]
             shape[i] = data.shape[i]
             chunked_late_bound[f"$d_{d}"] = dask.array.broadcast_to(
-                data[d].data,
-                shape=shape,
+                data[d].data.reshape(shape),
+                shape=data.shape,
                 meta=np.array((), dtype=data[d].dtype),
             ).rechunk(data.chunks)
     for k, v in late_bound_data_arrays.items():
@@ -323,8 +325,8 @@ def produce_data_array_correction(
             i = data.dims.index(d)
             shape[i] = data.shape[i]
         chunked_late_bound[k] = dask.array.broadcast_to(
-            v.transpose(*dims, transpose_coords=False).data,
-            shape=shape,
+            v.transpose(*dims, transpose_coords=False).data.reshape(shape),
+            shape=data.shape,
             meta=np.array((), dtype=v.dtype),
         ).rechunk(data.chunks)
 

@@ -549,8 +549,8 @@ class Safeguards:
         """
         Check if the `prediction_chunk` array chunk upholds the properties enforced by the safeguards with respect to the `data_chunk` array chunk.
 
-        This method should only be used when working with individual chunks of
-        data, otherwise please use the more efficient
+        This advanced method should only be used when working with individual
+        chunks of data, otherwise please use the simpler and more efficient
         [`check`][compression_safeguards.api.Safeguards.check]
         method instead.
 
@@ -781,8 +781,8 @@ class Safeguards:
         """
         Compute the correction required to make the `prediction_chunk` array chunk satisfy the safeguards relative to the `data_chunk` array chunk.
 
-        This method should only be used when working with individual chunks of
-        data, otherwise please use the more efficient
+        This advanced method should only be used when working with individual
+        chunks of data, otherwise please use the simpler and more efficient
         [`compute_correction`][compression_safeguards.api.Safeguards.compute_correction]
         method instead.
 
