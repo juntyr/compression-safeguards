@@ -10,6 +10,7 @@ With the `compression-safeguards` package, you can:
 - preserve properties over quantities of interest (QoIs) over the data
 - preserve regionally varying properties with regions of interest (RoIs)
 - combine safeguards arbitrarily with logical combinators
+- apply safeguards to any existing compressor or post-hoc to already-compressed data
 
 [^1]: Lossy compression methods reduce data size by only storing an approximation of the data. In contrast to lossless compression methods, lossy compression loses information about the data, e.g. by reducing its resolution (only store every $n$th element) precision (only store $n$ digits after the decimal point), smoothing, etc. Therefore, lossy compression methods provide a tradeoff between size reduction and quality preservation.
 
@@ -42,6 +43,13 @@ We also provide the following integrations of the safeguards with popular compre
 
 - `numcodecs-safeguards`: provides the `SafeguardsCodec` meta-compressor that conveniently applies safeguards to any compressor using the `numcodecs.abc.Codec` API.
 - `xarray-safeguards`: provides functionality to use safeguards with (chunked) `xarray.DataArray`s.
+
+The safeguards can be adopted easily:
+
+- any existing (lossy) compressor can be safeguarded, e.g. with the `numcodecs-safeguards` frontend, allowing users to try out different (untrusted) compressors as the safeguards guarantee that the safety requirements are always upheld
+- already compressed data can be safeguarded post-hoc as long as the original uncompressed data still exists, e.g. with the `xarray-safeguards` frontend
+- the safeguards-corrections to the compressed data can be stored inline (alongside the lossy-compressed data, e.g. with the `numcodecs-safeguards` frontend) or outline (e.g. in a separate file, with the `xarray-safeguards` frontend)
+- the safeguards can be combined with other meta-compression approaches, e.g. [progressive data compression and retrieval](https://doi.org/10.48550/arXiv.2308.11759)
 
 
 ### Other terminology used by the compression safeguards
@@ -154,9 +162,11 @@ pip install xarray-safeguards
 
 ### (a) Safeguards for users of lossy compression
 
+We provide the lower-level `compression-safeguards` package and the user-facing `numcodecs-safeguards` and `xarray-safeguards` frontend packages, which can all be used to apply safeguards. We generally recommend using the safeguards through one of their integrations with popular (compression) APIs, e.g. `numcodecs-safeguards` for quickly getting started with a ready-made compressor for non-chunked arrays, or `xarray-safeguards` for adopting safeguards post-hoc and applying them to already compressed (chunked) data arrays.
+
 #### `numcodecs-safeguards`
 
-We recommend using the safeguards through one of their integrations with popular compression APIs, e.g. `numcodecs-safeguards` for non-chunked data:
+You can get started quickly with the `numcodecs`-compatible `SafeguardsCodec` meta-compressor for non-chunked arrays:
 
 ```py
 import numpy as np
