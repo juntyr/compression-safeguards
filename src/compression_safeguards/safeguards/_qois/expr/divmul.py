@@ -214,6 +214,9 @@ class ScalarMultiply(Expr[Expr, Expr]):
             np.divide(
                 expr_abs_upper,
                 # we avoid division by zero here
+                # - if exprv_abs = 0 and expr_abs_upper = 0, factor = 0 works
+                # - if exprv_abs = 0 and expr_abs_upper > 0, factor is large
+                # - if exprv_abs > 0 and expr_abs_upper > 0, works as normal
                 _maximum_zero_sign_sensitive(exprv_abs, smallest_subnormal),
             ),
             copy=None,
@@ -225,6 +228,7 @@ class ScalarMultiply(Expr[Expr, Expr]):
         # TODO: for infinite a*b that includes finite bounds, allow them
         # TODO: we could peek at a and b if they're powers with a constant
         #       exponent to weigh the factor split
+        # TODO: handle all terms of a left-associative product in one go
 
         # compute the bounds for abs(a) and abs(b)
         # - a lower bound of zero is always passed through
@@ -248,7 +252,7 @@ class ScalarMultiply(Expr[Expr, Expr]):
         zero_inf_clash = any_zero & any_inf
 
         # we cannot allow 0*inf, so truncate the bounds to not include them
-        # if any term is NaN, other terms can have any value
+        # if any term is NaN, other non-NaN terms can have any value
         a_abs_lower[zero_inf_clash & (a_abs_lower == 0)] = smallest_subnormal
         a_abs_upper[zero_inf_clash & np.isinf(a_abs_upper)] = fmax
         a_abs_lower[any_nan & ~np.isnan(av_abs)] = 0
@@ -319,19 +323,28 @@ class ScalarMultiply(Expr[Expr, Expr]):
         )
 
         # derive the bounds on a and b based on the bounds on abs(a) and abs(b)
-        a_lower = _where(
-            _is_sign_negative_number(av), -tu_abs_stack[0], tl_abs_stack[0]
+        # if any term is NaN, other non-NaN terms can have any value of any sign
+        a_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
+            _where(_is_sign_negative_number(av), -tu_abs_stack[0], tl_abs_stack[0]),
+            copy=None,
         )
-        a_upper = _where(
-            _is_sign_negative_number(av), -tl_abs_stack[0], tu_abs_stack[0]
+        a_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
+            _where(_is_sign_negative_number(av), -tl_abs_stack[0], tu_abs_stack[0]),
+            copy=None,
         )
+        a_lower[any_nan & ~np.isnan(av)] = -np.inf
+        a_upper[any_nan & ~np.isnan(av)] = np.inf
 
-        b_lower = _where(
-            _is_sign_negative_number(bv), -tu_abs_stack[1], tl_abs_stack[1]
+        b_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
+            _where(_is_sign_negative_number(bv), -tu_abs_stack[1], tl_abs_stack[1]),
+            copy=None,
         )
-        b_upper = _where(
-            _is_sign_negative_number(bv), -tl_abs_stack[1], tu_abs_stack[1]
+        b_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
+            _where(_is_sign_negative_number(bv), -tl_abs_stack[1], tu_abs_stack[1]),
+            copy=None,
         )
+        b_lower[any_nan & ~np.isnan(bv)] = -np.inf
+        b_upper[any_nan & ~np.isnan(bv)] = np.inf
 
         # recurse into a and b to propagate their bounds, then combine their
         #  bounds on Xs
@@ -683,10 +696,12 @@ class ScalarDivide(Expr[Expr, Expr]):
         # TODO: for infinite a/b that includes finite bounds, allow them
         # TODO: we could peek at a and b if they're powers with a constant
         #       exponent to weigh the factor split
+        # TODO: handle all terms of a left-associative product in one go
 
         # compute the bounds for abs(a) and abs(b)
         # - a lower bound of zero is always passed through
         # - we ensure that the upper bound does not overflow into inf
+        # - the bounds for the divisor b are flipped
         a_abs_lower = np.array(np.divide(av_abs, expr_abs_lower_factor), copy=None)
         a_abs_lower[(expr_abs_lower == 0) & ~np.isnan(av_abs)] = 0
         a_abs_upper = np.array(np.multiply(av_abs, expr_abs_upper_factor), copy=None)
@@ -707,7 +722,7 @@ class ScalarDivide(Expr[Expr, Expr]):
 
         # we cannot allow 0/0 or inf/inf, so truncate the bounds to not include
         #  them
-        # if any term is NaN, other terms can have any value
+        # if any term is NaN, other non-NaN terms can have any value
         a_abs_lower[zero_inf_clash & (a_abs_lower == 0)] = smallest_subnormal
         a_abs_upper[zero_inf_clash & np.isinf(a_abs_upper)] = fmax
         a_abs_lower[any_nan & ~np.isnan(av_abs)] = 0
@@ -778,19 +793,35 @@ class ScalarDivide(Expr[Expr, Expr]):
         )
 
         # derive the bounds on a and b based on the bounds on abs(a) and abs(b)
-        a_lower = _where(
-            _is_sign_negative_number(av), -tu_abs_stack[0], tl_abs_stack[0]
+        # if any term is NaN, other non-NaN terms can have any value of any sign
+        # the bounds for the divisor b are flipped back here
+        a_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
+            _where(_is_sign_negative_number(av), -tu_abs_stack[0], tl_abs_stack[0]),
+            copy=None,
         )
-        a_upper = _where(
-            _is_sign_negative_number(av), -tl_abs_stack[0], tu_abs_stack[0]
+        a_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
+            _where(_is_sign_negative_number(av), -tl_abs_stack[0], tu_abs_stack[0]),
+            copy=None,
         )
+        a_lower[any_nan & ~np.isnan(av)] = -np.inf
+        a_upper[any_nan & ~np.isnan(av)] = np.inf
 
-        b_lower = _minimum_zero_sign_sensitive(tl_abs_stack[1], tu_abs_stack[1])
-        b_upper = _maximum_zero_sign_sensitive(tl_abs_stack[1], tu_abs_stack[1])
-        b_lower, b_upper = (
-            _where(_is_sign_negative_number(bv), -b_upper, b_lower),
-            _where(_is_sign_negative_number(bv), -b_lower, b_upper),
+        b_lower: np.ndarray[Ps, np.dtype[F]] = _minimum_zero_sign_sensitive(
+            tl_abs_stack[1], tu_abs_stack[1]
         )
+        b_upper: np.ndarray[Ps, np.dtype[F]] = _maximum_zero_sign_sensitive(
+            tl_abs_stack[1], tu_abs_stack[1]
+        )
+        b_lower, b_upper = (
+            np.array(
+                _where(_is_sign_negative_number(bv), -b_upper, b_lower), copy=None
+            ),
+            np.array(
+                _where(_is_sign_negative_number(bv), -b_lower, b_upper), copy=None
+            ),
+        )
+        b_lower[any_nan & ~np.isnan(bv)] = -np.inf
+        b_upper[any_nan & ~np.isnan(bv)] = np.inf
 
         # recurse into a and b to propagate their bounds, then combine their
         #  bounds on Xs

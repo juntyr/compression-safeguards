@@ -62,9 +62,13 @@ class ScalarSign(Expr[Expr]):
 
         # compute the lower and upper arg bounds that produce the sign bounds
         # sign(-0.0) = +0.0 and sign(+0.0) = +0.0
+        # - expr_lower = -0.0 (exprv >= +0.0) -> arg_lower = -0.0, exprv = +0.0
+        # - expr_lower = +0.0 (exprv >= +0.0) -> arg_lower = -0.0, exprv = +0.0
+        # - expr_upper = -0.0 (exprv < 0) -> arg_upper = -subnormal, exprv = -1
+        # - expr_upper = +0.0 (exprv <= +0.0) -> arg_upper = +0.0, exprv = +0.0
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, smallest_subnormal)
         arg_lower[np.less_equal(expr_lower, -1)] = -np.inf
-        arg_lower[_is_positive_zero(expr_lower)] = -0.0
+        arg_lower[expr_lower == 0] = -0.0
         np.copyto(arg_lower, exprv, where=np.isnan(exprv), casting="no")
 
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, -smallest_subnormal)

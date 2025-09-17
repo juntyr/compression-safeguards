@@ -558,6 +558,19 @@ class Safeguards:
         """
         Check if the `prediction_chunk` array chunk upholds the properties enforced by the safeguards with respect to the `data_chunk` array chunk.
 
+        Both the `data_chunk` and `prediction_chunk` contain the stencil around
+        the chunk, and the shape of this applied stencil is specified in the
+        `chunk_stencil` parameter. This stencil must be compatible with the
+        required stencil returned by
+        [`compute_required_stencil_for_chunked_correction(data_shape)`][compression_safeguards.api.Safeguards.compute_required_stencil_for_chunked_correction]:
+        - a wrapping boundary is always compatible with a valid boundary.
+        - a larger stencil is always compatible with a smaller stencil.
+        - a smaller stencil is sometimes compatible with a larger stencil, iff
+          the smaller stencil is near the entire data boundary and still
+          includes all required elements; for instance, providing the entire
+          data as a single chunk with no stencil is always compatible with any
+          stencil
+
         This advanced method should only be used when working with individual
         chunks of data, for non-chunked data please use the simpler and more
         efficient [`check`][compression_safeguards.api.Safeguards.check] method
@@ -566,28 +579,21 @@ class Safeguards:
         Parameters
         ----------
         data_chunk : np.ndarray[S, np.dtype[T]]
-            A chunk from the data array, relative to which the safeguards are
-            checked.
-        prediction_chunk : np.ndarray[S, np.dtype[T]]
-            The corresponding chunk from the prediction array for which the
+            A stencil-extended chunk from the data array, relative to which the
             safeguards are checked.
+        prediction_chunk : np.ndarray[S, np.dtype[T]]
+            The corresponding stencil-extended chunk from the prediction array
+            for which the safeguards are checked.
         data_shape : tuple[int, ...]
-            The shape of the entire data array, i.e. not just the chunk.
+            The shape of the entire data array, i.e. not just the chunk,
+            without any stencil.
         chunk_offset : tuple[int, ...]
-            The offset of the chunk inside the entire array. For arrays going
-            from left to right, bottom to top, ... the offset is the index of
-            the bottom left element in the entire array.
+            The offset of the non-stencil-extended chunk inside the entire
+            array. For arrays going from left to right, bottom to top, ..., the
+            offset is the index of the bottom left element in the entire array.
         chunk_stencil : tuple[tuple[Literal[BoundaryCondition.valid, BoundaryCondition.wrap], NeighbourhoodAxis], ...]
-            The shape of the stencil neighbourhood around the chunk. This
-            stencil must be compatible with the required stencil returned by
-            [`compute_required_stencil_for_chunked_correction(data_shape)`][compression_safeguards.api.Safeguards.compute_required_stencil_for_chunked_correction]:
-            - a wrapping boundary is always compatible with a valid boundary.
-            - a larger stencil is always compatible with a smaller stencil.
-            - a smaller stencil is sometimes compatible with a larger stencil,
-              iff the smaller stencil is near the entire data boundary and
-              still includes all required elements; for instance, providing the
-              entire data as a single chunk with no stencil is always
-              compatible with any stencil
+            The shape of the stencil neighbourhood that was applied around the
+            chunk in `data_chunk` and `prediction_chunk`.
         late_bound_chunk : Mapping[str | Parameter, Value] | Bindings
             The bindings for all late-bound parameters of the safeguards.
 
@@ -790,6 +796,19 @@ class Safeguards:
         """
         Compute the correction required to make the `prediction_chunk` array chunk satisfy the safeguards relative to the `data_chunk` array chunk.
 
+        Both the `data_chunk` and `prediction_chunk` contain the stencil around
+        the chunk, and the shape of this applied stencil is specified in the
+        `chunk_stencil` parameter. This stencil must be compatible with the
+        required stencil returned by
+        [`compute_required_stencil_for_chunked_correction(data_shape)`][compression_safeguards.api.Safeguards.compute_required_stencil_for_chunked_correction]:
+        - a wrapping boundary is always compatible with a valid boundary.
+        - a larger stencil is always compatible with a smaller stencil.
+        - a smaller stencil is sometimes compatible with a larger stencil, iff
+          the smaller stencil is near the entire data boundary and still
+          includes all required elements; for instance, providing the entire
+          data as a single chunk with no stencil is always compatible with any
+          stencil
+
         This advanced method should only be used when working with individual
         chunks of data, for non-chunked data please use the simpler and more
         efficient
@@ -799,28 +818,20 @@ class Safeguards:
         Parameters
         ----------
         data_chunk : np.ndarray[S, np.dtype[T]]
-            A chunk from the data array, relative to which the safeguards are
-            enforced.
+            A stencil-extended chunk from the data array, relative to which the
+            safeguards are enforced.
         prediction_chunk : np.ndarray[S, np.dtype[T]]
-            The corresponding chunk from the prediction array for which the
-            correction is computed.
+            The corresponding stencil-extended chunk from the prediction array
+            for which the correction is computed.
         data_shape : tuple[int, ...]
             The shape of the entire data array, i.e. not just the chunk.
         chunk_offset : tuple[int, ...]
-            The offset of the chunk inside the entire array. For arrays going
-            from left to right, bottom to top, ... the offset is the index of
-            the bottom left element in the entire array.
+            The offset of the non-stencil-extended chunk inside the entire
+            array. For arrays going from left to right, bottom to top, ..., the
+            offset is the index of the bottom left element in the entire array.
         chunk_stencil : tuple[tuple[Literal[BoundaryCondition.valid, BoundaryCondition.wrap], NeighbourhoodAxis], ...]
-            The shape of the stencil neighbourhood around the chunk. This
-            stencil must be compatible with the required stencil returned by
-            [`compute_required_stencil_for_chunked_correction(data_shape)`][compression_safeguards.api.Safeguards.compute_required_stencil_for_chunked_correction]:
-            - a wrapping boundary is always compatible with a valid boundary.
-            - a larger stencil is always compatible with a smaller stencil.
-            - a smaller stencil is sometimes compatible with a larger stencil,
-              iff the smaller stencil is near the entire data boundary and
-              still includes all required elements; for instance, providing the
-              entire data as a single chunk with no stencil is always
-              compatible with any stencil
+            The shape of the stencil neighbourhood that was applied around the
+            chunk in `data_chunk` and `prediction_chunk`.
         late_bound_chunk : Mapping[str | Parameter, Value] | Bindings
             The bindings for all late-bound parameters of the safeguards.
 
