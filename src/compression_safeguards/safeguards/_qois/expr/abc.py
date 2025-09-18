@@ -355,7 +355,7 @@ class Expr(ABC, Generic[Unpack[Es]]):
         Xs_lower = _minimum_zero_sign_sensitive(Xs, Xs_lower)
         Xs_upper = _maximum_zero_sign_sensitive(Xs, Xs_upper)
 
-        # handle rounding errors in the lower error bound computation
+        # handle rounding errors in the lower bound computation
         Xs_lower = guarantee_data_within_expr_bounds(
             lambda Xs_lower: self.eval(
                 X.shape,

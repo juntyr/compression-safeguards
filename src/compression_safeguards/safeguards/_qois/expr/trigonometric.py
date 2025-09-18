@@ -74,7 +74,8 @@ class ScalarSin(Expr[Expr]):
         arg_upper_diff = arg_upper - argv_asin
 
         # np.asin maps to [-pi/2, +pi/2] where sin is monotonically increasing
-        # flip the argument error bounds where sin is monotonically decreasing
+        # flip the argument difference bounds where sin is monotonically
+        #  decreasing
         # we check monotonicity using the derivative sin'(x) = cos(x)
         needs_flip = np.cos(argv) < 0
 
@@ -204,7 +205,8 @@ class ScalarCos(Expr[Expr]):
         arg_upper_diff = argv_acos - arg_upper
 
         # np.acos maps to [pi, 0] where cos is monotonically decreasing
-        # flip the argument error bounds where cos is monotonically decreasing
+        # flip the argument difference bounds where cos is monotonically
+        #  decreasing
         # we check monotonicity using the derivative cos'(x) = -sin(x)
         needs_flip = np.sin(argv) >= 0
 

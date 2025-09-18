@@ -69,7 +69,7 @@ class ScalarMultiply(Expr[Expr, Expr]):
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         a_const = not self._a.has_data
         b_const = not self._b.has_data
-        assert not (a_const and b_const), "constant multiplication has no error bounds"
+        assert not (a_const and b_const), "constant multiplication has no data bounds"
 
         # evaluate a and b and a*b
         a, b = self._a, self._b
@@ -446,7 +446,7 @@ class ScalarDivide(Expr[Expr, Expr]):
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         a_const = not self._a.has_data
         b_const = not self._b.has_data
-        assert not (a_const and b_const), "constant division has no error bounds"
+        assert not (a_const and b_const), "constant division has no data bounds"
 
         # evaluate a and b and a*b
         a, b = self._a, self._b

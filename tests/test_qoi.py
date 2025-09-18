@@ -32,7 +32,7 @@ from compression_safeguards.safeguards._qois.expr.power import ScalarPower
 from compression_safeguards.safeguards._qois.expr.reciprocal import ScalarReciprocal
 from compression_safeguards.safeguards._qois.expr.round import ScalarRoundTiesEven
 from compression_safeguards.safeguards._qois.expr.sign import ScalarSign
-from compression_safeguards.safeguards._qois.expr.square import ScalarSquare
+from compression_safeguards.safeguards._qois.expr.square import ScalarSqrt, ScalarSquare
 from compression_safeguards.safeguards._qois.expr.trigonometric import (
     ScalarAcos,
     ScalarAsin,
@@ -1432,3 +1432,47 @@ def test_negative_zero_ops(dtype):
 
     assert ty(-0.0) == 0
     assert ty(+0.0) == 0
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_power_nan_zero_in_bounds():
+    X = np.array(np.float16(-15920.0))
+
+    expr = ScalarPower(
+        ScalarAcosh(Data.SCALAR),
+        Data.SCALAR,
+    )
+
+    assert np.isnan(expr.eval((), X, dict()))
+
+    expr_lower = np.array(np.float16(np.nan))
+    expr_upper = np.array(np.float16(np.nan))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float16(-15920.0))
+    assert X_upper == np.array(np.float16(-15920.0))
+
+    assert np.isnan(expr.eval((), np.array(X_lower), dict()))
+    assert np.isnan(expr.eval((), np.array(X_upper), dict()))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_power_nan_excessive_nudging():
+    X = np.array(np.float64(-1.9794576248699151e-106))
+
+    expr = ScalarPower(
+        ScalarSqrt(Data.SCALAR),
+        ScalarExp(Exponential.exp, Data.SCALAR),
+    )
+
+    assert np.isnan(expr.eval((), X, dict()))
+
+    expr_lower = np.array(np.float64(np.nan))
+    expr_upper = np.array(np.float64(np.nan))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float64(-1.9794576248699151e-106))
+    assert X_upper == np.array(np.float64(-1.9794576248699151e-106))
+
+    assert np.isnan(expr.eval((), np.array(X_lower), dict()))
+    assert np.isnan(expr.eval((), np.array(X_upper), dict()))
