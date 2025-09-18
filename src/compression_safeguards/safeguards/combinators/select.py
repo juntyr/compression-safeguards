@@ -252,7 +252,7 @@ class _SelectSafeguardBase(ABC):
             valid._lower = (
                 np.take_along_axis(
                     np.stack([v._lower.T for v in valids], axis=0),
-                    selector.flatten().reshape((1, data.size, umax)),
+                    selector.flatten().reshape((1, data.size, 1)),
                     axis=0,
                 )
                 .reshape(data.size, umax)
@@ -261,7 +261,7 @@ class _SelectSafeguardBase(ABC):
             valid._upper = (
                 np.take_along_axis(
                     np.stack([v._upper.T for v in valids], axis=0),
-                    selector.flatten().reshape((1, data.size, umax)),
+                    selector.flatten().reshape((1, data.size, 1)),
                     axis=0,
                 )
                 .reshape(data.size, umax)
