@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
 from typing import Generic, final
+from warnings import warn
 
 import numpy as np
 from typing_extensions import (
@@ -318,6 +319,18 @@ class Expr(ABC, Generic[Unpack[Es]]):
             that contribute to the same QoI points.
         """
 
+        if (
+            data_bounds_checks(self.compute_data_bounds_unchecked)
+            != DataBounds.infallible
+        ):
+            exprv: np.ndarray[Ps, np.dtype[F]] = self.eval(X.shape, Xs, late_bound)
+            if not np.all((expr_lower <= exprv) | np.isnan(exprv)):
+                warn("expression lower bounds are above the expression values")
+            if not np.all((expr_upper >= exprv) | np.isnan(exprv)):
+                warn("expression upper bounds are below the expression values")
+        else:
+            exprv = None  # type: ignore
+
         Xs_lower: np.ndarray[Ns, np.dtype[F]]
         Xs_upper: np.ndarray[Ns, np.dtype[F]]
         Xs_lower, Xs_upper = self.compute_data_bounds_unchecked(
@@ -342,9 +355,7 @@ class Expr(ABC, Generic[Unpack[Es]]):
         Xs_lower = _minimum_zero_sign_sensitive(Xs, Xs_lower)
         Xs_upper = _maximum_zero_sign_sensitive(Xs, Xs_upper)
 
-        exprv = self.eval(X.shape, Xs, late_bound)
-
-        # handle rounding errors in the lower error bound computation
+        # handle rounding errors in the lower bound computation
         Xs_lower = guarantee_data_within_expr_bounds(
             lambda Xs_lower: self.eval(
                 X.shape,

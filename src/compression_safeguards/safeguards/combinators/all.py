@@ -14,7 +14,7 @@ from ...utils.intervals import IntervalUnion
 from ...utils.typing import S, T
 from ..abc import Safeguard
 from ..pointwise.abc import PointwiseSafeguard
-from ..stencil import NeighbourhoodAxis
+from ..stencil import BoundaryCondition, NeighbourhoodAxis
 from ..stencil.abc import StencilSafeguard
 
 
@@ -243,8 +243,10 @@ class _AllStencilSafeguards(_AllSafeguardsBase, StencilSafeguard):
 
     def compute_check_neighbourhood_for_data_shape(
         self, data_shape: tuple[int, ...]
-    ) -> tuple[None | NeighbourhoodAxis, ...]:
-        neighbourhood: list[None | NeighbourhoodAxis] = [None] * len(data_shape)
+    ) -> tuple[dict[BoundaryCondition, NeighbourhoodAxis], ...]:
+        neighbourhood: list[dict[BoundaryCondition, NeighbourhoodAxis]] = [
+            dict() for _ in data_shape
+        ]
 
         for safeguard in self._safeguards:
             if not isinstance(safeguard, StencilSafeguard):
@@ -256,11 +258,13 @@ class _AllStencilSafeguards(_AllSafeguardsBase, StencilSafeguard):
 
             for i, sn in enumerate(safeguard_neighbourhood):
                 ni = neighbourhood[i]
-                if ni is None:
-                    neighbourhood[i] = sn
-                elif sn is not None:
-                    neighbourhood[i] = NeighbourhoodAxis(
-                        max(ni.before, sn.before), max(ni.after, sn.after)
-                    )
+
+                for b, s in sn.items():
+                    if b in ni:
+                        neighbourhood[i][b] = NeighbourhoodAxis(
+                            max(ni[b].before, s.before), max(ni[b].after, s.after)
+                        )
+                    else:
+                        neighbourhood[i][b] = s
 
         return tuple(neighbourhood)

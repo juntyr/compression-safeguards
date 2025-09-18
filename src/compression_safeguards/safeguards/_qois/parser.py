@@ -678,18 +678,29 @@ class QoIParser(Parser):
         for t in terms[1:]:
             acc = ScalarAdd(acc, t)
 
+        required_axis_before = 0
+        required_axis_after = 0
+
         for idx in acc.data_indices:
-            for i, a, c in zip(idx, self._X.shape, self._I):
-                self.assert_or_error(
-                    i >= 0,
-                    p,
-                    f"cannot compute the `finite_difference` on axis {axis} since the neighbourhood is insufficiently large: before should be at least {c - i}",
-                )
-                self.assert_or_error(
-                    i < a,
-                    p,
-                    f"cannot compute the `finite_difference` on axis {axis} since the neighbourhood is insufficiently large: after should be at least {i - c}",
-                )
+            for x, i, a, c in zip(
+                range(len(self._X.shape)), idx, self._X.shape, self._I
+            ):
+                if x != ((axis + len(self._X.shape)) % len(self._X.shape)):
+                    assert i >= 0
+                    assert i < a
+
+                required_axis_before = max(required_axis_before, c - i)
+                required_axis_after = max(required_axis_after, i - c)
+
+        self.assert_or_error(
+            (required_axis_before <= self._I[axis])
+            and (required_axis_after <= (self._X.shape[axis] - self._I[axis] - 1)),
+            p,
+            f"cannot compute the `finite_difference` on axis {axis} since the "
+            "neighbourhood is insufficiently large: before should be at least "
+            f"{required_axis_before} and after should be at least "
+            f"{required_axis_after}",
+        )
 
         assert not isinstance(acc, Array)
         return Group(acc)

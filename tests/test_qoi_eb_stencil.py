@@ -987,17 +987,23 @@ def test_late_bound_broadcast():
 
     data = np.arange(16).reshape(4, 4)
 
-    with pytest.raises(ValueError, match="could not be broadcast together"):
-        safeguard.compute_safe_intervals(data, late_bound=Bindings(eb=np.ones((4, 4))))
-
+    safeguard.compute_safe_intervals(data, late_bound=Bindings(eb=np.ones((4, 4))))
     safeguard.compute_safe_intervals(data, late_bound=Bindings(eb=np.ones(tuple())))
     safeguard.compute_safe_intervals(data, late_bound=Bindings(eb=np.ones((1,))))
     safeguard.compute_safe_intervals(data, late_bound=Bindings(eb=np.ones((1, 1))))
-    safeguard.compute_safe_intervals(data, late_bound=Bindings(eb=np.ones((2, 2))))
 
-    with pytest.raises(ValueError, match="more dimensions"):
+    with pytest.raises(
+        ValueError,
+        match=r"cannot broadcast late-bound parameter eb with shape \(2, 2\) to shape \(4, 4\)",
+    ):
+        safeguard.compute_safe_intervals(data, late_bound=Bindings(eb=np.ones((2, 2))))
+
+    with pytest.raises(
+        ValueError,
+        match=r"cannot broadcast late-bound parameter eb with shape \(4, 4, 1\) to shape \(4, 4\)",
+    ):
         safeguard.compute_safe_intervals(
-            data, late_bound=Bindings(eb=np.ones((2, 2, 1)))
+            data, late_bound=Bindings(eb=np.ones((4, 4, 1)))
         )
 
 
@@ -1303,7 +1309,8 @@ def test_late_bound_constant_boundary():
     data = np.arange(6, dtype="uint8").reshape(2, 3)
 
     with pytest.raises(
-        ValueError, match="cannot broadcast a non-scalar to a scalar array"
+        ValueError,
+        match=r"cannot broadcast late-bound parameter const with shape \(2, 3\) to shape \(\)",
     ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(const=data, const2=4)

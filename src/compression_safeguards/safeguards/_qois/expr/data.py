@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from warnings import warn
 
 import numpy as np
 
@@ -64,15 +65,22 @@ class Data(Expr):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        X_lower: np.ndarray[Ns, np.dtype[F]] = np.copy(Xs)
-        X_lower[np.isfinite(Xs)] = -np.inf
-        X_lower[(...,) + self._index] = expr_lower
+        exprv = Xs[(...,) + self._index]
 
-        X_upper: np.ndarray[Ns, np.dtype[F]] = np.copy(Xs)
-        X_upper[np.isfinite(Xs)] = np.inf
-        X_upper[(...,) + self._index] = expr_upper
+        if not np.all((expr_lower <= exprv) | np.isnan(exprv)):
+            warn("data lower bounds are above the data values")
+        if not np.all((expr_upper >= exprv) | np.isnan(exprv)):
+            warn("data upper bounds are below the data values")
 
-        return X_lower, X_upper
+        Xs_lower: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(-np.inf))
+        Xs_lower[np.isnan(Xs)] = np.nan
+        Xs_lower[(...,) + self._index] = expr_lower
+
+        Xs_upper: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(np.inf))
+        Xs_upper[np.isnan(Xs)] = np.nan
+        Xs_upper[(...,) + self._index] = expr_upper
+
+        return Xs_lower, Xs_upper
 
     def __repr__(self) -> str:
         if self._index == ():

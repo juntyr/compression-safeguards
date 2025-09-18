@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
 from compression_safeguards.safeguards._qois.expr.addsub import ScalarSubtract
@@ -7,6 +8,7 @@ from compression_safeguards.safeguards._qois.expr.classification import (
     ScalarIsInf,
     ScalarIsNaN,
 )
+from compression_safeguards.safeguards._qois.expr.constfold import ScalarFoldedConstant
 from compression_safeguards.safeguards._qois.expr.data import Data
 from compression_safeguards.safeguards._qois.expr.divmul import (
     ScalarDivide,
@@ -17,7 +19,7 @@ from compression_safeguards.safeguards._qois.expr.hyperbolic import (
     ScalarAsinh,
     ScalarTanh,
 )
-from compression_safeguards.safeguards._qois.expr.literal import Euler, Number
+from compression_safeguards.safeguards._qois.expr.literal import Euler, Number, Pi
 from compression_safeguards.safeguards._qois.expr.logexp import (
     Exponential,
     Logarithm,
@@ -25,23 +27,28 @@ from compression_safeguards.safeguards._qois.expr.logexp import (
     ScalarLog,
     ScalarLogWithBase,
 )
+from compression_safeguards.safeguards._qois.expr.neg import ScalarNegate
 from compression_safeguards.safeguards._qois.expr.power import ScalarPower
 from compression_safeguards.safeguards._qois.expr.reciprocal import ScalarReciprocal
 from compression_safeguards.safeguards._qois.expr.round import ScalarRoundTiesEven
 from compression_safeguards.safeguards._qois.expr.sign import ScalarSign
-from compression_safeguards.safeguards._qois.expr.square import ScalarSquare
+from compression_safeguards.safeguards._qois.expr.square import ScalarSqrt, ScalarSquare
 from compression_safeguards.safeguards._qois.expr.trigonometric import (
     ScalarAcos,
     ScalarAsin,
     ScalarAtan,
     ScalarCos,
     ScalarSin,
+    ScalarTan,
 )
 from compression_safeguards.safeguards._qois.expr.where import ScalarWhere
 from compression_safeguards.safeguards._qois.interval import (
     compute_safe_data_lower_upper_interval_union,
 )
-from compression_safeguards.utils._float128 import _float128
+from compression_safeguards.utils._compat import _is_negative_zero, _is_positive_zero
+from compression_safeguards.utils._float128 import _float128, _float128_dtype
+
+np.set_printoptions(floatmode="unique")
 
 
 def test_abs():
@@ -875,7 +882,7 @@ def test_fuzzer_found_invalid_divide_rewrite():
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
     assert X_lower == np.array(2.9e-322, dtype=np.float64)
-    assert X_upper == np.array(2.9e-322, dtype=np.float64)
+    assert X_upper == np.array(1.7976931348623157e308, dtype=np.float64)
 
     assert expr.eval((), np.array(X_lower), dict()) == np.array(0.0, dtype=np.float64)
     assert expr.eval((), np.array(X_upper), dict()) == np.array(0.0, dtype=np.float64)
@@ -1061,3 +1068,411 @@ def test_fuzzer_found_excessive_nudging_one_power_nan():
 
     assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(1.0))
     assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float16(1.0))
+
+
+def test_fuzzer_found_excessive_nudging_atan_product():
+    X = np.array(np.float32(33556004.0))
+
+    expr = ScalarMultiply(
+        ScalarMultiply(
+            ScalarAtan(Data.SCALAR),
+            ScalarAtan(Data.SCALAR),
+        ),
+        ScalarAtan(Data.SCALAR),
+    )
+
+    assert np.round(expr.eval((), X, dict()), 3) == np.array(np.float32(3.876))
+
+    expr_lower = expr.eval((), X, dict())
+    expr_upper = np.array(np.float32(5.0197614e33))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower <= np.array(np.float32(33556004.0))
+    assert X_upper == np.array(np.float32(33556004.0))
+
+    assert np.round(expr.eval((), np.array(X_lower), dict()), 3) == np.array(
+        np.float32(3.876)
+    )
+    assert np.round(expr.eval((), np.array(X_upper), dict()), 3) == np.array(
+        np.float32(3.876)
+    )
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_oh_no_multiplication():
+    X = np.array(np.float64(-1.4568159901474651e144))
+
+    expr = ScalarMultiply(
+        ScalarReciprocal(Data.SCALAR),
+        ScalarMultiply(
+            ScalarReciprocal(Data.SCALAR),
+            ScalarSquare(Data.SCALAR),
+        ),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float64(1.0))
+
+    expr_lower = np.array(np.float64(-1.4568159901474629e144))
+    expr_upper = np.array(np.float64(1.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float64(-1.4568159901474651e144))
+    assert X_upper == np.array(np.float64(-1.4568159901474651e144))
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float64(1.0))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float64(1.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_excessive_nudging_product():
+    X = np.array(np.float16(255.9))
+
+    expr = ScalarMultiply(
+        ScalarAbs(Data.SCALAR),
+        ScalarMultiply(
+            ScalarIsFinite(Data.SCALAR),
+            ScalarRoundTiesEven(Data.SCALAR),
+        ),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float16(65500.0))
+
+    expr_lower = np.array(np.float16(0.0))
+    expr_upper = np.array(np.float16(65504.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float16(0.0))
+    assert X_upper == np.array(np.float16(255.9))
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(0.0))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float16(65500.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_excessive_nudging_zero_product():
+    X = np.array(np.float32(1.2830058e-22))
+
+    expr = ScalarMultiply(
+        ScalarNegate(Data.SCALAR),
+        ScalarMultiply(
+            ScalarFoldedConstant(np.float32(1.283019e-22)),
+            ScalarNegate(Data.SCALAR),
+        ),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float32(0.0))
+
+    expr_lower = np.array(np.float32(0.0))
+    expr_upper = np.array(np.float32(1.2630801e-38))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float32(0.0))
+    assert X_upper == np.array(np.float32(3.8519333e-19))
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float32(0.0))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float32(0.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_excessive_nudging_division():
+    X = np.array(np.float64(3.7921287488073535e146))
+
+    expr = ScalarDivide(
+        ScalarMultiply(
+            ScalarAbs(Data.SCALAR),
+            ScalarAcosh(Data.SCALAR),
+        ),
+        ScalarAbs(Data.SCALAR),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float64(338.2034982942516))
+
+    expr_lower = np.array(np.float64(338.2034982942516))
+    expr_upper = np.array(np.float64(3.7921287488073793e146))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float64(3.7921287488073535e146))
+    assert X_upper == np.array(np.float64(3.7921287488073535e146))
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(
+        np.float64(338.2034982942516)
+    )
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(
+        np.float64(338.2034982942516)
+    )
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_tan_upper_negative_zero():
+    X = np.array(np.float16(-0.841))
+
+    expr = ScalarMultiply(
+        ScalarDivide(
+            Number("-56809"),
+            ScalarTan(Data.SCALAR),
+        ),
+        Number("255"),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float16(np.inf))
+
+    expr_lower = np.array(np.float16(-0.841))
+    expr_upper = np.array(np.float16(np.inf))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float16(-1.57))
+    assert X_upper == np.array(np.float16(-0.0))
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(7012.0))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float16(np.inf))
+
+
+def test_fuzzer_found_power_excessive_nudging():
+    X = np.array(np.float32(13323083.0))
+
+    expr = ScalarPower(
+        Number("1263225675"),
+        ScalarAtan(Data.SCALAR),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float32(197957600000000.0))
+
+    expr_lower = np.array(np.float32(13323083.0))
+    expr_upper = np.array(np.float32(1.979576e14))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float32(0.9948097))
+    assert X_upper == np.array(np.float32(13323083.0))
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float32(13323100.0))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(
+        np.float32(197957600000000.0)
+    )
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_sign_negative_zero_bound():
+    X = np.array(np.float16(-0.0004613))
+
+    expr = ScalarDivide(
+        ScalarMultiply(
+            Number("-1886417009"),
+            Pi(),
+        ),
+        ScalarSign(Data.SCALAR),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float16(np.inf))
+
+    expr_lower = np.array(np.float16(-0.0004613))
+    expr_upper = np.array(np.float16(np.inf))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float16(-np.inf))
+    assert X_upper == np.array(np.float16(-6.0e-08))
+
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(np.inf))
+    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float16(np.inf))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+@pytest.mark.parametrize("dtype", ["float16", "float32", "float64", "float128"])
+def test_negative_zero_ops(dtype):
+    dtype = _float128_dtype if dtype == "float128" else np.dtype(dtype)
+    ty = dtype.type
+
+    assert _is_negative_zero(ty(-0.0))
+    assert not _is_positive_zero(ty(-0.0))
+    assert not _is_negative_zero(ty(+0.0))
+    assert _is_positive_zero(ty(+0.0))
+
+    assert _is_negative_zero(np.positive(ty(-0.0)))
+    assert _is_positive_zero(np.positive(ty(+0.0)))
+
+    assert _is_positive_zero(np.negative(ty(-0.0)))
+    assert _is_negative_zero(np.negative(ty(+0.0)))
+
+    assert _is_negative_zero(np.add(ty(-0.0), ty(-0.0)))
+    assert _is_positive_zero(np.add(ty(-0.0), ty(+0.0)))
+    assert _is_positive_zero(np.add(ty(+0.0), ty(-0.0)))
+    assert _is_positive_zero(np.add(ty(+0.0), ty(+0.0)))
+
+    assert _is_positive_zero(np.subtract(ty(-0.0), ty(-0.0)))
+    assert _is_negative_zero(np.subtract(ty(-0.0), ty(+0.0)))
+    assert _is_positive_zero(np.subtract(ty(+0.0), ty(-0.0)))
+    assert _is_positive_zero(np.subtract(ty(+0.0), ty(+0.0)))
+
+    assert _is_positive_zero(np.multiply(ty(-0.0), ty(-0.0)))
+    assert _is_negative_zero(np.multiply(ty(-0.0), ty(+0.0)))
+    assert _is_negative_zero(np.multiply(ty(+0.0), ty(-0.0)))
+    assert _is_positive_zero(np.multiply(ty(+0.0), ty(+0.0)))
+    assert _is_negative_zero(np.multiply(ty(-0.0), ty(1.0)))
+    assert _is_positive_zero(np.multiply(ty(+0.0), ty(1.0)))
+
+    assert np.isnan(np.divide(ty(-0.0), ty(-0.0)))
+    assert np.isnan(np.divide(ty(-0.0), ty(+0.0)))
+    assert np.isnan(np.divide(ty(+0.0), ty(-0.0)))
+    assert np.isnan(np.divide(ty(+0.0), ty(+0.0)))
+    assert _is_negative_zero(np.divide(ty(-0.0), ty(1.0)))
+    assert _is_positive_zero(np.divide(ty(+0.0), ty(1.0)))
+    assert np.isneginf(np.divide(ty(1.0), ty(-0.0)))
+    assert np.isposinf(np.divide(ty(1.0), ty(+0.0)))
+
+    assert np.power(ty(-0.0), ty(-0.0)) == ty(1.0)
+    assert np.power(ty(-0.0), ty(+0.0)) == ty(1.0)
+    assert np.power(ty(+0.0), ty(-0.0)) == ty(1.0)
+    assert np.power(ty(+0.0), ty(+0.0)) == ty(1.0)
+    assert np.power(ty(1.0), ty(-0.0)) == ty(1.0)
+    assert np.power(ty(1.0), ty(+0.0)) == ty(1.0)
+    assert _is_negative_zero(np.power(ty(-0.0), ty(1.0)))
+    assert _is_positive_zero(np.power(ty(+0.0), ty(1.0)))
+    assert _is_positive_zero(np.power(ty(-0.0), ty(2.0)))
+    assert _is_positive_zero(np.power(ty(+0.0), ty(2.0)))
+    assert _is_negative_zero(np.power(ty(-0.0), ty(3.0)))
+    assert _is_positive_zero(np.power(ty(+0.0), ty(3.0)))
+    assert _is_positive_zero(np.power(ty(-0.0), ty(3.6)))
+    assert _is_positive_zero(np.power(ty(+0.0), ty(3.6)))
+    assert np.isneginf(np.power(ty(-0.0), ty(-1.0)))
+    assert np.isposinf(np.power(ty(+0.0), ty(-1.0)))
+    assert np.isposinf(np.power(ty(-0.0), ty(-2.0)))
+    assert np.isposinf(np.power(ty(+0.0), ty(-2.0)))
+    assert np.isneginf(np.power(ty(-0.0), ty(-3.0)))
+    assert np.isposinf(np.power(ty(+0.0), ty(-3.0)))
+    assert np.isposinf(np.power(ty(-0.0), ty(-3.6)))
+    assert np.isposinf(np.power(ty(+0.0), ty(-3.6)))
+
+    assert np.isneginf(np.log(ty(-0.0)))
+    assert np.isneginf(np.log(ty(+0.0)))
+    assert np.isneginf(np.log2(ty(-0.0)))
+    assert np.isneginf(np.log2(ty(+0.0)))
+    assert np.isneginf(np.log10(ty(-0.0)))
+    assert np.isneginf(np.log10(ty(+0.0)))
+
+    assert np.exp(ty(-0.0)) == ty(1.0)
+    assert np.exp(ty(+0.0)) == ty(1.0)
+    assert np.exp2(ty(-0.0)) == ty(1.0)
+    assert np.exp2(ty(+0.0)) == ty(1.0)
+    assert np.power(ty(10.0), ty(-0.0)) == ty(1.0)
+    assert np.power(ty(10.0), ty(+0.0)) == ty(1.0)
+
+    assert _is_negative_zero(np.sqrt(ty(-0.0)))
+    assert _is_positive_zero(np.sqrt(ty(+0.0)))
+
+    assert _is_positive_zero(np.square(ty(-0.0)))
+    assert _is_positive_zero(np.square(ty(+0.0)))
+
+    assert np.isneginf(np.reciprocal(ty(-0.0)))
+    assert np.isposinf(np.reciprocal(ty(+0.0)))
+
+    assert _is_positive_zero(np.abs(ty(-0.0)))
+    assert _is_positive_zero(np.abs(ty(+0.0)))
+
+    assert _is_positive_zero(np.sign(ty(-0.0)))
+    assert _is_positive_zero(np.sign(ty(+0.0)))
+
+    assert _is_negative_zero(np.floor(ty(-0.0)))
+    assert _is_positive_zero(np.floor(ty(+0.0)))
+    assert _is_negative_zero(np.ceil(ty(-0.0)))
+    assert _is_positive_zero(np.ceil(ty(+0.0)))
+    assert _is_negative_zero(np.trunc(ty(-0.0)))
+    assert _is_positive_zero(np.trunc(ty(+0.0)))
+    assert _is_negative_zero(np.rint(ty(-0.0)))
+    assert _is_positive_zero(np.rint(ty(+0.0)))
+
+    assert _is_negative_zero(np.sin(ty(-0.0)))
+    assert _is_positive_zero(np.sin(ty(+0.0)))
+
+    assert np.cos(ty(-0.0)) == ty(1.0)
+    assert np.cos(ty(+0.0)) == ty(1.0)
+
+    assert _is_negative_zero(np.tan(ty(-0.0)))
+    assert _is_positive_zero(np.tan(ty(+0.0)))
+
+    assert _is_negative_zero(np.asin(ty(-0.0)))
+    assert _is_positive_zero(np.asin(ty(+0.0)))
+
+    assert np.rint(np.acos(ty(-0.0)) * 100) == ty(157)  # pi/2 * 100
+    assert np.rint(np.acos(ty(+0.0)) * 100) == ty(157)  # pi/2 * 100
+
+    assert _is_negative_zero(np.atan(ty(-0.0)))
+    assert _is_positive_zero(np.atan(ty(+0.0)))
+
+    assert _is_negative_zero(np.sinh(ty(-0.0)))
+    assert _is_positive_zero(np.sinh(ty(+0.0)))
+
+    assert np.cosh(ty(-0.0)) == ty(1.0)
+    assert np.cosh(ty(+0.0)) == ty(1.0)
+
+    assert _is_negative_zero(np.tanh(ty(-0.0)))
+    assert _is_positive_zero(np.tanh(ty(+0.0)))
+
+    assert _is_negative_zero(np.asin(ty(-0.0)))
+    assert _is_positive_zero(np.asin(ty(+0.0)))
+
+    assert np.isnan(np.acosh(ty(-0.0)))
+    assert np.isnan(np.acosh(ty(+0.0)))
+
+    assert _is_negative_zero(np.atan(ty(-0.0)))
+    assert _is_positive_zero(np.atan(ty(+0.0)))
+
+    assert np.isfinite(ty(-0.0))
+    assert np.isfinite(ty(+0.0))
+    assert np.array(np.isfinite(ty(-0.0))).astype(dtype) == ty(1.0)
+    assert np.array(np.isfinite(ty(+0.0))).astype(dtype) == ty(1.0)
+
+    assert not np.isinf(ty(-0.0))
+    assert not np.isinf(ty(+0.0))
+    assert _is_positive_zero(np.array(np.isinf(ty(-0.0))).astype(dtype))
+    assert _is_positive_zero(np.array(np.isinf(ty(+0.0))).astype(dtype))
+
+    assert not np.isnan(ty(-0.0))
+    assert not np.isnan(ty(+0.0))
+    assert _is_positive_zero(np.array(np.isnan(ty(-0.0))).astype(dtype))
+    assert _is_positive_zero(np.array(np.isnan(ty(+0.0))).astype(dtype))
+
+    assert ty(-0.0) == 0
+    assert ty(+0.0) == 0
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_power_nan_zero_in_bounds():
+    X = np.array(np.float16(-15920.0))
+
+    expr = ScalarPower(
+        ScalarAcosh(Data.SCALAR),
+        Data.SCALAR,
+    )
+
+    assert np.isnan(expr.eval((), X, dict()))
+
+    expr_lower = np.array(np.float16(np.nan))
+    expr_upper = np.array(np.float16(np.nan))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float16(-15920.0))
+    assert X_upper == np.array(np.float16(-15920.0))
+
+    assert np.isnan(expr.eval((), np.array(X_lower), dict()))
+    assert np.isnan(expr.eval((), np.array(X_upper), dict()))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_power_nan_excessive_nudging():
+    X = np.array(np.float64(-1.9794576248699151e-106))
+
+    expr = ScalarPower(
+        ScalarSqrt(Data.SCALAR),
+        ScalarExp(Exponential.exp, Data.SCALAR),
+    )
+
+    assert np.isnan(expr.eval((), X, dict()))
+
+    expr_lower = np.array(np.float64(np.nan))
+    expr_upper = np.array(np.float64(np.nan))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float64(-1.9794576248699151e-106))
+    assert X_upper == np.array(np.float64(-1.9794576248699151e-106))
+
+    assert np.isnan(expr.eval((), np.array(X_lower), dict()))
+    assert np.isnan(expr.eval((), np.array(X_upper), dict()))

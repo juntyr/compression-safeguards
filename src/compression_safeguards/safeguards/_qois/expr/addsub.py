@@ -171,7 +171,7 @@ def compute_left_associate_sum_data_bounds(
 
     # drop into expression difference bounds to divide up the bound
     # for NaN sums, we use a zero difference to ensure NaNs don't
-    #  accidentally propagate into the term error bounds
+    #  accidentally propagate into the term difference bounds
     expr_lower_diff: np.ndarray[Ps, np.dtype[F]] = np.array(
         np.subtract(expr_lower, exprv), copy=None
     )
@@ -216,7 +216,7 @@ def compute_left_associate_sum_data_bounds(
     # if total_abs_factor is zero, all abs_factorv are also zero and the term
     #  should keep the same value (unless the term is finite and there is any
     #  NaN term, see above)
-    # otherwise we split up the error bound for the terms by their factors
+    # otherwise we split up the difference bound for the terms by their factors
     tl_stack_: list[np.ndarray[Ps, np.dtype[F]]] = []
     for termv, abs_factorv in zip(termvs, abs_factorvs):
         if abs_factorv is None:

@@ -21,7 +21,7 @@ from .parser import QoIParser
 class PointwiseQuantityOfInterest:
     """
     Pointwise quantity of interest, which handles parsing, evaluation, and
-    error bound propagation for the QoI expression.
+    data bound propagation for the QoI expression.
 
     Parameters
     ----------
@@ -49,8 +49,8 @@ class PointwiseQuantityOfInterest:
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            # check if the expression is well-formed and if an error bound can
-            #  be computed
+            # check if the expression is well-formed and if data bounds can be
+            #  computed
             _canary_data_bounds = ScalarFoldedConstant.constant_fold_expr(
                 expr, np.dtype(np.float64)
             ).compute_data_bounds(
@@ -154,7 +154,7 @@ class PointwiseQuantityOfInterest:
 class StencilQuantityOfInterest:
     """
     Stencil quantity of interest, which handles parsing, evaluation, and
-    error bound propagation for the QoI expression.
+    data bound propagation for the QoI expression.
 
     Parameters
     ----------
@@ -202,8 +202,8 @@ class StencilQuantityOfInterest:
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
-            # check if the expression is well-formed and if an error bound can
-            #  be computed
+            # check if the expression is well-formed and if data bounds can be
+            #  computed
             _canary_data_bounds = ScalarFoldedConstant.constant_fold_expr(
                 expr, np.dtype(np.float64)
             ).compute_data_bounds(
@@ -281,8 +281,7 @@ class StencilQuantityOfInterest:
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         """
         Compute the lower-upper bounds on the stencil-extended data `Xs` that
-        satisfy the lower-upper error bounds `qoi_lower` and `qoi_lower` on the
-        QoI.
+        satisfy the lower-upper bounds `qoi_lower` and `qoi_lower` on the QoI.
 
         Parameters
         ----------

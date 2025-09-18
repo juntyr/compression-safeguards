@@ -30,6 +30,38 @@ with atheris.instrument_imports():
 warnings.filterwarnings("error")
 
 
+np.set_printoptions(floatmode="unique")
+
+
+# the fuzzer *somehow* messes up np.nanmin and np.nanmax, so patch them
+def nanmin(x: np.ndarray) -> np.number:
+    x = np.array(x, copy=None)
+    if np.all(np.isnan(x)):
+        warnings.warn("All-NaN slice encountered", RuntimeWarning)
+        return x.dtype.type(np.nan)
+    if np.any(np.isnan(x)):
+        x = np.copy(x)
+        x[np.isnan(x)] = np.inf
+    return np.amin(x)
+
+
+np.nanmin = nanmin
+
+
+def nanmax(x: np.ndarray) -> np.number:
+    x = np.array(x, copy=None)
+    if np.all(np.isnan(x)):
+        warnings.warn("All-NaN slice encountered", RuntimeWarning)
+        return x.dtype.type(np.nan)
+    if np.any(np.isnan(x)):
+        x = np.copy(x)
+        x[np.isnan(x)] = -np.inf
+    return np.amax(x)
+
+
+np.nanmax = nanmax
+
+
 class FuzzCodec(Codec):
     __slots__ = ("data", "decoded")
 
@@ -290,9 +322,11 @@ def check_one_input(data) -> None:
         for _ in range(data.ConsumeIntInRange(0, 8))
     ]
 
-    dtype: np.dtype = list(Safeguards.supported_dtypes())[
-        data.ConsumeIntInRange(0, len(Safeguards.supported_dtypes()) - 1)
-    ]
+    dtype: np.dtype = np.dtype(
+        sorted([d.name for d in Safeguards.supported_dtypes()])[
+            data.ConsumeIntInRange(0, len(Safeguards.supported_dtypes()) - 1)
+        ]
+    )
     sizea: int = data.ConsumeIntInRange(0, 20)
     sizeb: int = data.ConsumeIntInRange(0, 20 // max(1, sizea))
     size = sizea * sizeb
@@ -394,6 +428,12 @@ def check_one_input(data) -> None:
             or (
                 isinstance(err, AssertionError)
                 and (str(err) == "offset must not contain NaNs")
+            )
+            or (
+                isinstance(err, ValueError)
+                and ("cannot broadcast late-bound parameter" in str(err))
+                and ("with shape" in str(err))
+                and ("to shape" in str(err))
             )
         ):
             return

@@ -216,3 +216,22 @@ def test_numcodecs_validation():
             ],
             fixed_constants=dict(param=-1),
         )
+
+
+def test_fuzzer_found_select_shape_mismatch():
+    data = np.array([[256], [0]], dtype=np.int16)
+    decoded = np.array([[0], [0]], dtype=np.int16)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(
+                kind="select",
+                selector="$x_min",
+                safeguards=[
+                    dict(kind="same", value="$x_min", exclusive=True),
+                ],
+            ),
+        ],
+    )

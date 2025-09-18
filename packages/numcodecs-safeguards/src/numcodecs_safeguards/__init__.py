@@ -26,6 +26,11 @@ By using the `SafeguardsCodec` adapter, badly behaving lossy codecs become safe
 to use, at the cost of potentially less efficient compression, and lossy
 compression can be applied *without fear*.
 
+The `SafeguardsCodec` must only be used to encode the complete data, i.e. not
+just a chunk of data, so that non-pointwise safeguards are correctly applied.
+Please refer to the [`xarray-safeguards`][xarray_safeguards] frontend for
+applying safeguards to chunked data.
+
 ## Example
 
 You can wrap an existing codec with e.g. a relative error bound of
@@ -370,6 +375,11 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         If no correction is required, `correction_bytes` is empty and there is
         only a single-byte overhead from using the safeguards.
 
+        The `buf`fer must contain the complete data, i.e. not just a chunk of
+        data, so that non-pointwise safeguards are correctly applied. Please
+        refer to the [`xarray-safeguards`][xarray_safeguards] frontend for
+        applying safeguards to chunked data.
+
         Parameters
         ----------
         buf : Buffer
@@ -448,7 +458,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 **{
                     "$x_min": np.nanmin(data)
                     if data.size > 0 and not np.all(np.isnan(data))
-                    else np.array(0, dtype=data.dtype)
+                    else data.dtype.type(0)
                 }
             )
         if "$x_max" in late_bound_reqs:
@@ -456,7 +466,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 **{
                     "$x_max": np.nanmax(data)
                     if data.size > 0 and not np.all(np.isnan(data))
-                    else np.array(0, dtype=data.dtype)
+                    else data.dtype.type(0)
                 }
             )
 

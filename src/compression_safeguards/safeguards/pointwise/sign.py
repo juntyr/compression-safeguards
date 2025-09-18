@@ -127,8 +127,8 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         # values above (sign=+1) stay above
         # NaN values keep their sign bit
         ok: np.ndarray[S, np.dtype[np.bool]] = np.array(decoded == offset, copy=None)
-        np.copyto(ok, decoded < offset, where=(data < offset), casting="no")
-        np.copyto(ok, decoded > offset, where=(data > offset), casting="no")
+        np.less(decoded, offset, out=ok, where=np.less(data, offset))
+        np.greater(decoded, offset, out=ok, where=np.greater(data, offset))
         np.copyto(
             ok,
             np.isnan(decoded) & (np.signbit(data) == np.signbit(decoded)),

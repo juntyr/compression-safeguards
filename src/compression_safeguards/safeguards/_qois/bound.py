@@ -166,7 +166,7 @@ def guarantee_data_within_expr_bounds(
         #  difference
         Xs_diff *= backoff
         backoff = np.divide(backoff, 2)
-        np.copyto(Xs_bound_guess, Xs + Xs_diff, where=bounds_exceeded, casting="no")
+        np.add(Xs, Xs_diff, out=Xs_bound_guess, where=bounds_exceeded)
 
     warn("data bounds required excessive nudging")
 

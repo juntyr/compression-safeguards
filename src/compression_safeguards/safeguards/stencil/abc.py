@@ -13,7 +13,7 @@ from ...utils.bindings import Bindings
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import S, T
 from ..abc import Safeguard
-from . import NeighbourhoodAxis
+from . import BoundaryCondition, NeighbourhoodAxis
 
 
 class StencilSafeguard(Safeguard, ABC):
@@ -30,11 +30,14 @@ class StencilSafeguard(Safeguard, ABC):
     @abstractmethod
     def compute_check_neighbourhood_for_data_shape(
         self, data_shape: tuple[int, ...]
-    ) -> tuple[None | NeighbourhoodAxis, ...]:
+    ) -> tuple[dict[BoundaryCondition, NeighbourhoodAxis], ...]:
         """
         Compute the shape of the data neighbourhood for data of a given shape.
-        [`None`][None] is returned along dimensions for which the stencil
-        safeguard does not need to look at adjacent data points.
+        Boundary conditions of the same kind are combined, but separate kinds
+        are tracked separately.
+
+        An empty [`dict`][dict] is returned along dimensions for which the
+        stencil safeguard does not need to look at adjacent data points.
 
         This method also checks that the data shape is compatible with this
         stencil safeguard.
@@ -46,7 +49,7 @@ class StencilSafeguard(Safeguard, ABC):
 
         Returns
         -------
-        neighbourhood_shape : tuple[None | NeighbourhoodAxis, ...]
+        neighbourhood_shape : tuple[dict[BoundaryCondition, NeighbourhoodAxis], ...]
             The shape of the data neighbourhood.
         """
 

@@ -77,14 +77,19 @@ class ScalarPower(Expr[Expr, Expr]):
         # we need to full-force-force a and b to stay the same when
         #  (a) av is negative: powers of negative numbers are just too tricky
         #  (b) av is NaN and bv is zero: NaN ** 0 = 1 ... why???
+        #      but also for NaN ** b and b != 0 ensure that b doesn't become 0
         #  (c) av is one and bv is NaN: 1 ** NaN = 1 ... why???
+        #      but also for a ** NaN and a != 1 ensure that a doesn't become 1
+        # for (b) and (c) it easier to force both if isnan(a) or isnan(b), the
+        #  clearer rules could be applied once power no longer uses a rewrite
         force_same: np.ndarray[Ps, np.dtype[np.bool]] = _is_sign_negative_number(av)
-        force_same |= np.isnan(av) & (bv == 0)
-        force_same |= (av == 1) & np.isnan(bv)
+        # force_same |= np.isnan(av) & (bv == 0)
+        # force_same |= (av == 1) & np.isnan(bv)
+        force_same |= np.isnan(av) | np.isnan(bv)
 
         # rewrite a ** b as fake_abs(e^(b*ln(fake_abs(a))))
         # this is mathematically incorrect for a <= 0 but works for deriving
-        #  error bounds since fake_abs handles the error bound flips
+        #  data bounds since fake_abs handles the data bound flips
         rewritten = ScalarExp(
             Exponential.exp,
             ScalarMultiply(
@@ -169,14 +174,10 @@ class ScalarFakeAbs(Expr[Expr]):
 
         # flip the lower/upper bounds if the arg is negative
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(expr_lower, copy=True)
-        np.copyto(
-            arg_lower, -expr_upper, where=_is_sign_negative_number(argv), casting="no"
-        )
+        np.negative(expr_upper, out=arg_lower, where=_is_sign_negative_number(argv))
 
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(expr_upper, copy=True)
-        np.copyto(
-            arg_upper, -expr_lower, where=_is_sign_negative_number(argv), casting="no"
-        )
+        np.negative(expr_lower, out=arg_upper, where=_is_sign_negative_number(argv))
 
         return arg.compute_data_bounds(
             arg_lower,

@@ -119,6 +119,17 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     eb : int | float | str | Parameter
         The value of or late-bound parameter name for the error bound on the
         quantity of interest that is enforced by this safeguard.
+
+        The error bound is applied relative to the values of the quantity of
+        interest evaluated on the original data.
+
+        If `eb` is a late-bound parameter, its late-bound value must be
+        broadcastable to the shape of the data to be encoded, not the shape of
+        the QoI that has been evaluated (even though it is only applied to the
+        QoI). The
+        [`expand_qoi_to_data_shape`][compression_safeguards.safeguards.stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard.expand_qoi_to_data_shape]
+        method can be used to expand an error-bound from the QoI shape to the
+        data shape.
     qoi_dtype : str | ToFloatMode
         The floating-point data type in which the quantity of interest is
         evaluated. By default, the smallest floating-point data type that can
@@ -215,11 +226,14 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     def compute_check_neighbourhood_for_data_shape(
         self,
         data_shape: tuple[int, ...],
-    ) -> tuple[None | NeighbourhoodAxis, ...]:
+    ) -> tuple[dict[BoundaryCondition, NeighbourhoodAxis], ...]:
         """
         Compute the shape of the data neighbourhood for data of a given shape.
-        [`None`][None] is returned along dimensions for which the stencil QoI
-        safeguard does not need to look at adjacent data points.
+        Boundary conditions of the same kind are combined, but separate kinds
+        are tracked separately.
+
+        An empty [`dict`][dict] is returned along dimensions for which the
+        stencil QoI safeguard does not need to look at adjacent data points.
 
         This method also checks that the data shape is compatible with the
         stencil QoI safeguard.
@@ -231,11 +245,13 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         Returns
         -------
-        neighbourhood_shape : tuple[None | NeighbourhoodAxis, ...]
+        neighbourhood_shape : tuple[dict[BoundaryCondition, NeighbourhoodAxis], ...]
             The shape of the data neighbourhood.
         """
 
-        neighbourhood: list[None | NeighbourhoodAxis] = [None] * len(data_shape)
+        neighbourhood: list[dict[BoundaryCondition, NeighbourhoodAxis]] = [
+            dict() for _ in data_shape
+        ]
 
         all_axes = []
         for axis in self._neighbourhood:
@@ -250,10 +266,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 )
             all_axes.append(naxis)
 
-            neighbourhood[naxis] = axis.shape
+            neighbourhood[naxis][axis.boundary] = axis.shape
 
         if np.prod(data_shape) == 0:
-            return (None,) * len(data_shape)
+            return tuple(dict() for _ in data_shape)
 
         return tuple(neighbourhood)
 
@@ -524,7 +540,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         eb: np.ndarray[tuple[()] | tuple[int, ...], np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                 self._eb,
-                qoi_data.shape,
+                data.shape,  # for simplicity, we resolve to the data shape
                 qoi_data.dtype,
             )
             if isinstance(self._eb, Parameter)
@@ -532,6 +548,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 self._eb, qoi_data.dtype, "stencil QoI error bound safeguard eb"
             )
         )
+        if isinstance(self._eb, Parameter):
+            eb = self.truncate_data_to_qoi_shape(eb)  # and then truncate it
         _check_error_bound(self._type, eb)
 
         finite_ok = _compute_finite_absolute_error(
@@ -541,12 +559,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         windows_ok: np.ndarray[tuple[int, ...], np.dtype[np.bool]] = np.array(
             finite_ok, copy=None
         )
-        np.copyto(
-            windows_ok, qoi_data == qoi_decoded, where=np.isinf(qoi_data), casting="no"
-        )
-        np.copyto(
-            windows_ok, np.isnan(qoi_decoded), where=np.isnan(qoi_data), casting="no"
-        )
+        np.equal(qoi_data, qoi_decoded, out=windows_ok, where=np.isinf(qoi_data))
+        np.isnan(qoi_decoded, out=windows_ok, where=np.isnan(qoi_data))
 
         s = [slice(None)] * data.ndim
         for axis in self._neighbourhood:
@@ -680,7 +694,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         eb: np.ndarray[tuple[()] | tuple[int, ...], np.dtype[np.floating]] = (
             late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                 self._eb,
-                data_qoi.shape,
+                data.shape,  # for simplicity, we resolve to the data shape
                 data_qoi.dtype,
             )
             if isinstance(self._eb, Parameter)
@@ -688,6 +702,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 self._eb, data_qoi.dtype, "stencil QoI error bound safeguard eb"
             )
         )
+        if isinstance(self._eb, Parameter):
+            eb = self.truncate_data_to_qoi_shape(eb)  # and then truncate it
         _check_error_bound(self._type, eb)
 
         qoi_lower_upper: tuple[
@@ -736,7 +752,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         # compute the reverse: for each data element, which windows is it in
         # i.e. for each data element, which QoI elements does it contribute to
-        #      and thus which error bounds affect it
+        #      and thus which data bounds affect it
         reverse_indices_windows = np.full(
             (data.size, np.sum(window_used)), indices_windows.size
         )
@@ -796,6 +812,128 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         return compute_safe_data_lower_upper_interval_union(
             data, data_float_lower, data_float_upper
         )
+
+    def truncate_data_to_qoi_shape(
+        self, data: np.ndarray[tuple[int, ...], np.dtype[T]]
+    ) -> np.ndarray[tuple[int, ...], np.dtype[T]]:
+        """
+        Truncate the `data` array to the shape of the `qoi` array that would be evaluated from it.
+
+        For neighbourhoods without any
+        [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
+        boundaries, this method simply copies the `data` array. Along axes with
+        a
+        [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
+        boundary, the `data` is truncated before and after by as many elements as
+        the boundary cuts off.
+
+        This method is the *lossy* inverse of
+        [`expand_qoi_to_data_shape`][compression_safeguards.safeguards.stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard.expand_qoi_to_data_shape].
+
+        Parameters
+        ----------
+        data : np.ndarray[tuple[int, ...], np.dtype[T]]
+            Data array to be truncated.
+
+        Returns
+        -------
+        data_truncated : np.ndarray[tuple[int, ...], np.dtype[T]]
+            Truncated data array.
+        """
+
+        data = np.array(data, copy=None)
+
+        qoi_index = [slice(None, None) for _ in data.shape]
+
+        all_axes = []
+        for axis in self._neighbourhood:
+            if (axis.axis >= data.ndim) or (axis.axis < -data.ndim):
+                raise IndexError(
+                    f"axis index {axis.axis} is out of bounds for array of shape {data.shape}"
+                )
+            naxis = axis.axis if axis.axis >= 0 else data.ndim + axis.axis
+            if naxis in all_axes:
+                raise IndexError(
+                    f"duplicate axis index {axis.axis}, normalised to {naxis}, for array of shape {data.shape}"
+                )
+            all_axes.append(naxis)
+
+            if axis.boundary != BoundaryCondition.valid:
+                continue
+
+            qoi_index[naxis] = slice(
+                axis.before, None if axis.after == 0 else -axis.after
+            )
+
+        return data[tuple(qoi_index)]
+
+    def expand_qoi_to_data_shape(
+        self, qoi: np.ndarray[tuple[int, ...], np.dtype[T]]
+    ) -> np.ndarray[tuple[int, ...], np.dtype[T]]:
+        """
+        Expand the `qoi` array to the shape of the data it was evaluated from.
+
+        The `qoi` array is assumed to have been produced by the
+        [`evaluate_qoi`][compression_safeguards.safeguards.stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard.evaluate_qoi]
+        method.
+
+        For neighbourhoods without any
+        [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
+        boundaries, this method simply copies the `qoi` array. Along axes with
+        a
+        [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
+        boundary, the `qoi` is expanded before and after by as many elements as
+        the boundary cut off. These new elements are filled with zeros.
+
+        This method can be used to produce the array for the late-bound `eb`
+        parameter by first deriving the error bound from an evaluated QoI array
+        (shape) and then expanding it to the data shape.
+
+        This method is the *lossy* inverse of
+        [`truncate_data_to_qoi_shape`][compression_safeguards.safeguards.stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard.truncate_data_to_qoi_shape].
+
+        Parameters
+        ----------
+        qoi : np.ndarray[tuple[int, ...], np.dtype[T]]
+            QoI array to be expanded.
+
+        Returns
+        -------
+        qoi_expanded : np.ndarray[tuple[int, ...], np.dtype[T]]
+            Zero-expanded QoI array.
+        """
+
+        qoi = np.array(qoi, copy=None)
+
+        data_shape = list(qoi.shape)
+        qoi_index = [slice(None, None) for _ in qoi.shape]
+
+        all_axes = []
+        for axis in self._neighbourhood:
+            if (axis.axis >= qoi.ndim) or (axis.axis < -qoi.ndim):
+                raise IndexError(
+                    f"axis index {axis.axis} is out of bounds for array of shape {qoi.shape}"
+                )
+            naxis = axis.axis if axis.axis >= 0 else qoi.ndim + axis.axis
+            if naxis in all_axes:
+                raise IndexError(
+                    f"duplicate axis index {axis.axis}, normalised to {naxis}, for array of shape {qoi.shape}"
+                )
+            all_axes.append(naxis)
+
+            if axis.boundary != BoundaryCondition.valid:
+                continue
+
+            data_shape[naxis] += axis.before + axis.after
+            qoi_index[naxis] = slice(
+                axis.before, None if axis.after == 0 else -axis.after
+            )
+
+        out: np.ndarray[tuple[int, ...], np.dtype[T]] = np.zeros(
+            data_shape, dtype=qoi.dtype
+        )
+        out[tuple(qoi_index)] = qoi
+        return out
 
     def get_config(self) -> dict:
         """
