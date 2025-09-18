@@ -41,8 +41,9 @@ def nanmin(x: np.ndarray) -> np.number:
     if np.all(np.isnan(x)):
         warnings.warn("All-NaN slice encountered", RuntimeWarning)
         return x.dtype.type(np.nan)
-    x = np.copy(x)
-    x[np.isnan(x)] = np.inf
+    if np.any(np.isnan(x)):
+        x = np.copy(x)
+        x[np.isnan(x)] = np.inf
     return np.amin(x)
 
 
@@ -54,8 +55,9 @@ def nanmax(x: np.ndarray) -> np.number:
     if np.all(np.isnan(x)):
         warnings.warn("All-NaN slice encountered", RuntimeWarning)
         return x.dtype.type(np.nan)
-    x = np.copy(x)
-    x[np.isnan(x)] = -np.inf
+    if np.any(np.isnan(x)):
+        x = np.copy(x)
+        x[np.isnan(x)] = -np.inf
     return np.amax(x)
 
 
