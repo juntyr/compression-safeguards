@@ -35,6 +35,33 @@ warnings.filterwarnings("error")
 np.set_printoptions(floatmode="unique")
 
 
+# the fuzzer *somehow* messes up np.nanmin and np.nanmax, so patch them
+def nanmin(x: np.ndarray) -> np.number:
+    x = np.array(x, copy=None)
+    if np.all(np.isnan(x)):
+        warnings.warn("All-NaN slice encountered", RuntimeWarning)
+        return x.dtype.type(np.nan)
+    x = np.copy(x)
+    x[np.isnan(x)] = np.inf
+    return np.amin(x)
+
+
+np.nanmin = nanmin
+
+
+def nanmax(x: np.ndarray) -> np.number:
+    x = np.array(x, copy=None)
+    if np.all(np.isnan(x)):
+        warnings.warn("All-NaN slice encountered", RuntimeWarning)
+        return x.dtype.type(np.nan)
+    x = np.copy(x)
+    x[np.isnan(x)] = -np.inf
+    return np.amax(x)
+
+
+np.nanmax = nanmax
+
+
 _patch = _patch_for_hashing_qoi_dev_only()
 _patch.__enter__()
 
