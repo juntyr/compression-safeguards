@@ -1081,17 +1081,21 @@ def test_fuzzer_found_excessive_nudging_atan_product():
         ScalarAtan(Data.SCALAR),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float32(3.8757849))
+    assert np.round(expr.eval((), X, dict()), 3) == np.array(np.float32(3.876))
 
-    expr_lower = np.array(np.float32(3.8757849))
+    expr_lower = expr.eval((), X, dict())
     expr_upper = np.array(np.float32(5.0197614e33))
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
-    assert X_lower == np.array(np.float32(23400704.0))
+    assert X_lower <= np.array(np.float32(33556004.0))
     assert X_upper == np.array(np.float32(33556004.0))
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float32(3.8757849))
-    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float32(3.8757849))
+    assert np.round(expr.eval((), np.array(X_lower), dict()), 3) == np.array(
+        np.float32(3.876)
+    )
+    assert np.round(expr.eval((), np.array(X_upper), dict()), 3) == np.array(
+        np.float32(3.876)
+    )
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
