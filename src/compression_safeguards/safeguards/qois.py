@@ -336,8 +336,8 @@ The operators and functions in the above QoI grammar are evaluated using
 | `acosh` | `np.arccosh` | `acosh` | NaN |
 | `atanh` | `np.arctanh` | `atanh` | -0.0 |
 | `isfinite` | `np.isfinite` | `isfinite` | 1.0 |
-| `isinf` | `np.isinf` | `isinf` | 0.0 |
-| `isnan` | `np.isnan` | `isnan` | 0.0 |
+| `isinf` | `np.isinf` | `isinf` | +0.0 |
+| `isnan` | `np.isnan` | `isnan` | +0.0 |
 | `where` | `np.where` | | as expected |
 
 [^4]: with the round-to-nearest rounding mode

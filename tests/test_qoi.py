@@ -46,7 +46,7 @@ from compression_safeguards.safeguards._qois.interval import (
     compute_safe_data_lower_upper_interval_union,
 )
 from compression_safeguards.utils._compat import _is_negative_zero, _is_positive_zero
-from compression_safeguards.utils._float128 import _float128
+from compression_safeguards.utils._float128 import _float128, _float128_dtype
 
 np.set_printoptions(floatmode="unique")
 
@@ -1274,7 +1274,8 @@ def test_fuzzer_found_sign_negative_zero_bound():
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 @pytest.mark.parametrize("dtype", ["float16", "float32", "float64", "float128"])
 def test_negative_zero_ops(dtype):
-    ty = _float128 if dtype == "float128" else np.dtype(dtype).type
+    dtype = _float128_dtype if dtype == "float128" else np.dtype(dtype)
+    ty = dtype.type
 
     assert _is_negative_zero(ty(-0.0))
     assert not _is_positive_zero(ty(-0.0))
@@ -1412,12 +1413,18 @@ def test_negative_zero_ops(dtype):
 
     assert np.isfinite(ty(-0.0))
     assert np.isfinite(ty(+0.0))
+    assert np.array(np.isfinite(ty(-0.0))).astype(dtype) == ty(1.0)
+    assert np.array(np.isfinite(ty(+0.0))).astype(dtype) == ty(1.0)
 
     assert not np.isinf(ty(-0.0))
     assert not np.isinf(ty(+0.0))
+    assert _is_positive_zero(np.array(np.isinf(ty(-0.0))).astype(dtype))
+    assert _is_positive_zero(np.array(np.isinf(ty(+0.0))).astype(dtype))
 
     assert not np.isnan(ty(-0.0))
     assert not np.isnan(ty(+0.0))
+    assert _is_positive_zero(np.array(np.isnan(ty(-0.0))).astype(dtype))
+    assert _is_positive_zero(np.array(np.isnan(ty(+0.0))).astype(dtype))
 
     assert ty(-0.0) == 0
     assert ty(+0.0) == 0
