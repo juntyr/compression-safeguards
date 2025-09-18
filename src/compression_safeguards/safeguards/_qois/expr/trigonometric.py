@@ -660,7 +660,9 @@ class ScalarAtan(Expr[Expr]):
         # ensure that the bounds on atan(...) are in [-pi/2, +pi/2]
         # since tan is discontinuous at +-pi/2, we need to be extra careful
         arg_lower: np.ndarray[Ps, np.dtype[F]] = np.tan(
-            _maximum_zero_sign_sensitive(-atan_max, expr_lower)
+            _minimum_zero_sign_sensitive(
+                _maximum_zero_sign_sensitive(-atan_max, expr_lower), atan_max
+            )
         )
         arg_lower = np.array(
             _minimum_zero_sign_sensitive(argv, arg_lower),
@@ -668,7 +670,9 @@ class ScalarAtan(Expr[Expr]):
         )
 
         arg_upper: np.ndarray[Ps, np.dtype[F]] = np.tan(
-            _minimum_zero_sign_sensitive(atan_max, expr_upper)
+            _minimum_zero_sign_sensitive(
+                _maximum_zero_sign_sensitive(-atan_max, expr_upper), atan_max
+            )
         )
         arg_upper = np.array(
             _maximum_zero_sign_sensitive(argv, arg_upper),
