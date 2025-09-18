@@ -258,7 +258,7 @@ provided:
 - multiplication `a * b` (left associative): iff both `a` and `b` are integers,
   `a * b` is folded
 - exponentiation / power `a ** b` (right associative): iff both `a` and `b` are
-  integers, `a ** b` is folded
+  integers and b is non-negative, `a ** b` is folded
 
 Since (true) division (left associative) in Python always produces a floating
 point number, even for `a / 1`, division does not perform symbolic integer
@@ -298,49 +298,53 @@ The operators and functions in the above QoI grammar are evaluated using
 `numpy` ufuncs and follow the specification of the `math.h` ISO C standard
 (see e.g. <https://pubs.opengroup.org/onlinepubs/9799919799/>):
 
-| QoI function | `numpy` ufunc | `math.h` equivalent |
-| ------------ | ------------- | ------------------- |
-| `+a` | no-op | |
-| `-a` | `np.negative` | |
-| `a + b` | `np.add` | |
-| `a - b` | `np.subtract` | |
-| `a * b` | `np.multiply` | |
-| `a / b` | `np.divide` | |
-| `a ** b` | `np.power` | `pow` |
-| `ln` | `np.log` | `log` |
-| `log2` | `np.log2` | `log2` |
-| `log10` | `np.log10` | `log10` |
-| `log(a, base=b)` | `np.divide(np.log(a), np.log(b))` | |
-| `exp` | `np.exp` | `exp` |
-| `exp2` | `np.exp2` | `exp2` |
-| `exp10` | `np.power(10, a)` | |
-| `sqrt` | `np.sqrt` | `sqrt` |
-| `square` | `np.square` | |
-| `reciprocal` | `np.reciprocal` | |
-| `abs` | `np.abs` | |
-| `sign` | `np.sign` | |
-| `floor` | `np.floor` | `floor` |
-| `ceil` | `np.ceil` | `ceil` |
-| `trunc` | `np.trunc` | `trunc` |
-| `round_ties_even` | `np.rint` | `rint`[^4] |
-| `sin` | `np.sin` | `sin` |
-| `cos` | `np.cos` | `cos` |
-| `tan` | `np.tan` | `tan` |
-| `asin` | `np.arcsin` | `asin` |
-| `acos` | `np.arccos` | `acos` |
-| `atan` | `np.arctan` | `atan` |
-| `sinh` | `np.sinh` | `sinh` |
-| `cosh` | `np.cosh` | `cosh` |
-| `tanh` | `np.tanh` | `tanh` |
-| `asinh` | `np.arcsinh` | `asinh` |
-| `acosh` | `np.arccosh` | `acosh` |
-| `atanh` | `np.arctanh` | `atanh` |
-| `isfinite` | `np.isfinite` | `isfinite` |
-| `isinf` | `np.isinf` | `isinf` |
-| `isnan` | `np.isnan` | `isnan` |
-| `where` | `np.where` | |
+| QoI function | `numpy` ufunc | `math.h` equivalent | -0.0 behaviour |
+| ------------ | ------------- | ------------------- | -------------- |
+| `+a` | no-op | |  -0.0 |
+| `-a` | `np.negative` | | +0.0 |
+| `a + b` | `np.add` | | recessive[^5] |
+| `a - b` | `np.subtract` | | recessive[^5] |
+| `a * b` | `np.multiply` | | as expected[^6] |
+| `a / b` | `np.divide` | | as expected[^7] |
+| `a ** b` | `np.power` | `pow` | as expected[^8] |
+| `ln` | `np.log` | `log` | -inf |
+| `log2` | `np.log2` | `log2` | -inf |
+| `log10` | `np.log10` | `log10` | -inf |
+| `log(a, base=b)` | `np.divide(np.log(a), np.log(b))` | | as expected |
+| `exp` | `np.exp` | `exp` | 1.0 |
+| `exp2` | `np.exp2` | `exp2` | 1.0 |
+| `exp10` | `np.power(10, a)` | | 1.0 |
+| `sqrt` | `np.sqrt` | `sqrt` | -0.0 |
+| `square` | `np.square` | | +0.0 |
+| `reciprocal` | `np.reciprocal` | | -inf |
+| `abs` | `np.abs` | | +0.0 |
+| `sign` | `np.sign` | | +0.0 |
+| `floor` | `np.floor` | `floor` | -0.0 |
+| `ceil` | `np.ceil` | `ceil` | -0.0 |
+| `trunc` | `np.trunc` | `trunc` | -0.0 |
+| `round_ties_even` | `np.rint` | `rint`[^4] | -0.0 |
+| `sin` | `np.sin` | `sin` | -0.0 |
+| `cos` | `np.cos` | `cos` | 1.0 |
+| `tan` | `np.tan` | `tan` | -0.0 |
+| `asin` | `np.arcsin` | `asin` | -0.0 |
+| `acos` | `np.arccos` | `acos` | pi/2 |
+| `atan` | `np.arctan` | `atan` | -0.0 |
+| `sinh` | `np.sinh` | `sinh` | -0.0 |
+| `cosh` | `np.cosh` | `cosh` | 1.0 |
+| `tanh` | `np.tanh` | `tanh` | -0.0 |
+| `asinh` | `np.arcsinh` | `asinh` | -0.0 |
+| `acosh` | `np.arccosh` | `acosh` | NaN |
+| `atanh` | `np.arctanh` | `atanh` | -0.0 |
+| `isfinite` | `np.isfinite` | `isfinite` | 1.0 |
+| `isinf` | `np.isinf` | `isinf` | 0.0 |
+| `isnan` | `np.isnan` | `isnan` | 0.0 |
+| `where` | `np.where` | | as expected |
 
 [^4]: with the round-to-nearest rounding mode
+[^5]: -0.0 + -0.0 = -0.0, -0.0 - +0.0 = -0.0, otherwise -0.0 is treated like +0.0
+[^6]: a * -0.0 = -a * +0.0
+[^7]: a / -0.0 = -a / +0.0, -0.0 / b = +0.0 / -b
+[^8]: -0.0 ** (2k+1) = -0.0, -0.0 ** +b = +0.0 otherwise, -0.0 ** (-2k=1) = -inf, -0.0 ** -b = +inf otherwise, a ** -0.0 = 1.0
 
 Furthermore, the array `sum` and `matmul` functions are implemented as explicit
 sums over the array elements in natural order, e.g.

@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
 from compression_safeguards.safeguards._qois.expr.addsub import ScalarSubtract
@@ -44,6 +45,7 @@ from compression_safeguards.safeguards._qois.expr.where import ScalarWhere
 from compression_safeguards.safeguards._qois.interval import (
     compute_safe_data_lower_upper_interval_union,
 )
+from compression_safeguards.utils._compat import _is_negative_zero, _is_positive_zero
 from compression_safeguards.utils._float128 import _float128
 
 np.set_printoptions(floatmode="unique")
@@ -1267,3 +1269,155 @@ def test_fuzzer_found_sign_negative_zero_bound():
 
     assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(np.inf))
     assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float16(np.inf))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+@pytest.mark.parametrize("dtype", ["float16", "float32", "float64", "float128"])
+def test_negative_zero_ops(dtype):
+    ty = _float128 if dtype == "float128" else np.dtype(dtype).type
+
+    assert _is_negative_zero(ty(-0.0))
+    assert not _is_positive_zero(ty(-0.0))
+    assert not _is_negative_zero(ty(+0.0))
+    assert _is_positive_zero(ty(+0.0))
+
+    assert _is_negative_zero(np.positive(ty(-0.0)))
+    assert _is_positive_zero(np.positive(ty(+0.0)))
+
+    assert _is_positive_zero(np.negative(ty(-0.0)))
+    assert _is_negative_zero(np.negative(ty(+0.0)))
+
+    assert _is_negative_zero(np.add(ty(-0.0), ty(-0.0)))
+    assert _is_positive_zero(np.add(ty(-0.0), ty(+0.0)))
+    assert _is_positive_zero(np.add(ty(+0.0), ty(-0.0)))
+    assert _is_positive_zero(np.add(ty(+0.0), ty(+0.0)))
+
+    assert _is_positive_zero(np.subtract(ty(-0.0), ty(-0.0)))
+    assert _is_negative_zero(np.subtract(ty(-0.0), ty(+0.0)))
+    assert _is_positive_zero(np.subtract(ty(+0.0), ty(-0.0)))
+    assert _is_positive_zero(np.subtract(ty(+0.0), ty(+0.0)))
+
+    assert _is_positive_zero(np.multiply(ty(-0.0), ty(-0.0)))
+    assert _is_negative_zero(np.multiply(ty(-0.0), ty(+0.0)))
+    assert _is_negative_zero(np.multiply(ty(+0.0), ty(-0.0)))
+    assert _is_positive_zero(np.multiply(ty(+0.0), ty(+0.0)))
+    assert _is_negative_zero(np.multiply(ty(-0.0), ty(1.0)))
+    assert _is_positive_zero(np.multiply(ty(+0.0), ty(1.0)))
+
+    assert np.isnan(np.divide(ty(-0.0), ty(-0.0)))
+    assert np.isnan(np.divide(ty(-0.0), ty(+0.0)))
+    assert np.isnan(np.divide(ty(+0.0), ty(-0.0)))
+    assert np.isnan(np.divide(ty(+0.0), ty(+0.0)))
+    assert _is_negative_zero(np.divide(ty(-0.0), ty(1.0)))
+    assert _is_positive_zero(np.divide(ty(+0.0), ty(1.0)))
+    assert np.isneginf(np.divide(ty(1.0), ty(-0.0)))
+    assert np.isposinf(np.divide(ty(1.0), ty(+0.0)))
+
+    assert np.power(ty(-0.0), ty(-0.0)) == ty(1.0)
+    assert np.power(ty(-0.0), ty(+0.0)) == ty(1.0)
+    assert np.power(ty(+0.0), ty(-0.0)) == ty(1.0)
+    assert np.power(ty(+0.0), ty(+0.0)) == ty(1.0)
+    assert np.power(ty(1.0), ty(-0.0)) == ty(1.0)
+    assert np.power(ty(1.0), ty(+0.0)) == ty(1.0)
+    assert _is_negative_zero(np.power(ty(-0.0), ty(1.0)))
+    assert _is_positive_zero(np.power(ty(+0.0), ty(1.0)))
+    assert _is_positive_zero(np.power(ty(-0.0), ty(2.0)))
+    assert _is_positive_zero(np.power(ty(+0.0), ty(2.0)))
+    assert _is_negative_zero(np.power(ty(-0.0), ty(3.0)))
+    assert _is_positive_zero(np.power(ty(+0.0), ty(3.0)))
+    assert _is_positive_zero(np.power(ty(-0.0), ty(3.6)))
+    assert _is_positive_zero(np.power(ty(+0.0), ty(3.6)))
+    assert np.isneginf(np.power(ty(-0.0), ty(-1.0)))
+    assert np.isposinf(np.power(ty(+0.0), ty(-1.0)))
+    assert np.isposinf(np.power(ty(-0.0), ty(-2.0)))
+    assert np.isposinf(np.power(ty(+0.0), ty(-2.0)))
+    assert np.isneginf(np.power(ty(-0.0), ty(-3.0)))
+    assert np.isposinf(np.power(ty(+0.0), ty(-3.0)))
+    assert np.isposinf(np.power(ty(-0.0), ty(-3.6)))
+    assert np.isposinf(np.power(ty(+0.0), ty(-3.6)))
+
+    assert np.isneginf(np.log(ty(-0.0)))
+    assert np.isneginf(np.log(ty(+0.0)))
+    assert np.isneginf(np.log2(ty(-0.0)))
+    assert np.isneginf(np.log2(ty(+0.0)))
+    assert np.isneginf(np.log10(ty(-0.0)))
+    assert np.isneginf(np.log10(ty(+0.0)))
+
+    assert np.exp(ty(-0.0)) == ty(1.0)
+    assert np.exp(ty(+0.0)) == ty(1.0)
+    assert np.exp2(ty(-0.0)) == ty(1.0)
+    assert np.exp2(ty(+0.0)) == ty(1.0)
+    assert np.power(ty(10.0), ty(-0.0)) == ty(1.0)
+    assert np.power(ty(10.0), ty(+0.0)) == ty(1.0)
+
+    assert _is_negative_zero(np.sqrt(ty(-0.0)))
+    assert _is_positive_zero(np.sqrt(ty(+0.0)))
+
+    assert _is_positive_zero(np.square(ty(-0.0)))
+    assert _is_positive_zero(np.square(ty(+0.0)))
+
+    assert np.isneginf(np.reciprocal(ty(-0.0)))
+    assert np.isposinf(np.reciprocal(ty(+0.0)))
+
+    assert _is_positive_zero(np.abs(ty(-0.0)))
+    assert _is_positive_zero(np.abs(ty(+0.0)))
+
+    assert _is_positive_zero(np.sign(ty(-0.0)))
+    assert _is_positive_zero(np.sign(ty(+0.0)))
+
+    assert _is_negative_zero(np.floor(ty(-0.0)))
+    assert _is_positive_zero(np.floor(ty(+0.0)))
+    assert _is_negative_zero(np.ceil(ty(-0.0)))
+    assert _is_positive_zero(np.ceil(ty(+0.0)))
+    assert _is_negative_zero(np.trunc(ty(-0.0)))
+    assert _is_positive_zero(np.trunc(ty(+0.0)))
+    assert _is_negative_zero(np.rint(ty(-0.0)))
+    assert _is_positive_zero(np.rint(ty(+0.0)))
+
+    assert _is_negative_zero(np.sin(ty(-0.0)))
+    assert _is_positive_zero(np.sin(ty(+0.0)))
+
+    assert np.cos(ty(-0.0)) == ty(1.0)
+    assert np.cos(ty(+0.0)) == ty(1.0)
+
+    assert _is_negative_zero(np.tan(ty(-0.0)))
+    assert _is_positive_zero(np.tan(ty(+0.0)))
+
+    assert _is_negative_zero(np.asin(ty(-0.0)))
+    assert _is_positive_zero(np.asin(ty(+0.0)))
+
+    assert np.rint(np.acos(ty(-0.0)) * 100) == ty(157)  # pi/2 * 100
+    assert np.rint(np.acos(ty(+0.0)) * 100) == ty(157)  # pi/2 * 100
+
+    assert _is_negative_zero(np.atan(ty(-0.0)))
+    assert _is_positive_zero(np.atan(ty(+0.0)))
+
+    assert _is_negative_zero(np.sinh(ty(-0.0)))
+    assert _is_positive_zero(np.sinh(ty(+0.0)))
+
+    assert np.cosh(ty(-0.0)) == ty(1.0)
+    assert np.cosh(ty(+0.0)) == ty(1.0)
+
+    assert _is_negative_zero(np.tanh(ty(-0.0)))
+    assert _is_positive_zero(np.tanh(ty(+0.0)))
+
+    assert _is_negative_zero(np.asin(ty(-0.0)))
+    assert _is_positive_zero(np.asin(ty(+0.0)))
+
+    assert np.isnan(np.acosh(ty(-0.0)))
+    assert np.isnan(np.acosh(ty(+0.0)))
+
+    assert _is_negative_zero(np.atan(ty(-0.0)))
+    assert _is_positive_zero(np.atan(ty(+0.0)))
+
+    assert np.isfinite(ty(-0.0))
+    assert np.isfinite(ty(+0.0))
+
+    assert not np.isinf(ty(-0.0))
+    assert not np.isinf(ty(+0.0))
+
+    assert not np.isnan(ty(-0.0))
+    assert not np.isnan(ty(+0.0))
+
+    assert ty(-0.0) == 0
+    assert ty(+0.0) == 0
