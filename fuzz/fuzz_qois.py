@@ -8,7 +8,7 @@ with atheris.instrument_imports():
 
     import numpy as np
 
-    from compression_safeguards.safeguards._qois.expr.abc import Expr
+    from compression_safeguards.safeguards._qois.expr.abc import AnyExpr
     from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
     from compression_safeguards.safeguards._qois.expr.addsub import (
         ScalarAdd,
@@ -88,7 +88,9 @@ DTYPES = [
     _float128_dtype,
 ]
 
-NULLARY_EXPRESSIONS: list[Callable[[atheris.FuzzedDataProvider, np.dtype], Expr]] = [
+NULLARY_EXPRESSIONS: list[
+    Callable[[atheris.FuzzedDataProvider, np.dtype[np.number]], AnyExpr]
+] = [
     lambda data, dtype: Euler(),
     lambda data, dtype: Pi(),
     lambda data, dtype: Number(f"{data.ConsumeInt(4)}"),
@@ -96,7 +98,7 @@ NULLARY_EXPRESSIONS: list[Callable[[atheris.FuzzedDataProvider, np.dtype], Expr]
     lambda data, dtype: ScalarFoldedConstant(ConsumeDtypeElement(data, dtype)),
     lambda data, dtype: Data.SCALAR,
 ]
-UNARY_EXPRESSIONS: list[Callable[[Expr], Expr]] = [
+UNARY_EXPRESSIONS: list[Callable[[AnyExpr], AnyExpr]] = [
     ScalarAbs,
     ScalarIsFinite,
     ScalarIsInf,
@@ -130,7 +132,7 @@ UNARY_EXPRESSIONS: list[Callable[[Expr], Expr]] = [
     ScalarAcos,
     ScalarAtan,
 ]
-BINARY_EXPRESSIONS: list[Callable[[Expr, Expr], Expr]] = [
+BINARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr], AnyExpr]] = [
     ScalarAdd,
     ScalarSubtract,
     ScalarDivide,
@@ -138,7 +140,7 @@ BINARY_EXPRESSIONS: list[Callable[[Expr, Expr], Expr]] = [
     ScalarLogWithBase,
     ScalarPower,
 ]
-TERNARY_EXPRESSIONS: list[Callable[[Expr, Expr, Expr], Expr]] = [
+TERNARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr, AnyExpr], AnyExpr]] = [
     ScalarWhere,
     lambda a, b, c: ScalarAdd(ScalarAdd(a, b), c),
     lambda a, b, c: ScalarAdd(a, ScalarAdd(b, c)),
@@ -176,7 +178,7 @@ def check_one_input(data) -> None:
                 - 1,
             )
             if exprid < len(UNARY_EXPRESSIONS):
-                expr: Expr = (UNARY_EXPRESSIONS[exprid])(dataexpr)
+                expr: AnyExpr = (UNARY_EXPRESSIONS[exprid])(dataexpr)
             elif exprid < (len(UNARY_EXPRESSIONS) + len(BINARY_EXPRESSIONS)):
                 exprs = []
                 for _ in range(2):

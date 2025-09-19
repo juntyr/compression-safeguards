@@ -27,6 +27,7 @@ with atheris.instrument_imports():
         StencilQuantityOfInterestErrorBoundSafeguard,
     )
     from compression_safeguards.utils.bindings import Parameter
+    from compression_safeguards.utils.typing import S, T
 
 
 warnings.filterwarnings("error")
@@ -36,7 +37,7 @@ np.set_printoptions(floatmode="unique")
 
 
 # the fuzzer *somehow* messes up np.nanmin and np.nanmax, so patch them
-def nanmin(x: np.ndarray) -> np.number:
+def nanmin(x: np.ndarray[S, np.dtype[T]]) -> T:
     x = np.array(x, copy=None)
     if np.all(np.isnan(x)):
         warnings.warn("All-NaN slice encountered", RuntimeWarning)
@@ -50,7 +51,7 @@ def nanmin(x: np.ndarray) -> np.number:
 np.nanmin = nanmin
 
 
-def nanmax(x: np.ndarray) -> np.number:
+def nanmax(x: np.ndarray[S, np.dtype[T]]) -> T:
     x = np.array(x, copy=None)
     if np.all(np.isnan(x)):
         warnings.warn("All-NaN slice encountered", RuntimeWarning)
@@ -142,7 +143,7 @@ def check_one_input(data) -> None:
         if p != "qoi"
     }
 
-    dtype: np.dtype = np.dtype(
+    dtype: np.dtype[np.number] = np.dtype(
         sorted([d.name for d in Safeguards.supported_dtypes()])[
             data.ConsumeIntInRange(0, len(Safeguards.supported_dtypes()) - 1)
         ]
@@ -212,7 +213,7 @@ def check_one_input(data) -> None:
             )
             safeguard._qoi_expr._expr = HashingExpr.from_data_shape(
                 data_shape=safeguard._qoi_expr._stencil_shape,
-                late_bound_constants=frozenset(["foo"]),
+                late_bound_constants=frozenset([Parameter("foo")]),
             )
             safeguard._qoi_expr._late_bound_constants = (
                 safeguard._qoi_expr._expr.late_bound_constants

@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 import numcodecs.compat
 import numpy as np
 from numcodecs.abc import Codec
@@ -9,7 +11,7 @@ from numcodecs_zero import ZeroCodec
 class NegCodec(Codec):
     __slots__: tuple[str, ...] = ()
 
-    codec_id: str = "neg"  # type: ignore
+    codec_id: ClassVar[str] = "neg"  # type: ignore
 
     def encode(self, buf):
         return np.negative(buf)
@@ -21,7 +23,7 @@ class NegCodec(Codec):
 class IdentityCodec(Codec):
     __slots__: tuple[str, ...] = ()
 
-    codec_id: str = "identity"  # type: ignore
+    codec_id: ClassVar[str] = "identity"  # type: ignore
 
     def encode(self, buf):
         return buf
@@ -34,7 +36,7 @@ class NoiseCodec(Codec):
     __slots__: tuple[str, ...] = ("_seed",)
     _seed: int
 
-    codec_id: str = "noise"  # type: ignore
+    codec_id: ClassVar[str] = "noise"  # type: ignore
 
     def __init__(self, *, seed: int):
         self._seed = seed
@@ -50,7 +52,7 @@ class NoiseCodec(Codec):
 class MockCodec(Codec):
     __slots__: tuple[str, ...] = ("data", "decoded")
 
-    codec_id: str = "mock"  # type: ignore
+    codec_id: ClassVar[str] = "mock"  # type: ignore
 
     def __init__(self, data, decoded):
         self.data = data

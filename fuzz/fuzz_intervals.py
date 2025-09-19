@@ -20,7 +20,7 @@ warnings.filterwarnings("error")
 
 def generate_interval_union(
     data: atheris.FuzzedDataProvider, n: int, imin: int, imax: int
-) -> tuple[IntervalUnion, set[int]]:
+) -> tuple[IntervalUnion[np.int_, int, int], set[int]]:
     n = data.ConsumeIntInRange(1, n)
 
     pivots = sorted(data.ConsumeIntInRange(imin, imax) for _ in range(n * 2))

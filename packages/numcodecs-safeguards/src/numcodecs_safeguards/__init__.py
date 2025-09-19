@@ -78,6 +78,7 @@ __all__ = ["SafeguardsCodec"]
 
 from collections.abc import Callable, Collection, Mapping, Set
 from io import BytesIO
+from typing import ClassVar
 
 import numcodecs
 import numcodecs.compat
@@ -208,7 +209,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
     _lossless_for_codec: None | Codec
     _lossless_for_safeguards: Codec
 
-    codec_id: str = "safeguards"  # type: ignore
+    codec_id: ClassVar[str] = "safeguards"  # type: ignore
 
     def __init__(
         self,

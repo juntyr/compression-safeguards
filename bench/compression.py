@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Generator
 from pathlib import Path
 from types import SimpleNamespace
+from typing import ClassVar
 
 import numcodecs
 import numcodecs.compat
@@ -176,7 +177,7 @@ class MySafeguardsQuantizer(MyQuantizer):
 class LorenzoPredictor(Codec):
     __slots__: tuple[str, ...] = ("_quantizer", "_lossless")
 
-    codec_id: str = "lorenzo"
+    codec_id: ClassVar[str] = "lorenzo"
 
     def __init__(self, quantizer: MyQuantizer):
         self._quantizer = quantizer
