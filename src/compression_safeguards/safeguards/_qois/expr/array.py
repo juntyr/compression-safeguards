@@ -5,10 +5,11 @@ import numpy as np
 from typing_extensions import (
     TypeVarTuple,  # MSPV 3.11
     Unpack,  # MSPV 3.11
+    override,  # MSPV 3.12
 )
 
 from ....utils.bindings import Parameter
-from .abc import Expr
+from .abc import AnyExpr, Expr
 from .addsub import ScalarAdd
 from .constfold import ScalarFoldedConstant
 from .data import Data
@@ -22,11 +23,11 @@ Es2 = TypeVarTuple("Es2")
 """ Tuple of [`Expr`][compression_safeguards.safeguards._qois.expr.abc.Expr]s. """
 
 
-class Array(Expr[Expr, Unpack[Es]]):
-    __slots__ = ("_array",)
+class Array(Expr[AnyExpr, Unpack[Es]]):
+    __slots__: tuple[str, ...] = ("_array",)
     _array: np.ndarray
 
-    def __init__(self, el: Expr, *els: Expr):
+    def __init__(self, el: AnyExpr, *els: AnyExpr) -> None:
         if isinstance(el, Array):
             aels = [el._array]
             for e in els:
@@ -43,7 +44,7 @@ class Array(Expr[Expr, Unpack[Es]]):
             self._array = np.array((el,) + els, copy=None)
 
     @staticmethod
-    def from_data_shape(shape: tuple[int, ...]) -> "Array":
+    def from_data_shape(shape: tuple[int, ...]) -> "Array[Unpack[tuple[AnyExpr, ...]]]":
         out = Array.__new__(Array)
         out._array = np.empty(shape, dtype=object)
 
@@ -53,20 +54,24 @@ class Array(Expr[Expr, Unpack[Es]]):
         return out
 
     @property
-    def args(self) -> tuple[Expr, Unpack[Es]]:
+    @override
+    def args(self) -> tuple[AnyExpr, Unpack[Es]]:
         if self._array.ndim == 1:
             return tuple(self._array)
         return tuple(a for a in self._array)
 
-    def with_args(self, el: Expr, *els: Unpack[Es]) -> "Array":
+    @override
+    def with_args(self, el: AnyExpr, *els: Unpack[Es]) -> "Array[Unpack[Es]]":
         return Array(el, *els)  # type: ignore
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return Array.map(
             lambda e: ScalarFoldedConstant.constant_fold_expr(e, dtype),  # type: ignore
             self,
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -75,6 +80,7 @@ class Array(Expr[Expr, Unpack[Es]]):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         assert False, "cannot evaluate an array expression"
 
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -90,13 +96,13 @@ class Array(Expr[Expr, Unpack[Es]]):
         return self._array.shape
 
     @staticmethod
-    def map(map: Callable[[Unpack[Es2]], Expr], *exprs: Unpack[Es2]) -> Expr:
+    def map(map: Callable[[Unpack[Es2]], AnyExpr], *exprs: Unpack[Es2]) -> AnyExpr:
         if not any(isinstance(e, Array) for e in exprs):
             return map(*exprs)
 
         shape = None
         size = 0
-        iters: list[Iterator[Expr]] = []
+        iters: list[Iterator[AnyExpr]] = []
 
         for i, expr in enumerate(exprs):  # type: ignore
             if isinstance(expr, Array):
@@ -118,7 +124,7 @@ class Array(Expr[Expr, Unpack[Es]]):
         ).reshape(shape)
         return out
 
-    def index(self, index: tuple[int | slice, ...]) -> Expr:
+    def index(self, index: tuple[int | slice, ...]) -> AnyExpr:
         a = self._array[index]
         if isinstance(a, np.ndarray):
             out = Array.__new__(Array)
@@ -126,12 +132,12 @@ class Array(Expr[Expr, Unpack[Es]]):
             return out
         return a
 
-    def transpose(self) -> "Array":
+    def transpose(self) -> "Array[Unpack[tuple[AnyExpr, ...]]]":
         out = Array.__new__(Array)
         out._array = self._array.T
         return out
 
-    def sum(self) -> Expr:
+    def sum(self) -> AnyExpr:
         acc = None
         for e in self._array.flat:
             if acc is None:
@@ -144,7 +150,10 @@ class Array(Expr[Expr, Unpack[Es]]):
         return Group(acc)
 
     @staticmethod
-    def matmul(left: "Array", right: "Array") -> "Array":
+    def matmul(
+        left: "Array[Unpack[tuple[AnyExpr, ...]]]",
+        right: "Array[Unpack[tuple[AnyExpr, ...]]]",
+    ) -> "Array[Unpack[tuple[AnyExpr, ...]]]":
         if len(left.shape) != 2:
             raise ValueError("can only matmul(a, b) a 2D array a")
         if len(right.shape) != 2:
@@ -157,7 +166,7 @@ class Array(Expr[Expr, Unpack[Es]]):
         out._array = np.empty((left.shape[0], right.shape[1]), dtype=object)
         for n in range(left.shape[0]):
             for m in range(right.shape[1]):
-                acc: None | Expr = None
+                acc: None | AnyExpr = None
                 for k in range(left.shape[1]):
                     kk = ScalarMultiply(left._array[n, k], right._array[k, m])
                     if acc is None:
@@ -170,5 +179,6 @@ class Array(Expr[Expr, Unpack[Es]]):
                 out._array[n, m] = Group(acc)
         return out
 
+    @override
     def __repr__(self) -> str:
         return f"{self._array!r}".removeprefix("array(").removesuffix(", dtype=object)")

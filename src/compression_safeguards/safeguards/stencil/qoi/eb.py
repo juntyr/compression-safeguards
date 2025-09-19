@@ -5,9 +5,11 @@ Stencil quantity of interest (QoI) error bound safeguard.
 __all__ = ["StencilQuantityOfInterestErrorBoundSafeguard"]
 
 from collections.abc import Sequence, Set
+from typing import ClassVar
 
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import (
@@ -17,7 +19,7 @@ from ....utils.cast import (
     to_float,
 )
 from ....utils.intervals import Interval, IntervalUnion
-from ....utils.typing import F, S, T
+from ....utils.typing import JSON, F, S, T
 from ..._qois import StencilQuantityOfInterest
 from ..._qois.interval import compute_safe_data_lower_upper_interval_union
 from ...eb import (
@@ -136,7 +138,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         losslessly represent all input data values is chosen.
     """
 
-    __slots__ = (
+    __slots__: tuple[str, ...] = (
         "_qoi",
         "_neighbourhood",
         "_type",
@@ -151,12 +153,12 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     _qoi_dtype: ToFloatMode
     _qoi_expr: StencilQuantityOfInterest
 
-    kind = "qoi_eb_stencil"
+    kind: ClassVar[str] = "qoi_eb_stencil"
 
     def __init__(
         self,
         qoi: StencilQuantityOfInterestExpression,
-        neighbourhood: Sequence[dict | NeighbourhoodBoundaryAxis],
+        neighbourhood: Sequence[dict[str, JSON] | NeighbourhoodBoundaryAxis],
         type: str | ErrorBound,
         eb: int | float | str | Parameter,
         qoi_dtype: str | ToFloatMode = ToFloatMode.lossless,
@@ -200,6 +202,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         self._qoi_expr = qoi_expr
 
     @property
+    @override
     def late_bound(self) -> Set[Parameter]:
         """
         The set of late-bound parameters that this safeguard has.
@@ -223,6 +226,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         return frozenset(parameters)
 
+    @override
     def compute_check_neighbourhood_for_data_shape(
         self,
         data_shape: tuple[int, ...],
@@ -253,7 +257,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             dict() for _ in data_shape
         ]
 
-        all_axes = []
+        all_axes: list[int] = []
         for axis in self._neighbourhood:
             if (axis.axis >= len(data_shape)) or (axis.axis < -len(data_shape)):
                 raise IndexError(
@@ -391,6 +395,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             late_bound_constants,
         )
 
+    @override
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -574,6 +579,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         return ok
 
+    @override
     def compute_safe_intervals(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -845,7 +851,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         qoi_index = [slice(None, None) for _ in data.shape]
 
-        all_axes = []
+        all_axes: list[int] = []
         for axis in self._neighbourhood:
             if (axis.axis >= data.ndim) or (axis.axis < -data.ndim):
                 raise IndexError(
@@ -908,7 +914,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         data_shape = list(qoi.shape)
         qoi_index = [slice(None, None) for _ in qoi.shape]
 
-        all_axes = []
+        all_axes: list[int] = []
         for axis in self._neighbourhood:
             if (axis.axis >= qoi.ndim) or (axis.axis < -qoi.ndim):
                 raise IndexError(
@@ -935,13 +941,14 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         out[tuple(qoi_index)] = qoi
         return out
 
-    def get_config(self) -> dict:
+    @override
+    def get_config(self) -> dict[str, JSON]:
         """
         Returns the configuration of the safeguard.
 
         Returns
         -------
-        config : dict
+        config : dict[str, JSON]
             Configuration of the safeguard.
         """
 

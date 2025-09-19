@@ -7,16 +7,20 @@ __all__ = ["Monotonicity", "MonotonicityPreservingSafeguard"]
 from collections.abc import Set
 from enum import Enum
 from operator import ge, gt, le, lt
+from typing import ClassVar
 
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
-from typing_extensions import assert_never  # MSPV 3.11
+from typing_extensions import (
+    assert_never,  # MSPV 3.11
+    override,  # MSPV 3.12
+)
 
 from ...utils._compat import _maximum_zero_sign_sensitive, _minimum_zero_sign_sensitive
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
-from ...utils.typing import S, T
+from ...utils.typing import JSON, S, T
 from . import BoundaryCondition, NeighbourhoodAxis, _pad_with_boundary
 from .abc import StencilSafeguard
 
@@ -118,14 +122,20 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         [`None`][None], is to preserve along all axes.
     """
 
-    __slots__ = ("_monotonicity", "_window", "_boundary", "_constant_boundary", "_axis")
+    __slots__: tuple[str, ...] = (
+        "_monotonicity",
+        "_window",
+        "_boundary",
+        "_constant_boundary",
+        "_axis",
+    )
     _monotonicity: Monotonicity
     _window: int
     _boundary: BoundaryCondition
     _constant_boundary: None | int | float | Parameter
     _axis: None | int
 
-    kind = "monotonicity"
+    kind: ClassVar[str] = "monotonicity"
 
     def __init__(
         self,
@@ -170,6 +180,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         self._axis = axis
 
     @property
+    @override
     def late_bound(self) -> Set[Parameter]:
         """
         The set of late-bound parameters that this safeguard has.
@@ -188,6 +199,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             else frozenset()
         )
 
+    @override
     def compute_check_neighbourhood_for_data_shape(
         self, data_shape: tuple[int, ...]
     ) -> tuple[dict[BoundaryCondition, NeighbourhoodAxis], ...]:
@@ -230,6 +242,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         return tuple(neighbourhood)
 
+    @override
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -327,6 +340,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         return ok
 
+    @override
     def compute_safe_intervals(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -662,22 +676,25 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         return filtered_valid.union(zero_valid)
 
-    def get_config(self) -> dict:
+    @override
+    def get_config(self) -> dict[str, JSON]:
         """
         Returns the configuration of the safeguard.
 
         Returns
         -------
-        config : dict
+        config : dict[str, JSON]
             Configuration of the safeguard.
         """
 
-        config = dict(
+        config: dict[str, JSON] = dict(
             kind=type(self).kind,
             monotonicity=self._monotonicity.name,
             window=self._window,
             boundary=self._boundary.name,
-            constant_boundary=self._constant_boundary,
+            constant_boundary=str(self._constant_boundary)
+            if isinstance(self._constant_boundary, Parameter)
+            else self._constant_boundary,
             axis=self._axis,
         )
 

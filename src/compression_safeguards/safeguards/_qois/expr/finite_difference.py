@@ -2,11 +2,14 @@ from collections.abc import Callable, Mapping
 from enum import Enum, auto
 
 import numpy as np
-from typing_extensions import assert_never  # MSPV 3.11
+from typing_extensions import (
+    assert_never,  # MSPV 3.11
+    override,  # MSPV 3.11
+)
 
 from ....utils._compat import _symmetric_modulo
 from ....utils.bindings import Parameter
-from .abc import Expr
+from .abc import AnyExpr, Expr
 from .addsub import ScalarSubtract
 from .constfold import ScalarFoldedConstant
 from .divmul import ScalarDivide, ScalarMultiply
@@ -16,23 +19,26 @@ from .neg import ScalarNegate
 from .typing import F, Fi, Ns, Ps, PsI
 
 
-class ScalarSymmetricModulo(Expr[Expr, Expr]):
-    __slots__ = ("_a", "_b")
-    _a: Expr
-    _b: Expr
+class ScalarSymmetricModulo(Expr[AnyExpr, AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a", "_b")
+    _a: AnyExpr
+    _b: AnyExpr
 
-    def __init__(self, a: Expr, b: Expr):
+    def __init__(self, a: AnyExpr, b: AnyExpr) -> None:
         self._a = a
         self._b = b
 
     @property
-    def args(self) -> tuple[Expr, Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
 
-    def with_args(self, a: Expr, b: Expr) -> "ScalarSymmetricModulo":
+    @override
+    def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarSymmetricModulo":
         return ScalarSymmetricModulo(a, b)
 
-    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | AnyExpr:
         return ScalarFoldedConstant.constant_fold_binary(
             self._a,
             self._b,
@@ -41,6 +47,7 @@ class ScalarSymmetricModulo(Expr[Expr, Expr]):
             ScalarSymmetricModulo,
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -51,6 +58,7 @@ class ScalarSymmetricModulo(Expr[Expr, Expr]):
             self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound)
         )
 
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -61,6 +69,7 @@ class ScalarSymmetricModulo(Expr[Expr, Expr]):
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         assert False, "cannot compute the data bounds for symmetric_modulo"
 
+    @override
     def __repr__(self) -> str:
         return f"symmetric_modulo({self._a!r}, {self._b!r})"
 
@@ -107,10 +116,10 @@ def finite_difference_offsets(
 
 def finite_difference_coefficients(
     order: int,
-    offsets: tuple[Expr, ...],
-    centre_dist: Callable[[Expr], Expr] = lambda x: x,
-    delta_transform: Callable[[Expr], Expr] = lambda x: x,
-) -> tuple[Expr, ...]:
+    offsets: tuple[AnyExpr, ...],
+    centre_dist: Callable[[AnyExpr], AnyExpr] = lambda x: x,
+    delta_transform: Callable[[AnyExpr], AnyExpr] = lambda x: x,
+) -> tuple[AnyExpr, ...]:
     """
     Finite difference coefficient algorithm from:
 
@@ -121,25 +130,25 @@ def finite_difference_coefficients(
 
     dx0 = centre_dist
     M: int = order
-    a: tuple[Expr, ...] = offsets
+    a: tuple[AnyExpr, ...] = offsets
     N: int = len(a) - 1
 
     # we explicitly the coefficient fraction into numerator and denominator
     #  expressions to delay the division for as long as possible, which allows
     #  more symbolic integer constant folding to occur
-    coeffs_num: dict[tuple[int, int, int], Expr] = {
+    coeffs_num: dict[tuple[int, int, int], AnyExpr] = {
         (0, 0, 0): Number.ONE,
     }
-    coeffs_denom: dict[tuple[int, int, int], Expr] = {
+    coeffs_denom: dict[tuple[int, int, int], AnyExpr] = {
         (0, 0, 0): Number.ONE,
     }
 
-    c1: Expr = Number.ONE
+    c1: AnyExpr = Number.ONE
 
     for n in range(1, N + 1):
-        c2: Expr = Number.ONE
+        c2: AnyExpr = Number.ONE
         for v in range(0, n):
-            c3: Expr = delta_transform(Group(ScalarSubtract(a[n], a[v])))
+            c3: AnyExpr = delta_transform(Group(ScalarSubtract(a[n], a[v])))
             c2 = Group(ScalarMultiply(c2, c3))
             if n <= M:
                 coeffs_num[(n, n - 1, v)] = Number.ZERO

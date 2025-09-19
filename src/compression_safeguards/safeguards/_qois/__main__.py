@@ -18,8 +18,6 @@ if __name__ == "__main__":
                 stencil_shape=(3,),
                 stencil_I=(1,),
             )
-            if qoi_expr is None:
-                continue
             print(f"parsed: {qoi_expr!r}")  # noqa: T201
             Xs = np.array([[1.0, 2.0, 3.0]])
             print(  # noqa: T201

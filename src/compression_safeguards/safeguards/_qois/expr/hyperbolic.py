@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _is_sign_negative_number,
@@ -10,26 +11,29 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
-from .abc import Expr
+from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
 
 
-class ScalarSinh(Expr[Expr]):
-    __slots__ = ("_a",)
-    _a: Expr
+class ScalarSinh(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a",)
+    _a: AnyExpr
 
-    def __init__(self, a: Expr):
+    def __init__(self, a: AnyExpr) -> None:
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarSinh":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarSinh":
         return ScalarSinh(a)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
@@ -37,6 +41,7 @@ class ScalarSinh(Expr[Expr]):
             ScalarSinh,
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -46,6 +51,7 @@ class ScalarSinh(Expr[Expr]):
         return np.sinh(self._a.eval(x, Xs, late_bound))
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -99,25 +105,29 @@ class ScalarSinh(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"sinh({self._a!r})"
 
 
-class ScalarCosh(Expr[Expr]):
-    __slots__ = ("_a",)
-    _a: Expr
+class ScalarCosh(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a",)
+    _a: AnyExpr
 
-    def __init__(self, a: Expr):
+    def __init__(self, a: AnyExpr) -> None:
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarCosh":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarCosh":
         return ScalarCosh(a)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
@@ -125,6 +135,7 @@ class ScalarCosh(Expr[Expr]):
             ScalarCosh,
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -134,6 +145,7 @@ class ScalarCosh(Expr[Expr]):
         return np.cosh(self._a.eval(x, Xs, late_bound))
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -204,25 +216,29 @@ class ScalarCosh(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"cosh({self._a!r})"
 
 
-class ScalarTanh(Expr[Expr]):
-    __slots__ = ("_a",)
-    _a: Expr
+class ScalarTanh(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a",)
+    _a: AnyExpr
 
-    def __init__(self, a: Expr):
+    def __init__(self, a: AnyExpr) -> None:
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarTanh":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarTanh":
         return ScalarTanh(a)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
@@ -230,6 +246,7 @@ class ScalarTanh(Expr[Expr]):
             ScalarTanh,
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -239,6 +256,7 @@ class ScalarTanh(Expr[Expr]):
         return np.tanh(self._a.eval(x, Xs, late_bound))
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -293,25 +311,29 @@ class ScalarTanh(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"tanh({self._a!r})"
 
 
-class ScalarAsinh(Expr[Expr]):
-    __slots__ = ("_a",)
-    _a: Expr
+class ScalarAsinh(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a",)
+    _a: AnyExpr
 
-    def __init__(self, a: Expr):
+    def __init__(self, a: AnyExpr) -> None:
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarAsinh":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarAsinh":
         return ScalarAsinh(a)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
@@ -319,6 +341,7 @@ class ScalarAsinh(Expr[Expr]):
             ScalarAsinh,
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -328,6 +351,7 @@ class ScalarAsinh(Expr[Expr]):
         return np.asinh(self._a.eval(x, Xs, late_bound))
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -381,25 +405,29 @@ class ScalarAsinh(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"asinh({self._a!r})"
 
 
-class ScalarAcosh(Expr[Expr]):
-    __slots__ = ("_a",)
-    _a: Expr
+class ScalarAcosh(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a",)
+    _a: AnyExpr
 
-    def __init__(self, a: Expr):
+    def __init__(self, a: AnyExpr) -> None:
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarAcosh":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarAcosh":
         return ScalarAcosh(a)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
@@ -407,6 +435,7 @@ class ScalarAcosh(Expr[Expr]):
             ScalarAcosh,
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -416,6 +445,7 @@ class ScalarAcosh(Expr[Expr]):
         return np.acosh(self._a.eval(x, Xs, late_bound))
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -478,25 +508,29 @@ class ScalarAcosh(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"acosh({self._a!r})"
 
 
-class ScalarAtanh(Expr[Expr]):
-    __slots__ = ("_a",)
-    _a: Expr
+class ScalarAtanh(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a",)
+    _a: AnyExpr
 
-    def __init__(self, a: Expr):
+    def __init__(self, a: AnyExpr) -> None:
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarAtanh":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarAtanh":
         return ScalarAtanh(a)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
@@ -504,6 +538,7 @@ class ScalarAtanh(Expr[Expr]):
             ScalarAtanh,
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -513,6 +548,7 @@ class ScalarAtanh(Expr[Expr]):
         return np.atanh(self._a.eval(x, Xs, late_bound))
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -576,5 +612,6 @@ class ScalarAtanh(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"atanh({self._a!r})"

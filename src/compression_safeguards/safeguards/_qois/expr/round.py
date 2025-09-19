@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _is_negative_zero,
@@ -11,30 +12,34 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
-from .abc import Expr
+from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
 
 
-class ScalarFloor(Expr[Expr]):
-    __slots__ = ("_a",)
-    _a: Expr
+class ScalarFloor(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a",)
+    _a: AnyExpr
 
-    def __init__(self, a: Expr):
+    def __init__(self, a: AnyExpr):
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarFloor":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarFloor":
         return ScalarFloor(a)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a, dtype, np.floor, ScalarFloor
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -44,6 +49,7 @@ class ScalarFloor(Expr[Expr]):
         return np.floor(self._a.eval(x, Xs, late_bound))
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -82,29 +88,34 @@ class ScalarFloor(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"floor({self._a!r})"
 
 
-class ScalarCeil(Expr[Expr]):
-    __slots__ = ("_a",)
-    _a: Expr
+class ScalarCeil(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a",)
+    _a: AnyExpr
 
-    def __init__(self, a: Expr):
+    def __init__(self, a: AnyExpr):
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarCeil":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarCeil":
         return ScalarCeil(a)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a, dtype, np.ceil, ScalarCeil
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -114,6 +125,7 @@ class ScalarCeil(Expr[Expr]):
         return np.ceil(self._a.eval(x, Xs, late_bound))
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -152,29 +164,34 @@ class ScalarCeil(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"ceil({self._a!r})"
 
 
-class ScalarTrunc(Expr[Expr]):
-    __slots__ = ("_a",)
-    _a: Expr
+class ScalarTrunc(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a",)
+    _a: AnyExpr
 
-    def __init__(self, a: Expr):
+    def __init__(self, a: AnyExpr):
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarTrunc":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarTrunc":
         return ScalarTrunc(a)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a, dtype, np.trunc, ScalarTrunc
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -184,6 +201,7 @@ class ScalarTrunc(Expr[Expr]):
         return np.trunc(self._a.eval(x, Xs, late_bound))
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -235,25 +253,29 @@ class ScalarTrunc(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"trunc({self._a!r})"
 
 
-class ScalarRoundTiesEven(Expr[Expr]):
-    __slots__ = ("_a",)
-    _a: Expr
+class ScalarRoundTiesEven(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a",)
+    _a: AnyExpr
 
-    def __init__(self, a: Expr):
+    def __init__(self, a: AnyExpr):
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarRoundTiesEven":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarRoundTiesEven":
         return ScalarRoundTiesEven(a)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
@@ -261,6 +283,7 @@ class ScalarRoundTiesEven(Expr[Expr]):
             ScalarRoundTiesEven,
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -270,6 +293,7 @@ class ScalarRoundTiesEven(Expr[Expr]):
         return np.rint(self._a.eval(x, Xs, late_bound))
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -335,5 +359,6 @@ class ScalarRoundTiesEven(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"round_ties_even({self._a!r})"

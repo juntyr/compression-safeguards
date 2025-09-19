@@ -6,12 +6,14 @@ __all__ = ["SelectSafeguard"]
 
 from abc import ABC
 from collections.abc import Collection, Set
+from typing import ClassVar
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
 from ...utils.intervals import IntervalUnion
-from ...utils.typing import S, T
+from ...utils.typing import JSON, S, T
 from ..abc import Safeguard
 from ..pointwise.abc import PointwiseSafeguard
 from ..stencil import BoundaryCondition, NeighbourhoodAxis
@@ -37,7 +39,7 @@ class SelectSafeguard(Safeguard):
     selector : str | Parameter
         Late-bound parameter name that is used to select between the
         `safeguards`.
-    safeguards : Collection[dict | PointwiseSafeguard | StencilSafeguard]
+    safeguards : Collection[dict[str, JSON] | PointwiseSafeguard | StencilSafeguard]
         At least one safeguard configuration [`dict`][dict]s or already
         initialized
         [`PointwiseSafeguard`][compression_safeguards.safeguards.pointwise.abc.PointwiseSafeguard]
@@ -45,15 +47,15 @@ class SelectSafeguard(Safeguard):
         [`StencilSafeguard`][compression_safeguards.safeguards.stencil.abc.StencilSafeguard].
     """
 
-    __slots__ = ()
+    __slots__: tuple[str, ...] = ()
 
-    kind = "select"
+    kind: ClassVar[str] = "select"
 
     def __init__(
         self,
         *,
         selector: str | Parameter,
-        safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard],
+        safeguards: Collection[dict[str, JSON] | PointwiseSafeguard | StencilSafeguard],
     ) -> None:
         pass
 
@@ -61,7 +63,7 @@ class SelectSafeguard(Safeguard):
         cls,
         *,
         selector: str | Parameter,
-        safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard],
+        safeguards: Collection[dict[str, JSON] | PointwiseSafeguard | StencilSafeguard],
     ) -> "_SelectPointwiseSafeguard | _SelectStencilSafeguard":
         from ... import SafeguardKind  # noqa: PLC0415
 
@@ -72,7 +74,7 @@ class SelectSafeguard(Safeguard):
         safeguards_ = tuple(
             safeguard
             if isinstance(safeguard, PointwiseSafeguard | StencilSafeguard)
-            else SafeguardKind[safeguard["kind"]].value(
+            else SafeguardKind[safeguard["kind"]].value(  # type: ignore
                 **{p: v for p, v in safeguard.items() if p != "kind"}
             )
             for safeguard in safeguards
@@ -104,6 +106,7 @@ class SelectSafeguard(Safeguard):
         ...
 
     @property
+    @override
     def late_bound(self) -> Set[Parameter]:  # type: ignore
         """
         The set of late-bound parameters that this safeguard has.
@@ -114,6 +117,34 @@ class SelectSafeguard(Safeguard):
 
         Late-bound parameters can be used for parameters that depend on the
         specific data that is to be safeguarded.
+        """
+
+        ...
+
+    @override
+    def check(  # type: ignore
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
+    ) -> bool:
+        """
+        Check if, for all elements, the selected safeguard succeed the check.
+
+        Parameters
+        ----------
+        data : np.ndarray[S, np.dtype[T]]
+            Data to be encoded.
+        decoded : np.ndarray[S, np.dtype[T]]
+            Decoded data.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+
+        Returns
+        -------
+        ok : bool
+            `True` if the check succeeded.
         """
 
         ...
@@ -169,7 +200,8 @@ class SelectSafeguard(Safeguard):
 
         ...
 
-    def get_config(self) -> dict:  # type: ignore
+    @override
+    def get_config(self) -> dict[str, JSON]:  # type: ignore
         """
         Returns the configuration of the safeguard.
 
@@ -183,9 +215,9 @@ class SelectSafeguard(Safeguard):
 
 
 class _SelectSafeguardBase(ABC):
-    __slots__ = ()
+    __slots__: tuple[str, ...] = ()
 
-    kind = "select"
+    kind: ClassVar[str] = "select"
 
     @property
     def selector(self) -> Parameter:
@@ -272,22 +304,20 @@ class _SelectSafeguardBase(ABC):
 
         return valid
 
-    def get_config(self) -> dict:
+    def get_config(self) -> dict[str, JSON]:
         return dict(
             kind=type(self).kind,
             selector=self.selector,
             safeguards=[safeguard.get_config() for safeguard in self.safeguards],
         )
 
+    @override
     def __repr__(self) -> str:
         return f"{SelectSafeguard.__name__}(selector={self.selector!r}, safeguards={list(self.safeguards)!r})"
 
 
 class _SelectPointwiseSafeguard(_SelectSafeguardBase, PointwiseSafeguard):
-    __slots__ = (
-        "_selector",
-        "_safeguards",
-    )
+    __slots__: tuple[str, ...] = ("_selector", "_safeguards")
     _selector: Parameter
     _safeguards: tuple[PointwiseSafeguard, ...]
 
@@ -302,10 +332,7 @@ class _SelectPointwiseSafeguard(_SelectSafeguardBase, PointwiseSafeguard):
 
 
 class _SelectStencilSafeguard(_SelectSafeguardBase, StencilSafeguard):
-    __slots__ = (
-        "_selector",
-        "_safeguards",
-    )
+    __slots__: tuple[str, ...] = ("_selector", "_safeguards")
     _selector: Parameter
     _safeguards: tuple[PointwiseSafeguard | StencilSafeguard, ...]
 
@@ -320,6 +347,7 @@ class _SelectStencilSafeguard(_SelectSafeguardBase, StencilSafeguard):
             )
         self._safeguards = safeguards
 
+    @override
     def compute_check_neighbourhood_for_data_shape(
         self, data_shape: tuple[int, ...]
     ) -> tuple[dict[BoundaryCondition, NeighbourhoodAxis], ...]:

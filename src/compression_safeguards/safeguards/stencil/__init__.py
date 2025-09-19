@@ -10,10 +10,11 @@ import numpy as np
 from typing_extensions import (
     Self,  # MSPV 3.11
     assert_never,  # MSPV 3.11
+    override,  # MSPV 3.12
 )
 
 from ...utils.bindings import Parameter
-from ...utils.typing import S, T
+from ...utils.typing import JSON, S, T
 
 
 class BoundaryCondition(Enum):
@@ -82,7 +83,7 @@ class NeighbourhoodAxis:
         two next values.
     """
 
-    __slots__ = ("_before", "_after")
+    __slots__: tuple[str, ...] = ("_before", "_after")
     _before: int
     _after: int
 
@@ -115,6 +116,7 @@ class NeighbourhoodAxis:
         """
         return self._after
 
+    @override
     def __repr__(self) -> str:
         return f"{type(self).__name__}(before={self.before}, after={self.after})"
 
@@ -150,7 +152,7 @@ class NeighbourhoodBoundaryAxis:
         boundary. The value must be losslessly convertible to the data dtype.
     """
 
-    __slots__ = ("_axis", "_shape", "_boundary", "_constant_boundary")
+    __slots__: tuple[str, ...] = ("_axis", "_shape", "_boundary", "_constant_boundary")
     _axis: int
     _shape: NeighbourhoodAxis
     _boundary: BoundaryCondition
@@ -238,22 +240,24 @@ class NeighbourhoodBoundaryAxis:
         """
         return self._constant_boundary
 
-    def get_config(self) -> dict:
+    def get_config(self) -> dict[str, JSON]:
         """
         Returns the configuration of the data neighbourhood.
 
         Returns
         -------
-        config : dict
+        config : dict[str, JSON]
             Configuration of the data neighbourhood.
         """
 
-        config = dict(
+        config: dict[str, JSON] = dict(
             axis=self.axis,
             before=self.before,
             after=self.after,
             boundary=self.boundary.name,
-            constant_boundary=self.constant_boundary,
+            constant_boundary=str(self.constant_boundary)
+            if isinstance(self.constant_boundary, Parameter)
+            else self.constant_boundary,
         )
 
         if self.constant_boundary is None:
@@ -262,13 +266,13 @@ class NeighbourhoodBoundaryAxis:
         return config
 
     @classmethod
-    def from_config(cls, config: dict) -> Self:
+    def from_config(cls, config: dict[str, JSON]) -> Self:
         """
         Instantiate the data neighbourhood from a configuration [`dict`][dict].
 
         Parameters
         ----------
-        config : dict
+        config : dict[str, JSON]
             Configuration of the data neighbourhood.
 
         Returns
@@ -277,8 +281,9 @@ class NeighbourhoodBoundaryAxis:
             Instantiated data neighbourhood.
         """
 
-        return cls(**config)
+        return cls(**config)  # type: ignore
 
+    @override
     def __repr__(self) -> str:
         return f"{type(self).__name__}({', '.join(f'{k}={v!r}' for k, v in self.get_config().items())})"
 

@@ -2,10 +2,11 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils.bindings import Parameter
 from ..bound import DataBounds, data_bounds
-from .abc import Expr
+from .abc import AnyExpr, Expr
 from .literal import Number
 from .typing import F, Ns, Ps, PsI
 
@@ -16,10 +17,10 @@ class Reporter(ABC):
     interest expression computations.
     """
 
-    __slots__ = ()
+    __slots__: tuple[str, ...] = ()
 
     @abstractmethod
-    def enter(self, expr: Expr) -> None:
+    def enter(self, expr: AnyExpr) -> None:
         """
         Report that `expr` has been entered.
 
@@ -30,7 +31,7 @@ class Reporter(ABC):
         """
 
     @abstractmethod
-    def exit(self, expr: Expr) -> None:
+    def exit(self, expr: AnyExpr) -> None:
         """
         Report that `expr` has been exited.
 
@@ -41,7 +42,7 @@ class Reporter(ABC):
         """
 
 
-class ReportingExpr(Expr[Expr]):
+class ReportingExpr(Expr[AnyExpr]):
     """
     A reporting expression wraps around an existing `expr`, forwarding all
     functionality to it while also informing the `reporter`.
@@ -54,38 +55,45 @@ class ReportingExpr(Expr[Expr]):
         The reporter that will report on the expression.
     """
 
-    __slots__ = ("_expr", "_reporter")
-    _expr: Expr
+    __slots__: tuple[str, ...] = ("_expr", "_reporter")
+    _expr: AnyExpr
     _reporter: Reporter
 
-    def __new__(cls, expr: Expr, reporter: Reporter):
+    def __init__(self, expr: AnyExpr, reporter: Reporter):
+        self._expr = expr
+        self._reporter = reporter
+
+    def __new__(cls, expr: AnyExpr, reporter: Reporter) -> "ReportingExpr | Number":  # type: ignore[misc]
         if isinstance(expr, ReportingExpr | Number):
             return expr
-        this = super().__new__(cls)
-        this._expr = expr
-        this._reporter = reporter
-        return this
+        return super().__new__(cls)
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._expr,)
 
-    def with_args(self, expr: Expr) -> "ReportingExpr":
+    @override
+    def with_args(self, expr: AnyExpr) -> "ReportingExpr | Number":
         return ReportingExpr(expr, self._reporter)
 
-    @property  # type: ignore
+    @property  # type: ignore[misc]
+    @override
     def expr_size(self) -> int:
         return self._expr.expr_size
 
-    @property  # type: ignore
+    @property  # type: ignore[misc]
+    @override
     def data_expr_size(self) -> int:
         return self._expr.data_expr_size
 
-    @property  # type: ignore
+    @property  # type: ignore[misc]
+    @override
     def has_data(self) -> bool:
         return self._expr.has_data
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         fexpr = self._expr.constant_fold(dtype)
         # partially / not constant folded -> stop further folding
         if isinstance(fexpr, Expr):
@@ -93,6 +101,7 @@ class ReportingExpr(Expr[Expr]):
         # fully constant folded -> allow further folding
         return fexpr
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -102,6 +111,7 @@ class ReportingExpr(Expr[Expr]):
         return self._expr.eval(x, Xs, late_bound)
 
     @data_bounds(DataBounds.infallible)
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -118,5 +128,6 @@ class ReportingExpr(Expr[Expr]):
         finally:
             self._reporter.exit(self._expr)
 
+    @override
     def __repr__(self) -> str:
         return repr(self._expr)

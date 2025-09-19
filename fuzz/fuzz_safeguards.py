@@ -63,9 +63,9 @@ np.nanmax = nanmax
 
 
 class FuzzCodec(Codec):
-    __slots__ = ("data", "decoded")
+    __slots__: tuple[str, ...] = ("data", "decoded")
 
-    codec_id = "fuzz"  # type: ignore
+    codec_id: str = "fuzz"  # type: ignore
 
     def __init__(self, data, decoded):
         self.data = data

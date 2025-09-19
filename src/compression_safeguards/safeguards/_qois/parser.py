@@ -2,9 +2,10 @@ import itertools
 from contextlib import contextmanager
 
 from sly import Parser
+from typing_extensions import Unpack  # MSPV 3.11
 
 from ...utils.bindings import Parameter
-from .expr.abc import Expr
+from .expr.abc import AnyExpr
 from .expr.abs import ScalarAbs
 from .expr.addsub import ScalarAdd, ScalarSubtract
 from .expr.array import Array
@@ -47,14 +48,20 @@ from .lexer import QoILexer
 
 
 class QoIParser(Parser):
-    __slots__ = ("_x", "_X", "_I", "_vars", "_text")
+    __slots__: tuple[str, ...] = ("_x", "_X", "_I", "_vars", "_text")
     _x: Data
-    _X: None | Array
+    _X: None | Array[Unpack[tuple[AnyExpr, ...]]]
     _I: None | tuple[int, ...]
-    _vars: dict[Parameter, Expr]
+    _vars: dict[Parameter, AnyExpr]
     _text: str
 
-    def __init__(self, *, x: Data, X: None | Array, I: None | tuple[int, ...]):  # noqa: E741
+    def __init__(
+        self,
+        *,
+        x: Data,
+        X: None | Array[Unpack[tuple[AnyExpr, ...]]],
+        I: None | tuple[int, ...],  # noqa: E741
+    ):  # noqa: E741
         self._x = x
         self._X = X
         self._I = I

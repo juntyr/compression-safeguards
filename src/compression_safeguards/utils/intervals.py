@@ -18,7 +18,10 @@ __all__ = [
 from typing import Any, Generic, Literal, TypeVar
 
 import numpy as np
-from typing_extensions import Self  # MSPV 3.11
+from typing_extensions import (
+    Self,  # MSPV 3.11
+    override,  # MSPV 3.12
+)
 
 from ._compat import _maximum_zero_sign_sensitive as _np_maximum
 from ._compat import _minimum_zero_sign_sensitive as _np_minimum
@@ -101,7 +104,7 @@ class Interval(Generic[T, N]):
     [`Interval.into_union`][compression_safeguards.utils.intervals.Interval.into_union].
     """
 
-    __slots__ = ("_lower", "_upper")
+    __slots__: tuple[str, ...] = ("_lower", "_upper")
     _lower: np.ndarray[tuple[N], np.dtype[T]]
     _upper: np.ndarray[tuple[N], np.dtype[T]]
 
@@ -503,12 +506,13 @@ class Interval(Generic[T, N]):
             _upper=self._upper.reshape(1, -1),  # type: ignore
         )
 
+    @override
     def __repr__(self) -> str:
         return f"Interval(lower={self._lower!r}, upper={self._upper!r})"
 
 
 class IndexedInterval(Generic[T, N]):
-    __slots__ = ("_lower", "_upper", "_index")
+    __slots__: tuple[str, ...] = ("_lower", "_upper", "_index")
     _lower: np.ndarray[tuple[N], np.dtype[T]]
     _upper: np.ndarray[tuple[N], np.dtype[T]]
     _index: Any
@@ -538,7 +542,7 @@ def _minimum(dtype: np.dtype[T]) -> np.ndarray[tuple[()], np.dtype[T]]:
 
 
 class _Minimum:
-    __slots__ = ()
+    __slots__: tuple[str, ...] = ()
 
     def __le__(self, interval: IndexedInterval[T, N]) -> IndexedInterval[T, N]:
         if not isinstance(interval, IndexedInterval):
@@ -566,7 +570,7 @@ def _maximum(dtype: np.dtype[T]) -> np.ndarray[tuple[()], np.dtype[T]]:
 
 
 class _Maximum:
-    __slots__ = ()
+    __slots__: tuple[str, ...] = ()
 
     def __ge__(self, interval: IndexedInterval[T, N]) -> IndexedInterval[T, N]:
         if not isinstance(interval, IndexedInterval):
@@ -595,7 +599,7 @@ class Lower:
         The lower bound array
     """
 
-    __slots__ = ("_lower",)
+    __slots__: tuple[str, ...] = ("_lower",)
     _lower: np.ndarray[tuple[int, ...], np.dtype[np.number]]
 
     def __init__(self, lower: np.ndarray[tuple[int, ...], np.dtype[np.number]]) -> None:
@@ -639,7 +643,7 @@ class Upper:
         The upper bound array
     """
 
-    __slots__ = ("_upper",)
+    __slots__: tuple[str, ...] = ("_upper",)
     _upper: np.ndarray[tuple[int, ...], np.dtype[np.number]]
 
     def __init__(self, upper: np.ndarray[tuple[int, ...], np.dtype[np.number]]) -> None:
@@ -674,7 +678,7 @@ class IntervalUnion(Generic[T, N, U]):
     Union of `U` intervals, each over a `N`-sized [`ndarray`][numpy.ndarray] of data type `T`.
     """
 
-    __slots__ = ("_lower", "_upper")
+    __slots__: tuple[str, ...] = ("_lower", "_upper")
     # invariants:
     # - the lower/upper bounds are in sorted order
     # - no non-empty intervals come after empty intervals
@@ -1211,6 +1215,7 @@ class IntervalUnion(Generic[T, N, U]):
 
         return self._pick_more_zeros(prediction)
 
+    @override
     def __repr__(self) -> str:
         return f"IntervalUnion(lower={self._lower!r}, upper={self._upper!r})"
 

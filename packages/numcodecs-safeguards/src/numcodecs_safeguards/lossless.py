@@ -7,6 +7,7 @@ __all__ = ["Lossless"]
 from dataclasses import dataclass, field
 
 import numcodecs
+from compression_safeguards.utils.typing import JSON
 from numcodecs.abc import Codec
 from numcodecs_combinators.best import PickBestCodec
 from numcodecs_combinators.stack import CodecStack
@@ -32,14 +33,14 @@ class Lossless:
     wrapped codec's encoded data and any safeguards-computed corrections.
     """
 
-    for_codec: None | dict | Codec = None
+    for_codec: None | dict[str, JSON] | Codec = None
     """
     Lossless codec (configuration) that is applied to wrapped codec's encoding.
     
     By default, no further lossless encoding is applied.
     """
 
-    for_safeguards: dict | Codec = field(
+    for_safeguards: dict[str, JSON] | Codec = field(
         default_factory=_default_lossless_for_safeguards,
     )
     """

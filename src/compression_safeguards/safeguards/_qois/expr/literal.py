@@ -3,22 +3,23 @@ from collections.abc import Callable, Mapping
 from warnings import warn
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import _broadcast_to, _e, _pi
 from ....utils.bindings import Parameter
-from .abc import Expr
+from .abc import AnyExpr, Expr
 from .typing import F, Ns, Ps, PsI
 
 
-class Number(Expr):
-    __slots__ = ("_n",)
+class Number(Expr[()]):
+    __slots__: tuple[str, ...] = ("_n",)
     _n: str
 
     ZERO: "Number"
     ONE: "Number"
     TWO: "Number"
 
-    def __init__(self, n: str):
+    def __init__(self, n: str) -> None:
         self._n = n
 
     @staticmethod
@@ -56,15 +57,19 @@ class Number(Expr):
         return expr
 
     @property
+    @override
     def args(self) -> tuple[()]:
         return ()
 
+    @override
     def with_args(self) -> "Number":
         return Number(self._n)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return dtype.type(self._n)
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -74,6 +79,7 @@ class Number(Expr):
         n: F = Xs.dtype.type(self._n)
         return _broadcast_to(n, x)
 
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -116,11 +122,12 @@ class Number(Expr):
             if int_max_str_digits is not None:
                 sys.set_int_max_str_digits(int_max_str_digits)
 
+    @override
     def __repr__(self) -> str:
         return self._n
 
     @staticmethod
-    def symbolic_fold_unary(expr: Expr, m: Callable[[int], int]) -> None | Expr:
+    def symbolic_fold_unary(expr: AnyExpr, m: Callable[[int], int]) -> "None | Number":
         if not isinstance(expr, Number):
             return None
         i = expr.as_int()
@@ -130,8 +137,8 @@ class Number(Expr):
 
     @staticmethod
     def symbolic_fold_binary(
-        a: Expr, b: Expr, m: Callable[[int, int], int]
-    ) -> None | Expr:
+        a: AnyExpr, b: AnyExpr, m: Callable[[int, int], int]
+    ) -> "None | Number":
         if not isinstance(a, Number) or not isinstance(b, Number):
             return None
         ai = a.as_int()
@@ -146,19 +153,23 @@ Number.ONE = Number.from_symbolic_int(1)
 Number.TWO = Number.from_symbolic_int(2)
 
 
-class Pi(Expr):
-    __slots__ = ()
+class Pi(Expr[()]):
+    __slots__: tuple[str, ...] = ()
 
     @property
+    @override
     def args(self) -> tuple[()]:
         return ()
 
+    @override
     def with_args(self) -> "Pi":
         return Pi()
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return _pi(dtype)
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -168,6 +179,7 @@ class Pi(Expr):
         pi: F = _pi(Xs.dtype)
         return _broadcast_to(pi, x)
 
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -178,23 +190,28 @@ class Pi(Expr):
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         assert False, "pi has no data bounds"
 
+    @override
     def __repr__(self) -> str:
         return "pi"
 
 
-class Euler(Expr):
-    __slots__ = ()
+class Euler(Expr[()]):
+    __slots__: tuple[str, ...] = ()
 
     @property
+    @override
     def args(self) -> tuple[()]:
         return ()
 
+    @override
     def with_args(self) -> "Euler":
         return Euler()
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return _e(dtype)
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -204,6 +221,7 @@ class Euler(Expr):
         e: F = _e(Xs.dtype)
         return _broadcast_to(e, x)
 
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -214,5 +232,6 @@ class Euler(Expr):
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         assert False, "Euler's e has no data bounds"
 
+    @override
     def __repr__(self) -> str:
         return "e"

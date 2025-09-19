@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
-from typing import Generic, final
+from typing import TYPE_CHECKING, Generic, TypeAlias, final
 from warnings import warn
 
 import numpy as np
@@ -8,12 +8,16 @@ from typing_extensions import (
     Self,  # MSPV 3.11
     Unpack,  # MSPV 3.11
     assert_never,  # MSPV 3.11
+    override,  # MSPV 3.12
 )
 
 from ....utils._compat import _maximum_zero_sign_sensitive, _minimum_zero_sign_sensitive
 from ....utils.bindings import Parameter
 from ..bound import DataBounds, data_bounds_checks, guarantee_data_within_expr_bounds
 from .typing import Es, F, Ns, Ps, PsI
+
+if TYPE_CHECKING:
+    from .literal import Number
 
 
 class Expr(ABC, Generic[Unpack[Es]]):
@@ -22,7 +26,7 @@ class Expr(ABC, Generic[Unpack[Es]]):
     tree.
     """
 
-    __slots__ = ()
+    __slots__: tuple[str, ...] = ()
 
     @property
     @abstractmethod
@@ -32,7 +36,7 @@ class Expr(ABC, Generic[Unpack[Es]]):
         """
 
     @abstractmethod
-    def with_args(self, *args: Unpack[Es]) -> Self:
+    def with_args(self, *args: Unpack[Es]) -> "Self | Number":
         """
         Reconstruct this expression with different sub-expression arguments.
 
@@ -49,27 +53,27 @@ class Expr(ABC, Generic[Unpack[Es]]):
         """
 
     @final
-    def map_expr(self, m: "Callable[[Expr], Expr]") -> "Expr":
+    def map_expr(self, m: "Callable[[AnyExpr], AnyExpr]") -> "AnyExpr":
         """
         Recursively maps the expression mapping function `m` over this
         expression and its sub-expression arguments.
 
         Parameters
         ----------
-        m : Callable[[Expr], Expr]
+        m : Callable[[AnyExpr], AnyExpr]
             The expression mapper, which is applied to an expression whose
             sub-expression arguments have already been mapped, i.e. the mapper
             is *not* responsible for recursion.
 
         Returns
         -------
-        expr : Self
+        expr : AnyExpr
             The mapped expression.
         """
 
-        args: tuple[Expr, ...] = self.args  # type: ignore
-        mapped_args: tuple[Expr, ...] = tuple(a.map_expr(m) for a in args)
-        mapped_self: Self = self.with_args(*mapped_args)  # type: ignore
+        args: tuple[AnyExpr, ...] = self.args  # type: ignore
+        mapped_args: tuple[AnyExpr, ...] = tuple(a.map_expr(m) for a in args)
+        mapped_self: AnyExpr = self.with_args(*mapped_args)  # type: ignore
         return m(mapped_self)
 
     @final
@@ -79,7 +83,7 @@ class Expr(ABC, Generic[Unpack[Es]]):
         The size of the expression tree, counting the number of nodes.
         """
 
-        args: tuple[Expr, ...] = self.args  # type: ignore
+        args: tuple[AnyExpr, ...] = self.args  # type: ignore
 
         return sum(a.expr_size for a in args) + 1
 
@@ -91,9 +95,9 @@ class Expr(ABC, Generic[Unpack[Es]]):
         nodes.
         """
 
-        args: tuple[Expr, ...] = self.args  # type: ignore
+        args: tuple[AnyExpr, ...] = self.args  # type: ignore
 
-        if args == 0:
+        if len(args) == 0:
             return int(self.has_data)
 
         return sum(a.expr_size for a in args if a.has_data) + 1
@@ -105,7 +109,7 @@ class Expr(ABC, Generic[Unpack[Es]]):
         Does this expression reference the data `x` or `X[i]`?
         """
 
-        args: tuple[Expr, ...] = self.args  # type: ignore
+        args: tuple[AnyExpr, ...] = self.args  # type: ignore
 
         return any(a.has_data for a in args)
 
@@ -116,7 +120,7 @@ class Expr(ABC, Generic[Unpack[Es]]):
         The set of data indices `X[is]` that this expression uses.
         """
 
-        args: tuple[Expr, ...] = self.args  # type: ignore
+        args: tuple[AnyExpr, ...] = self.args  # type: ignore
 
         match args:
             case ():
@@ -149,7 +153,7 @@ class Expr(ABC, Generic[Unpack[Es]]):
 
         Returns
         -------
-        expr : Expr
+        expr : Self
             The modified expression.
         """
 
@@ -164,7 +168,7 @@ class Expr(ABC, Generic[Unpack[Es]]):
         The set of late-bound constant parameters that this expression uses.
         """
 
-        args: tuple[Expr, ...] = self.args  # type: ignore
+        args: tuple[AnyExpr, ...] = self.args  # type: ignore
 
         match args:
             case ():
@@ -181,7 +185,7 @@ class Expr(ABC, Generic[Unpack[Es]]):
     #        not being able to relate on TypeVarTuple to another, here *Expr to
     #        *F, see e.g. https://github.com/python/typing/issues/1216
     @abstractmethod
-    def constant_fold(self, dtype: np.dtype[F]) -> "F | Expr":
+    def constant_fold(self, dtype: np.dtype[F]) -> "F | AnyExpr":
         """
         Apply scalar constant folding for the given `dtype` to this expression.
 
@@ -386,5 +390,9 @@ class Expr(ABC, Generic[Unpack[Es]]):
         return Xs_lower, Xs_upper
 
     @abstractmethod
+    @override
     def __repr__(self) -> str:
         pass
+
+
+AnyExpr: TypeAlias = Expr[Unpack[tuple["AnyExpr", ...]]]

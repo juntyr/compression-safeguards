@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _is_sign_negative_number,
@@ -10,7 +11,7 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
-from .abc import Expr
+from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
 from .divmul import ScalarMultiply
 from .literal import Number
@@ -18,12 +19,16 @@ from .logexp import Exponential, Logarithm, ScalarExp, ScalarLog
 from .typing import F, Fi, Ns, Ps, PsI
 
 
-class ScalarPower(Expr[Expr, Expr]):
-    __slots__ = ("_a", "_b")
-    _a: Expr
-    _b: Expr
+class ScalarPower(Expr[AnyExpr, AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a", "_b")
+    _a: AnyExpr
+    _b: AnyExpr
 
-    def __new__(cls, a: Expr, b: Expr):
+    def __init__(self, a: AnyExpr, b: AnyExpr) -> None:
+        self._a = a
+        self._b = b
+
+    def __new__(cls, a: AnyExpr, b: AnyExpr) -> "ScalarPower | Number":  # type: ignore[misc]
         if isinstance(a, Number) and isinstance(b, Number):
             # symbolical constant propagation for int ** int
             # where the exponent is non-negative and the result thus is an int
@@ -31,23 +36,24 @@ class ScalarPower(Expr[Expr, Expr]):
             if (ai is not None) and (bi is not None):
                 if bi >= 0:
                     return Number.from_symbolic_int(ai**bi)
-        this = super().__new__(cls)
-        this._a = a
-        this._b = b
-        return this
+        return super().__new__(cls)
 
     @property
-    def args(self) -> tuple[Expr, Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
 
-    def with_args(self, a: Expr, b: Expr) -> "ScalarPower":
+    @override
+    def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarPower | Number":
         return ScalarPower(a, b)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_binary(
             self._a, self._b, dtype, np.power, ScalarPower
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -58,6 +64,7 @@ class ScalarPower(Expr[Expr, Expr]):
             self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound)
         )
 
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -128,29 +135,34 @@ class ScalarPower(Expr[Expr, Expr]):
 
         return rewritten.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 
+    @override
     def __repr__(self) -> str:
         return f"{self._a!r} ** {self._b!r}"
 
 
-class ScalarFakeAbs(Expr[Expr]):
-    __slots__ = ("_a",)
-    _a: Expr
+class ScalarFakeAbs(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a",)
+    _a: AnyExpr
 
-    def __init__(self, a: Expr):
+    def __init__(self, a: AnyExpr) -> None:
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarFakeAbs":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarFakeAbs":
         return ScalarFakeAbs(a)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a, dtype, np.abs, ScalarFakeAbs
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -160,6 +172,7 @@ class ScalarFakeAbs(Expr[Expr]):
         return np.abs(self._a.eval(x, Xs, late_bound))
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -187,31 +200,38 @@ class ScalarFakeAbs(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"fake_abs({self._a!r})"
 
 
-class ForceEquivalent(Expr[Expr]):
-    __slots__ = ("_a", "_force")
-    _a: Expr
+class ForceEquivalent(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a", "_force")
+    _a: AnyExpr
     _force: np.ndarray[tuple[int, ...], np.dtype[np.bool]]
 
-    def __init__(self, a: Expr, force: np.ndarray[tuple[int, ...], np.dtype[np.bool]]):
+    def __init__(
+        self, a: AnyExpr, force: np.ndarray[tuple[int, ...], np.dtype[np.bool]]
+    ) -> None:
         self._a = a
         self._force = force
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ForceEquivalent":
+    @override
+    def with_args(self, a: AnyExpr) -> "ForceEquivalent":
         return ForceEquivalent(a, self._force)
 
-    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a, dtype, lambda x: x, lambda a: ForceEquivalent(a, self._force)
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -221,6 +241,7 @@ class ForceEquivalent(Expr[Expr]):
         return self._a.eval(x, Xs, late_bound)
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -248,5 +269,6 @@ class ForceEquivalent(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"force_equivalent({self._a!r})"

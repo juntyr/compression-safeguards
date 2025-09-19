@@ -6,10 +6,14 @@ __all__ = ["Safeguards"]
 
 import functools
 from collections.abc import Collection, Mapping, Set
-from typing import Literal
+from typing import Final, Literal
 
 import numpy as np
-from typing_extensions import Self, assert_never  # MSPV 3.11
+from typing_extensions import (
+    Self,  # MSPV 3.11
+    assert_never,  # MSPV 3.11
+    override,  # MSPV 3.12
+)
 
 from .safeguards import SafeguardKind
 from .safeguards.abc import Safeguard
@@ -18,7 +22,8 @@ from .safeguards.stencil import BoundaryCondition, NeighbourhoodAxis
 from .safeguards.stencil.abc import StencilSafeguard
 from .utils.bindings import Bindings, Parameter, Value
 from .utils.cast import as_bits
-from .utils.typing import C, S, T
+from .utils.intervals import IntervalUnion  # noqa: TC001
+from .utils.typing import JSON, C, S, T
 
 
 class Safeguards:
@@ -39,14 +44,14 @@ class Safeguards:
         The safeguards' version. Do not provide this parameter explicitly.
     """
 
-    __slots__ = ("_pointwise_safeguards", "_stencil_safeguards")
+    __slots__: tuple[str, ...] = ("_pointwise_safeguards", "_stencil_safeguards")
     _pointwise_safeguards: tuple[PointwiseSafeguard, ...]
     _stencil_safeguards: tuple[StencilSafeguard, ...]
 
     def __init__(
         self,
         *,
-        safeguards: Collection[dict | Safeguard],
+        safeguards: Collection[dict[str, JSON] | Safeguard],
         _version: None | str = None,
     ) -> None:
         if _version is not None:
@@ -55,7 +60,7 @@ class Safeguards:
         safeguards = [
             safeguard
             if isinstance(safeguard, Safeguard)
-            else SafeguardKind[safeguard["kind"]].value(
+            else SafeguardKind[safeguard["kind"]].value(  # type: ignore
                 **{p: v for p, v in safeguard.items() if p != "kind"}
             )
             for safeguard in safeguards
@@ -128,7 +133,7 @@ class Safeguards:
         return _FORMAT_VERSION
 
     @staticmethod
-    def supported_dtypes() -> frozenset[np.dtype]:
+    def supported_dtypes() -> frozenset[np.dtype[np.number]]:
         """
         The set of numpy [`dtype`][numpy.dtype]s that the safeguards support.
         """
@@ -262,7 +267,7 @@ class Safeguards:
             self._stencil_safeguards
         )
 
-        all_intervals = []
+        all_intervals: list[IntervalUnion[T, int, int]] = []
         for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
             intervals = safeguard.compute_safe_intervals(data, late_bound=late_bound)
             assert np.all(intervals.contains(data)), (
@@ -758,7 +763,7 @@ class Safeguards:
             self._stencil_safeguards
         )
 
-        all_intervals = []
+        all_intervals: list[IntervalUnion[T, int, int]] = []
         for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
             intervals = safeguard.compute_safe_intervals(
                 data_chunk_, late_bound=late_bound_chunk
@@ -1005,13 +1010,13 @@ class Safeguards:
             tuple(non_stencil_indices),
         )
 
-    def get_config(self) -> dict:
+    def get_config(self) -> dict[str, JSON]:
         """
         Returns the configuration of the safeguards.
 
         Returns
         -------
-        config : dict
+        config : dict[str, JSON]
             Configuration of the safeguards.
         """
 
@@ -1021,13 +1026,13 @@ class Safeguards:
         )
 
     @classmethod
-    def from_config(cls, config: dict) -> Self:
+    def from_config(cls, config: dict[str, JSON]) -> Self:
         """
         Instantiate the safeguards from a configuration [`dict`][dict].
 
         Parameters
         ----------
-        config : dict
+        config : dict[str, JSON]
             Configuration of the safeguards.
 
         Returns
@@ -1036,16 +1041,17 @@ class Safeguards:
             Collection of safeguards.
         """
 
-        return cls(**config)
+        return cls(**config)  # type: ignore
 
+    @override
     def __repr__(self) -> str:
         return f"{type(self).__name__}(safeguards={list(self.safeguards)!r})"
 
 
-_FORMAT_VERSION: str = "0.1.x"
+_FORMAT_VERSION: Final[str] = "0.1.x"
 
 
-_SUPPORTED_DTYPES: frozenset[np.dtype] = frozenset(
+_SUPPORTED_DTYPES: Final[frozenset[np.dtype[np.number]]] = frozenset(
     {
         np.dtype(np.int8),
         np.dtype(np.int16),

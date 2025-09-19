@@ -1,31 +1,36 @@
 from collections.abc import Callable, Mapping
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import _broadcast_to
 from ....utils.bindings import Parameter
-from .abc import Expr
+from .abc import AnyExpr, Expr
 from .typing import F, Ns, Ps, PsI
 
 
-class ScalarFoldedConstant(Expr):
-    __slots__ = ("_const",)
+class ScalarFoldedConstant(Expr[()]):
+    __slots__: tuple[str, ...] = ("_const",)
     _const: np.number
 
-    def __init__(self, const: np.number):
+    def __init__(self, const: np.number) -> None:
         self._const = const[()] if isinstance(const, np.ndarray) else const  # type: ignore
 
     @property
+    @override
     def args(self) -> tuple[()]:
         return ()
 
+    @override
     def with_args(self) -> "ScalarFoldedConstant":
         return ScalarFoldedConstant(self._const)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         assert isinstance(self._const, dtype.type)
         return self._const
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -35,6 +40,7 @@ class ScalarFoldedConstant(Expr):
         assert isinstance(self._const, Xs.dtype.type)
         return _broadcast_to(self._const, x)
 
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -47,21 +53,24 @@ class ScalarFoldedConstant(Expr):
 
     @staticmethod
     def constant_fold_unary(
-        expr: Expr, dtype: np.dtype[F], m: Callable[[F], F], rm: Callable[[Expr], Expr]
-    ) -> F | Expr:
-        fexpr = expr.constant_fold(dtype)
+        expr: AnyExpr,
+        dtype: np.dtype[F],
+        m: Callable[[F], F],
+        rm: Callable[[AnyExpr], AnyExpr],
+    ) -> F | AnyExpr:
+        fexpr: F | AnyExpr = expr.constant_fold(dtype)
         if isinstance(fexpr, Expr):
             return rm(fexpr)
         return m(fexpr)
 
     @staticmethod
     def constant_fold_binary(
-        left: Expr,
-        right: Expr,
+        left: AnyExpr,
+        right: AnyExpr,
         dtype: np.dtype[F],
         m: Callable[[F, F], F],
-        rm: Callable[[Expr, Expr], Expr],
-    ) -> F | Expr:
+        rm: Callable[[AnyExpr, AnyExpr], AnyExpr],
+    ) -> F | AnyExpr:
         fleft = left.constant_fold(dtype)
         fright = right.constant_fold(dtype)
 
@@ -78,13 +87,13 @@ class ScalarFoldedConstant(Expr):
     #        https://github.com/python/typing/issues/1216
     @staticmethod
     def constant_fold_ternary(
-        left: Expr,
-        middle: Expr,
-        right: Expr,
+        left: AnyExpr,
+        middle: AnyExpr,
+        right: AnyExpr,
         dtype: np.dtype[F],
         m: Callable[[F, F, F], F],
-        rm: Callable[[Expr, Expr, Expr], Expr],
-    ) -> F | Expr:
+        rm: Callable[[AnyExpr, AnyExpr, AnyExpr], AnyExpr],
+    ) -> F | AnyExpr:
         fleft = left.constant_fold(dtype)
         fmiddle = middle.constant_fold(dtype)
         fright = right.constant_fold(dtype)
@@ -105,11 +114,12 @@ class ScalarFoldedConstant(Expr):
         return rm(fleft, fmiddle, fright)
 
     @staticmethod
-    def constant_fold_expr(expr: Expr, dtype: np.dtype[F]) -> "Expr":
+    def constant_fold_expr(expr: AnyExpr, dtype: np.dtype[F]) -> AnyExpr:
         fexpr = expr.constant_fold(dtype)
         if isinstance(fexpr, Expr):
             return fexpr
         return ScalarFoldedConstant(fexpr)
 
+    @override
     def __repr__(self) -> str:
         return f"({self._const!r})"

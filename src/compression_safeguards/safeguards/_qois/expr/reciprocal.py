@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _is_sign_negative_number,
@@ -10,26 +11,29 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
-from .abc import Expr
+from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
 
 
-class ScalarReciprocal(Expr[Expr]):
-    __slots__ = ("_a",)
-    _a: Expr
+class ScalarReciprocal(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a",)
+    _a: AnyExpr
 
-    def __init__(self, a: Expr):
+    def __init__(self, a: AnyExpr):
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarReciprocal":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarReciprocal":
         return ScalarReciprocal(a)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
@@ -37,6 +41,7 @@ class ScalarReciprocal(Expr[Expr]):
             ScalarReciprocal,
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -46,6 +51,7 @@ class ScalarReciprocal(Expr[Expr]):
         return np.reciprocal(self._a.eval(x, Xs, late_bound))
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -111,5 +117,6 @@ class ScalarReciprocal(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"reciprocal({self._a!r})"

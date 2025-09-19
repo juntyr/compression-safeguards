@@ -11,11 +11,14 @@ from types import MappingProxyType
 from typing import TypeAlias
 
 import numpy as np
-from typing_extensions import Self  # MSPV 3.11
+from typing_extensions import (
+    Self,  # MSPV 3.11
+    override,  # MSPV 3.12
+)
 
 from ._compat import _broadcast_to
 from .cast import lossless_cast, saturating_finite_float_cast
-from .typing import F, Si, T
+from .typing import JSON, F, Si, T
 
 
 class Parameter(str):
@@ -28,7 +31,7 @@ class Parameter(str):
         Name of the parameter, which must be a valid identifier.
     """
 
-    __slots__ = ()
+    __slots__: tuple[str, ...] = ()
 
     def __init__(self, param: str) -> None:
         pass
@@ -49,6 +52,7 @@ class Parameter(str):
 
         return self.startswith("$")
 
+    @override
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self})"
 
@@ -71,7 +75,7 @@ class Bindings:
         Mapping from parameters to values as keyword arguments.
     """
 
-    __slots__ = ("_bindings",)
+    __slots__: tuple[str, ...] = ("_bindings",)
     _bindings: MappingProxyType[Parameter, Value]
 
     def __init__(self, **kwargs: Value) -> None:
@@ -377,26 +381,26 @@ class Bindings:
             }
         )
 
-    def get_config(self) -> dict:
+    def get_config(self) -> dict[str, JSON]:
         """
         Returns the configuration of the bindings in a JSON compatible format.
 
         Returns
         -------
-        config : dict
+        config : dict[str, JSON]
             Configuration of the bindings.
         """
 
         return {str(p): _encode_value(p, v) for p, v in self._bindings.items()}
 
     @classmethod
-    def from_config(cls, config: dict) -> Self:
+    def from_config(cls, config: dict[str, JSON]) -> Self:
         """
         Instantiate the bindings from a configuration [`dict`][dict].
 
         Parameters
         ----------
-        config : dict
+        config : dict[str, JSON]
             Configuration of the bindings.
 
         Returns
@@ -405,7 +409,7 @@ class Bindings:
             Instantiated bindings.
         """
 
-        return cls(**{p: _decode_value(p, v) for p, v in config.items()})
+        return cls(**{p: _decode_value(Parameter(p), v) for p, v in config.items()})  # type: ignore
 
 
 _NPZ_DATA_URI_BASE64: str = "data:application/x-npz;base64,"

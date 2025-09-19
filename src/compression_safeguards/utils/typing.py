@@ -2,9 +2,9 @@
 Commonly used type variables.
 """
 
-__all__ = ["C", "F", "S", "Si", "T", "Ti", "U"]
+__all__ = ["C", "F", "S", "Si", "T", "Ti", "U", "JSON"]
 
-from typing import TypeVar
+from typing import TypeAlias, TypeVar
 
 import numpy as np
 
@@ -28,3 +28,5 @@ Ti = TypeVar("Ti", bound=np.number)
 
 U = TypeVar("U", bound=np.unsignedinteger, covariant=True)
 """ Any numpy [`unsignedinteger`][numpy.unsignedinteger] data type (covariant). """
+
+JSON: TypeAlias = "None | int | float | str | bool | list[JSON] | dict[str, JSON]"

@@ -1,30 +1,34 @@
 from collections.abc import Mapping
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import _floating_smallest_subnormal, _is_positive_zero
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
-from .abc import Expr
+from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
 
 
-class ScalarSign(Expr[Expr]):
-    __slots__ = ("_a",)
-    _a: Expr
+class ScalarSign(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a",)
+    _a: AnyExpr
 
-    def __init__(self, a: Expr):
+    def __init__(self, a: AnyExpr):
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarSign":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarSign":
         return ScalarSign(a)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
@@ -32,6 +36,7 @@ class ScalarSign(Expr[Expr]):
             ScalarSign,
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -41,6 +46,7 @@ class ScalarSign(Expr[Expr]):
         return np.sign(self._a.eval(x, Xs, late_bound))
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -84,5 +90,6 @@ class ScalarSign(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"sign({self._a!r})"

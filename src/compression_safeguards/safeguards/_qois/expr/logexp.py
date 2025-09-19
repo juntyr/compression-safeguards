@@ -2,6 +2,7 @@ from collections.abc import Callable, Mapping
 from enum import Enum, auto
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _floating_smallest_subnormal,
@@ -12,7 +13,7 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
-from .abc import Expr
+from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
 
@@ -23,23 +24,26 @@ class Logarithm(Enum):
     log10 = auto()
 
 
-class ScalarLog(Expr[Expr]):
-    __slots__ = ("_log", "_a")
+class ScalarLog(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_log", "_a")
     _log: Logarithm
-    _a: Expr
+    _a: AnyExpr
 
-    def __init__(self, log: Logarithm, a: Expr):
+    def __init__(self, log: Logarithm, a: AnyExpr) -> None:
         self._log = log
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarLog":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarLog":
         return ScalarLog(self._log, a)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
@@ -47,6 +51,7 @@ class ScalarLog(Expr[Expr]):
             lambda e: ScalarLog(self._log, e),
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -56,6 +61,7 @@ class ScalarLog(Expr[Expr]):
         return (LOGARITHM_UFUNC[self._log])(self._a.eval(x, Xs, late_bound))
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -127,11 +133,14 @@ class ScalarLog(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"{self._log.name}({self._a!r})"
 
 
-LOGARITHM_UFUNC: dict[Logarithm, Callable[[np.ndarray], np.ndarray]] = {
+LOGARITHM_UFUNC: dict[
+    Logarithm, Callable[[np.ndarray[Ps, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]]
+] = {
     Logarithm.ln: np.log,
     Logarithm.log2: np.log2,
     Logarithm.log10: np.log10,
@@ -144,23 +153,26 @@ class Exponential(Enum):
     exp10 = auto()
 
 
-class ScalarExp(Expr[Expr]):
-    __slots__ = ("_exp", "_a")
+class ScalarExp(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_exp", "_a")
     _exp: Exponential
-    _a: Expr
+    _a: AnyExpr
 
-    def __init__(self, exp: Exponential, a: Expr):
+    def __init__(self, exp: Exponential, a: AnyExpr) -> None:
         self._exp = exp
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarExp":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarExp":
         return ScalarExp(self._exp, a)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
@@ -168,6 +180,7 @@ class ScalarExp(Expr[Expr]):
             lambda e: ScalarExp(self._exp, e),
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -177,6 +190,7 @@ class ScalarExp(Expr[Expr]):
         return (EXPONENTIAL_UFUNC[self._exp])(self._a.eval(x, Xs, late_bound))
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -236,46 +250,56 @@ class ScalarExp(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"{self._exp.name}({self._a!r})"
 
 
-EXPONENTIAL_UFUNC: dict[Exponential, Callable[[np.ndarray], np.ndarray]] = {
+EXPONENTIAL_UFUNC: dict[
+    Exponential, Callable[[np.ndarray[Ps, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]]
+] = {
     Exponential.exp: np.exp,
     Exponential.exp2: np.exp2,
     Exponential.exp10: lambda x: np.power(10, x),
 }
 
-LOGARITHM_EXPONENTIAL_UFUNC: dict[Logarithm, Callable[[np.ndarray], np.ndarray]] = {
+LOGARITHM_EXPONENTIAL_UFUNC: dict[
+    Logarithm, Callable[[np.ndarray[Ps, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]]
+] = {
     Logarithm.ln: EXPONENTIAL_UFUNC[Exponential.exp],
     Logarithm.log2: EXPONENTIAL_UFUNC[Exponential.exp2],
     Logarithm.log10: EXPONENTIAL_UFUNC[Exponential.exp10],
 }
 
-EXPONENTIAL_LOGARITHM_UFUNC: dict[Exponential, Callable[[np.ndarray], np.ndarray]] = {
+EXPONENTIAL_LOGARITHM_UFUNC: dict[
+    Exponential, Callable[[np.ndarray[Ps, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]]
+] = {
     Exponential.exp: LOGARITHM_UFUNC[Logarithm.ln],
     Exponential.exp2: LOGARITHM_UFUNC[Logarithm.log2],
     Exponential.exp10: LOGARITHM_UFUNC[Logarithm.log10],
 }
 
 
-class ScalarLogWithBase(Expr[Expr, Expr]):
-    __slots__ = ("_a", "_b")
-    _a: Expr
-    _b: Expr
+class ScalarLogWithBase(Expr[AnyExpr, AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a", "_b")
+    _a: AnyExpr
+    _b: AnyExpr
 
-    def __init__(self, a: Expr, b: Expr):
+    def __init__(self, a: AnyExpr, b: AnyExpr) -> None:
         self._a = a
         self._b = b
 
     @property
-    def args(self) -> tuple[Expr, Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
 
-    def with_args(self, a: Expr, b: Expr) -> "ScalarLogWithBase":
+    @override
+    def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarLogWithBase":
         return ScalarLogWithBase(a, b)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         from .divmul import ScalarDivide  # noqa: PLC0415
 
         return ScalarDivide(
@@ -289,6 +313,7 @@ class ScalarLogWithBase(Expr[Expr, Expr]):
             ),
         ).constant_fold(dtype)
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -308,6 +333,7 @@ class ScalarLogWithBase(Expr[Expr, Expr]):
             ),
         ).eval(x, Xs, late_bound)
 
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -329,5 +355,6 @@ class ScalarLogWithBase(Expr[Expr, Expr]):
             ),
         ).compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 
+    @override
     def __repr__(self) -> str:
         return f"log({self._a!r}, base={self._b!r})"

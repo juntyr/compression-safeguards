@@ -5,13 +5,15 @@ Same value safeguard.
 __all__ = ["SameValueSafeguard"]
 
 from collections.abc import Set
+from typing import ClassVar
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import as_bits, from_total_order, lossless_cast, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Maximum, Minimum, Upper
-from ...utils.typing import S, T
+from ...utils.typing import JSON, S, T
 from .abc import PointwiseSafeguard
 
 
@@ -47,11 +49,11 @@ class SameValueSafeguard(PointwiseSafeguard):
         `value` after decoding.
     """
 
-    __slots__ = ("_value", "_exclusive")
+    __slots__: tuple[str, ...] = ("_value", "_exclusive")
     _value: int | float | Parameter
     _exclusive: bool
 
-    kind = "same"
+    kind: ClassVar[str] = "same"
 
     def __init__(
         self, value: int | float | str | Parameter, *, exclusive: bool = False
@@ -66,6 +68,7 @@ class SameValueSafeguard(PointwiseSafeguard):
         self._exclusive = exclusive
 
     @property
+    @override
     def late_bound(self) -> Set[Parameter]:
         """
         The set of late-bound parameters that this safeguard has.
@@ -84,6 +87,7 @@ class SameValueSafeguard(PointwiseSafeguard):
             else frozenset()
         )
 
+    @override
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -131,6 +135,7 @@ class SameValueSafeguard(PointwiseSafeguard):
         # value must stay value, everything else can be arbitrary
         return (data_bits != value_bits) | (decoded_bits == value_bits)
 
+    @override
     def compute_safe_intervals(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -208,13 +213,14 @@ class SameValueSafeguard(PointwiseSafeguard):
 
         return valid_below.union(valid_above)
 
-    def get_config(self) -> dict:
+    @override
+    def get_config(self) -> dict[str, JSON]:
         """
         Returns the configuration of the safeguard.
 
         Returns
         -------
-        config : dict
+        config : dict[str, JSON]
             Configuration of the safeguard.
         """
 

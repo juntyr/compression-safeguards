@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from typing import final
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings
 from ...utils.intervals import IntervalUnion
@@ -23,9 +24,10 @@ class PointwiseSafeguard(Safeguard, ABC):
     element, i.e. independent of other elements.
     """
 
-    __slots__ = ()
+    __slots__: tuple[str, ...] = ()
 
     @final
+    @override
     def check(
         self,
         data: np.ndarray[S, np.dtype[T]],

@@ -2,39 +2,49 @@ from collections.abc import Mapping
 from warnings import warn
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import _is_of_shape
 from ....utils.bindings import Parameter
 from ..bound import DataBounds, data_bounds
-from .abc import Expr
+from .abc import AnyExpr, Expr
 from .typing import F, Ns, Ps, PsI
 
 
-class Data(Expr):
-    __slots__ = ("_index",)
+class Data(Expr[()]):
+    __slots__: tuple[str, ...] = ("_index",)
     _index: tuple[int, ...]
 
     SCALAR: "Data"
 
-    def __init__(self, index: tuple[int, ...]):
+    def __init__(self, index: tuple[int, ...]) -> None:
         self._index = index
 
     @property
+    def index(self) -> tuple[int, ...]:
+        return self._index
+
+    @property
+    @override
     def args(self) -> tuple[()]:
         return ()
 
+    @override
     def with_args(self) -> "Data":
         return Data(self._index)
 
     @property  # type: ignore
+    @override
     def has_data(self) -> bool:
         return True
 
     @property  # type: ignore
+    @override
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return frozenset([self._index])
 
-    def apply_array_element_offset(  # type: ignore
+    @override  # type: ignore
+    def apply_array_element_offset(
         self,
         axis: int,
         offset: int,
@@ -43,9 +53,11 @@ class Data(Expr):
         index[axis] += offset
         return Data(index=tuple(index))
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return self
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -57,6 +69,7 @@ class Data(Expr):
         return out
 
     @data_bounds(DataBounds.infallible)
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -82,6 +95,7 @@ class Data(Expr):
 
         return Xs_lower, Xs_upper
 
+    @override
     def __repr__(self) -> str:
         if self._index == ():
             return "x"
@@ -91,31 +105,38 @@ class Data(Expr):
 Data.SCALAR = Data(index=())
 
 
-class LateBoundConstant(Expr):
-    __slots__ = ("_name", "_index")
+class LateBoundConstant(Expr[()]):
+    __slots__: tuple[str, ...] = ("_name", "_index")
     _name: Parameter
     _index: tuple[int, ...]
 
-    def __init__(self, name: Parameter, index: tuple[int, ...]):
+    def __init__(self, name: Parameter, index: tuple[int, ...]) -> None:
         self._name = name
         self._index = index
 
     @staticmethod
     def like(name: Parameter, data: Data) -> "LateBoundConstant":
-        return LateBoundConstant(name, data._index)
+        return LateBoundConstant(name, data.index)
 
     @property
     def name(self) -> Parameter:
         return self._name
 
     @property
+    def index(self) -> tuple[int, ...]:
+        return self._index
+
+    @property
+    @override
     def args(self) -> tuple[()]:
         return ()
 
+    @override
     def with_args(self) -> "LateBoundConstant":  # type: ignore
         return LateBoundConstant(self._name, self._index)
 
-    def apply_array_element_offset(  # type: ignore
+    @override  # type: ignore
+    def apply_array_element_offset(
         self,
         axis: int,
         offset: int,
@@ -125,12 +146,15 @@ class LateBoundConstant(Expr):
         return LateBoundConstant(self._name, index=tuple(index))
 
     @property  # type: ignore
+    @override
     def late_bound_constants(self) -> frozenset[Parameter]:
         return frozenset([self.name])
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return self
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -143,6 +167,7 @@ class LateBoundConstant(Expr):
         assert _is_of_shape(out, x)
         return out
 
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -153,6 +178,7 @@ class LateBoundConstant(Expr):
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         assert False, "late-bound constants have no data bounds"
 
+    @override
     def __repr__(self) -> str:
         if self._index == ():
             return f'c["{self._name}"]'

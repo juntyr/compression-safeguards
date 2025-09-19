@@ -5,13 +5,15 @@ Error bound safeguard.
 __all__ = ["ErrorBoundSafeguard"]
 
 from collections.abc import Set
+from typing import ClassVar
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import ToFloatMode, as_bits, saturating_finite_float_cast, to_float
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
-from ...utils.typing import S, T
+from ...utils.typing import JSON, S, T
 from ..eb import (
     ErrorBound,
     _apply_finite_error_bound,
@@ -48,12 +50,12 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         pattern satisfies the error bound.
     """
 
-    __slots__ = ("_type", "_eb", "_equal_nan")
+    __slots__: tuple[str, ...] = ("_type", "_eb", "_equal_nan")
     _type: ErrorBound
     _eb: int | float | Parameter
     _equal_nan: bool
 
-    kind = "eb"
+    kind: ClassVar[str] = "eb"
 
     def __init__(
         self,
@@ -75,6 +77,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         self._equal_nan = equal_nan
 
     @property
+    @override
     def late_bound(self) -> Set[Parameter]:
         """
         The set of late-bound parameters that this safeguard has.
@@ -90,6 +93,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         return frozenset([self._eb]) if isinstance(self._eb, Parameter) else frozenset()
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+    @override
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -152,6 +156,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
 
         return ok
 
+    @override
     def compute_safe_intervals(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -205,19 +210,20 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
 
         return valid.preserve_any_nan(dataf, equal_nan=self._equal_nan)
 
-    def get_config(self) -> dict:
+    @override
+    def get_config(self) -> dict[str, JSON]:
         """
         Returns the configuration of the safeguard.
 
         Returns
         -------
-        config : dict
+        config : dict[str, JSON]
             Configuration of the safeguard.
         """
 
         return dict(
             kind=type(self).kind,
             type=self._type.name,
-            eb=self._eb,
+            eb=str(self._eb) if isinstance(self._eb, Parameter) else self._eb,
             equal_nan=self._equal_nan,
         )

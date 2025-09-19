@@ -2,30 +2,34 @@ from collections.abc import Callable, Mapping
 from typing import overload
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import _floating_max
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
-from .abc import Expr
+from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Fi, Ns, Ps, PsI
 
 
-class ScalarIsFinite(Expr[Expr]):
-    __slots__ = ("_a",)
-    _a: Expr
+class ScalarIsFinite(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a",)
+    _a: AnyExpr
 
-    def __init__(self, a: Expr):
+    def __init__(self, a: AnyExpr) -> None:
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarIsFinite":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarIsFinite":
         return ScalarIsFinite(a)
 
-    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
@@ -33,6 +37,7 @@ class ScalarIsFinite(Expr[Expr]):
             ScalarIsFinite,
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -41,6 +46,7 @@ class ScalarIsFinite(Expr[Expr]):
     ) -> np.ndarray[PsI, np.dtype[F]]:
         return classify_to_dtype(np.isfinite, self._a.eval(x, Xs, late_bound), Xs.dtype)
 
+    @override
     @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
@@ -76,25 +82,29 @@ class ScalarIsFinite(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"isfinite({self._a!r})"
 
 
-class ScalarIsInf(Expr[Expr]):
-    __slots__ = ("_a",)
-    _a: Expr
+class ScalarIsInf(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a",)
+    _a: AnyExpr
 
-    def __init__(self, a: Expr):
+    def __init__(self, a: AnyExpr) -> None:
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarIsInf":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarIsInf":
         return ScalarIsInf(a)
 
-    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
@@ -102,6 +112,7 @@ class ScalarIsInf(Expr[Expr]):
             ScalarIsInf,
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -111,6 +122,7 @@ class ScalarIsInf(Expr[Expr]):
         return classify_to_dtype(np.isinf, self._a.eval(x, Xs, late_bound), Xs.dtype)
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -145,25 +157,29 @@ class ScalarIsInf(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"isinf({self._a!r})"
 
 
-class ScalarIsNaN(Expr[Expr]):
-    __slots__ = ("_a",)
-    _a: Expr
+class ScalarIsNaN(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a",)
+    _a: AnyExpr
 
-    def __init__(self, a: Expr):
+    def __init__(self, a: AnyExpr) -> None:
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarIsNaN":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarIsNaN":
         return ScalarIsNaN(a)
 
-    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
@@ -171,6 +187,7 @@ class ScalarIsNaN(Expr[Expr]):
             ScalarIsNaN,
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -180,6 +197,7 @@ class ScalarIsNaN(Expr[Expr]):
         return classify_to_dtype(np.isnan, self._a.eval(x, Xs, late_bound), Xs.dtype)
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -210,6 +228,7 @@ class ScalarIsNaN(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"isnan({self._a!r})"
 

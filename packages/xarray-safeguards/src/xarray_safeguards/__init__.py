@@ -108,6 +108,7 @@ from compression_safeguards.safeguards.stencil import (
     NeighbourhoodAxis,
 )
 from compression_safeguards.utils.bindings import Parameter, Value
+from compression_safeguards.utils.typing import JSON, S, T
 from typing_extensions import assert_never  # MSPV 3.11
 
 DataValue: TypeAlias = int | float | np.number | xr.DataArray
@@ -119,7 +120,7 @@ Parameter value type that includes scalar numbers and data arrays thereof.
 def produce_data_array_correction(
     data: xr.DataArray,
     prediction: xr.DataArray,
-    safeguards: Collection[dict | Safeguard],
+    safeguards: Collection[dict[str, JSON] | Safeguard],
     late_bound: Mapping[str, DataValue] = MappingProxyType(dict()),
     *,
     allow_unsafe_safeguards_override: bool = False,
@@ -338,19 +339,21 @@ def produce_data_array_correction(
     required_stencil = safeguards_.compute_required_stencil_for_chunked_correction(
         data.shape
     )
-    correction_dtype: np.dtype = safeguards_.correction_dtype_for_data(data.dtype)
+    correction_dtype: np.dtype[np.unsignedinteger] = (
+        safeguards_.correction_dtype_for_data(data.dtype)
+    )
 
     # special case for no stencil: just apply independently to each chunk
     if all(s.before == 0 and s.after == 0 for b, s in required_stencil):
 
         def _compute_independent_chunk_correction(
-            data_chunk: np.ndarray,
-            prediction_chunk: np.ndarray,
-            *late_bound_chunks: np.ndarray,
-            late_bound_names: tuple[str],
+            data_chunk: np.ndarray[S, np.dtype[T]],
+            prediction_chunk: np.ndarray[S, np.dtype[T]],
+            *late_bound_chunks: np.ndarray[S, np.dtype[T]],
+            late_bound_names: tuple[str, ...],
             late_bound_global: dict[str, int | float | np.number],
             safeguards: Safeguards,
-        ) -> np.ndarray:
+        ) -> np.ndarray[S, np.dtype[np.unsignedinteger]]:
             assert len(late_bound_chunks) == len(late_bound_names), (
                 "late-bound chunks and names mismatch"
             )
@@ -416,18 +419,18 @@ def produce_data_array_correction(
             assert_never(boundary)
 
     def _check_overlapping_stencil_chunk(
-        data_chunk: np.ndarray,
-        prediction_chunk: np.ndarray,
-        data_indices_chunk: np.ndarray,
-        *late_bound_chunks: np.ndarray,
-        late_bound_names: tuple[str],
+        data_chunk: np.ndarray[S, np.dtype[T]],
+        prediction_chunk: np.ndarray[S, np.dtype[T]],
+        data_indices_chunk: np.ndarray[S, np.dtype[np.int_]],
+        *late_bound_chunks: np.ndarray[S, np.dtype[T]],
+        late_bound_names: tuple[str, ...],
         late_bound_global: dict[str, int | float | np.number],
         safeguards: Safeguards,
         data_shape: tuple[int, ...],
         depth_: tuple[int | tuple[int, int], ...],
         boundary_: Literal["none", "periodic"],
         block_info=None,
-    ) -> np.ndarray:
+    ) -> np.ndarray[tuple[int, ...], np.dtype[np.bool]]:
         assert block_info is not None, "missing block info"
         assert len(late_bound_chunks) == len(late_bound_names), (
             "late-bound chunks and names mismatch"
@@ -481,18 +484,20 @@ def produce_data_array_correction(
                 assert_never(boundary_)
 
         # extract the indices of the non-stencil-extended data indices chunk
-        data_indices_chunk = data_indices_chunk[
-            tuple(
-                slice(a.before, None if a.after == 0 else -a.after)
-                for b, a in chunk_stencil
-            )
-        ]
-        chunk_shape = data_indices_chunk.shape
+        data_indices_chunk_: np.ndarray[tuple[int, ...], np.dtype[np.int_]] = (
+            data_indices_chunk[
+                tuple(
+                    slice(a.before, None if a.after == 0 else -a.after)
+                    for b, a in chunk_stencil
+                )
+            ]
+        )
+        chunk_shape = data_indices_chunk_.shape
 
         # extract the offset of the chunk from the data indices chunk
-        if data_indices_chunk.size > 0:
-            chunk_offset_index = int(data_indices_chunk.flatten()[0])
-            chunk_offset_ = []
+        if data_indices_chunk_.size > 0:
+            chunk_offset_index = int(data_indices_chunk_.flatten()[0])
+            chunk_offset_: list[int] = []
             for s in data_shape[::-1]:
                 chunk_offset_.append(chunk_offset_index % s)
                 chunk_offset_index //= s
@@ -551,11 +556,11 @@ def produce_data_array_correction(
     )
 
     def _compute_overlapping_stencil_chunk_correction(
-        data_chunk: np.ndarray,
-        prediction_chunk: np.ndarray,
-        data_indices_chunk: np.ndarray,
-        *late_bound_chunks: np.ndarray,
-        late_bound_names: tuple[str],
+        data_chunk: np.ndarray[S, np.dtype[T]],
+        prediction_chunk: np.ndarray[S, np.dtype[T]],
+        data_indices_chunk: np.ndarray[S, np.dtype[np.int_]],
+        *late_bound_chunks: np.ndarray[S, np.dtype[T]],
+        late_bound_names: tuple[str, ...],
         late_bound_global: dict[str, int | float | np.number],
         safeguards: Safeguards,
         data_shape: tuple[int, ...],
@@ -563,7 +568,7 @@ def produce_data_array_correction(
         boundary_: Literal["none", "periodic"],
         any_chunk_check_failed: bool,
         block_info=None,
-    ) -> np.ndarray:
+    ) -> np.ndarray[tuple[int, ...], np.dtype[np.unsignedinteger]]:
         assert block_info is not None, "missing block info"
         assert len(late_bound_chunks) == len(late_bound_names), (
             "late-bound chunks and names mismatch"
@@ -620,18 +625,20 @@ def produce_data_array_correction(
                 assert_never(boundary_)
 
         # extract the indices of the non-stencil-extended data indices chunk
-        data_indices_chunk = data_indices_chunk[
-            tuple(
-                slice(a.before, None if a.after == 0 else -a.after)
-                for b, a in chunk_stencil
-            )
-        ]
-        chunk_shape = data_indices_chunk.shape
+        data_indices_chunk_: np.ndarray[tuple[int, ...], np.dtype[np.int_]] = (
+            data_indices_chunk[
+                tuple(
+                    slice(a.before, None if a.after == 0 else -a.after)
+                    for b, a in chunk_stencil
+                )
+            ]
+        )
+        chunk_shape = data_indices_chunk_.shape
 
         # extract the offset of the chunk from the data indices chunk
-        if data_indices_chunk.size > 0:
-            chunk_offset_index = int(data_indices_chunk.flatten()[0])
-            chunk_offset_ = []
+        if data_indices_chunk_.size > 0:
+            chunk_offset_index = int(data_indices_chunk_.flatten()[0])
+            chunk_offset_: list[int] = []
             for s in data_shape[::-1]:
                 chunk_offset_.append(chunk_offset_index % s)
                 chunk_offset_index //= s
@@ -643,14 +650,16 @@ def produce_data_array_correction(
         # - map_overlap ensures we get chunks including their required stencil
         # - compute_chunked_correction only returns the correction for the non-
         #   overlapping non-stencil parts of the chunk
-        correction: np.ndarray = safeguards.compute_chunked_correction(
-            data_chunk,
-            prediction_chunk,
-            data_shape=data_shape,
-            chunk_offset=chunk_offset,
-            chunk_stencil=chunk_stencil,
-            any_chunk_check_failed=any_chunk_check_failed,
-            late_bound_chunk=late_bound_chunk,
+        correction: np.ndarray[tuple[int, ...], np.dtype[np.unsignedinteger]] = (
+            safeguards.compute_chunked_correction(
+                data_chunk,
+                prediction_chunk,
+                data_shape=data_shape,
+                chunk_offset=chunk_offset,
+                chunk_stencil=chunk_stencil,
+                any_chunk_check_failed=any_chunk_check_failed,
+                late_bound_chunk=late_bound_chunk,
+            )
         )
         assert correction.shape == chunk_shape, "invalid correction chunk shape"
 
@@ -771,7 +780,7 @@ class DatasetSafeguardedAccessor:
     `ds.safeguarded.foo`.
     """
 
-    __slots__ = ()
+    __slots__: tuple[str, ...] = ()
 
     def __new__(cls, ds: xr.Dataset) -> xr.Dataset:  # type: ignore
         corrected: dict[str, xr.DataArray] = dict()
@@ -804,7 +813,7 @@ class DataArraySafeguardsAccessor:
     a safeguards correction or corrected array.
     """
 
-    __slots__ = ()
+    __slots__: tuple[str, ...] = ()
 
     def __new__(cls, da: xr.DataArray) -> Collection[Safeguard]:  # type: ignore
         if "safeguards" not in da.attrs:

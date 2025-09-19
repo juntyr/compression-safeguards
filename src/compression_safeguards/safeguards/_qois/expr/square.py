@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _floating_smallest_subnormal,
@@ -10,30 +11,34 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
-from .abc import Expr
+from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Ns, Ps, PsI
 
 
-class ScalarSqrt(Expr[Expr]):
-    __slots__ = ("_a",)
-    _a: Expr
+class ScalarSqrt(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a",)
+    _a: AnyExpr
 
-    def __init__(self, a: Expr):
+    def __init__(self, a: AnyExpr):
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarSqrt":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarSqrt":
         return ScalarSqrt(a)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a, dtype, np.sqrt, ScalarSqrt
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -43,6 +48,7 @@ class ScalarSqrt(Expr[Expr]):
         return np.sqrt(self._a.eval(x, Xs, late_bound))
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -114,29 +120,34 @@ class ScalarSqrt(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"sqrt({self._a!r})"
 
 
-class ScalarSquare(Expr[Expr]):
-    __slots__ = ("_a",)
-    _a: Expr
+class ScalarSquare(Expr[AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a",)
+    _a: AnyExpr
 
-    def __init__(self, a: Expr):
+    def __init__(self, a: AnyExpr):
         self._a = a
 
     @property
-    def args(self) -> tuple[Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
-    def with_args(self, a: Expr) -> "ScalarSquare":
+    @override
+    def with_args(self, a: AnyExpr) -> "ScalarSquare":
         return ScalarSquare(a)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_unary(
             self._a, dtype, np.square, ScalarSquare
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -146,6 +157,7 @@ class ScalarSquare(Expr[Expr]):
         return np.square(self._a.eval(x, Xs, late_bound))
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -216,5 +228,6 @@ class ScalarSquare(Expr[Expr]):
             late_bound,
         )
 
+    @override
     def __repr__(self) -> str:
         return f"square({self._a!r})"
