@@ -114,7 +114,11 @@ def generate_parameter(
         if len(tys) == 2 and tys[0] is str and issubclass(tys[1], Enum):
             return list(tys[1])[data.ConsumeIntInRange(0, len(tys[1]) - 1)]
 
-        if len(tys) == 2 and tys[0] is dict and tys[1] is NeighbourhoodBoundaryAxis:
+        if (
+            len(tys) == 2
+            and (tys[0] is dict or typing.get_origin(tys[0]) is dict)
+            and tys[1] is NeighbourhoodBoundaryAxis
+        ):
             return {
                 p: generate_parameter(data, v.annotation, depth, late_bound)
                 for p, v in signature(NeighbourhoodBoundaryAxis).parameters.items()
@@ -130,7 +134,7 @@ def generate_parameter(
 
         if (
             len(tys) > 1
-            and tys[0] is dict
+            and (tys[0] is dict or typing.get_origin(tys[0]) is dict)
             and all(issubclass(t, Safeguard) for t in tys[1:])
         ):
             return generate_safeguard_config(data, depth + 1, late_bound)

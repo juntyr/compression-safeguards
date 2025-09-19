@@ -29,4 +29,4 @@ Ti = TypeVar("Ti", bound=np.number)
 U = TypeVar("U", bound=np.unsignedinteger, covariant=True)
 """ Any numpy [`unsignedinteger`][numpy.unsignedinteger] data type (covariant). """
 
-JSON: TypeAlias = "None | int | float | str | bool | list[JSON] | dict[str, JSON]"
+JSON: TypeAlias = None | int | float | str | bool | list["JSON"] | dict[str, "JSON"]
