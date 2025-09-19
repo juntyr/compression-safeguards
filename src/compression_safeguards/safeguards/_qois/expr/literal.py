@@ -7,11 +7,11 @@ from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import _broadcast_to, _e, _pi
 from ....utils.bindings import Parameter
-from .abc import AnyExpr, Expr
+from .abc import AnyExpr, EmptyExpr
 from .typing import F, Ns, Ps, PsI
 
 
-class Number(Expr[()]):
+class Number(EmptyExpr):
     __slots__: tuple[str, ...] = ("_n",)
     _n: str
 
@@ -153,7 +153,7 @@ Number.ONE = Number.from_symbolic_int(1)
 Number.TWO = Number.from_symbolic_int(2)
 
 
-class Pi(Expr[()]):
+class Pi(EmptyExpr):
     __slots__: tuple[str, ...] = ()
 
     @property
@@ -195,7 +195,7 @@ class Pi(Expr[()]):
         return "pi"
 
 
-class Euler(Expr[()]):
+class Euler(EmptyExpr):
     __slots__: tuple[str, ...] = ()
 
     @property

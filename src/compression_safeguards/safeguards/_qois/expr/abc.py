@@ -1,3 +1,4 @@
+import sys
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Generic, TypeAlias, final
@@ -396,3 +397,8 @@ class Expr(ABC, Generic[Unpack[Es]]):
 
 
 AnyExpr: TypeAlias = Expr[Unpack[tuple["AnyExpr", ...]]]
+
+if sys.version_info >= (3, 11) or TYPE_CHECKING:
+    EmptyExpr: TypeAlias = Expr[()]
+else:
+    EmptyExpr: TypeAlias = Expr  # type: ignore

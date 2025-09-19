@@ -7,11 +7,11 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import _is_of_shape
 from ....utils.bindings import Parameter
 from ..bound import DataBounds, data_bounds
-from .abc import AnyExpr, Expr
+from .abc import AnyExpr, EmptyExpr
 from .typing import F, Ns, Ps, PsI
 
 
-class Data(Expr[()]):
+class Data(EmptyExpr):
     __slots__: tuple[str, ...] = ("_index",)
     _index: tuple[int, ...]
 
@@ -105,7 +105,7 @@ class Data(Expr[()]):
 Data.SCALAR = Data(index=())
 
 
-class LateBoundConstant(Expr[()]):
+class LateBoundConstant(EmptyExpr):
     __slots__: tuple[str, ...] = ("_name", "_index")
     _name: Parameter
     _index: tuple[int, ...]

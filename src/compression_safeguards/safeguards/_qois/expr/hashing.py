@@ -12,11 +12,11 @@ from ....utils.cast import from_float
 from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import S, T
 from ..bound import DataBounds, data_bounds
-from .abc import AnyExpr, Expr
+from .abc import AnyExpr, EmptyExpr
 from .typing import F, Ns, Ps, PsI
 
 
-class HashingExpr(Expr[()]):
+class HashingExpr(EmptyExpr):
     __slots__: tuple[str, ...] = ("_data_indices", "_late_bound_constants")
     _data_indices: frozenset[tuple[int, ...]]
     _late_bound_constants: frozenset[Parameter]

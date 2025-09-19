@@ -5,11 +5,11 @@ from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import _broadcast_to
 from ....utils.bindings import Parameter
-from .abc import AnyExpr, Expr
+from .abc import AnyExpr, EmptyExpr, Expr
 from .typing import F, Ns, Ps, PsI
 
 
-class ScalarFoldedConstant(Expr[()]):
+class ScalarFoldedConstant(EmptyExpr):
     __slots__: tuple[str, ...] = ("_const",)
     _const: np.number
 
