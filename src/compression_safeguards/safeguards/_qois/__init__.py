@@ -3,13 +3,14 @@ __all__ = ["PointwiseQuantityOfInterest", "StencilQuantityOfInterest"]
 from collections.abc import Mapping, Set
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Parameter
 from ..qois import (
     PointwiseQuantityOfInterestExpression,
     StencilQuantityOfInterestExpression,
 )
-from .expr.abc import Expr
+from .expr.abc import AnyExpr, Expr
 from .expr.array import Array
 from .expr.constfold import ScalarFoldedConstant
 from .expr.data import Data
@@ -29,8 +30,8 @@ class PointwiseQuantityOfInterest:
         The pointwise quantity of interest in [`str`][str]ing form.
     """
 
-    __slots__ = ("_expr", "_late_bound_constants")
-    _expr: Expr
+    __slots__: tuple[str, ...] = ("_expr", "_late_bound_constants")
+    _expr: AnyExpr
     _late_bound_constants: frozenset[Parameter]
 
     def __init__(self, qoi: PointwiseQuantityOfInterestExpression):
@@ -147,6 +148,7 @@ class PointwiseQuantityOfInterest:
         assert X_upper.shape == X.shape
         return X_lower, X_upper
 
+    @override
     def __repr__(self) -> str:
         return repr(self._expr)
 
@@ -166,8 +168,13 @@ class StencilQuantityOfInterest:
         The index `I` for the centre of the stencil neighbourhood.
     """
 
-    __slots__ = ("_expr", "_stencil_shape", "_stencil_I", "_late_bound_constants")
-    _expr: Expr
+    __slots__: tuple[str, ...] = (
+        "_expr",
+        "_stencil_shape",
+        "_stencil_I",
+        "_late_bound_constants",
+    )
+    _expr: AnyExpr
     _stencil_shape: tuple[int, ...]
     _stencil_I: tuple[int, ...]
     _late_bound_constants: frozenset[Parameter]
@@ -328,5 +335,6 @@ class StencilQuantityOfInterest:
         assert Xs_upper.shape == Xs.shape
         return Xs_lower, Xs_upper
 
+    @override
     def __repr__(self) -> str:
         return repr(self._expr)

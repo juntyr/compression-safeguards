@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from typing import final
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings
 from ...utils.intervals import IntervalUnion
@@ -25,7 +26,7 @@ class StencilSafeguard(Safeguard, ABC):
     the safeguard is coupled to its neighbouring elements.
     """
 
-    __slots__ = ()
+    __slots__: tuple[str, ...] = ()
 
     @abstractmethod
     def compute_check_neighbourhood_for_data_shape(
@@ -56,6 +57,7 @@ class StencilSafeguard(Safeguard, ABC):
         pass
 
     @final
+    @override
     def check(
         self,
         data: np.ndarray[S, np.dtype[T]],

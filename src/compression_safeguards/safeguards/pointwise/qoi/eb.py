@@ -5,13 +5,15 @@ Pointwise quantity of interest (QoI) error bound safeguard.
 __all__ = ["PointwiseQuantityOfInterestErrorBoundSafeguard"]
 
 from collections.abc import Set
+from typing import ClassVar
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import ToFloatMode, saturating_finite_float_cast, to_float
 from ....utils.intervals import IntervalUnion
-from ....utils.typing import F, S, T
+from ....utils.typing import JSON, F, S, T
 from ..._qois import PointwiseQuantityOfInterest
 from ..._qois.interval import compute_safe_data_lower_upper_interval_union
 from ...eb import (
@@ -80,7 +82,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         losslessly represent all input data values is chosen.
     """
 
-    __slots__ = (
+    __slots__: tuple[str, ...] = (
         "_qoi",
         "_type",
         "_eb",
@@ -93,7 +95,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
     _qoi_dtype: ToFloatMode
     _qoi_expr: PointwiseQuantityOfInterest
 
-    kind = "qoi_eb_pw"
+    kind: ClassVar[str] = "qoi_eb_pw"
 
     def __init__(
         self,
@@ -127,6 +129,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         self._qoi_expr = qoi_expr
 
     @property
+    @override
     def late_bound(self) -> Set[Parameter]:
         """
         The set of late-bound parameters that this safeguard has.
@@ -183,6 +186,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             late_bound_constants,
         )
 
+    @override
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -250,6 +254,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         return ok
 
+    @override
     def compute_safe_intervals(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -321,13 +326,14 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             data, data_float_lower, data_float_upper
         )
 
-    def get_config(self) -> dict:
+    @override
+    def get_config(self) -> dict[str, JSON]:
         """
         Returns the configuration of the safeguard.
 
         Returns
         -------
-        config : dict
+        config : dict[str, JSON]
             Configuration of the safeguard.
         """
 

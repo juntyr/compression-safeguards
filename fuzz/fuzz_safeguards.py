@@ -9,6 +9,7 @@ with atheris.instrument_imports():
     from collections.abc import Collection, Sequence
     from enum import Enum
     from inspect import signature
+    from typing import ClassVar, Generic
 
     import numcodecs
     import numcodecs.compat
@@ -16,6 +17,7 @@ with atheris.instrument_imports():
     import numpy as np
     from numcodecs.abc import Codec
     from numcodecs_safeguards import SafeguardsCodec
+    from typing_extensions import override  # MSPV 3.12
 
     from compression_safeguards import SafeguardKind, Safeguards
     from compression_safeguards.safeguards.abc import Safeguard
@@ -25,6 +27,7 @@ with atheris.instrument_imports():
     )
     from compression_safeguards.safeguards.stencil import NeighbourhoodBoundaryAxis
     from compression_safeguards.utils.bindings import Parameter
+    from compression_safeguards.utils.typing import S, T
 
 
 warnings.filterwarnings("error")
@@ -34,7 +37,7 @@ np.set_printoptions(floatmode="unique")
 
 
 # the fuzzer *somehow* messes up np.nanmin and np.nanmax, so patch them
-def nanmin(x: np.ndarray) -> np.number:
+def nanmin(x: np.ndarray[S, np.dtype[T]]) -> T:
     x = np.array(x, copy=None)
     if np.all(np.isnan(x)):
         warnings.warn("All-NaN slice encountered", RuntimeWarning)
@@ -48,7 +51,7 @@ def nanmin(x: np.ndarray) -> np.number:
 np.nanmin = nanmin
 
 
-def nanmax(x: np.ndarray) -> np.number:
+def nanmax(x: np.ndarray[S, np.dtype[T]]) -> T:
     x = np.array(x, copy=None)
     if np.all(np.isnan(x)):
         warnings.warn("All-NaN slice encountered", RuntimeWarning)
@@ -62,12 +65,16 @@ def nanmax(x: np.ndarray) -> np.number:
 np.nanmax = nanmax
 
 
-class FuzzCodec(Codec):
-    __slots__ = ("data", "decoded")
+class FuzzCodec(Codec, Generic[S, T]):
+    __slots__: tuple[str, ...] = ("data", "decoded")
+    data: np.ndarray[S, np.dtype[T]]
+    decoded: np.ndarray[S, np.dtype[T]]
 
-    codec_id = "fuzz"  # type: ignore
+    codec_id: ClassVar[str] = "fuzz"  # type: ignore
 
-    def __init__(self, data, decoded):
+    def __init__(
+        self, data: np.ndarray[S, np.dtype[T]], decoded: np.ndarray[S, np.dtype[T]]
+    ):
         self.data = data
         self.decoded = decoded
 
@@ -81,6 +88,7 @@ class FuzzCodec(Codec):
     def get_config(self):
         return dict(id=type(self).codec_id, data=self.data, decoded=self.decoded)
 
+    @override
     def __repr__(self):
         config = {k: v for k, v in self.get_config().items() if k != "id"}
         return f"{type(self).__name__}({', '.join(f'{k}={v!r}' for k, v in config.items())})"
@@ -114,7 +122,11 @@ def generate_parameter(
         if len(tys) == 2 and tys[0] is str and issubclass(tys[1], Enum):
             return list(tys[1])[data.ConsumeIntInRange(0, len(tys[1]) - 1)]
 
-        if len(tys) == 2 and tys[0] is dict and tys[1] is NeighbourhoodBoundaryAxis:
+        if (
+            len(tys) == 2
+            and (tys[0] is dict or typing.get_origin(tys[0]) is dict)
+            and tys[1] is NeighbourhoodBoundaryAxis
+        ):
             return {
                 p: generate_parameter(data, v.annotation, depth, late_bound)
                 for p, v in signature(NeighbourhoodBoundaryAxis).parameters.items()
@@ -130,7 +142,7 @@ def generate_parameter(
 
         if (
             len(tys) > 1
-            and tys[0] is dict
+            and (tys[0] is dict or typing.get_origin(tys[0]) is dict)
             and all(issubclass(t, Safeguard) for t in tys[1:])
         ):
             return generate_safeguard_config(data, depth + 1, late_bound)
@@ -322,7 +334,7 @@ def check_one_input(data) -> None:
         for _ in range(data.ConsumeIntInRange(0, 8))
     ]
 
-    dtype: np.dtype = np.dtype(
+    dtype: np.dtype[np.number] = np.dtype(
         sorted([d.name for d in Safeguards.supported_dtypes()])[
             data.ConsumeIntInRange(0, len(Safeguards.supported_dtypes()) - 1)
         ]

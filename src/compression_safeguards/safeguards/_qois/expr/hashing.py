@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from hashlib import blake2b
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import _broadcast_to
 from ....utils.bindings import Bindings, Parameter
@@ -11,12 +12,12 @@ from ....utils.cast import from_float
 from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import S, T
 from ..bound import DataBounds, data_bounds
-from .abc import Expr
+from .abc import AnyExpr, EmptyExpr
 from .typing import F, Ns, Ps, PsI
 
 
-class HashingExpr(Expr):
-    __slots__ = ("_data_indices", "_late_bound_constants")
+class HashingExpr(EmptyExpr):
+    __slots__: tuple[str, ...] = ("_data_indices", "_late_bound_constants")
     _data_indices: frozenset[tuple[int, ...]]
     _late_bound_constants: frozenset[Parameter]
 
@@ -24,7 +25,7 @@ class HashingExpr(Expr):
         self,
         data_indices: frozenset[tuple[int, ...]],
         late_bound_constants: frozenset[Parameter],
-    ):
+    ) -> None:
         self._data_indices = data_indices
         self._late_bound_constants = late_bound_constants
 
@@ -39,21 +40,26 @@ class HashingExpr(Expr):
         return HashingExpr(data_indices, late_bound_constants)
 
     @property
+    @override
     def args(self) -> tuple[()]:
         return ()
 
+    @override
     def with_args(self) -> "HashingExpr":
         return HashingExpr(self._data_indices, self._late_bound_constants)
 
     @property  # type: ignore
+    @override
     def has_data(self) -> bool:
         return True
 
     @property  # type: ignore
+    @override
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return self._data_indices
 
-    def apply_array_element_offset(  # type: ignore
+    @override  # type: ignore
+    def apply_array_element_offset(
         self,
         axis: int,
         offset: int,
@@ -69,12 +75,15 @@ class HashingExpr(Expr):
         )
 
     @property  # type: ignore
+    @override
     def late_bound_constants(self) -> frozenset[Parameter]:
         return self._late_bound_constants
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return self
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -107,6 +116,7 @@ class HashingExpr(Expr):
         return hash  # type: ignore
 
     @data_bounds(DataBounds.infallible)
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -121,6 +131,7 @@ class HashingExpr(Expr):
         )
         return np.copy(Xs_hash), np.copy(Xs_hash)
 
+    @override
     def __repr__(self) -> str:
         return "hashing"
 

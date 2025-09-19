@@ -315,7 +315,7 @@ def _is_positive_zero(
 
 # type guard for x.dtype == dtype
 def _is_of_dtype(
-    x: np.ndarray[S, np.dtype], dtype: np.dtype[T]
+    x: np.ndarray[S, np.dtype[np.number]], dtype: np.dtype[T]
 ) -> TypeGuard[np.ndarray[S, np.dtype[T]]]:
     return x.dtype == dtype
 

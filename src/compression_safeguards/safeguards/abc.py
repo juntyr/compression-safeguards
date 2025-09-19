@@ -6,12 +6,16 @@ __all__ = ["Safeguard"]
 
 from abc import ABC, abstractmethod
 from collections.abc import Set
+from typing import ClassVar
 
 import numpy as np
-from typing_extensions import Self  # MSPV 3.11
+from typing_extensions import (
+    Self,  # MSPV 3.11
+    override,  # MSPV 3.12
+)
 
 from ..utils.bindings import Bindings, Parameter
-from ..utils.typing import S, T
+from ..utils.typing import JSON, S, T
 
 
 class Safeguard(ABC):
@@ -19,8 +23,8 @@ class Safeguard(ABC):
     Safeguard abstract base class.
     """
 
-    __slots__ = ()
-    kind: str
+    __slots__: tuple[str, ...] = ()
+    kind: ClassVar[str]
     """Safeguard kind."""
 
     @property
@@ -68,7 +72,7 @@ class Safeguard(ABC):
         pass
 
     @abstractmethod
-    def get_config(self) -> dict:
+    def get_config(self) -> dict[str, JSON]:
         """
         Returns the configuration of the safeguard.
 
@@ -77,20 +81,20 @@ class Safeguard(ABC):
 
         Returns
         -------
-        config : dict
+        config : dict[str, JSON]
             Configuration of the safeguard.
         """
 
         pass
 
     @classmethod
-    def from_config(cls, config: dict) -> Self:
+    def from_config(cls, config: dict[str, JSON]) -> Self:
         """
         Instantiate the safeguard from a configuration [`dict`][dict].
 
         Parameters
         ----------
-        config : dict
+        config : dict[str, JSON]
             Configuration of the safeguard.
 
         Returns
@@ -101,7 +105,10 @@ class Safeguard(ABC):
 
         return cls(**config)
 
+    @override
     def __repr__(self) -> str:
-        config = {k: v for k, v in self.get_config().items() if k != "kind"}
+        config: dict[str, JSON] = {
+            k: v for k, v in self.get_config().items() if k != "kind"
+        }
 
         return f"{type(self).__name__}({', '.join(f'{k}={v!r}' for k, v in config.items())})"

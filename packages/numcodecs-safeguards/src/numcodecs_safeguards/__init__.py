@@ -78,6 +78,7 @@ __all__ = ["SafeguardsCodec"]
 
 from collections.abc import Callable, Collection, Mapping, Set
 from io import BytesIO
+from typing import ClassVar
 
 import numcodecs
 import numcodecs.compat
@@ -89,11 +90,13 @@ from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.abc import Safeguard
 from compression_safeguards.utils.bindings import Bindings, Parameter, Value
 from compression_safeguards.utils.cast import as_bits
+from compression_safeguards.utils.typing import JSON
 from numcodecs.abc import Codec
 from numcodecs_combinators.abc import CodecCombinatorMixin
 from typing_extensions import (
     Buffer,  # MSPV 3.12
     Self,  # MSPV 3.11
+    override,  # MSPV 3.12
 )
 
 from .lossless import Lossless
@@ -107,7 +110,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
     Parameters
     ----------
-    codec : dict | Codec
+    codec : dict[str, JSON] | Codec
         The codec to wrap with safeguards. It can either be passed as a codec
         configuration [`dict`][dict], which is passed to
         [`numcodecs.registry.get_codec(config)`][numcodecs.registry.get_codec],
@@ -135,7 +138,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         `dict(id="zero")` to `codec`. The zero codec only encodes the data
         type and shape, not the data values themselves, and decodes to all-
         zeros, forcing the safeguards to correct (almost) all values.
-    safeguards : Collection[dict | Safeguard]
+    safeguards : Collection[dict[str, JSON] | Safeguard]
         The safeguards that will be applied to the codec. They can either be
         passed as a safeguard configuration [`dict`][dict] or an already
         initialized
@@ -175,7 +178,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         [`.npz`][numpy.savez_compressed] format and stored in a
         `data:application/x-npz;base64,<data>`
         [data URI](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Schemes/data).
-    lossless : None | dict | Lossless, optional
+    lossless : None | dict[str, JSON] | Lossless, optional
         The lossless encoding that is applied after the codec and the
         safeguards:
 
@@ -193,7 +196,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         The codecs's version. Do not provide this parameter explicitly.
     """
 
-    __slots__ = (
+    __slots__: tuple[str, ...] = (
         "_codec",
         "_safeguards",
         "_late_bound",
@@ -206,15 +209,15 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
     _lossless_for_codec: None | Codec
     _lossless_for_safeguards: Codec
 
-    codec_id: str = "safeguards"  # type: ignore
+    codec_id: ClassVar[str] = "safeguards"  # type: ignore
 
     def __init__(
         self,
         *,
-        codec: dict | Codec,
-        safeguards: Collection[dict | Safeguard],
+        codec: dict[str, JSON] | Codec,
+        safeguards: Collection[dict[str, JSON] | Safeguard],
         fixed_constants: Mapping[str | Parameter, Value] | Bindings = Bindings.empty(),
-        lossless: None | dict | Lossless = None,
+        lossless: None | dict[str, JSON] | Lossless = None,
         _version: None | str = None,
     ) -> None:
         wraps_safeguards_codec = False
@@ -255,7 +258,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         lossless = (
             lossless
             if isinstance(lossless, Lossless)
-            else Lossless(**lossless)
+            else Lossless(**lossless)  # type: ignore
             if lossless is not None
             else Lossless()
         )
@@ -352,6 +355,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             _version=self._safeguards.version,
         )
 
+    @override
     def encode(self, buf: Buffer) -> bytes:
         """Encode the data in `buf`.
 
@@ -491,6 +495,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         return correction_len + encoded_bytes + correction_bytes
 
+    @override
     def decode(self, buf: Buffer, out: None | Buffer = None) -> Buffer:
         """Decode the data in `buf`.
 
@@ -550,7 +555,8 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         return numcodecs.compat.ndarray_copy(corrected, out)  # type: ignore
 
-    def get_config(self) -> dict:
+    @override
+    def get_config(self) -> dict[str, JSON]:
         """
         Returns the configuration of the codec with safeguards.
 
@@ -559,7 +565,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         Returns
         -------
-        config : dict
+        config : dict[str, JSON]
             Configuration of the codec with safeguards.
         """
 
@@ -580,13 +586,14 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         )
 
     @classmethod
-    def from_config(cls, config: dict) -> Self:
+    @override
+    def from_config(cls, config: dict[str, JSON]) -> Self:
         """
         Instantiate the codec with safeguards from a configuration [`dict`][dict].
 
         Parameters
         ----------
-        config : dict
+        config : dict[str, JSON]
             Configuration of the codec with safeguards.
 
         Returns
@@ -597,16 +604,18 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         # Bindings.from_config handles the encoding and decoding of late-bound
         #  constants, which may be in a JSON-compatible serialised form
-        config = {
-            k: (Bindings.from_config(v) if k == "fixed_constants" else v)
+        config_: dict[str, JSON | Bindings] = {
+            k: (Bindings.from_config(v) if k == "fixed_constants" else v)  # type: ignore
             for k, v in config.items()
         }
 
-        return cls(**config)
+        return cls(**config_)  # type: ignore
 
+    @override
     def __repr__(self) -> str:
         return f"{type(self).__name__}(codec={self._codec!r}, safeguards={list(self._safeguards.safeguards)!r}, fixed_constants={dict(**self._late_bound._bindings)!r}, lossless={Lossless(for_codec=self._lossless_for_codec, for_safeguards=self._lossless_for_safeguards)!r})"
 
+    @override
     def map(self, mapper: Callable[[Codec], Codec]) -> "SafeguardsCodec":
         """
         Apply the `mapper` to this codec with safeguards.

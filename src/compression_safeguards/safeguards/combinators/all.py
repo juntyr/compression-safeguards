@@ -6,12 +6,14 @@ __all__ = ["AllSafeguards"]
 
 from abc import ABC
 from collections.abc import Collection, Set
+from typing import ClassVar
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
 from ...utils.intervals import IntervalUnion
-from ...utils.typing import S, T
+from ...utils.typing import JSON, S, T
 from ..abc import Safeguard
 from ..pointwise.abc import PointwiseSafeguard
 from ..stencil import BoundaryCondition, NeighbourhoodAxis
@@ -29,7 +31,7 @@ class AllSafeguards(Safeguard):
 
     Parameters
     ----------
-    safeguards : Collection[dict | PointwiseSafeguard | StencilSafeguard]
+    safeguards : Collection[dict[str, JSON] | PointwiseSafeguard | StencilSafeguard]
         At least one safeguard configuration [`dict`][dict]s or already
         initialized
         [`PointwiseSafeguard`][compression_safeguards.safeguards.pointwise.abc.PointwiseSafeguard]
@@ -37,17 +39,21 @@ class AllSafeguards(Safeguard):
         [`StencilSafeguard`][compression_safeguards.safeguards.stencil.abc.StencilSafeguard].
     """
 
-    __slots__ = ()
+    __slots__: tuple[str, ...] = ()
 
-    kind = "all"
+    kind: ClassVar[str] = "all"
 
     def __init__(
-        self, *, safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard]
+        self,
+        *,
+        safeguards: Collection[dict[str, JSON] | PointwiseSafeguard | StencilSafeguard],
     ) -> None:
         pass
 
     def __new__(  # type: ignore
-        cls, *, safeguards: Collection[dict | PointwiseSafeguard | StencilSafeguard]
+        cls,
+        *,
+        safeguards: Collection[dict[str, JSON] | PointwiseSafeguard | StencilSafeguard],
     ) -> "_AllPointwiseSafeguards | _AllStencilSafeguards":
         from ... import SafeguardKind  # noqa: PLC0415
 
@@ -56,7 +62,7 @@ class AllSafeguards(Safeguard):
         safeguards_ = tuple(
             safeguard
             if isinstance(safeguard, PointwiseSafeguard | StencilSafeguard)
-            else SafeguardKind[safeguard["kind"]].value(
+            else SafeguardKind[safeguard["kind"]].value(  # type: ignore
                 **{p: v for p, v in safeguard.items() if p != "kind"}
             )
             for safeguard in safeguards
@@ -82,6 +88,7 @@ class AllSafeguards(Safeguard):
         ...
 
     @property
+    @override
     def late_bound(self) -> Set[Parameter]:  # type: ignore
         """
         The set of late-bound parameters that this safeguard has.
@@ -92,6 +99,35 @@ class AllSafeguards(Safeguard):
 
         Late-bound parameters can be used for parameters that depend on the
         specific data that is to be safeguarded.
+        """
+
+        ...
+
+    @override
+    def check(  # type: ignore
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        decoded: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
+    ) -> bool:
+        """
+        Check if, for all elements, all of the combined safeguards succeed the
+        check.
+
+        Parameters
+        ----------
+        data : np.ndarray[S, np.dtype[T]]
+            Data to be encoded.
+        decoded : np.ndarray[S, np.dtype[T]]
+            Decoded data.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+
+        Returns
+        -------
+        ok : bool
+            `True` if the check succeeded.
         """
 
         ...
@@ -149,13 +185,14 @@ class AllSafeguards(Safeguard):
 
         ...
 
-    def get_config(self) -> dict:  # type: ignore
+    @override
+    def get_config(self) -> dict[str, JSON]:  # type: ignore
         """
         Returns the configuration of the safeguard.
 
         Returns
         -------
-        config : dict
+        config : dict[str, JSON]
             Configuration of the safeguard.
         """
 
@@ -163,9 +200,9 @@ class AllSafeguards(Safeguard):
 
 
 class _AllSafeguardsBase(ABC):
-    __slots__ = ()
+    __slots__: tuple[str, ...] = ()
 
-    kind = "all"
+    kind: ClassVar[str] = "all"
 
     @property
     def safeguards(self) -> tuple[PointwiseSafeguard | StencilSafeguard, ...]:
@@ -208,18 +245,19 @@ class _AllSafeguardsBase(ABC):
 
         return valid
 
-    def get_config(self) -> dict:
+    def get_config(self) -> dict[str, JSON]:
         return dict(
             kind=type(self).kind,
             safeguards=[safeguard.get_config() for safeguard in self.safeguards],
         )
 
+    @override
     def __repr__(self) -> str:
         return f"{AllSafeguards.__name__}(safeguards={list(self.safeguards)!r})"
 
 
 class _AllPointwiseSafeguards(_AllSafeguardsBase, PointwiseSafeguard):
-    __slots__ = ("_safeguards",)
+    __slots__: tuple[str, ...] = ("_safeguards",)
     _safeguards: tuple[PointwiseSafeguard, ...]
 
     def __init__(self, *safeguards: PointwiseSafeguard) -> None:
@@ -231,7 +269,7 @@ class _AllPointwiseSafeguards(_AllSafeguardsBase, PointwiseSafeguard):
 
 
 class _AllStencilSafeguards(_AllSafeguardsBase, StencilSafeguard):
-    __slots__ = ("_safeguards",)
+    __slots__: tuple[str, ...] = ("_safeguards",)
     _safeguards: tuple[PointwiseSafeguard | StencilSafeguard, ...]
 
     def __init__(self, *safeguards: PointwiseSafeguard | StencilSafeguard) -> None:
@@ -241,6 +279,7 @@ class _AllStencilSafeguards(_AllSafeguardsBase, StencilSafeguard):
             )
         self._safeguards = safeguards
 
+    @override
     def compute_check_neighbourhood_for_data_shape(
         self, data_shape: tuple[int, ...]
     ) -> tuple[dict[BoundaryCondition, NeighbourhoodAxis], ...]:

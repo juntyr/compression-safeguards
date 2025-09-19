@@ -5,14 +5,16 @@ Sign-preserving safeguard.
 __all__ = ["SignPreservingSafeguard"]
 
 from collections.abc import Set
+from typing import ClassVar
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ...utils._compat import _floating_smallest_subnormal
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
-from ...utils.typing import S, T
+from ...utils.typing import JSON, S, T
 from .abc import PointwiseSafeguard
 
 
@@ -50,10 +52,10 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         Literal values are (unsafely) cast to the data dtype before comparison.
     """
 
-    __slots__ = ("_offset",)
+    __slots__: tuple[str, ...] = ("_offset",)
     _offset: int | float | Parameter
 
-    kind = "sign"
+    kind: ClassVar[str] = "sign"
 
     def __init__(self, *, offset: int | float | str | Parameter = 0) -> None:
         if isinstance(offset, Parameter):
@@ -67,6 +69,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             self._offset = offset
 
     @property
+    @override
     def late_bound(self) -> Set[Parameter]:
         """
         The set of late-bound parameters that this safeguard has.
@@ -85,6 +88,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             else frozenset()
         )
 
+    @override
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -138,6 +142,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
 
         return ok
 
+    @override
     def compute_safe_intervals(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -209,13 +214,14 @@ class SignPreservingSafeguard(PointwiseSafeguard):
 
         return valid.into_union()
 
-    def get_config(self) -> dict:
+    @override
+    def get_config(self) -> dict[str, JSON]:
         """
         Returns the configuration of the safeguard.
 
         Returns
         -------
-        config : dict
+        config : dict[str, JSON]
             Configuration of the safeguard.
         """
 

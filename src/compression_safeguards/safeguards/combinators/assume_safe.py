@@ -5,12 +5,14 @@ Always safe (logical truth) combinator safeguard.
 __all__ = ["AssumeAlwaysSafeguard"]
 
 from collections.abc import Set
+from typing import ClassVar
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
 from ...utils.intervals import Interval, IntervalUnion
-from ...utils.typing import S, T
+from ...utils.typing import JSON, S, T
 from ..pointwise.abc import PointwiseSafeguard
 
 
@@ -25,14 +27,15 @@ class AssumeAlwaysSafeguard(PointwiseSafeguard):
     safety requirements are imposed.
     """
 
-    __slots__ = ()
+    __slots__: tuple[str, ...] = ()
 
-    kind = "assume_safe"
+    kind: ClassVar[str] = "assume_safe"
 
     def __init__(self) -> None:
         pass
 
     @property
+    @override
     def late_bound(self) -> Set[Parameter]:
         """
         The set of late-bound parameters that this safeguard has.
@@ -47,6 +50,7 @@ class AssumeAlwaysSafeguard(PointwiseSafeguard):
 
         return frozenset()
 
+    @override
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -74,6 +78,7 @@ class AssumeAlwaysSafeguard(PointwiseSafeguard):
 
         return np.ones_like(data, dtype=np.bool)  # type: ignore
 
+    @override
     def compute_safe_intervals(
         self,
         data: np.ndarray[S, np.dtype[T]],
@@ -100,7 +105,8 @@ class AssumeAlwaysSafeguard(PointwiseSafeguard):
 
         return Interval.full_like(data).into_union()
 
-    def get_config(self) -> dict:
+    @override
+    def get_config(self) -> dict[str, JSON]:
         """
         Returns the configuration of the safeguard.
 

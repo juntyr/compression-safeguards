@@ -3,6 +3,7 @@ from collections.abc import Mapping
 from math import gcd
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _broadcast_to,
@@ -16,38 +17,43 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
-from .abc import Expr
+from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
 from .literal import Number
 from .typing import F, Ns, Ps, PsI
 
 
-class ScalarMultiply(Expr[Expr, Expr]):
-    __slots__ = ("_a", "_b")
-    _a: Expr
-    _b: Expr
+class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a", "_b")
+    _a: AnyExpr
+    _b: AnyExpr
 
-    def __new__(cls, a: Expr, b: Expr):
+    def __init__(self, a: AnyExpr, b: AnyExpr) -> None:
+        self._a = a
+        self._b = b
+
+    def __new__(cls, a: AnyExpr, b: AnyExpr) -> "ScalarMultiply | Number":  # type: ignore[misc]
         ab = Number.symbolic_fold_binary(a, b, operator.mul)
         if ab is not None:
             return ab
-        this = super().__new__(cls)
-        this._a = a
-        this._b = b
-        return this
+        return super().__new__(cls)
 
     @property
-    def args(self) -> tuple[Expr, Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
 
-    def with_args(self, a: Expr, b: Expr) -> "ScalarMultiply":
+    @override
+    def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarMultiply | Number":
         return ScalarMultiply(a, b)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_binary(
             self._a, self._b, dtype, np.multiply, ScalarMultiply
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -59,6 +65,7 @@ class ScalarMultiply(Expr[Expr, Expr]):
         )
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -372,16 +379,17 @@ class ScalarMultiply(Expr[Expr, Expr]):
 
         return Xs_lower, Xs_upper
 
+    @override
     def __repr__(self) -> str:
         return f"{self._a!r} * {self._b!r}"
 
 
-class ScalarDivide(Expr[Expr, Expr]):
-    __slots__ = ("_a", "_b")
-    _a: Expr
-    _b: Expr
+class ScalarDivide(Expr[AnyExpr, AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a", "_b")
+    _a: AnyExpr
+    _b: AnyExpr
 
-    def __new__(cls, a: Expr, b: Expr):
+    def __new__(cls, a: AnyExpr, b: AnyExpr) -> "ScalarDivide | Number":  # type: ignore[misc]
         if isinstance(a, Number) and isinstance(b, Number):
             # symbolical constant propagation for some cases of int / int
             # division always produces a floating-point number
@@ -408,23 +416,29 @@ class ScalarDivide(Expr[Expr, Expr]):
                 if d != 0:
                     a = Number.from_symbolic_int(ai)
                     b = Number.from_symbolic_int(bi)
+        # we have to also assign inside __new__ since the symbolic constant
+        #  folding check can change a and b to simplify the expression
         this = super().__new__(cls)
         this._a = a
         this._b = b
         return this
 
     @property
-    def args(self) -> tuple[Expr, Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
 
-    def with_args(self, a: Expr, b: Expr) -> "ScalarDivide":
+    @override
+    def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarDivide | Number":
         return ScalarDivide(a, b)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_binary(
             self._a, self._b, dtype, np.divide, ScalarDivide
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -436,6 +450,7 @@ class ScalarDivide(Expr[Expr, Expr]):
         )
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -849,5 +864,6 @@ class ScalarDivide(Expr[Expr, Expr]):
 
         return Xs_lower, Xs_upper
 
+    @override
     def __repr__(self) -> str:
         return f"{self._a!r} / {self._b!r}"

@@ -2,6 +2,7 @@ import operator
 from collections.abc import Mapping
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _broadcast_to,
@@ -11,7 +12,7 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
-from .abc import Expr
+from .abc import AnyExpr, Expr
 from .abs import ScalarAbs
 from .constfold import ScalarFoldedConstant
 from .literal import Number
@@ -19,32 +20,37 @@ from .neg import ScalarNegate
 from .typing import F, Ns, Ps, PsI
 
 
-class ScalarAdd(Expr[Expr, Expr]):
-    __slots__ = ("_a", "_b")
-    _a: Expr
-    _b: Expr
+class ScalarAdd(Expr[AnyExpr, AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a", "_b")
+    _a: AnyExpr
+    _b: AnyExpr
 
-    def __new__(cls, a: Expr, b: Expr):
+    def __init__(self, a: AnyExpr, b: AnyExpr) -> None:
+        self._a = a
+        self._b = b
+
+    def __new__(cls, a: AnyExpr, b: AnyExpr) -> "ScalarAdd | Number":  # type: ignore[misc]
         ab = Number.symbolic_fold_binary(a, b, operator.add)
         if ab is not None:
             return ab
-        this = super().__new__(cls)
-        this._a = a
-        this._b = b
-        return this
+        return super().__new__(cls)
 
     @property
-    def args(self) -> tuple[Expr, Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
 
-    def with_args(self, a: Expr, b: Expr) -> "ScalarAdd":
+    @override
+    def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarAdd | Number":
         return ScalarAdd(a, b)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_binary(
             self._a, self._b, dtype, np.add, ScalarAdd
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -54,6 +60,7 @@ class ScalarAdd(Expr[Expr, Expr]):
         return np.add(self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound))
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -66,36 +73,42 @@ class ScalarAdd(Expr[Expr, Expr]):
             self, expr_lower, expr_upper, X, Xs, late_bound
         )
 
+    @override
     def __repr__(self) -> str:
         return f"{self._a!r} + {self._b!r}"
 
 
-class ScalarSubtract(Expr[Expr, Expr]):
-    __slots__ = ("_a", "_b")
-    _a: Expr
-    _b: Expr
+class ScalarSubtract(Expr[AnyExpr, AnyExpr]):
+    __slots__: tuple[str, ...] = ("_a", "_b")
+    _a: AnyExpr
+    _b: AnyExpr
 
-    def __new__(cls, a: Expr, b: Expr):
+    def __init__(self, a: AnyExpr, b: AnyExpr) -> None:
+        self._a = a
+        self._b = b
+
+    def __new__(cls, a: AnyExpr, b: AnyExpr) -> "ScalarSubtract | Number":  # type: ignore[misc]
         ab = Number.symbolic_fold_binary(a, b, operator.sub)
         if ab is not None:
             return ab
-        this = super().__new__(cls)
-        this._a = a
-        this._b = b
-        return this
+        return super().__new__(cls)
 
     @property
-    def args(self) -> tuple[Expr, Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
 
-    def with_args(self, a: Expr, b: Expr) -> "ScalarSubtract":
+    @override
+    def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarSubtract | Number":
         return ScalarSubtract(a, b)
 
-    def constant_fold(self, dtype: np.dtype[F]) -> F | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return ScalarFoldedConstant.constant_fold_binary(
             self._a, self._b, dtype, np.subtract, ScalarSubtract
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -107,6 +120,7 @@ class ScalarSubtract(Expr[Expr, Expr]):
         )
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -119,6 +133,7 @@ class ScalarSubtract(Expr[Expr, Expr]):
             self, expr_lower, expr_upper, X, Xs, late_bound
         )
 
+    @override
     def __repr__(self) -> str:
         return f"{self._a!r} - {self._b!r}"
 
@@ -384,8 +399,8 @@ def compute_left_associate_sum_data_bounds(
 
 def as_left_associative_sum(
     expr: ScalarAdd | ScalarSubtract,
-) -> tuple[Expr, ...]:
-    terms_rev: list[Expr] = []
+) -> tuple[AnyExpr, ...]:
+    terms_rev: list[AnyExpr] = []
 
     while True:
         # rewrite ( a - b ) as ( a + (-b) ), which is bitwsie equivalent for
@@ -403,7 +418,7 @@ def as_left_associative_sum(
     return tuple(terms_rev[::-1])
 
 
-def get_expr_left_associative_abs_factor_approximate(expr: Expr) -> None | Expr:
+def get_expr_left_associative_abs_factor_approximate(expr: AnyExpr) -> None | AnyExpr:
     from .divmul import ScalarDivide, ScalarMultiply  # noqa: PLC0415
 
     if not expr.has_data:
@@ -412,7 +427,7 @@ def get_expr_left_associative_abs_factor_approximate(expr: Expr) -> None | Expr:
     if not isinstance(expr, ScalarMultiply | ScalarDivide):
         return Number.ONE
 
-    factor_stack: list[tuple[Expr, type[ScalarMultiply] | type[ScalarDivide]]] = []
+    factor_stack: list[tuple[AnyExpr, type[ScalarMultiply] | type[ScalarDivide]]] = []
 
     while True:
         factor_stack.append((expr._b, type(expr)))

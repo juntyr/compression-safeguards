@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _broadcast_to,
@@ -10,30 +11,33 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
-from .abc import Expr
+from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
 from .typing import F, Fi, Ns, Ps, PsI
 
 
-class ScalarWhere(Expr[Expr, Expr, Expr]):
-    __slots__ = ("_condition", "_a", "_b")
-    _condition: Expr
-    _a: Expr
-    _b: Expr
+class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
+    __slots__: tuple[str, ...] = ("_condition", "_a", "_b")
+    _condition: AnyExpr
+    _a: AnyExpr
+    _b: AnyExpr
 
-    def __init__(self, condition: Expr, a: Expr, b: Expr):
+    def __init__(self, condition: AnyExpr, a: AnyExpr, b: AnyExpr):
         self._condition = condition
         self._a = a
         self._b = b
 
     @property
-    def args(self) -> tuple[Expr, Expr, Expr]:
+    @override
+    def args(self) -> tuple[AnyExpr, AnyExpr, AnyExpr]:
         return (self._condition, self._a, self._b)
 
-    def with_args(self, condition: Expr, a: Expr, b: Expr) -> "ScalarWhere":
+    @override
+    def with_args(self, condition: AnyExpr, a: AnyExpr, b: AnyExpr) -> "ScalarWhere":
         return ScalarWhere(condition, a, b)
 
-    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | Expr:
+    @override
+    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | AnyExpr:
         return ScalarFoldedConstant.constant_fold_ternary(
             self._condition,
             self._a,
@@ -43,6 +47,7 @@ class ScalarWhere(Expr[Expr, Expr, Expr]):
             ScalarWhere,
         )
 
+    @override
     def eval(
         self,
         x: PsI,
@@ -56,6 +61,7 @@ class ScalarWhere(Expr[Expr, Expr, Expr]):
         )
 
     @checked_data_bounds
+    @override
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -137,5 +143,6 @@ class ScalarWhere(Expr[Expr, Expr, Expr]):
 
         return Xs_lower, Xs_upper
 
+    @override
     def __repr__(self) -> str:
         return f"where({self._condition!r}, {self._a!r}, {self._b!r})"
