@@ -61,7 +61,7 @@ class QoIParser(Parser):
         x: Data,
         X: None | Array[Unpack[tuple[AnyExpr, ...]]],
         I: None | tuple[int, ...],  # noqa: E741
-    ):  # noqa: E741
+    ):
         self._x = x
         self._X = X
         self._I = I

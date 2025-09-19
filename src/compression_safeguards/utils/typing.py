@@ -30,3 +30,4 @@ U = TypeVar("U", bound=np.unsignedinteger, covariant=True)
 """ Any numpy [`unsignedinteger`][numpy.unsignedinteger] data type (covariant). """
 
 JSON: TypeAlias = None | int | float | str | bool | list["JSON"] | dict[str, "JSON"]
+""" Types that are valid JSON and can be encoded with [`json.dumps`][json.dumps]. """

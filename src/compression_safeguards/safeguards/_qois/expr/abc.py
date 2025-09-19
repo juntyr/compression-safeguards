@@ -139,7 +139,7 @@ class Expr(ABC, Generic[Unpack[Es]]):
         self,
         axis: int,
         offset: int,
-    ) -> Self:
+    ) -> "AnyExpr":
         """
         Apply an `offset` to the array element indices along the given `axis`.
 
@@ -154,7 +154,7 @@ class Expr(ABC, Generic[Unpack[Es]]):
 
         Returns
         -------
-        expr : Self
+        expr : AnyExpr
             The modified expression.
         """
 
@@ -397,8 +397,10 @@ class Expr(ABC, Generic[Unpack[Es]]):
 
 
 AnyExpr: TypeAlias = Expr[Unpack[tuple["AnyExpr", ...]]]
+""" Expression with sub-expression arguments """
 
 if sys.version_info >= (3, 11) or TYPE_CHECKING:
     EmptyExpr: TypeAlias = Expr[()]
+    """ Expression with zero arguments """
 else:
     EmptyExpr: TypeAlias = Expr  # type: ignore
