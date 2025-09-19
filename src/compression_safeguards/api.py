@@ -32,7 +32,7 @@ class Safeguards:
 
     Parameters
     ----------
-    safeguards : Collection[dict | Safeguard]
+    safeguards : Collection[dict[str, JSON] | Safeguard]
         The safeguards that will be applied. They can either be passed as a
         safeguard configuration [`dict`][dict] or an already initialized
         [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard].

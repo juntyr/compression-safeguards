@@ -389,10 +389,6 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
     _a: AnyExpr
     _b: AnyExpr
 
-    def __init__(self, a: AnyExpr, b: AnyExpr) -> None:
-        self._a = a
-        self._b = b
-
     def __new__(cls, a: AnyExpr, b: AnyExpr) -> "ScalarDivide | Number":  # type: ignore[misc]
         if isinstance(a, Number) and isinstance(b, Number):
             # symbolical constant propagation for some cases of int / int
@@ -420,7 +416,12 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
                 if d != 0:
                     a = Number.from_symbolic_int(ai)
                     b = Number.from_symbolic_int(bi)
-        return super().__new__(cls)
+        # we have to also assign inside __new__ since the symbolic constant
+        #  folding check can change a and b to simplify the expression
+        this = super().__new__(cls)
+        this._a = a
+        this._b = b
+        return this
 
     @property
     @override

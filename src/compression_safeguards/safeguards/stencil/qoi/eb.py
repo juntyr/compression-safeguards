@@ -107,7 +107,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     qoi : StencilExpr
         The non-constant expression for computing the derived quantity of
         interest over a neighbourhood tensor `X`.
-    neighbourhood : Sequence[dict | NeighbourhoodBoundaryAxis]
+    neighbourhood : Sequence[dict[str, JSON] | NeighbourhoodBoundaryAxis]
         The non-empty axes of the data neighbourhood for which the quantity of
         interest is computed. The neighbourhood window is applied independently
         over any additional axes in the data.

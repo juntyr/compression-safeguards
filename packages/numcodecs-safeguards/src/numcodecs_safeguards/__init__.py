@@ -109,7 +109,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
     Parameters
     ----------
-    codec : dict | Codec
+    codec : dict[str, JSON] | Codec
         The codec to wrap with safeguards. It can either be passed as a codec
         configuration [`dict`][dict], which is passed to
         [`numcodecs.registry.get_codec(config)`][numcodecs.registry.get_codec],
@@ -137,7 +137,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         `dict(id="zero")` to `codec`. The zero codec only encodes the data
         type and shape, not the data values themselves, and decodes to all-
         zeros, forcing the safeguards to correct (almost) all values.
-    safeguards : Collection[dict | Safeguard]
+    safeguards : Collection[dict[str, JSON] | Safeguard]
         The safeguards that will be applied to the codec. They can either be
         passed as a safeguard configuration [`dict`][dict] or an already
         initialized
@@ -177,7 +177,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         [`.npz`][numpy.savez_compressed] format and stored in a
         `data:application/x-npz;base64,<data>`
         [data URI](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Schemes/data).
-    lossless : None | dict | Lossless, optional
+    lossless : None | dict[str, JSON] | Lossless, optional
         The lossless encoding that is applied after the codec and the
         safeguards:
 

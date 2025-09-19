@@ -59,14 +59,15 @@ class ReportingExpr(Expr[AnyExpr]):
     _expr: AnyExpr
     _reporter: Reporter
 
-    def __init__(self, expr: AnyExpr, reporter: Reporter):
-        self._expr = expr
-        self._reporter = reporter
-
     def __new__(cls, expr: AnyExpr, reporter: Reporter) -> "ReportingExpr | Number":  # type: ignore[misc]
         if isinstance(expr, ReportingExpr | Number):
             return expr
-        return super().__new__(cls)
+        # we have to also assign inside __new__ since the double ReportingExpr
+        #  unwrapping would still call __init__ and create a reference loop
+        this = super().__new__(cls)
+        this._expr = expr
+        this._reporter = reporter
+        return this
 
     @property
     @override

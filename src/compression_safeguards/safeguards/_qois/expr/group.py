@@ -14,13 +14,14 @@ class Group(Expr[AnyExpr]):
     __slots__: tuple[str, ...] = ("_expr",)
     _expr: AnyExpr
 
-    def __init__(self, expr: AnyExpr) -> None:
-        self._expr = expr
-
     def __new__(cls, expr: AnyExpr) -> "Group | Number":  # type: ignore[misc]
         if isinstance(expr, Number | Group):
             return expr
-        return super().__new__(cls)
+        # we have to also assign inside __new__ since the double Group
+        #  unwrapping would still call __init__ and create a reference loop
+        this = super().__new__(cls)
+        this._expr = expr
+        return this
 
     @property
     @override

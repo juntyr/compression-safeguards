@@ -147,7 +147,7 @@ def produce_data_array_correction(
         The data array, relative to which the safeguards are enforced.
     prediction : xr.DataArray
         The prediction array for which the correction is produced.
-    safeguards : Collection[dict | Safeguard]
+    safeguards : Collection[dict[str, JSON] | Safeguard]
         The safeguards that will be applied relative to the `data` array.
 
         They can either be
