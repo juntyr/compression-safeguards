@@ -420,6 +420,7 @@ def as_left_associative_sum(
 
 def get_expr_left_associative_abs_factor_approximate(expr: AnyExpr) -> None | AnyExpr:
     from .divmul import ScalarDivide, ScalarMultiply  # noqa: PLC0415
+    from .where import ScalarWhere  # noqa: PLC0415
 
     if not expr.has_data:
         return None
@@ -435,6 +436,23 @@ def get_expr_left_associative_abs_factor_approximate(expr: AnyExpr) -> None | An
         if isinstance(expr._a, ScalarMultiply | ScalarDivide):
             expr = expr._a
         else:
+            if isinstance(expr._a, ScalarWhere) and expr._a.has_data:
+                if (
+                    not expr._a._condition.has_data
+                    and (expr._a._a.has_data + expr._a._b.has_data) == 1
+                ):
+                    factor_stack.append(
+                        (
+                            ScalarWhere(
+                                expr._a._condition,
+                                Number.ONE if expr._a._a.has_data else expr._a._a,
+                                Number.ONE if expr._a._b.has_data else expr._a._b,
+                            ),
+                            ScalarMultiply,
+                        )
+                    )
+                    break
+
             factor_stack.append(
                 (Number.ONE if expr._a.has_data else expr._a, ScalarMultiply)
             )
