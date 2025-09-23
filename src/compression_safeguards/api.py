@@ -280,13 +280,13 @@ class Safeguards:
             combined_intervals = combined_intervals.intersect(intervals)
         correction = combined_intervals.pick(prediction)
 
-        # for safeguard, intervals in zip(self.safeguards, all_intervals):
-        #     assert np.all(intervals.contains(correction)), (
-        #         f"safeguard {safeguard!r} interval does not contain the correction {correction!r}"
-        #     )
-        #     assert safeguard.check(data, correction, late_bound=late_bound), (
-        #         f"safeguard {safeguard!r} check fails after correction {correction!r} on data {data!r}"
-        #     )
+        for safeguard, intervals in zip(self.safeguards, all_intervals):
+            assert np.all(intervals.contains(correction)), (
+                f"safeguard {safeguard!r} interval does not contain the correction {correction!r}"
+            )
+            assert safeguard.check(data, correction, late_bound=late_bound), (
+                f"safeguard {safeguard!r} check fails after correction {correction!r} on data {data!r}"
+            )
 
         prediction_bits = as_bits(prediction)
         correction_bits = as_bits(correction)
