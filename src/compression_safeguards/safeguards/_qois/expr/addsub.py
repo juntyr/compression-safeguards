@@ -435,24 +435,29 @@ def get_expr_left_associative_abs_factor_approximate(expr: AnyExpr) -> None | An
 
         if isinstance(expr._a, ScalarMultiply | ScalarDivide):
             expr = expr._a
-        else:
-            if isinstance(expr._a, ScalarWhere) and expr._a.has_data:
-                if (
-                    not expr._a._condition.has_data
-                    and (expr._a._a.has_data + expr._a._b.has_data) == 1
-                ):
-                    factor_stack.append(
-                        (
-                            ScalarWhere(
-                                expr._a._condition,
-                                Number.ONE if expr._a._a.has_data else expr._a._a,
-                                Number.ONE if expr._a._b.has_data else expr._a._b,
-                            ),
-                            ScalarMultiply,
-                        )
-                    )
-                    break
+        elif isinstance(expr._a, ScalarWhere):
+            where_condition_const = not expr._a._condition.has_data
+            where_a_const = not expr._a._a.has_data
+            where_b_const = not expr._a._b.has_data
 
+            # look into a where expression if the condition is constant and
+            #  at least a or b is also constant
+            if where_condition_const and (where_a_const + where_b_const) >= 1:
+                factor_stack.append(
+                    (
+                        ScalarWhere(
+                            expr._a._condition,
+                            expr._a._a if where_a_const else Number.ONE,
+                            expr._a._b if where_b_const else Number.ONE,
+                        ),
+                        ScalarMultiply,
+                    )
+                )
+                break
+            else:
+                factor_stack.append((Number.ONE, ScalarMultiply))
+                break
+        else:
             factor_stack.append(
                 (Number.ONE if expr._a.has_data else expr._a, ScalarMultiply)
             )
