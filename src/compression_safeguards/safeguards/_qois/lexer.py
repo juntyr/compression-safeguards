@@ -89,6 +89,7 @@ class QoILexer(Lexer):
         # conditional
         WHERE,  # type: ignore[name-defined]  # noqa: F821
         # array operations
+        SIZE,  # type: ignore[name-defined]  # noqa: F821
         SUM,  # type: ignore[name-defined]  # noqa: F821
         MATMUL,  # type: ignore[name-defined]  # noqa: F821
         # finite difference
@@ -228,6 +229,7 @@ class QoILexer(Lexer):
     # conditional
     ID["where"] = WHERE  # type: ignore[index, name-defined]  # noqa: F821
     # array operations
+    ID["size"] = SIZE  # type: ignore[index, name-defined]  # noqa: F821
     ID["sum"] = SUM  # type: ignore[index, name-defined]  # noqa: F821
     ID["matmul"] = MATMUL  # type: ignore[index, name-defined]  # noqa: F821
     # finite difference
@@ -352,6 +354,7 @@ class QoILexer(Lexer):
             # conditional
             "WHERE": "`where`",
             # array operations
+            "SIZE": "`size`",
             "SUM": "`sum`",
             "MATMUL": "`matmul`",
             # finite difference

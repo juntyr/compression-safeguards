@@ -441,6 +441,13 @@ def test_where(check):
 
 
 @pytest.mark.parametrize("check", CHECKS)
+def test_size(check):
+    with pytest.raises(AssertionError, match="scalar non-array expression has no size"):
+        check("size(x) + x")
+    check("size([x]) + x")
+
+
+@pytest.mark.parametrize("check", CHECKS)
 def test_composed(check):
     check("2 / (ln(x) + sqrt(x))")
 

@@ -244,7 +244,7 @@ def test_mean():
     # arithmetic mean
     check_all_codecs(
         np.arange(64, dtype=float).reshape(4, 4, 4),
-        "(X[I[0]-1,I[1]]+X[I[0]+1,I[1]]+X[I[0],I[1]-1]+X[I[0],I[1]+1])/4",
+        "(X[I[0]-1,I[1]]+X[I[0]+1,I[1]]+X[I[0],I[1]-1]+X[I[0],I[1]+1])/size(X)",
         [(1, 1), (1, 1)],
     )
 
@@ -258,7 +258,7 @@ def test_mean():
     # geometric mean
     check_all_codecs(
         np.arange(64, dtype=float).reshape(4, 4, 4),
-        "(X[I[0]-1,I[1]]*X[I[0]+1,I[1]]*X[I[0],I[1]-1]*X[I[0],I[1]+1])**(1/4)",
+        "(X[I[0]-1,I[1]]*X[I[0]+1,I[1]]*X[I[0],I[1]-1]*X[I[0],I[1]+1])**reciprocal(size(X))",
         [(1, 1), (1, 1)],
     )
 

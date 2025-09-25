@@ -95,6 +95,10 @@ class Array(Expr[AnyExpr, Unpack[Es]]):
     def shape(self) -> tuple[int, ...]:
         return self._array.shape
 
+    @property
+    def size(self) -> int:
+        return self._array.size
+
     @staticmethod
     def map(map: Callable[[Unpack[Es2]], AnyExpr], *exprs: Unpack[Es2]) -> AnyExpr:
         if not any(isinstance(e, Array) for e in exprs):

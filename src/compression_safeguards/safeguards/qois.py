@@ -180,6 +180,7 @@ functions =
   | "isinf", "(", expr, [","], ")"  (* 1 if inf, 0 if finite or NaN *)
   | "isnan", "(", expr, [","], ")"  (* 1 if NaN, 0 if finite or inf *)
   | "where", "(", expr, ",", expr, ",", expr, [","], ")"  (* where(c, x, y) = x if (c != 0) else y *)
+  | "size", "(", expr, [","], ")"  (* array size *)
   | "sum", "(", expr, [","], ")"  (* array sum *)
   | "matmul", "(", expr, ",", expr, [","], ")"  (* matrix (2d array) multiplication *)
   | "finite_difference", "("  (* finite difference over an expression, only available in stencil QoIs *)
