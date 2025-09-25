@@ -7,6 +7,7 @@ from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _broadcast_to,
+    _ensure_array,
     _floating_max,
     _floating_smallest_subnormal,
     _is_sign_negative_number,
@@ -96,7 +97,9 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
             #  since [-NaN, NaN] would be misunderstood as only NaN
             # if term_lower == termv and termv == -0.0, we need to guarantee
             #  that term_lower is also -0.0, same for term_upper
-            term_lower: np.ndarray[Ps, np.dtype[F]] = np.array(expr_lower, copy=True)
+            term_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+                expr_lower, copy=True
+            )
             np.copyto(
                 term_lower,
                 expr_upper,
@@ -113,7 +116,9 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
             term_lower[constv == 0] = -fmax
             term_lower = _minimum_zero_sign_sensitive(termv, term_lower)
 
-            term_upper: np.ndarray[Ps, np.dtype[F]] = np.array(expr_upper, copy=True)
+            term_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+                expr_upper, copy=True
+            )
             np.copyto(
                 term_upper,
                 expr_lower,
@@ -184,24 +189,22 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
 
         # limit expr_lower and expr_upper to keep the same sign
         # then compute the lower and upper bounds for the abs(expr)
-        expr_lower = np.array(expr_lower, copy=True)
+        expr_lower = _ensure_array(expr_lower, copy=True)
         expr_lower[_is_sign_positive_number(exprv) & (expr_lower <= 0)] = +0.0
-        expr_upper = np.array(expr_upper, copy=True)
+        expr_upper = _ensure_array(expr_upper, copy=True)
         expr_upper[_is_sign_negative_number(exprv) & (expr_upper >= 0)] = -0.0
         expr_abs_lower, expr_abs_upper = (
-            np.array(
-                _where(_is_sign_negative_number(exprv), -expr_upper, expr_lower),
-                copy=None,
+            _ensure_array(
+                _where(_is_sign_negative_number(exprv), -expr_upper, expr_lower)
             ),
-            np.array(
-                _where(_is_sign_negative_number(exprv), -expr_lower, expr_upper),
-                copy=None,
+            _ensure_array(
+                _where(_is_sign_negative_number(exprv), -expr_lower, expr_upper)
             ),
         )
 
         av_abs = np.abs(av)
         bv_abs = np.abs(bv)
-        exprv_abs = np.array(np.abs(exprv), copy=None)
+        exprv_abs = _ensure_array(np.abs(exprv))
 
         fmax = _floating_max(X.dtype)
         smallest_subnormal = _floating_smallest_subnormal(X.dtype)
@@ -210,14 +213,14 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
         # - if the factor is infinite, we limit it to fmax
         # - if the factor is NaN, e.g. from 0/0, we set the factor to 1
         # finally we split the factor geometrically in two using the sqrt
-        expr_abs_lower_factor: np.ndarray[Ps, np.dtype[F]] = np.array(
-            np.divide(exprv_abs, expr_abs_lower), copy=None
+        expr_abs_lower_factor: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            np.divide(exprv_abs, expr_abs_lower)
         )
         expr_abs_lower_factor[np.isinf(expr_abs_lower_factor)] = fmax
         np.sqrt(expr_abs_lower_factor, out=expr_abs_lower_factor)
         expr_abs_lower_factor[np.isnan(expr_abs_lower_factor)] = 1
 
-        expr_abs_upper_factor: np.ndarray[Ps, np.dtype[F]] = np.array(
+        expr_abs_upper_factor: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
             np.divide(
                 expr_abs_upper,
                 # we avoid division by zero here
@@ -225,8 +228,7 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
                 # - if exprv_abs = 0 and expr_abs_upper > 0, factor is large
                 # - if exprv_abs > 0 and expr_abs_upper > 0, works as normal
                 _maximum_zero_sign_sensitive(exprv_abs, smallest_subnormal),
-            ),
-            copy=None,
+            )
         )
         expr_abs_upper_factor[np.isinf(expr_abs_upper_factor)] = fmax
         np.sqrt(expr_abs_upper_factor, out=expr_abs_upper_factor)
@@ -240,14 +242,14 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
         # compute the bounds for abs(a) and abs(b)
         # - a lower bound of zero is always passed through
         # - we ensure that the upper bound does not overflow into inf
-        a_abs_lower = np.array(np.divide(av_abs, expr_abs_lower_factor), copy=None)
+        a_abs_lower = _ensure_array(np.divide(av_abs, expr_abs_lower_factor))
         a_abs_lower[(expr_abs_lower == 0) & ~np.isnan(av_abs)] = 0
-        a_abs_upper = np.array(np.multiply(av_abs, expr_abs_upper_factor), copy=None)
+        a_abs_upper = _ensure_array(np.multiply(av_abs, expr_abs_upper_factor))
         a_abs_upper[np.isinf(a_abs_upper) & ~np.isinf(expr_abs_upper)] = fmax
 
-        b_abs_lower = np.array(np.divide(bv_abs, expr_abs_lower_factor), copy=None)
+        b_abs_lower = _ensure_array(np.divide(bv_abs, expr_abs_lower_factor))
         b_abs_lower[(expr_abs_lower == 0) & ~np.isnan(bv_abs)] = 0
-        b_abs_upper = np.array(np.multiply(bv_abs, expr_abs_upper_factor), copy=None)
+        b_abs_upper = _ensure_array(np.multiply(bv_abs, expr_abs_upper_factor))
         b_abs_upper[np.isinf(b_abs_upper) & ~np.isinf(expr_abs_upper)] = fmax
 
         any_nan = np.isnan(av_abs)
@@ -290,7 +292,7 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
             )
 
             return _broadcast_to(
-                np.array(total_product, copy=None).reshape((1,) + exprv_abs.shape),
+                _ensure_array(total_product).reshape((1,) + exprv_abs.shape),
                 (t_stack.shape[0],) + exprv_abs.shape,
             )
 
@@ -331,24 +333,20 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
 
         # derive the bounds on a and b based on the bounds on abs(a) and abs(b)
         # if any term is NaN, other non-NaN terms can have any value of any sign
-        a_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
-            _where(_is_sign_negative_number(av), -tu_abs_stack[0], tl_abs_stack[0]),
-            copy=None,
+        a_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            _where(_is_sign_negative_number(av), -tu_abs_stack[0], tl_abs_stack[0])
         )
-        a_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
-            _where(_is_sign_negative_number(av), -tl_abs_stack[0], tu_abs_stack[0]),
-            copy=None,
+        a_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            _where(_is_sign_negative_number(av), -tl_abs_stack[0], tu_abs_stack[0])
         )
         a_lower[any_nan & ~np.isnan(av)] = -np.inf
         a_upper[any_nan & ~np.isnan(av)] = np.inf
 
-        b_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
-            _where(_is_sign_negative_number(bv), -tu_abs_stack[1], tl_abs_stack[1]),
-            copy=None,
+        b_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            _where(_is_sign_negative_number(bv), -tu_abs_stack[1], tl_abs_stack[1])
         )
-        b_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
-            _where(_is_sign_negative_number(bv), -tl_abs_stack[1], tu_abs_stack[1]),
-            copy=None,
+        b_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            _where(_is_sign_negative_number(bv), -tl_abs_stack[1], tu_abs_stack[1])
         )
         b_lower[any_nan & ~np.isnan(bv)] = -np.inf
         b_upper[any_nan & ~np.isnan(bv)] = np.inf
@@ -478,7 +476,10 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
         if a_const:
             term, termv, constv = b, bv, av
 
-            expr_lower, expr_upper = np.copy(expr_lower), np.copy(expr_upper)
+            expr_lower, expr_upper = (
+                _ensure_array(expr_lower, copy=True),
+                _ensure_array(expr_upper, copy=True),
+            )
 
             # ensure that the expression keeps the same sign
             expr_lower[(expr_lower <= 0) & _is_sign_positive_number(exprv)] = +0.0
@@ -498,7 +499,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             #  that term_lower is also -0.0, same for term_upper
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
-            term_lower = np.array(expr_upper, copy=True)
+            term_lower = _ensure_array(expr_upper, copy=True)
             np.copyto(
                 term_lower,
                 expr_lower,
@@ -516,7 +517,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             term_lower[np.isinf(constv) & _is_sign_negative_number(termv)] = -fmax
             term_lower = _minimum_zero_sign_sensitive(termv, term_lower)
 
-            term_upper = np.array(expr_lower, copy=True)
+            term_upper = _ensure_array(expr_lower, copy=True)
             np.copyto(
                 term_upper,
                 expr_upper,
@@ -575,7 +576,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             #  since [-NaN, NaN] would be misunderstood as only NaN
             # if term_lower == termv and termv == -0.0, we need to guarantee
             #  that term_lower is also -0.0, same for term_upper
-            term_lower = np.array(expr_lower, copy=True)
+            term_lower = _ensure_array(expr_lower, copy=True)
             np.copyto(
                 term_lower,
                 expr_upper,
@@ -592,7 +593,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             term_lower[np.isinf(constv)] = -fmax
             term_lower = _minimum_zero_sign_sensitive(termv, term_lower)
 
-            term_upper = np.array(expr_upper, copy=True)
+            term_upper = _ensure_array(expr_upper, copy=True)
             np.copyto(
                 term_upper,
                 expr_lower,
@@ -663,24 +664,22 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
 
         # limit expr_lower and expr_upper to keep the same sign
         # then compute the lower and upper bounds for the abs(expr)
-        expr_lower = np.array(expr_lower, copy=True)
+        expr_lower = _ensure_array(expr_lower, copy=True)
         expr_lower[_is_sign_positive_number(exprv) & (expr_lower <= 0)] = +0.0
-        expr_upper = np.array(expr_upper, copy=True)
+        expr_upper = _ensure_array(expr_upper, copy=True)
         expr_upper[_is_sign_negative_number(exprv) & (expr_upper >= 0)] = -0.0
         expr_abs_lower, expr_abs_upper = (
-            np.array(
-                _where(_is_sign_negative_number(exprv), -expr_upper, expr_lower),
-                copy=None,
+            _ensure_array(
+                _where(_is_sign_negative_number(exprv), -expr_upper, expr_lower)
             ),
-            np.array(
-                _where(_is_sign_negative_number(exprv), -expr_lower, expr_upper),
-                copy=None,
+            _ensure_array(
+                _where(_is_sign_negative_number(exprv), -expr_lower, expr_upper)
             ),
         )
 
         av_abs = np.abs(av)
         bv_abs = np.abs(bv)
-        exprv_abs = np.array(np.abs(exprv), copy=None)
+        exprv_abs = _ensure_array(np.abs(exprv))
 
         fmax = _floating_max(X.dtype)
         smallest_subnormal = _floating_smallest_subnormal(X.dtype)
@@ -689,20 +688,19 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
         # - if the factor is infinite, we limit it to fmax
         # - if the factor is NaN, e.g. from 0/0, we set the factor to 1
         # finally we split the factor geometrically in two using the sqrt
-        expr_abs_lower_factor: np.ndarray[Ps, np.dtype[F]] = np.array(
-            np.divide(exprv_abs, expr_abs_lower), copy=None
+        expr_abs_lower_factor: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            np.divide(exprv_abs, expr_abs_lower)
         )
         expr_abs_lower_factor[np.isinf(expr_abs_lower_factor)] = fmax
         np.sqrt(expr_abs_lower_factor, out=expr_abs_lower_factor)
         expr_abs_lower_factor[np.isnan(expr_abs_lower_factor)] = 1
 
-        expr_abs_upper_factor: np.ndarray[Ps, np.dtype[F]] = np.array(
+        expr_abs_upper_factor: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
             np.divide(
                 expr_abs_upper,
                 # we avoid division by zero here
                 _maximum_zero_sign_sensitive(exprv_abs, smallest_subnormal),
-            ),
-            copy=None,
+            )
         )
         expr_abs_upper_factor[np.isinf(expr_abs_upper_factor)] = fmax
         np.sqrt(expr_abs_upper_factor, out=expr_abs_upper_factor)
@@ -717,14 +715,14 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
         # - a lower bound of zero is always passed through
         # - we ensure that the upper bound does not overflow into inf
         # - the bounds for the divisor b are flipped
-        a_abs_lower = np.array(np.divide(av_abs, expr_abs_lower_factor), copy=None)
+        a_abs_lower = _ensure_array(np.divide(av_abs, expr_abs_lower_factor))
         a_abs_lower[(expr_abs_lower == 0) & ~np.isnan(av_abs)] = 0
-        a_abs_upper = np.array(np.multiply(av_abs, expr_abs_upper_factor), copy=None)
+        a_abs_upper = _ensure_array(np.multiply(av_abs, expr_abs_upper_factor))
         a_abs_upper[np.isinf(a_abs_upper) & ~np.isinf(expr_abs_upper)] = fmax
 
-        b_abs_lower = np.array(np.multiply(bv_abs, expr_abs_lower_factor), copy=None)
+        b_abs_lower = _ensure_array(np.multiply(bv_abs, expr_abs_lower_factor))
         b_abs_lower[(expr_abs_lower == 0) & ~np.isnan(av_abs)] = np.inf
-        b_abs_upper = np.array(np.divide(bv_abs, expr_abs_upper_factor), copy=None)
+        b_abs_upper = _ensure_array(np.divide(bv_abs, expr_abs_upper_factor))
         b_abs_upper[(b_abs_upper == 0) & ~np.isinf(expr_abs_upper)] = smallest_subnormal
 
         any_nan = np.isnan(av_abs)
@@ -768,7 +766,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             )
 
             return _broadcast_to(
-                np.array(total_product, copy=None).reshape((1,) + exprv_abs.shape),
+                _ensure_array(total_product).reshape((1,) + exprv_abs.shape),
                 (t_stack.shape[0],) + exprv_abs.shape,
             )
 
@@ -810,13 +808,11 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
         # derive the bounds on a and b based on the bounds on abs(a) and abs(b)
         # if any term is NaN, other non-NaN terms can have any value of any sign
         # the bounds for the divisor b are flipped back here
-        a_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
-            _where(_is_sign_negative_number(av), -tu_abs_stack[0], tl_abs_stack[0]),
-            copy=None,
+        a_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            _where(_is_sign_negative_number(av), -tu_abs_stack[0], tl_abs_stack[0])
         )
-        a_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
-            _where(_is_sign_negative_number(av), -tl_abs_stack[0], tu_abs_stack[0]),
-            copy=None,
+        a_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            _where(_is_sign_negative_number(av), -tl_abs_stack[0], tu_abs_stack[0])
         )
         a_lower[any_nan & ~np.isnan(av)] = -np.inf
         a_upper[any_nan & ~np.isnan(av)] = np.inf
@@ -828,12 +824,8 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             tl_abs_stack[1], tu_abs_stack[1]
         )
         b_lower, b_upper = (
-            np.array(
-                _where(_is_sign_negative_number(bv), -b_upper, b_lower), copy=None
-            ),
-            np.array(
-                _where(_is_sign_negative_number(bv), -b_lower, b_upper), copy=None
-            ),
+            _ensure_array(_where(_is_sign_negative_number(bv), -b_upper, b_lower)),
+            _ensure_array(_where(_is_sign_negative_number(bv), -b_lower, b_upper)),
         )
         b_lower[any_nan & ~np.isnan(bv)] = -np.inf
         b_upper[any_nan & ~np.isnan(bv)] = np.inf

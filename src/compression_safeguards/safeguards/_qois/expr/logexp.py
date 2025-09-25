@@ -5,6 +5,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
+    _ensure_array,
     _floating_smallest_subnormal,
     _is_negative_zero,
     _maximum_zero_sign_sensitive,
@@ -82,19 +83,17 @@ class ScalarLog(Expr[AnyExpr]):
         #  value
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
             _minimum_zero_sign_sensitive(
                 argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_lower)
-            ),
-            copy=None,
+            )
         )
         arg_lower[np.less(argv, 0)] = -np.inf
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
             _maximum_zero_sign_sensitive(
                 argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_upper)
-            ),
-            copy=None,
+            )
         )
         arg_upper[np.less(argv, 0)] = -smallest_subnormal
 

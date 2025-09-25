@@ -3,7 +3,7 @@ from collections.abc import Mapping
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import _is_sign_negative_number
+from ....utils._compat import _ensure_array, _is_sign_negative_number
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from .abc import AnyExpr, Expr
@@ -63,13 +63,13 @@ class ScalarAbs(Expr[AnyExpr]):
         #  - el <= 0 -> al = -eu, au = eu
         # TODO: an interval union could represent that the two sometimes-
         #       disjoint intervals in the future
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.copy(expr_lower)
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(expr_lower, copy=True)
         np.negative(
             expr_upper,
             out=arg_lower,
             where=(np.less_equal(expr_lower, 0) | _is_sign_negative_number(argv)),
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.copy(expr_upper)
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(expr_upper, copy=True)
         np.negative(
             expr_lower,
             out=arg_upper,

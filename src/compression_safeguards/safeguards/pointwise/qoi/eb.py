@@ -10,6 +10,7 @@ from typing import ClassVar
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
+from ....utils._compat import _ensure_array
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import ToFloatMode, saturating_finite_float_cast, to_float
 from ....utils.intervals import IntervalUnion
@@ -248,7 +249,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             _compute_finite_absolute_error_bound(self._type, eb, qoi_data),
         )
 
-        ok: np.ndarray[S, np.dtype[np.bool]] = np.array(finite_ok, copy=None)  # type: ignore
+        ok: np.ndarray[S, np.dtype[np.bool]] = _ensure_array(finite_ok)
         np.equal(qoi_data, qoi_decoded, out=ok, where=np.isinf(qoi_data))
         np.isnan(qoi_decoded, out=ok, where=np.isnan(qoi_data))
 

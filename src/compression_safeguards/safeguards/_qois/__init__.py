@@ -5,6 +5,7 @@ from collections.abc import Mapping, Set
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
+from ...utils._compat import _ensure_array
 from ...utils.bindings import Parameter
 from ..qois import (
     PointwiseQuantityOfInterestExpression,
@@ -96,9 +97,9 @@ class PointwiseQuantityOfInterest:
             The pointwise quantity of interest values.
         """
 
-        X = np.array(X, copy=None)
+        X = _ensure_array(X)
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, X.dtype)
-        exprv = np.array(expr.eval(X.shape, X, late_bound), copy=None)
+        exprv = _ensure_array(expr.eval(X.shape, X, late_bound))
         assert exprv.dtype == X.dtype
         assert exprv.shape == X.shape
         return exprv
@@ -133,15 +134,15 @@ class PointwiseQuantityOfInterest:
             The pointwise lower and upper bounds on the data `X`.
         """
 
-        qoi_lower = np.array(qoi_lower, copy=None)
-        qoi_upper = np.array(qoi_upper, copy=None)
-        X = np.array(X, copy=None)
+        qoi_lower = _ensure_array(qoi_lower)
+        qoi_upper = _ensure_array(qoi_upper)
+        X = _ensure_array(X)
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, X.dtype)
         X_lower, X_upper = expr.compute_data_bounds(
             qoi_lower, qoi_upper, X, X, late_bound
         )
-        X_lower = np.array(X_lower, copy=None)
-        X_upper = np.array(X_upper, copy=None)
+        X_lower = _ensure_array(X_lower)
+        X_upper = _ensure_array(X_upper)
         assert X_lower.dtype == X.dtype
         assert X_upper.dtype == X.dtype
         assert X_lower.shape == X.shape
@@ -268,12 +269,12 @@ class StencilQuantityOfInterest:
             The pointwise quantity of interest values.
         """
 
-        Xs = np.array(Xs, copy=None)
+        Xs = _ensure_array(Xs)
         X_shape: Ps = Xs.shape[: -len(self._stencil_shape)]  # type: ignore
         stencil_shape = Xs.shape[-len(self._stencil_shape) :]
         assert stencil_shape == self._stencil_shape
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, Xs.dtype)
-        exprv = np.array(expr.eval(X_shape, Xs, late_bound), copy=None)
+        exprv = _ensure_array(expr.eval(X_shape, Xs, late_bound))
         assert exprv.dtype == Xs.dtype
         assert exprv.shape == X_shape
         return exprv
@@ -313,9 +314,9 @@ class StencilQuantityOfInterest:
             that contribute to the same QoI points.
         """
 
-        qoi_lower = np.array(qoi_lower, copy=None)
-        qoi_upper = np.array(qoi_upper, copy=None)
-        Xs = np.array(Xs, copy=None)
+        qoi_lower = _ensure_array(qoi_lower)
+        qoi_upper = _ensure_array(qoi_upper)
+        Xs = _ensure_array(Xs)
         X_shape, stencil_shape = (
             Xs.shape[: -len(self._stencil_shape)],
             Xs.shape[-len(self._stencil_shape) :],
@@ -327,8 +328,8 @@ class StencilQuantityOfInterest:
         Xs_lower, Xs_upper = expr.compute_data_bounds(
             qoi_lower, qoi_upper, X, Xs, late_bound
         )
-        Xs_lower = np.array(Xs_lower, copy=None)
-        Xs_upper = np.array(Xs_upper, copy=None)
+        Xs_lower = _ensure_array(Xs_lower)
+        Xs_upper = _ensure_array(Xs_upper)
         assert Xs_lower.dtype == Xs.dtype
         assert Xs_upper.dtype == Xs.dtype
         assert Xs_lower.shape == Xs.shape

@@ -9,7 +9,12 @@ from enum import Enum, auto
 import numpy as np
 from typing_extensions import assert_never  # MSPV 3.11
 
-from ..utils._compat import _nan_to_zero_inf_to_finite, _nextafter, _where
+from ..utils._compat import (
+    _ensure_array,
+    _nan_to_zero_inf_to_finite,
+    _nextafter,
+    _where,
+)
 from ..utils.cast import from_float, from_total_order, to_float, to_total_order
 from ..utils.typing import F, S, T
 
@@ -232,8 +237,8 @@ def _compute_finite_absolute_error(
         case ErrorBound.abs | ErrorBound.rel:
             return np.abs(np.subtract(data_float, decoded_float))
         case ErrorBound.ratio:
-            err_abs: np.ndarray[S, np.dtype[F]] = np.array(
-                np.divide(decoded_float, data_float), copy=None
+            err_abs: np.ndarray[S, np.dtype[F]] = _ensure_array(
+                np.divide(decoded_float, data_float)
             )
             np.divide(
                 data_float,
@@ -306,19 +311,17 @@ def _apply_finite_error_bound(
                     to_float(upper, ftype=data_float.dtype) - data_float, eb_abs
                 )
 
-            lower = np.array(
+            lower = _ensure_array(
                 from_total_order(
-                    np.add(to_total_order(lower), lower_outside_eb),
+                    np.add(to_total_order(lower), lower_outside_eb),  # type: ignore
                     data.dtype,
-                ),
-                copy=None,
+                )
             )
-            upper = np.array(
+            upper = _ensure_array(
                 from_total_order(
-                    np.subtract(to_total_order(upper), upper_outside_eb),
+                    np.subtract(to_total_order(upper), upper_outside_eb),  # type: ignore
                     data.dtype,
-                ),
-                copy=None,
+                )
             )
 
             # a zero-error bound must preserve exactly, e.g. even for -0.0
@@ -361,19 +364,17 @@ def _apply_finite_error_bound(
                     > eb_abs
                 )
 
-            lower = np.array(
+            lower = _ensure_array(
                 from_total_order(
-                    np.add(to_total_order(lower), lower_outside_eb),
+                    np.add(to_total_order(lower), lower_outside_eb),  # type: ignore
                     data.dtype,
-                ),
-                copy=None,
+                )
             )
-            upper = np.array(
+            upper = _ensure_array(
                 from_total_order(
-                    np.subtract(to_total_order(upper), upper_outside_eb),
+                    np.subtract(to_total_order(upper), upper_outside_eb),  # type: ignore
                     data.dtype,
-                ),
-                copy=None,
+                )
             )
 
             # a ratio of 1 bound must preserve exactly, e.g. even for -0.0
@@ -432,11 +433,11 @@ def _apply_finite_qoi_error_bound(
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
-                lower: np.ndarray[S, np.dtype[F]] = np.array(
-                    np.subtract(qoi_float, eb_abs), copy=None
+                lower: np.ndarray[S, np.dtype[F]] = _ensure_array(
+                    np.subtract(qoi_float, eb_abs)
                 )
-                upper: np.ndarray[S, np.dtype[F]] = np.array(
-                    np.add(qoi_float, eb_abs), copy=None
+                upper: np.ndarray[S, np.dtype[F]] = _ensure_array(
+                    np.add(qoi_float, eb_abs)
                 )
 
             # correct rounding errors in the lower and upper bound
@@ -476,12 +477,8 @@ def _apply_finite_qoi_error_bound(
                     qoi_float * eb_abs,
                     qoi_float / eb_abs,
                 )
-            lower = np.array(
-                _where(np.less(qoi_float, 0), data_mul, data_div), copy=None
-            )
-            upper = np.array(
-                _where(np.less(qoi_float, 0), data_div, data_mul), copy=None
-            )
+            lower = _ensure_array(_where(np.less(qoi_float, 0), data_mul, data_div))
+            upper = _ensure_array(_where(np.less(qoi_float, 0), data_div, data_mul))
 
             # correct rounding errors in the lower and upper bound
             with np.errstate(

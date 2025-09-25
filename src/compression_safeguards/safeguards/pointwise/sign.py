@@ -10,7 +10,7 @@ from typing import ClassVar
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ...utils._compat import _floating_smallest_subnormal
+from ...utils._compat import _ensure_array, _floating_smallest_subnormal
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
@@ -130,7 +130,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         # values below (sign=-1) stay below,
         # values above (sign=+1) stay above
         # NaN values keep their sign bit
-        ok: np.ndarray[S, np.dtype[np.bool]] = np.array(decoded == offset, copy=None)
+        ok: np.ndarray[S, np.dtype[np.bool]] = _ensure_array(decoded == offset)
         np.less(decoded, offset, out=ok, where=np.less(data, offset))
         np.greater(decoded, offset, out=ok, where=np.greater(data, offset))
         np.copyto(
@@ -184,20 +184,20 @@ class SignPreservingSafeguard(PointwiseSafeguard):
                 # special case for floating-point -0.0 / +0.0 which both have
                 #  zero sign and thus have weird below / above intervals
                 smallest_subnormal = _floating_smallest_subnormal(data.dtype)  # type: ignore
-                below_upper = np.array(
-                    from_total_order(offsetf_total - 1, data.dtype), copy=None
+                below_upper = _ensure_array(
+                    from_total_order(offsetf_total - 1, data.dtype)
                 )
                 below_upper[offsetf == 0] = -smallest_subnormal
-                above_lower = np.array(
-                    from_total_order(offsetf_total + 1, data.dtype), copy=None
+                above_lower = _ensure_array(
+                    from_total_order(offsetf_total + 1, data.dtype)
                 )
                 above_lower[offsetf == 0] = smallest_subnormal
             else:
-                below_upper = np.array(
-                    from_total_order(offsetf_total - 1, data.dtype), copy=None
+                below_upper = _ensure_array(
+                    from_total_order(offsetf_total - 1, data.dtype)
                 )
-                above_lower = np.array(
-                    from_total_order(offsetf_total + 1, data.dtype), copy=None
+                above_lower = _ensure_array(
+                    from_total_order(offsetf_total + 1, data.dtype)
                 )
 
         dataf = data.flatten()

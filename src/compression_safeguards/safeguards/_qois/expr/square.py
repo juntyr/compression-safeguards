@@ -4,6 +4,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
+    _ensure_array,
     _floating_smallest_subnormal,
     _is_sign_negative_number,
     _maximum_zero_sign_sensitive,
@@ -60,8 +61,8 @@ class ScalarSqrt(Expr[AnyExpr]):
         # for sqrt(-0.0), we should return -0.0 as the inverse
         # this ensures that 1/sqrt(-0.0) doesn't become 1/sqrt(0.0)
         def _sqrt_inv(x: np.ndarray[Ps, np.dtype[F]]) -> np.ndarray[Ps, np.dtype[F]]:
-            out: np.ndarray[Ps, np.dtype[F]] = np.array(
-                np.square(_maximum_zero_sign_sensitive(X.dtype.type(0), x)), copy=None
+            out: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+                np.square(_maximum_zero_sign_sensitive(X.dtype.type(0), x))
             )
             np.copyto(out, x, where=(x == 0), casting="no")
             return out
@@ -80,13 +81,13 @@ class ScalarSqrt(Expr[AnyExpr]):
         # otherwise ensure that the bounds on sqrt(...) are non-negative
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
-            _minimum_zero_sign_sensitive(argv, _sqrt_inv(expr_lower)), copy=None
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            _minimum_zero_sign_sensitive(argv, _sqrt_inv(expr_lower))
         )
         arg_lower[np.less(argv, 0)] = -np.inf
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
-            _maximum_zero_sign_sensitive(argv, _sqrt_inv(expr_upper)), copy=None
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            _maximum_zero_sign_sensitive(argv, _sqrt_inv(expr_upper))
         )
         arg_upper[np.less(argv, 0)] = -smallest_subnormal
 
@@ -182,7 +183,7 @@ class ScalarSquare(Expr[AnyExpr]):
         #  - el <= 0 -> al = -eu, au = eu
         # TODO: an interval union could represent that the two sometimes-
         #       disjoint intervals in the future
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(al, copy=True)
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(al, copy=True)
         np.negative(
             au,
             out=arg_lower,
@@ -190,7 +191,7 @@ class ScalarSquare(Expr[AnyExpr]):
         )
         arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(au, copy=True)
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(au, copy=True)
         np.negative(
             al,
             out=arg_upper,

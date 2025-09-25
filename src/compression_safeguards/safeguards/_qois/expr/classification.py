@@ -4,7 +4,7 @@ from typing import overload
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import _floating_max
+from ....utils._compat import _ensure_array, _floating_max
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from .abc import AnyExpr, Expr
@@ -33,7 +33,7 @@ class ScalarIsFinite(Expr[AnyExpr]):
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
-            lambda x: classify_to_dtype(np.isfinite, x, dtype),  # type: ignore
+            lambda x: classify_to_dtype(np.isfinite, x, dtype),
             ScalarIsFinite,
         )
 
@@ -183,7 +183,7 @@ class ScalarIsNaN(Expr[AnyExpr]):
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
-            lambda x: classify_to_dtype(np.isnan, x, dtype),  # type: ignore
+            lambda x: classify_to_dtype(np.isnan, x, dtype),
             ScalarIsNaN,
         )
 
@@ -255,6 +255,6 @@ def classify_to_dtype(classify, a, dtype):
     c = classify(a)
 
     if not isinstance(c, np.ndarray):
-        return np.array(c, copy=None).astype(dtype, casting="safe")[()]
+        return _ensure_array(c).astype(dtype, casting="safe")[()]
 
     return c.astype(dtype, casting="safe")

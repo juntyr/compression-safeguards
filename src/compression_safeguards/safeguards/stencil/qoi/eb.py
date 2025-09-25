@@ -11,6 +11,7 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 from typing_extensions import override  # MSPV 3.12
 
+from ....utils._compat import _ensure_array, _ones, _zeros
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import (
     ToFloatMode,
@@ -319,7 +320,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         ftype: np.dtype[F] = self._qoi_dtype.floating_point_dtype_for(data.dtype)  # type: ignore
 
         if any(s == 0 for s in empty_shape):
-            return np.zeros(empty_shape, dtype=ftype)
+            return _zeros(tuple(empty_shape), dtype=ftype)
 
         constant_boundaries = [
             None
@@ -431,9 +432,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         #  neighbourhood shape exceeds the data shape, allow all values
         for axis, w in zip(self._neighbourhood, window):
             if data.shape[axis.axis] < w and axis.boundary == BoundaryCondition.valid:
-                return np.ones_like(data, dtype=np.bool)  # type: ignore
+                return _ones(data.shape, dtype=np.dtype(np.bool))
         if data.size == 0:
-            return np.ones_like(data, dtype=np.bool)  # type: ignore
+            return _ones(data.shape, dtype=np.dtype(np.bool))
 
         constant_boundaries = [
             None
@@ -561,8 +562,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             self._type, qoi_data, qoi_decoded
         ) <= _compute_finite_absolute_error_bound(self._type, eb, qoi_data)
 
-        windows_ok: np.ndarray[tuple[int, ...], np.dtype[np.bool]] = np.array(
-            finite_ok, copy=None
+        windows_ok: np.ndarray[tuple[int, ...], np.dtype[np.bool]] = _ensure_array(
+            finite_ok
         )
         np.equal(qoi_data, qoi_decoded, out=windows_ok, where=np.isinf(qoi_data))
         np.isnan(qoi_decoded, out=windows_ok, where=np.isnan(qoi_data))
@@ -574,7 +575,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 end = None if axis.after == 0 else -axis.after
                 s[axis.axis] = slice(start, end)
 
-        ok: np.ndarray[S, np.dtype[np.bool]] = np.ones_like(data, dtype=np.bool)  # type: ignore
+        ok: np.ndarray[S, np.dtype[np.bool]] = _ones(
+            data.shape, dtype=np.dtype(np.bool)
+        )
         ok[tuple(s)] = windows_ok
 
         return ok
@@ -752,7 +755,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         ).reshape((-1, np.prod(window)))
 
         # only contribute window elements that are used in the QoI
-        window_used = np.zeros(window, dtype=bool)
+        window_used = _zeros(window, dtype=np.dtype(np.bool))
         for idxs in self._qoi_expr.data_indices:
             window_used[idxs] = True
 
@@ -847,7 +850,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             Truncated data array.
         """
 
-        data = np.array(data, copy=None)
+        data = _ensure_array(data)
 
         qoi_index = [slice(None, None) for _ in data.shape]
 
@@ -909,7 +912,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             Zero-expanded QoI array.
         """
 
-        qoi = np.array(qoi, copy=None)
+        qoi = _ensure_array(qoi)
 
         data_shape = list(qoi.shape)
         qoi_index = [slice(None, None) for _ in qoi.shape]
@@ -935,8 +938,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 axis.before, None if axis.after == 0 else -axis.after
             )
 
-        out: np.ndarray[tuple[int, ...], np.dtype[T]] = np.zeros(
-            data_shape, dtype=qoi.dtype
+        out: np.ndarray[tuple[int, ...], np.dtype[T]] = _zeros(
+            tuple(data_shape), dtype=qoi.dtype
         )
         out[tuple(qoi_index)] = qoi
         return out

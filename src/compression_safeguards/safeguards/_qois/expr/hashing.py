@@ -6,7 +6,7 @@ from hashlib import blake2b
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import _broadcast_to
+from ....utils._compat import _broadcast_to, _ensure_array, _is_of_shape, _ones, _zeros
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import from_float
 from ....utils.intervals import Interval, IntervalUnion
@@ -52,6 +52,15 @@ class HashingExpr(EmptyExpr):
     @override
     def has_data(self) -> bool:
         return True
+
+    @override  # type: ignore
+    def eval_has_data(
+        self,
+        x: PsI,
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> np.ndarray[PsI, np.dtype[np.bool]]:
+        return _ones(x, dtype=np.dtype(np.bool))
 
     @property  # type: ignore
     @override
@@ -112,8 +121,8 @@ class HashingExpr(EmptyExpr):
             hash_[i] = np.frombuffer(hasher.digest(), dtype=Xs.dtype, count=1)[0]
 
         hash = hash_.reshape(x)
-        assert hash.shape == x
-        return hash  # type: ignore
+        assert _is_of_shape(hash, x)
+        return hash
 
     @data_bounds(DataBounds.infallible)
     @override
@@ -129,7 +138,7 @@ class HashingExpr(EmptyExpr):
         Xs_hash: np.ndarray[Ns, np.dtype[F]] = _broadcast_to(
             X_hash.reshape(X.shape + (1,) * (Xs.ndim - X.ndim)), Xs.shape
         )
-        return np.copy(Xs_hash), np.copy(Xs_hash)
+        return _ensure_array(Xs_hash, copy=True), _ensure_array(Xs_hash, copy=True)
 
     @override
     def __repr__(self) -> str:
@@ -177,14 +186,14 @@ def _patch_for_hashing_qoi_dev_only():
 def _interval_union_contains(
     self, other: np.ndarray[S, np.dtype[T]]
 ) -> np.ndarray[S, np.dtype[np.bool]]:
-    return np.ones(other.shape, dtype=np.bool)  # type: ignore
+    return _ones(other.shape, dtype=np.dtype(np.bool))
 
 
 def _interval_union_pick(
     self, prediction: np.ndarray[S, np.dtype[T]]
 ) -> np.ndarray[S, np.dtype[T]]:
     assert not np.all(self._lower == 1), "fuzzer hash is all ones"
-    return np.array(self._lower[0].reshape(prediction.shape), copy=True)
+    return _ensure_array(self._lower[0].reshape(prediction.shape))
 
 
 def _stencil_qoi_check_pointwise(
@@ -195,8 +204,8 @@ def _stencil_qoi_check_pointwise(
     late_bound: Bindings,
 ) -> np.ndarray[S, np.dtype[np.bool]]:
     if np.all(decoded == 1):
-        return np.zeros(data.shape, dtype=np.bool)  # type: ignore
-    return np.ones(data.shape, dtype=np.bool)  # type: ignore
+        return _zeros(data.shape, dtype=np.dtype(np.bool))
+    return _ones(data.shape, dtype=np.dtype(np.bool))
 
 
 def _compute_safe_data_lower_upper_interval_union(

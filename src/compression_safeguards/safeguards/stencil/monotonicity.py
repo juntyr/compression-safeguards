@@ -16,7 +16,13 @@ from typing_extensions import (
     override,  # MSPV 3.12
 )
 
-from ...utils._compat import _maximum_zero_sign_sensitive, _minimum_zero_sign_sensitive
+from ...utils._compat import (
+    _ensure_array,
+    _maximum_zero_sign_sensitive,
+    _minimum_zero_sign_sensitive,
+    _ones,
+    _zeros,
+)
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
@@ -283,7 +289,9 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             )
         )
 
-        ok: np.ndarray[S, np.dtype[np.bool]] = np.ones_like(data, dtype=np.bool)  # type: ignore
+        ok: np.ndarray[S, np.dtype[np.bool]] = _ones(
+            data.shape, dtype=np.dtype(np.bool)
+        )
 
         window = 1 + self._window * 2
 
@@ -387,7 +395,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         # track which elements have any monotonicity-based restrictions
         #  imposed upon them
-        any_restriction = np.zeros_like(data, dtype=np.bool)
+        any_restriction = _zeros(data.shape, dtype=np.dtype(np.bool))
 
         for axis, alen in enumerate(data.shape):
             if (
@@ -421,11 +429,11 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             #  elements at the left and right edge of the window cannot access
             #  one further element to the left / right, respectively
             elem_lt_left, elem_lt_right, elem_eq, elem_gt_left, elem_gt_right = (
-                np.zeros_like(data_boundary, dtype=np.bool),
-                np.zeros_like(data_boundary, dtype=np.bool),
-                np.zeros_like(data_boundary, dtype=np.bool),
-                np.zeros_like(data_boundary, dtype=np.bool),
-                np.zeros_like(data_boundary, dtype=np.bool),
+                _zeros(data_boundary.shape, dtype=np.dtype(np.bool)),
+                _zeros(data_boundary.shape, dtype=np.dtype(np.bool)),
+                _zeros(data_boundary.shape, dtype=np.dtype(np.bool)),
+                _zeros(data_boundary.shape, dtype=np.dtype(np.bool)),
+                _zeros(data_boundary.shape, dtype=np.dtype(np.bool)),
             )
             for w in range(window):
                 # ensure that all members of the window receive their
@@ -635,7 +643,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         lt: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = to_total_order(
             valid._lower
         )
-        lt = np.array(lt, copy=None)
+        lt = _ensure_array(lt)
         ut: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = to_total_order(
             valid._upper
         )

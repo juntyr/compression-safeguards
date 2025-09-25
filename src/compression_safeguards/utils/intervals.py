@@ -23,9 +23,9 @@ from typing_extensions import (
     override,  # MSPV 3.12
 )
 
+from ._compat import _ensure_array, _nextafter, _where
 from ._compat import _maximum_zero_sign_sensitive as _np_maximum
 from ._compat import _minimum_zero_sign_sensitive as _np_minimum
-from ._compat import _nextafter, _where
 from .cast import as_bits, from_total_order, to_total_order
 from .typing import S, T
 
@@ -906,9 +906,9 @@ class IntervalUnion(Generic[T, N, U]):
             choose_i = valid_i & ((lower_i < lower_j) | ~valid_j)
             choose_j = valid_j & ((lower_i >= lower_j) | ~valid_i)
 
-            lower_ij = np.array(lower_j, copy=None)
+            lower_ij = _ensure_array(lower_j)
             np.copyto(lower_ij, lower_i, where=choose_i, casting="no")
-            upper_ij = np.array(upper_j, copy=None)
+            upper_ij = _ensure_array(upper_j)
             np.copyto(upper_ij, upper_i, where=choose_i, casting="no")
 
             # check if the selected interval intersects with the previously
@@ -927,7 +927,7 @@ class IntervalUnion(Generic[T, N, U]):
 
             # - intersection -> next is intersection
             # - no intersection -> next is next interval
-            next_lower = np.array(lower_ij, copy=True)
+            next_lower = _ensure_array(lower_ij, copy=True)
             np.copyto(
                 next_lower,
                 _np_minimum(lower_o, lower_ij),
@@ -935,7 +935,7 @@ class IntervalUnion(Generic[T, N, U]):
                 casting="no",
             )
 
-            next_upper = np.array(upper_ij, copy=True)
+            next_upper = _ensure_array(upper_ij, copy=True)
             np.copyto(
                 next_upper,
                 _np_maximum(upper_o, upper_ij),
@@ -1003,7 +1003,7 @@ class IntervalUnion(Generic[T, N, U]):
         # simple pick:
         #  1. if prediction is in the interval, use it
         #  2. otherwise pick the lower bound of the first interval
-        pick: np.ndarray[S, np.dtype[T]] = np.array(
+        pick: np.ndarray[S, np.dtype[T]] = _ensure_array(
             self._lower[0].reshape(prediction.shape), copy=True
         )
         np.copyto(pick, prediction, where=self.contains(prediction), casting="no")
@@ -1166,9 +1166,7 @@ class IntervalUnion(Generic[T, N, U]):
         #     upper: 0b00..01xxx1zzzzzzz
         #     lower: 0b00..01yyy0wwwwwww
         #   -> pick: 0b00..01xxx10000000
-        pick_bits = np.array(upper & ~(allbits >> (lxu_lz + 1)), copy=None).reshape(
-            1, -1
-        )
+        pick_bits = _ensure_array(upper & ~(allbits >> (lxu_lz + 1))).reshape(1, -1)
 
         # 11. undo the negation step to allow "negative" unsigned values again
         np.copyto(pick_bits, ~pick_bits + 1, where=negative, casting="no")
@@ -1252,6 +1250,6 @@ def _count_leading_zeros(
     _, low_exp = np.frexp(x_bits.astype(np.uint64, casting="safe") & 0xFFFFFFFF)
     # then lossless truncation of the number of leading zeros
     high_exp += 32
-    exp = np.array(low_exp, copy=None)
+    exp = _ensure_array(low_exp)
     np.copyto(exp, high_exp, where=(high_exp > 32), casting="no")
     return (nbits - exp).astype(np.uint8, casting="unsafe")  # type: ignore

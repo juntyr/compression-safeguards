@@ -4,7 +4,12 @@ from warnings import warn
 
 import numpy as np
 
-from ...utils._compat import _broadcast_to, _nan_to_zero_inf_to_finite, _nextafter
+from ...utils._compat import (
+    _broadcast_to,
+    _ensure_array,
+    _nan_to_zero_inf_to_finite,
+    _nextafter,
+)
 from .expr.typing import Ci, F, Ns, Ps
 
 
@@ -100,11 +105,11 @@ def guarantee_data_within_expr_bounds(
         `isnan(exprv) & isnan(expr(Xs_bound_guess))`.
     """
 
-    exprv = np.array(exprv, copy=None)
-    Xs = np.array(Xs, copy=None)
-    Xs_bound_guess = np.array(Xs_bound_guess, copy=True)
-    expr_lower = np.array(expr_lower, copy=None)
-    expr_upper = np.array(expr_upper, copy=None)
+    exprv = _ensure_array(exprv)
+    Xs = _ensure_array(Xs)
+    Xs_bound_guess = _ensure_array(Xs_bound_guess)
+    expr_lower = _ensure_array(expr_lower)
+    expr_upper = _ensure_array(expr_upper)
 
     assert exprv.dtype == Xs.dtype
     assert Xs_bound_guess.dtype == Xs.dtype
@@ -150,7 +155,7 @@ def guarantee_data_within_expr_bounds(
             casting="no",
         )
 
-    Xs_diff = np.array(_nan_to_zero_inf_to_finite(Xs_bound_guess - Xs), copy=None)
+    Xs_diff = _ensure_array(_nan_to_zero_inf_to_finite(Xs_bound_guess - Xs))
 
     # exponential backoff for the distance
     backoff = Xs.dtype.type(0.5)
@@ -170,7 +175,7 @@ def guarantee_data_within_expr_bounds(
 
     warn("data bounds required excessive nudging")
 
-    return np.copy(Xs)
+    return _ensure_array(Xs, copy=True)
 
 
 class DataBounds(Enum):

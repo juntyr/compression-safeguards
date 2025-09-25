@@ -6,6 +6,7 @@ from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _broadcast_to,
+    _ensure_array,
     _floating_max,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
@@ -149,7 +150,7 @@ def compute_left_associate_sum_data_bounds(
     def _zero_add(
         a: np.ndarray[Ps, np.dtype[F]], b: np.ndarray[Ps, np.dtype[F]]
     ) -> np.ndarray[Ps, np.dtype[F]]:
-        sum_: np.ndarray[Ps, np.dtype[F]] = np.array(np.add(a, b), copy=None)
+        sum_: np.ndarray[Ps, np.dtype[F]] = _ensure_array(np.add(a, b))
         np.copyto(sum_, a, where=(b == 0), casting="no")
         return sum_
 
@@ -162,15 +163,20 @@ def compute_left_associate_sum_data_bounds(
         abs_factor = get_expr_left_associative_abs_factor_approximate(term)
         termvs.append(term.eval(X.shape, Xs, late_bound))
         abs_factorvs.append(
-            None if abs_factor is None else abs_factor.eval(X.shape, Xs, late_bound)
+            None
+            if abs_factor is None
+            else np.multiply(
+                abs_factor.eval(X.shape, Xs, late_bound),
+                _ensure_array(term.eval_has_data(X.shape, Xs, late_bound)).astype(
+                    X.dtype
+                ),
+            )
         )
 
     # evaluate the total expression sum
-    exprv: np.ndarray[Ps, np.dtype[F]] = np.array(
-        sum(termvs[1:], start=termvs[0]), copy=None
-    )
-    expr_lower = np.array(expr_lower, copy=None)
-    expr_upper = np.array(expr_upper, copy=None)
+    exprv: np.ndarray[Ps, np.dtype[F]] = _ensure_array(sum(termvs[1:], start=termvs[0]))
+    expr_lower = _ensure_array(expr_lower)
+    expr_upper = _ensure_array(expr_upper)
 
     # compute the sum of absolute factors
     total_abs_factor_: None | np.ndarray[Ps, np.dtype[F]] = None
@@ -178,7 +184,7 @@ def compute_left_associate_sum_data_bounds(
         if abs_factorv is None:
             continue
         if total_abs_factor_ is None:
-            total_abs_factor_ = np.copy(abs_factorv)
+            total_abs_factor_ = _ensure_array(abs_factorv, copy=True)
         else:
             total_abs_factor_ += abs_factorv
     assert total_abs_factor_ is not None
@@ -187,12 +193,12 @@ def compute_left_associate_sum_data_bounds(
     # drop into expression difference bounds to divide up the bound
     # for NaN sums, we use a zero difference to ensure NaNs don't
     #  accidentally propagate into the term difference bounds
-    expr_lower_diff: np.ndarray[Ps, np.dtype[F]] = np.array(
-        np.subtract(expr_lower, exprv), copy=None
+    expr_lower_diff: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+        np.subtract(expr_lower, exprv)
     )
     expr_lower_diff[np.isnan(expr_lower_diff)] = 0
-    expr_upper_diff: np.ndarray[Ps, np.dtype[F]] = np.array(
-        np.subtract(expr_upper, exprv), copy=None
+    expr_upper_diff: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+        np.subtract(expr_upper, exprv)
     )
     expr_upper_diff[np.isnan(expr_upper_diff)] = 0
 
@@ -204,11 +210,11 @@ def compute_left_associate_sum_data_bounds(
     #      zero
     #  (b) -inf - inf and inf - -inf are +-inf, so expr_[lower|upper]_diff is
     #      the same infinity as expr_[lower|upper]
-    tfl: np.ndarray[Ps, np.dtype[F]] = np.array(
-        np.divide(expr_lower_diff, total_abs_factor), copy=None
+    tfl: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+        np.divide(expr_lower_diff, total_abs_factor)
     )
-    tfu: np.ndarray[Ps, np.dtype[F]] = np.array(
-        np.divide(expr_upper_diff, total_abs_factor), copy=None
+    tfu: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+        np.divide(expr_upper_diff, total_abs_factor)
     )
 
     fmax = _floating_max(X.dtype)
@@ -236,7 +242,7 @@ def compute_left_associate_sum_data_bounds(
     for termv, abs_factorv in zip(termvs, abs_factorvs):
         if abs_factorv is None:
             continue
-        tl: np.ndarray[Ps, np.dtype[F]] = np.array(termv, copy=True)
+        tl: np.ndarray[Ps, np.dtype[F]] = _ensure_array(termv, copy=True)
         tl[np.isfinite(termv) & any_nan] = -fmax
         np.copyto(
             tl,
@@ -262,7 +268,7 @@ def compute_left_associate_sum_data_bounds(
     for termv, abs_factorv in zip(termvs, abs_factorvs):
         if abs_factorv is None:
             continue
-        tu: np.ndarray[Ps, np.dtype[F]] = np.array(termv, copy=True)
+        tu: np.ndarray[Ps, np.dtype[F]] = _ensure_array(termv, copy=True)
         tu[np.isfinite(termv) & any_nan] = fmax
         np.copyto(
             tu,
@@ -294,9 +300,9 @@ def compute_left_associate_sum_data_bounds(
         for termv, abs_factorv in zip(termvs, abs_factorvs):
             if total_sum is None:
                 if abs_factorv is None:
-                    total_sum = np.copy(termv)
+                    total_sum = _ensure_array(termv, copy=True)
                 else:
-                    total_sum = np.copy(t_stack[i])
+                    total_sum = _ensure_array(t_stack[i], copy=True)
             elif abs_factorv is None:
                 total_sum += termv
             else:
@@ -306,7 +312,7 @@ def compute_left_associate_sum_data_bounds(
         assert total_sum is not None
 
         return _broadcast_to(
-            np.array(total_sum, copy=None).reshape((1,) + exprv.shape),
+            _ensure_array(total_sum).reshape((1,) + exprv.shape),
             (t_stack.shape[0],) + exprv.shape,
         )
 
@@ -420,7 +426,6 @@ def as_left_associative_sum(
 
 def get_expr_left_associative_abs_factor_approximate(expr: AnyExpr) -> None | AnyExpr:
     from .divmul import ScalarDivide, ScalarMultiply  # noqa: PLC0415
-    from .where import ScalarWhere  # noqa: PLC0415
 
     if not expr.has_data:
         return None
@@ -435,28 +440,6 @@ def get_expr_left_associative_abs_factor_approximate(expr: AnyExpr) -> None | An
 
         if isinstance(expr._a, ScalarMultiply | ScalarDivide):
             expr = expr._a
-        elif isinstance(expr._a, ScalarWhere):
-            where_condition_const = not expr._a._condition.has_data
-            where_a_const = not expr._a._a.has_data
-            where_b_const = not expr._a._b.has_data
-
-            # look into a where expression if the condition is constant and
-            #  at least a or b is also constant
-            if where_condition_const and (where_a_const + where_b_const) >= 1:
-                factor_stack.append(
-                    (
-                        ScalarWhere(
-                            expr._a._condition,
-                            expr._a._a if where_a_const else Number.ONE,
-                            expr._a._b if where_b_const else Number.ONE,
-                        ),
-                        ScalarMultiply,
-                    )
-                )
-                break
-            else:
-                factor_stack.append((Number.ONE, ScalarMultiply))
-                break
         else:
             factor_stack.append(
                 (Number.ONE if expr._a.has_data else expr._a, ScalarMultiply)

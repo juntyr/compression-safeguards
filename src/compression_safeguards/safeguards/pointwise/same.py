@@ -10,6 +10,7 @@ from typing import ClassVar
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
+from ...utils._compat import _ensure_array
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import as_bits, from_total_order, lossless_cast, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Maximum, Minimum, Upper
@@ -194,12 +195,8 @@ class SameValueSafeguard(PointwiseSafeguard):
         Lower(valuef) <= valid_below[dataf_bits == valuef_bits] <= Upper(valuef)
 
         with np.errstate(over="ignore", under="ignore"):
-            below_upper = np.array(
-                from_total_order(valuef_total - 1, data.dtype), copy=None
-            )
-            above_lower = np.array(
-                from_total_order(valuef_total + 1, data.dtype), copy=None
-            )
+            below_upper = _ensure_array(from_total_order(valuef_total - 1, data.dtype))
+            above_lower = _ensure_array(from_total_order(valuef_total + 1, data.dtype))
 
         # non-value elements must exclude value from their interval,
         #  leading to a union of two intervals, below and above value

@@ -10,6 +10,7 @@ from typing import ClassVar
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
+from ...utils._compat import _ones
 from ...utils.bindings import Bindings, Parameter
 from ...utils.intervals import Interval, IntervalUnion
 from ...utils.typing import JSON, S, T
@@ -76,7 +77,7 @@ class AssumeAlwaysSafeguard(PointwiseSafeguard):
             Pointwise, `True` for every element.
         """
 
-        return np.ones_like(data, dtype=np.bool)  # type: ignore
+        return _ones(data.shape, dtype=np.dtype(np.bool))
 
     @override
     def compute_safe_intervals(
