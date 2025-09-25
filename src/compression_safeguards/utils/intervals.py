@@ -1106,7 +1106,9 @@ class IntervalUnion(Generic[T, N, U]):
 
         # 3. only work with "positive" unsigned values
         negative: np.ndarray[tuple[U, N], np.dtype[np.bool]] = np.less(
-            as_bits(lower, kind="i"), 0
+            # lower has an unsigned integer dtype, make signed to compare
+            lower.astype(lower.dtype.str.replace("u", "i")),
+            0,
         )
         np.copyto(lower, ~lower + 1, where=negative, casting="no")
         np.copyto(upper, ~upper + 1, where=negative, casting="no")
@@ -1225,29 +1227,28 @@ def _count_leading_zeros(
     https://stackoverflow.com/a/79189999
     """
 
-    x_bits = as_bits(x)
-    nbits = np.iinfo(x_bits.dtype).bits
+    nbits = np.iinfo(x.dtype).bits
 
     assert nbits <= 64
 
     if nbits <= 16:
         # safe cast from integer type to a larger integer type,
         # then lossless truncation of the number of leading zeros
-        return (nbits - np.frexp(x_bits.astype(np.uint32, casting="safe"))[1]).astype(  # type: ignore
+        return (nbits - np.frexp(x.astype(np.uint32, casting="safe"))[1]).astype(  # type: ignore
             np.uint8, casting="unsafe"
         )
 
     if nbits <= 32:
         # safe cast from integer type to a larger integer type,
         # then lossless truncation of the number of leading zeros
-        return (nbits - np.frexp(x_bits.astype(np.uint64, casting="safe"))[1]).astype(  # type: ignore
+        return (nbits - np.frexp(x.astype(np.uint64, casting="safe"))[1]).astype(  # type: ignore
             np.uint8, casting="unsafe"
         )
 
     # nbits <= 64
     # safe cast from integer type to a larger integer type,
-    _, high_exp = np.frexp(x_bits.astype(np.uint64, casting="safe") >> 32)
-    _, low_exp = np.frexp(x_bits.astype(np.uint64, casting="safe") & 0xFFFFFFFF)
+    _, high_exp = np.frexp(x.astype(np.uint64, casting="safe") >> 32)
+    _, low_exp = np.frexp(x.astype(np.uint64, casting="safe") & 0xFFFFFFFF)
     # then lossless truncation of the number of leading zeros
     high_exp += 32
     exp = _ensure_array(low_exp)

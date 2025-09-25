@@ -107,7 +107,7 @@ def guarantee_data_within_expr_bounds(
 
     exprv = _ensure_array(exprv)
     Xs = _ensure_array(Xs)
-    Xs_bound_guess = _ensure_array(Xs_bound_guess)
+    Xs_bound_guess = _ensure_array(Xs_bound_guess, copy=True)
     expr_lower = _ensure_array(expr_lower)
     expr_upper = _ensure_array(expr_upper)
 

@@ -124,10 +124,12 @@ class SameValueSafeguard(PointwiseSafeguard):
             if isinstance(self._value, Parameter)
             else lossless_cast(self._value, data.dtype, "same safeguard value")
         )
-        value_bits = as_bits(value)
+        value_bits: np.ndarray[tuple[()] | S, np.dtype[np.unsignedinteger]] = as_bits(
+            value
+        )
 
-        data_bits = as_bits(data)
-        decoded_bits = as_bits(decoded)
+        data_bits: np.ndarray[S, np.dtype[np.unsignedinteger]] = as_bits(data)
+        decoded_bits: np.ndarray[S, np.dtype[np.unsignedinteger]] = as_bits(decoded)
 
         if self._exclusive:
             # value if and only if where value
@@ -160,7 +162,7 @@ class SameValueSafeguard(PointwiseSafeguard):
             Union of intervals in which the same value guarantee is upheld.
         """
 
-        valuef = (
+        valuef: np.ndarray[tuple[()] | tuple[int], np.dtype[T]] = (
             late_bound.resolve_ndarray_with_lossless_cast(
                 self._value,
                 data.shape,
@@ -169,10 +171,14 @@ class SameValueSafeguard(PointwiseSafeguard):
             if isinstance(self._value, Parameter)
             else lossless_cast(self._value, data.dtype, "same safeguard value")
         )
-        valuef_bits = as_bits(valuef)
+        valuef_bits: np.ndarray[
+            tuple[()] | tuple[int], np.dtype[np.unsignedinteger]
+        ] = as_bits(valuef)
 
-        dataf = data.flatten()
-        dataf_bits = as_bits(dataf)
+        dataf: np.ndarray[tuple[int], np.dtype[T]] = data.flatten()
+        dataf_bits: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = as_bits(
+            dataf
+        )
 
         valid = Interval.empty_like(dataf)
 

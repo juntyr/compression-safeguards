@@ -289,8 +289,8 @@ class Safeguards:
                 f"safeguard {safeguard!r} check fails after correction {correction!r} on data {data!r}"
             )
 
-        prediction_bits = as_bits(prediction)
-        correction_bits = as_bits(correction)
+        prediction_bits: np.ndarray[S, np.dtype[C]] = as_bits(prediction)
+        correction_bits: np.ndarray[S, np.dtype[C]] = as_bits(correction)
 
         return prediction_bits - correction_bits
 
@@ -370,8 +370,8 @@ class Safeguards:
 
         assert correction.shape == prediction.shape
 
-        prediction_bits = as_bits(prediction)
-        correction_bits = as_bits(correction)
+        prediction_bits: np.ndarray[S, np.dtype[C]] = as_bits(prediction)
+        correction_bits = correction
 
         corrected = prediction_bits - correction_bits
 
@@ -797,8 +797,12 @@ class Safeguards:
                 f"safeguard {safeguard!r} check fails after correction {correction_chunk!r} on data {data_chunk_!r}"
             )
 
-        prediction_chunk_bits = as_bits(prediction_chunk_)
-        correction_chunk_bits = as_bits(correction_chunk)
+        prediction_chunk_bits: np.ndarray[tuple[int, ...], np.dtype[C]] = as_bits(
+            prediction_chunk_
+        )
+        correction_chunk_bits: np.ndarray[tuple[int, ...], np.dtype[C]] = as_bits(
+            correction_chunk
+        )
 
         return (prediction_chunk_bits - correction_chunk_bits)[
             tuple(non_stencil_indices)

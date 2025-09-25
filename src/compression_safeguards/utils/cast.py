@@ -14,7 +14,6 @@ __all__ = [
 ]
 
 from enum import Enum, auto
-from typing import Any
 
 import numpy as np
 from typing_extensions import assert_never  # MSPV 3.11
@@ -261,30 +260,27 @@ def from_float(
 
 
 def as_bits(
-    a: np.ndarray[S, np.dtype[T]], *, kind: str = "u"
-) -> np.ndarray[S, np.dtype[Any]]:
+    a: np.ndarray[S, np.dtype[T]],
+) -> np.ndarray[S, np.dtype[U]]:
     """
-    Reinterprets the array `a` to its binary representation.
+    Reinterprets the array `a` to its binary unsigned integer representation.
 
     Parameters
     ----------
     a : np.ndarray[S, np.dtype[T]]
         The array to reinterpret as binary.
-    kind : str, optional
-        The kind of binary dtype, e.g. `"u"` or `"i"`.
 
     Returns
     -------
-    binary : np.ndarray[S, np.dtype[Any]]
-        The binary representation of the array `a`.
+    binary : np.ndarray[S, np.dtype[U]]
+        The binary unsigned integer representation of the array `a`.
     """
 
     return a.view(
-        a.dtype.str.replace("f", kind)
-        .replace("i", kind)
-        .replace("u", kind)
+        a.dtype.str.replace("f", "u")
+        .replace("i", "u")
         # numpy_quaddtype currently does not set its kind properly
-        .replace(_float128_dtype.kind, kind)
+        .replace(_float128_dtype.kind, "u")
     )
 
 
