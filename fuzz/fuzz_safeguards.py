@@ -249,6 +249,7 @@ def generate_parameter(
                 # array transpose
                 "transpose": 1,
                 # array operations
+                "size": 1,
                 "sum": 1,
                 "matmul": 2,
                 # finite difference
