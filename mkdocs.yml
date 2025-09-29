@@ -44,7 +44,7 @@ nav:
       - Safeguards on chunked data:
           - xarray-safeguards: examples/chunked.ipynb
       - Preview:
-          - Progressive safeguards: examples/progressive.ipynb
+          - Incremental safeguards: examples/incremental.ipynb
   - Links:
       - GitHub: https://github.com/juntyr/compression-safeguards
       - PyPI:
