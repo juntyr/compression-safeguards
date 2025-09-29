@@ -1,6 +1,6 @@
 # Safe and Fearless lossy compression with `compression-safeguards`
 
-Lossy compression [^1] can be *scary* as valuable information or features of the data may be lost.
+Lossy[^1] compression can be *scary* as valuable information or features of the data may be lost.
 
 By using safeguards to **guarantee** your safety requirements, lossy compression can be applied *safely* and *without fear*.
 
@@ -49,7 +49,9 @@ The safeguards can be adopted easily:
 - any existing (lossy) compressor can be safeguarded, e.g. with the `numcodecs-safeguards` frontend, allowing users to try out different (untrusted) compressors as the safeguards guarantee that the safety requirements are always upheld
 - already compressed data can be safeguarded post-hoc as long as the original uncompressed data still exists, e.g. with the `xarray-safeguards` frontend
 - the safeguards-corrections to the compressed data can be stored inline (alongside the lossy-compressed data, e.g. with the `numcodecs-safeguards` frontend) or outline (e.g. in a separate file, with the `xarray-safeguards` frontend)
-- the safeguards can be combined with other meta-compression approaches, e.g. [progressive data compression and retrieval](https://doi.org/10.48550/arXiv.2308.11759)
+- the safeguards can be combined with other meta-compression approaches, e.g. progressive data compression and retrieval[^2]
+
+[^2]: See [doi:10.1109/TVCG.2023.3327186](https://doi.org/10.1109/TVCG.2023.3327186) for a general meta-compressor approach that allows user to progressively decompress to satisfy a compression error that is user-chosen at decompression time.
 
 
 ### Other terminology used by the compression safeguards
@@ -345,11 +347,11 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
 - *biased corrections*: The `compression-safeguards` do not currently provide a safeguard to guarantee that the compression errors after safeguarding are unbiased. For instance, if a compressor, which produces biased decompressed values that are within the safeguarded error bound, is safeguarded, the biased values are not corrected by the safeguards. Furthermore, the safeguard corrections themselves may introduce bias in the compression error. Please refer to [`error-distribution.ipynb`](examples/error-distribution.ipynb) for some examples. We are working on a bias safeguard that would optionally provide these guarantees.
 
-- *suboptimal corrections*: The `compression-safeguards` sometimes cannot provide optimal and easily compressible corrections. For instance, using a stencil safeguard that spans a local neighbourhood requires the safeguard to conservatively assume that the worst cases from each individual element could accumulate. Since the `compression-safeguards` compute the corrections for all elements simultaneously (instead of incrementally or by testing an initial correction that is repeatedly adjusted if it leads to a violation elsewhere), even a single violation can require conservative corrections for many data elements. We are working on supporting incremental corrections that would be able to use earlier already-corrected data elements to provide better corrections for later elements.
+- *suboptimal one-shot corrections*: The `compression-safeguards` sometimes cannot provide optimal and easily compressible corrections. For instance, using a stencil safeguard that spans a local neighbourhood requires the safeguard to conservatively assume that the worst cases from each individual element could accumulate. Since the `compression-safeguards` compute the corrections for all elements simultaneously (instead of incrementally or by testing an initial correction that is repeatedly adjusted if it leads to a violation elsewhere), even a single violation can require conservative corrections for many data elements. In the future, the `compression-safeguards` API could support computing corrections incrementally such that stencil safeguards could make use of earlier[^3] already-corrected data elements and restrictions imposed by pointwise safeguards to provide better corrections for later elements. If you would like a peek at how safeguards could be applied incrementally, you can have a look at the [`progressive.ipynb`](examples/progressive.ipynb) example.
 
 - *no global safeguards*: The `compression-safeguards` implementation do not currently support global safeguards, such as preserving mean errors or global data distributions. In many cases, it is possible to preserve these properties using stricter pointwise safeguards, at the cost of achieving lower compression ratios. Please refer to the [How to safeguard](#how-to-safeguard) section above for further details and examples.
 
-- *only real data*: The `compression-safeguards` only support data of the following extended[^2] real data types: `uint8`, `int8`, `uint16`, `int16`, `uint32`, `int32`, `uint64`, `int64`, `float16`, `float32`, `float64`. We appreciate contributions for supporting further, e.g. complex, data types.
+- *only real data*: The `compression-safeguards` only support data of the following extended[^4] real data types: `uint8`, `int8`, `uint16`, `int16`, `uint32`, `int32`, `uint64`, `int64`, `float16`, `float32`, `float64`. We appreciate contributions for supporting further, e.g. complex, data types.
 
 - *single variable only*: The `compression-safeguards` do not support multi-variable safeguarding. If several variables should be safeguarded together, e.g. as inputs to a multi-variable quantity of interest, the variables can be stacked along a new dimension and then used as input for a stencil quantity of interest, e.g. as shown in the [`kinetic-energy.ipynb`](examples/kinetic-energy.ipynb) example. Note that compressing stacked variables with different data distributions might require prior normalisation.
 
@@ -357,7 +359,9 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
 - *expensive*: The `compression-safeguards` require substantial computation at compression time, since safety requirements have to be checked, potentially re-established, and then checked again. Safeguarding a quantity of interest can be particularly expensive since rounding errors have to be checked for at every step. However, these extensive checks allow the safeguards to provide hard safety guarantees that users can rely on.
 
-[^2]: The extended real values `-inf` and `+inf` and `NaN` (not a number) are supported for floating-point input data types.
+[^3]: See e.g. Figure 4 in [doi:10.14778/3574245.3574255](https://doi.org/10.14778/3574245.3574255) for inspiration on how incremental safeguard corrections might work.
+
+[^4]: The extended real values `-inf` and `+inf` and `NaN` (not a number) are supported for floating-point input data types.
 
 ## Related Projects
 
