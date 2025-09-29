@@ -93,6 +93,15 @@ class ReportingExpr(Expr[AnyExpr]):
     def has_data(self) -> bool:
         return self._expr.has_data
 
+    @override  # type: ignore
+    def eval_has_data(
+        self,
+        x: PsI,
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> np.ndarray[PsI, np.dtype[np.bool]]:
+        return self._expr.eval_has_data(x, Xs, late_bound)
+
     @override
     def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         fexpr = self._expr.constant_fold(dtype)

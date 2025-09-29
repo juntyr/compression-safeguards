@@ -12,7 +12,11 @@ from typing_extensions import (
     override,  # MSPV 3.12
 )
 
-from ....utils._compat import _maximum_zero_sign_sensitive, _minimum_zero_sign_sensitive
+from ....utils._compat import (
+    _maximum_zero_sign_sensitive,
+    _minimum_zero_sign_sensitive,
+    _zeros,
+)
 from ....utils.bindings import Parameter
 from ..bound import DataBounds, data_bounds_checks, guarantee_data_within_expr_bounds
 from .typing import Es, F, Ns, Ps, PsI
@@ -113,6 +117,28 @@ class Expr(ABC, Generic[Unpack[Es]]):
         args: tuple[AnyExpr, ...] = self.args  # type: ignore
 
         return any(a.has_data for a in args)
+
+    @final
+    def eval_has_data(
+        self,
+        x: PsI,
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> np.ndarray[PsI, np.dtype[np.bool]]:
+        if not self.has_data:
+            return _zeros(x, dtype=np.dtype(np.bool))
+
+        args: tuple[AnyExpr, ...] = self.args  # type: ignore
+
+        match args:
+            case ():
+                return _zeros(x, dtype=np.dtype(np.bool))
+            case _:
+                a, *as_ = args
+                has_data = a.eval_has_data(x, Xs, late_bound)
+                for a in as_:
+                    has_data |= a.eval_has_data(x, Xs, late_bound)
+                return has_data
 
     @final
     @property

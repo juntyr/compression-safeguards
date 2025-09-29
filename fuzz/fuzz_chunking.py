@@ -26,6 +26,7 @@ with atheris.instrument_imports():
     from compression_safeguards.safeguards.stencil.qoi.eb import (
         StencilQuantityOfInterestErrorBoundSafeguard,
     )
+    from compression_safeguards.utils._compat import _ensure_array, _ones
     from compression_safeguards.utils.bindings import Parameter
     from compression_safeguards.utils.typing import S, T
 
@@ -38,12 +39,12 @@ np.set_printoptions(floatmode="unique")
 
 # the fuzzer *somehow* messes up np.nanmin and np.nanmax, so patch them
 def nanmin(x: np.ndarray[S, np.dtype[T]]) -> T:
-    x = np.array(x, copy=None)
+    x = _ensure_array(x)
     if np.all(np.isnan(x)):
         warnings.warn("All-NaN slice encountered", RuntimeWarning)
         return x.dtype.type(np.nan)
     if np.any(np.isnan(x)):
-        x = np.copy(x)
+        x = _ensure_array(x, copy=True)
         x[np.isnan(x)] = np.inf
     return np.amin(x)
 
@@ -52,12 +53,12 @@ np.nanmin = nanmin
 
 
 def nanmax(x: np.ndarray[S, np.dtype[T]]) -> T:
-    x = np.array(x, copy=None)
+    x = _ensure_array(x)
     if np.all(np.isnan(x)):
         warnings.warn("All-NaN slice encountered", RuntimeWarning)
         return x.dtype.type(np.nan)
     if np.any(np.isnan(x)):
-        x = np.copy(x)
+        x = _ensure_array(x, copy=True)
         x[np.isnan(x)] = -np.inf
     return np.amax(x)
 
@@ -222,7 +223,7 @@ def check_one_input(data) -> None:
         return
 
     da = xr.DataArray(raw, name="da", dims=dims)
-    da_prediction = xr.DataArray(np.ones_like(raw), name="da", dims=dims)
+    da_prediction = xr.DataArray(_ones(raw.shape, raw.dtype), name="da", dims=dims)
 
     # xarray-safeguards provides `$x_min` and `$x_max`,
     #  but the compression-safeguards do not

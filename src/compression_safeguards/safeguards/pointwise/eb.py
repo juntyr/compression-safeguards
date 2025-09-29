@@ -10,6 +10,7 @@ from typing import ClassVar
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
+from ...utils._compat import _ensure_array
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import ToFloatMode, as_bits, saturating_finite_float_cast, to_float
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
@@ -149,7 +150,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         same_bits = as_bits(data) == as_bits(decoded)
         both_nan = self._equal_nan and (np.isnan(data) & np.isnan(decoded))
 
-        ok: np.ndarray[S, np.dtype[np.bool]] = np.array(finite_ok, copy=None)  # type: ignore
+        ok: np.ndarray[S, np.dtype[np.bool]] = _ensure_array(finite_ok)
         np.copyto(ok, same_bits, where=~np.isfinite(data), casting="no")
         if self._equal_nan:
             np.copyto(ok, both_nan, where=np.isnan(data), casting="no")

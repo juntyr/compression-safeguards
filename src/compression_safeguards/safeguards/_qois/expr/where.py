@@ -5,6 +5,7 @@ from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _broadcast_to,
+    _ensure_array,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
     _where,
@@ -35,6 +36,21 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
     @override
     def with_args(self, condition: AnyExpr, a: AnyExpr, b: AnyExpr) -> "ScalarWhere":
         return ScalarWhere(condition, a, b)
+
+    @override  # type: ignore
+    def eval_has_data(
+        self,
+        x: PsI,
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> np.ndarray[PsI, np.dtype[np.bool]]:
+        has_data = self._condition.eval_has_data(x, Xs, late_bound)
+        has_data |= _where(
+            self._condition.eval(x, Xs, late_bound) != 0,
+            self._a.eval_has_data(x, Xs, late_bound),
+            self._b.eval_has_data(x, Xs, late_bound),
+        )
+        return has_data
 
     @override
     def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | AnyExpr:
@@ -75,7 +91,7 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
         condv: np.ndarray[Ps, np.dtype[F]] = cond.eval(X.shape, Xs, late_bound)
         condvb_Ps: np.ndarray[Ps, np.dtype[np.bool]] = condv != 0
         condvb_Ns: np.ndarray[Ns, np.dtype[np.bool]] = _broadcast_to(
-            np.array(condvb_Ps, copy=None).reshape(X.shape + (1,) * (Xs.ndim - X.ndim)),
+            _ensure_array(condvb_Ps).reshape(X.shape + (1,) * (Xs.ndim - X.ndim)),
             Xs.shape,
         )
         av = a.eval(X.shape, Xs, late_bound)

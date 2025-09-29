@@ -14,12 +14,11 @@ __all__ = [
 ]
 
 from enum import Enum, auto
-from typing import Any
 
 import numpy as np
 from typing_extensions import assert_never  # MSPV 3.11
 
-from ._compat import _is_of_dtype, _nan_to_zero_inf_to_finite
+from ._compat import _ensure_array, _is_of_dtype, _nan_to_zero_inf_to_finite
 from ._float128 import _float128_dtype
 from .typing import F, S, T, U
 
@@ -231,7 +230,7 @@ def from_float(
         The re-converted array with the original `dtype`.
     """
 
-    x = np.array(x, copy=None)
+    x = _ensure_array(x)
 
     assert np.issubdtype(x.dtype, np.floating) or (x.dtype == _float128_dtype)
 
@@ -251,7 +250,7 @@ def from_float(
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         # lossy cast from floating-point to integer
         # round first with rint (round to nearest, ties to nearest even)
-        converted: np.ndarray[S, np.dtype[T]] = np.array(np.rint(x), copy=None).astype(
+        converted: np.ndarray[S, np.dtype[T]] = _ensure_array(np.rint(x)).astype(
             dtype, casting="unsafe"
         )
         converted[np.greater(x, imax.astype(x.dtype, casting="safe"))] = imax
@@ -261,30 +260,27 @@ def from_float(
 
 
 def as_bits(
-    a: np.ndarray[S, np.dtype[T]], *, kind: str = "u"
-) -> np.ndarray[S, np.dtype[Any]]:
+    a: np.ndarray[S, np.dtype[T]],
+) -> np.ndarray[S, np.dtype[U]]:
     """
-    Reinterprets the array `a` to its binary representation.
+    Reinterprets the array `a` to its binary unsigned integer representation.
 
     Parameters
     ----------
     a : np.ndarray[S, np.dtype[T]]
         The array to reinterpret as binary.
-    kind : str, optional
-        The kind of binary dtype, e.g. `"u"` or `"i"`.
 
     Returns
     -------
-    binary : np.ndarray[S, np.dtype[Any]]
-        The binary representation of the array `a`.
+    binary : np.ndarray[S, np.dtype[U]]
+        The binary unsigned integer representation of the array `a`.
     """
 
     return a.view(
-        a.dtype.str.replace("f", kind)
-        .replace("i", kind)
-        .replace("u", kind)
+        a.dtype.str.replace("f", "u")
+        .replace("i", "u")
         # numpy_quaddtype currently does not set its kind properly
-        .replace(_float128_dtype.kind, kind)
+        .replace(_float128_dtype.kind, "u")
     )
 
 
@@ -433,7 +429,7 @@ def lossless_cast(
 
     # we use unsafe casts here since we later check them for safety
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        xa_to = np.array(xa, copy=None).astype(dtype, casting="unsafe")
+        xa_to = _ensure_array(xa).astype(dtype, casting="unsafe")
         xa_back = xa_to.astype(dtype_from, casting="unsafe")
 
     lossless_same = (xa == xa_back) | (np.isnan(xa) & np.isnan(xa_back))
@@ -488,6 +484,6 @@ def saturating_finite_float_cast(
     # - we cast to float, where under- and overflows saturate to np.inf
     # - we later clamp the values to finite
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        xa_to = np.array(xa, copy=None).astype(dtype, casting="unsafe")
+        xa_to = _ensure_array(xa).astype(dtype, casting="unsafe")
 
     return _nan_to_zero_inf_to_finite(xa_to)

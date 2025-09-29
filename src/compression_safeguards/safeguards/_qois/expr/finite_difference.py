@@ -43,7 +43,7 @@ class ScalarSymmetricModulo(Expr[AnyExpr, AnyExpr]):
             self._a,
             self._b,
             dtype,
-            lambda a, b: _symmetric_modulo(a, b),  # type: ignore
+            lambda a, b: _symmetric_modulo(a, b),
             ScalarSymmetricModulo,
         )
 

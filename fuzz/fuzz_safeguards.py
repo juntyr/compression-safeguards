@@ -26,6 +26,7 @@ with atheris.instrument_imports():
         StencilQuantityOfInterestExpression,
     )
     from compression_safeguards.safeguards.stencil import NeighbourhoodBoundaryAxis
+    from compression_safeguards.utils._compat import _ensure_array
     from compression_safeguards.utils.bindings import Parameter
     from compression_safeguards.utils.typing import S, T
 
@@ -38,12 +39,12 @@ np.set_printoptions(floatmode="unique")
 
 # the fuzzer *somehow* messes up np.nanmin and np.nanmax, so patch them
 def nanmin(x: np.ndarray[S, np.dtype[T]]) -> T:
-    x = np.array(x, copy=None)
+    x = _ensure_array(x)
     if np.all(np.isnan(x)):
         warnings.warn("All-NaN slice encountered", RuntimeWarning)
         return x.dtype.type(np.nan)
     if np.any(np.isnan(x)):
-        x = np.copy(x)
+        x = _ensure_array(x, copy=True)
         x[np.isnan(x)] = np.inf
     return np.amin(x)
 
@@ -52,12 +53,12 @@ np.nanmin = nanmin
 
 
 def nanmax(x: np.ndarray[S, np.dtype[T]]) -> T:
-    x = np.array(x, copy=None)
+    x = _ensure_array(x)
     if np.all(np.isnan(x)):
         warnings.warn("All-NaN slice encountered", RuntimeWarning)
         return x.dtype.type(np.nan)
     if np.any(np.isnan(x)):
-        x = np.copy(x)
+        x = _ensure_array(x, copy=True)
         x[np.isnan(x)] = -np.inf
     return np.amax(x)
 
@@ -83,7 +84,9 @@ class FuzzCodec(Codec, Generic[S, T]):
 
     def decode(self, buf, out=None):
         assert len(buf) == 0
-        return numcodecs.compat.ndarray_copy(np.copy(self.decoded), out)
+        return numcodecs.compat.ndarray_copy(
+            _ensure_array(self.decoded, copy=True), out
+        )
 
     def get_config(self):
         return dict(id=type(self).codec_id, data=self.data, decoded=self.decoded)
@@ -246,6 +249,7 @@ def generate_parameter(
                 # array transpose
                 "transpose": 1,
                 # array operations
+                "size": 1,
                 "sum": 1,
                 "matmul": 2,
                 # finite difference

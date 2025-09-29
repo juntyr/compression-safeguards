@@ -20,6 +20,7 @@ from .safeguards.abc import Safeguard
 from .safeguards.pointwise.abc import PointwiseSafeguard
 from .safeguards.stencil import BoundaryCondition, NeighbourhoodAxis
 from .safeguards.stencil.abc import StencilSafeguard
+from .utils._compat import _ones, _zeros
 from .utils.bindings import Bindings, Parameter, Value
 from .utils.cast import as_bits
 from .utils.intervals import IntervalUnion  # noqa: TC001
@@ -260,7 +261,7 @@ class Safeguards:
                 break
 
         if all_ok:
-            return np.zeros_like(as_bits(data))
+            return _zeros(data.shape, as_bits(data).dtype)
 
         # ensure we don't accidentally forget to handle new kinds of safeguards here
         assert len(self.safeguards) == len(self._pointwise_safeguards) + len(
@@ -288,8 +289,8 @@ class Safeguards:
                 f"safeguard {safeguard!r} check fails after correction {correction!r} on data {data!r}"
             )
 
-        prediction_bits = as_bits(prediction)
-        correction_bits = as_bits(correction)
+        prediction_bits: np.ndarray[S, np.dtype[C]] = as_bits(prediction)
+        correction_bits: np.ndarray[S, np.dtype[C]] = as_bits(correction)
 
         return prediction_bits - correction_bits
 
@@ -369,8 +370,8 @@ class Safeguards:
 
         assert correction.shape == prediction.shape
 
-        prediction_bits = as_bits(prediction)
-        correction_bits = as_bits(correction)
+        prediction_bits: np.ndarray[S, np.dtype[C]] = as_bits(prediction)
+        correction_bits = correction
 
         corrected = prediction_bits - correction_bits
 
@@ -627,7 +628,9 @@ class Safeguards:
             self._stencil_safeguards
         )
 
-        all_ok = np.ones_like(data_chunk_[tuple(non_stencil_indices)], dtype=np.bool)
+        all_ok = _ones(
+            data_chunk_[tuple(non_stencil_indices)].shape, dtype=np.dtype(np.bool)
+        )
 
         # we need to use pointwise checks here so that we can only look at the
         #  non-stencil check results
@@ -730,15 +733,18 @@ class Safeguards:
 
         # if no chunk requires a correction, this one doesn't either
         if not any_chunk_check_failed:
-            return np.zeros_like(as_bits(data_chunk_)[tuple(non_stencil_indices)])
+            return _zeros(
+                data_chunk_[tuple(non_stencil_indices)].shape,
+                as_bits(data_chunk_).dtype,
+            )
 
         safeguard: Safeguard
 
         # if only pointwise safeguards are used, check if we need to correct
         #  this chunk
         if len(self._pointwise_safeguards) == len(self.safeguards):
-            all_ok = np.ones_like(
-                data_chunk_[tuple(non_stencil_indices)], dtype=np.bool
+            all_ok = _ones(
+                data_chunk_[tuple(non_stencil_indices)].shape, dtype=np.dtype(np.bool)
             )
 
             # we need to use pointwise checks here so that we can only look at the
@@ -752,7 +758,10 @@ class Safeguards:
                     break
 
             if np.all(all_ok):
-                return np.zeros_like(as_bits(data_chunk_)[tuple(non_stencil_indices)])
+                return _zeros(
+                    data_chunk_[tuple(non_stencil_indices)].shape,
+                    as_bits(data_chunk_).dtype,
+                )
 
         # otherwise, correct the chunk
         # if stencil safeguards are used, then any chunk needing a correction
@@ -788,8 +797,12 @@ class Safeguards:
                 f"safeguard {safeguard!r} check fails after correction {correction_chunk!r} on data {data_chunk_!r}"
             )
 
-        prediction_chunk_bits = as_bits(prediction_chunk_)
-        correction_chunk_bits = as_bits(correction_chunk)
+        prediction_chunk_bits: np.ndarray[tuple[int, ...], np.dtype[C]] = as_bits(
+            prediction_chunk_
+        )
+        correction_chunk_bits: np.ndarray[tuple[int, ...], np.dtype[C]] = as_bits(
+            correction_chunk
+        )
 
         return (prediction_chunk_bits - correction_chunk_bits)[
             tuple(non_stencil_indices)

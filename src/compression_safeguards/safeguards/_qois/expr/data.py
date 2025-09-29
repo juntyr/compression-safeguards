@@ -4,7 +4,7 @@ from warnings import warn
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import _is_of_shape
+from ....utils._compat import _is_of_shape, _ones
 from ....utils.bindings import Parameter
 from ..bound import DataBounds, data_bounds
 from .abc import AnyExpr, EmptyExpr
@@ -37,6 +37,15 @@ class Data(EmptyExpr):
     @override
     def has_data(self) -> bool:
         return True
+
+    @override  # type: ignore
+    def eval_has_data(
+        self,
+        x: PsI,
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> np.ndarray[PsI, np.dtype[np.bool]]:
+        return _ones(x, dtype=np.dtype(np.bool))
 
     @property  # type: ignore
     @override

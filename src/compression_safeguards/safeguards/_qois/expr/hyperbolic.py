@@ -4,6 +4,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
+    _ensure_array,
     _is_sign_negative_number,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
@@ -170,7 +171,7 @@ class ScalarCosh(Expr[AnyExpr]):
         #  - el <= 1 -> al = -eu, au = eu
         # TODO: an interval union could represent that the two sometimes-
         #       disjoint intervals in the future
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(al, copy=True)
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(al, copy=True)
         np.negative(
             au,
             out=arg_lower,
@@ -178,7 +179,7 @@ class ScalarCosh(Expr[AnyExpr]):
         )
         arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(au, copy=True)
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(au, copy=True)
         np.negative(
             al,
             out=arg_upper,
@@ -465,16 +466,13 @@ class ScalarAcosh(Expr[AnyExpr]):
         # acosh(...) is NaN for values smaller than 1 and can then take any
         #  value smaller than one
         # otherwise ensure that the bounds on acosh(...) are non-negative
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
-            np.cosh(_maximum_zero_sign_sensitive(X.dtype.type(0), expr_lower)),
-            copy=None,
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            np.cosh(_maximum_zero_sign_sensitive(X.dtype.type(0), expr_lower))
         )
         arg_lower[np.less(argv, 1)] = -np.inf
         arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
-            np.cosh(expr_upper), copy=None
-        )
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(np.cosh(expr_upper))
         arg_upper[np.less(argv, 1)] = eps_one
         arg_upper = _maximum_zero_sign_sensitive(argv, arg_upper)
 
@@ -568,16 +566,12 @@ class ScalarAtanh(Expr[AnyExpr]):
         # atanh(...) is NaN when abs(...) > 1 and can then take any value > 1
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
-            np.tanh(expr_lower), copy=None
-        )
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(np.tanh(expr_lower))
         arg_lower[np.greater(argv, 1)] = one_eps
         arg_lower[np.less(argv, -1)] = -np.inf
         arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
-            np.tanh(expr_upper), copy=None
-        )
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(np.tanh(expr_upper))
         arg_upper[np.greater(argv, 1)] = np.inf
         arg_upper[np.less(argv, -1)] = -one_eps
         arg_upper = _maximum_zero_sign_sensitive(argv, arg_upper)

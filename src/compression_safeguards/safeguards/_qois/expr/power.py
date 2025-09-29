@@ -4,6 +4,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
+    _ensure_array,
     _is_sign_negative_number,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
@@ -186,10 +187,10 @@ class ScalarFakeAbs(Expr[AnyExpr]):
         argv = arg.eval(X.shape, Xs, late_bound)
 
         # flip the lower/upper bounds if the arg is negative
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(expr_lower, copy=True)
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(expr_lower, copy=True)
         np.negative(expr_upper, out=arg_lower, where=_is_sign_negative_number(argv))
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(expr_upper, copy=True)
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(expr_upper, copy=True)
         np.negative(expr_lower, out=arg_upper, where=_is_sign_negative_number(argv))
 
         return arg.compute_data_bounds(
@@ -255,10 +256,10 @@ class ForceEquivalent(Expr[AnyExpr]):
         argv = arg.eval(X.shape, Xs, late_bound)
 
         # force the argument bounds if requested
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(expr_lower, copy=True)
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(expr_lower, copy=True)
         np.copyto(arg_lower, argv, where=self._force, casting="no")
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(expr_upper, copy=True)
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(expr_upper, copy=True)
         np.copyto(arg_upper, argv, where=self._force, casting="no")
 
         return arg.compute_data_bounds(

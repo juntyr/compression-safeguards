@@ -562,6 +562,13 @@ class QoIParser(Parser):
             return Array.map(ScalarWhere, p.expr0, p.expr1, p.expr2)
 
     # array operations
+    @_("SIZE LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        self.assert_or_error(
+            isinstance(p.expr, Array), p, "scalar non-array expression has no size"
+        )
+        return Number.from_symbolic_int(p.expr.size)
+
     @_("SUM LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         self.assert_or_error(

@@ -2,7 +2,7 @@
 Commonly used type variables.
 """
 
-__all__ = ["C", "F", "S", "Si", "T", "Ti", "U", "JSON"]
+__all__ = ["C", "F", "Fi", "S", "Si", "T", "Ti", "U", "JSON"]
 
 from typing import TypeAlias, TypeVar
 
@@ -13,6 +13,9 @@ C = TypeVar("C", bound=np.unsignedinteger, covariant=True)
 
 F = TypeVar("F", bound=np.floating, covariant=True)
 """ Any numpy [`floating`][numpy.floating]-point data type (covariant). """
+
+Fi = TypeVar("Fi", bound=np.floating)
+""" Any numpy [`floating`][numpy.floating]-point data type (invariant). """
 
 S = TypeVar("S", bound=tuple[int, ...], covariant=True)
 """ Any array shape (covariant). """

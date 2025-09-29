@@ -11,6 +11,9 @@ __all__ = [
     "_maximum_zero_sign_sensitive",
     "_where",
     "_broadcast_to",
+    "_ensure_array",
+    "_ones",
+    "_zeros",
     "_is_sign_negative_number",
     "_is_negative_zero",
     "_is_sign_positive_number",
@@ -38,7 +41,7 @@ from ._float128 import (
     _float128_smallest_subnormal,
     _float128_type,
 )
-from .typing import F, S, Si, T, Ti
+from .typing import F, Fi, S, Si, T, Ti
 
 
 # reimplementation of np.nan_to_num that also works for numpy_quaddtype and
@@ -47,7 +50,7 @@ from .typing import F, S, Si, T, Ti
 def _nan_to_zero_inf_to_finite(
     a: np.ndarray[S, np.dtype[T]],
 ) -> np.ndarray[S, np.dtype[T]]:
-    out: np.ndarray[S, np.dtype[T]] = np.array(a, copy=True)
+    out: np.ndarray[S, np.dtype[T]] = _ensure_array(a, copy=True)
 
     if out.dtype == _float128_dtype:
         fmin, fmax = _float128_min, _float128_max
@@ -74,8 +77,8 @@ def _nextafter(
     ):
         return np.nextafter(a, b)
 
-    a = np.array(a, copy=None)
-    b = np.array(b, copy=None)
+    a = _ensure_array(a)
+    b = _ensure_array(b)
 
     _float128_incr_subnormal = np.full(a.shape, _float128_smallest_subnormal)
     np.negative(_float128_incr_subnormal, out=_float128_incr_subnormal, where=(a < 0))
@@ -91,11 +94,11 @@ def _nextafter(
     _float128_incr_normal = abs_a_zero_mantissa / (_float128(2) ** 112)
 
     # zero, subnormal, or smallest normal
-    out_subnormal = np.array(np.subtract(a, _float128_incr_subnormal), copy=None)
+    out_subnormal = _ensure_array(np.subtract(a, _float128_incr_subnormal))
     out_subnormal[a == (-_float128_smallest_subnormal)] = -0.0
     np.add(a, _float128_incr_subnormal, out=out_subnormal, where=((a < b) == (a >= 0)))
 
-    out: np.ndarray[S, np.dtype[F]] = np.array(a, copy=True)
+    out: np.ndarray[S, np.dtype[F]] = _ensure_array(a, copy=True)
     # normal
     # note: implementation deviates here since numpy_quaddtype
     #       divides/multiplies with error
@@ -140,11 +143,19 @@ def _nextafter(
 
 
 # wrapper around np.mod(p, q) that guarantees that the result is in [-q/2, q/2]
+@overload
 def _symmetric_modulo(
     p: np.ndarray[S, np.dtype[F]], q: np.ndarray[S, np.dtype[F]]
-) -> np.ndarray[S, np.dtype[F]]:
-    q2: np.ndarray[S, np.dtype[F]] = np.divide(q, 2)
-    out: np.ndarray[S, np.dtype[F]] = np.array(np.add(p, q2), copy=None)
+) -> np.ndarray[S, np.dtype[F]]: ...
+
+
+@overload
+def _symmetric_modulo(p: Fi, q: Fi) -> Fi: ...
+
+
+def _symmetric_modulo(p, q):
+    q2 = np.divide(q, 2)
+    out = _ensure_array(np.add(p, q2))
     np.mod(out, q, out=out)
     np.subtract(out, q2, out=out)
     return out
@@ -170,12 +181,12 @@ def _minimum_zero_sign_sensitive(
 
 
 def _minimum_zero_sign_sensitive(a, b):
-    a = np.array(a, copy=None)
-    b = np.array(b, copy=None)
+    a = _ensure_array(a)
+    b = _ensure_array(b)
     minimum = np.minimum(a, b)
     if np.issubdtype(a.dtype, np.integer) and np.issubdtype(b.dtype, np.integer):
         return minimum
-    minimum_array = np.array(minimum, copy=None)
+    minimum_array = _ensure_array(minimum)
     a = _broadcast_to(
         a.astype(minimum_array.dtype, casting="safe"), minimum_array.shape
     )
@@ -217,12 +228,12 @@ def _maximum_zero_sign_sensitive(
 
 
 def _maximum_zero_sign_sensitive(a, b):
-    a = np.array(a, copy=None)
-    b = np.array(b, copy=None)
+    a = _ensure_array(a)
+    b = _ensure_array(b)
     maximum = np.maximum(a, b)
     if np.issubdtype(a.dtype, np.integer) and np.issubdtype(b.dtype, np.integer):
         return maximum
-    maximum_array = np.array(maximum, copy=None)
+    maximum_array = _ensure_array(maximum)
     a = _broadcast_to(
         a.astype(maximum_array.dtype, casting="safe"), maximum_array.shape
     )
@@ -254,6 +265,14 @@ def _where(
 
 
 @overload
+def _where(
+    cond: np.ndarray[S, np.dtype[np.bool]],
+    a: np.ndarray[S, np.dtype[np.bool]],
+    b: np.ndarray[S, np.dtype[np.bool]],
+) -> np.ndarray[S, np.dtype[np.bool]]: ...
+
+
+@overload
 def _where(cond: bool, a: Ti, b: Ti) -> Ti: ...
 
 
@@ -280,6 +299,51 @@ def _broadcast_to(a: Ti, shape: Si) -> np.ndarray[Si, np.dtype[Ti]]: ...
 
 def _broadcast_to(a, shape):
     return np.broadcast_to(a, shape)
+
+
+# wrapper around np.array(a, copy=(copy=None)) but with better type hints
+@overload
+def _ensure_array(
+    a: np.ndarray[S, np.dtype[T]], copy: None | bool = None
+) -> np.ndarray[S, np.dtype[T]]: ...
+
+
+@overload
+def _ensure_array(
+    a: np.ndarray[S, np.dtype[np.bool]], copy: None | bool = None
+) -> np.ndarray[S, np.dtype[np.bool]]: ...
+
+
+def _ensure_array(a, copy=None):
+    return np.array(a, copy=copy)  # type: ignore
+
+
+# wrapper around np.ones but with better type hints
+@overload
+def _ones(shape: Si, dtype: np.dtype[T]) -> np.ndarray[Si, np.dtype[T]]: ...
+
+
+@overload
+def _ones(shape: Si, dtype: np.dtype[np.bool]) -> np.ndarray[Si, np.dtype[np.bool]]: ...
+
+
+def _ones(shape, dtype):
+    return np.ones(shape, dtype=dtype)
+
+
+# wrapper around np.zeros but with better type hints
+@overload
+def _zeros(shape: Si, dtype: np.dtype[T]) -> np.ndarray[Si, np.dtype[T]]: ...
+
+
+@overload
+def _zeros(
+    shape: Si, dtype: np.dtype[np.bool]
+) -> np.ndarray[Si, np.dtype[np.bool]]: ...
+
+
+def _zeros(shape, dtype):
+    return np.zeros(shape, dtype=dtype)
 
 
 # wrapper around a < 0 that also works for -0.0 (is negative) but excludes NaNs

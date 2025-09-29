@@ -10,6 +10,7 @@ from typing import ClassVar
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
+from ...utils._compat import _ensure_array
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import as_bits, from_total_order, lossless_cast, to_total_order
 from ...utils.intervals import Interval, IntervalUnion, Lower, Maximum, Minimum, Upper
@@ -123,10 +124,12 @@ class SameValueSafeguard(PointwiseSafeguard):
             if isinstance(self._value, Parameter)
             else lossless_cast(self._value, data.dtype, "same safeguard value")
         )
-        value_bits = as_bits(value)
+        value_bits: np.ndarray[tuple[()] | S, np.dtype[np.unsignedinteger]] = as_bits(
+            value
+        )
 
-        data_bits = as_bits(data)
-        decoded_bits = as_bits(decoded)
+        data_bits: np.ndarray[S, np.dtype[np.unsignedinteger]] = as_bits(data)
+        decoded_bits: np.ndarray[S, np.dtype[np.unsignedinteger]] = as_bits(decoded)
 
         if self._exclusive:
             # value if and only if where value
@@ -159,7 +162,7 @@ class SameValueSafeguard(PointwiseSafeguard):
             Union of intervals in which the same value guarantee is upheld.
         """
 
-        valuef = (
+        valuef: np.ndarray[tuple[()] | tuple[int], np.dtype[T]] = (
             late_bound.resolve_ndarray_with_lossless_cast(
                 self._value,
                 data.shape,
@@ -168,10 +171,14 @@ class SameValueSafeguard(PointwiseSafeguard):
             if isinstance(self._value, Parameter)
             else lossless_cast(self._value, data.dtype, "same safeguard value")
         )
-        valuef_bits = as_bits(valuef)
+        valuef_bits: np.ndarray[
+            tuple[()] | tuple[int], np.dtype[np.unsignedinteger]
+        ] = as_bits(valuef)
 
-        dataf = data.flatten()
-        dataf_bits = as_bits(dataf)
+        dataf: np.ndarray[tuple[int], np.dtype[T]] = data.flatten()
+        dataf_bits: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = as_bits(
+            dataf
+        )
 
         valid = Interval.empty_like(dataf)
 
@@ -194,12 +201,8 @@ class SameValueSafeguard(PointwiseSafeguard):
         Lower(valuef) <= valid_below[dataf_bits == valuef_bits] <= Upper(valuef)
 
         with np.errstate(over="ignore", under="ignore"):
-            below_upper = np.array(
-                from_total_order(valuef_total - 1, data.dtype), copy=None
-            )
-            above_lower = np.array(
-                from_total_order(valuef_total + 1, data.dtype), copy=None
-            )
+            below_upper = _ensure_array(from_total_order(valuef_total - 1, data.dtype))
+            above_lower = _ensure_array(from_total_order(valuef_total + 1, data.dtype))
 
         # non-value elements must exclude value from their interval,
         #  leading to a union of two intervals, below and above value

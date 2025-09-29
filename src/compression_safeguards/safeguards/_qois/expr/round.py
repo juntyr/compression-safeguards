@@ -4,6 +4,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
+    _ensure_array,
     _is_negative_zero,
     _is_positive_zero,
     _is_sign_negative_number,
@@ -75,8 +76,8 @@ class ScalarFloor(Expr[AnyExpr]):
         #  to -0.0
         # if expr_upper is +0.0, floor(+0.0) = +0.0, and floor(1-eps) = +0.0
         arg_lower: np.ndarray[Ps, np.dtype[F]] = expr_lower
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
-            _nextafter(expr_upper + 1, expr_upper), copy=None
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            _nextafter(expr_upper + 1, expr_upper)
         )
         arg_upper[_is_negative_zero(expr_upper)] = -0.0
 
@@ -150,8 +151,8 @@ class ScalarCeil(Expr[AnyExpr]):
         # if expr_upper is -0.0, floor(-0.0) = -0.0, there is nothing above
         #  -0.0 for which ceil(...) = -0.0
         # if expr_upper is +0.0, floor(+0.0) = +0.0, only ceil(+0.0) = +0.0
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
-            _nextafter(expr_lower - 1, expr_lower), copy=None
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            _nextafter(expr_lower - 1, expr_lower)
         )
         arg_lower[_is_positive_zero(expr_lower)] = +0.0
         arg_upper: np.ndarray[Ps, np.dtype[F]] = expr_upper
@@ -226,8 +227,8 @@ class ScalarTrunc(Expr[AnyExpr]):
         # if expr_upper is -0.0, floor(-0.0) = -0.0, there is nothing above
         #  -0.0 for which trunc(...) = -0.0
         # if expr_upper is +0.0, floor(+0.0) = +0.0, and trunc(1-eps) = +0.0
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
-            _nextafter(expr_lower - 1, expr_lower), copy=None
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            _nextafter(expr_lower - 1, expr_lower)
         )
         np.copyto(
             arg_lower,
@@ -235,8 +236,8 @@ class ScalarTrunc(Expr[AnyExpr]):
             where=_is_sign_positive_number(expr_lower),
             casting="no",
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
-            _nextafter(expr_upper + 1, expr_upper), copy=None
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            _nextafter(expr_upper + 1, expr_upper)
         )
         np.copyto(
             arg_upper,
@@ -322,12 +323,12 @@ class ScalarRoundTiesEven(Expr[AnyExpr]):
         # if expr_upper is -0.0, floor(-0.0) = -0.0, we need to force arg_upper
         #  to -0.0
         # if expr_upper is +0.0, floor(+0.0) = +0.0, and rint(+0.5) = +0.0
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.array(
-            np.subtract(expr_lower, X.dtype.type(0.5)), copy=None
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            np.subtract(expr_lower, X.dtype.type(0.5))
         )
         arg_lower[_is_positive_zero(expr_lower)] = +0.0
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.array(
-            np.add(expr_upper, X.dtype.type(0.5)), copy=None
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            np.add(expr_upper, X.dtype.type(0.5))
         )
         arg_upper[_is_negative_zero(expr_upper)] = -0.0
 

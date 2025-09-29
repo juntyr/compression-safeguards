@@ -40,15 +40,17 @@ nav:
           - "Neighbourhood: Vorticity": examples/vorticity.ipynb
           - Bounding the dSSIM metric: examples/dssim.ipynb
       - Error bound distributions:
-        - Absolute error bound: examples/error-distribution.ipynb
+          - Absolute error bound: examples/error-distribution.ipynb
       - Safeguards on chunked data:
-        - xarray-safeguards: examples/chunked.ipynb
+          - xarray-safeguards: examples/chunked.ipynb
+      - Preview:
+          - Incremental safeguards: examples/incremental.ipynb
   - Links:
       - GitHub: https://github.com/juntyr/compression-safeguards
       - PyPI:
-        - compression-safeguards: https://pypi.org/project/compression-safeguards/
-        - numcodecs-safeguards: https://pypi.org/project/numcodecs-safeguards/
-        - xarray-safeguards: https://pypi.org/project/xarray-safeguards/
+          - compression-safeguards: https://pypi.org/project/compression-safeguards/
+          - numcodecs-safeguards: https://pypi.org/project/numcodecs-safeguards/
+          - xarray-safeguards: https://pypi.org/project/xarray-safeguards/
 
 plugins:
   - exclude:
