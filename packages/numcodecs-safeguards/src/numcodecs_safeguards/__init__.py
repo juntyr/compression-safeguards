@@ -133,8 +133,8 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         [`numcodecs_combinators.framed.FramedCodecStack`][numcodecs_combinators.framed.FramedCodecStack]
         combinator.
 
-        It is also possible to use *only* the safeguards to encode the data by
-        passing [`numcodecs_zero.ZeroCodec()`][numcodecs_zero.ZeroCodec] or
+        It is also possible to use *only* the safeguards to compress the data
+        by passing [`numcodecs_zero.ZeroCodec()`][numcodecs_zero.ZeroCodec] or
         `dict(id="zero")` to `codec`. The zero codec only encodes the data
         type and shape, not the data values themselves, and decodes to all-
         zeros, forcing the safeguards to correct (almost) all values.
@@ -187,9 +187,9 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
           of the wrapped `codec`. By default, no additional lossless encoding
           is applied.
         - [`Lossless.for_safeguards`][numcodecs_safeguards.lossless.Lossless.for_safeguards]
-          specifies the lossless encoding that is applied to the encoded
-          correction that the safeguards produce. By default, Huffman encoding
-          followed by Zstandard is applied.
+          specifies the lossless encoding that is applied to the corrections
+          that the safeguards produce. By default, Huffman coding followed by
+          Zstandard compression is applied.
 
         The lossless encoding must encode to a 1D buffer of bytes.
     _version : ...

@@ -107,7 +107,7 @@ class AnySafeguard(Safeguard):
     def check(  # type: ignore
         self,
         data: np.ndarray[S, np.dtype[T]],
-        decoded: np.ndarray[S, np.dtype[T]],
+        prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
     ) -> bool:
@@ -118,9 +118,9 @@ class AnySafeguard(Safeguard):
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Data to be encoded.
-        decoded : np.ndarray[S, np.dtype[T]]
-            Decoded data.
+            Original data, relative to which the `prediction` is checked.
+        prediction : np.ndarray[S, np.dtype[T]]
+            Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
@@ -135,7 +135,7 @@ class AnySafeguard(Safeguard):
     def check_pointwise(  # type: ignore
         self,
         data: np.ndarray[S, np.dtype[T]],
-        decoded: np.ndarray[S, np.dtype[T]],
+        prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
@@ -146,9 +146,9 @@ class AnySafeguard(Safeguard):
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Data to be encoded.
-        decoded : np.ndarray[S, np.dtype[T]]
-            Decoded data.
+            Original data, relative to which the `prediction` is checked.
+        prediction : np.ndarray[S, np.dtype[T]]
+            Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
@@ -215,16 +215,16 @@ class _AnySafeguardBase(ABC):
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        decoded: np.ndarray[S, np.dtype[T]],
+        prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         front, *tail = self.safeguards
 
-        ok = front.check_pointwise(data, decoded, late_bound=late_bound)
+        ok = front.check_pointwise(data, prediction, late_bound=late_bound)
 
         for safeguard in tail:
-            ok |= safeguard.check_pointwise(data, decoded, late_bound=late_bound)
+            ok |= safeguard.check_pointwise(data, prediction, late_bound=late_bound)
 
         return ok
 

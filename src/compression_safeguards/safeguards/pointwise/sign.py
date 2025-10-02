@@ -92,20 +92,20 @@ class SignPreservingSafeguard(PointwiseSafeguard):
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        decoded: np.ndarray[S, np.dtype[T]],
+        prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check for which elements in the `decoded` array the signs match the
+        Check for which elements in the `prediction` array the signs match the
         signs of the `data` array elements'.
 
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Data to be encoded.
-        decoded : np.ndarray[S, np.dtype[T]]
-            Decoded data.
+            Original data, relative to which the `prediction` is checked.
+        prediction : np.ndarray[S, np.dtype[T]]
+            Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
@@ -130,12 +130,12 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         # values below (sign=-1) stay below,
         # values above (sign=+1) stay above
         # NaN values keep their sign bit
-        ok: np.ndarray[S, np.dtype[np.bool]] = _ensure_array(decoded == offset)
-        np.less(decoded, offset, out=ok, where=np.less(data, offset))
-        np.greater(decoded, offset, out=ok, where=np.greater(data, offset))
+        ok: np.ndarray[S, np.dtype[np.bool]] = _ensure_array(prediction == offset)
+        np.less(prediction, offset, out=ok, where=np.less(data, offset))
+        np.greater(prediction, offset, out=ok, where=np.greater(data, offset))
         np.copyto(
             ok,
-            np.isnan(decoded) & (np.signbit(data) == np.signbit(decoded)),
+            np.isnan(prediction) & (np.signbit(data) == np.signbit(prediction)),
             where=np.isnan(data),
             casting="no",
         )

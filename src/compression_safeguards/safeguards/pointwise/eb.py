@@ -30,9 +30,10 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
     The `ErrorBoundSafeguard` guarantees that the pointwise error `type` is less than or equal to the provided bound `eb`.
 
     Infinite values are preserved with the same bit pattern. If `equal_nan` is
-    set to [`True`][True], decoding a NaN value to a NaN value with a different
-    bit pattern also satisfies the error bound. If `equal_nan` is set to
-    [`False`][False], NaN values are also preserved with the same bit pattern.
+    set to [`True`][True], correcting a NaN value to a NaN value with a
+    different bit pattern also satisfies the error bound. If `equal_nan` is set
+    to [`False`][False], NaN values are also preserved with the same bit
+    pattern.
 
     The error bound can be verified by casting the data and error bound to a
     sufficiently large floating-point type, selected by
@@ -47,7 +48,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         The value of or late-bound parameter name for the error bound that is
         enforced by this safeguard.
     equal_nan: bool
-        Whether decoding a NaN value to a NaN value with a different bit
+        Whether correcting a NaN value to a NaN value with a different bit
         pattern satisfies the error bound.
     """
 
@@ -98,19 +99,19 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        decoded: np.ndarray[S, np.dtype[T]],
+        prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check which elements in the `decoded` array satisfy the error bound.
+        Check which elements in the `prediction` array satisfy the error bound.
 
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Data to be encoded.
-        decoded : np.ndarray[S, np.dtype[T]]
-            Decoded data.
+            Original data, relative to which the `prediction` is checked.
+        prediction : np.ndarray[S, np.dtype[T]]
+            Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
@@ -124,8 +125,8 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             data.dtype
         )
         data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
-        decoded_float: np.ndarray[S, np.dtype[np.floating]] = to_float(
-            decoded, ftype=ftype
+        prediction_float: np.ndarray[S, np.dtype[np.floating]] = to_float(
+            prediction, ftype=ftype
         )
 
         eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
@@ -142,13 +143,13 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         _check_error_bound(self._type, eb)
 
         finite_ok: np.ndarray[S, np.dtype[np.bool]] = np.less_equal(
-            _compute_finite_absolute_error(self._type, data_float, decoded_float),
+            _compute_finite_absolute_error(self._type, data_float, prediction_float),
             _compute_finite_absolute_error_bound(self._type, eb, data_float),
         )
 
         # bitwise equality for inf and NaNs (unless equal_nan)
-        same_bits = as_bits(data) == as_bits(decoded)
-        both_nan = self._equal_nan and (np.isnan(data) & np.isnan(decoded))
+        same_bits = as_bits(data) == as_bits(prediction)
+        both_nan = self._equal_nan and (np.isnan(data) & np.isnan(prediction))
 
         ok: np.ndarray[S, np.dtype[np.bool]] = _ensure_array(finite_ok)
         np.copyto(ok, same_bits, where=~np.isfinite(data), casting="no")

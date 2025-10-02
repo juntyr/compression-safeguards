@@ -153,42 +153,42 @@ def test_monotonicity():
         )
 
         # test for all possible window combinations
-        for data_window, decoded_window in product(windows, windows):
+        for data_window, prediction_window in product(windows, windows):
             data = windows[data_window]
-            decoded = windows[decoded_window]
+            prediction = windows[prediction_window]
 
             # the constant window needs to adjusted for the weak monotonicities
             #  since the implementation also checks that no overlap with
             #  adjacent elements occurs, which the weak windows have for 1.0
-            if decoded_window == "co" and data_window in ("wi", "wd"):
-                decoded = np.array([1.0, 1, 1])
+            if prediction_window == "co" and data_window in ("wi", "wd"):
+                prediction = np.array([1.0, 1, 1])
 
             # if the window activates the safeguard ...
             if data_window in active_allowed:
                 # the check has to return the expected result
-                assert safeguard.check(data, decoded, late_bound=Bindings.empty()) == (
-                    decoded_window in active_allowed[data_window]
-                )
+                assert safeguard.check(
+                    data, prediction, late_bound=Bindings.empty()
+                ) == (prediction_window in active_allowed[data_window])
 
                 # correcting the data must pass both checks
                 corrected = safeguard.compute_safe_intervals(
                     data, late_bound=Bindings.empty()
-                ).pick(decoded)
+                ).pick(prediction)
                 assert safeguard.check(data, corrected, late_bound=Bindings.empty())
             else:
                 # the window doesn't activate the safeguard so the checks must
                 #  succeed
-                assert safeguard.check(data, decoded, late_bound=Bindings.empty())
+                assert safeguard.check(data, prediction, late_bound=Bindings.empty())
 
                 # the window doesn't activate the safeguard so the corrected
-                #  array should be bit-equivalent to the decoded array
+                #  array should be bit-equivalent to the prediction array
                 assert np.array_equal(
                     as_bits(
                         safeguard.compute_safe_intervals(
                             data, late_bound=Bindings.empty()
-                        ).pick(decoded)
+                        ).pick(prediction)
                     ),
-                    as_bits(decoded),
+                    as_bits(prediction),
                 )
 
 

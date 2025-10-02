@@ -40,9 +40,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
     If the derived quantity of interest for an element evaluates to an infinite
     value, this safeguard guarantees that the quantity of interest on the
-    decoded value produces the exact same infinite value. For a NaN quantity of
-    interest, this safeguard guarantees that the quantity of interest on the
-    decoded value is also NaN, but does not guarantee that it has the same
+    corrected value produces the exact same infinite value. For a NaN quantity
+    of interest, this safeguard guarantees that the quantity of interest on the
+    corrected value is also NaN, but does not guarantee that it has the same
     bit pattern.
 
     The error bound can be verified by evaluating the QoI in the floating-point
@@ -191,20 +191,20 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        decoded: np.ndarray[S, np.dtype[T]],
+        prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check which elements in the `decoded` array satisfy the error bound for
-        the quantity of interest on the `data`.
+        Check which elements in the `prediction` array satisfy the error bound
+        for the quantity of interest on the `data`.
 
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Data to be encoded.
-        decoded : np.ndarray[S, np.dtype[T]]
-            Decoded data.
+            Original data, relative to which the `prediction` is checked.
+        prediction : np.ndarray[S, np.dtype[T]]
+            Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
@@ -227,8 +227,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         }
 
         qoi_data = self._qoi_expr.eval(data_float, late_bound_constants)
-        qoi_decoded = self._qoi_expr.eval(
-            to_float(decoded, ftype=ftype), late_bound_constants
+        qoi_prediction = self._qoi_expr.eval(
+            to_float(prediction, ftype=ftype), late_bound_constants
         )
 
         eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
@@ -245,13 +245,13 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         _check_error_bound(self._type, eb)
 
         finite_ok: np.ndarray[S, np.dtype[np.bool]] = np.less_equal(
-            _compute_finite_absolute_error(self._type, qoi_data, qoi_decoded),
+            _compute_finite_absolute_error(self._type, qoi_data, qoi_prediction),
             _compute_finite_absolute_error_bound(self._type, eb, qoi_data),
         )
 
         ok: np.ndarray[S, np.dtype[np.bool]] = _ensure_array(finite_ok)
-        np.equal(qoi_data, qoi_decoded, out=ok, where=np.isinf(qoi_data))
-        np.isnan(qoi_decoded, out=ok, where=np.isnan(qoi_data))
+        np.equal(qoi_data, qoi_prediction, out=ok, where=np.isinf(qoi_data))
+        np.isnan(qoi_prediction, out=ok, where=np.isnan(qoi_data))
 
         return ok
 

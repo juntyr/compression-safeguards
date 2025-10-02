@@ -125,7 +125,7 @@ class SelectSafeguard(Safeguard):
     def check(  # type: ignore
         self,
         data: np.ndarray[S, np.dtype[T]],
-        decoded: np.ndarray[S, np.dtype[T]],
+        prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
     ) -> bool:
@@ -135,9 +135,9 @@ class SelectSafeguard(Safeguard):
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Data to be encoded.
-        decoded : np.ndarray[S, np.dtype[T]]
-            Decoded data.
+            Original data, relative to which the `prediction` is checked.
+        prediction : np.ndarray[S, np.dtype[T]]
+            Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
@@ -152,7 +152,7 @@ class SelectSafeguard(Safeguard):
     def check_pointwise(  # type: ignore
         self,
         data: np.ndarray[S, np.dtype[T]],
-        decoded: np.ndarray[S, np.dtype[T]],
+        prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
@@ -162,9 +162,9 @@ class SelectSafeguard(Safeguard):
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Data to be encoded.
-        decoded : np.ndarray[S, np.dtype[T]]
-            Decoded data.
+            Original data, relative to which the `prediction` is checked.
+        prediction : np.ndarray[S, np.dtype[T]]
+            Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
@@ -236,7 +236,7 @@ class _SelectSafeguardBase(ABC):
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        decoded: np.ndarray[S, np.dtype[T]],
+        prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
@@ -245,7 +245,7 @@ class _SelectSafeguardBase(ABC):
         )
 
         oks = [
-            safeguard.check_pointwise(data, decoded, late_bound=late_bound)
+            safeguard.check_pointwise(data, prediction, late_bound=late_bound)
             for safeguard in self.safeguards
         ]
 
