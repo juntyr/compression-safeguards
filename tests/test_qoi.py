@@ -1476,3 +1476,25 @@ def test_fuzzer_found_power_nan_excessive_nudging():
 
     assert np.isnan(expr.eval((), np.array(X_lower), dict()))
     assert np.isnan(expr.eval((), np.array(X_upper), dict()))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_asinh_power_excessive_nudging():
+    X = np.array(np.float32(2.52e-43))
+
+    expr = ScalarPower(
+        ScalarAsinh(Data.SCALAR),
+        ScalarFoldedConstant(np.float32(3.2749045e-10)),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float32(0.99999994))
+
+    expr_lower = np.array(np.float32(0.0))
+    expr_upper = np.array(np.float32(0.99999994))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float32(0.0))
+    assert X_upper == np.array(np.float32(2.52e-43))
+
+    assert expr.eval((), X_lower, dict()) == np.array(np.float32(0.0))
+    assert expr.eval((), X_upper, dict()) == np.array(np.float32(0.99999994))
