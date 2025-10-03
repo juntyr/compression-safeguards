@@ -356,6 +356,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
 
         # TODO: handle special-cases, for now be overly cautious
+        # powers of sign-negative numbers are just too tricky, so force av and bv
         force_same: np.ndarray[Ps, np.dtype[np.bool]] = _is_sign_negative_number(av)
         force_same |= av == 0
         force_same |= bv == 0
@@ -366,9 +367,8 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         force_same |= np.isnan(bv)
         np.copyto(a_lower, av, where=force_same, casting="no")
         np.copyto(a_upper, av, where=force_same, casting="no")
-
-        np.copyto(a_lower, av, where=(expr_lower == expr_upper), casting="no")
-        np.copyto(a_upper, av, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(b_lower, bv, where=force_same, casting="no")
+        np.copyto(b_upper, bv, where=force_same, casting="no")
 
         # we need to force av and bv if expr_lower == expr_upper
         # FIXME: only force when there's no allow-any
