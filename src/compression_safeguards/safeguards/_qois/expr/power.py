@@ -5,13 +5,15 @@ from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _ensure_array,
+    _floating_smallest_subnormal,
     _is_sign_negative_number,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
+    _nextafter,
     _where,
 )
 from ....utils.bindings import Parameter
-from ..bound import checked_data_bounds
+from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
 from .divmul import ScalarMultiply
@@ -74,13 +76,207 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        a_const = not self._a.has_data
+        b_const = not self._b.has_data
+        assert not (a_const and b_const), "constant power has no data bounds"
+
         # evaluate a, b, and power(a, b)
         a, b = self._a, self._b
         av = a.eval(X.shape, Xs, late_bound)
         bv = b.eval(X.shape, Xs, late_bound)
         exprv: np.ndarray[Ps, np.dtype[F]] = np.power(av, bv)
 
-        print(self, "og", av, bv, exprv, expr_lower, expr_upper)
+        if a_const:
+            av_log = np.log(av)
+
+            # apply the inverse function to get the bounds on b
+            # if b_lower == bv and bv == -0.0, we need to guarantee that
+            #  b_lower is also -0.0, same for b_upper
+            b_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+                _minimum_zero_sign_sensitive(bv, np.divide(np.log(expr_lower), av_log))
+            )
+            b_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+                _maximum_zero_sign_sensitive(bv, np.divide(np.log(expr_upper), av_log))
+            )
+
+            smallest_subnormal = _floating_smallest_subnormal(X.dtype)
+
+            # 0 ** 0 = 1, so force bv = 0
+            np.copyto(b_lower, bv, where=((av == 0) & (bv == 0)), casting="no")
+            np.copyto(b_upper, bv, where=((av == 0) & (bv == 0)), casting="no")
+            # ... and also ensure that 0 ** (!=0) doesn't become 0 ** 0
+            b_lower[(av == 0) & (bv > 0)] = smallest_subnormal
+            b_upper[(av == 0) & (bv < 0)] = -smallest_subnormal
+
+            # +0 ** (>0) = 0
+            #   so allow all bv with the same sign (-0 is handled later)
+            # +0 ** (<0) = +inf
+            b_lower[(av == 0) & (bv < 0)] = -np.inf
+            b_upper[(av == 0) & (bv > 0)] = np.inf
+
+            # +inf ** 0 = 1, so force bv = 0 (-inf is handled later)
+            np.copyto(b_lower, bv, where=(np.isinf(av) & (bv == 0)), casting="no")
+            np.copyto(b_upper, bv, where=(np.isinf(av) & (bv == 0)), casting="no")
+            # ... and also ensure that +inf ** (!=0) doesn't become +inf ** 0
+            b_lower[np.isinf(av) & (bv > 0)] = smallest_subnormal
+            b_upper[np.isinf(av) & (bv < 0)] = -smallest_subnormal
+
+            # +inf ** (>0) = +inf
+            #   so allow all bv with the same sign (-inf is handled later)
+            # +inf ** (<0) = +0
+            b_lower[np.isinf(av) & (bv < 0)] = -np.inf
+            b_upper[np.isinf(av) & (bv > 0)] = np.inf
+
+            # NaN ** 0 = 1, so force bv = 0
+            np.copyto(b_lower, bv, where=(np.isnan(av) & (bv == 0)), casting="no")
+            np.copyto(b_upper, bv, where=(np.isnan(av) & (bv == 0)), casting="no")
+            # ... and also ensure that NaN ** (!=0) doesn't become NaN ** 0
+            # TODO: an interval union could represent that the two disjoint
+            #       intervals in the future
+            b_lower[np.isnan(av) & (bv > 0)] = smallest_subnormal
+            b_upper[np.isnan(av) & (bv > 0)] = np.inf
+            b_lower[np.isnan(av) & (bv < 0)] = -np.inf
+            b_upper[np.isnan(av) & (bv < 0)] = -smallest_subnormal
+
+            # powers of sign-negative numbers are just too tricky, so force bv
+            np.copyto(b_lower, bv, where=_is_sign_negative_number(av), casting="no")
+            np.copyto(b_upper, bv, where=_is_sign_negative_number(av), casting="no")
+
+            # we need to force bv if expr_lower == expr_upper
+            np.copyto(b_lower, bv, where=(expr_lower == expr_upper), casting="no")
+            np.copyto(b_upper, bv, where=(expr_lower == expr_upper), casting="no")
+
+            # print(self, "ac", av, bv, exprv, expr_lower, expr_upper, b_lower, b_upper)
+
+            # handle rounding errors in power(a, log(..., base=a)) early
+            b_lower = guarantee_arg_within_expr_bounds(
+                lambda b_lower: np.power(av, b_lower),
+                exprv,
+                bv,
+                b_lower,
+                expr_lower,
+                expr_upper,
+            )
+            b_upper = guarantee_arg_within_expr_bounds(
+                lambda b_upper: np.power(av, b_upper),
+                exprv,
+                bv,
+                b_upper,
+                expr_lower,
+                expr_upper,
+            )
+
+            return b.compute_data_bounds(
+                b_lower,
+                b_upper,
+                X,
+                Xs,
+                late_bound,
+            )
+
+        if b_const:
+            # apply the inverse function to get the bounds on a
+            # if a_lower == av and av == -0.0, we need to guarantee that
+            #  a_lower is also -0.0, same for a_upper
+            a_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+                _minimum_zero_sign_sensitive(
+                    av, np.power(expr_lower, np.reciprocal(bv))
+                )
+            )
+            a_upper: np.ndarray[Ps, np.dtype[F]] = _maximum_zero_sign_sensitive(
+                av, np.power(expr_upper, np.reciprocal(bv))
+            )
+
+            smallest_subnormal = _floating_smallest_subnormal(X.dtype)
+
+            # 0 ** 0 = 1, so force av = 0
+            np.copyto(a_lower, bv, where=((av == 0) & (bv == 0)), casting="no")
+            np.copyto(a_upper, bv, where=((av == 0) & (bv == 0)), casting="no")
+            # ... and also ensure that (!=0) ** 0 doesn't become 0 ** 0
+            a_lower[(av > 0) & (bv == 0)] = smallest_subnormal
+            a_upper[(av < 0) & (bv == 0)] = -smallest_subnormal
+
+            # (!=0) ** 0 = 0, so allow all non-zero av,
+            #  simplified to allowing all av with the same sign
+            # TODO: an interval union could represent that the two disjoint
+            #       intervals in the future
+            a_lower[(av < 0) & (bv == 0)] = -np.inf
+            a_upper[(av > 0) & (bv == 0)] = np.inf
+
+            # TODO: handle inf cases
+
+            one_plus_eps = _nextafter(
+                np.array(1, dtype=X.dtype), np.array(2, dtype=X.dtype)
+            )
+            one_minus_eps = _nextafter(
+                np.array(1, dtype=X.dtype), np.array(0, dtype=X.dtype)
+            )
+
+            # 1 ** +-inf = 1, so force av = 1
+            a_lower[(av == 1) & np.isinf(bv)] = 1
+            a_upper[(av == 1) & np.isinf(bv)] = 1
+            # ... and also ensure that (!=1) ** +-inf doesn't become 1 ** +-inf
+            # TODO: an interval union could represent that the two disjoint
+            #       intervals in the future
+            a_lower[(av > 1) & np.isinf(bv)] = one_plus_eps
+            a_upper[(av < 1) & np.isinf(bv)] = one_minus_eps
+
+            # (0<1) ** +inf = +0 (a < 0 is handled later)
+            # (>1) ** +inf = +inf
+            # (0<1) ** -inf = +inf (a < 0 is handled later)
+            # (>1) ** -inf = +0
+            # so allow all av with the same sign relative to 1
+            a_upper[(av > 1) & np.isinf(bv)] = np.inf
+            a_lower[(av < 1) & np.isinf(bv)] = smallest_subnormal
+
+            # 1 ** NaN = 1, so force av = 1
+            a_lower[(av == 1) & np.isnan(bv)] = 1
+            a_upper[(av == 1) & np.isnan(bv)] = 1
+            # ... and also ensure that (!=1) ** NaN doesn't become 1 ** NaN
+            # TODO: an interval union could represent that the two disjoint
+            #       intervals in the future
+            a_lower[(av > 1) & np.isnan(bv)] = one_plus_eps
+            a_upper[(av > 1) & np.isnan(bv)] = np.inf
+            a_lower[(av < 1) & np.isnan(bv)] = -np.inf
+            a_upper[(av < 1) & np.isnan(bv)] = one_minus_eps
+
+            # powers of sign-negative numbers are just too tricky, so force av
+            np.copyto(a_lower, av, where=_is_sign_negative_number(av), casting="no")
+            np.copyto(a_upper, av, where=_is_sign_negative_number(av), casting="no")
+
+            # we need to force av if expr_lower == expr_upper
+            np.copyto(a_lower, av, where=(expr_lower == expr_upper), casting="no")
+            np.copyto(a_upper, av, where=(expr_lower == expr_upper), casting="no")
+
+            # print(self, "bc", av, bv, exprv, expr_lower, expr_upper, a_lower, a_upper)
+
+            # handle rounding errors in power(power(..., 1/b), b) early
+            a_lower = guarantee_arg_within_expr_bounds(
+                lambda a_lower: np.power(a_lower, bv),
+                exprv,
+                av,
+                a_lower,
+                expr_lower,
+                expr_upper,
+            )
+            a_upper = guarantee_arg_within_expr_bounds(
+                lambda a_upper: np.power(a_upper, bv),
+                exprv,
+                av,
+                a_upper,
+                expr_lower,
+                expr_upper,
+            )
+
+            return a.compute_data_bounds(
+                a_lower,
+                a_upper,
+                X,
+                Xs,
+                late_bound,
+            )
+
+        # print(self, "og", av, bv, exprv, expr_lower, expr_upper)
 
         # TODO: handle a^const and const^b more efficiently
 
@@ -128,25 +324,29 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
 
         # ensure that the bounds at least contain the rewritten expression
         #  result
-        expr_lower = _minimum_zero_sign_sensitive(expr_lower, exprv_rewritten)
-        expr_upper = _maximum_zero_sign_sensitive(expr_upper, exprv_rewritten)
+        expr_lower = _ensure_array(
+            _minimum_zero_sign_sensitive(expr_lower, exprv_rewritten)
+        )
+        expr_upper = _ensure_array(
+            _maximum_zero_sign_sensitive(expr_upper, exprv_rewritten)
+        )
 
         # enforce bounds that only contain the rewritten expression value when
         #  we also force a and b to stay the same
         np.copyto(expr_lower, exprv_rewritten, where=force_same, casting="no")
         np.copyto(expr_upper, exprv_rewritten, where=force_same, casting="no")
 
-        print(
-            self,
-            "rw",
-            av,
-            bv,
-            exprv,
-            exprv_rewritten,
-            force_same,
-            expr_lower,
-            expr_upper,
-        )
+        # print(
+        #     self,
+        #     "rw",
+        #     av,
+        #     bv,
+        #     exprv,
+        #     exprv_rewritten,
+        #     force_same,
+        #     expr_lower,
+        #     expr_upper,
+        # )
 
         return rewritten.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 

@@ -75,7 +75,7 @@ class ScalarFloor(Expr[AnyExpr]):
         # if expr_upper is -0.0, floor(-0.0) = -0.0, we need to force arg_upper
         #  to -0.0
         # if expr_upper is +0.0, floor(+0.0) = +0.0, and floor(1-eps) = +0.0
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = expr_lower
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(expr_lower)
         arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
             _nextafter(expr_upper + 1, expr_upper)
         )
@@ -155,7 +155,7 @@ class ScalarCeil(Expr[AnyExpr]):
             _nextafter(expr_lower - 1, expr_lower)
         )
         arg_lower[_is_positive_zero(expr_lower)] = +0.0
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = expr_upper
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(expr_upper)
 
         return arg.compute_data_bounds(
             arg_lower,

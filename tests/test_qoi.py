@@ -1241,10 +1241,10 @@ def test_fuzzer_found_power_excessive_nudging():
     expr_upper = np.array(np.float32(1.979576e14))
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
-    assert X_lower == np.array(np.float32(0.9948097))
+    assert X_lower == np.array(np.float32(0.99480957))
     assert X_upper == np.array(np.float32(13323083.0))
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float32(13323100.0))
+    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float32(13323083.0))
     assert expr.eval((), np.array(X_upper), dict()) == np.array(
         np.float32(197957600000000.0)
     )

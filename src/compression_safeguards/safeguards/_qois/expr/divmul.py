@@ -114,7 +114,7 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
                 term_lower, termv, where=(np.isinf(constv) & (termv == 0)), casting="no"
             )
             term_lower[constv == 0] = -fmax
-            term_lower = _minimum_zero_sign_sensitive(termv, term_lower)
+            term_lower = _ensure_array(_minimum_zero_sign_sensitive(termv, term_lower))
 
             term_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
                 expr_upper, copy=True
@@ -135,7 +135,7 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
                 term_upper, termv, where=(np.isinf(constv) & (termv == 0)), casting="no"
             )
             term_upper[constv == 0] = fmax
-            term_upper = _maximum_zero_sign_sensitive(termv, term_upper)
+            term_upper = _ensure_array(_maximum_zero_sign_sensitive(termv, term_upper))
 
             # we need to force argv if expr_lower == expr_upper and constv is
             #  finite non-zero (in other cases we explicitly expand ranges)
@@ -156,7 +156,7 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            print(self, av, bv, exprv, expr_lower, expr_upper, term_lower, term_upper)
+            # print(self, av, bv, exprv, expr_lower, expr_upper, term_lower, term_upper)
 
             # handle rounding errors in multiply(divide(...)) early
             term_lower = guarantee_arg_within_expr_bounds(
@@ -275,11 +275,11 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
         b_abs_upper[any_nan & ~np.isnan(bv_abs)] = np.inf
 
         # ensure that the bounds on abs(a) and abs(b) include their values
-        a_abs_lower = _minimum_zero_sign_sensitive(av_abs, a_abs_lower)
-        a_abs_upper = _maximum_zero_sign_sensitive(av_abs, a_abs_upper)
+        a_abs_lower = _ensure_array(_minimum_zero_sign_sensitive(av_abs, a_abs_lower))
+        a_abs_upper = _ensure_array(_maximum_zero_sign_sensitive(av_abs, a_abs_upper))
 
-        b_abs_lower = _minimum_zero_sign_sensitive(bv_abs, b_abs_lower)
-        b_abs_upper = _maximum_zero_sign_sensitive(bv_abs, b_abs_upper)
+        b_abs_lower = _ensure_array(_minimum_zero_sign_sensitive(bv_abs, b_abs_lower))
+        b_abs_upper = _ensure_array(_maximum_zero_sign_sensitive(bv_abs, b_abs_upper))
 
         # stack the bounds on a and b so that we can nudge their bounds, if
         #  necessary, together
@@ -517,7 +517,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             )
             term_lower[np.isinf(constv)] = +0.0
             term_lower[np.isinf(constv) & _is_sign_negative_number(termv)] = -fmax
-            term_lower = _minimum_zero_sign_sensitive(termv, term_lower)
+            term_lower = _ensure_array(_minimum_zero_sign_sensitive(termv, term_lower))
 
             term_upper = _ensure_array(expr_lower, copy=True)
             np.copyto(
@@ -537,7 +537,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             )
             term_upper[np.isinf(constv)] = fmax
             term_upper[np.isinf(constv) & _is_sign_negative_number(termv)] = -0.0
-            term_upper = _maximum_zero_sign_sensitive(termv, term_upper)
+            term_upper = _ensure_array(_maximum_zero_sign_sensitive(termv, term_upper))
 
             # we need to force termv if expr_lower == expr_upper
             np.copyto(term_lower, termv, where=(expr_lower == expr_upper), casting="no")
@@ -593,7 +593,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
                 term_lower, termv, where=((constv == 0) & (termv == 0)), casting="no"
             )
             term_lower[np.isinf(constv)] = -fmax
-            term_lower = _minimum_zero_sign_sensitive(termv, term_lower)
+            term_lower = _ensure_array(_minimum_zero_sign_sensitive(termv, term_lower))
 
             term_upper = _ensure_array(expr_upper, copy=True)
             np.copyto(
@@ -612,7 +612,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
                 term_upper, termv, where=((constv == 0) & (termv == 0)), casting="no"
             )
             term_upper[np.isinf(constv)] = fmax
-            term_upper = _maximum_zero_sign_sensitive(termv, term_upper)
+            term_upper = _ensure_array(_maximum_zero_sign_sensitive(termv, term_upper))
 
             # we need to force termv if expr_lower == expr_upper and constv is
             #  finite non-zero (in other cases we explicitly expand ranges)
@@ -749,11 +749,11 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
         b_abs_upper[any_nan & ~np.isnan(bv_abs)] = np.inf
 
         # ensure that the bounds on abs(a) and abs(b) include their values
-        a_abs_lower = _minimum_zero_sign_sensitive(av_abs, a_abs_lower)
-        a_abs_upper = _maximum_zero_sign_sensitive(av_abs, a_abs_upper)
+        a_abs_lower = _ensure_array(_minimum_zero_sign_sensitive(av_abs, a_abs_lower))
+        a_abs_upper = _ensure_array(_maximum_zero_sign_sensitive(av_abs, a_abs_upper))
 
-        b_abs_lower = _minimum_zero_sign_sensitive(bv_abs, b_abs_lower)
-        b_abs_upper = _maximum_zero_sign_sensitive(bv_abs, b_abs_upper)
+        b_abs_lower = _ensure_array(_minimum_zero_sign_sensitive(bv_abs, b_abs_lower))
+        b_abs_upper = _ensure_array(_maximum_zero_sign_sensitive(bv_abs, b_abs_upper))
 
         # stack the bounds on a and b so that we can nudge their bounds, if
         #  necessary, together

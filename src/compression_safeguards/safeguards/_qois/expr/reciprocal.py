@@ -4,6 +4,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
+    _ensure_array,
     _is_sign_negative_number,
     _is_sign_positive_number,
     _maximum_zero_sign_sensitive,
@@ -69,23 +70,23 @@ class ScalarReciprocal(Expr[AnyExpr]):
         # ensure that reciprocal(...) keeps the same sign as arg
         # TODO: an interval union could represent that the two disjoint
         #       intervals in the future
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum_zero_sign_sensitive(
-            expr_upper, X.dtype.type(-0.0)
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            _minimum_zero_sign_sensitive(expr_upper, X.dtype.type(-0.0))
         )
         np.copyto(
             arg_lower, expr_upper, where=_is_sign_positive_number(exprv), casting="no"
         )
-        arg_lower = np.reciprocal(arg_lower)
-        arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
+        np.reciprocal(arg_lower, out=arg_lower)
+        arg_lower = _ensure_array(_minimum_zero_sign_sensitive(argv, arg_lower))
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum_zero_sign_sensitive(
-            X.dtype.type(+0.0), expr_lower
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            _maximum_zero_sign_sensitive(X.dtype.type(+0.0), expr_lower)
         )
         np.copyto(
             arg_upper, expr_lower, where=_is_sign_negative_number(exprv), casting="no"
         )
-        arg_upper = np.reciprocal(arg_upper)
-        arg_upper = _maximum_zero_sign_sensitive(argv, arg_upper)
+        np.reciprocal(arg_upper, out=arg_upper)
+        arg_upper = _ensure_array(_maximum_zero_sign_sensitive(argv, arg_upper))
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")

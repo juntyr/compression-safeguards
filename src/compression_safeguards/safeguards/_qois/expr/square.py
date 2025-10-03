@@ -189,7 +189,7 @@ class ScalarSquare(Expr[AnyExpr]):
             out=arg_lower,
             where=(np.less_equal(expr_lower, 0) | _is_sign_negative_number(argv)),
         )
-        arg_lower = _minimum_zero_sign_sensitive(argv, arg_lower)
+        arg_lower = _ensure_array(_minimum_zero_sign_sensitive(argv, arg_lower))
 
         arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(au, copy=True)
         np.negative(
@@ -197,7 +197,7 @@ class ScalarSquare(Expr[AnyExpr]):
             out=arg_upper,
             where=(np.greater(expr_lower, 0) & _is_sign_negative_number(argv)),
         )
-        arg_upper = _maximum_zero_sign_sensitive(argv, arg_upper)
+        arg_upper = _ensure_array(_maximum_zero_sign_sensitive(argv, arg_upper))
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")

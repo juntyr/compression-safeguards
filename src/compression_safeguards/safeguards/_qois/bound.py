@@ -116,7 +116,7 @@ def guarantee_data_within_expr_bounds(
     assert expr_lower.dtype == Xs.dtype
     assert expr_upper.dtype == Xs.dtype
 
-    print(-1, Xs, exprv, Xs_bound_guess, expr(Xs_bound_guess))
+    # print(-1, Xs, exprv, Xs_bound_guess, expr(Xs_bound_guess))
 
     # check if any derived expression exceeds the expression bounds
     def exceeds_expr_bounds(
@@ -169,7 +169,7 @@ def guarantee_data_within_expr_bounds(
             np.copyto(Xs_bound_guess, Xs, where=(Xs_bound_guess == Xs), casting="no")
             return Xs_bound_guess
 
-        print(_, Xs, exprv, Xs_bound_guess, expr(Xs_bound_guess))
+        # print(_, Xs, exprv, Xs_bound_guess, expr(Xs_bound_guess))
 
         # shove the guess towards the data by exponentially reducing the
         #  difference
