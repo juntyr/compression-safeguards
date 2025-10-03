@@ -127,7 +127,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         interest evaluated on the original data.
 
         If `eb` is a late-bound parameter, its late-bound value must be
-        broadcastable to the shape of the data to be corrected, not the shape
+        broadcastable to the shape of the data to be safeguarded, not the shape
         of the QoI that has been evaluated (even though it is only applied to
         the QoI). The
         [`expand_qoi_to_data_shape`][compression_safeguards.safeguards.stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard.expand_qoi_to_data_shape]
@@ -411,7 +411,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Original data, relative to which the `prediction` is checked.
+            Original data array, relative to which the `prediction` is checked.
         prediction : np.ndarray[S, np.dtype[T]]
             Prediction for the `data` array.
         late_bound : Bindings

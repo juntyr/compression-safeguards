@@ -133,11 +133,16 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         [`numcodecs_combinators.framed.FramedCodecStack`][numcodecs_combinators.framed.FramedCodecStack]
         combinator.
 
-        It is also possible to use *only* the safeguards to compress the data
-        by passing [`numcodecs_zero.ZeroCodec()`][numcodecs_zero.ZeroCodec] or
+        It is also possible to compress the data with *only* the safeguards
+        (i.e. without a `codec` that provides proper lossy compression) by
+        passing [`numcodecs_zero.ZeroCodec()`][numcodecs_zero.ZeroCodec] or
         `dict(id="zero")` to `codec`. The zero codec only encodes the data
         type and shape, not the data values themselves, and decodes to all-
-        zeros, forcing the safeguards to correct (almost) all values.
+        zero values, forcing the safeguards to correct (almost) all values.
+        With this configuration, the safeguards thus act as a safe lossy
+        compressor in their own right, as any size reduction comes from the
+        `lossless` compression of the safeguards corrections (which the
+        safeguards produce to be highly-compressible, if possible).
     safeguards : Collection[dict[str, JSON] | Safeguard]
         The safeguards that will be applied to the codec. They can either be
         passed as a safeguard configuration [`dict`][dict] or an already

@@ -65,7 +65,7 @@ class AssumeAlwaysSafeguard(PointwiseSafeguard):
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Original data, relative to which the `prediction` is checked.
+            Original data array, relative to which the `prediction` is checked.
         prediction : np.ndarray[S, np.dtype[T]]
             Prediction for the `data` array.
         late_bound : Bindings
