@@ -394,6 +394,10 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
                 (t_stack.shape[0],) + exprv.shape,
             )
 
+        exprv = _ensure_array(exprv)
+        expr_lower = _ensure_array(expr_lower)
+        expr_upper = _ensure_array(expr_upper)
+
         tl_stack = guarantee_arg_within_expr_bounds(
             compute_term_power,
             _broadcast_to(

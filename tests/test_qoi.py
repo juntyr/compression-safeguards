@@ -1498,3 +1498,21 @@ def test_fuzzer_found_asinh_power_excessive_nudging():
 
     assert expr.eval((), X_lower, dict()) == np.array(np.float32(0.0))
     assert expr.eval((), X_upper, dict()) == np.array(np.float32(0.99999994))
+
+
+# dtype = dtype('float32')
+# X = array(0., dtype=float32)
+# expr = abs(x) ** -1.7976931344677203e+308
+# exprv = np.float32(inf)
+# expr_lower = array(0., dtype=float32)
+# expr_upper = array(inf, dtype=float32)
+
+# dtype = QuadPrecDType(backend='sleef')
+# X = array(QuadPrecision('0.0e+000', backend='sleef'),
+#       dtype=QuadPrecDType(backend='sleef'))
+# expr = log10(x) ** reciprocal(x)
+# exprv = QuadPrecision('inf', backend='sleef')
+# expr_lower = array(QuadPrecision('0.0e+000', backend='sleef'),
+#       dtype=QuadPrecDType(backend='sleef'))
+# expr_upper = array(QuadPrecision('inf', backend='sleef'),
+#       dtype=QuadPrecDType(backend='sleef'))
