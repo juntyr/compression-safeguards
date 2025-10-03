@@ -9,6 +9,7 @@ with atheris.instrument_imports():
     import numpy as np
     from typing_extensions import override  # MSPV 3.12
 
+    from compression_safeguards.safeguards._qois.bound import DataBounds, data_bounds
     from compression_safeguards.safeguards._qois.expr.abc import AnyExpr, EmptyExpr
     from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
     from compression_safeguards.safeguards._qois.expr.addsub import (
@@ -133,6 +134,7 @@ class ScalarFakeAnyDataConstant(EmptyExpr):
         return _broadcast_to(self._const, x)
 
     @override
+    @data_bounds(DataBounds.infallible)
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],

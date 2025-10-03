@@ -4,9 +4,12 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
+    _broadcast_to,
     _ensure_array,
+    _floating_max,
     _floating_smallest_subnormal,
     _is_sign_negative_number,
+    _is_sign_positive_number,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
     _nextafter,
@@ -16,10 +19,8 @@ from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
-from .divmul import ScalarMultiply
 from .literal import Number
-from .logexp import Exponential, Logarithm, ScalarExp, ScalarLog
-from .typing import F, Fi, Ns, Ps, PsI
+from .typing import F, Ns, Ps, PsI
 
 
 class ScalarPower(Expr[AnyExpr, AnyExpr]):
@@ -68,6 +69,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         )
 
     @override
+    @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[Ps, np.dtype[F]],
@@ -86,16 +88,19 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         bv = b.eval(X.shape, Xs, late_bound)
         exprv: np.ndarray[Ps, np.dtype[F]] = np.power(av, bv)
 
+        b_lower: np.ndarray[Ps, np.dtype[F]]
+        b_upper: np.ndarray[Ps, np.dtype[F]]
+
         if a_const:
             av_log = np.log(av)
 
             # apply the inverse function to get the bounds on b
             # if b_lower == bv and bv == -0.0, we need to guarantee that
             #  b_lower is also -0.0, same for b_upper
-            b_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            b_lower = _ensure_array(
                 _minimum_zero_sign_sensitive(bv, np.divide(np.log(expr_lower), av_log))
             )
-            b_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            b_upper = _ensure_array(
                 _maximum_zero_sign_sensitive(bv, np.divide(np.log(expr_upper), av_log))
             )
 
@@ -174,16 +179,21 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
                 late_bound,
             )
 
+        # TODO: support better bounds if b is a symbolic integer
+
+        a_lower: np.ndarray[Ps, np.dtype[F]]
+        a_upper: np.ndarray[Ps, np.dtype[F]]
+
         if b_const:
             # apply the inverse function to get the bounds on a
             # if a_lower == av and av == -0.0, we need to guarantee that
             #  a_lower is also -0.0, same for a_upper
-            a_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            a_lower = _ensure_array(
                 _minimum_zero_sign_sensitive(
                     av, np.power(expr_lower, np.reciprocal(bv))
                 )
             )
-            a_upper: np.ndarray[Ps, np.dtype[F]] = _maximum_zero_sign_sensitive(
+            a_upper = _maximum_zero_sign_sensitive(
                 av, np.power(expr_upper, np.reciprocal(bv))
             )
 
@@ -276,214 +286,178 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
                 late_bound,
             )
 
-        # print(self, "og", av, bv, exprv, expr_lower, expr_upper)
+        exprv_log = np.log(exprv)
 
-        # TODO: handle a^const and const^b more efficiently
-
-        # we need to full-force-force a and b to stay the same when
-        #  (a) av is negative: powers of negative numbers are just too tricky
-        #  (b) av is NaN and bv is zero: NaN ** 0 = 1 ... why???
-        #      but also for NaN ** b and b != 0 ensure that b doesn't become 0
-        #  (c) av is one and bv is NaN: 1 ** NaN = 1 ... why???
-        #      but also for a ** NaN and a != 1 ensure that a doesn't become 1
-        # for (b) and (c) it easier to force both if isnan(a) or isnan(b), the
-        #  clearer rules could be applied once power no longer uses a rewrite
-        force_same: np.ndarray[Ps, np.dtype[np.bool]] = _is_sign_negative_number(av)
-        # force_same |= np.isnan(av) & (bv == 0)
-        # force_same |= (av == 1) & np.isnan(bv)
-        force_same |= np.isnan(av) | np.isnan(bv)
-
-        # rewrite a ** b as fake_abs(e^(b*ln(fake_abs(a))))
-        # this is mathematically incorrect for a <= 0 but works for deriving
-        #  data bounds since fake_abs handles the data bound flips
-        rewritten = ScalarExp(
-            Exponential.exp,
-            ScalarMultiply(
-                ForceEquivalent(self._b, force_same),
-                ScalarLog(
-                    Logarithm.ln,
-                    ScalarFakeAbs(
-                        ForceEquivalent(self._a, force_same),
-                    ),
-                ),
+        expr_log_lower = _ensure_array(np.log(expr_lower))
+        expr_log_lower[
+            _is_sign_positive_number(exprv_log) & (expr_log_lower <= 0)
+        ] = +0.0
+        expr_log_upper = _ensure_array(np.log(expr_upper))
+        expr_log_upper[
+            _is_sign_negative_number(exprv_log) & (expr_log_upper >= 0)
+        ] = -0.0
+        expr_log_abs_lower, expr_log_abs_upper = (
+            _ensure_array(
+                _where(
+                    _is_sign_negative_number(exprv_log), -expr_log_upper, expr_log_lower
+                )
+            ),
+            _ensure_array(
+                _where(
+                    _is_sign_negative_number(exprv_log), -expr_log_lower, expr_log_upper
+                )
             ),
         )
-        exprv_rewritten = rewritten.eval(X.shape, Xs, late_bound)
 
-        # we also need to full-force-force a and b to stay the same when
-        #  (d) isnan(exprv) != isnan(exprv_rewritten): bail out
-        force_same |= np.isnan(exprv) != np.isnan(exprv_rewritten)
+        av_log = np.log(av)
+        av_log_abs = np.abs(av_log)
+        bv_abs = np.abs(bv)
+        exprv_log_abs: np.ndarray[Ps, np.dtype[F]] = _ensure_array(np.abs(exprv_log))
 
-        # inlined outer ScalarFakeAbs
-        # flip the lower/upper bounds if the result is negative
-        #  since our rewrite below only works with non-negative exprv
-        expr_lower, expr_upper = (
-            _where(_is_sign_negative_number(exprv), -expr_upper, expr_lower),
-            _where(_is_sign_negative_number(exprv), -expr_lower, expr_upper),
+        fmax = _floating_max(X.dtype)
+        smallest_subnormal = _floating_smallest_subnormal(X.dtype)
+
+        expr_log_abs_lower_factor: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            np.divide(exprv_log_abs, expr_log_abs_lower)
+        )
+        expr_log_abs_lower_factor[np.isinf(expr_log_abs_lower_factor)] = fmax
+        np.sqrt(expr_log_abs_lower_factor, out=expr_log_abs_lower_factor)
+        expr_log_abs_lower_factor[np.isnan(expr_log_abs_lower_factor)] = 1
+
+        expr_log_abs_upper_factor: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            np.divide(
+                expr_log_abs_upper,
+                _maximum_zero_sign_sensitive(exprv_log_abs, smallest_subnormal),
+            )
+        )
+        expr_log_abs_upper_factor[np.isinf(expr_log_abs_upper_factor)] = fmax
+        np.sqrt(expr_log_abs_upper_factor, out=expr_log_abs_upper_factor)
+        expr_log_abs_upper_factor[np.isnan(expr_log_abs_upper_factor)] = 1
+
+        a_log_abs_lower = np.divide(av_log_abs, expr_log_abs_lower_factor)
+        a_log_abs_upper = np.multiply(av_log_abs, expr_log_abs_upper_factor)
+
+        b_abs_lower = np.divide(bv_abs, expr_log_abs_lower_factor)
+        b_abs_upper = np.multiply(bv_abs, expr_log_abs_upper_factor)
+
+        a_log_lower: np.ndarray[Ps, np.dtype[F]] = _where(
+            _is_sign_negative_number(av_log), -a_log_abs_upper, a_log_abs_lower
+        )
+        a_log_upper: np.ndarray[Ps, np.dtype[F]] = _where(
+            _is_sign_negative_number(av_log), -a_log_abs_lower, a_log_abs_upper
         )
 
-        # ensure that the bounds at least contain the rewritten expression
-        #  result
-        expr_lower = _ensure_array(
-            _minimum_zero_sign_sensitive(expr_lower, exprv_rewritten)
+        a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, np.exp(a_log_lower)))
+        a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, np.exp(a_log_upper)))
+
+        b_lower = _where(_is_sign_negative_number(bv), -b_abs_upper, b_abs_lower)
+        b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
+        b_upper = _where(_is_sign_negative_number(bv), -b_abs_lower, b_abs_upper)
+        b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
+
+        # TODO: handle special-cases, for now be overly cautious
+        force_same: np.ndarray[Ps, np.dtype[np.bool]] = _is_sign_negative_number(av)
+        force_same |= av == 0
+        force_same |= bv == 0
+        force_same |= av == 1
+        force_same |= np.isinf(av)
+        force_same |= np.isinf(bv)
+        force_same |= np.isnan(av)
+        force_same |= np.isnan(bv)
+        np.copyto(a_lower, av, where=force_same, casting="no")
+        np.copyto(a_upper, av, where=force_same, casting="no")
+
+        np.copyto(a_lower, av, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(a_upper, av, where=(expr_lower == expr_upper), casting="no")
+
+        # we need to force av and bv if expr_lower == expr_upper
+        # FIXME: only force when there's no allow-any
+        np.copyto(a_lower, av, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(a_upper, av, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(b_lower, bv, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(b_upper, bv, where=(expr_lower == expr_upper), casting="no")
+
+        # stack the bounds on a and b so that we can nudge their bounds, if
+        #  necessary, together
+        tl_stack = np.stack([a_lower, b_lower])
+        tu_stack = np.stack([a_upper, b_upper])
+
+        def compute_term_power(
+            t_stack: np.ndarray[tuple[int, ...], np.dtype[F]],
+        ) -> np.ndarray[tuple[int, ...], np.dtype[F]]:
+            total_power: np.ndarray[tuple[int, ...], np.dtype[F]] = np.power(
+                t_stack[0], t_stack[1]
+            )
+
+            return _broadcast_to(
+                _ensure_array(total_power).reshape((1,) + exprv.shape),
+                (t_stack.shape[0],) + exprv.shape,
+            )
+
+        tl_stack = guarantee_arg_within_expr_bounds(
+            compute_term_power,
+            _broadcast_to(
+                exprv.reshape((1,) + exprv.shape),
+                (tl_stack.shape[0],) + exprv.shape,
+            ),
+            np.stack([av, bv]),
+            tl_stack,
+            _broadcast_to(
+                expr_lower.reshape((1,) + exprv.shape),
+                (tl_stack.shape[0],) + exprv.shape,
+            ),
+            _broadcast_to(
+                expr_upper.reshape((1,) + exprv.shape),
+                (tl_stack.shape[0],) + exprv.shape,
+            ),
         )
-        expr_upper = _ensure_array(
-            _maximum_zero_sign_sensitive(expr_upper, exprv_rewritten)
+        tu_stack = guarantee_arg_within_expr_bounds(
+            compute_term_power,
+            _broadcast_to(
+                exprv.reshape((1,) + exprv.shape),
+                (tu_stack.shape[0],) + exprv.shape,
+            ),
+            np.stack([av, bv]),
+            tu_stack,
+            _broadcast_to(
+                expr_lower.reshape((1,) + exprv.shape),
+                (tu_stack.shape[0],) + exprv.shape,
+            ),
+            _broadcast_to(
+                expr_upper.reshape((1,) + exprv.shape),
+                (tu_stack.shape[0],) + exprv.shape,
+            ),
         )
 
-        # enforce bounds that only contain the rewritten expression value when
-        #  we also force a and b to stay the same
-        np.copyto(expr_lower, exprv_rewritten, where=force_same, casting="no")
-        np.copyto(expr_upper, exprv_rewritten, where=force_same, casting="no")
+        a_lower, a_upper = tl_stack[0], tu_stack[0]
+        b_lower, b_upper = tl_stack[1], tu_stack[1]
 
-        # print(
-        #     self,
-        #     "rw",
-        #     av,
-        #     bv,
-        #     exprv,
-        #     exprv_rewritten,
-        #     force_same,
-        #     expr_lower,
-        #     expr_upper,
-        # )
+        # recurse into a and b to propagate their bounds, then combine their
+        #  bounds on Xs
+        Xs_lower, Xs_upper = a.compute_data_bounds(
+            a_lower,
+            a_upper,
+            X,
+            Xs,
+            late_bound,
+        )
 
-        return rewritten.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
+        bl, bu = b.compute_data_bounds(
+            b_lower,
+            b_upper,
+            X,
+            Xs,
+            late_bound,
+        )
+        Xs_lower = _maximum_zero_sign_sensitive(Xs_lower, bl)
+        Xs_upper = _minimum_zero_sign_sensitive(Xs_upper, bu)
+
+        # ensure that the bounds on Xs include Xs
+        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
+        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+
+        return Xs_lower, Xs_upper
 
     @override
     def __repr__(self) -> str:
         return f"{self._a!r} ** {self._b!r}"
-
-
-class ScalarFakeAbs(Expr[AnyExpr]):
-    __slots__: tuple[str, ...] = ("_a",)
-    _a: AnyExpr
-
-    def __init__(self, a: AnyExpr) -> None:
-        self._a = a
-
-    @property
-    @override
-    def args(self) -> tuple[AnyExpr]:
-        return (self._a,)
-
-    @override
-    def with_args(self, a: AnyExpr) -> "ScalarFakeAbs":
-        return ScalarFakeAbs(a)
-
-    @override
-    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
-        return ScalarFoldedConstant.constant_fold_unary(
-            self._a, dtype, np.abs, ScalarFakeAbs
-        )
-
-    @override
-    def eval(
-        self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.abs(self._a.eval(x, Xs, late_bound))
-
-    @checked_data_bounds
-    @override
-    def compute_data_bounds_unchecked(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # evaluate arg
-        arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
-
-        # flip the lower/upper bounds if the arg is negative
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(expr_lower, copy=True)
-        np.negative(expr_upper, out=arg_lower, where=_is_sign_negative_number(argv))
-
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(expr_upper, copy=True)
-        np.negative(expr_lower, out=arg_upper, where=_is_sign_negative_number(argv))
-
-        return arg.compute_data_bounds(
-            arg_lower,
-            arg_upper,
-            X,
-            Xs,
-            late_bound,
-        )
-
-    @override
-    def __repr__(self) -> str:
-        return f"fake_abs({self._a!r})"
-
-
-class ForceEquivalent(Expr[AnyExpr]):
-    __slots__: tuple[str, ...] = ("_a", "_force")
-    _a: AnyExpr
-    _force: np.ndarray[tuple[int, ...], np.dtype[np.bool]]
-
-    def __init__(
-        self, a: AnyExpr, force: np.ndarray[tuple[int, ...], np.dtype[np.bool]]
-    ) -> None:
-        self._a = a
-        self._force = force
-
-    @property
-    @override
-    def args(self) -> tuple[AnyExpr]:
-        return (self._a,)
-
-    @override
-    def with_args(self, a: AnyExpr) -> "ForceEquivalent":
-        return ForceEquivalent(a, self._force)
-
-    @override
-    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | AnyExpr:
-        return ScalarFoldedConstant.constant_fold_unary(
-            self._a, dtype, lambda x: x, lambda a: ForceEquivalent(a, self._force)
-        )
-
-    @override
-    def eval(
-        self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return self._a.eval(x, Xs, late_bound)
-
-    @checked_data_bounds
-    @override
-    def compute_data_bounds_unchecked(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        # evaluate arg
-        arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
-
-        # force the argument bounds if requested
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(expr_lower, copy=True)
-        np.copyto(arg_lower, argv, where=self._force, casting="no")
-
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(expr_upper, copy=True)
-        np.copyto(arg_upper, argv, where=self._force, casting="no")
-
-        return arg.compute_data_bounds(
-            arg_lower,
-            arg_upper,
-            X,
-            Xs,
-            late_bound,
-        )
-
-    @override
-    def __repr__(self) -> str:
-        return f"force_equivalent({self._a!r})"

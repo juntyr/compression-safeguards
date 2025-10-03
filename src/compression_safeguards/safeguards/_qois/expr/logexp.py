@@ -338,6 +338,7 @@ class ScalarLogWithBase(Expr[AnyExpr, AnyExpr]):
             ),
         ).eval(x, Xs, late_bound)
 
+    @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
