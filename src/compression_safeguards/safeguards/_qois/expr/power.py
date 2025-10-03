@@ -88,6 +88,10 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         bv = b.eval(X.shape, Xs, late_bound)
         exprv: np.ndarray[Ps, np.dtype[F]] = np.power(av, bv)
 
+        # we always bail for av < 0, which is the only way to get exprv < 0,
+        #  so we can clamp expr_lower to >= +0.0
+        expr_lower = _maximum_zero_sign_sensitive(X.dtype.type(+0.0), expr_lower)
+
         b_lower: np.ndarray[Ps, np.dtype[F]]
         b_upper: np.ndarray[Ps, np.dtype[F]]
 
