@@ -60,7 +60,7 @@ jobs:
         run: uv sync --all-packages --group test
 
       - name: Run tests
-        run: uv run pytest -v -W error
+        run: uv run pytest -v -W error -v tests/test_qoi.py -k test_fuzzer_found_asinh_power_excessive_nudging --capture no
 
   mypy:
     name: Typecheck

@@ -156,6 +156,8 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
+            print(self, av, bv, exprv, expr_lower, expr_upper, term_lower, term_upper)
+
             # handle rounding errors in multiply(divide(...)) early
             term_lower = guarantee_arg_within_expr_bounds(
                 lambda term_lower: np.multiply(term_lower, constv),

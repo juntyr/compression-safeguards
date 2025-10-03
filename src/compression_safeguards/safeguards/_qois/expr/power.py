@@ -80,6 +80,8 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         bv = b.eval(X.shape, Xs, late_bound)
         exprv: np.ndarray[Ps, np.dtype[F]] = np.power(av, bv)
 
+        print(self, "og", av, bv, exprv, expr_lower, expr_upper)
+
         # TODO: handle a^const and const^b more efficiently
 
         # we need to full-force-force a and b to stay the same when
@@ -133,6 +135,18 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         #  we also force a and b to stay the same
         np.copyto(expr_lower, exprv_rewritten, where=force_same, casting="no")
         np.copyto(expr_upper, exprv_rewritten, where=force_same, casting="no")
+
+        print(
+            self,
+            "rw",
+            av,
+            bv,
+            exprv,
+            exprv_rewritten,
+            force_same,
+            expr_lower,
+            expr_upper,
+        )
 
         return rewritten.compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
 

@@ -380,6 +380,8 @@ class ScalarAsinh(Expr[AnyExpr]):
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
         np.copyto(arg_upper, argv, where=(expr_lower == expr_upper), casting="no")
 
+        print(self, argv, exprv, expr_lower, expr_upper, arg_lower, arg_upper)
+
         # handle rounding errors in asinh(sinh(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
             lambda arg_lower: np.asinh(arg_lower),
