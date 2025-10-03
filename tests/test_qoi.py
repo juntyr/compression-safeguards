@@ -1449,8 +1449,8 @@ def test_fuzzer_found_power_nan_zero_in_bounds():
     expr_upper = np.array(np.float16(np.nan))
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
-    assert X_lower == np.array(np.float16(-15920.0))
-    assert X_upper == np.array(np.float16(-15920.0))
+    assert X_lower == np.array(np.float16(-np.inf))
+    assert X_upper == np.array(np.float16(-6.0e-08))
 
     assert np.isnan(expr.eval((), np.array(X_lower), dict()))
     assert np.isnan(expr.eval((), np.array(X_upper), dict()))
@@ -1471,8 +1471,8 @@ def test_fuzzer_found_power_nan_excessive_nudging():
     expr_upper = np.array(np.float64(np.nan))
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
-    assert X_lower == np.array(np.float64(-1.9794576248699151e-106))
-    assert X_upper == np.array(np.float64(-1.9794576248699151e-106))
+    assert X_lower == np.array(np.float64(-744.4400719213812))
+    assert X_upper == np.array(np.float64(-5.0e-324))
 
     assert np.isnan(expr.eval((), np.array(X_lower), dict()))
     assert np.isnan(expr.eval((), np.array(X_upper), dict()))
@@ -1564,3 +1564,31 @@ def test_fuzzer_found_power_ensure_array():
 
     assert expr.eval((), X_lower, dict()) == np.array(_float128(np.inf))
     assert expr.eval((), X_upper, dict()) == np.array(_float128(np.inf))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_power_lower_bound_clamp():
+    X = np.array(_float128("2.6644362440334694804167e-4944"))
+
+    expr = ScalarPower(
+        ScalarLog(Logarithm.ln, Data.SCALAR),
+        ScalarExp(Exponential.exp10, Data.SCALAR),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(
+        _float128("-1.1383000707268022330514359191511894e+004")
+    )
+
+    expr_lower = np.array(_float128("-1.1383000707268022330514359191511894e+004"))
+    expr_upper = np.array(_float128(0.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(_float128("2.6644362440334694804167e-4944"))
+    assert X_upper == np.array(_float128("2.6644362440334694804167e-4944"))
+
+    assert expr.eval((), X_lower, dict()) == np.array(
+        _float128("-1.1383000707268022330514359191511894e+004")
+    )
+    assert expr.eval((), X_upper, dict()) == np.array(
+        _float128("-1.1383000707268022330514359191511894e+004")
+    )

@@ -89,8 +89,14 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         exprv: np.ndarray[Ps, np.dtype[F]] = np.power(av, bv)
 
         # we always bail for av < 0, which is the only way to get exprv < 0,
-        #  so we can clamp expr_lower to >= +0.0
-        expr_lower = _maximum_zero_sign_sensitive(X.dtype.type(+0.0), expr_lower)
+        #  so we can clamp expr_lower to >= +0.0 if exprv >= +0.0
+        expr_lower = _ensure_array(expr_lower, copy=True)
+        np.copyto(
+            expr_lower,
+            _maximum_zero_sign_sensitive(X.dtype.type(+0.0), expr_lower),
+            where=_is_sign_positive_number(exprv),
+            casting="no",
+        )
 
         b_lower: np.ndarray[Ps, np.dtype[F]]
         b_upper: np.ndarray[Ps, np.dtype[F]]
@@ -216,8 +222,6 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             #       intervals in the future
             a_lower[(av < 0) & (bv == 0)] = -np.inf
             a_upper[(av > 0) & (bv == 0)] = np.inf
-
-            # TODO: handle inf cases
 
             one_plus_eps = _nextafter(
                 np.array(1, dtype=X.dtype), np.array(2, dtype=X.dtype)
@@ -359,27 +363,52 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         b_upper = _where(_is_sign_negative_number(bv), -b_abs_lower, b_abs_upper)
         b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
 
+        # we need to force av and bv if expr_lower == expr_upper
+        np.copyto(a_lower, av, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(a_upper, av, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(b_lower, bv, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(b_upper, bv, where=(expr_lower == expr_upper), casting="no")
+
+        # NaN ** 0 = 1, so force bv = 0 (av will stay NaN)
+        np.copyto(b_lower, bv, where=(np.isnan(av) & (bv == 0)), casting="no")
+        np.copyto(b_upper, bv, where=(np.isnan(av) & (bv == 0)), casting="no")
+        # ... and also ensure that NaN ** (!=0) doesn't become NaN ** 0
+        # TODO: an interval union could represent that the two disjoint
+        #       intervals in the future
+        b_lower[np.isnan(av) & (bv > 0)] = smallest_subnormal
+        b_upper[np.isnan(av) & (bv > 0)] = np.inf
+        b_lower[np.isnan(av) & (bv < 0)] = -np.inf
+        b_upper[np.isnan(av) & (bv < 0)] = -smallest_subnormal
+
+        one_plus_eps = _nextafter(
+            np.array(1, dtype=X.dtype), np.array(2, dtype=X.dtype)
+        )
+        one_minus_eps = _nextafter(
+            np.array(1, dtype=X.dtype), np.array(0, dtype=X.dtype)
+        )
+
+        # 1 ** NaN = 1, so force av = 1 (bv will stay NaN)
+        a_lower[(av == 1) & np.isnan(bv)] = 1
+        a_upper[(av == 1) & np.isnan(bv)] = 1
+        # ... and also ensure that (!=1) ** NaN doesn't become 1 ** NaN
+        # TODO: an interval union could represent that the two disjoint
+        #       intervals in the future
+        a_lower[(av > 1) & np.isnan(bv)] = one_plus_eps
+        a_upper[(av > 1) & np.isnan(bv)] = np.inf
+        a_lower[(av < 1) & np.isnan(bv)] = -np.inf
+        a_upper[(av < 1) & np.isnan(bv)] = one_minus_eps
+
         # TODO: handle special-cases, for now be overly cautious
         # powers of sign-negative numbers are just too tricky, so force av and bv
         force_same: np.ndarray[Ps, np.dtype[np.bool]] = _is_sign_negative_number(av)
         force_same |= av == 0
         force_same |= bv == 0
-        force_same |= av == 1
         force_same |= np.isinf(av)
         force_same |= np.isinf(bv)
-        force_same |= np.isnan(av)
-        force_same |= np.isnan(bv)
         np.copyto(a_lower, av, where=force_same, casting="no")
         np.copyto(a_upper, av, where=force_same, casting="no")
         np.copyto(b_lower, bv, where=force_same, casting="no")
         np.copyto(b_upper, bv, where=force_same, casting="no")
-
-        # we need to force av and bv if expr_lower == expr_upper
-        # FIXME: only force when there's no allow-any
-        np.copyto(a_lower, av, where=(expr_lower == expr_upper), casting="no")
-        np.copyto(a_upper, av, where=(expr_lower == expr_upper), casting="no")
-        np.copyto(b_lower, bv, where=(expr_lower == expr_upper), casting="no")
-        np.copyto(b_upper, bv, where=(expr_lower == expr_upper), casting="no")
 
         # stack the bounds on a and b so that we can nudge their bounds, if
         #  necessary, together
