@@ -237,7 +237,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             # (>1) ** -inf = +0
             # so allow all av with the same sign relative to 1
             a_upper[(av > 1) & np.isinf(bv)] = np.inf
-            a_lower[(av < 1) & np.isinf(bv)] = smallest_subnormal
+            a_lower[(av < 1) & np.isinf(bv)] = +0.0
 
             # 1 ** NaN = 1, so force av = 1
             a_lower[(av == 1) & np.isnan(bv)] = 1

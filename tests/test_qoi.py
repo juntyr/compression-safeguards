@@ -1500,12 +1500,27 @@ def test_fuzzer_found_asinh_power_excessive_nudging():
     assert expr.eval((), X_upper, dict()) == np.array(np.float32(0.99999994))
 
 
-# dtype = dtype('float32')
-# X = array(0., dtype=float32)
-# expr = abs(x) ** -1.7976931344677203e+308
-# exprv = np.float32(inf)
-# expr_lower = array(0., dtype=float32)
-# expr_upper = array(inf, dtype=float32)
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_power_const_exponent_excessive_nudging():
+    X = np.array(np.float32(0.0))
+
+    expr = ScalarPower(
+        ScalarAbs(Data.SCALAR),
+        Number("-1.7976931344677203e+308"),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float32(np.inf))
+
+    expr_lower = np.array(np.float32(0.0))
+    expr_upper = np.array(np.float32(np.inf))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float32(-0.99999994))
+    assert X_upper == np.array(np.float32(0.99999994))
+
+    assert expr.eval((), X_lower, dict()) == np.array(np.float32(np.inf))
+    assert expr.eval((), X_upper, dict()) == np.array(np.float32(np.inf))
+
 
 # dtype = QuadPrecDType(backend='sleef')
 # X = array(QuadPrecision('0.0e+000', backend='sleef'),
@@ -1516,3 +1531,10 @@ def test_fuzzer_found_asinh_power_excessive_nudging():
 #       dtype=QuadPrecDType(backend='sleef'))
 # expr_upper = array(QuadPrecision('inf', backend='sleef'),
 #       dtype=QuadPrecDType(backend='sleef'))
+
+# dtype = dtype('float32')
+# X = array(0., dtype=float32)
+# expr = cos(x) ** ln(x)
+# exprv = np.float32(1.0)
+# expr_lower = array(0., dtype=float32)
+# expr_upper = array(1., dtype=float32)
