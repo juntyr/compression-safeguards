@@ -129,6 +129,10 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             b_lower[(av == 0) & (bv < 0)] = -np.inf
             b_upper[(av == 0) & (bv > 0)] = np.inf
 
+            # 1 ** [-inf, +inf] = 1
+            b_lower[(av == 1)] = -np.inf
+            b_upper[(av == 1)] = np.inf
+
             # +inf ** 0 = 1, so force bv = 0 (-inf is handled later)
             np.copyto(b_lower, bv, where=(np.isinf(av) & (bv == 0)), casting="no")
             np.copyto(b_upper, bv, where=(np.isinf(av) & (bv == 0)), casting="no")
