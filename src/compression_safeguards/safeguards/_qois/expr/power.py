@@ -463,10 +463,10 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         # TODO: handle special-cases, for now be overly cautious
         # powers of sign-negative numbers are just too tricky, so force av and bv
         force_same: np.ndarray[Ps, np.dtype[np.bool]] = _is_sign_negative_number(av)
-        force_same |= av == 0
-        force_same |= bv == 0
-        force_same |= np.isinf(av)
-        force_same |= np.isinf(bv)
+        # force_same |= av == 0
+        # force_same |= bv == 0
+        # force_same |= np.isinf(av)
+        # force_same |= np.isinf(bv)
         np.copyto(a_lower, av, where=force_same, casting="no")
         np.copyto(a_upper, av, where=force_same, casting="no")
         np.copyto(b_lower, bv, where=force_same, casting="no")
