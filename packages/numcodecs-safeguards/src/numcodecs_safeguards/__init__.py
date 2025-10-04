@@ -133,7 +133,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         [`numcodecs_combinators.framed.FramedCodecStack`][numcodecs_combinators.framed.FramedCodecStack]
         combinator.
 
-        It is also possible to compress the data with *only* the safeguards
+        It is also possible to compress the data with *just* the safeguards
         (i.e. without a `codec` that provides proper lossy compression) by
         passing [`numcodecs_zero.ZeroCodec()`][numcodecs_zero.ZeroCodec] or
         `dict(id="zero")` to `codec`. The zero codec only encodes the data

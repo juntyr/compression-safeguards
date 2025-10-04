@@ -165,8 +165,6 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             np.copyto(b_lower, bv, where=(expr_lower == expr_upper), casting="no")
             np.copyto(b_upper, bv, where=(expr_lower == expr_upper), casting="no")
 
-            # print(self, "ac", av, bv, exprv, expr_lower, expr_upper, b_lower, b_upper)
-
             # handle rounding errors in power(a, log(..., base=a)) early
             b_lower = guarantee_arg_within_expr_bounds(
                 lambda b_lower: np.power(av, b_lower),
@@ -270,8 +268,6 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             np.copyto(a_lower, av, where=(expr_lower == expr_upper), casting="no")
             np.copyto(a_upper, av, where=(expr_lower == expr_upper), casting="no")
 
-            # print(self, "bc", av, bv, exprv, expr_lower, expr_upper, a_lower, a_upper)
-
             # handle rounding errors in power(power(..., 1/b), b) early
             a_lower = guarantee_arg_within_expr_bounds(
                 lambda a_lower: np.power(a_lower, bv),
@@ -305,16 +301,16 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             np.array(1, dtype=X.dtype), np.array(0, dtype=X.dtype)
         )
 
-        # our method never allows <1 vs =1 vs >1 to be crossed since the sign
-        #  in the exp isn't crossed
-        # so, if exprv = 1,
-        #  - if av = 1, force av and allow any bv
-        #  - if bv = 0, force bv and allow any av ???
-        #  - otherwise force both
-        # otherwise adjust the error bounds to stay on the same side of 1
-
         expr_upper = _ensure_array(expr_upper, copy=True)
 
+        # our method never allows exprv <1 vs =1 vs >1 to be crossed
+        #  (we partition the data bound based on |a|**b = exp(b * ln(|a|)) and
+        #   cannot cross <0> in the product of b * ln(|a|))
+        # so, if exprv = 1,
+        #  - if av = 1, force av = 1 and allow any bv
+        #  - if bv = 0, force bv = 0 and allow any av
+        #  - otherwise force both by setting expr_lower = expr_upper = 1
+        # otherwise adjust the error bounds to stay on the same side of 1
         np.copyto(
             expr_lower,
             _maximum_zero_sign_sensitive(one_plus_eps, expr_lower),
@@ -327,7 +323,6 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             where=(((av >= 0) & (av < 1) & (bv > 0)) | (av > 1) & (bv < 0)),
             casting="no",
         )
-
         expr_lower[exprv == 1] = 1
         expr_upper[exprv == 1] = 1
 
@@ -354,18 +349,6 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             ),
         )
 
-        # print(
-        #     av,
-        #     bv,
-        #     exprv,
-        #     expr_lower,
-        #     expr_upper,
-        #     expr_log_lower,
-        #     expr_log_upper,
-        #     expr_log_abs_lower,
-        #     expr_log_upper,
-        # )
-
         av_log = np.log(av)
         av_log_abs = np.abs(av_log)
         bv_abs = np.abs(bv)
@@ -381,8 +364,6 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         np.sqrt(expr_log_abs_lower_factor, out=expr_log_abs_lower_factor)
         expr_log_abs_lower_factor[np.isnan(expr_log_abs_lower_factor)] = 1
 
-        # print(exprv_log_abs, expr_log_abs_lower, expr_log_abs_lower_factor)
-
         expr_log_abs_upper_factor: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
             np.divide(
                 expr_log_abs_upper,
@@ -393,17 +374,11 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         np.sqrt(expr_log_abs_upper_factor, out=expr_log_abs_upper_factor)
         expr_log_abs_upper_factor[np.isnan(expr_log_abs_upper_factor)] = 1
 
-        # print(exprv_log_abs, expr_log_abs_upper, expr_log_abs_upper_factor)
-
         a_log_abs_lower = np.divide(av_log_abs, expr_log_abs_lower_factor)
         a_log_abs_upper = np.multiply(av_log_abs, expr_log_abs_upper_factor)
 
-        # print(av, av_log, av_log_abs, a_log_abs_lower, a_log_abs_upper)
-
         b_abs_lower = np.divide(bv_abs, expr_log_abs_lower_factor)
         b_abs_upper = np.multiply(bv_abs, expr_log_abs_upper_factor)
-
-        # print(bv, bv_abs, b_abs_lower, b_abs_upper)
 
         a_log_lower: np.ndarray[Ps, np.dtype[F]] = _where(
             _is_sign_negative_number(av_log), -a_log_abs_upper, a_log_abs_lower
@@ -460,19 +435,11 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         a_lower[(av < 1) & np.isnan(bv)] = -np.inf
         a_upper[(av < 1) & np.isnan(bv)] = one_minus_eps
 
-        # TODO: handle special-cases, for now be overly cautious
         # powers of sign-negative numbers are just too tricky, so force av and bv
-        force_same: np.ndarray[Ps, np.dtype[np.bool]] = _is_sign_negative_number(av)
-        # force_same |= av == 0
-        # force_same |= bv == 0
-        # force_same |= np.isinf(av)
-        # force_same |= np.isinf(bv)
-        np.copyto(a_lower, av, where=force_same, casting="no")
-        np.copyto(a_upper, av, where=force_same, casting="no")
-        np.copyto(b_lower, bv, where=force_same, casting="no")
-        np.copyto(b_upper, bv, where=force_same, casting="no")
-
-        # print(a_lower, a_upper, b_lower, b_upper)
+        np.copyto(a_lower, av, where=_is_sign_negative_number(av), casting="no")
+        np.copyto(a_upper, av, where=_is_sign_negative_number(av), casting="no")
+        np.copyto(b_lower, bv, where=_is_sign_negative_number(av), casting="no")
+        np.copyto(b_upper, bv, where=_is_sign_negative_number(av), casting="no")
 
         # flip a bounds if bv < 0; flip b bounds if av < 1
         # - av < 1 -> av ** b_lower >= av ** b_upper -> flip b bounds
@@ -495,8 +462,6 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         #  necessary, together
         tl_stack = np.stack([a_lower, b_lower])
         tu_stack = np.stack([a_upper, b_upper])
-
-        # print(self, av, bv, exprv, tl_stack, tu_stack)
 
         def compute_term_power(
             t_stack: np.ndarray[tuple[int, ...], np.dtype[F]],

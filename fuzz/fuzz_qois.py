@@ -120,8 +120,7 @@ class ScalarFakeAnyDataConstant(EmptyExpr):
 
     @override
     def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
-        assert isinstance(self._const, dtype.type)
-        return self._const
+        return self
 
     @override
     def eval(

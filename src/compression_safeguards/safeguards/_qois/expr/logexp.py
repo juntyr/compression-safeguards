@@ -106,8 +106,6 @@ class ScalarLog(Expr[AnyExpr]):
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
         np.copyto(arg_upper, argv, where=(expr_lower == expr_upper), casting="no")
 
-        # print(self, argv, exprv, expr_lower, expr_upper, arg_lower, arg_upper)
-
         # handle rounding errors in log(exp(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
             lambda arg_lower: (LOGARITHM_UFUNC[self._log])(arg_lower),
@@ -226,8 +224,6 @@ class ScalarExp(Expr[AnyExpr]):
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
         np.copyto(arg_upper, argv, where=(expr_lower == expr_upper), casting="no")
-
-        # print(self, argv, exprv, expr_lower, expr_upper, arg_lower, arg_upper)
 
         # handle rounding errors in exp(log(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
