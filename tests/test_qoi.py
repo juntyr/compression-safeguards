@@ -1592,3 +1592,25 @@ def test_fuzzer_found_power_lower_bound_clamp():
     assert expr.eval((), X_upper, dict()) == np.array(
         _float128("-1.1383000707268022330514359191511894e+004")
     )
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_power_guaranteed_bounds():
+    X = np.array(np.float16(0.01643))
+
+    expr = ScalarPower(
+        ScalarTan(Data.SCALAR),
+        ScalarExp(Exponential.exp, Data.SCALAR),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float16(0.01535))
+
+    expr_lower = np.array(np.float16(0.01535))
+    expr_upper = np.array(np.float16(0.04236))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float16(0.01643))
+    assert X_upper == np.array(np.float16(0.01646))
+
+    assert expr.eval((), X_lower, dict()) == np.array(np.float16(0.01535))
+    assert expr.eval((), X_upper, dict()) == np.array(np.float16(0.01538))

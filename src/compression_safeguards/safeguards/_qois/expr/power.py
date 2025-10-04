@@ -216,7 +216,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             a_lower[(av > 0) & (bv == 0)] = smallest_subnormal
             a_upper[(av < 0) & (bv == 0)] = -smallest_subnormal
 
-            # (!=0) ** 0 = 0, so allow all non-zero av,
+            # (!=0) ** 0 = 1, so allow all non-zero av,
             #  simplified to allowing all av with the same sign
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
@@ -410,6 +410,23 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         np.copyto(b_lower, bv, where=force_same, casting="no")
         np.copyto(b_upper, bv, where=force_same, casting="no")
 
+        # flip a bounds if bv < 0; flip b bounds if av < 1
+        # - av < 1 -> av ** b_lower >= av ** b_upper -> flip b bounds
+        # - av < 1 & bv < 0 -> a_lower ** bv >= a_upper ** bv -> flip a bounds
+        # - av < 1 & bv > 0 -> a_lower ** bv <= a_upper ** bv
+        # - av > 1 -> av ** b_lower <= av ** b_upper
+        # - av > 1 & bv < 0 -> a_lower ** bv >= a_upper ** bv -> flip a bounds
+        # - av > 1 & bv > 0 -> a_lower ** bv <= a_upper ** bv
+        # so that the below nudging works with the worst case combinations
+        a_lower, a_upper = (
+            _where(np.less(bv, 0), a_upper, a_lower),
+            _where(np.less(bv, 0), a_lower, a_upper),
+        )
+        b_lower, b_upper = (
+            _where(np.less(av, 1), b_upper, b_lower),
+            _where(np.less(av, 1), b_lower, b_upper),
+        )
+
         # stack the bounds on a and b so that we can nudge their bounds, if
         #  necessary, together
         tl_stack = np.stack([a_lower, b_lower])
@@ -466,8 +483,15 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             ),
         )
 
-        a_lower, a_upper = tl_stack[0], tu_stack[0]
-        b_lower, b_upper = tl_stack[1], tu_stack[1]
+        # extract the bounds for a and b and undo any earlier flips
+        a_lower, a_upper = (
+            _where(np.less(bv, 0), tu_stack[0], tl_stack[0]),
+            _where(np.less(bv, 0), tl_stack[0], tu_stack[0]),
+        )
+        b_lower, b_upper = (
+            _where(np.less(av, 1), tu_stack[1], tl_stack[1]),
+            _where(np.less(av, 1), tl_stack[1], tu_stack[1]),
+        )
 
         # recurse into a and b to propagate their bounds, then combine their
         #  bounds on Xs
