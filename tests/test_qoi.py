@@ -1636,3 +1636,25 @@ def test_fuzzer_found_power_one_ln():
 
     assert expr.eval((), X_lower, dict()) == np.array(np.float16(1.0))
     assert expr.eval((), X_upper, dict()) == np.array(np.float16(1.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_power_abs_abs_excessive_nudging():
+    X = np.array(np.float64(-1.2682853192147052e-30))
+
+    expr = ScalarPower(
+        ScalarAbs(Data.SCALAR),
+        ScalarAbs(Data.SCALAR),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float64(1.0))
+
+    expr_lower = np.array(np.float64(1.0))
+    expr_upper = np.array(np.float64(4.4417230418076605e291))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float64(-1.2682853192147052e-30))
+    assert X_upper == np.array(np.float64(-1.2682853192147052e-30))
+
+    assert expr.eval((), X_lower, dict()) == np.array(np.float64(1.0))
+    assert expr.eval((), X_upper, dict()) == np.array(np.float64(1.0))
