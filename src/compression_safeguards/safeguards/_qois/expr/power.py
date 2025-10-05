@@ -295,7 +295,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
 
         expr_upper = _ensure_array(expr_upper, copy=True)
 
-        # if neither a nor b is const, we need to split the data bound,
+        # if neither a nor b is const, we need to split the data bound, and
         #  we use that, symbolically, a ** b = exp( b * ln(a) ) for a > 0
         # for av = +-0.0, we keep av the same and handle the cases for bv
         # powers of negative numbers are just too tricky, in general, e.g. can
