@@ -4,13 +4,11 @@ from timeoutcontext import timeout
 with atheris.instrument_imports():
     import sys
     import warnings
-    from collections.abc import Callable, Mapping
+    from collections.abc import Callable
 
     import numpy as np
-    from typing_extensions import override  # MSPV 3.12
 
-    from compression_safeguards.safeguards._qois.bound import DataBounds, data_bounds
-    from compression_safeguards.safeguards._qois.expr.abc import AnyExpr, EmptyExpr
+    from compression_safeguards.safeguards._qois.expr.abc import AnyExpr
     from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
     from compression_safeguards.safeguards._qois.expr.addsub import (
         ScalarAdd,
@@ -24,7 +22,10 @@ with atheris.instrument_imports():
     from compression_safeguards.safeguards._qois.expr.constfold import (
         ScalarFoldedConstant,
     )
-    from compression_safeguards.safeguards._qois.expr.data import Data
+    from compression_safeguards.safeguards._qois.expr.data import (
+        Data,
+        ScalarAnyDataConstant,
+    )
     from compression_safeguards.safeguards._qois.expr.divmul import (
         ScalarDivide,
         ScalarMultiply,
@@ -68,100 +69,27 @@ with atheris.instrument_imports():
         ScalarSin,
         ScalarTan,
     )
-    from compression_safeguards.safeguards._qois.expr.typing import F, Ns, Ps, PsI
     from compression_safeguards.safeguards._qois.expr.where import ScalarWhere
     from compression_safeguards.utils._compat import (
-        _broadcast_to,
         _maximum_zero_sign_sensitive,
         _minimum_zero_sign_sensitive,
-        _ones,
     )
     from compression_safeguards.utils._float128 import _float128_dtype
-    from compression_safeguards.utils.bindings import Parameter
-    from compression_safeguards.utils.typing import T
+    from compression_safeguards.utils.typing import S, T, U
 
 
-# scalar constant that tricks the QoIs by pretending to be data
-# this is useful to allow the fuzzer to produce specific data-like values
-class ScalarFakeAnyDataConstant(EmptyExpr):
-    __slots__: tuple[str, ...] = ("_const",)
-    _const: np.number
+def as_bits(
+    a: np.ndarray[S, np.dtype[T]],
+) -> np.ndarray[S, np.dtype[U]]:
+    a = np.array(a, copy=None)
 
-    def __init__(self, const: np.number) -> None:
-        self._const = const
+    kind = "V" if a.dtype == _float128_dtype else "u"
 
-    @property
-    @override
-    def args(self) -> tuple[()]:
-        return ()
-
-    @override
-    def with_args(self) -> "ScalarFakeAnyDataConstant":
-        return ScalarFakeAnyDataConstant(self._const)
-
-    @property  # type: ignore
-    @override
-    def has_data(self) -> bool:
-        return True
-
-    @override  # type: ignore
-    def eval_has_data(
-        self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[np.bool]]:
-        return _ones(x, dtype=np.dtype(np.bool))
-
-    @property  # type: ignore
-    @override
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return frozenset()
-
-    @override
-    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
-        return self
-
-    @override
-    def eval(
-        self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        assert isinstance(self._const, Xs.dtype.type)
-        return _broadcast_to(self._const, x)
-
-    @override
-    @data_bounds(DataBounds.infallible)
-    def compute_data_bounds_unchecked(
-        self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        assert isinstance(self._const, Xs.dtype.type)
-
-        assert np.all((expr_lower <= self._const) | np.isnan(self._const)), (
-            "data lower bounds are above the fake data constant"
-        )
-        assert np.all((expr_upper >= self._const) | np.isnan(self._const)), (
-            "data upper bounds are below the fake data constant"
-        )
-
-        Xs_lower: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(-np.inf))
-        Xs_lower[np.isnan(Xs)] = np.nan
-
-        Xs_upper: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(np.inf))
-        Xs_upper[np.isnan(Xs)] = np.nan
-
-        return Xs_lower, Xs_upper
-
-    @override
-    def __repr__(self) -> str:
-        return f"fake_data({self._const!r})"
+    return a.view(
+        a.dtype.str.replace("f", kind)
+        # numpy_quaddtype currently does not set its kind properly
+        .replace(_float128_dtype.kind, kind)
+    )
 
 
 def ConsumeDtypeElement(data, dtype: np.dtype[T]) -> T:
@@ -185,7 +113,7 @@ NULLARY_EXPRESSIONS: list[
     lambda data, dtype: Number(f"{data.ConsumeInt(4)}"),
     lambda data, dtype: Number(f"{data.ConsumeFloat()}"),
     lambda data, dtype: ScalarFoldedConstant(ConsumeDtypeElement(data, dtype)),
-    lambda data, dtype: ScalarFakeAnyDataConstant(ConsumeDtypeElement(data, dtype)),
+    lambda data, dtype: ScalarAnyDataConstant(ConsumeDtypeElement(data, dtype)),
     lambda data, dtype: Data.SCALAR,
 ]
 UNARY_EXPRESSIONS: list[Callable[[AnyExpr], AnyExpr]] = [
@@ -358,11 +286,11 @@ def check_one_input(data) -> None:
             + "\n".join(
                 [
                     f"dtype = {dtype!r}",
-                    f"X = {X!r}",
+                    f"X = {X!r} ({as_bits(X)})",
                     f"expr = {expr!r}",
-                    f"exprv = {exprv!r}",
-                    f"expr_lower = {expr_lower!r}",
-                    f"expr_upper = {expr_upper!r}",
+                    f"exprv = {exprv!r} ({as_bits(exprv)})",
+                    f"expr_lower = {expr_lower!r} ({as_bits(expr_lower)})",
+                    f"expr_upper = {expr_upper!r} ({as_bits(expr_upper)})",
                 ]
             )
             + "\n\n===\n"
@@ -430,17 +358,17 @@ def check_one_input(data) -> None:
             + "\n".join(
                 [
                     f"dtype = {dtype!r}",
-                    f"X = {X!r}",
+                    f"X = {X!r} ({as_bits(X)})",
                     f"expr = {expr!r}",
-                    f"exprv = {exprv!r}",
-                    f"expr_lower = {expr_lower!r}",
-                    f"expr_upper = {expr_upper!r}",
-                    f"X_lower = {X_lower!r}",
-                    f"X_upper = {X_upper!r}",
-                    f"exprv_X_lower = {exprv_X_lower!r}",
-                    f"exprv_X_upper = {exprv_X_upper!r}",
-                    f"X_test = {X_test!r}",
-                    f"exprv_X_test = {exprv_X_test!r}",
+                    f"exprv = {exprv!r} ({as_bits(exprv)})",
+                    f"expr_lower = {expr_lower!r} ({as_bits(expr_lower)})",
+                    f"expr_upper = {expr_upper!r} ({as_bits(expr_upper)})",
+                    f"X_lower = {X_lower!r} ({as_bits(X_lower)})",
+                    f"X_upper = {X_upper!r} ({as_bits(X_upper)})",
+                    f"exprv_X_lower = {exprv_X_lower!r} ({as_bits(exprv_X_lower)})",
+                    f"exprv_X_upper = {exprv_X_upper!r} ({as_bits(exprv_X_upper)})",
+                    f"X_test = {X_test!r} ({as_bits(X_test)})",
+                    f"exprv_X_test = {exprv_X_test!r} ({as_bits(exprv_X_test)})",
                 ]
             )
             + "\n\n===\n"

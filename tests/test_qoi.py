@@ -1700,8 +1700,8 @@ def test_fuzzer_found_power_tanh_acos_excessive_nudging():
     expr_upper = np.array(np.float32(1.9024737e-38))
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
-    assert X_lower == np.array(np.float32(4.18e-43))
-    assert X_upper == np.array(np.float32(4.18e-43))
+    assert X_lower == np.array(np.float32(0.0))
+    assert X_upper == np.array(np.float32(1.2555627e-32))
 
     assert expr.eval((), X_lower, dict()) == np.array(np.float32(0.0))
     assert expr.eval((), X_upper, dict()) == np.array(np.float32(0.0))

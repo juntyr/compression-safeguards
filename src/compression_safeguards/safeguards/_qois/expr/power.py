@@ -8,6 +8,8 @@ from ....utils._compat import (
     _ensure_array,
     _floating_max,
     _floating_smallest_subnormal,
+    _is_negative_zero,
+    _is_positive_zero,
     _is_sign_negative_number,
     _is_sign_positive_number,
     _maximum_zero_sign_sensitive,
@@ -88,10 +90,11 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         bv = b.eval(X.shape, Xs, late_bound)
         exprv: np.ndarray[Ps, np.dtype[F]] = np.power(av, bv)
 
-        # powers of sign-negative numbers are just too tricky, so we just force
-        #  av and bv to remain the same if av <= -0.0
+        # powers of negative numbers are just too tricky, so we just force
+        #  av and bv to remain the same if av < 0 and handle av = 0 by cases
         # powers of sign-positive numbers cannot produce sign-negative numbers,
         #  so clamp expr_lower to >= +0.0 if av >= +0.0
+        # TODO: when optimising for a ** int, this clamping should be disabled
         expr_lower = _ensure_array(expr_lower, copy=True)
         expr_lower[_is_sign_positive_number(av) & (expr_lower <= 0)] = +0.0
 
@@ -118,18 +121,22 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             smallest_subnormal = _floating_smallest_subnormal(X.dtype)
 
             # handle 0 ** bv
-            # - 0 ** 0 = 1 -> discontinuous, force bv = +-0
-            # - 0 ** (>0) = 0 -> allow any bv > 0
-            # - 0 ** (<0) = -inf -> allow any bv < 0
+            # - +-0 ** +-0 = 1 -> discontinuous, force bv = +-0
+            # - +0 ** (>0) = +0 -> allow any bv > 0
+            # - +0 ** (<0) = -inf -> allow any bv < 0
+            # - -0 ** (>0) = +-0 -> too tricky, just keep both av and bv the same
+            # - -0 ** (<0) = +-inf -> too tricky, just keep both av and bv the same
+            np.copyto(b_lower, bv, where=_is_negative_zero(av), casting="no")
+            np.copyto(b_upper, bv, where=_is_negative_zero(av), casting="no")
             b_lower[(av == 0) & (bv == 0)] = -0.0
             b_upper[(av == 0) & (bv == 0)] = +0.0
-            b_lower[(av == 0) & (bv > 0)] = smallest_subnormal
-            b_upper[(av == 0) & (bv > 0)] = np.inf
-            b_lower[(av == 0) & (bv < 0)] = -np.inf
-            b_upper[(av == 0) & (bv < 0)] = -smallest_subnormal
+            b_lower[_is_positive_zero(av) & (bv > 0)] = smallest_subnormal
+            b_upper[_is_positive_zero(av) & (bv > 0)] = np.inf
+            b_lower[_is_positive_zero(av) & (bv < 0)] = -np.inf
+            b_upper[_is_positive_zero(av) & (bv < 0)] = -smallest_subnormal
 
             # handle +inf ** bv
-            # - +inf ** 0 = 1 -> discontinuous, force bv = +-0
+            # - +inf ** +-0 = 1 -> discontinuous, force bv = +-0
             # - +inf ** (>0) = +inf -> allow any bv > 0
             # - +inf ** (<0) = +0 -> allow any bv < 0
             b_lower[np.isinf(av) & (bv == 0)] = -0.0
@@ -140,7 +147,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             b_upper[np.isinf(av) & (bv < 0)] = -smallest_subnormal
 
             # handle NaN ** bv
-            # - NaN ** 0 = 1 -> discontinous, force bv = +-0
+            # - NaN ** +-0 = 1 -> discontinuous, force bv = +-0
             # - NaN ** (<0>) = NaN -> allow any bv != 0
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
@@ -155,9 +162,9 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             b_lower[(av == 1)] = -np.inf
             b_upper[(av == 1)] = np.inf
 
-            # powers of sign-negative numbers are just too tricky, so force bv
-            np.copyto(b_lower, bv, where=_is_sign_negative_number(av), casting="no")
-            np.copyto(b_upper, bv, where=_is_sign_negative_number(av), casting="no")
+            # powers of negative numbers are just too tricky, so force bv
+            np.copyto(b_lower, bv, where=(av < 0), casting="no")
+            np.copyto(b_upper, bv, where=(av < 0), casting="no")
 
             # handle rounding errors in power(a, log(..., base=a)) early
             b_lower = guarantee_arg_within_expr_bounds(
@@ -207,7 +214,12 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             np.copyto(a_lower, av, where=(expr_lower == expr_upper), casting="no")
             np.copyto(a_upper, av, where=(expr_lower == expr_upper), casting="no")
 
-            # [-NaN, -inf, +inf, +NaN] ** 0 = 1 -> allow any av
+            # handle +-0 ** bv -> keep av the same
+            #  special-cases are optimised below
+            np.copyto(a_lower, av, where=(av == 0), casting="no")
+            np.copyto(a_upper, av, where=(av == 0), casting="no")
+
+            # [-NaN, -inf, +inf, +NaN] ** +-0 = 1 -> allow any av
             a_lower[(bv == 0)] = -np.inf
             a_upper[(bv == 0)] = np.inf
 
@@ -219,21 +231,21 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             )
 
             # handle av ** +-inf
-            # - 1 ** +-inf = 1 -> discontinous, force av = 1
-            # - (0<1) ** +inf = +0 -> allow any +0 <= av < 1
+            # - 1 ** +-inf = 1 -> discontinuous, force av = 1
+            # - (+-0<1) ** +inf = +0 -> allow any -0.0 <= av < 1
             # - (>1) ** +inf = +inf -> allow any av > 1
-            # - (0<1) ** -inf = +inf -> allow any +0 <= av < 1
+            # - (+-0<1) ** -inf = +inf -> allow any -0.0 <= av < 1
             # - (>1) ** -inf = +0 -> allow any av > 1
             # 1 ** +-inf = 1, so force av = 1
             a_lower[(av == 1) & np.isinf(bv)] = 1
             a_upper[(av == 1) & np.isinf(bv)] = 1
             a_lower[(av > 1) & np.isinf(bv)] = one_plus_eps
             a_upper[(av > 1) & np.isinf(bv)] = np.inf
-            a_lower[(av < 1) & np.isinf(bv)] = +0.0
+            a_lower[(av < 1) & np.isinf(bv)] = -0.0
             a_upper[(av < 1) & np.isinf(bv)] = one_minus_eps
 
             # handle av ** NaN
-            # - 1 ** NaN = 1 -> discontinous, force av = 1
+            # - 1 ** NaN = 1 -> discontinuous, force av = 1
             # - (<1>) ** NaN = NaN -> allow any av != 1
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
@@ -244,9 +256,9 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             a_lower[(av < 1) & np.isnan(bv)] = -np.inf
             a_upper[(av < 1) & np.isnan(bv)] = one_minus_eps
 
-            # powers of sign-negative numbers are just too tricky, so force av
-            np.copyto(a_lower, av, where=_is_sign_negative_number(av), casting="no")
-            np.copyto(a_upper, av, where=_is_sign_negative_number(av), casting="no")
+            # powers of negative numbers are just too tricky, so force av
+            np.copyto(a_lower, av, where=(av < 0), casting="no")
+            np.copyto(a_upper, av, where=(av < 0), casting="no")
 
             # handle rounding errors in power(power(..., 1/b), b) early
             a_lower = guarantee_arg_within_expr_bounds(
@@ -283,14 +295,23 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
 
         expr_upper = _ensure_array(expr_upper, copy=True)
 
-        # our method never allows exprv <1 vs =1 vs >1 to be crossed
-        #  (we partition the data bound based on |a|**b = exp(b * ln(|a|)) and
-        #   cannot cross <0> in the product of b * ln(|a|))
-        # so, if exprv = 1,
-        #  - if av = 1, force av = 1 and allow any bv
-        #  - if bv = 0, force bv = 0 and allow any av
-        #  - otherwise force both by setting expr_lower = expr_upper = 1
-        # otherwise adjust the error bounds to stay on the same side of 1
+        # if neither a nor b is const, we need to split the data bound,
+        #  we use that, symbolically, a ** b = exp( b * ln(a) ) for a > 0
+        # for av = +-0.0, we keep av the same and handle the cases for bv
+        # powers of negative numbers are just too tricky, in general, e.g. can
+        #  change sign or suddenly become NaN with negative exponents, so we
+        #  just force av and bv to remain the same if av < 0
+        # since we know how to derive data bounds for exp and ln and how to
+        #  split the data bound for a multiplication, we can combine their
+        #  derivations to split the data bound on a ** b into bounds on a and b
+        # after the split, we check if our rewrite-based derivation works in
+        #  practice by checking against the original power(a, b) function
+        # in the data bound split for multiplication, the sign of the two terms
+        #  ln(a) and b is kept the same to keep the sign of the product the
+        #  same, meaning the sign of b and a <1 vs =1 vs >1 have to remain the
+        #  same as well
+        # exprv <1 vs =1 vs >1 is thus enforced to remain the same, and we can
+        #  adjust the expr bounds to reflect that
         expr_lower[exprv == 1] = 1
         expr_upper[exprv == 1] = 1
         expr_lower[_is_sign_positive_number(av) & (exprv > 1) & (expr_lower <= 1)] = (
@@ -303,6 +324,12 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         exprv_log = np.log(exprv)
         expr_log_lower = np.log(expr_lower)
         expr_log_upper = np.log(expr_upper)
+
+        # we simplify the data bounds split for ln(a) * b by not allowing the
+        #  sign of ln(a) * b to change
+        # we further simplify the code by working with
+        #  abs(ln(a) * b) = abs(ln(a)) * abs(b)
+        # and only taking the sign of ln(a) and b into account after the split
         expr_log_abs_lower, expr_log_abs_upper = (
             _where(
                 _is_sign_negative_number(exprv_log), -expr_log_upper, expr_log_lower
@@ -315,53 +342,71 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         av_log = np.log(av)
         av_log_abs = np.abs(av_log)
         bv_abs = np.abs(bv)
-        exprv_log_abs: np.ndarray[Ps, np.dtype[F]] = _ensure_array(np.abs(exprv_log))
+
+        # we use |ln(a)| * |b| here instead of |ln(a ** b)| since the former
+        #  behaves better when a**b is rounded to zero but a != 0
+        # in particular, the latter would start with ln(0) = -inf, while the
+        #  former can work with finite logarithm results
+        exprv_log_abs = np.multiply(av_log_abs, bv_abs)
 
         fmax = _floating_max(X.dtype)
         smallest_subnormal = _floating_smallest_subnormal(X.dtype)
 
+        # we are given l <= e <= u, which we translate into e/lf <= e <= e*uf
+        # - if the factor is infinite, we limit it to fmax
+        # - if the factor is NaN, e.g. from 0/0, we set the factor to 1
+        # finally we split the factor geometrically in two using the sqrt
         expr_log_abs_lower_factor: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
             np.divide(exprv_log_abs, expr_log_abs_lower)
         )
         expr_log_abs_lower_factor[np.isinf(expr_log_abs_lower_factor)] = fmax
         np.sqrt(expr_log_abs_lower_factor, out=expr_log_abs_lower_factor)
         expr_log_abs_lower_factor[np.isnan(expr_log_abs_lower_factor)] = 1
-        
+
         expr_log_abs_upper_factor: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
             np.divide(
                 expr_log_abs_upper,
+                # we avoid division by zero here
+                # - if exprv_log_abs = 0 and expr_log_abs_upper = 0, factor = 0 works
+                # - if exprv_log_abs = 0 and expr_log_abs_upper > 0, factor is large
+                # - if exprv_log_abs > 0 and expr_log_abs_upper > 0, works as normal
                 _maximum_zero_sign_sensitive(exprv_log_abs, smallest_subnormal),
             )
         )
         expr_log_abs_upper_factor[np.isinf(expr_log_abs_upper_factor)] = fmax
         np.sqrt(expr_log_abs_upper_factor, out=expr_log_abs_upper_factor)
         expr_log_abs_upper_factor[np.isnan(expr_log_abs_upper_factor)] = 1
-        
+
+        # TODO: for infinite ln(a) * b that includes finite bounds, allow them
+
+        # compute the bounds for abs(ln(a)) and abs(b)
         a_log_abs_lower = np.divide(av_log_abs, expr_log_abs_lower_factor)
         a_log_abs_upper = np.multiply(av_log_abs, expr_log_abs_upper_factor)
 
         b_abs_lower = np.divide(bv_abs, expr_log_abs_lower_factor)
         b_abs_upper = np.multiply(bv_abs, expr_log_abs_upper_factor)
-        
+
+        # derive the bounds on ln(a) and b based on the bounds on abs(ln(a))
+        #  and abs(b), and on a based on ln(a)
         a_log_lower: np.ndarray[Ps, np.dtype[F]] = _where(
             _is_sign_negative_number(av_log), -a_log_abs_upper, a_log_abs_lower
         )
         a_log_upper: np.ndarray[Ps, np.dtype[F]] = _where(
             _is_sign_negative_number(av_log), -a_log_abs_lower, a_log_abs_upper
         )
-        
+
         # if a_lower == av and av == -0.0, we need to guarantee
         #  that a_lower is also -0.0, same for a_upper
         a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, np.exp(a_log_lower)))
         a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, np.exp(a_log_upper)))
-        
+
         # if b_lower == bv and bv == -0.0, we need to guarantee
         #  that b_lower is also -0.0, same for b_upper
         b_lower = _where(_is_sign_negative_number(bv), -b_abs_upper, b_abs_lower)
         b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
         b_upper = _where(_is_sign_negative_number(bv), -b_abs_lower, b_abs_upper)
         b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
-        
+
         # we need to force av and bv if expr_lower == expr_upper
         np.copyto(a_lower, av, where=(expr_lower == expr_upper), casting="no")
         np.copyto(a_upper, av, where=(expr_lower == expr_upper), casting="no")
@@ -382,6 +427,25 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         a_lower[(av < 1) & np.isnan(bv)] = -np.inf
         a_upper[(av < 1) & np.isnan(bv)] = one_minus_eps
 
+        # handle 0 ** bv
+        # - +-0 ** +-0 = 1 -> discontinuous, force av = +-0 and bv = +-0
+        # - +0 ** (>0) = +0 -> allow any bv > 0
+        # - +0 ** (<0) = -inf -> allow any bv < 0
+        # - -0 ** (>0) = +-0 -> too tricky, just keep both av and bv the same
+        # - -0 ** (<0) = +-inf -> too tricky, just keep both av and bv the same
+        np.copyto(a_lower, av, where=_is_negative_zero(av), casting="no")
+        np.copyto(a_upper, av, where=_is_negative_zero(av), casting="no")
+        np.copyto(b_lower, bv, where=_is_negative_zero(av), casting="no")
+        np.copyto(b_upper, bv, where=_is_negative_zero(av), casting="no")
+        a_lower[(av == 0) & (bv == 0)] = -0.0
+        a_upper[(av == 0) & (bv == 0)] = +0.0
+        b_lower[(av == 0) & (bv == 0)] = -0.0
+        b_upper[(av == 0) & (bv == 0)] = +0.0
+        b_lower[_is_positive_zero(av) & (bv > 0)] = smallest_subnormal
+        b_upper[_is_positive_zero(av) & (bv > 0)] = np.inf
+        b_lower[_is_positive_zero(av) & (bv < 0)] = -np.inf
+        b_upper[_is_positive_zero(av) & (bv < 0)] = -smallest_subnormal
+
         # [-NaN, -inf, +inf, +NaN] ** +-0 = 1 -> so force bv = +-0 and allow
         #  any av
         a_lower[bv == 0] = -np.inf
@@ -396,18 +460,12 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         b_upper[np.isnan(av) & (bv > 0)] = np.inf
         b_lower[np.isnan(av) & (bv < 0)] = -np.inf
         b_upper[np.isnan(av) & (bv < 0)] = -smallest_subnormal
-        
-        # powers that result in zero are just too tricky, so force av and bv
-        np.copyto(a_lower, av, where=(exprv == 0), casting="no")
-        np.copyto(a_upper, av, where=(exprv == 0), casting="no")
-        np.copyto(b_lower, bv, where=(exprv == 0), casting="no")
-        np.copyto(b_upper, bv, where=(exprv == 0), casting="no")
 
-        # powers of sign-negative numbers are just too tricky, so force av and bv
-        np.copyto(a_lower, av, where=_is_sign_negative_number(av), casting="no")
-        np.copyto(a_upper, av, where=_is_sign_negative_number(av), casting="no")
-        np.copyto(b_lower, bv, where=_is_sign_negative_number(av), casting="no")
-        np.copyto(b_upper, bv, where=_is_sign_negative_number(av), casting="no")
+        # powers of negative numbers are just too tricky, so force av and bv
+        np.copyto(a_lower, av, where=(av < 0), casting="no")
+        np.copyto(a_upper, av, where=(av < 0), casting="no")
+        np.copyto(b_lower, bv, where=(av < 0), casting="no")
+        np.copyto(b_upper, bv, where=(av < 0), casting="no")
 
         # flip a bounds if bv < 0; flip b bounds if av < 1
         # - av < 1 -> av ** b_lower >= av ** b_upper -> flip b bounds

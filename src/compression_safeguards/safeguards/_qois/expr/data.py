@@ -4,7 +4,7 @@ from warnings import warn
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import _is_of_shape, _ones
+from ....utils._compat import _broadcast_to, _is_of_shape, _ones
 from ....utils.bindings import Parameter
 from ..bound import DataBounds, data_bounds
 from .abc import AnyExpr, EmptyExpr
@@ -192,3 +192,86 @@ class LateBoundConstant(EmptyExpr):
         if self._index == ():
             return f'c["{self._name}"]'
         return f'C["{self._name}"][{",".join(str(i) for i in self._index)}]'
+
+
+# scalar constant that tricks the QoIs by pretending to be data,
+# which is useful for tests and fuzzing to produce specific data-like values
+class ScalarAnyDataConstant(EmptyExpr):
+    __slots__: tuple[str, ...] = ("_const",)
+    _const: np.number
+
+    def __init__(self, const: np.number) -> None:
+        self._const = const
+
+    @property
+    @override
+    def args(self) -> tuple[()]:
+        return ()
+
+    @override
+    def with_args(self) -> "ScalarAnyDataConstant":
+        return ScalarAnyDataConstant(self._const)
+
+    @property  # type: ignore
+    @override
+    def has_data(self) -> bool:
+        return True
+
+    @override  # type: ignore
+    def eval_has_data(
+        self,
+        x: PsI,
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> np.ndarray[PsI, np.dtype[np.bool]]:
+        return _ones(x, dtype=np.dtype(np.bool))
+
+    @property  # type: ignore
+    @override
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        return frozenset()
+
+    @override
+    def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
+        return self
+
+    @override
+    def eval(
+        self,
+        x: PsI,
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> np.ndarray[PsI, np.dtype[F]]:
+        assert isinstance(self._const, Xs.dtype.type)
+        return _broadcast_to(self._const, x)
+
+    @override
+    @data_bounds(DataBounds.infallible)
+    def compute_data_bounds_unchecked(
+        self,
+        expr_lower: np.ndarray[Ps, np.dtype[F]],
+        expr_upper: np.ndarray[Ps, np.dtype[F]],
+        X: np.ndarray[Ps, np.dtype[F]],
+        Xs: np.ndarray[Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
+    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        assert isinstance(self._const, Xs.dtype.type)
+
+        assert np.all((expr_lower <= self._const) | np.isnan(self._const)), (
+            "data lower bounds are above the any data constant"
+        )
+        assert np.all((expr_upper >= self._const) | np.isnan(self._const)), (
+            "data upper bounds are below the any data constant"
+        )
+
+        Xs_lower: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(-np.inf))
+        Xs_lower[np.isnan(Xs)] = np.nan
+
+        Xs_upper: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(np.inf))
+        Xs_upper[np.isnan(Xs)] = np.nan
+
+        return Xs_lower, Xs_upper
+
+    @override
+    def __repr__(self) -> str:
+        return f"any_data({self._const!r})"
