@@ -1683,3 +1683,25 @@ def test_fuzzer_found_power_trunc_sign():
 
     assert expr.eval((), X_lower, dict()) == np.array(np.float16(-np.inf))
     assert expr.eval((), X_upper, dict()) == np.array(np.float16(-np.inf))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_power_tanh_acos_excessive_nudging():
+    X = np.array(np.float32(4.18e-43))
+
+    expr = ScalarPower(
+        ScalarTanh(Data.SCALAR),
+        ScalarAcos(Data.SCALAR),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float32(0.0))
+
+    expr_lower = np.array(np.float32(-2.430206e09))
+    expr_upper = np.array(np.float32(1.9024737e-38))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float32(4.18e-43))
+    assert X_upper == np.array(np.float32(4.18e-43))
+
+    assert expr.eval((), X_lower, dict()) == np.array(np.float32(0.0))
+    assert expr.eval((), X_upper, dict()) == np.array(np.float32(0.0))
