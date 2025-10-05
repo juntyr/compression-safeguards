@@ -30,7 +30,10 @@ from compression_safeguards.safeguards._qois.expr.logexp import (
 from compression_safeguards.safeguards._qois.expr.neg import ScalarNegate
 from compression_safeguards.safeguards._qois.expr.power import ScalarPower
 from compression_safeguards.safeguards._qois.expr.reciprocal import ScalarReciprocal
-from compression_safeguards.safeguards._qois.expr.round import ScalarRoundTiesEven
+from compression_safeguards.safeguards._qois.expr.round import (
+    ScalarRoundTiesEven,
+    ScalarTrunc,
+)
 from compression_safeguards.safeguards._qois.expr.sign import ScalarSign
 from compression_safeguards.safeguards._qois.expr.square import ScalarSqrt, ScalarSquare
 from compression_safeguards.safeguards._qois.expr.trigonometric import (
@@ -1658,3 +1661,25 @@ def test_fuzzer_found_power_abs_abs_excessive_nudging():
 
     assert expr.eval((), X_lower, dict()) == np.array(np.float64(1.0))
     assert expr.eval((), X_upper, dict()) == np.array(np.float64(1.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_power_trunc_sign():
+    X = np.array(np.float16(-0.841))
+
+    expr = ScalarPower(
+        ScalarTrunc(Data.SCALAR),
+        ScalarSign(Data.SCALAR),
+    )
+
+    assert expr.eval((), X, dict()) == np.array(np.float16(-np.inf))
+
+    expr_lower = np.array(np.float16(-np.inf))
+    expr_upper = np.array(np.float16(-0.841))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    assert X_lower == np.array(np.float16(-0.9995))
+    assert X_upper == np.array(np.float16(-6.0e-08))
+
+    assert expr.eval((), X_lower, dict()) == np.array(np.float16(-np.inf))
+    assert expr.eval((), X_upper, dict()) == np.array(np.float16(-np.inf))

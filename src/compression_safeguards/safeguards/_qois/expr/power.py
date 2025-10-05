@@ -314,13 +314,19 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         np.copyto(
             expr_lower,
             _maximum_zero_sign_sensitive(one_plus_eps, expr_lower),
-            where=(((av > 1) & (bv > 0)) | (av >= 0) & (av < 1) & (bv < 0)),
+            where=(
+                ((av > 1) & (bv > 0))
+                | _is_sign_positive_number(av) & (av < 1) & (bv < 0)
+            ),
             casting="no",
         )
         np.copyto(
             expr_upper,
             _minimum_zero_sign_sensitive(expr_upper, one_minus_eps),
-            where=(((av >= 0) & (av < 1) & (bv > 0)) | (av > 1) & (bv < 0)),
+            where=(
+                (_is_sign_positive_number(av) & (av < 1) & (bv > 0))
+                | (av > 1) & (bv < 0)
+            ),
             casting="no",
         )
         expr_lower[exprv == 1] = 1
