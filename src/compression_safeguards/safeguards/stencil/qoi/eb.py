@@ -80,9 +80,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
     If the derived quantity of interest for a data neighbourhood evaluates to
     an infinite value, this safeguard guarantees that the quantity of interest
-    on the decoded data neighbourhood produces the exact same infinite value.
+    on the corrected data neighbourhood produces the exact same infinite value.
     For a NaN quantity of interest, this safeguard guarantees that the quantity
-    of interest on the decoded data neighbourhood is also NaN, but does not
+    of interest on the corrected data neighbourhood is also NaN, but does not
     guarantee that it has the same bit pattern.
 
     The error bound can be verified by evaluating the QoI in the floating-point
@@ -127,9 +127,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         interest evaluated on the original data.
 
         If `eb` is a late-bound parameter, its late-bound value must be
-        broadcastable to the shape of the data to be encoded, not the shape of
-        the QoI that has been evaluated (even though it is only applied to the
-        QoI). The
+        broadcastable to the shape of the data to be safeguarded, not the shape
+        of the QoI that has been evaluated (even though it is only applied to
+        the QoI). The
         [`expand_qoi_to_data_shape`][compression_safeguards.safeguards.stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard.expand_qoi_to_data_shape]
         method can be used to expand an error-bound from the QoI shape to the
         data shape.
@@ -400,20 +400,20 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        decoded: np.ndarray[S, np.dtype[T]],
+        prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check which elements in the `decoded` array satisfy the error bound for
-        the quantity of interest over a neighbourhood on the `data`.
+        Check which elements in the `prediction` array satisfy the error bound
+        for the quantity of interest over a neighbourhood on the `data`.
 
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Data to be encoded.
-        decoded : np.ndarray[S, np.dtype[T]]
-            Decoded data.
+            Original data array, relative to which the `prediction` is checked.
+        prediction : np.ndarray[S, np.dtype[T]]
+            Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
@@ -452,7 +452,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         ]
 
         data_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = data
-        decoded_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = decoded
+        prediction_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = prediction
         for axis, axis_constant_boundary in zip(
             self._neighbourhood, constant_boundaries
         ):
@@ -464,8 +464,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 axis_constant_boundary,
                 axis.axis,
             )
-            decoded_boundary = _pad_with_boundary(
-                decoded_boundary,
+            prediction_boundary = _pad_with_boundary(
+                prediction_boundary,
                 axis.boundary,
                 axis.before,
                 axis.after,
@@ -487,10 +487,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 ftype=ftype,
             )
         )
-        decoded_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+        prediction_windows_float: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
             to_float(
                 sliding_window_view(
-                    decoded_boundary,
+                    prediction_boundary,
                     window,
                     axis=tuple(axis.axis for axis in self._neighbourhood),
                     writeable=False,
@@ -536,9 +536,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 late_bound_constants,
             )
         )
-        qoi_decoded: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+        qoi_prediction: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
             self._qoi_expr.eval(
-                decoded_windows_float,
+                prediction_windows_float,
                 late_bound_constants,
             )
         )
@@ -559,14 +559,14 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         _check_error_bound(self._type, eb)
 
         finite_ok = _compute_finite_absolute_error(
-            self._type, qoi_data, qoi_decoded
+            self._type, qoi_data, qoi_prediction
         ) <= _compute_finite_absolute_error_bound(self._type, eb, qoi_data)
 
         windows_ok: np.ndarray[tuple[int, ...], np.dtype[np.bool]] = _ensure_array(
             finite_ok
         )
-        np.equal(qoi_data, qoi_decoded, out=windows_ok, where=np.isinf(qoi_data))
-        np.isnan(qoi_decoded, out=windows_ok, where=np.isnan(qoi_data))
+        np.equal(qoi_data, qoi_prediction, out=windows_ok, where=np.isinf(qoi_data))
+        np.isnan(qoi_prediction, out=windows_ok, where=np.isnan(qoi_data))
 
         s = [slice(None)] * data.ndim
         for axis in self._neighbourhood:

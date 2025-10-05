@@ -46,8 +46,8 @@ class SameValueSafeguard(PointwiseSafeguard):
         to the data dtype before binary comparison.
     exclusive : bool
         If [`True`][True], non-`value` elements in the data stay non-`value`
-        after decoding. If [`False`][False], non-`value` values may have the
-        `value` after decoding.
+        after applying corrections. If [`False`][False], non-`value` values may
+        have the `value` after applying corrections.
     """
 
     __slots__: tuple[str, ...] = ("_value", "_exclusive")
@@ -92,20 +92,20 @@ class SameValueSafeguard(PointwiseSafeguard):
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        decoded: np.ndarray[S, np.dtype[T]],
+        prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements preserve the special `value` from the `data` to
-        the `decoded` array.
+        the `prediction` array.
 
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Data to be encoded.
-        decoded : np.ndarray[S, np.dtype[T]]
-            Decoded data.
+            Original data array, relative to which the `prediction` is checked.
+        prediction : np.ndarray[S, np.dtype[T]]
+            Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
@@ -129,14 +129,16 @@ class SameValueSafeguard(PointwiseSafeguard):
         )
 
         data_bits: np.ndarray[S, np.dtype[np.unsignedinteger]] = as_bits(data)
-        decoded_bits: np.ndarray[S, np.dtype[np.unsignedinteger]] = as_bits(decoded)
+        prediction_bits: np.ndarray[S, np.dtype[np.unsignedinteger]] = as_bits(
+            prediction
+        )
 
         if self._exclusive:
             # value if and only if where value
-            return (data_bits == value_bits) == (decoded_bits == value_bits)
+            return (data_bits == value_bits) == (prediction_bits == value_bits)
 
         # value must stay value, everything else can be arbitrary
-        return (data_bits != value_bits) | (decoded_bits == value_bits)
+        return (data_bits != value_bits) | (prediction_bits == value_bits)
 
     @override
     def compute_safe_intervals(

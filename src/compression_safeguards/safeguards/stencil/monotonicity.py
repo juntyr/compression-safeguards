@@ -45,7 +45,7 @@ class Monotonicity(Enum):
     strict = _STRICT
     """
     Strictly increasing/decreasing sequences in the input array are guaranteed
-    to be strictly increasing/decreasing in the decoded array.
+    to be strictly increasing/decreasing in the corrected array.
 
     Sequences that are not strictly increasing/decreasing or contain NaN values
     are not affected.
@@ -54,7 +54,7 @@ class Monotonicity(Enum):
     strict_with_consts = _STRICT_WITH_CONSTS
     """
     Strictly increasing/decreasing/constant sequences in the input array are
-    guaranteed to be strictly increasing/decreasing/constant in the decoded
+    guaranteed to be strictly increasing/decreasing/constant in the corrected
     array.
 
     Sequences that are not strictly increasing/decreasing/constant or contain
@@ -64,7 +64,7 @@ class Monotonicity(Enum):
     strict_to_weak = _STRICT_TO_WEAK
     """
     Strictly increasing/decreasing sequences in the input array are guaranteed
-    to be *weakly* increasing/decreasing (or constant) in the decoded array.
+    to be *weakly* increasing/decreasing (or constant) in the corrected array.
 
     Sequences that are not strictly increasing/decreasing or contain NaN values
     are not affected.
@@ -74,7 +74,7 @@ class Monotonicity(Enum):
     """
     Weakly increasing/decreasing (but not constant) sequences in the input
     array are guaranteed to be weakly increasing/decreasing (or constant) in
-    the decoded array.
+    the corrected array.
 
     Sequences that are not weakly increasing/decreasing or are constant or
     contain NaN values are not affected.
@@ -252,20 +252,20 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        decoded: np.ndarray[S, np.dtype[T]],
+        prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which monotonic sequences centred on the points in the `data`
-        array are preserved in the `decoded` array.
+        array are preserved in the `prediction` array.
 
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Data to be encoded.
-        decoded : np.ndarray[S, np.dtype[T]]
-            Decoded data.
+            Original data array, relative to which the `prediction` is checked.
+        prediction : np.ndarray[S, np.dtype[T]]
+            Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
@@ -317,8 +317,8 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 constant_boundary,
                 axis,
             )
-            decoded_boundary = _pad_with_boundary(
-                decoded,
+            prediction_boundary = _pad_with_boundary(
+                prediction,
                 self._boundary,
                 self._window,
                 self._window,
@@ -327,13 +327,19 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             )
 
             data_windows = sliding_window_view(data_boundary, window, axis=axis)
-            decoded_windows = sliding_window_view(decoded_boundary, window, axis=axis)
+            prediction_windows = sliding_window_view(
+                prediction_boundary, window, axis=axis
+            )
 
-            data_monotonic = self._monotonic_sign(data_windows, is_decoded=False)
-            decoded_monotonic = self._monotonic_sign(decoded_windows, is_decoded=True)
+            data_monotonic = self._monotonic_sign(data_windows, is_prediction=False)
+            prediction_monotonic = self._monotonic_sign(
+                prediction_windows, is_prediction=True
+            )
 
             # for monotonic windows, check that the monotonicity matches
-            axis_ok = self._monotonic_sign_not_equal(data_monotonic, decoded_monotonic)
+            axis_ok = self._monotonic_sign_not_equal(
+                data_monotonic, prediction_monotonic
+            )
 
             if self._boundary == BoundaryCondition.valid:
                 s = tuple(
@@ -420,7 +426,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 axis,
             )
             data_windows = sliding_window_view(data_boundary, window, axis=axis)
-            data_monotonic = self._monotonic_sign(data_windows, is_decoded=False)
+            data_monotonic = self._monotonic_sign(data_windows, is_prediction=False)
 
             # compute, pointwise, if the element has a decreasing (lt),
             #  increasing (gt), or equality (eq) constraint imposed upon it
@@ -715,9 +721,9 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         self,
         x: np.ndarray[S, np.dtype[T]],
         *,
-        is_decoded: bool,
+        is_prediction: bool,
     ) -> np.ndarray[tuple[int, ...], np.dtype[np.float64]]:
-        (lt, gt, eq, _is_weak) = self._monotonicity.value[int(is_decoded)]
+        (lt, gt, eq, _is_weak) = self._monotonicity.value[int(is_prediction)]
 
         # default to NaN
         monotonic: np.ndarray[tuple[int, ...], np.dtype[np.float64]] = np.full(
@@ -744,15 +750,18 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     def _monotonic_sign_not_equal(
         self,
         data_monotonic: np.ndarray[S, np.dtype[T]],
-        decoded_monotonic: np.ndarray[S, np.dtype[T]],
+        prediction_monotonic: np.ndarray[S, np.dtype[T]],
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         match self._monotonicity:
             case Monotonicity.strict | Monotonicity.strict_with_consts:
-                return ~np.isnan(data_monotonic) & (decoded_monotonic != data_monotonic)
+                return ~np.isnan(data_monotonic) & (
+                    prediction_monotonic != data_monotonic
+                )
             case Monotonicity.strict_to_weak | Monotonicity.weak:
                 # having the opposite sign or no sign are both not equal
                 return ~np.isnan(data_monotonic) & (
-                    (decoded_monotonic == -data_monotonic) | np.isnan(decoded_monotonic)
+                    (prediction_monotonic == -data_monotonic)
+                    | np.isnan(prediction_monotonic)
                 )
             case _:
                 assert_never(self._monotonicity)

@@ -70,7 +70,7 @@ class ErrorBound(Enum):
     ratio = auto()
     r"""
     Ratio error bound, which guarantees that the ratios between the original
-    and the decoded values as well as their inverse ratios are less than or
+    and the corrected values as well as their inverse ratios are less than or
     equal to the provided bound $\epsilon_{ratio}$:
 
     \[
@@ -93,8 +93,8 @@ class ErrorBound(Enum):
     for a finite $\epsilon_{ratio} \geq 1$.
 
     Since the $\epsilon_{ratio}$ bound is finite, ratio error bound also
-    guarantees that the sign of each decoded value matches the sign of each
-    original value and that a decoded value is zero if and only if it is zero
+    guarantees that the sign of each corrected value matches the sign of each
+    original value and that a corrected value is zero if and only if it is zero
     in the original data.
 
     The ratio error bound is sometimes also known as a decimal error bound[^1]
@@ -206,14 +206,14 @@ def _compute_finite_absolute_error_bound(
 def _compute_finite_absolute_error(
     type: ErrorBound,
     data_float: np.ndarray[S, np.dtype[F]],
-    decoded_float: np.ndarray[S, np.dtype[F]],
+    prediction_float: np.ndarray[S, np.dtype[F]],
 ) -> np.ndarray[S, np.dtype[F]]:
     """
     Compute the absolute error value, which is compared against the absolute
-    error bound, from the data and decoded arrays.
+    error bound, from the data and prediction arrays.
 
     The computation is only defined for finite data elements, i.e. the produced
-    error should not be used for non-finite data or decoded elements.
+    error should not be used for non-finite data or prediction elements.
 
     Parameters
     ----------
@@ -221,13 +221,13 @@ def _compute_finite_absolute_error(
         The error bound type.
     data_float : np.ndarray[S, np.dtype[F]]
         The original data array in floating-point representation.
-    decoded_float : np.ndarray[S, np.dtype[F]]
-        The decoded data array in floating-point representation.
+    prediction_float : np.ndarray[S, np.dtype[F]]
+        The prediction data array in floating-point representation.
 
     Returns
     -------
     err_abs : np.ndarray[S, np.dtype[F]]
-        The absolute error value between the original and decoded data.
+        The absolute error value between the original and prediction data.
     """
 
     match type:
@@ -235,19 +235,19 @@ def _compute_finite_absolute_error(
         #  here since the error bound will include the data value that together
         #  form a relative error bound
         case ErrorBound.abs | ErrorBound.rel:
-            return np.abs(np.subtract(data_float, decoded_float))
+            return np.abs(np.subtract(data_float, prediction_float))
         case ErrorBound.ratio:
             err_abs: np.ndarray[S, np.dtype[F]] = _ensure_array(
-                np.divide(decoded_float, data_float)
+                np.divide(prediction_float, data_float)
             )
             np.divide(
                 data_float,
-                decoded_float,
+                prediction_float,
                 out=err_abs,
-                where=(np.abs(data_float) > np.abs(decoded_float)),
+                where=(np.abs(data_float) > np.abs(prediction_float)),
             )
-            err_abs[(data_float == 0) & (decoded_float == 0)] = 0
-            err_abs[np.sign(data_float) != np.sign(decoded_float)] = np.inf
+            err_abs[(data_float == 0) & (prediction_float == 0)] = 0
+            err_abs[np.sign(data_float) != np.sign(prediction_float)] = np.inf
             return err_abs
         case _:
             assert_never(type)

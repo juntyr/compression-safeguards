@@ -199,11 +199,11 @@ def _interval_union_pick(
 def _stencil_qoi_check_pointwise(
     self,
     data: np.ndarray[S, np.dtype[T]],
-    decoded: np.ndarray[S, np.dtype[T]],
+    prediction: np.ndarray[S, np.dtype[T]],
     *,
     late_bound: Bindings,
 ) -> np.ndarray[S, np.dtype[np.bool]]:
-    if np.all(decoded == 1):
+    if np.all(prediction == 1):
         return _zeros(data.shape, dtype=np.dtype(np.bool))
     return _ones(data.shape, dtype=np.dtype(np.bool))
 

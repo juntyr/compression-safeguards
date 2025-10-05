@@ -22,7 +22,10 @@ with atheris.instrument_imports():
     from compression_safeguards.safeguards._qois.expr.constfold import (
         ScalarFoldedConstant,
     )
-    from compression_safeguards.safeguards._qois.expr.data import Data
+    from compression_safeguards.safeguards._qois.expr.data import (
+        Data,
+        ScalarAnyDataConstant,
+    )
     from compression_safeguards.safeguards._qois.expr.divmul import (
         ScalarDivide,
         ScalarMultiply,
@@ -72,7 +75,21 @@ with atheris.instrument_imports():
         _minimum_zero_sign_sensitive,
     )
     from compression_safeguards.utils._float128 import _float128_dtype
-    from compression_safeguards.utils.typing import T
+    from compression_safeguards.utils.typing import S, T, U
+
+
+def as_bits(
+    a: np.ndarray[S, np.dtype[T]],
+) -> np.ndarray[S, np.dtype[U]]:
+    a = np.array(a, copy=None)
+
+    kind = "V" if a.dtype == _float128_dtype else "u"
+
+    return a.view(
+        a.dtype.str.replace("f", kind)
+        # numpy_quaddtype currently does not set its kind properly
+        .replace(_float128_dtype.kind, kind)
+    )
 
 
 def ConsumeDtypeElement(data, dtype: np.dtype[T]) -> T:
@@ -96,6 +113,7 @@ NULLARY_EXPRESSIONS: list[
     lambda data, dtype: Number(f"{data.ConsumeInt(4)}"),
     lambda data, dtype: Number(f"{data.ConsumeFloat()}"),
     lambda data, dtype: ScalarFoldedConstant(ConsumeDtypeElement(data, dtype)),
+    lambda data, dtype: ScalarAnyDataConstant(ConsumeDtypeElement(data, dtype)),
     lambda data, dtype: Data.SCALAR,
 ]
 UNARY_EXPRESSIONS: list[Callable[[AnyExpr], AnyExpr]] = [
@@ -268,11 +286,11 @@ def check_one_input(data) -> None:
             + "\n".join(
                 [
                     f"dtype = {dtype!r}",
-                    f"X = {X!r}",
+                    f"X = {X!r} ({as_bits(X)})",
                     f"expr = {expr!r}",
-                    f"exprv = {exprv!r}",
-                    f"expr_lower = {expr_lower!r}",
-                    f"expr_upper = {expr_upper!r}",
+                    f"exprv = {exprv!r} ({as_bits(exprv)})",
+                    f"expr_lower = {expr_lower!r} ({as_bits(expr_lower)})",
+                    f"expr_upper = {expr_upper!r} ({as_bits(expr_upper)})",
                 ]
             )
             + "\n\n===\n"
@@ -340,17 +358,17 @@ def check_one_input(data) -> None:
             + "\n".join(
                 [
                     f"dtype = {dtype!r}",
-                    f"X = {X!r}",
+                    f"X = {X!r} ({as_bits(X)})",
                     f"expr = {expr!r}",
-                    f"exprv = {exprv!r}",
-                    f"expr_lower = {expr_lower!r}",
-                    f"expr_upper = {expr_upper!r}",
-                    f"X_lower = {X_lower!r}",
-                    f"X_upper = {X_upper!r}",
-                    f"exprv_X_lower = {exprv_X_lower!r}",
-                    f"exprv_X_upper = {exprv_X_upper!r}",
-                    f"X_test = {X_test!r}",
-                    f"exprv_X_test = {exprv_X_test!r}",
+                    f"exprv = {exprv!r} ({as_bits(exprv)})",
+                    f"expr_lower = {expr_lower!r} ({as_bits(expr_lower)})",
+                    f"expr_upper = {expr_upper!r} ({as_bits(expr_upper)})",
+                    f"X_lower = {X_lower!r} ({as_bits(X_lower)})",
+                    f"X_upper = {X_upper!r} ({as_bits(X_upper)})",
+                    f"exprv_X_lower = {exprv_X_lower!r} ({as_bits(exprv_X_lower)})",
+                    f"exprv_X_upper = {exprv_X_upper!r} ({as_bits(exprv_X_upper)})",
+                    f"X_test = {X_test!r} ({as_bits(X_test)})",
+                    f"exprv_X_test = {exprv_X_test!r} ({as_bits(exprv_X_test)})",
                 ]
             )
             + "\n\n===\n"

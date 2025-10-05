@@ -160,7 +160,7 @@ def check_one_input(data) -> None:
         **(dict(b=chunksb) if chunksb > 0 else {}),
     }
 
-    # input data and the decoded data
+    # input data
     raw = data.ConsumeBytes(size * dtype.itemsize)
 
     if len(raw) != size * dtype.itemsize:

@@ -47,20 +47,20 @@ class Safeguard(ABC):
     def check(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        decoded: np.ndarray[S, np.dtype[T]],
+        prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
     ) -> bool:
         """
-        Check if the `decoded` array upholds the property enforced by this
+        Check if the `prediction` array upholds the property enforced by this
         safeguard.
 
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Data to be encoded.
-        decoded : np.ndarray[S, np.dtype[T]]
-            Decoded data.
+            Original data array, relative to which the `prediction` is checked.
+        prediction : np.ndarray[S, np.dtype[T]]
+            Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 

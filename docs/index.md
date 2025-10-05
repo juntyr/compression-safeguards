@@ -78,7 +78,7 @@ This package currently implements the following [safeguards][compression_safegua
 
 - [`eb`][compression_safeguards.safeguards.pointwise.eb.ErrorBoundSafeguard] (error bound):
 
-    The pointwise error is guaranteed to be less than or equal to the provided bound. Three types of [error bounds][compression_safeguards.safeguards.eb.ErrorBound] can be enforced: `abs` (absolute), `rel` (relative), and `ratio` (ratio / decimal). For the relative and ratio error bounds, zero values are preserved with the same bit pattern. For the ratio error bound, the sign of the data is preserved. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that decoding a NaN value to a NaN value with a different bit pattern also satisfies the error bound.
+    The pointwise error is guaranteed to be less than or equal to the provided bound. Three types of [error bounds][compression_safeguards.safeguards.eb.ErrorBound] can be enforced: `abs` (absolute), `rel` (relative), and `ratio` (ratio / decimal). For the relative and ratio error bounds, zero values are preserved with the same bit pattern. For the ratio error bound, the sign of the data is preserved. Infinite values are preserved with the same bit pattern. The safeguard can be configured such that NaN values are preserved with the same bit pattern, or that correcting a NaN value to a NaN value with a different bit pattern also satisfies the error bound.
 
 ### Error Bounds on derived Quantities of Interest (QoIs)
 

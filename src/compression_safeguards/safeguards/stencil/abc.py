@@ -61,20 +61,20 @@ class StencilSafeguard(Safeguard, ABC):
     def check(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        decoded: np.ndarray[S, np.dtype[T]],
+        prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
     ) -> bool:
         """
-        Check if the `decoded` array upholds the property enforced by this
+        Check if the `prediction` array upholds the property enforced by this
         safeguard.
 
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Data to be encoded.
-        decoded : np.ndarray[S, np.dtype[T]]
-            Decoded data.
+            Original data array, relative to which the `prediction` is checked.
+        prediction : np.ndarray[S, np.dtype[T]]
+            Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 
@@ -84,26 +84,28 @@ class StencilSafeguard(Safeguard, ABC):
             `True` if the check succeeded.
         """
 
-        return bool(np.all(self.check_pointwise(data, decoded, late_bound=late_bound)))
+        return bool(
+            np.all(self.check_pointwise(data, prediction, late_bound=late_bound))
+        )
 
     @abstractmethod
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        decoded: np.ndarray[S, np.dtype[T]],
+        prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check which elements in the `decoded` array uphold the neighbourhood
+        Check which elements in the `prediction` array uphold the neighbourhood
         property enforced by this safeguard.
 
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Data to be encoded.
-        decoded : np.ndarray[S, np.dtype[T]]
-            Decoded data.
+            Original data array, relative to which the `prediction` is checked.
+        prediction : np.ndarray[S, np.dtype[T]]
+            Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
 

@@ -207,19 +207,21 @@ class ScalarExp(Expr[AnyExpr]):
         # exp(...) cannot be negative, so ensure the bounds on expr also cannot
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _minimum_zero_sign_sensitive(
-            argv,
-            (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(
-                _maximum_zero_sign_sensitive(X.dtype.type(0), expr_lower)
-            ),
+        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            _minimum_zero_sign_sensitive(
+                argv,
+                (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(
+                    _maximum_zero_sign_sensitive(X.dtype.type(0), expr_lower)
+                ),
+            )
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _maximum_zero_sign_sensitive(
-            argv, (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(expr_upper)
+        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            _maximum_zero_sign_sensitive(
+                argv, (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(expr_upper)
+            )
         )
 
-        # we need to force argv if expr_lower == expr_upper, which can be
-        #  triggered by power of a negative base, which requires an exact bound
-        #  on exprv
+        # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
         np.copyto(arg_upper, argv, where=(expr_lower == expr_upper), casting="no")
 
@@ -332,6 +334,7 @@ class ScalarLogWithBase(Expr[AnyExpr, AnyExpr]):
             ),
         ).eval(x, Xs, late_bound)
 
+    @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
