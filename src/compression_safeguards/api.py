@@ -261,7 +261,7 @@ class Safeguards:
                 break
 
         if all_ok:
-            return _zeros(data.shape, as_bits(data).dtype)
+            return _zeros(data.shape, self.correction_dtype_for_data(data.dtype))
 
         # ensure we don't accidentally forget to handle new kinds of safeguards here
         assert len(self.safeguards) == len(self._pointwise_safeguards) + len(
@@ -292,7 +292,11 @@ class Safeguards:
         prediction_bits: np.ndarray[S, np.dtype[C]] = as_bits(prediction)
         correction_bits: np.ndarray[S, np.dtype[C]] = as_bits(correction)
 
-        return prediction_bits - correction_bits
+        with np.errstate(
+            over="ignore",
+            under="ignore",
+        ):
+            return correction_bits - prediction_bits
 
     def _prepare_non_chunked_bindings(
         self,
@@ -373,7 +377,13 @@ class Safeguards:
         prediction_bits: np.ndarray[S, np.dtype[C]] = as_bits(prediction)
         correction_bits = correction
 
-        corrected = prediction_bits - correction_bits
+        with np.errstate(
+            over="ignore",
+            under="ignore",
+        ):
+            corrected: np.ndarray[S, np.dtype[C]] = np.add(
+                prediction_bits, correction_bits
+            )
 
         return corrected.view(prediction.dtype)
 
@@ -735,7 +745,7 @@ class Safeguards:
         if not any_chunk_check_failed:
             return _zeros(
                 data_chunk_[tuple(non_stencil_indices)].shape,
-                as_bits(data_chunk_).dtype,
+                self.correction_dtype_for_data(data_chunk_.dtype),
             )
 
         safeguard: Safeguard
@@ -760,7 +770,7 @@ class Safeguards:
             if np.all(all_ok):
                 return _zeros(
                     data_chunk_[tuple(non_stencil_indices)].shape,
-                    as_bits(data_chunk_).dtype,
+                    self.correction_dtype_for_data(data_chunk_.dtype),
                 )
 
         # otherwise, correct the chunk
@@ -804,9 +814,13 @@ class Safeguards:
             correction_chunk
         )
 
-        return (prediction_chunk_bits - correction_chunk_bits)[
-            tuple(non_stencil_indices)
-        ]
+        with np.errstate(
+            over="ignore",
+            under="ignore",
+        ):
+            return (correction_chunk_bits - prediction_chunk_bits)[
+                tuple(non_stencil_indices)
+            ]
 
     def _prepare_stencil_chunked_arrays_and_bindings(
         self,
