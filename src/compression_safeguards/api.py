@@ -145,6 +145,9 @@ class Safeguards:
         """
         Compute the dtype of the correction for data of the provided `dtype`.
 
+        The correction dtype is the corresponding binary unsigned integer data
+        type with the same bit size.
+
         Parameters
         ----------
         dtype : np.dtype[T]
@@ -225,6 +228,13 @@ class Safeguards:
         [`compute_chunked_correction`][compression_safeguards.api.Safeguards.compute_chunked_correction]
         method instead when working with individual chunks of data.
 
+        The correction is defined as `as_bits(corrected) - as_bits(prediction)`
+        using wrapping unsigned integer arithmetic. It has the corresponding
+        binary unsigned integer data type with the same bit size. The
+        correction can be applied using
+        [`apply_correction`][compression_safeguards.api.Safeguards.apply_correction]
+        to get the corrected `prediction`.
+
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
@@ -279,24 +289,24 @@ class Safeguards:
         combined_intervals = all_intervals[0]
         for intervals in all_intervals[1:]:
             combined_intervals = combined_intervals.intersect(intervals)
-        correction = combined_intervals.pick(prediction)
+        corrected = combined_intervals.pick(prediction)
 
         for safeguard, intervals in zip(self.safeguards, all_intervals):
-            assert np.all(intervals.contains(correction)), (
-                f"safeguard {safeguard!r} interval does not contain the correction {correction!r}"
+            assert np.all(intervals.contains(corrected)), (
+                f"safeguard {safeguard!r} interval does not contain the corrected array {corrected!r}"
             )
-            assert safeguard.check(data, correction, late_bound=late_bound), (
-                f"safeguard {safeguard!r} check fails after correction {correction!r} on data {data!r}"
+            assert safeguard.check(data, corrected, late_bound=late_bound), (
+                f"safeguard {safeguard!r} check fails with corrected array {corrected!r} on data {data!r}"
             )
 
         prediction_bits: np.ndarray[S, np.dtype[C]] = as_bits(prediction)
-        correction_bits: np.ndarray[S, np.dtype[C]] = as_bits(correction)
+        corrected_bits: np.ndarray[S, np.dtype[C]] = as_bits(corrected)
 
         with np.errstate(
             over="ignore",
             under="ignore",
         ):
-            return correction_bits - prediction_bits
+            return corrected_bits - prediction_bits
 
     def _prepare_non_chunked_bindings(
         self,
@@ -359,6 +369,10 @@ class Safeguards:
         applying a chunk of the `correction` to the corresponding chunk of the
         `prediction` produces the correct result.
 
+        The `correction` is applied with
+        `from_bits(as_bits(prediction) + correction)` using wrapping unsigned
+        integer arithmetic.
+
         Parameters
         ----------
         prediction : np.ndarray[S, np.dtype[T]]
@@ -381,11 +395,11 @@ class Safeguards:
             over="ignore",
             under="ignore",
         ):
-            corrected: np.ndarray[S, np.dtype[C]] = np.add(
+            corrected_bits: np.ndarray[S, np.dtype[C]] = np.add(
                 prediction_bits, correction_bits
             )
 
-        return corrected.view(prediction.dtype)
+        return corrected_bits.view(prediction.dtype)
 
     @functools.lru_cache
     def compute_required_stencil_for_chunked_correction(
@@ -692,6 +706,14 @@ class Safeguards:
         efficient
         [`compute_correction`][compression_safeguards.api.Safeguards.compute_correction]
         method instead.
+
+        The (chunked) correction is defined as
+        `as_bits(corrected) - as_bits(prediction)` using wrapping unsigned
+        integer arithmetic. It has the corresponding binary unsigned integer
+        data type with the same bit size. The chunked correction can be applied
+        using
+        [`apply_correction`][compression_safeguards.api.Safeguards.apply_correction]
+        to get the corrected chunked `prediction`.
 
         Parameters
         ----------
