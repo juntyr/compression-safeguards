@@ -6,6 +6,7 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import (
     _broadcast_to,
     _ensure_array,
+    _floating_smallest_subnormal,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
     _where,
@@ -88,7 +89,9 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         # evaluate the condition, a, and b
         cond, a, b = self._condition, self._a, self._b
-        condv: np.ndarray[Ps, np.dtype[F]] = cond.eval(X.shape, Xs, late_bound)
+        condv: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+            cond.eval(X.shape, Xs, late_bound)
+        )
         condvb_Ps: np.ndarray[Ps, np.dtype[np.bool]] = condv != 0
         condvb_Ns: np.ndarray[Ns, np.dtype[np.bool]] = _broadcast_to(
             _ensure_array(condvb_Ps).reshape(X.shape + (1,) * (Xs.ndim - X.ndim)),
@@ -101,9 +104,28 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
         Xs_upper: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(np.inf))
 
         if cond.has_data:
-            # for simplicity, we assume that the condition must always be
-            #  preserved exactly
-            cl, cu = cond.compute_data_bounds(condv, condv, X, Xs, late_bound)
+            # for simplicity, we assume that the condition must always evaluate
+            #  to the same boolean when compared to 0
+            cond_lower: np.ndarray[Ps, np.dtype[F]] = np.full(
+                condv.shape, X.dtype.type(-np.inf)
+            )
+            cond_upper: np.ndarray[Ps, np.dtype[F]] = np.full(
+                condv.shape, X.dtype.type(np.inf)
+            )
+
+            # zero condition values must remain zero
+            cond_lower[condv == 0] = -0.0
+            cond_upper[condv == 0] = +0.0
+
+            smallest_subnormal = _floating_smallest_subnormal(X.dtype)
+
+            # non-zero condition values must remain non-zero
+            # TODO: an interval union could represent that the two disjoint
+            #       intervals in the future
+            cond_lower[condv > 0] = smallest_subnormal
+            cond_upper[condv < 0] = -smallest_subnormal
+
+            cl, cu = cond.compute_data_bounds(cond_lower, cond_upper, X, Xs, late_bound)
             Xs_lower = _maximum_zero_sign_sensitive(Xs_lower, cl)
             Xs_upper = _minimum_zero_sign_sensitive(Xs_upper, cu)
 
