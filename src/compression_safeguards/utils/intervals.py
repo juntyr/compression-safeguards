@@ -1086,8 +1086,6 @@ class IntervalUnion(Generic[T, N, U]):
         prediction_bits: np.ndarray[
             tuple[Literal[1], int], np.dtype[np.unsignedinteger]
         ] = to_total_order(prediction).reshape(1, -1)  # type: ignore
-        todtype = prediction_bits.dtype
-        prediction_bits = as_bits(prediction_bits)
 
         lower: np.ndarray[tuple[U, N], np.dtype[np.unsignedinteger]] = to_total_order(
             self._lower
@@ -1096,13 +1094,13 @@ class IntervalUnion(Generic[T, N, U]):
             self._upper
         )
         interval_nonempty = lower <= upper
-        lower, upper = as_bits(lower), as_bits(upper)
 
-        # 2. look at the difference between the prediction value and the
-        #    interval we assume that prediction is not inside the interval,
-        #    since that's handled separately with the special case (a)
-        lower = prediction_bits - lower
-        upper = prediction_bits - upper
+        # 2. look at the total order binary difference between the interval
+        #    bounds and the prediction
+        #    we assume that prediction is not inside the interval, since that
+        #    is handled separately with the special case (a)
+        lower = lower - prediction_bits
+        upper = upper - prediction_bits
 
         # 3. only work with "positive" unsigned values
         negative: np.ndarray[tuple[U, N], np.dtype[np.bool]] = np.less(
@@ -1175,16 +1173,16 @@ class IntervalUnion(Generic[T, N, U]):
 
         # 12. undo the difference with prediction and enforce the special case
         #     from (a) that prediction values inside the interval are kept as-is
-        np.subtract(prediction_bits, pick_bits, out=pick_bits)
+        pick_bits += prediction_bits
         np.copyto(pick_bits, prediction_bits, where=contains_prediction, casting="no")
 
         # 13. convert everything back from total-ordered bits to value space
-        pick = from_total_order(pick_bits.view(todtype), prediction.dtype).reshape(
-            prediction.shape
-        )
+        pick: np.ndarray[S, np.dtype[T]] = from_total_order(
+            pick_bits, prediction.dtype
+        ).reshape(prediction.shape)  # type: ignore
         assert np.all(self.contains(pick))
 
-        return pick.reshape(prediction.shape)  # type: ignore
+        return pick
 
     def pick(
         self, prediction: np.ndarray[S, np.dtype[T]]
