@@ -13,6 +13,7 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import _ensure_array
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import ToFloatMode, saturating_finite_float_cast, to_float
+from ....utils.error import _check_instance, _validate_safeguard
 from ....utils.intervals import IntervalUnion
 from ....utils.typing import JSON, F, S, T
 from ..._qois import PointwiseQuantityOfInterest
@@ -105,29 +106,35 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         eb: int | float | str | Parameter,
         qoi_dtype: str | ToFloatMode = ToFloatMode.lossless,
     ) -> None:
-        self._type = type if isinstance(type, ErrorBound) else ErrorBound[type]
+        with _validate_safeguard(self) as ctx:
+            with ctx.parameter("qoi"):
+                _check_instance(qoi, str)
 
-        if isinstance(eb, Parameter):
-            self._eb = eb
-        elif isinstance(eb, str):
-            self._eb = Parameter(eb)
-        else:
-            _check_error_bound(self._type, eb)
-            self._eb = eb
+            with ctx.enum_parameter("type", ErrorBound):
+                _check_instance(type, str | ErrorBound)
+                self._type = type if isinstance(type, ErrorBound) else ErrorBound[type]
 
-        self._qoi_dtype = (
-            qoi_dtype if isinstance(qoi_dtype, ToFloatMode) else ToFloatMode[qoi_dtype]
-        )
+            with ctx.parameter("eb"):
+                _check_instance(eb, int | float | str | Parameter)
+                if isinstance(eb, Parameter):
+                    self._eb = eb
+                elif isinstance(eb, str):
+                    self._eb = Parameter(eb)
+                else:
+                    _check_error_bound(self._type, eb)
+                    self._eb = eb
 
-        try:
-            qoi_expr = PointwiseQuantityOfInterest(qoi)
-        except Exception as err:
-            raise AssertionError(
-                f"failed to parse pointwise QoI expression {qoi!r}: {err}"
-            ) from err
+            with ctx.enum_parameter("qoi_dtype", ToFloatMode):
+                _check_instance(qoi_dtype, str | ToFloatMode)
+                self._qoi_dtype = (
+                    qoi_dtype
+                    if isinstance(qoi_dtype, ToFloatMode)
+                    else ToFloatMode[qoi_dtype]
+                )
 
-        self._qoi = qoi
-        self._qoi_expr = qoi_expr
+            with ctx.parameter("qoi"):
+                self._qoi = qoi
+                self._qoi_expr = PointwiseQuantityOfInterest(qoi)
 
     @property
     @override

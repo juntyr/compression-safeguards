@@ -15,6 +15,7 @@ from compression_safeguards.safeguards.pointwise.qoi.eb import (
 )
 from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.cast import ToFloatMode
+from compression_safeguards.utils.error import QuantityOfInterestSyntaxError
 
 from .codecs import (
     NoiseCodec,
@@ -123,9 +124,7 @@ CHECKS = [
 
 
 def test_sandbox():
-    with pytest.raises(
-        AssertionError, match="failed to parse pointwise QoI expression"
-    ):
+    with pytest.raises(QuantityOfInterestSyntaxError, match="unexpected token"):
         # sandbox escape based on https://stackoverflow.com/q/35804961 and
         #  https://stackoverflow.com/a/35806044
         check_all_codecs(
@@ -136,18 +135,26 @@ def test_sandbox():
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_empty(check):
-    with pytest.raises(AssertionError, match="empty"):
+    with pytest.raises(
+        QuantityOfInterestSyntaxError, match="expression must not be empty"
+    ):
         check("")
-    with pytest.raises(AssertionError, match="empty"):
+    with pytest.raises(
+        QuantityOfInterestSyntaxError, match="expression must not be empty"
+    ):
         check("  \t   \n   ")
-    with pytest.raises(AssertionError, match="empty"):
+    with pytest.raises(
+        QuantityOfInterestSyntaxError, match="expression must not be empty"
+    ):
         check(" # just a comment ")
 
 
 def test_non_expression():
-    with pytest.raises(AssertionError, match="EOF"):
+    with pytest.raises(
+        QuantityOfInterestSyntaxError, match="expected more input but found EOF"
+    ):
         check_all_codecs(np.empty(0), "exp")
-    with pytest.raises(AssertionError, match="unexpected token `x`"):
+    with pytest.raises(QuantityOfInterestSyntaxError, match="unexpected token `x`"):
         check_all_codecs(np.empty(0), "e x p")
 
 
@@ -170,36 +177,44 @@ def test_comment():
 
 def test_variables():
     with pytest.raises(
-        AssertionError,
+        QuantityOfInterestSyntaxError,
         match=r'cannot assign to identifier `a`, assign to a variable v\["a"\] instead',
     ):
         check_all_codecs(np.array([]), "a = 4; return a")
     with pytest.raises(
-        AssertionError, match="pointwise QoI variables use lower-case `v`"
+        QuantityOfInterestSyntaxError,
+        match="pointwise QoI variables use lower-case `v`",
     ):
         check_all_codecs(np.array([]), 'V["a"]')
     with pytest.raises(
-        AssertionError, match='invalid string literal with missing closing `"`'
+        QuantityOfInterestSyntaxError,
+        match='invalid string literal with missing closing `"`',
     ):
         check_all_codecs(np.array([]), 'v["a]')
-    with pytest.raises(AssertionError, match="invalid quoted parameter"):
+    with pytest.raises(QuantityOfInterestSyntaxError, match="invalid quoted parameter"):
         check_all_codecs(np.array([]), 'v["123"]')
-    with pytest.raises(AssertionError, match="invalid quoted parameter"):
+    with pytest.raises(QuantityOfInterestSyntaxError, match="invalid quoted parameter"):
         check_all_codecs(np.array([]), 'v["a 123"]')
     with pytest.raises(
-        AssertionError, match=r"variable name must not be built-in \(start with `\$`\)"
+        QuantityOfInterestSyntaxError,
+        match=r"variable name must not be built-in \(start with `\$`\)",
     ):
         check_all_codecs(np.array([]), 'v["$a"]')
-    with pytest.raises(AssertionError, match=r'undefined variable v\["a"\]'):
+    with pytest.raises(
+        QuantityOfInterestSyntaxError, match=r'undefined variable v\["a"\]'
+    ):
         check_all_codecs(np.array([]), 'v["a"]')
-    with pytest.raises(AssertionError, match=r'undefined variable v\["b"\]'):
+    with pytest.raises(
+        QuantityOfInterestSyntaxError, match=r'undefined variable v\["b"\]'
+    ):
         check_all_codecs(np.array([]), 'v["a"] = 3; return x + v["b"];')
-    with pytest.raises(AssertionError, match="unexpected token `=`"):
+    with pytest.raises(QuantityOfInterestSyntaxError, match="unexpected token `=`"):
         check_all_codecs(np.array([]), "1 = x")
-    with pytest.raises(AssertionError, match=r"expected `\(`"):
+    with pytest.raises(QuantityOfInterestSyntaxError, match=r"expected `\(`"):
         check_all_codecs(np.array([]), 'v["a"] = log; return x + v["a"];')
     with pytest.raises(
-        AssertionError, match=r'cannot override already-defined variable v\["a"\]'
+        QuantityOfInterestSyntaxError,
+        match=r'cannot override already-defined variable v\["a"\]',
     ):
         check_all_codecs(
             np.array([]), 'v["a"] = x + 1; v["a"] = v["a"]; return v["a"];'
@@ -216,19 +231,33 @@ def test_variables():
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_constant(check):
-    with pytest.raises(AssertionError, match="constant"):
+    with pytest.raises(
+        QuantityOfInterestSyntaxError, match="expression must not be constant"
+    ):
         check("0")
-    with pytest.raises(AssertionError, match="constant"):
+    with pytest.raises(
+        QuantityOfInterestSyntaxError, match="expression must not be constant"
+    ):
         check("NaN")
-    with pytest.raises(AssertionError, match="constant"):
+    with pytest.raises(
+        QuantityOfInterestSyntaxError, match="expression must not be constant"
+    ):
         check("Inf")
-    with pytest.raises(AssertionError, match="constant"):
+    with pytest.raises(
+        QuantityOfInterestSyntaxError, match="expression must not be constant"
+    ):
         check("-Inf")
-    with pytest.raises(AssertionError, match="constant"):
+    with pytest.raises(
+        QuantityOfInterestSyntaxError, match="expression must not be constant"
+    ):
         check("pi")
-    with pytest.raises(AssertionError, match="constant"):
+    with pytest.raises(
+        QuantityOfInterestSyntaxError, match="expression must not be constant"
+    ):
         check("e")
-    with pytest.raises(AssertionError, match="constant"):
+    with pytest.raises(
+        QuantityOfInterestSyntaxError, match="expression must not be constant"
+    ):
         check("-(-(-e))")
 
 
@@ -442,7 +471,9 @@ def test_where(check):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_size(check):
-    with pytest.raises(AssertionError, match="scalar non-array expression has no size"):
+    with pytest.raises(
+        QuantityOfInterestSyntaxError, match="scalar non-array expression has no size"
+    ):
         check("size(x) + x")
     check("size([x]) + x")
 

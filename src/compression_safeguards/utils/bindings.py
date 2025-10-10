@@ -39,9 +39,8 @@ class Parameter(str):
     def __new__(cls, param: str) -> "Parameter":
         if isinstance(param, Parameter):
             return param
-        assert param.removeprefix("$").isidentifier(), (
-            f"parameter `{param}` must be a valid identifier"
-        )
+        if not param.removeprefix("$").isidentifier():
+            raise ValueError(f"parameter `{param}` must be a valid identifier")
         return super().__new__(cls, param)
 
     @property

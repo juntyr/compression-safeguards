@@ -5,6 +5,7 @@ from sly import Parser
 from typing_extensions import Unpack  # MSPV 3.11
 
 from ...utils.bindings import Parameter
+from ...utils.error import QuantityOfInterestSyntaxError
 from .expr.abc import AnyExpr
 from .expr.abs import ScalarAbs
 from .expr.addsub import ScalarAdd, ScalarSubtract
@@ -72,7 +73,7 @@ class QoIParser(Parser):
         tokens, tokens2 = itertools.tee(tokens)
 
         if next(tokens2, None) is None:
-            raise SyntaxError("expression must not be empty")
+            raise QuantityOfInterestSyntaxError.root("expression must not be empty")
 
         return super().parse(tokens)
 
@@ -99,9 +100,9 @@ class QoIParser(Parser):
         self.assert_or_error(
             not isinstance(p.expr, Array),
             p,
-            lambda: f"QoI expression must be a scalar but is an array expression of shape {p.expr.shape}",
+            lambda: f"expression must be a scalar but is an array expression of shape {p.expr.shape}",
         )
-        self.assert_or_error(p.expr.has_data, p, "QoI expression must not be constant")
+        self.assert_or_error(p.expr.has_data, p, "expression must not be constant")
         return p.expr
 
     @_("many_assign return_expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
@@ -113,10 +114,10 @@ class QoIParser(Parser):
         self.assert_or_error(
             not isinstance(p.expr, Array),
             p,
-            lambda: f"QoI return expression must be a scalar but is an array expression of shape {p.expr.shape}",
+            lambda: f"return expression must be a scalar but is an array expression of shape {p.expr.shape}",
         )
         self.assert_or_error(
-            p.expr.has_data, p, "QoI return expression must not be constant"
+            p.expr.has_data, p, "return expression must not be constant"
         )
         return p.expr
 
@@ -787,18 +788,20 @@ class QoIParser(Parser):
         oneof = " one of" if len(actions) > 1 else ""
 
         if t is None:
-            raise SyntaxError(
+            raise QuantityOfInterestSyntaxError.root(
                 f"expected more input but found EOF\nexpected{oneof} {options}"
             )
 
         t_value = f'"{t.value}"' if t.type == "STRING" else t.value
 
-        raise SyntaxError(
-            f"unexpected token `{t_value}` at line {t.lineno}, column {self.find_column(t)}\nexpected{oneof} {options}"
+        raise QuantityOfInterestSyntaxError(
+            f"unexpected token `{t_value}`\nexpected{oneof} {options}",
+            t.lineno,
+            self.find_column(t),
         )
 
     def raise_error(self, t, message):
-        raise SyntaxError(f"{message} at line {t.lineno}, column {self.find_column(t)}")
+        raise QuantityOfInterestSyntaxError(message, t.lineno, self.find_column(t))
 
     def assert_or_error(self, check, t, message):
         if not check:

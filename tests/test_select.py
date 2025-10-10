@@ -107,7 +107,7 @@ def test_inheritance():
 
 def test_parameter_validation():
     with pytest.raises(
-        AssertionError,
+        ValueError,
         match=r"parameter `` must be a valid identifier",
     ):
         Safeguards(

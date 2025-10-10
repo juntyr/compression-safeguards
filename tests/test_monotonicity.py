@@ -1,3 +1,4 @@
+import re
 from itertools import product
 
 import numpy as np
@@ -11,6 +12,7 @@ from compression_safeguards.safeguards.stencil.monotonicity import (
 )
 from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.cast import as_bits
+from compression_safeguards.utils.error import ParameterValueError
 
 from .codecs import (
     encode_decode_identity,
@@ -257,8 +259,10 @@ def test_late_bound_constant_boundary():
 
     for c in ["$x", "$X"]:
         with pytest.raises(
-            AssertionError,
-            match="late-bound constant boundary must be a scalar",
+            ParameterValueError,
+            match=re.escape(
+                f"monotonicity.constant_boundary: must be scalar but late-bound constant data {c} may not be"
+            ),
         ):
             safeguards = Safeguards(
                 safeguards=[

@@ -13,6 +13,7 @@ from typing_extensions import override  # MSPV 3.12
 from ...utils._compat import _ensure_array, _floating_smallest_subnormal
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
+from ...utils.error import _check_instance, _validate_safeguard
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import JSON, S, T
 from .abc import PointwiseSafeguard
@@ -58,15 +59,17 @@ class SignPreservingSafeguard(PointwiseSafeguard):
     kind: ClassVar[str] = "sign"
 
     def __init__(self, *, offset: int | float | str | Parameter = 0) -> None:
-        if isinstance(offset, Parameter):
-            self._offset = offset
-        elif isinstance(offset, str):
-            self._offset = Parameter(offset)
-        else:
-            assert isinstance(offset, int) or (not np.isnan(offset)), (
-                "offset must not be NaN"
-            )
-            self._offset = offset
+        with _validate_safeguard(self) as ctx:
+            with ctx.parameter("offset"):
+                _check_instance(offset, int | float | str | Parameter)
+                if isinstance(offset, Parameter):
+                    self._offset = offset
+                elif isinstance(offset, str):
+                    self._offset = Parameter(offset)
+                elif isinstance(offset, int) or (not np.isnan(offset)):
+                    self._offset = offset
+                else:
+                    raise ValueError("must not be NaN")
 
     @property
     @override
@@ -124,7 +127,9 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             if isinstance(self._offset, Parameter)
             else lossless_cast(self._offset, data.dtype, "sign safeguard offset")
         )
-        assert np.all(~np.isnan(offset)), "offset must not contain NaNs"
+        with _validate_safeguard(self) as ctx, ctx.late_bound_parameter("offset"):
+            if np.any(np.isnan(offset)):
+                raise ValueError("must not contain any NaN values")
 
         # values equal to the offset (sign=0) stay equal
         # values below (sign=-1) stay below,
@@ -174,7 +179,9 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             if isinstance(self._offset, Parameter)
             else lossless_cast(self._offset, data.dtype, "sign safeguard offset")
         )
-        assert np.all(~np.isnan(offsetf)), "offset must not contain NaNs"
+        with _validate_safeguard(self) as ctx, ctx.late_bound_parameter("offset"):
+            if np.any(np.isnan(offsetf)):
+                raise ValueError("must not contain any NaN values")
         offsetf_total: np.ndarray[
             tuple[()] | tuple[int], np.dtype[np.unsignedinteger]
         ] = to_total_order(offsetf)

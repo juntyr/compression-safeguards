@@ -13,6 +13,7 @@ from typing_extensions import override  # MSPV 3.12
 from ...utils._compat import _ensure_array
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import ToFloatMode, as_bits, saturating_finite_float_cast, to_float
+from ...utils.error import _check_instance, _validate_safeguard
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import JSON, S, T
 from ..eb import (
@@ -66,17 +67,24 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         *,
         equal_nan: bool = False,
     ) -> None:
-        self._type = type if isinstance(type, ErrorBound) else ErrorBound[type]
+        with _validate_safeguard(self) as ctx:
+            with ctx.enum_parameter("type", ErrorBound):
+                _check_instance(type, str | ErrorBound)
+                self._type = type if isinstance(type, ErrorBound) else ErrorBound[type]
 
-        if isinstance(eb, Parameter):
-            self._eb = eb
-        elif isinstance(eb, str):
-            self._eb = Parameter(eb)
-        else:
-            _check_error_bound(self._type, eb)
-            self._eb = eb
+            with ctx.parameter("eb"):
+                _check_instance(eb, int | float | str | Parameter)
+                if isinstance(eb, Parameter):
+                    self._eb = eb
+                elif isinstance(eb, str):
+                    self._eb = Parameter(eb)
+                else:
+                    _check_error_bound(self._type, eb)
+                    self._eb = eb
 
-        self._equal_nan = equal_nan
+            with ctx.parameter("equal_nan"):
+                _check_instance(equal_nan, bool)
+                self._equal_nan = equal_nan
 
     @property
     @override

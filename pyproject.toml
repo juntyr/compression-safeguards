@@ -55,7 +55,7 @@ test = [
     "zarr-any-numcodecs~=0.1.2; python_version >= '3.11'",
 ]
 doctest = ["griffe2md~=1.1", "pytest~=8.3", "pytest-codeblocks~=0.17.0"]
-typing = ["mypy~=1.14"]
+typing = ["mypy~=1.18"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

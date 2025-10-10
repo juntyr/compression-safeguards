@@ -25,6 +25,7 @@ from ...utils._compat import (
 )
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
+from ...utils.error import _check_instance, _validate_safeguard
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import JSON, S, T
 from . import BoundaryCondition, NeighbourhoodAxis, _pad_with_boundary
@@ -151,39 +152,55 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         constant_boundary: None | int | float | str | Parameter = None,
         axis: None | int = None,
     ) -> None:
-        self._monotonicity = (
-            monotonicity
-            if isinstance(monotonicity, Monotonicity)
-            else Monotonicity[monotonicity]
-        )
+        with _validate_safeguard(self) as ctx:
+            with ctx.enum_parameter("monotonicity", Monotonicity):
+                _check_instance(monotonicity, str | Monotonicity)
+                self._monotonicity = (
+                    monotonicity
+                    if isinstance(monotonicity, Monotonicity)
+                    else Monotonicity[monotonicity]
+                )
 
-        assert window > 0, "window size must be positive"
-        self._window = window
+            with ctx.parameter("window"):
+                _check_instance(window, int)
+                if window <= 0:
+                    raise ValueError("must be positive")
+                self._window = window
 
-        self._boundary = (
-            boundary
-            if isinstance(boundary, BoundaryCondition)
-            else BoundaryCondition[boundary]
-        )
-        assert (self._boundary != BoundaryCondition.constant) == (
-            constant_boundary is None
-        ), (
-            "constant_boundary must be provided if and only if the constant boundary condition is used"
-        )
+            with ctx.enum_parameter("boundary", BoundaryCondition):
+                _check_instance(boundary, str | BoundaryCondition)
+                self._boundary = (
+                    boundary
+                    if isinstance(boundary, BoundaryCondition)
+                    else BoundaryCondition[boundary]
+                )
 
-        if isinstance(constant_boundary, Parameter):
-            self._constant_boundary = constant_boundary
-        elif isinstance(constant_boundary, str):
-            self._constant_boundary = Parameter(constant_boundary)
-        else:
-            self._constant_boundary = constant_boundary
+            with ctx.parameter("constant_boundary"):
+                _check_instance(constant_boundary, None | int | float | str | Parameter)
+                if (self._boundary != BoundaryCondition.constant) != (
+                    constant_boundary is None
+                ):
+                    raise ValueError(
+                        "must be provided if and only if the constant boundary condition is used"
+                    )
 
-        if isinstance(self._constant_boundary, Parameter):
-            assert self._constant_boundary not in ["$x", "$X"], (
-                f"late-bound constant boundary must be a scalar but constant data {self._constant_boundary} may not be"
-            )
+                if isinstance(constant_boundary, Parameter):
+                    self._constant_boundary = constant_boundary
+                elif isinstance(constant_boundary, str):
+                    self._constant_boundary = Parameter(constant_boundary)
+                else:
+                    self._constant_boundary = constant_boundary
 
-        self._axis = axis
+                if isinstance(
+                    self._constant_boundary, Parameter
+                ) and self._constant_boundary in ["$x", "$X"]:
+                    raise ValueError(
+                        f"must be scalar but late-bound constant data {self._constant_boundary} may not be"
+                    )
+
+            with ctx.parameter("axis"):
+                _check_instance(axis, None | int)
+                self._axis = axis
 
     @property
     @override
