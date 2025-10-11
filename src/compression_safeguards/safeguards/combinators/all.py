@@ -12,6 +12,11 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
+from ...utils.error import (
+    _check_collection,
+    _check_instance,
+    _validate_safeguard_type,
+)
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import JSON, S, T
 from ..abc import Safeguard
@@ -57,21 +62,26 @@ class AllSafeguards(Safeguard):
     ) -> "_AllPointwiseSafeguards | _AllStencilSafeguards":
         from ... import SafeguardKind  # noqa: PLC0415
 
-        assert len(safeguards) > 0, "can only combine over at least one safeguard"
+        with _validate_safeguard_type(cls) as ctx:
+            with ctx.enum_parameter("safeguards", SafeguardKind):
+                _check_collection(
+                    safeguards, dict | PointwiseSafeguard | StencilSafeguard
+                )
 
-        safeguards_ = tuple(
-            safeguard
-            if isinstance(safeguard, PointwiseSafeguard | StencilSafeguard)
-            else SafeguardKind[safeguard["kind"]].value(  # type: ignore
-                **{p: v for p, v in safeguard.items() if p != "kind"}
-            )
-            for safeguard in safeguards
-        )
+                if len(safeguards) <= 0:
+                    raise ValueError("can only combine over at least one safeguard")
 
-        for safeguard in safeguards_:
-            assert isinstance(safeguard, PointwiseSafeguard | StencilSafeguard), (
-                f"{safeguard!r} is not a pointwise or stencil safeguard"
-            )
+                safeguards_ = tuple(
+                    safeguard
+                    if isinstance(safeguard, PointwiseSafeguard | StencilSafeguard)
+                    else SafeguardKind[safeguard["kind"]].value(  # type: ignore
+                        **{p: v for p, v in safeguard.items() if p != "kind"}
+                    )
+                    for safeguard in safeguards
+                )
+
+                for safeguard in safeguards_:
+                    _check_instance(safeguard, PointwiseSafeguard | StencilSafeguard)
 
         if all(isinstance(safeguard, PointwiseSafeguard) for safeguard in safeguards_):
             return _AllPointwiseSafeguards(*safeguards_)  # type: ignore

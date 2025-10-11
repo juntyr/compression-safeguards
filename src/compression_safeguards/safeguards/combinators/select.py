@@ -12,6 +12,12 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
+from ...utils.error import (
+    LateBoundSelectorIndexError,
+    _check_collection,
+    _check_instance,
+    _validate_safeguard_type,
+)
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import JSON, S, T
 from ..abc import Safeguard
@@ -67,23 +73,32 @@ class SelectSafeguard(Safeguard):
     ) -> "_SelectPointwiseSafeguard | _SelectStencilSafeguard":
         from ... import SafeguardKind  # noqa: PLC0415
 
-        selector = selector if isinstance(selector, Parameter) else Parameter(selector)
+        with _validate_safeguard_type(cls) as ctx:
+            with ctx.parameter("selector"):
+                _check_instance(selector, str | Parameter)
+                selector = (
+                    selector if isinstance(selector, Parameter) else Parameter(selector)
+                )
 
-        assert len(safeguards) > 0, "can only select over at least one safeguard"
+            with ctx.enum_parameter("safeguards", SafeguardKind):
+                _check_collection(
+                    safeguards, dict | PointwiseSafeguard | StencilSafeguard
+                )
 
-        safeguards_ = tuple(
-            safeguard
-            if isinstance(safeguard, PointwiseSafeguard | StencilSafeguard)
-            else SafeguardKind[safeguard["kind"]].value(  # type: ignore
-                **{p: v for p, v in safeguard.items() if p != "kind"}
-            )
-            for safeguard in safeguards
-        )
+                if len(safeguards) <= 0:
+                    raise ValueError("can only select over at least one safeguard")
 
-        for safeguard in safeguards_:
-            assert isinstance(safeguard, PointwiseSafeguard | StencilSafeguard), (
-                f"{safeguard!r} is not a pointwise or stencil safeguard"
-            )
+                safeguards_ = tuple(
+                    safeguard
+                    if isinstance(safeguard, PointwiseSafeguard | StencilSafeguard)
+                    else SafeguardKind[safeguard["kind"]].value(  # type: ignore
+                        **{p: v for p, v in safeguard.items() if p != "kind"}
+                    )
+                    for safeguard in safeguards
+                )
+
+                for safeguard in safeguards_:
+                    _check_instance(safeguard, PointwiseSafeguard | StencilSafeguard)
 
         if all(isinstance(safeguard, PointwiseSafeguard) for safeguard in safeguards_):
             return _SelectPointwiseSafeguard(selector, *safeguards_)  # type: ignore
@@ -252,7 +267,9 @@ class _SelectSafeguardBase(ABC):
         try:
             return np.choose(selector, oks)  # type: ignore
         except IndexError as err:
-            raise IndexError("invalid select safeguard selector indices") from err
+            raise LateBoundSelectorIndexError(
+                SelectSafeguard, Parameter("selector"), str(err)
+            )
 
     def compute_safe_intervals(
         self,
@@ -300,7 +317,9 @@ class _SelectSafeguardBase(ABC):
                 .T
             )
         except IndexError as err:
-            raise IndexError("invalid select safeguard selector indices") from err
+            raise LateBoundSelectorIndexError(
+                SelectSafeguard, Parameter("selector"), str(err)
+            )
 
         return valid
 

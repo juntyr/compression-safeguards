@@ -4,8 +4,10 @@ __all__ = [
     "ParameterTypeError",
     "LateBoundParameterTypeError",
     "QuantityOfInterestSyntaxError",
+    "LateBoundSelectorIndexError",
 ]
 
+from collections.abc import Collection
 from contextlib import AbstractContextManager, contextmanager
 from enum import Enum
 from types import UnionType
@@ -78,8 +80,23 @@ class LateBoundParameterTypeError(ParameterTypeError[T]):
     pass
 
 
-# class LateBoundSelectorIndexError(IndexError):
-#     pass
+class LateBoundSelectorIndexError(IndexError):
+    safeguard: type[Safeguard]
+    parameter: Parameter
+    message: str
+
+    def __init__(
+        self, safeguard: type[Safeguard], parameter: Parameter, message: str
+    ) -> None:
+        self.safeguard = safeguard
+        self.parameter = parameter
+        self.message = message
+
+        super().__init__(safeguard, parameter, message)
+
+    @override
+    def __str__(self) -> str:
+        return f"{self.safeguard.kind}.{self.parameter}: {self.message}"
 
 
 class QuantityOfInterestSyntaxError(SyntaxError):
@@ -105,6 +122,17 @@ def _check_instance(obj: object, tyx: type | UnionType) -> None | Never:
     raise _TypeCheckError(tyx, obj)
 
 
+def _check_collection(obj: object, tyx: type | UnionType) -> None | Never:
+    if not isinstance(obj, Collection):
+        raise _TypeCheckError(Collection[tyx], obj)
+
+    for e in obj:
+        if not isinstance(e, tyx):
+            raise _TypeCheckError(tyx, e)
+
+    return None
+
+
 class _TypeCheckError(TypeError):
     __slots__: tuple[str, ...] = ("expected", "found")
     expected: type | UnionType
@@ -122,6 +150,12 @@ class _TypeCheckError(TypeError):
 
 def _validate_safeguard(safeguard: Safeguard) -> "_SafeguardValidationContext":
     return _SafeguardValidationContext(type(safeguard))
+
+
+def _validate_safeguard_type(
+    safeguard: type[Safeguard],
+) -> "_SafeguardValidationContext":
+    return _SafeguardValidationContext(safeguard)
 
 
 class _SafeguardValidationContext(
