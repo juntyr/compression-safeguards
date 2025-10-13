@@ -11,6 +11,7 @@ from compression_safeguards.safeguards.stencil.qoi.eb import (
 from compression_safeguards.utils._float128 import _float128_dtype
 from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.cast import ToFloatMode, to_float
+from compression_safeguards.utils.error import QuantityOfInterestSyntaxError
 
 from .codecs import (
     encode_decode_identity,
@@ -170,36 +171,43 @@ CHECKS = [
 
 def test_variables():
     with pytest.raises(
-        AssertionError,
+        QuantityOfInterestSyntaxError,
         match=r'cannot assign to identifier `a`, assign to a variable V\["a"\] instead',
     ):
         check_all_codecs(np.array([]), "a = 4; return a", [(0, 0)])
     with pytest.raises(
-        AssertionError, match="stencil QoI variables use upper-case `V`"
+        QuantityOfInterestSyntaxError, match="stencil QoI variables use upper-case `V`"
     ):
         check_all_codecs(np.array([]), 'v["a"]', [(0, 0)])
     with pytest.raises(
-        AssertionError, match='invalid string literal with missing closing `"`'
+        QuantityOfInterestSyntaxError,
+        match='invalid string literal with missing closing `"`',
     ):
         check_all_codecs(np.array([]), 'V["a]', [(0, 0)])
-    with pytest.raises(AssertionError, match="invalid quoted parameter"):
+    with pytest.raises(QuantityOfInterestSyntaxError, match="invalid quoted parameter"):
         check_all_codecs(np.array([]), 'V["123"]', [(0, 0)])
-    with pytest.raises(AssertionError, match="invalid quoted parameter"):
+    with pytest.raises(QuantityOfInterestSyntaxError, match="invalid quoted parameter"):
         check_all_codecs(np.array([]), 'V["a 123"]', [(0, 0)])
     with pytest.raises(
-        AssertionError, match=r"variable name must not be built-in \(start with `\$`\)"
+        QuantityOfInterestSyntaxError,
+        match=r"variable name must not be built-in \(start with `\$`\)",
     ):
         check_all_codecs(np.array([]), 'V["$a"]', [(0, 0)])
-    with pytest.raises(AssertionError, match=r'undefined variable V\["a"\]'):
+    with pytest.raises(
+        QuantityOfInterestSyntaxError, match=r'undefined variable V\["a"\]'
+    ):
         check_all_codecs(np.array([]), 'V["a"]', [(0, 0)])
-    with pytest.raises(AssertionError, match=r'undefined variable V\["b"\]'):
+    with pytest.raises(
+        QuantityOfInterestSyntaxError, match=r'undefined variable V\["b"\]'
+    ):
         check_all_codecs(np.array([]), 'V["a"] = 3; return x + V["b"];', [(0, 0)])
-    with pytest.raises(AssertionError, match="unexpected token `=`"):
+    with pytest.raises(QuantityOfInterestSyntaxError, match="unexpected token `=`"):
         check_all_codecs(np.array([]), "1 = x", [(0, 0)])
-    with pytest.raises(AssertionError, match=r"expected `\(`"):
+    with pytest.raises(QuantityOfInterestSyntaxError, match=r"expected `\(`"):
         check_all_codecs(np.array([]), 'V["a"] = log; return x + V["a"];', [(0, 0)])
     with pytest.raises(
-        AssertionError, match=r'cannot override already-defined variable V\["a"\]'
+        QuantityOfInterestSyntaxError,
+        match=r'cannot override already-defined variable V\["a"\]',
     ):
         check_all_codecs(
             np.array([]), 'V["a"] = x + 1; V["a"] = V["a"]; return V["a"];', [(0, 0)]
@@ -218,11 +226,12 @@ def test_variables():
     check_all_codecs(np.array([]), 'c["$x"] * x', [(0, 0)])
 
     with pytest.raises(
-        AssertionError, match="index 1 is out of bounds for axis 0 with size 1"
+        QuantityOfInterestSyntaxError,
+        match="index 1 is out of bounds for axis 0 with size 1",
     ):
         check_all_codecs(np.array([]), 'V["a"] = X + 1; return V["a"][1];', [(0, 0)])
     with pytest.raises(
-        AssertionError,
+        QuantityOfInterestSyntaxError,
         match="too many indices for array: array is 1-dimensional, but 2 were indexed",
     ):
         check_all_codecs(np.array([]), 'V["a"] = X + 1; return V["a"][0,1];', [(0, 0)])
@@ -234,9 +243,9 @@ def test_variables():
 
 
 def test_invalid_array():
-    with pytest.raises(AssertionError, match="EOF"):
+    with pytest.raises(QuantityOfInterestSyntaxError, match="EOF"):
         check_all_codecs(np.empty(0), "[[1],", [(0, 0)])
-    with pytest.raises(AssertionError, match="empty array literal"):
+    with pytest.raises(QuantityOfInterestSyntaxError, match="empty array literal"):
         check_all_codecs(np.empty(0), "[]", [(0, 0)])
 
 
@@ -394,7 +403,7 @@ def test_finite_difference_array():
     decoded = np.zeros(5)
 
     with pytest.raises(
-        AssertionError,
+        QuantityOfInterestSyntaxError,
         match="expr must be a scalar array element expression, e.g. the centre value, not an array",
     ):
         encode_decode_mock(
@@ -442,7 +451,7 @@ def test_finite_difference_constant_grid_spacing():
     )
 
     with pytest.raises(
-        AssertionError,
+        QuantityOfInterestSyntaxError,
         match="grid_spacing must be a constant scalar expression, not an array",
     ):
         safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
@@ -501,7 +510,7 @@ def test_finite_difference_arbitrary_grid():
     )
 
     with pytest.raises(
-        AssertionError,
+        QuantityOfInterestSyntaxError,
         match="grid_centre must be a constant scalar array element expression",
     ):
         safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
@@ -539,7 +548,7 @@ def test_finite_difference_arbitrary_grid():
 
 def test_finite_difference_periodic_grid():
     with pytest.raises(
-        AssertionError,
+        QuantityOfInterestSyntaxError,
         match="grid_period must not reference late-bound constants",
     ):
         safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
@@ -590,7 +599,7 @@ def test_finite_difference_periodic_grid():
     )
 
     safeguard.compute_safe_intervals(
-        np.arange(5, dtype=np.uint64), late_bound=Bindings.empty()
+        np.arange(5, dtype=np.uint64), late_bound=Bindings.EMPTY
     )
 
 
@@ -1183,10 +1192,10 @@ def test_finite_difference_dx():
         corrected = safeguards.apply_correction(decoded, correction)
 
         data_finite_difference = safeguards.safeguards[0].evaluate_qoi(
-            data, Bindings.empty()
+            data, Bindings.EMPTY
         )
         corrected_finite_difference = safeguards.safeguards[0].evaluate_qoi(
-            corrected, Bindings.empty()
+            corrected, Bindings.EMPTY
         )
 
         assert data_finite_difference[len(data_finite_difference) // 2] == 10
@@ -1265,7 +1274,7 @@ def test_pointwise_normalised_absolute_error(check):
 def test_late_bound_constant_boundary():
     for c in ["$x", "$X"]:
         with pytest.raises(
-            AssertionError,
+            QuantityOfInterestSyntaxError,
             match="late-bound constant boundary must be a scalar",
         ):
             safeguard = StencilQuantityOfInterestErrorBoundSafeguard(

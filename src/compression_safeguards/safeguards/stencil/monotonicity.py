@@ -25,7 +25,7 @@ from ...utils._compat import (
 )
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
-from ...utils.error import _check_instance, _validate_safeguard
+from ...utils.error import ErrorContext, ParameterTypeError, ParameterValueError
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import JSON, S, T
 from . import BoundaryCondition, NeighbourhoodAxis, _pad_with_boundary
@@ -152,36 +152,48 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         constant_boundary: None | int | float | str | Parameter = None,
         axis: None | int = None,
     ) -> None:
-        with _validate_safeguard(self) as ctx:
-            with ctx.enum_parameter("monotonicity", Monotonicity):
-                _check_instance(monotonicity, str | Monotonicity)
+        with ErrorContext(self.kind).enter() as ctx:
+            with ctx.parameter("monotonicity"):
+                ParameterTypeError.check_instance_or_raise(
+                    monotonicity, str | Monotonicity, ctx.ctx
+                )
                 self._monotonicity = (
                     monotonicity
                     if isinstance(monotonicity, Monotonicity)
-                    else Monotonicity[monotonicity]
+                    else ParameterValueError.lookup_enum_or_raise(
+                        Monotonicity, monotonicity, ctx.ctx
+                    )
                 )
 
             with ctx.parameter("window"):
-                _check_instance(window, int)
+                ParameterTypeError.check_instance_or_raise(window, int, ctx.ctx)
                 if window <= 0:
-                    raise ValueError("must be positive")
+                    raise ParameterValueError("must be positive", ctx.ctx)
                 self._window = window
 
-            with ctx.enum_parameter("boundary", BoundaryCondition):
-                _check_instance(boundary, str | BoundaryCondition)
+            with ctx.parameter("boundary"):
+                ParameterTypeError.check_instance_or_raise(
+                    boundary, str | BoundaryCondition, ctx.ctx
+                )
                 self._boundary = (
                     boundary
                     if isinstance(boundary, BoundaryCondition)
-                    else BoundaryCondition[boundary]
+                    else ParameterValueError.lookup_enum_or_raise(
+                        BoundaryCondition, boundary, ctx.ctx
+                    )
                 )
 
             with ctx.parameter("constant_boundary"):
-                _check_instance(constant_boundary, None | int | float | str | Parameter)
+                ParameterTypeError.check_instance_or_raise(
+                    constant_boundary, None | int | float | str | Parameter, ctx.ctx
+                )
+
                 if (self._boundary != BoundaryCondition.constant) != (
                     constant_boundary is None
                 ):
-                    raise ValueError(
-                        "must be provided if and only if the constant boundary condition is used"
+                    raise ParameterValueError(
+                        "must be provided if and only if the constant boundary condition is used",
+                        ctx.ctx,
                     )
 
                 if isinstance(constant_boundary, Parameter):
@@ -194,12 +206,13 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 if isinstance(
                     self._constant_boundary, Parameter
                 ) and self._constant_boundary in ["$x", "$X"]:
-                    raise ValueError(
-                        f"must be scalar but late-bound constant data {self._constant_boundary} may not be"
+                    raise ParameterValueError(
+                        f"must be scalar but late-bound constant data {self._constant_boundary} may not be",
+                        ctx.ctx,
                     )
 
             with ctx.parameter("axis"):
-                _check_instance(axis, None | int)
+                ParameterTypeError.check_instance_or_raise(axis, None | int, ctx.ctx)
                 self._axis = axis
 
     @property

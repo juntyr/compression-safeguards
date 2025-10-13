@@ -19,6 +19,7 @@ from ....utils.cast import (
     saturating_finite_float_cast,
     to_float,
 )
+from ....utils.error import ErrorContext, ParameterTypeError, ParameterValueError
 from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import JSON, F, S, T
 from ..._qois import StencilQuantityOfInterest
@@ -164,43 +165,80 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         eb: int | float | str | Parameter,
         qoi_dtype: str | ToFloatMode = ToFloatMode.lossless,
     ) -> None:
-        self._neighbourhood = tuple(
-            axis
-            if isinstance(axis, NeighbourhoodBoundaryAxis)
-            else NeighbourhoodBoundaryAxis.from_config(axis)
-            for axis in neighbourhood
-        )
-        assert len(self._neighbourhood) > 0, "neighbourhood must not be empty"
-        assert len(set(axis.axis for axis in self._neighbourhood)) == len(
-            self._neighbourhood
-        ), "neighbourhood axes must be unique"
+        with ErrorContext(self.kind).enter() as ctx:
+            with ctx.parameter("qoi"):
+                ParameterTypeError.check_instance_or_raise(qoi, str, ctx.ctx)
 
-        self._type = type if isinstance(type, ErrorBound) else ErrorBound[type]
+            with ctx.parameter("neighbourhood"):
+                ParameterTypeError.check_instance_or_raise(
+                    neighbourhood, Sequence, ctx.ctx
+                )
 
-        if isinstance(eb, Parameter):
-            self._eb = eb
-        elif isinstance(eb, str):
-            self._eb = Parameter(eb)
-        else:
-            _check_error_bound(self._type, eb)
-            self._eb = eb
+                all_axes: list[int] = []
+                neighbourhood_: list[NeighbourhoodBoundaryAxis] = []
+                for i, axis in enumerate(neighbourhood):
+                    with ctx.index(i):
+                        ParameterTypeError.check_instance_or_raise(
+                            axis, dict | NeighbourhoodBoundaryAxis, ctx.ctx
+                        )
+                        axis_ = (
+                            axis
+                            if isinstance(axis, NeighbourhoodBoundaryAxis)
+                            else NeighbourhoodBoundaryAxis.from_config(axis)
+                        )
+                        if axis_.axis in all_axes:
+                            raise ParameterValueError("axis must be unique", ctx.ctx)
+                        all_axes.append(axis_.axis)
+                        neighbourhood_.append(axis_)
+                self._neighbourhood = tuple(neighbourhood_)
 
-        self._qoi_dtype = (
-            qoi_dtype if isinstance(qoi_dtype, ToFloatMode) else ToFloatMode[qoi_dtype]
-        )
+                if len(self._neighbourhood) <= 0:
+                    raise ParameterValueError("must not be empty", ctx.ctx)
+
+            with ctx.parameter("type"):
+                ParameterTypeError.check_instance_or_raise(
+                    type, str | ErrorBound, ctx.ctx
+                )
+                self._type = (
+                    type
+                    if isinstance(type, ErrorBound)
+                    else ParameterValueError.lookup_enum_or_raise(
+                        ErrorBound, type, ctx.ctx
+                    )
+                )
+
+            with ctx.parameter("eb"):
+                ParameterTypeError.check_instance_or_raise(
+                    eb, int | float | str | Parameter, ctx.ctx
+                )
+                if isinstance(eb, Parameter):
+                    self._eb = eb
+                elif isinstance(eb, str):
+                    self._eb = Parameter(eb)
+                else:
+                    _check_error_bound(self._type, eb)
+                    self._eb = eb
+
+            with ctx.parameter("qoi_dtype"):
+                ParameterTypeError.check_instance_or_raise(
+                    qoi_dtype, str | ToFloatMode, ctx.ctx
+                )
+                self._qoi_dtype = (
+                    qoi_dtype
+                    if isinstance(qoi_dtype, ToFloatMode)
+                    else ParameterValueError.lookup_enum_or_raise(
+                        ToFloatMode, qoi_dtype, ctx.ctx
+                    )
+                )
 
         shape = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
         I = tuple(axis.before for axis in self._neighbourhood)  # noqa: E741
 
-        try:
-            qoi_expr = StencilQuantityOfInterest(qoi, stencil_shape=shape, stencil_I=I)
-        except Exception as err:
-            raise AssertionError(
-                f"failed to parse stencil QoI expression {qoi!r}: {err}"
-            ) from err
-
-        self._qoi = qoi
-        self._qoi_expr = qoi_expr
+        with ctx.parameter("qoi"):
+            self._qoi = qoi
+            self._qoi_expr = StencilQuantityOfInterest(
+                qoi, stencil_shape=shape, stencil_I=I
+            )
 
     @property
     @override

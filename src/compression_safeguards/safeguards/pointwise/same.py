@@ -13,7 +13,7 @@ from typing_extensions import override  # MSPV 3.12
 from ...utils._compat import _ensure_array
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import as_bits, from_total_order, lossless_cast, to_total_order
-from ...utils.error import _check_instance, _validate_safeguard
+from ...utils.error import ErrorContext, ParameterTypeError
 from ...utils.intervals import Interval, IntervalUnion, Lower, Maximum, Minimum, Upper
 from ...utils.typing import JSON, S, T
 from .abc import PointwiseSafeguard
@@ -60,9 +60,11 @@ class SameValueSafeguard(PointwiseSafeguard):
     def __init__(
         self, value: int | float | str | Parameter, *, exclusive: bool = False
     ) -> None:
-        with _validate_safeguard(self) as ctx:
+        with ErrorContext(self.kind).enter() as ctx:
             with ctx.parameter("value"):
-                _check_instance(value, int | float | str | Parameter)
+                ParameterTypeError.check_instance_or_raise(
+                    value, int | float | str | Parameter, ctx.ctx
+                )
                 if isinstance(value, Parameter):
                     self._value = value
                 elif isinstance(value, str):
@@ -71,7 +73,7 @@ class SameValueSafeguard(PointwiseSafeguard):
                     self._value = value
 
             with ctx.parameter("exclusive"):
-                _check_instance(exclusive, bool)
+                ParameterTypeError.check_instance_or_raise(exclusive, bool, ctx.ctx)
                 self._exclusive = exclusive
 
     @property

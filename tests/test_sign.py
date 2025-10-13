@@ -136,7 +136,7 @@ def test_sign_intervals_zero():
     data = np.array([-1.0, 1.0])
 
     intervals = SignPreservingSafeguard(offset=+0.0).compute_safe_intervals(
-        data, late_bound=Bindings.empty()
+        data, late_bound=Bindings.EMPTY
     )
 
     np.testing.assert_equal(
@@ -149,7 +149,7 @@ def test_sign_intervals_zero():
     )
 
     intervals = SignPreservingSafeguard(offset=-0.0).compute_safe_intervals(
-        data, late_bound=Bindings.empty()
+        data, late_bound=Bindings.EMPTY
     )
 
     np.testing.assert_equal(

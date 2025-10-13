@@ -12,11 +12,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
-from ...utils.error import (
-    _check_collection,
-    _check_instance,
-    _validate_safeguard_type,
-)
+from ...utils.error import ErrorContext, ParameterTypeError, ParameterValueError
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import JSON, S, T
 from ..abc import Safeguard
@@ -62,26 +58,37 @@ class AnySafeguard(Safeguard):
     ) -> "_AnyPointwiseSafeguard | _AnyStencilSafeguard":
         from ... import SafeguardKind  # noqa: PLC0415
 
-        with _validate_safeguard_type(cls) as ctx:
-            with ctx.enum_parameter("safeguards", SafeguardKind):
-                _check_collection(
-                    safeguards, dict | PointwiseSafeguard | StencilSafeguard
+        with ErrorContext(cls.kind).enter() as ctx:
+            with ctx.parameter("safeguards"):
+                ParameterTypeError.check_instance_or_raise(
+                    safeguards, Collection, ctx.ctx
                 )
 
                 if len(safeguards) <= 0:
-                    raise ValueError("can only combine over at least one safeguard")
-
-                safeguards_ = tuple(
-                    safeguard
-                    if isinstance(safeguard, PointwiseSafeguard | StencilSafeguard)
-                    else SafeguardKind[safeguard["kind"]].value(  # type: ignore
-                        **{p: v for p, v in safeguard.items() if p != "kind"}
+                    raise ParameterValueError(
+                        "can only combine over at least one safeguard", ctx.ctx
                     )
-                    for safeguard in safeguards
-                )
 
-                for safeguard in safeguards_:
-                    _check_instance(safeguard, PointwiseSafeguard | StencilSafeguard)
+                safeguards_: list[PointwiseSafeguard | StencilSafeguard] = []
+                safeguard: dict[str, JSON] | Safeguard
+                for i, safeguard in enumerate(safeguards):
+                    with ctx.index(i):
+                        ParameterTypeError.check_instance_or_raise(
+                            safeguard,
+                            dict | PointwiseSafeguard | StencilSafeguard,
+                            ctx.ctx,
+                        )
+                        if isinstance(safeguard, dict):
+                            safeguard = SafeguardKind.from_config(safeguard, ctx.ctx)
+                        if not isinstance(
+                            safeguard, PointwiseSafeguard | StencilSafeguard
+                        ):
+                            raise ParameterTypeError(
+                                PointwiseSafeguard | StencilSafeguard,
+                                safeguard,
+                                ctx.ctx,
+                            )
+                        safeguards_.append(safeguard)
 
         if all(isinstance(safeguard, PointwiseSafeguard) for safeguard in safeguards_):
             return _AnyPointwiseSafeguard(*safeguards_)  # type: ignore

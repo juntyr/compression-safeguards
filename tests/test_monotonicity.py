@@ -168,26 +168,26 @@ def test_monotonicity():
             # if the window activates the safeguard ...
             if data_window in active_allowed:
                 # the check has to return the expected result
-                assert safeguard.check(
-                    data, prediction, late_bound=Bindings.empty()
-                ) == (prediction_window in active_allowed[data_window])
+                assert safeguard.check(data, prediction, late_bound=Bindings.EMPTY) == (
+                    prediction_window in active_allowed[data_window]
+                )
 
                 # correcting the data must pass both checks
                 corrected = safeguard.compute_safe_intervals(
-                    data, late_bound=Bindings.empty()
+                    data, late_bound=Bindings.EMPTY
                 ).pick(prediction)
-                assert safeguard.check(data, corrected, late_bound=Bindings.empty())
+                assert safeguard.check(data, corrected, late_bound=Bindings.EMPTY)
             else:
                 # the window doesn't activate the safeguard so the checks must
                 #  succeed
-                assert safeguard.check(data, prediction, late_bound=Bindings.empty())
+                assert safeguard.check(data, prediction, late_bound=Bindings.EMPTY)
 
                 # the window doesn't activate the safeguard so the corrected
                 #  array should be bit-equivalent to the prediction array
                 assert np.array_equal(
                     as_bits(
                         safeguard.compute_safe_intervals(
-                            data, late_bound=Bindings.empty()
+                            data, late_bound=Bindings.EMPTY
                         ).pick(prediction)
                     ),
                     as_bits(prediction),

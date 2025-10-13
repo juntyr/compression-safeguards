@@ -6,6 +6,9 @@ __all__ = ["SafeguardKind"]
 
 from enum import Enum
 
+from ..utils.error import ErrorContext, ParameterTypeError, ParameterValueError
+from ..utils.typing import JSON
+from .abc import Safeguard
 from .combinators.all import AllSafeguards
 from .combinators.any import AnySafeguard
 from .combinators.assume_safe import AssumeAlwaysSafeguard
@@ -57,3 +60,54 @@ class SafeguardKind(Enum):
 
     select = SelectSafeguard
     """Select, pointwise, which safeguard's guarantees to enforce."""
+
+    @staticmethod
+    def from_config(config: dict[str, JSON], context: ErrorContext) -> Safeguard:
+        """
+        Instantiate a safeguard from a configuration [`dict`][dict].
+
+        The `config` must contain the safeguard's `kind`.
+
+        Parameters
+        ----------
+        config : dict[str, JSON]
+            Configuration of the safeguard.
+
+        Returns
+        -------
+        safeguard : Safeguard
+            Instantiated safeguard.
+
+        Raises
+        ------
+        ParameterValueError
+            if the `config` does not contain the safeguard `kind` or the
+            `kind` is unknown.
+        ParameterTypeError
+            if the safeguard `kind` is not a [`str`][str]ing.
+        ParameterValueError
+            if instantiating the safeguard from the `config` fails.
+        """
+
+        if "kind" not in config:
+            raise ParameterValueError("missing safeguard `kind`", context)
+
+        kind = config["kind"]
+
+        with context.enter() as ctx:
+            with ctx.parameter("kind"):
+                ParameterTypeError.check_instance_or_raise(kind, str, ctx.ctx)
+                safeguard: type[Safeguard] = ParameterValueError.lookup_enum_or_raise(
+                    SafeguardKind,
+                    kind,  # type: ignore
+                    ctx.ctx,
+                ).value
+
+            try:
+                return safeguard.from_config(
+                    {p: v for p, v in config.items() if p != "kind"}
+                )
+            except Exception as err:
+                raise ParameterValueError(
+                    "invalid safeguard configuration", ctx.ctx
+                ) from err

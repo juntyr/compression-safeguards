@@ -166,7 +166,7 @@ class Safeguards:
         data: np.ndarray[S, np.dtype[T]],
         prediction: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str | Parameter, Value] | Bindings = Bindings.empty(),
+        late_bound: Mapping[str | Parameter, Value] | Bindings = Bindings.EMPTY,
     ) -> bool:
         """
         Check if the `prediction` array upholds the properties enforced by the safeguards with respect to the `data` array.
@@ -217,7 +217,7 @@ class Safeguards:
         data: np.ndarray[S, np.dtype[T]],
         prediction: np.ndarray[S, np.dtype[T]],
         *,
-        late_bound: Mapping[str | Parameter, Value] | Bindings = Bindings.empty(),
+        late_bound: Mapping[str | Parameter, Value] | Bindings = Bindings.EMPTY,
     ) -> np.ndarray[S, np.dtype[C]]:
         """
         Compute the correction required to make the `prediction` array satisfy the safeguards relative to the `data` array.
@@ -577,7 +577,7 @@ class Safeguards:
             ],
             ...,
         ],
-        late_bound_chunk: Mapping[str | Parameter, Value] | Bindings = Bindings.empty(),
+        late_bound_chunk: Mapping[str | Parameter, Value] | Bindings = Bindings.EMPTY,
     ) -> bool:
         """
         Check if the `prediction_chunk` array chunk upholds the properties enforced by the safeguards with respect to the `data_chunk` array chunk.
@@ -683,7 +683,7 @@ class Safeguards:
             ...,
         ],
         any_chunk_check_failed: bool,
-        late_bound_chunk: Mapping[str | Parameter, Value] | Bindings = Bindings.empty(),
+        late_bound_chunk: Mapping[str | Parameter, Value] | Bindings = Bindings.EMPTY,
     ) -> np.ndarray[tuple[int, ...], np.dtype[C]]:
         """
         Compute the correction required to make the `prediction_chunk` array chunk satisfy the safeguards relative to the `data_chunk` array chunk.

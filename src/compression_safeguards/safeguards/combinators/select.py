@@ -13,10 +13,10 @@ from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
 from ...utils.error import (
+    ErrorContext,
     LateBoundSelectorIndexError,
-    _check_collection,
-    _check_instance,
-    _validate_safeguard_type,
+    ParameterTypeError,
+    ParameterValueError,
 )
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import JSON, S, T
@@ -73,32 +73,45 @@ class SelectSafeguard(Safeguard):
     ) -> "_SelectPointwiseSafeguard | _SelectStencilSafeguard":
         from ... import SafeguardKind  # noqa: PLC0415
 
-        with _validate_safeguard_type(cls) as ctx:
+        with ErrorContext(cls.kind).enter() as ctx:
             with ctx.parameter("selector"):
-                _check_instance(selector, str | Parameter)
+                ParameterTypeError.check_instance_or_raise(
+                    selector, str | Parameter, ctx.ctx
+                )
                 selector = (
                     selector if isinstance(selector, Parameter) else Parameter(selector)
                 )
 
-            with ctx.enum_parameter("safeguards", SafeguardKind):
-                _check_collection(
-                    safeguards, dict | PointwiseSafeguard | StencilSafeguard
+            with ctx.parameter("safeguards"):
+                ParameterTypeError.check_instance_or_raise(
+                    safeguards, Collection, ctx.ctx
                 )
 
                 if len(safeguards) <= 0:
-                    raise ValueError("can only select over at least one safeguard")
-
-                safeguards_ = tuple(
-                    safeguard
-                    if isinstance(safeguard, PointwiseSafeguard | StencilSafeguard)
-                    else SafeguardKind[safeguard["kind"]].value(  # type: ignore
-                        **{p: v for p, v in safeguard.items() if p != "kind"}
+                    raise ParameterValueError(
+                        "can only select over at least one safeguard", ctx.ctx
                     )
-                    for safeguard in safeguards
-                )
 
-                for safeguard in safeguards_:
-                    _check_instance(safeguard, PointwiseSafeguard | StencilSafeguard)
+                safeguards_: list[PointwiseSafeguard | StencilSafeguard] = []
+                safeguard: dict[str, JSON] | Safeguard
+                for i, safeguard in enumerate(safeguards):
+                    with ctx.index(i):
+                        ParameterTypeError.check_instance_or_raise(
+                            safeguard,
+                            dict | PointwiseSafeguard | StencilSafeguard,
+                            ctx.ctx,
+                        )
+                        if isinstance(safeguard, dict):
+                            safeguard = SafeguardKind.from_config(safeguard, ctx.ctx)
+                        if not isinstance(
+                            safeguard, PointwiseSafeguard | StencilSafeguard
+                        ):
+                            raise ParameterTypeError(
+                                PointwiseSafeguard | StencilSafeguard,
+                                safeguard,
+                                ctx.ctx,
+                            )
+                        safeguards_.append(safeguard)
 
         if all(isinstance(safeguard, PointwiseSafeguard) for safeguard in safeguards_):
             return _SelectPointwiseSafeguard(selector, *safeguards_)  # type: ignore
@@ -268,7 +281,7 @@ class _SelectSafeguardBase(ABC):
             return np.choose(selector, oks)  # type: ignore
         except IndexError as err:
             raise LateBoundSelectorIndexError(
-                SelectSafeguard, Parameter("selector"), str(err)
+                str(err), ErrorContext(self.kind, "selector")
             )
 
     def compute_safe_intervals(
@@ -318,7 +331,7 @@ class _SelectSafeguardBase(ABC):
             )
         except IndexError as err:
             raise LateBoundSelectorIndexError(
-                SelectSafeguard, Parameter("selector"), str(err)
+                str(err), ErrorContext(self.kind, "selector")
             )
 
         return valid

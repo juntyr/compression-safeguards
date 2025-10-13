@@ -1,102 +1,162 @@
 __all__ = [
+    "ErrorContext",
     "ParameterValueError",
     "LateBoundParameterValueError",
     "ParameterTypeError",
     "LateBoundParameterTypeError",
     "QuantityOfInterestSyntaxError",
     "LateBoundSelectorIndexError",
+    "LateBoundParameterResolutionError",
 ]
 
-from collections.abc import Collection
 from contextlib import AbstractContextManager, contextmanager
 from enum import Enum
 from types import UnionType
-from typing import Generic, TypeVar
+from typing import TypeVar
 
+import numpy as np
 from typing_extensions import (
     Never,  # MSPV 3.11
     override,  # MSPV 3.12
 )
 
-from ..safeguards.abc import Safeguard
 from .bindings import Parameter
-
-T = TypeVar("T", covariant=True)
-""" Any type (covariant). """
 
 Ei = TypeVar("Ei", bound=Enum)
 """ Any enum type (invariant). """
 
 
-class ParameterValueError(ValueError):
-    safeguard: type[Safeguard]
-    parameter: Parameter
-    message: str
+class ErrorContext:
+    __slots__: tuple[str, ...] = ("_path",)
+    _path: tuple[str, ...]
 
-    def __init__(
-        self, safeguard: type[Safeguard], parameter: Parameter, message: str
-    ) -> None:
-        self.safeguard = safeguard
-        self.parameter = parameter
-        self.message = message
+    def __init__(self, *path: str):
+        self._path = path
 
-        super().__init__(safeguard, parameter, message)
+    def enter(self) -> "ErrorContextManager":
+        return ErrorContextManager(self)
+
+    def push(self, p: str) -> "ErrorContext":
+        return ErrorContext(*self._path, p)
 
     @override
     def __str__(self) -> str:
-        return f"{self.safeguard.kind}.{self.parameter}: {self.message}"
+        return f"{'.'.join(self._path)}"
+
+
+class ErrorContextManager(AbstractContextManager["ErrorContextManager", None]):
+    __slots__: tuple[str, ...] = ("_context",)
+    _context: ErrorContext
+
+    def __init__(self, context: ErrorContext):
+        self._context = context
+
+    @override
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        return None
+
+    @contextmanager
+    def repr(self, value: object):
+        old_context = self._context
+        self._context = old_context.push(repr(value))
+        yield self
+
+    @contextmanager
+    def parameter(self, name: str | Parameter):
+        old_context = self._context
+        self._context = old_context.push(str(name))
+        yield self
+
+    @contextmanager
+    def index(self, index: int):
+        old_context = self._context
+        self._context = old_context.push(f"[{index}]")
+        yield self
+
+    @property
+    def ctx(self) -> ErrorContext:
+        return self._context
+
+
+class ParameterValueError(ValueError):
+    message: str
+    context: ErrorContext
+
+    def __init__(self, message: str, context: ErrorContext) -> None:
+        self.message = message
+        self.context = context
+
+        super().__init__(message, context)
+
+    @classmethod
+    def lookup_enum_or_raise(
+        cls, enum: type[Ei], name: str, context: ErrorContext
+    ) -> Ei | Never:
+        if name in enum.__members__:
+            return enum.__members__[name]
+
+        raise cls(
+            f"unknown {enum.__name__} {name!r}, use one of "
+            + f"{', '.join(repr(m) for m in enum.__members__)}",
+            context,
+        )
+
+    @override
+    def __str__(self) -> str:
+        return f"{self.context}: {self.message}"
 
 
 class LateBoundParameterValueError(ParameterValueError):
     pass
 
 
-class ParameterTypeError(Generic[T], TypeError):
-    safeguard: type[Safeguard]
-    parameter: Parameter
+class ParameterTypeError(TypeError):
     expected: type | UnionType
     found: object
+    context: ErrorContext
 
     def __init__(
         self,
-        safeguard: type[Safeguard],
-        parameter: Parameter,
         expected: type | UnionType,
         found: object,
+        context: ErrorContext,
     ) -> None:
-        self.safeguard = safeguard
-        self.parameter = parameter
         self.expected = expected
         self.found = found
+        self.context = context
 
-        super().__init__(safeguard, parameter, expected, found)
+        super().__init__(expected, found, context)
+
+    @classmethod
+    def check_instance_or_raise(
+        cls, obj: object, expected: type | UnionType, context: ErrorContext
+    ) -> None | Never:
+        if isinstance(obj, expected):
+            return None
+        raise cls(expected, obj, context)
 
     @override
     def __str__(self) -> str:
-        return f"{self.safeguard.kind}.{self.parameter}: expected {self.expected} but found {self.found} of type {type(self.found)}"
+        return f"{self.context}: expected {self.expected} but found {self.found} of type {type(self.found)}"
 
 
-class LateBoundParameterTypeError(ParameterTypeError[T]):
+class LateBoundParameterTypeError(ParameterTypeError):
     pass
 
 
 class LateBoundSelectorIndexError(IndexError):
-    safeguard: type[Safeguard]
-    parameter: Parameter
     message: str
+    context: ErrorContext
 
-    def __init__(
-        self, safeguard: type[Safeguard], parameter: Parameter, message: str
-    ) -> None:
-        self.safeguard = safeguard
-        self.parameter = parameter
+    def __init__(self, message: str, context: ErrorContext) -> None:
         self.message = message
+        self.context = context
 
-        super().__init__(safeguard, parameter, message)
+        super().__init__(message, context)
 
     @override
     def __str__(self) -> str:
-        return f"{self.safeguard.kind}.{self.parameter}: {self.message}"
+        return f"{self.context}: {self.message}"
 
 
 class QuantityOfInterestSyntaxError(SyntaxError):
@@ -108,107 +168,73 @@ class QuantityOfInterestSyntaxError(SyntaxError):
         return QuantityOfInterestSyntaxError(message, None, None)  # type: ignore
 
 
+class LateBoundParameterResolutionError(KeyError):
+    expected: frozenset[Parameter]
+    provided: frozenset[Parameter]
+
+    def __init__(self, expected: frozenset[Parameter], provided: frozenset[Parameter]):
+        assert expected != provided
+        self.expected = expected
+        self.provided = provided
+        super().__init__(expected, provided)
+
+    @staticmethod
+    def check_or_raise(
+        expected: frozenset[Parameter], provided: frozenset[Parameter]
+    ) -> None | Never:
+        if expected == provided:
+            return None
+        raise LateBoundParameterResolutionError(expected, provided)
+
+    @override
+    def __str__(self) -> str:
+        missing = self.expected - self.provided
+        missing_str = (
+            "missing late-bound parameter"
+            + ("s " if len(missing) > 1 else " ")
+            + ", ".join(f"`{p}`" for p in missing)
+        )
+
+        extraneous = self.provided - self.expected
+        extraneous_str = (
+            "extraneous late-bound parameter"
+            + ("s " if len(extraneous) > 1 else " ")
+            + ", ".join(f"`{p}`" for p in extraneous)
+        )
+
+        if len(missing) <= 0:
+            return extraneous_str
+
+        if len(extraneous) <= 0:
+            return missing_str
+
+        return f"{missing} and {extraneous}"
+
+
+class UnsupportedDateTypeError(TypeError):
+    dtype: np.dtype
+    supported: frozenset[np.dtype]
+
+    def __init__(self, dtype: np.dtype, supported: frozenset[np.dtype]):
+        assert dtype not in supported
+        self.dtype = dtype
+        self.supported = supported
+        super().__init__(dtype, supported)
+
+    @staticmethod
+    def check_or_raise(dtype: np.dtype, supported: frozenset[np.dtype]) -> None | Never:
+        if dtype in supported:
+            return None
+        raise UnsupportedDateTypeError(dtype, supported)
+
+    @override
+    def __str__(self) -> str:
+        return f"unsupported data type {self.dtype.name}, only {', '.join(d.name for d in sorted(self.supported))} are supported"
+
+
 # class ParameterComplexityWarning(UserWarning):
 #     pass
 
 
 # class QuantityOfInterestRuntimeWarning(RuntimeWarning):
 #     pass
-
-
-def _check_instance(obj: object, tyx: type | UnionType) -> None | Never:
-    if isinstance(obj, tyx):
-        return None
-    raise _TypeCheckError(tyx, obj)
-
-
-def _check_collection(obj: object, tyx: type | UnionType) -> None | Never:
-    if not isinstance(obj, Collection):
-        raise _TypeCheckError(Collection[tyx], obj)
-
-    for e in obj:
-        if not isinstance(e, tyx):
-            raise _TypeCheckError(tyx, e)
-
-    return None
-
-
-class _TypeCheckError(TypeError):
-    __slots__: tuple[str, ...] = ("expected", "found")
-    expected: type | UnionType
-    found: object
-
-    def __init__(self, expected: type | UnionType, found: object) -> None:
-        self.expected = expected
-        self.found = found
-        super().__init__(expected, found)
-
-    @override
-    def __str__(self) -> str:
-        return f"expected {self.expected} but found {self.found} of type {type(self.found)}"
-
-
-def _validate_safeguard(safeguard: Safeguard) -> "_SafeguardValidationContext":
-    return _SafeguardValidationContext(type(safeguard))
-
-
-def _validate_safeguard_type(
-    safeguard: type[Safeguard],
-) -> "_SafeguardValidationContext":
-    return _SafeguardValidationContext(safeguard)
-
-
-class _SafeguardValidationContext(
-    AbstractContextManager["_SafeguardValidationContext", None]
-):
-    __slots__: tuple[str, ...] = ("_safeguard",)
-    _safeguard: type[Safeguard]
-
-    def __init__(self, safeguard: type[Safeguard]):
-        self._safeguard = safeguard
-
-    @override
-    def __exit__(self, exc_type, exc_value, traceback) -> None:
-        return None
-
-    @contextmanager
-    def parameter(self, parameter: str | Parameter):
-        try:
-            yield
-        except _TypeCheckError as err:
-            raise ParameterTypeError(
-                self._safeguard, Parameter(parameter), err.expected, err.found
-            )
-        except ValueError as err:
-            raise ParameterValueError(self._safeguard, Parameter(parameter), str(err))
-
-    @contextmanager
-    def enum_parameter(self, parameter: str | Parameter, enum: type[Ei]):
-        try:
-            yield
-        except _TypeCheckError as err:
-            raise ParameterTypeError(
-                self._safeguard, Parameter(parameter), err.expected, err.found
-            )
-        except KeyError as err:
-            raise ParameterValueError(
-                self._safeguard,
-                Parameter(parameter),
-                f"unknown {enum.__name__} {err.args[0]!r}, use one of "
-                + f"{', '.join(repr(m) for m in enum.__members__)}",
-            )
-        except ValueError as err:
-            raise ParameterValueError(self._safeguard, Parameter(parameter), str(err))
-
-    @contextmanager
-    def late_bound_parameter(self, parameter: str | Parameter):
-        try:
-            yield
-        except _TypeCheckError as err:
-            raise LateBoundParameterTypeError(
-                self._safeguard, Parameter(parameter), err.expected, err.found
-            )
-        except ValueError as err:
-            raise LateBoundParameterValueError(
-                self._safeguard, Parameter(parameter), str(err)
-            )

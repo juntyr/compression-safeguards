@@ -20,7 +20,7 @@ def test_missing_extraneous_bindings():
     )
 
     with pytest.raises(AssertionError, match=r"missing bindings.+eb.+,.+zero"):
-        safeguards.compute_correction(data, prediction, late_bound=Bindings.empty())
+        safeguards.compute_correction(data, prediction, late_bound=Bindings.EMPTY)
 
     with pytest.raises(AssertionError, match=r"extraneous bindings.+\$x"):
         safeguards.compute_correction(

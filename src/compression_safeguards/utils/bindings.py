@@ -77,23 +77,15 @@ class Bindings:
     __slots__: tuple[str, ...] = ("_bindings",)
     _bindings: MappingProxyType[Parameter, Value]
 
+    EMPTY: "Bindings"
+    """
+    Empty bindings.
+    """
+
     def __init__(self, **kwargs: Value) -> None:
         self._bindings = MappingProxyType(
             {Parameter(name): value for name, value in kwargs.items()}
         )
-
-    @staticmethod
-    def empty() -> "Bindings":
-        """
-        Create empty bindings.
-
-        Returns
-        -------
-        empty : Bindings
-            Empty bindings.
-        """
-
-        return Bindings()
 
     def update(self, **kwargs: Value) -> Self:
         """
@@ -409,6 +401,9 @@ class Bindings:
         """
 
         return cls(**{p: _decode_value(Parameter(p), v) for p, v in config.items()})  # type: ignore
+
+
+Bindings.EMPTY = Bindings()
 
 
 _NPZ_DATA_URI_BASE64: str = "data:application/x-npz;base64,"

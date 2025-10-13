@@ -638,7 +638,7 @@ def test_gaussian_kernel():
 
     assert (
         safeguard.evaluate_qoi(
-            np.array(1.0, dtype=np.float64), late_bound=Bindings.empty()
+            np.array(1.0, dtype=np.float64), late_bound=Bindings.EMPTY
         )
         == kernel[5, 5]
     )
