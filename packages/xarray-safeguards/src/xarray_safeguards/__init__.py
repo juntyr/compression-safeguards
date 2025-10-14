@@ -835,6 +835,8 @@ class DatasetSafeguardedAccessor:
     ------
     AttributeError
         if the dataset does not contain not-yet-applied safeguards corrections.
+    RuntimeError
+        if the attributes of the safeguards correction are invalid.
     """
 
     __slots__: tuple[str, ...] = ()
@@ -842,14 +844,24 @@ class DatasetSafeguardedAccessor:
     def __new__(cls, ds: xr.Dataset) -> xr.Dataset:  # type: ignore
         corrected: dict[str, xr.DataArray] = dict()
 
-        for v in ds.data_vars.values():
+        for vn, v in ds.data_vars.items():
             if "safeguarded" in v.attrs:
                 kp = v.attrs["safeguarded"]
-                assert kp is not None, "safeguarded attr must not be None"
-                assert kp in ds.data_vars, (
-                    "safeguarded attr must refer to another variable"
-                )
-                assert "safeguards" in v.attrs, "safeguards attr must exist"
+                if kp is None:
+                    raise RuntimeError(
+                        f"data variable {vn!r} is a safeguards correction but "
+                        + "its `safeguarded` attribute must not be None"
+                    )
+                if kp not in ds.data_vars:
+                    raise RuntimeError(
+                        f"data variable {vn!r} is a safeguards correction for "
+                        + f"{kp!r} but there is no variable of that name"
+                    )
+                if "safeguards" not in v.attrs:
+                    raise RuntimeError(
+                        f"data variable {vn!r} is missing the `safeguards` "
+                        + "attribute"
+                    )
 
                 corrected[kp] = apply_data_array_correction(ds.data_vars[kp], v)
 
