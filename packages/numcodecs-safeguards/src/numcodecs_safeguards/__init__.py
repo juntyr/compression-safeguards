@@ -97,6 +97,7 @@ from compression_safeguards.utils.error import (
 from compression_safeguards.utils.typing import JSON
 from numcodecs.abc import Codec
 from numcodecs_combinators.abc import CodecCombinatorMixin
+from semver import Version
 from typing_extensions import (
     Buffer,  # MSPV 3.12
     Self,  # MSPV 3.11
@@ -202,7 +203,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         The lossless encoding must encode to a 1D buffer of bytes.
     _version : ...
-        The codecs's version. Do not provide this parameter explicitly.
+        The version of the codec. Do not provide this parameter explicitly.
 
     Raises
     ------
@@ -236,7 +237,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         safeguards: Collection[dict[str, JSON] | Safeguard],
         fixed_constants: Mapping[str | Parameter, Value] | Bindings = Bindings.EMPTY,
         lossless: None | dict[str, JSON] | Lossless = None,
-        _version: None | str = None,
+        _version: None | str | Version = None,
     ) -> None:
         wraps_safeguards_codec = False
 
@@ -418,6 +419,8 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         ------
         UnsupportedDateTypeError
             if the `buf`fer uses an unsupported data type.
+        RuntimeError
+            if decoding with the `codec` with `out=None` fails.
         RuntimError
             if `codec` and `lossless` do not encode to 1D bytes or do not
             recreate the data's dtype and shape during decoding.
@@ -451,7 +454,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 err.add_note(message)  # type: ignore
                 raise err
             else:
-                raise ValueError(message) from err
+                raise RuntimeError(message) from err
         decoded = numcodecs.compat.ensure_ndarray(decoded)
 
         if self._lossless_for_codec is not None:
@@ -621,7 +624,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 else self._lossless_for_codec.get_config(),
                 for_safeguards=self._lossless_for_safeguards.get_config(),
             ),
-            _version=self._safeguards.version,
+            _version=str(self._safeguards.version),
         )
 
     @classmethod

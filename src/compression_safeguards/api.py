@@ -9,6 +9,7 @@ from collections.abc import Collection, Mapping, Set
 from typing import Final, Literal
 
 import numpy as np
+from semver import Version
 from typing_extensions import (
     Self,  # MSPV 3.11
     assert_never,  # MSPV 3.11
@@ -23,6 +24,14 @@ from .safeguards.stencil.abc import StencilSafeguard
 from .utils._compat import _ones, _zeros
 from .utils.bindings import Bindings, Parameter, Value
 from .utils.cast import as_bits
+from .utils.error import (
+    IncompatibleChunkStencilError,
+    IncompatibleSafeguardsVersion,
+    LateBoundParameterResolutionError,
+    SafeguardsSafetyBug,
+    UnsupportedDateTypeError,
+    UnsupportedSafeguardError,
+)
 from .utils.intervals import IntervalUnion  # noqa: TC001
 from .utils.typing import JSON, C, S, T
 
@@ -42,7 +51,13 @@ class Safeguards:
         [`SafeguardKind`][compression_safeguards.safeguards.SafeguardKind]
         for an enumeration of all supported safeguards.
     _version : ...
-        The safeguards' version. Do not provide this parameter explicitly.
+        The version of the safeguards. Do not provide this parameter explicitly.
+
+    Raises
+    ------
+    IncompatibleSafeguardsVersion
+        if the safeguards are instantiated with a configuration from an
+        incompatible version of the safeguards.
     """
 
     __slots__: tuple[str, ...] = ("_pointwise_safeguards", "_stencil_safeguards")
@@ -53,12 +68,15 @@ class Safeguards:
         self,
         *,
         safeguards: Collection[dict[str, JSON] | Safeguard],
-        _version: None | str = None,
+        _version: None | str | Version = None,
     ) -> None:
         if _version is not None:
-            assert _version == _FORMAT_VERSION
+            _version = (
+                _version if isinstance(_version, Version) else Version.parse(_version)
+            )
+            IncompatibleSafeguardsVersion.check_or_raise(self.version, _version)
 
-        safeguards = [
+        safeguards_: list[Safeguard] = [
             safeguard
             if isinstance(safeguard, Safeguard)
             else SafeguardKind[safeguard["kind"]].value(  # type: ignore
@@ -69,23 +87,22 @@ class Safeguards:
 
         self._pointwise_safeguards = tuple(
             safeguard
-            for safeguard in safeguards
+            for safeguard in safeguards_
             if isinstance(safeguard, PointwiseSafeguard)
         )
         self._stencil_safeguards = tuple(
             safeguard
-            for safeguard in safeguards
+            for safeguard in safeguards_
             if isinstance(safeguard, StencilSafeguard)
         )
-        unsupported_safeguards = [
+        unsupported_safeguards = tuple(
             safeguard
-            for safeguard in safeguards
+            for safeguard in safeguards_
             if not isinstance(safeguard, PointwiseSafeguard | StencilSafeguard)
-        ]
-
-        assert len(unsupported_safeguards) == 0, (
-            f"unsupported safeguards {unsupported_safeguards!r}"
         )
+
+        if len(unsupported_safeguards) > 0:
+            raise UnsupportedSafeguardError(unsupported_safeguards)
 
     @property
     def safeguards(self) -> Collection[Safeguard]:
@@ -120,18 +137,31 @@ class Safeguards:
         return frozenset([Parameter("$x"), Parameter("$X")])
 
     @property
-    def version(self) -> str:
+    def version(self) -> Version:
         """
-        The version of the format of the correction computed by the
-        [`compute_correction`][compression_safeguards.api.Safeguards.compute_correction]
-        method.
+        The semantic version [^1] of the safeguards provided by this package,
+        which covers
 
-        The safeguards can only
-        [`apply_correction`][compression_safeguards.api.Safeguards.apply_correction]s
-        with the matching version.
+        - the guarantees provided by the safeguards (can only be weaked in a
+          new breaking major release)
+        - the configurations of the safeguards (can be extended backwards-
+          compatibly in a new minor release)
+        - the format of the safeguards corrections (can only be changed in a
+          new breaking major release)
+
+        The [`Safeguards`][compression_safeguards.api.Safeguards] can only load
+        configurations for and apply corrections produced by safeguards with a
+        compatible semantic version.
+
+        Note that the version of the safeguards may be different from the
+        version of the `compression-safeguards` package, which may make changes
+        to the implementation or programmatic API without needing to increase
+        the version of the safeguards.
+
+        [^1]: <https://semver.org>
         """
 
-        return _FORMAT_VERSION
+        return _SAFEGUARDS_VERSION
 
     @staticmethod
     def supported_dtypes() -> frozenset[np.dtype[np.number]]:
@@ -196,6 +226,18 @@ class Safeguards:
         -------
         ok : bool
             `True` if the check succeeded.
+
+        Raises
+        ------
+        UnsupportedDateTypeError
+            if the `data` uses an unsupported data type.
+        ValueError
+            if the `data`'s dtype or shape do not match the `prediction`'s.
+        RuntimeError
+            if the `data` array is chunked.
+        LateBoundParameterResolutionError
+            if `late_bound` does not resolve all late-bound parameters of the
+            safeguards or includes any extraneous parameters.
         """
 
         late_bound = self._prepare_non_chunked_bindings(
@@ -254,6 +296,18 @@ class Safeguards:
         -------
         correction : np.ndarray[S, np.dtype[C]]
             The correction array.
+
+        Raises
+        ------
+        UnsupportedDateTypeError
+            if the `data` uses an unsupported data type.
+        ValueError
+            if the `data`'s dtype or shape do not match the `prediction`'s.
+        RuntimeError
+            if the `data` array is chunked.
+        LateBoundParameterResolutionError
+            if `late_bound` does not resolve all late-bound parameters of the
+            safeguards or includes any extraneous parameters.
         """
 
         late_bound = self._prepare_non_chunked_bindings(
@@ -281,9 +335,11 @@ class Safeguards:
         all_intervals: list[IntervalUnion[T, int, int]] = []
         for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
             intervals = safeguard.compute_safe_intervals(data, late_bound=late_bound)
-            assert np.all(intervals.contains(data)), (
-                f"safeguard {safeguard!r}'s intervals must contain the original data"
-            )
+            if not np.all(intervals.contains(data)):
+                raise SafeguardsSafetyBug(
+                    f"the safe intervals for the {safeguard!r} safeguard do "
+                    + "not contain the original data"
+                )
             all_intervals.append(intervals)
 
         combined_intervals = all_intervals[0]
@@ -292,12 +348,16 @@ class Safeguards:
         corrected = combined_intervals.pick(prediction)
 
         for safeguard, intervals in zip(self.safeguards, all_intervals):
-            assert np.all(intervals.contains(corrected)), (
-                f"safeguard {safeguard!r} interval does not contain the corrected array {corrected!r}"
-            )
-            assert safeguard.check(data, corrected, late_bound=late_bound), (
-                f"safeguard {safeguard!r} check fails with corrected array {corrected!r} on data {data!r}"
-            )
+            if not np.all(intervals.contains(corrected)):
+                raise SafeguardsSafetyBug(
+                    f"the safe intervals for the {safeguard!r} safeguard do "
+                    + "not contain the corrected array"
+                )
+            if not safeguard.check(data, corrected, late_bound=late_bound):
+                raise SafeguardsSafetyBug(
+                    f"the check for the {safeguard!r} safeguard fails with "
+                    + "the corrected array"
+                )
 
         prediction_bits: np.ndarray[S, np.dtype[C]] = as_bits(prediction)
         corrected_bits: np.ndarray[S, np.dtype[C]] = as_bits(corrected)
@@ -317,25 +377,25 @@ class Safeguards:
         description: str,
         chunked_method_name: str,
     ) -> Bindings:
-        assert data.dtype in _SUPPORTED_DTYPES, (
-            f"can only safeguard arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
-        )
+        UnsupportedDateTypeError.check_or_raise(data.dtype, _SUPPORTED_DTYPES)
 
         # ensure we don't accidentally forget to handle new kinds of safeguards here
         assert len(self.safeguards) == len(self._pointwise_safeguards) + len(
             self._stencil_safeguards
         )
 
-        if len(self._stencil_safeguards) > 0:
-            assert not getattr(data, "chunked", False), (
+        if len(self._stencil_safeguards) > 0 and getattr(data, "chunked", False):
+            raise RuntimeError(
                 f"{description} for an individual chunk in a chunked array is "
-                "unsafe when using stencil safeguards since their safety "
-                "requirements cannot be guaranteed across chunk boundaries; "
-                f"use {chunked_method_name} instead"
+                + "unsafe when using stencil safeguards since their safety "
+                + "requirements cannot be guaranteed across chunk boundaries; "
+                + f"use {chunked_method_name} instead"
             )
 
-        assert data.dtype == prediction.dtype
-        assert data.shape == prediction.shape
+        if data.dtype != prediction.dtype:
+            raise ValueError("data.dtype must match prediction.dtype")
+        if data.shape != prediction.shape:
+            raise ValueError("data.shape must match prediction.shape")
 
         late_bound = (
             late_bound if isinstance(late_bound, Bindings) else Bindings(**late_bound)
@@ -345,11 +405,10 @@ class Safeguards:
         late_bound_builtin = {
             p: data for p in late_bound_reqs if p in self.builtin_late_bound
         }
-        late_bound_reqs = late_bound_reqs - late_bound_builtin.keys()
+        late_bound_reqs = frozenset(late_bound_reqs - late_bound_builtin.keys())
         late_bound_keys = frozenset(late_bound.parameters())
-        assert late_bound_reqs == late_bound_keys, (
-            f"late_bound is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} "
-            f"/ has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
+        LateBoundParameterResolutionError.check_or_raise(
+            late_bound_reqs, late_bound_keys
         )
 
         if len(late_bound_builtin) > 0:
@@ -384,9 +443,21 @@ class Safeguards:
         -------
         corrected : np.ndarray[S, np.dtype[T]]
             The corrected array, which satisfies the safeguards.
+
+        Raises
+        ------
+        ValueError
+            if the `correction`'s shape dos not match the `prediction`'s, or if
+            the `correction`'s dtype does not match the correction dtype for
+            the `prediction`'s dtype.
         """
 
-        assert correction.shape == prediction.shape
+        if correction.dtype != self.correction_dtype_for_data(prediction.dtype):
+            raise ValueError(
+                "correction.dtype must match the correction dtype for prediction.dtype"
+            )
+        if correction.shape != prediction.shape:
+            raise ValueError("correction.shape must match prediction.shape")
 
         prediction_bits: np.ndarray[S, np.dtype[C]] = as_bits(prediction)
         correction_bits = correction
@@ -634,6 +705,21 @@ class Safeguards:
         -------
         chunk_ok : bool
             `True` if the check succeeded for the chunk.
+
+        Raises
+        ------
+        UnsupportedDateTypeError
+            if the `data_chunk` uses an unsupported data type.
+        ValueError
+            if the `data_chunk`'s dtype or shape do not match the
+            `prediction_chunk`'s, or if the length of the `data_shape`,
+            `chunk_offset`, or `chunk_stencil` do not match the dimensionality
+            of the `data`.
+        IncompatibleChunkStencilError
+            if the `chunk_stencil` is not compatible with the required stencil.
+        LateBoundParameterResolutionError
+            if `late_bound` does not resolve all late-bound parameters of the
+            safeguards or includes any extraneous parameters.
         """
 
         data_chunk_, prediction_chunk_, late_bound_chunk, non_stencil_indices = (
@@ -750,6 +836,21 @@ class Safeguards:
             The correction array chunk. The correction chunk is truncated to
             remove the stencil, i.e. it only contains the correction for the
             non-stencil-extended chunk.
+
+        Raises
+        ------
+        UnsupportedDateTypeError
+            if the `data_chunk` uses an unsupported data type.
+        ValueError
+            if the `data_chunk`'s dtype or shape do not match the
+            `prediction_chunk`'s, or if the length of the `data_shape`,
+            `chunk_offset`, or `chunk_stencil` do not match the dimensionality
+            of the `data`.
+        IncompatibleChunkStencilError
+            if the `chunk_stencil` is not compatible with the required stencil.
+        LateBoundParameterResolutionError
+            if `late_bound` does not resolve all late-bound parameters of the
+            safeguards or includes any extraneous parameters.
         """
 
         data_chunk_, prediction_chunk_, late_bound_chunk, non_stencil_indices = (
@@ -809,38 +910,43 @@ class Safeguards:
             intervals = safeguard.compute_safe_intervals(
                 data_chunk_, late_bound=late_bound_chunk
             )
-            assert np.all(intervals.contains(data_chunk_)), (
-                f"safeguard {safeguard!r}'s intervals must contain the original data"
-            )
+            if not np.all(intervals.contains(data_chunk_)):
+                raise SafeguardsSafetyBug(
+                    f"the safe intervals for the {safeguard!r} safeguard must contain the original data chunk"
+                )
             all_intervals.append(intervals)
 
         combined_intervals = all_intervals[0]
         for intervals in all_intervals[1:]:
             combined_intervals = combined_intervals.intersect(intervals)
-        correction_chunk = combined_intervals.pick(prediction_chunk_)
+        corrected_chunk = combined_intervals.pick(prediction_chunk_)
 
         for safeguard, intervals in zip(self.safeguards, all_intervals):
-            assert np.all(intervals.contains(correction_chunk)), (
-                f"safeguard {safeguard!r} interval does not contain the correction {correction_chunk!r}"
-            )
-            assert safeguard.check(
-                data_chunk_, correction_chunk, late_bound=late_bound_chunk
-            ), (
-                f"safeguard {safeguard!r} check fails after correction {correction_chunk!r} on data {data_chunk_!r}"
-            )
+            if not np.all(intervals.contains(corrected_chunk)):
+                raise SafeguardsSafetyBug(
+                    f"the safe intervals for the {safeguard!r} safeguard do "
+                    + "not contain the corrected array chunk"
+                )
+            if not safeguard.check(
+                data_chunk_, corrected_chunk, late_bound=late_bound_chunk
+            ):
+                raise SafeguardsSafetyBug(
+                    f"the check for the {safeguard!r} safeguard fails with "
+                    + "the corrected array chunk"
+                )
 
         prediction_chunk_bits: np.ndarray[tuple[int, ...], np.dtype[C]] = as_bits(
             prediction_chunk_
         )
-        correction_chunk_bits: np.ndarray[tuple[int, ...], np.dtype[C]] = as_bits(
-            correction_chunk
+        corrected_chunk_bits: np.ndarray[tuple[int, ...], np.dtype[C]] = as_bits(
+            corrected_chunk
         )
 
         with np.errstate(
             over="ignore",
             under="ignore",
         ):
-            return (correction_chunk_bits - prediction_chunk_bits)[
+            return (corrected_chunk_bits - prediction_chunk_bits)[
                 tuple(non_stencil_indices)
             ]
 
@@ -865,15 +971,18 @@ class Safeguards:
         Bindings,
         tuple[slice, ...],
     ]:
-        assert data_chunk.dtype in _SUPPORTED_DTYPES, (
-            f"can only safeguard arrays of dtype {', '.join(d.str for d in _SUPPORTED_DTYPES)}"
-        )
+        UnsupportedDateTypeError.check_or_raise(data_chunk.dtype, _SUPPORTED_DTYPES)
 
-        assert data_chunk.dtype == prediction_chunk.dtype
-        assert data_chunk.shape == prediction_chunk.shape
-        assert len(data_shape) == data_chunk.ndim
-        assert len(chunk_offset) == data_chunk.ndim
-        assert len(chunk_stencil) == data_chunk.ndim
+        if data_chunk.dtype != prediction_chunk.dtype:
+            raise ValueError("data_chunk.dtype must match prediction_chunk.dtype")
+        if data_chunk.shape != prediction_chunk.shape:
+            raise ValueError("data_chunk.shape must match prediction_chunk.shape")
+        if len(data_shape) != data_chunk.ndim:
+            raise ValueError("len(data_shape) must match data_chunk.ndim")
+        if len(chunk_offset) != data_chunk.ndim:
+            raise ValueError("len(chunk_offset) must match data_chunk.ndim")
+        if len(chunk_stencil) != data_chunk.ndim:
+            raise ValueError("len(chunk_stencil) must match data_chunk.ndim")
 
         chunk_shape: tuple[int, ...] = tuple(
             a - s[1].before - s[1].after
@@ -911,7 +1020,12 @@ class Safeguards:
                     # we need to check that we requested a valid boundary,
                     #  which is only compatible with itself
                     # and that the stencil is large enough
-                    assert r[0] == BoundaryCondition.valid
+                    if r[0] != BoundaryCondition.valid:
+                        raise IncompatibleChunkStencilError(
+                            f"requires {r[0].name} stencil boundary but found "
+                            + "valid boundary",
+                            i,
+                        )
 
                     # what is the required stencil after adjusting for near-
                     #  boundary stencil truncation?
@@ -922,8 +1036,18 @@ class Safeguards:
                             data_shape[i] - chunk_shape[i] - chunk_offset[i],
                         ),
                     )
-                    assert c[1].before >= rs.before
-                    assert c[1].after >= rs.after
+                    if c[1].before < rs.before:
+                        raise IncompatibleChunkStencilError(
+                            f"requires stencil with at least {rs.before} point"
+                            + f"(s) before but received only {c[1].before}",
+                            i,
+                        )
+                    if c[1].after < rs.after:
+                        raise IncompatibleChunkStencilError(
+                            f"requires stencil with at least {rs.after} point"
+                            + f"(s) before but received only {c[1].after}",
+                            i,
+                        )
 
                     stencil_indices.append(
                         slice(
@@ -937,7 +1061,12 @@ class Safeguards:
                     )
                 case BoundaryCondition.wrap:
                     # a wrapping boundary is compatible with any other boundary
-                    assert r[0] in (BoundaryCondition.valid, BoundaryCondition.wrap)
+                    if r[0] not in (BoundaryCondition.valid, BoundaryCondition.wrap):
+                        raise IncompatibleChunkStencilError(
+                            f"requires {r[0].name} stencil boundary but found "
+                            + "wrapping boundary",
+                            i,
+                        )
 
                     # what is the required stencil after adjusting for near-
                     #  boundary stencil truncation?
@@ -990,8 +1119,18 @@ class Safeguards:
                             )
                         ),
                     )
-                    assert c[1].before >= rs.before
-                    assert c[1].after >= rs.after
+                    if c[1].before < rs.before:
+                        raise IncompatibleChunkStencilError(
+                            f"requires stencil with at least {rs.before} point"
+                            + f"(s) before but received only {c[1].before}",
+                            i,
+                        )
+                    if c[1].after < rs.after:
+                        raise IncompatibleChunkStencilError(
+                            f"requires stencil with at least {rs.after} point"
+                            + f"(s) before but received only {c[1].after}",
+                            i,
+                        )
 
                     roll_before = max(0, rs.before - chunk_offset[i])
                     roll_after = max(
@@ -1042,11 +1181,10 @@ class Safeguards:
         late_bound_builtin = {
             p: data_chunk_ for p in late_bound_reqs if p in self.builtin_late_bound
         }
-        late_bound_reqs = late_bound_reqs - late_bound_builtin.keys()
+        late_bound_reqs = frozenset(late_bound_reqs - late_bound_builtin.keys())
         late_bound_keys = frozenset(late_bound_chunk.parameters())
-        assert late_bound_reqs == late_bound_keys, (
-            f"late_bound_chunk is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} "
-            f"/ has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
+        LateBoundParameterResolutionError.check_or_raise(
+            late_bound_reqs, late_bound_keys
         )
 
         if len(late_bound_builtin) > 0:
@@ -1070,8 +1208,8 @@ class Safeguards:
         """
 
         return dict(
-            _version=self.version,
             safeguards=[safeguard.get_config() for safeguard in self.safeguards],
+            _version=str(self.version),
         )
 
     @classmethod
@@ -1097,7 +1235,7 @@ class Safeguards:
         return f"{type(self).__name__}(safeguards={list(self.safeguards)!r})"
 
 
-_FORMAT_VERSION: Final[str] = "0.1.x"
+_SAFEGUARDS_VERSION: Final[Version] = Version(1, 0, 0)
 
 
 _SUPPORTED_DTYPES: Final[frozenset[np.dtype[np.number]]] = frozenset(

@@ -1,6 +1,9 @@
 __all__ = [
     "ErrorContext",
+    "IncompatibleSafeguardsVersion",
+    "UnsupportedSafeguardError",
     "ParameterValueError",
+    "IncompatibleChunkStencilError",
     "LateBoundParameterValueError",
     "ParameterTypeError",
     "LateBoundParameterTypeError",
@@ -15,10 +18,13 @@ from types import UnionType
 from typing import TypeVar
 
 import numpy as np
+from semver import Version
 from typing_extensions import (
     Never,  # MSPV 3.11
     override,  # MSPV 3.12
 )
+
+from compression_safeguards.safeguards.abc import Safeguard
 
 from .bindings import Parameter
 
@@ -78,6 +84,80 @@ class ErrorContextManager(AbstractContextManager["ErrorContextManager", None]):
         return self._context
 
 
+class IncompatibleSafeguardsVersion(ValueError):
+    safeguards: Version
+    incompatible: Version
+
+    def __init__(self, safeguards: Version, incompatible: Version) -> None:
+        assert not incompatible.is_compatible(safeguards)
+        self.safeguards = safeguards
+        self.incompatible = incompatible
+        super().__init__(safeguards, incompatible)
+
+    @staticmethod
+    def check_or_raise(safeguards: Version, version: Version) -> None | Never:
+        if version.is_compatible(safeguards):
+            return None
+        raise IncompatibleSafeguardsVersion(safeguards, version)
+
+    @override
+    def __str__(self) -> str:
+        return (
+            f"{self.incompatible} is not semantic-versioning-compatible with "
+            + f"the safeguards version {self.safeguards}"
+        )
+
+
+class UnsupportedSafeguardError(ValueError):
+    safeguards: tuple[Safeguard, ...]
+
+    def __init__(self, safeguards: tuple[Safeguard, ...]) -> None:
+        self.safeguards = safeguards
+        super().__init__(safeguards)
+
+    @override
+    def __str__(self) -> str:
+        return repr(list(self.safeguards))
+
+
+class SafeguardsSafetyBug(RuntimeError):
+    message: str
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+        super().__init__(message)
+
+        message = (
+            "This is a bug in the implementation of the "
+            + "`compression-safeguards`. Please report it at "
+            + "<https://github.com/juntyr/compression-safeguards/issues>."
+        )
+
+        # MSPV 3.11
+        if getattr(self, "add_note", None) is not None:
+            self.add_note(message)  # type: ignore
+        else:
+            self.message = f"{self.message}\n\n{message}"
+
+    @override
+    def __str__(self) -> str:
+        return self.message
+
+
+class IncompatibleChunkStencilError(ValueError):
+    message: str
+    axis: int
+
+    def __init__(self, message: str, axis: int) -> None:
+        self.message = message
+        self.axis = axis
+        super().__init__(message, axis)
+
+    @override
+    def __str__(self) -> str:
+        return f"{self.message} on axis {self.axis}"
+
+
 class ParameterValueError(ValueError):
     message: str
     context: ErrorContext
@@ -85,7 +165,6 @@ class ParameterValueError(ValueError):
     def __init__(self, message: str, context: ErrorContext) -> None:
         self.message = message
         self.context = context
-
         super().__init__(message, context)
 
     @classmethod
@@ -124,7 +203,6 @@ class ParameterTypeError(TypeError):
         self.expected = expected
         self.found = found
         self.context = context
-
         super().__init__(expected, found, context)
 
     @classmethod
@@ -151,7 +229,6 @@ class LateBoundSelectorIndexError(IndexError):
     def __init__(self, message: str, context: ErrorContext) -> None:
         self.message = message
         self.context = context
-
         super().__init__(message, context)
 
     @override
