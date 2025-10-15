@@ -7,6 +7,7 @@ from typing_extensions import override  # MSPV 3.12
 
 from ...utils._compat import _ensure_array
 from ...utils.bindings import Parameter
+from ...utils.error import QuantityOfInterestSyntaxError
 from ..qois import (
     PointwiseQuantityOfInterestExpression,
     StencilQuantityOfInterestExpression,
@@ -41,10 +42,17 @@ class PointwiseQuantityOfInterest:
 
         expr = parser.parse(qoi, lexer.tokenize(qoi))
         assert isinstance(expr, Expr)
-        assert not isinstance(expr, Array), (
-            f"QoI expression must be a scalar but is an array expression of shape {expr.shape}"
-        )
-        assert expr.has_data, "QoI expression must not be constant"
+
+        if isinstance(expr, Array):
+            raise QuantityOfInterestSyntaxError.root(
+                "QoI expression must evaluate to a scalar, not an array "
+                + f"expression of shape {expr.shape}"
+            )
+
+        if not expr.has_data:
+            raise QuantityOfInterestSyntaxError.root(
+                "QoI expression must not be constant"
+            )
 
         late_bound_constants = expr.late_bound_constants
 
@@ -200,10 +208,17 @@ class StencilQuantityOfInterest:
 
         expr = parser.parse(qoi, lexer.tokenize(qoi))
         assert isinstance(expr, Expr)
-        assert not isinstance(expr, Array), (
-            f"QoI expression must be a scalar but is an array expression of shape {expr.shape}"
-        )
-        assert expr.has_data, "QoI expression must not be constant"
+
+        if isinstance(expr, Array):
+            raise QuantityOfInterestSyntaxError.root(
+                "QoI expression must evaluate to a scalar, not an array "
+                + f"expression of shape {expr.shape}"
+            )
+
+        if not expr.has_data:
+            raise QuantityOfInterestSyntaxError.root(
+                "QoI expression must not be constant"
+            )
 
         late_bound_constants = expr.late_bound_constants
 

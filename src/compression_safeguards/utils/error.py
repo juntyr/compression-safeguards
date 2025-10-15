@@ -45,6 +45,9 @@ class ErrorContext:
     def push(self, p: str) -> "ErrorContext":
         return ErrorContext(*self._path, p)
 
+    def extend(self, other: "ErrorContext") -> "ErrorContext":
+        return ErrorContext(*self._path, *other._path)
+
     @override
     def __str__(self) -> str:
         return f"{'.'.join(self._path)}"

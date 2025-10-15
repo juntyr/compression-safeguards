@@ -13,7 +13,12 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import _ensure_array
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import ToFloatMode, saturating_finite_float_cast, to_float
-from ....utils.error import ErrorContext, ParameterTypeError, ParameterValueError
+from ....utils.error import (
+    ErrorContext,
+    LateBoundParameterValueError,
+    ParameterTypeError,
+    ParameterValueError,
+)
 from ....utils.intervals import IntervalUnion
 from ....utils.typing import JSON, F, S, T
 from ..._qois import PointwiseQuantityOfInterest
@@ -131,7 +136,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                 elif isinstance(eb, str):
                     self._eb = Parameter(eb)
                 else:
-                    _check_error_bound(self._type, eb)
+                    _check_error_bound(self._type, eb, ParameterValueError, ctx.ctx)
                     self._eb = eb
 
             with ctx.parameter("qoi_dtype"):
@@ -263,7 +268,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                 self._eb, qoi_data.dtype, "pointwise QoI error bound safeguard eb"
             )
         )
-        _check_error_bound(self._type, eb)
+        with ErrorContext(self.kind).enter() as ctx, ctx.parameter("eb"):
+            _check_error_bound(self._type, eb, LateBoundParameterValueError, ctx.ctx)
 
         finite_ok: np.ndarray[S, np.dtype[np.bool]] = np.less_equal(
             _compute_finite_absolute_error(self._type, qoi_data, qoi_prediction),
@@ -325,7 +331,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                 self._eb, data_qoi.dtype, "pointwise QoI error bound safeguard eb"
             )
         )
-        _check_error_bound(self._type, eb)
+        with ErrorContext(self.kind).enter() as ctx, ctx.parameter("eb"):
+            _check_error_bound(self._type, eb, LateBoundParameterValueError, ctx.ctx)
 
         qoi_lower_upper: tuple[
             np.ndarray[S, np.dtype[np.floating]], np.ndarray[S, np.dtype[np.floating]]

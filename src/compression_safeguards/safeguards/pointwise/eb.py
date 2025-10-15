@@ -13,7 +13,12 @@ from typing_extensions import override  # MSPV 3.12
 from ...utils._compat import _ensure_array
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import ToFloatMode, as_bits, saturating_finite_float_cast, to_float
-from ...utils.error import ErrorContext, ParameterTypeError, ParameterValueError
+from ...utils.error import (
+    ErrorContext,
+    LateBoundParameterValueError,
+    ParameterTypeError,
+    ParameterValueError,
+)
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import JSON, S, T
 from ..eb import (
@@ -89,7 +94,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
                 elif isinstance(eb, str):
                     self._eb = Parameter(eb)
                 else:
-                    _check_error_bound(self._type, eb)
+                    _check_error_bound(self._type, eb, ParameterValueError, ctx.ctx)
                     self._eb = eb
 
             with ctx.parameter("equal_nan"):
@@ -158,7 +163,8 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
                 self._eb, data_float.dtype, "error bound safeguard eb"
             )
         )
-        _check_error_bound(self._type, eb)
+        with ErrorContext(self.kind).enter() as ctx, ctx.parameter("eb"):
+            _check_error_bound(self._type, eb, LateBoundParameterValueError, ctx.ctx)
 
         finite_ok: np.ndarray[S, np.dtype[np.bool]] = np.less_equal(
             _compute_finite_absolute_error(self._type, data_float, prediction_float),
@@ -220,7 +226,8 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
                 self._eb, data_float.dtype, "error bound safeguard eb"
             )
         )
-        _check_error_bound(self._type, eb)
+        with ErrorContext(self.kind).enter() as ctx, ctx.parameter("eb"):
+            _check_error_bound(self._type, eb, LateBoundParameterValueError, ctx.ctx)
 
         lower, upper = _apply_finite_error_bound(
             self._type, eb, data, to_float(data, ftype=ftype)

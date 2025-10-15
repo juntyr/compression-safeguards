@@ -19,7 +19,12 @@ from ....utils.cast import (
     saturating_finite_float_cast,
     to_float,
 )
-from ....utils.error import ErrorContext, ParameterTypeError, ParameterValueError
+from ....utils.error import (
+    ErrorContext,
+    LateBoundParameterValueError,
+    ParameterTypeError,
+    ParameterValueError,
+)
 from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import JSON, F, S, T
 from ..._qois import StencilQuantityOfInterest
@@ -181,11 +186,15 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                         ParameterTypeError.check_instance_or_raise(
                             axis, dict | NeighbourhoodBoundaryAxis, ctx.ctx
                         )
-                        axis_ = (
-                            axis
-                            if isinstance(axis, NeighbourhoodBoundaryAxis)
-                            else NeighbourhoodBoundaryAxis.from_config(axis)
-                        )
+                        try:
+                            axis_ = (
+                                axis
+                                if isinstance(axis, NeighbourhoodBoundaryAxis)
+                                else NeighbourhoodBoundaryAxis.from_config(axis)
+                            )
+                        except (ParameterValueError, ParameterTypeError) as err:
+                            err.context = ctx.ctx.extend(err.context)
+                            raise err
                         if axis_.axis in all_axes:
                             raise ParameterValueError("axis must be unique", ctx.ctx)
                         all_axes.append(axis_.axis)
@@ -216,7 +225,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 elif isinstance(eb, str):
                     self._eb = Parameter(eb)
                 else:
-                    _check_error_bound(self._type, eb)
+                    _check_error_bound(self._type, eb, ParameterValueError, ctx.ctx)
                     self._eb = eb
 
             with ctx.parameter("qoi_dtype"):
@@ -594,7 +603,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         )
         if isinstance(self._eb, Parameter):
             eb = self.truncate_data_to_qoi_shape(eb)  # and then truncate it
-        _check_error_bound(self._type, eb)
+        with ErrorContext(self.kind).enter() as ctx, ctx.parameter("eb"):
+            _check_error_bound(self._type, eb, LateBoundParameterValueError, ctx.ctx)
 
         finite_ok = _compute_finite_absolute_error(
             self._type, qoi_data, qoi_prediction
@@ -751,7 +761,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         )
         if isinstance(self._eb, Parameter):
             eb = self.truncate_data_to_qoi_shape(eb)  # and then truncate it
-        _check_error_bound(self._type, eb)
+        with ErrorContext(self.kind).enter() as ctx, ctx.parameter("eb"):
+            _check_error_bound(self._type, eb, LateBoundParameterValueError, ctx.ctx)
 
         qoi_lower_upper: tuple[
             np.ndarray[tuple[int, ...], np.dtype[np.floating]],
