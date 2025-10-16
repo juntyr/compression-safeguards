@@ -323,7 +323,7 @@ def to_total_order(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[U]]:
             )
 
     if not np.issubdtype(a.dtype, np.floating):
-        raise TypeError(f"unsupported interval type {a.dtype}")
+        raise TypeError(f"unsupported data type {a.dtype}")
 
     itype = a.dtype.str.replace("f", "i")
     bits = np.iinfo(utype).bits
@@ -370,7 +370,7 @@ def from_total_order(
             return a.view(dtype) + shift + dtype.type(1)
 
     if not np.issubdtype(dtype, np.floating):
-        raise TypeError(f"unsupported interval type {dtype}")
+        raise TypeError(f"unsupported data type {dtype}")
 
     utype = dtype.str.replace("f", "u")
     itype = dtype.str.replace("f", "i")
@@ -386,7 +386,6 @@ def from_total_order(
 def lossless_cast(
     x: int | float | np.number | np.ndarray[S, np.dtype[np.number]],
     dtype: np.dtype[T],
-    context: str,
 ) -> np.ndarray[tuple[()] | S, np.dtype[T]]:
     """
     Try to losslessly convert `x` to the provided `dtype`.
@@ -423,9 +422,7 @@ def lossless_cast(
     dtype_from = xa.dtype
 
     if np.issubdtype(dtype_from, np.floating) and not np.issubdtype(dtype, np.floating):
-        raise TypeError(
-            f"cannot losslessly cast {context} from {dtype_from} to {dtype}"
-        )
+        raise TypeError(f"cannot losslessly cast from {dtype_from} to {dtype}")
 
     # we use unsafe casts here since we later check them for safety
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
@@ -436,7 +433,7 @@ def lossless_cast(
 
     if not np.all(lossless_same):
         raise ValueError(
-            f"cannot losslessly cast (some) {context} values from {dtype_from} to {dtype}"
+            f"cannot losslessly cast (some) values from {dtype_from} to {dtype}"
         )
 
     return xa_to
@@ -445,7 +442,6 @@ def lossless_cast(
 def saturating_finite_float_cast(
     x: int | float | np.number | np.ndarray[S, np.dtype[np.number]],
     dtype: np.dtype[F],
-    context: str,
 ) -> np.ndarray[tuple[()] | S, np.dtype[F]]:
     """
     Try to convert the finite `x` to the provided floating-point `dtype`.
@@ -476,7 +472,7 @@ def saturating_finite_float_cast(
 
     if not isinstance(x, int) and not np.all(np.isfinite(xa)):
         raise ValueError(
-            f"cannot cast non-finite {context} values from {xa.dtype} to saturating finite {dtype}"
+            f"cannot cast non-finite values from {xa.dtype} to saturating finite {dtype}"
         )
 
     # we use unsafe casts here since but are safe since

@@ -812,7 +812,7 @@ def test_fuzzer_found_float16_to_float128_cast_invalid_value():
 
     with pytest.raises(
         ValueError,
-        match=r"cannot cast non-finite late-bound parameter \$x values from float16 to saturating finite",
+        match=r"cannot cast non-finite values from float16 to saturating finite",
     ):
         encode_decode_mock(
             data,

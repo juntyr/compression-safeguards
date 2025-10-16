@@ -69,7 +69,7 @@ def test_codec_stack_stencil():
     encoded_decoded_da = stack.encode_decode_data_array(xr.DataArray(data, name="da"))
     assert np.all(encoded_decoded_da.values == decoded)
 
-    with pytest.raises(AssertionError, match="chunked array"):
+    with pytest.raises(RuntimeError, match="chunked array"):
         encoded_decoded_da = stack.encode_decode_data_array(
             xr.DataArray(data, name="da").chunk(10)
         ).compute()
@@ -121,7 +121,7 @@ def test_zarr_stencil():
 
     store = zarr.storage.MemoryStore()
 
-    with pytest.raises(AssertionError, match="chunked array"):
+    with pytest.raises(RuntimeError, match="chunked array"):
         zarr.save_array(
             store,
             data,

@@ -152,19 +152,25 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             prediction, ftype=ftype
         )
 
-        eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
-            late_bound.resolve_ndarray_with_saturating_finite_float_cast(
-                self._eb,
-                data_float.shape,
-                data_float.dtype,
-            )
-            if isinstance(self._eb, Parameter)
-            else saturating_finite_float_cast(
-                self._eb, data_float.dtype, "error bound safeguard eb"
-            )
-        )
         with ErrorContext(self.kind).enter() as ctx, ctx.parameter("eb"):
-            _check_error_bound(self._type, eb, LateBoundParameterValueError, ctx.ctx)
+            with ctx.catch():
+                eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
+                    late_bound.resolve_ndarray_with_saturating_finite_float_cast(
+                        self._eb,
+                        data_float.shape,
+                        data_float.dtype,
+                    )
+                    if isinstance(self._eb, Parameter)
+                    else saturating_finite_float_cast(self._eb, data_float.dtype)
+                )
+            if isinstance(self._eb, Parameter):
+                _eb: Parameter = self._eb
+                _check_error_bound(
+                    self._type,
+                    eb,
+                    lambda m, c: LateBoundParameterValueError(m, _eb, c),
+                    ctx.ctx,
+                )
 
         finite_ok: np.ndarray[S, np.dtype[np.bool]] = np.less_equal(
             _compute_finite_absolute_error(self._type, data_float, prediction_float),
@@ -215,19 +221,25 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         )
         data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
 
-        eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
-            late_bound.resolve_ndarray_with_saturating_finite_float_cast(
-                self._eb,
-                data_float.shape,
-                data_float.dtype,
-            )
-            if isinstance(self._eb, Parameter)
-            else saturating_finite_float_cast(
-                self._eb, data_float.dtype, "error bound safeguard eb"
-            )
-        )
         with ErrorContext(self.kind).enter() as ctx, ctx.parameter("eb"):
-            _check_error_bound(self._type, eb, LateBoundParameterValueError, ctx.ctx)
+            with ctx.catch():
+                eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
+                    late_bound.resolve_ndarray_with_saturating_finite_float_cast(
+                        self._eb,
+                        data_float.shape,
+                        data_float.dtype,
+                    )
+                    if isinstance(self._eb, Parameter)
+                    else saturating_finite_float_cast(self._eb, data_float.dtype)
+                )
+            if isinstance(self._eb, Parameter):
+                _eb: Parameter = self._eb
+                _check_error_bound(
+                    self._type,
+                    eb,
+                    lambda m, c: LateBoundParameterValueError(m, _eb, c),
+                    ctx.ctx,
+                )
 
         lower, upper = _apply_finite_error_bound(
             self._type, eb, data, to_float(data, ftype=ftype)

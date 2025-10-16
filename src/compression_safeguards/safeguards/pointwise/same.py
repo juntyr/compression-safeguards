@@ -123,15 +123,20 @@ class SameValueSafeguard(PointwiseSafeguard):
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        value: np.ndarray[tuple[()] | S, np.dtype[T]] = (
-            late_bound.resolve_ndarray_with_lossless_cast(
-                self._value,
-                data.shape,
-                data.dtype,
+        with (
+            ErrorContext(self.kind).enter() as ctx,
+            ctx.parameter("value"),
+            ctx.catch(),
+        ):
+            value: np.ndarray[tuple[()] | S, np.dtype[T]] = (
+                late_bound.resolve_ndarray_with_lossless_cast(
+                    self._value,
+                    data.shape,
+                    data.dtype,
+                )
+                if isinstance(self._value, Parameter)
+                else lossless_cast(self._value, data.dtype)
             )
-            if isinstance(self._value, Parameter)
-            else lossless_cast(self._value, data.dtype, "same safeguard value")
-        )
         value_bits: np.ndarray[tuple[()] | S, np.dtype[np.unsignedinteger]] = as_bits(
             value
         )
@@ -172,15 +177,20 @@ class SameValueSafeguard(PointwiseSafeguard):
             Union of intervals in which the same value guarantee is upheld.
         """
 
-        valuef: np.ndarray[tuple[()] | tuple[int], np.dtype[T]] = (
-            late_bound.resolve_ndarray_with_lossless_cast(
-                self._value,
-                data.shape,
-                data.dtype,
-            ).flatten()
-            if isinstance(self._value, Parameter)
-            else lossless_cast(self._value, data.dtype, "same safeguard value")
-        )
+        with (
+            ErrorContext(self.kind).enter() as ctx,
+            ctx.parameter("value"),
+            ctx.catch(),
+        ):
+            valuef: np.ndarray[tuple[()] | tuple[int], np.dtype[T]] = (
+                late_bound.resolve_ndarray_with_lossless_cast(
+                    self._value,
+                    data.shape,
+                    data.dtype,
+                ).flatten()
+                if isinstance(self._value, Parameter)
+                else lossless_cast(self._value, data.dtype)
+            )
         valuef_bits: np.ndarray[
             tuple[()] | tuple[int], np.dtype[np.unsignedinteger]
         ] = as_bits(valuef)

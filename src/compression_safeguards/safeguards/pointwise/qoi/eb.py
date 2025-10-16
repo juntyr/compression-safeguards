@@ -198,15 +198,22 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             Evaluated quantity of interest, in floating-point.
         """
 
-        ftype: np.dtype[F] = self._qoi_dtype.floating_point_dtype_for(data.dtype)  # type: ignore
-        data_float: np.ndarray[S, np.dtype[F]] = to_float(data, ftype=ftype)
+        with ErrorContext(self.kind).enter() as ctx:
+            with ctx.parameter("qoi_dtype"), ctx.catch():
+                ftype: np.dtype[F] = self._qoi_dtype.floating_point_dtype_for(
+                    data.dtype
+                )  # type: ignore
+                data_float: np.ndarray[S, np.dtype[F]] = to_float(data, ftype=ftype)
 
-        late_bound_constants: dict[Parameter, np.ndarray[S, np.dtype[F]]] = {
-            c: late_bound.resolve_ndarray_with_lossless_cast(
-                c, data.shape, data_float.dtype
-            )
-            for c in self._qoi_expr.late_bound_constants
-        }
+            late_bound_constants: dict[Parameter, np.ndarray[S, np.dtype[F]]] = dict()
+            with ctx.parameter("qoi"):
+                for c in self._qoi_expr.late_bound_constants:
+                    with ctx.parameter(c), ctx.catch():
+                        late_bound_constants[c] = (
+                            late_bound.resolve_ndarray_with_lossless_cast(
+                                c, data.shape, data_float.dtype
+                            )
+                        )
 
         return self._qoi_expr.eval(
             data_float,
@@ -240,36 +247,51 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        ftype: np.dtype[np.floating] = self._qoi_dtype.floating_point_dtype_for(
-            data.dtype
-        )
-        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
+        with ErrorContext(self.kind).enter() as ctx:
+            with ctx.parameter("qoi_dtype"), ctx.catch():
+                ftype: np.dtype[np.floating] = self._qoi_dtype.floating_point_dtype_for(
+                    data.dtype
+                )
+                data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(
+                    data, ftype=ftype
+                )
 
-        late_bound_constants: dict[Parameter, np.ndarray[S, np.dtype[np.floating]]] = {
-            c: late_bound.resolve_ndarray_with_lossless_cast(
-                c, data.shape, data_float.dtype
-            )
-            for c in self._qoi_expr.late_bound_constants
-        }
+            late_bound_constants: dict[
+                Parameter, np.ndarray[S, np.dtype[np.floating]]
+            ] = dict()
+            with ctx.parameter("qoi"):
+                for c in self._qoi_expr.late_bound_constants:
+                    with ctx.parameter(c), ctx.catch():
+                        late_bound_constants[c] = (
+                            late_bound.resolve_ndarray_with_lossless_cast(
+                                c, data.shape, data_float.dtype
+                            )
+                        )
 
-        qoi_data = self._qoi_expr.eval(data_float, late_bound_constants)
-        qoi_prediction = self._qoi_expr.eval(
-            to_float(prediction, ftype=ftype), late_bound_constants
-        )
+            qoi_data = self._qoi_expr.eval(data_float, late_bound_constants)
+            qoi_prediction = self._qoi_expr.eval(
+                to_float(prediction, ftype=ftype), late_bound_constants
+            )
 
-        eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
-            late_bound.resolve_ndarray_with_saturating_finite_float_cast(
-                self._eb,
-                qoi_data.shape,
-                qoi_data.dtype,
-            )
-            if isinstance(self._eb, Parameter)
-            else saturating_finite_float_cast(
-                self._eb, qoi_data.dtype, "pointwise QoI error bound safeguard eb"
-            )
-        )
-        with ErrorContext(self.kind).enter() as ctx, ctx.parameter("eb"):
-            _check_error_bound(self._type, eb, LateBoundParameterValueError, ctx.ctx)
+            with ctx.parameter("eb"):
+                with ctx.catch():
+                    eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
+                        late_bound.resolve_ndarray_with_saturating_finite_float_cast(
+                            self._eb,
+                            qoi_data.shape,
+                            qoi_data.dtype,
+                        )
+                        if isinstance(self._eb, Parameter)
+                        else saturating_finite_float_cast(self._eb, qoi_data.dtype)
+                    )
+                if isinstance(self._eb, Parameter):
+                    _eb: Parameter = self._eb
+                    _check_error_bound(
+                        self._type,
+                        eb,
+                        lambda m, c: LateBoundParameterValueError(m, _eb, c),
+                        ctx.ctx,
+                    )
 
         finite_ok: np.ndarray[S, np.dtype[np.bool]] = np.less_equal(
             _compute_finite_absolute_error(self._type, qoi_data, qoi_prediction),
@@ -306,33 +328,48 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             Union of intervals in which the error bound is upheld.
         """
 
-        ftype: np.dtype[np.floating] = self._qoi_dtype.floating_point_dtype_for(
-            data.dtype
-        )
-        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
+        with ErrorContext(self.kind).enter() as ctx:
+            with ctx.parameter("qoi_dtype"), ctx.catch():
+                ftype: np.dtype[np.floating] = self._qoi_dtype.floating_point_dtype_for(
+                    data.dtype
+                )
+                data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(
+                    data, ftype=ftype
+                )
 
-        late_bound_constants: dict[Parameter, np.ndarray[S, np.dtype[np.floating]]] = {
-            c: late_bound.resolve_ndarray_with_lossless_cast(
-                c, data.shape, data_float.dtype
-            )
-            for c in self._qoi_expr.late_bound_constants
-        }
+            late_bound_constants: dict[
+                Parameter, np.ndarray[S, np.dtype[np.floating]]
+            ] = dict()
+            with ctx.parameter("qoi"):
+                for c in self._qoi_expr.late_bound_constants:
+                    with ctx.parameter(c), ctx.catch():
+                        late_bound_constants[c] = (
+                            late_bound.resolve_ndarray_with_lossless_cast(
+                                c, data.shape, data_float.dtype
+                            )
+                        )
 
-        data_qoi = self._qoi_expr.eval(data_float, late_bound_constants)
+            data_qoi = self._qoi_expr.eval(data_float, late_bound_constants)
 
-        eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
-            late_bound.resolve_ndarray_with_saturating_finite_float_cast(
-                self._eb,
-                data_qoi.shape,
-                data_qoi.dtype,
-            )
-            if isinstance(self._eb, Parameter)
-            else saturating_finite_float_cast(
-                self._eb, data_qoi.dtype, "pointwise QoI error bound safeguard eb"
-            )
-        )
-        with ErrorContext(self.kind).enter() as ctx, ctx.parameter("eb"):
-            _check_error_bound(self._type, eb, LateBoundParameterValueError, ctx.ctx)
+            with ctx.parameter("eb"):
+                with ctx.catch():
+                    eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
+                        late_bound.resolve_ndarray_with_saturating_finite_float_cast(
+                            self._eb,
+                            data_qoi.shape,
+                            data_qoi.dtype,
+                        )
+                        if isinstance(self._eb, Parameter)
+                        else saturating_finite_float_cast(self._eb, data_qoi.dtype)
+                    )
+                if isinstance(self._eb, Parameter):
+                    _eb: Parameter = self._eb
+                    _check_error_bound(
+                        self._type,
+                        eb,
+                        lambda m, c: LateBoundParameterValueError(m, _eb, c),
+                        ctx.ctx,
+                    )
 
         qoi_lower_upper: tuple[
             np.ndarray[S, np.dtype[np.floating]], np.ndarray[S, np.dtype[np.floating]]

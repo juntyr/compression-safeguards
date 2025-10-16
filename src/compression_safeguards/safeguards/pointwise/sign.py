@@ -125,20 +125,22 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        offset: np.ndarray[tuple[()] | S, np.dtype[T]] = (
-            late_bound.resolve_ndarray_with_lossless_cast(
-                self._offset,
-                data.shape,
-                data.dtype,
-            )
-            if isinstance(self._offset, Parameter)
-            else lossless_cast(self._offset, data.dtype, "sign safeguard offset")
-        )
         with ErrorContext(self.kind).enter() as ctx, ctx.parameter("offset"):
-            if np.any(np.isnan(offset)):
-                raise LateBoundParameterValueError(
-                    "must not contain any NaN values", ctx.ctx
+            with ctx.catch():
+                offset: np.ndarray[tuple[()] | S, np.dtype[T]] = (
+                    late_bound.resolve_ndarray_with_lossless_cast(
+                        self._offset,
+                        data.shape,
+                        data.dtype,
+                    )
+                    if isinstance(self._offset, Parameter)
+                    else lossless_cast(self._offset, data.dtype)
                 )
+            if isinstance(self._offset, Parameter):
+                if np.any(np.isnan(offset)):
+                    raise LateBoundParameterValueError(
+                        "must not contain any NaN values", self._offset, ctx.ctx
+                    )
 
         # values equal to the offset (sign=0) stay equal
         # values below (sign=-1) stay below,
@@ -179,20 +181,22 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             Union of intervals in which the `data`'s sign is preserved.
         """
 
-        offsetf: np.ndarray[tuple[()] | tuple[int], np.dtype[T]] = (
-            late_bound.resolve_ndarray_with_lossless_cast(
-                self._offset,
-                data.shape,
-                data.dtype,
-            ).flatten()
-            if isinstance(self._offset, Parameter)
-            else lossless_cast(self._offset, data.dtype, "sign safeguard offset")
-        )
         with ErrorContext(self.kind).enter() as ctx, ctx.parameter("offset"):
-            if np.any(np.isnan(offsetf)):
-                raise LateBoundParameterValueError(
-                    "must not contain any NaN values", ctx.ctx
+            with ctx.catch():
+                offsetf: np.ndarray[tuple[()] | tuple[int], np.dtype[T]] = (
+                    late_bound.resolve_ndarray_with_lossless_cast(
+                        self._offset,
+                        data.shape,
+                        data.dtype,
+                    ).flatten()
+                    if isinstance(self._offset, Parameter)
+                    else lossless_cast(self._offset, data.dtype)
                 )
+            if isinstance(self._offset, Parameter):
+                if np.any(np.isnan(offsetf)):
+                    raise LateBoundParameterValueError(
+                        "must not contain any NaN values", self._offset, ctx.ctx
+                    )
         offsetf_total: np.ndarray[
             tuple[()] | tuple[int], np.dtype[np.unsignedinteger]
         ] = to_total_order(offsetf)

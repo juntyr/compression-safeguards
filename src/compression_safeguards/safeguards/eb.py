@@ -4,6 +4,7 @@ Error bounds that can be guaranteed by various safeguards.
 
 __all__ = ["ErrorBound"]
 
+from collections.abc import Callable
 from enum import Enum, auto
 
 import numpy as np
@@ -19,7 +20,7 @@ from ..utils._compat import (
     _where,
 )
 from ..utils.cast import from_float, from_total_order, to_float, to_total_order
-from ..utils.error import ErrorContext, ParameterValueError
+from ..utils.error import ErrorContext
 from ..utils.typing import F, S, T
 
 
@@ -127,7 +128,7 @@ class ErrorBound(Enum):
 def _check_error_bound(
     type: ErrorBound,
     eb: int | float | np.ndarray[tuple[()] | S, np.dtype[F]],
-    error: type[ParameterValueError],
+    error: Callable[[str, ErrorContext], Exception],
     context: ErrorContext,
 ) -> None | Never:
     """

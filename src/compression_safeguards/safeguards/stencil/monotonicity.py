@@ -305,19 +305,20 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        constant_boundary = (
-            None
-            if self._constant_boundary is None
-            else late_bound.resolve_ndarray_with_lossless_cast(
-                self._constant_boundary, (), data.dtype
+        with (
+            ErrorContext(self.kind).enter() as ctx,
+            ctx.parameter("constant_boundary"),
+            ctx.catch(),
+        ):
+            constant_boundary = (
+                None
+                if self._constant_boundary is None
+                else late_bound.resolve_ndarray_with_lossless_cast(
+                    self._constant_boundary, (), data.dtype
+                )
+                if isinstance(self._constant_boundary, Parameter)
+                else lossless_cast(self._constant_boundary, data.dtype)
             )
-            if isinstance(self._constant_boundary, Parameter)
-            else lossless_cast(
-                self._constant_boundary,
-                data.dtype,
-                "monotonicity safeguard constant boundary",
-            )
-        )
 
         ok: np.ndarray[S, np.dtype[np.bool]] = _ones(
             data.shape, dtype=np.dtype(np.bool)
@@ -408,19 +409,20 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             Union of intervals in which the monotonicity is preserved.
         """
 
-        constant_boundary = (
-            None
-            if self._constant_boundary is None
-            else late_bound.resolve_ndarray_with_lossless_cast(
-                self._constant_boundary, (), data.dtype
+        with (
+            ErrorContext(self.kind).enter() as ctx,
+            ctx.parameter("constant_boundary"),
+            ctx.catch(),
+        ):
+            constant_boundary = (
+                None
+                if self._constant_boundary is None
+                else late_bound.resolve_ndarray_with_lossless_cast(
+                    self._constant_boundary, (), data.dtype
+                )
+                if isinstance(self._constant_boundary, Parameter)
+                else lossless_cast(self._constant_boundary, data.dtype)
             )
-            if isinstance(self._constant_boundary, Parameter)
-            else lossless_cast(
-                self._constant_boundary,
-                data.dtype,
-                "monotonicity safeguard constant boundary",
-            )
-        )
 
         window = 1 + self._window * 2
 

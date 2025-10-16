@@ -76,10 +76,7 @@ def test_fuzzer_invalid_cast():
     data = np.array([115491483746327])
     decoded = np.array([150740651871305728])
 
-    with pytest.raises(
-        TypeError,
-        match="cannot losslessly cast same safeguard value from float64 to int64",
-    ):
+    with pytest.raises(TypeError, match="cannot losslessly cast from float64 to int64"):
         encode_decode_mock(
             data,
             decoded,

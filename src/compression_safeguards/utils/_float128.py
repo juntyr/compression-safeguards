@@ -22,6 +22,8 @@ try:
     _float128: TypeAlias = np.float128
     _float128_type: TypeAlias = np.float128
     _float128_dtype: np.dtype[_float128] = np.dtype(np.float128)
+    if (np.finfo(np.float128).nmant + np.finfo(np.float128).nexp + 1) != 128:
+        raise TypeError("numpy.float128 does not offer true 128 bit precision")
     assert (np.finfo(np.float128).nmant + np.finfo(np.float128).nexp + 1) == 128
     _float128_min: _float128 = np.finfo(np.float128).min
     _float128_max: _float128 = np.finfo(np.float128).max
@@ -29,7 +31,7 @@ try:
     _float128_smallest_subnormal: _float128 = np.finfo(np.float128).smallest_subnormal
     _float128_pi: _float128 = np.float128("3.14159265358979323846264338327950288")
     _float128_e: _float128 = np.float128("2.71828182845904523536028747135266249")
-except (AttributeError, AssertionError):
+except (AttributeError, TypeError):
     try:
         import numpy_quaddtype
 

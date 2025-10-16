@@ -1,3 +1,4 @@
+import re
 from itertools import cycle, permutations, product
 
 import numpy as np
@@ -11,7 +12,11 @@ from compression_safeguards.safeguards.stencil.qoi.eb import (
 from compression_safeguards.utils._float128 import _float128_dtype
 from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.cast import ToFloatMode, to_float
-from compression_safeguards.utils.error import QuantityOfInterestSyntaxError
+from compression_safeguards.utils.error import (
+    LateBoundParameterValueError,
+    ParameterValueError,
+    QuantityOfInterestSyntaxError,
+)
 
 from .codecs import (
     encode_decode_identity,
@@ -1002,14 +1007,14 @@ def test_late_bound_broadcast():
     safeguard.compute_safe_intervals(data, late_bound=Bindings(eb=np.ones((1, 1))))
 
     with pytest.raises(
-        ValueError,
-        match=r"cannot broadcast late-bound parameter eb with shape \(2, 2\) to shape \(4, 4\)",
+        LateBoundParameterValueError,
+        match=r"qoi_eb_stencil\.eb=eb: cannot broadcast from shape \(2, 2\) to shape \(4, 4\)",
     ):
         safeguard.compute_safe_intervals(data, late_bound=Bindings(eb=np.ones((2, 2))))
 
     with pytest.raises(
-        ValueError,
-        match=r"cannot broadcast late-bound parameter eb with shape \(4, 4, 1\) to shape \(4, 4\)",
+        LateBoundParameterValueError,
+        match=r"qoi_eb_stencil\.eb=eb: cannot broadcast from shape \(4, 4, 1\) to shape \(4, 4\)",
     ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(eb=np.ones((4, 4, 1)))
@@ -1274,8 +1279,11 @@ def test_pointwise_normalised_absolute_error(check):
 def test_late_bound_constant_boundary():
     for c in ["$x", "$X"]:
         with pytest.raises(
-            QuantityOfInterestSyntaxError,
-            match="late-bound constant boundary must be a scalar",
+            ParameterValueError,
+            match=re.escape(
+                "qoi_eb_stencil.neighbourhood.[0].constant_boundary: must be "
+                + f"a scalar but late-bound constant data {c} may not be"
+            ),
         ):
             safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
                 qoi="X[0,0] - X[2,0]",
@@ -1318,8 +1326,8 @@ def test_late_bound_constant_boundary():
     data = np.arange(6, dtype="uint8").reshape(2, 3)
 
     with pytest.raises(
-        ValueError,
-        match=r"cannot broadcast late-bound parameter const with shape \(2, 3\) to shape \(\)",
+        LateBoundParameterValueError,
+        match=r"qoi_eb_stencil.neighbourhood\.\[0\]\.constant_boundary=const: cannot broadcast from shape \(2, 3\) to shape \(\)",
     ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(const=data, const2=4)
@@ -1327,7 +1335,7 @@ def test_late_bound_constant_boundary():
 
     with pytest.raises(
         ValueError,
-        match=r"cannot losslessly cast \(some\) late-bound parameter const2 values from int64 to uint8",
+        match=r"cannot losslessly cast \(some\) values from int64 to uint8",
     ):
         safeguard.compute_safe_intervals(data, late_bound=Bindings(const=1, const2=256))
 

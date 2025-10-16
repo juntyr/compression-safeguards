@@ -268,9 +268,14 @@ class _SelectSafeguardBase(ABC):
         *,
         late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
-        selector = late_bound.resolve_ndarray_with_lossless_cast(
-            self.selector, data.shape, np.dtype(np.int_)
-        )
+        with (
+            ErrorContext(self.kind).enter() as ctx,
+            ctx.parameter("selector"),
+            ctx.catch(),
+        ):
+            selector = late_bound.resolve_ndarray_with_lossless_cast(
+                self.selector, data.shape, np.dtype(np.int_)
+            )
 
         oks = [
             safeguard.check_pointwise(data, prediction, late_bound=late_bound)
@@ -281,7 +286,7 @@ class _SelectSafeguardBase(ABC):
             return np.choose(selector, oks)  # type: ignore
         except IndexError as err:
             raise LateBoundSelectorIndexError(
-                str(err), ErrorContext(self.kind, "selector")
+                str(err), self.selector, ErrorContext(self.kind, "selector")
             )
 
     def compute_safe_intervals(
@@ -290,9 +295,14 @@ class _SelectSafeguardBase(ABC):
         *,
         late_bound: Bindings,
     ) -> IntervalUnion[T, int, int]:
-        selector = late_bound.resolve_ndarray_with_lossless_cast(
-            self.selector, data.shape, np.dtype(np.int_)
-        )
+        with (
+            ErrorContext(self.kind).enter() as ctx,
+            ctx.parameter("selector"),
+            ctx.catch(),
+        ):
+            selector = late_bound.resolve_ndarray_with_lossless_cast(
+                self.selector, data.shape, np.dtype(np.int_)
+            )
 
         valids = [
             safeguard.compute_safe_intervals(data, late_bound=late_bound)
@@ -331,7 +341,7 @@ class _SelectSafeguardBase(ABC):
             )
         except IndexError as err:
             raise LateBoundSelectorIndexError(
-                str(err), ErrorContext(self.kind, "selector")
+                str(err), self.selector, ErrorContext(self.kind, "selector")
             )
 
         return valid

@@ -8,14 +8,14 @@ from xarray_safeguards import apply_data_array_correction, produce_data_array_co
 def test_direct_wrap():
     SafeguardsCodec(codec=dict(id="zero"), safeguards=[])
 
-    with pytest.raises(AssertionError, match="printer problem"):
+    with pytest.raises(ValueError, match="printer problem"):
         SafeguardsCodec(
             codec=SafeguardsCodec(codec=dict(id="zero"), safeguards=[]), safeguards=[]
         )
 
 
 def test_codec_stack_wrap():
-    with pytest.raises(AssertionError, match="printer problem"):
+    with pytest.raises(ValueError, match="printer problem"):
         SafeguardsCodec(
             codec=dict(
                 id="combinators.stack",
@@ -45,7 +45,7 @@ def test_xarray_repeated_safeguarding():
     da_corrected = apply_data_array_correction(da_prediction, da_correction)
     np.testing.assert_allclose(da_corrected.values, da.values, rtol=0, atol=0.1)
 
-    with pytest.raises(AssertionError, match="printer problem"):
+    with pytest.raises(ValueError, match="printer problem"):
         produce_data_array_correction(
             da_corrected,
             da_prediction,
@@ -53,7 +53,7 @@ def test_xarray_repeated_safeguarding():
             late_bound=dict(),
         )
 
-    with pytest.raises(AssertionError, match="printer problem"):
+    with pytest.raises(ValueError, match="printer problem"):
         produce_data_array_correction(
             da,
             da_corrected,

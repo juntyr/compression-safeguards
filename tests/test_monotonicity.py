@@ -12,7 +12,10 @@ from compression_safeguards.safeguards.stencil.monotonicity import (
 )
 from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.cast import as_bits
-from compression_safeguards.utils.error import ParameterValueError
+from compression_safeguards.utils.error import (
+    LateBoundParameterValueError,
+    ParameterValueError,
+)
 
 from .codecs import (
     encode_decode_identity,
@@ -219,7 +222,7 @@ def test_fuzzer_padding_overflow():
 
     with pytest.raises(
         ValueError,
-        match=r"cannot losslessly cast \(some\) monotonicity safeguard constant boundary values from float64 to float32",
+        match=r"cannot losslessly cast \(some\) values from float64 to float32",
     ):
         encode_decode_mock(
             data,
@@ -298,7 +301,7 @@ def test_late_bound_constant_boundary():
 
     with pytest.raises(
         ValueError,
-        match=r"cannot losslessly cast \(some\) late-bound parameter const values from int64 to uint8",
+        match=r"cannot losslessly cast \(some\) values from int64 to uint8",
     ):
         correction = safeguards.compute_correction(
             data, decoded, late_bound=Bindings(const=-1)
@@ -310,8 +313,8 @@ def test_fuzzer_found_broadcast():
     decoded = np.array([], dtype=np.int8)
 
     with pytest.raises(
-        ValueError,
-        match=r"cannot broadcast late-bound parameter 䣿䡈 with shape \(0,\) to shape \(\)",
+        LateBoundParameterValueError,
+        match=r"monotonicity.constant_boundary=䣿䡈: cannot broadcast from shape \(0,\) to shape \(\)",
     ):
         encode_decode_mock(
             data,

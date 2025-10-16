@@ -6,7 +6,6 @@ __all__ = [
     "IncompatibleChunkStencilError",
     "LateBoundParameterValueError",
     "ParameterTypeError",
-    "LateBoundParameterTypeError",
     "QuantityOfInterestSyntaxError",
     "LateBoundSelectorIndexError",
     "LateBoundParameterResolutionError",
@@ -15,7 +14,7 @@ __all__ = [
 from contextlib import AbstractContextManager, contextmanager
 from enum import Enum
 from types import UnionType
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
 from semver import Version
@@ -24,9 +23,9 @@ from typing_extensions import (
     override,  # MSPV 3.12
 )
 
-from compression_safeguards.safeguards.abc import Safeguard
-
-from .bindings import Parameter
+if TYPE_CHECKING:
+    from ..safeguards.abc import Safeguard
+    from .bindings import Parameter
 
 Ei = TypeVar("Ei", bound=Enum)
 """ Any enum type (invariant). """
@@ -48,6 +47,11 @@ class ErrorContext:
     def extend(self, other: "ErrorContext") -> "ErrorContext":
         return ErrorContext(*self._path, *other._path)
 
+    def to_str_followed_by(self, follow: str) -> str:
+        if self._path == ():
+            return ""
+        return f"{self}{follow}"
+
     @override
     def __str__(self) -> str:
         return f"{'.'.join(self._path)}"
@@ -65,22 +69,35 @@ class ErrorContextManager(AbstractContextManager["ErrorContextManager", None]):
         return None
 
     @contextmanager
-    def repr(self, value: object):
-        old_context = self._context
-        self._context = old_context.push(repr(value))
-        yield self
-
-    @contextmanager
-    def parameter(self, name: str | Parameter):
+    def parameter(self, name: "str | Parameter"):
         old_context = self._context
         self._context = old_context.push(str(name))
-        yield self
+        try:
+            yield self
+        finally:
+            self._context = old_context
 
     @contextmanager
     def index(self, index: int):
         old_context = self._context
         self._context = old_context.push(f"[{index}]")
-        yield self
+        try:
+            yield self
+        finally:
+            self._context = old_context
+
+    @contextmanager
+    def catch(self):
+        try:
+            yield
+        except (
+            ParameterValueError,
+            ParameterValueError,
+            LateBoundParameterValueError,
+            LateBoundSelectorIndexError,
+        ) as err:
+            err.context = self.ctx.extend(err.context)
+            raise err
 
     @property
     def ctx(self) -> ErrorContext:
@@ -112,9 +129,9 @@ class IncompatibleSafeguardsVersion(ValueError):
 
 
 class UnsupportedSafeguardError(ValueError):
-    safeguards: tuple[Safeguard, ...]
+    safeguards: tuple["Safeguard", ...]
 
-    def __init__(self, safeguards: tuple[Safeguard, ...]) -> None:
+    def __init__(self, safeguards: tuple["Safeguard", ...]) -> None:
         self.safeguards = safeguards
         super().__init__(safeguards)
 
@@ -185,11 +202,25 @@ class ParameterValueError(ValueError):
 
     @override
     def __str__(self) -> str:
-        return f"{self.context}: {self.message}"
+        return f"{self.context.to_str_followed_by(': ')}{self.message}"
 
 
-class LateBoundParameterValueError(ParameterValueError):
-    pass
+class LateBoundParameterValueError(ValueError):
+    message: str
+    parameter: "Parameter"
+    context: ErrorContext
+
+    def __init__(
+        self, message: str, parameter: "Parameter", context: ErrorContext
+    ) -> None:
+        self.message = message
+        self.parameter = parameter
+        self.context = context
+        super().__init__(message, parameter, context)
+
+    @override
+    def __str__(self) -> str:
+        return f"{self.context.to_str_followed_by('=')}{self.parameter}: {self.message}"
 
 
 class ParameterTypeError(TypeError):
@@ -218,25 +249,25 @@ class ParameterTypeError(TypeError):
 
     @override
     def __str__(self) -> str:
-        return f"{self.context}: expected {self.expected} but found {self.found} of type {type(self.found)}"
-
-
-class LateBoundParameterTypeError(ParameterTypeError):
-    pass
+        return f"{self.context.to_str_followed_by(': ')}expected {self.expected} but found {self.found} of type {type(self.found)}"
 
 
 class LateBoundSelectorIndexError(IndexError):
     message: str
+    parameter: "Parameter"
     context: ErrorContext
 
-    def __init__(self, message: str, context: ErrorContext) -> None:
+    def __init__(
+        self, message: str, parameter: "Parameter", context: ErrorContext
+    ) -> None:
         self.message = message
+        self.parameter = parameter
         self.context = context
-        super().__init__(message, context)
+        super().__init__(message, parameter, context)
 
     @override
     def __str__(self) -> str:
-        return f"{self.context}: {self.message}"
+        return f"{self.context.to_str_followed_by('=')}{self.parameter}: {self.message}"
 
 
 class QuantityOfInterestSyntaxError(SyntaxError):
@@ -249,10 +280,12 @@ class QuantityOfInterestSyntaxError(SyntaxError):
 
 
 class LateBoundParameterResolutionError(KeyError):
-    expected: frozenset[Parameter]
-    provided: frozenset[Parameter]
+    expected: frozenset["Parameter"]
+    provided: frozenset["Parameter"]
 
-    def __init__(self, expected: frozenset[Parameter], provided: frozenset[Parameter]):
+    def __init__(
+        self, expected: frozenset["Parameter"], provided: frozenset["Parameter"]
+    ):
         assert expected != provided
         self.expected = expected
         self.provided = provided
@@ -260,7 +293,7 @@ class LateBoundParameterResolutionError(KeyError):
 
     @staticmethod
     def check_or_raise(
-        expected: frozenset[Parameter], provided: frozenset[Parameter]
+        expected: frozenset["Parameter"], provided: frozenset["Parameter"]
     ) -> None | Never:
         if expected == provided:
             return None
@@ -272,14 +305,14 @@ class LateBoundParameterResolutionError(KeyError):
         missing_str = (
             "missing late-bound parameter"
             + ("s " if len(missing) > 1 else " ")
-            + ", ".join(f"`{p}`" for p in missing)
+            + ", ".join(f"`{p}`" for p in sorted(missing))
         )
 
         extraneous = self.provided - self.expected
         extraneous_str = (
             "extraneous late-bound parameter"
             + ("s " if len(extraneous) > 1 else " ")
-            + ", ".join(f"`{p}`" for p in extraneous)
+            + ", ".join(f"`{p}`" for p in sorted(extraneous))
         )
 
         if len(missing) <= 0:
