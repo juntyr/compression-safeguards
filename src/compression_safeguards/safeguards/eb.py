@@ -4,7 +4,6 @@ Error bounds that can be guaranteed by various safeguards.
 
 __all__ = ["ErrorBound"]
 
-from collections.abc import Callable
 from enum import Enum, auto
 
 import numpy as np
@@ -20,7 +19,7 @@ from ..utils._compat import (
     _where,
 )
 from ..utils.cast import from_float, from_total_order, to_float, to_total_order
-from ..utils.error import ErrorContext
+from ..utils.error import ValueErrorWithContext
 from ..utils.typing import F, S, T
 
 
@@ -128,8 +127,6 @@ class ErrorBound(Enum):
 def _check_error_bound(
     type: ErrorBound,
     eb: int | float | np.ndarray[tuple[()] | S, np.dtype[F]],
-    error: Callable[[str, ErrorContext], Exception],
-    context: ErrorContext,
 ) -> None | Never:
     """
     Check if the error bound value `eb` is valid for the error bound `type`.
@@ -140,30 +137,32 @@ def _check_error_bound(
         The error bound type.
     eb : int | float | np.ndarray[tuple[()] | S, np.dtype[F]]
         The error bound value.
-    error : type[ParameterValueError]
-        The type of error to raise if the error bound `value` is invalid.
 
     Raises
     ------
-    ParameterValueError
+    ValueError
         If the error bound `value` is invalid.
     """
 
     match type:
         case ErrorBound.abs:
             if not np.all(eb >= 0):
-                raise error("must be non-negative for an absolute error bound", context)
+                raise ValueErrorWithContext(
+                    "must be non-negative for an absolute error bound"
+                )
         case ErrorBound.rel:
             if not np.all(eb >= 0):
-                raise error("must be non-negative for a relative error bound", context)
+                raise ValueErrorWithContext(
+                    "must be non-negative for a relative error bound"
+                )
         case ErrorBound.ratio:
             if not np.all(eb >= 1):
-                raise error("must be >= 1 for a ratio error bound", context)
+                raise ValueErrorWithContext("must be >= 1 for a ratio error bound")
         case _:
             assert_never(type)
 
     if (not isinstance(eb, int)) and (not np.all(np.isfinite(eb))):
-        raise error("must be finite", context)
+        raise ValueErrorWithContext("must be finite")
 
     return None
 

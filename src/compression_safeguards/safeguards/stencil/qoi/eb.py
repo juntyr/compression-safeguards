@@ -21,9 +21,9 @@ from ....utils.cast import (
 )
 from ....utils.error import (
     ErrorContext,
-    LateBoundParameterValueError,
-    ParameterTypeError,
-    ParameterValueError,
+    IndexErrorWithContext,
+    TypeCheckError,
+    ValueErrorWithContext,
 )
 from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import JSON, F, S, T
@@ -170,84 +170,72 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         eb: int | float | str | Parameter,
         qoi_dtype: str | ToFloatMode = ToFloatMode.lossless,
     ) -> None:
-        with ErrorContext(self.kind).enter() as ctx:
+        with ErrorContext().enter() as ctx, ctx.safeguard(self):
             with ctx.parameter("qoi"):
-                ParameterTypeError.check_instance_or_raise(qoi, str, ctx.ctx)
+                TypeCheckError.check_instance_or_raise(qoi, str)
 
             with ctx.parameter("neighbourhood"):
-                ParameterTypeError.check_instance_or_raise(
-                    neighbourhood, Sequence, ctx.ctx
-                )
+                TypeCheckError.check_instance_or_raise(neighbourhood, Sequence)
 
                 all_axes: list[int] = []
                 neighbourhood_: list[NeighbourhoodBoundaryAxis] = []
                 for i, axis in enumerate(neighbourhood):
                     with ctx.index(i):
-                        ParameterTypeError.check_instance_or_raise(
-                            axis, dict | NeighbourhoodBoundaryAxis, ctx.ctx
+                        TypeCheckError.check_instance_or_raise(
+                            axis, dict | NeighbourhoodBoundaryAxis
                         )
-                        try:
-                            axis_ = (
-                                axis
-                                if isinstance(axis, NeighbourhoodBoundaryAxis)
-                                else NeighbourhoodBoundaryAxis.from_config(axis)
-                            )
-                        except (ParameterValueError, ParameterTypeError) as err:
-                            err.context = ctx.ctx.extend(err.context)
-                            raise err
+                        axis_ = (
+                            axis
+                            if isinstance(axis, NeighbourhoodBoundaryAxis)
+                            else NeighbourhoodBoundaryAxis.from_config(axis)
+                        )
                         if axis_.axis in all_axes:
-                            raise ParameterValueError("axis must be unique", ctx.ctx)
+                            raise ValueErrorWithContext("axis must be unique")
                         all_axes.append(axis_.axis)
                         neighbourhood_.append(axis_)
                 self._neighbourhood = tuple(neighbourhood_)
 
                 if len(self._neighbourhood) <= 0:
-                    raise ParameterValueError("must not be empty", ctx.ctx)
+                    raise ValueErrorWithContext("must not be empty")
 
             with ctx.parameter("type"):
-                ParameterTypeError.check_instance_or_raise(
-                    type, str | ErrorBound, ctx.ctx
-                )
+                TypeCheckError.check_instance_or_raise(type, str | ErrorBound)
                 self._type = (
                     type
                     if isinstance(type, ErrorBound)
-                    else ParameterValueError.lookup_enum_or_raise(
-                        ErrorBound, type, ctx.ctx
-                    )
+                    else ValueErrorWithContext.lookup_enum_or_raise(ErrorBound, type)
                 )
 
             with ctx.parameter("eb"):
-                ParameterTypeError.check_instance_or_raise(
-                    eb, int | float | str | Parameter, ctx.ctx
+                TypeCheckError.check_instance_or_raise(
+                    eb, int | float | str | Parameter
                 )
                 if isinstance(eb, Parameter):
                     self._eb = eb
                 elif isinstance(eb, str):
                     self._eb = Parameter(eb)
                 else:
-                    _check_error_bound(self._type, eb, ParameterValueError, ctx.ctx)
+                    _check_error_bound(self._type, eb)
                     self._eb = eb
 
             with ctx.parameter("qoi_dtype"):
-                ParameterTypeError.check_instance_or_raise(
-                    qoi_dtype, str | ToFloatMode, ctx.ctx
-                )
+                TypeCheckError.check_instance_or_raise(qoi_dtype, str | ToFloatMode)
                 self._qoi_dtype = (
                     qoi_dtype
                     if isinstance(qoi_dtype, ToFloatMode)
-                    else ParameterValueError.lookup_enum_or_raise(
-                        ToFloatMode, qoi_dtype, ctx.ctx
+                    else ValueErrorWithContext.lookup_enum_or_raise(
+                        ToFloatMode, qoi_dtype
                     )
                 )
 
-        shape = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
-        I = tuple(axis.before for axis in self._neighbourhood)  # noqa: E741
+            shape = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
+            I = tuple(axis.before for axis in self._neighbourhood)  # noqa: E741
 
-        with ctx.parameter("qoi"):
-            self._qoi = qoi
-            self._qoi_expr = StencilQuantityOfInterest(
-                qoi, stencil_shape=shape, stencil_I=I
-            )
+            with ctx.parameter("qoi"):
+                self._qoi = qoi
+                self._qoi_expr = StencilQuantityOfInterest(
+                    qoi, stencil_shape=shape, stencil_I=I
+                )
 
     @property
     @override
@@ -306,19 +294,25 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         ]
 
         all_axes: list[int] = []
-        for axis in self._neighbourhood:
-            if (axis.axis >= len(data_shape)) or (axis.axis < -len(data_shape)):
-                raise IndexError(
-                    f"axis index {axis.axis} is out of bounds for array of shape {data_shape}"
-                )
-            naxis = axis.axis if axis.axis >= 0 else len(data_shape) + axis.axis
-            if naxis in all_axes:
-                raise IndexError(
-                    f"duplicate axis index {axis.axis}, normalised to {naxis}, for array of shape {data_shape}"
-                )
-            all_axes.append(naxis)
+        with (
+            ErrorContext().enter() as ctx,
+            ctx.safeguard(self),
+            ctx.parameter("neighbourhood"),
+        ):
+            for i, axis in enumerate(self._neighbourhood):
+                with ctx.index(i), ctx.parameter("axis"):
+                    if (axis.axis >= len(data_shape)) or (axis.axis < -len(data_shape)):
+                        raise IndexErrorWithContext(
+                            f"{axis.axis} is out of bounds for array of shape {data_shape}"
+                        )
+                    naxis = axis.axis if axis.axis >= 0 else len(data_shape) + axis.axis
+                    if naxis in all_axes:
+                        raise IndexErrorWithContext(
+                            f"duplicate {axis.axis}, normalised to {naxis}, for array of shape {data_shape}"
+                        )
+                    all_axes.append(naxis)
 
-            neighbourhood[naxis][axis.boundary] = axis.shape
+                    neighbourhood[naxis][axis.boundary] = axis.shape
 
         if np.prod(data_shape) == 0:
             return tuple(dict() for _ in data_shape)
@@ -364,8 +358,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     0, empty_shape[axis.axis] - axis.before - axis.after
                 )
 
-        with ErrorContext(self.kind).enter() as ctx:
-            with ctx.parameter("qoi_dtype"), ctx.catch():
+        with ErrorContext().enter() as ctx, ctx.safeguard(self):
+            with ctx.parameter("qoi_dtype"):
                 ftype: np.dtype[F] = self._qoi_dtype.floating_point_dtype_for(
                     data.dtype
                 )  # type: ignore
@@ -376,7 +370,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             constant_boundaries: list[None | np.ndarray[tuple[()], np.dtype[T]]] = []
             with ctx.parameter("neighbourhood"):
                 for i, axis in enumerate(self._neighbourhood):
-                    with ctx.index(i), ctx.parameter("constant_boundary"), ctx.catch():
+                    with ctx.index(i), ctx.parameter("constant_boundary"):
                         constant_boundaries.append(
                             None
                             if axis.constant_boundary is None
@@ -417,7 +411,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             ] = dict()
             with ctx.parameter("qoi"):
                 for c in self._qoi_expr.late_bound_constants:
-                    with ctx.parameter(c), ctx.catch():
+                    with ctx.parameter(c):
                         late_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = (
                             late_bound.resolve_ndarray_with_lossless_cast(
                                 c, data.shape, data.dtype
@@ -492,11 +486,11 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         if data.size == 0:
             return _ones(data.shape, dtype=np.dtype(np.bool))
 
-        with ErrorContext(self.kind).enter() as ctx:
+        with ErrorContext().enter() as ctx, ctx.safeguard(self):
             constant_boundaries: list[None | np.ndarray[tuple[()], np.dtype[T]]] = []
             with ctx.parameter("neighbourhood"):
                 for i, axis in enumerate(self._neighbourhood):
-                    with ctx.index(i), ctx.parameter("constant_boundary"), ctx.catch():
+                    with ctx.index(i), ctx.parameter("constant_boundary"):
                         constant_boundaries.append(
                             None
                             if axis.constant_boundary is None
@@ -529,7 +523,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     axis.axis,
                 )
 
-            with ctx.parameter("qoi_dtype"), ctx.catch():
+            with ctx.parameter("qoi_dtype"):
                 ftype: np.dtype[np.floating] = self._qoi_dtype.floating_point_dtype_for(
                     data.dtype
                 )
@@ -562,7 +556,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             ] = dict()
             with ctx.parameter("qoi"):
                 for c in self._qoi_expr.late_bound_constants:
-                    with ctx.parameter(c), ctx.catch():
+                    with ctx.parameter(c):
                         late_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = (
                             late_bound.resolve_ndarray_with_lossless_cast(
                                 c, data.shape, data.dtype
@@ -606,27 +600,20 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
 
             with ctx.parameter("eb"):
-                with ctx.catch():
-                    eb: np.ndarray[
-                        tuple[()] | tuple[int, ...], np.dtype[np.floating]
-                    ] = (
-                        late_bound.resolve_ndarray_with_saturating_finite_float_cast(
-                            self._eb,
-                            data.shape,  # for simplicity, we resolve to the data shape
-                            qoi_data.dtype,
-                        )
-                        if isinstance(self._eb, Parameter)
-                        else saturating_finite_float_cast(self._eb, qoi_data.dtype)
+                eb: np.ndarray[tuple[()] | tuple[int, ...], np.dtype[np.floating]] = (
+                    late_bound.resolve_ndarray_with_saturating_finite_float_cast(
+                        self._eb,
+                        data.shape,  # for simplicity, we resolve to the data shape
+                        qoi_data.dtype,
                     )
+                    if isinstance(self._eb, Parameter)
+                    else saturating_finite_float_cast(self._eb, qoi_data.dtype)
+                )
                 if isinstance(self._eb, Parameter):
                     _eb: Parameter = self._eb
-                    eb = self.truncate_data_to_qoi_shape(eb)  # and then truncate it
-                    _check_error_bound(
-                        self._type,
-                        eb,
-                        lambda m, c: LateBoundParameterValueError(m, _eb, c),
-                        ctx.ctx,
-                    )
+                    with ctx.late_bound_parameter(_eb):
+                        eb = self.truncate_data_to_qoi_shape(eb)  # and then truncate it
+                        _check_error_bound(self._type, eb)
 
         finite_ok = _compute_finite_absolute_error(
             self._type, qoi_data, qoi_prediction
@@ -689,11 +676,11 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         if data.size == 0:
             return Interval.full_like(data).into_union()
 
-        with ErrorContext(self.kind).enter() as ctx:
+        with ErrorContext().enter() as ctx, ctx.safeguard(self):
             constant_boundaries: list[None | np.ndarray[tuple[()], np.dtype[T]]] = []
             with ctx.parameter("neighbourhood"):
                 for i, axis in enumerate(self._neighbourhood):
-                    with ctx.index(i), ctx.parameter("constant_boundary"), ctx.catch():
+                    with ctx.index(i), ctx.parameter("constant_boundary"):
                         constant_boundaries.append(
                             None
                             if axis.constant_boundary is None
@@ -717,7 +704,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     axis.axis,
                 )
 
-            with ctx.parameter("qoi_dtype"), ctx.catch():
+            with ctx.parameter("qoi_dtype"):
                 ftype: np.dtype[np.floating] = self._qoi_dtype.floating_point_dtype_for(
                     data.dtype
                 )
@@ -739,7 +726,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             ] = dict()
             with ctx.parameter("qoi"):
                 for c in self._qoi_expr.late_bound_constants:
-                    with ctx.parameter(c), ctx.catch():
+                    with ctx.parameter(c):
                         late_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = (
                             late_bound.resolve_ndarray_with_lossless_cast(
                                 c, data.shape, data.dtype
@@ -777,27 +764,20 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
 
             with ctx.parameter("eb"):
-                with ctx.catch():
-                    eb: np.ndarray[
-                        tuple[()] | tuple[int, ...], np.dtype[np.floating]
-                    ] = (
-                        late_bound.resolve_ndarray_with_saturating_finite_float_cast(
-                            self._eb,
-                            data.shape,  # for simplicity, we resolve to the data shape
-                            data_qoi.dtype,
-                        )
-                        if isinstance(self._eb, Parameter)
-                        else saturating_finite_float_cast(self._eb, data_qoi.dtype)
+                eb: np.ndarray[tuple[()] | tuple[int, ...], np.dtype[np.floating]] = (
+                    late_bound.resolve_ndarray_with_saturating_finite_float_cast(
+                        self._eb,
+                        data.shape,  # for simplicity, we resolve to the data shape
+                        data_qoi.dtype,
                     )
+                    if isinstance(self._eb, Parameter)
+                    else saturating_finite_float_cast(self._eb, data_qoi.dtype)
+                )
                 if isinstance(self._eb, Parameter):
                     _eb: Parameter = self._eb
-                    eb = self.truncate_data_to_qoi_shape(eb)  # and then truncate it
-                    _check_error_bound(
-                        self._type,
-                        eb,
-                        lambda m, c: LateBoundParameterValueError(m, _eb, c),
-                        ctx.ctx,
-                    )
+                    with ctx.late_bound_parameter(_eb):
+                        eb = self.truncate_data_to_qoi_shape(eb)  # and then truncate it
+                        _check_error_bound(self._type, eb)
 
         qoi_lower_upper: tuple[
             np.ndarray[tuple[int, ...], np.dtype[np.floating]],

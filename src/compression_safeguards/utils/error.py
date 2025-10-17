@@ -2,15 +2,16 @@ __all__ = [
     "ErrorContext",
     "IncompatibleSafeguardsVersion",
     "UnsupportedSafeguardError",
-    "ParameterValueError",
+    "ValueErrorWithContext",
     "IncompatibleChunkStencilError",
-    "LateBoundParameterValueError",
-    "ParameterTypeError",
+    "TypeCheckError",
+    "TypeErrorWithContext",
     "QuantityOfInterestSyntaxError",
-    "LateBoundSelectorIndexError",
+    "IndexErrorWithContext",
     "LateBoundParameterResolutionError",
 ]
 
+from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager, contextmanager
 from enum import Enum
 from types import UnionType
@@ -31,30 +32,126 @@ Ei = TypeVar("Ei", bound=Enum)
 """ Any enum type (invariant). """
 
 
-class ErrorContext:
-    __slots__: tuple[str, ...] = ("_path",)
-    _path: tuple[str, ...]
+class ContextFragment(ABC):
+    @override
+    @abstractmethod
+    def __str__(self) -> str:
+        pass
 
-    def __init__(self, *path: str):
-        self._path = path
+    @property
+    def separator(self) -> str:
+        return "."
+
+
+class IndexContextFragment(ContextFragment):
+    __slots__: tuple[str, ...] = ("_index",)
+    _index: int
+
+    def __init__(self, index: int):
+        self._index = index
+
+    @property
+    def index(self) -> int:
+        return self._index
+
+    @override
+    def __str__(self) -> str:
+        return f"[{self.index}]"
+
+    @property
+    @override
+    def separator(self) -> str:
+        return ""
+
+
+class SafeguardTypeContextFragment(ContextFragment):
+    __slots__: tuple[str, ...] = ("_safeguard",)
+    _safeguard: type["Safeguard"]
+
+    def __init__(self, safeguard: type["Safeguard"]):
+        self._safeguard = safeguard
+
+    @property
+    def parameter(self) -> type["Safeguard"]:
+        return self._safeguard
+
+    @override
+    def __str__(self) -> str:
+        return self._safeguard.kind
+
+
+class ParameterContextFragment(ContextFragment):
+    __slots__: tuple[str, ...] = ("_parameter",)
+    _parameter: str
+
+    def __init__(self, parameter: str):
+        self._parameter = parameter
+
+    @property
+    def parameter(self) -> str:
+        return self._parameter
+
+    @override
+    def __str__(self) -> str:
+        return self._parameter
+
+
+class LateBoundParameterContextFragment(ContextFragment):
+    __slots__: tuple[str, ...] = ("_parameter",)
+    _parameter: "Parameter"
+
+    def __init__(self, parameter: "Parameter"):
+        self._parameter = parameter
+
+    @property
+    def parameter(self) -> str:
+        return str(self._parameter)
+
+    @override
+    def __str__(self) -> str:
+        return str(self._parameter)
+
+    @property
+    @override
+    def separator(self) -> str:
+        return "="
+
+
+class ErrorContext:
+    __slots__: tuple[str, ...] = ("_context",)
+    _context: tuple[ContextFragment, ...]
+
+    def __init__(self, *context: ContextFragment):
+        self._context = context
 
     def enter(self) -> "ErrorContextManager":
         return ErrorContextManager(self)
 
-    def push(self, p: str) -> "ErrorContext":
-        return ErrorContext(*self._path, p)
+    def push(self, c: ContextFragment) -> "ErrorContext":
+        return ErrorContext(*self._context, c)
 
     def extend(self, other: "ErrorContext") -> "ErrorContext":
-        return ErrorContext(*self._path, *other._path)
+        return ErrorContext(*self._context, *other._context)
 
     def to_str_followed_by(self, follow: str) -> str:
-        if self._path == ():
+        if self._context == ():
             return ""
         return f"{self}{follow}"
 
     @override
     def __str__(self) -> str:
-        return f"{'.'.join(self._path)}"
+        match self._context:
+            case ():
+                return ""
+            case (c,):
+                return str(c)
+            case _:
+                c, *cs = self._context
+                acc = [str(c)]
+                for c in cs:
+                    acc.append(c.separator)
+                    acc.append(str(c))
+                return "".join(acc)
 
 
 class ErrorContextManager(AbstractContextManager["ErrorContextManager", None]):
@@ -69,39 +166,33 @@ class ErrorContextManager(AbstractContextManager["ErrorContextManager", None]):
         return None
 
     @contextmanager
-    def parameter(self, name: "str | Parameter"):
-        old_context = self._context
-        self._context = old_context.push(str(name))
-        try:
-            yield self
-        finally:
-            self._context = old_context
-
-    @contextmanager
-    def index(self, index: int):
-        old_context = self._context
-        self._context = old_context.push(f"[{index}]")
-        try:
-            yield self
-        finally:
-            self._context = old_context
-
-    @contextmanager
-    def catch(self):
+    def fragment(self, fragment: ContextFragment):
         try:
             yield
         except (
-            ParameterValueError,
-            ParameterValueError,
-            LateBoundParameterValueError,
-            LateBoundSelectorIndexError,
+            ValueErrorWithContext,
+            TypeCheckError,
+            IndexErrorWithContext,
+            QuantityOfInterestSyntaxError,
+            LateBoundParameterResolutionError,
         ) as err:
-            err.context = self.ctx.extend(err.context)
-            raise err
+            err.context = ErrorContext(fragment).extend(err.context)
+            raise
 
-    @property
-    def ctx(self) -> ErrorContext:
-        return self._context
+    def parameter(self, name: str):
+        return self.fragment(ParameterContextFragment(name))
+
+    def late_bound_parameter(self, name: "Parameter"):
+        return self.fragment(LateBoundParameterContextFragment(name))
+
+    def index(self, index: int):
+        return self.fragment(IndexContextFragment(index))
+
+    def safeguard(self, safeguard: "Safeguard"):
+        return self.fragment(SafeguardTypeContextFragment(type(safeguard)))
+
+    def safeguardty(self, safeguard: type["Safeguard"]):
+        return self.fragment(SafeguardTypeContextFragment(safeguard))
 
 
 class IncompatibleSafeguardsVersion(ValueError):
@@ -178,26 +269,26 @@ class IncompatibleChunkStencilError(ValueError):
         return f"{self.message} on axis {self.axis}"
 
 
-class ParameterValueError(ValueError):
-    message: str
+class ValueErrorWithContext(ValueError):
     context: ErrorContext
 
-    def __init__(self, message: str, context: ErrorContext) -> None:
-        self.message = message
-        self.context = context
-        super().__init__(message, context)
+    def __init__(self, message: str) -> None:
+        self.context = ErrorContext()
+        super().__init__(message)
+
+    @property
+    def message(self) -> str:
+        (message,) = self.args
+        return message
 
     @classmethod
-    def lookup_enum_or_raise(
-        cls, enum: type[Ei], name: str, context: ErrorContext
-    ) -> Ei | Never:
+    def lookup_enum_or_raise(cls, enum: type[Ei], name: str) -> Ei | Never:
         if name in enum.__members__:
             return enum.__members__[name]
 
         raise cls(
             f"unknown {enum.__name__} {name!r}, use one of "
-            + f"{', '.join(repr(m) for m in enum.__members__)}",
-            context,
+            + f"{', '.join(repr(m) for m in enum.__members__)}"
         )
 
     @override
@@ -205,90 +296,103 @@ class ParameterValueError(ValueError):
         return f"{self.context.to_str_followed_by(': ')}{self.message}"
 
 
-class LateBoundParameterValueError(ValueError):
-    message: str
-    parameter: "Parameter"
+class TypeErrorWithContext(TypeError):
     context: ErrorContext
 
-    def __init__(
-        self, message: str, parameter: "Parameter", context: ErrorContext
-    ) -> None:
-        self.message = message
-        self.parameter = parameter
-        self.context = context
-        super().__init__(message, parameter, context)
+    def __init__(self, message: str) -> None:
+        self.context = ErrorContext()
+        super().__init__(message)
+
+    @property
+    def message(self) -> str:
+        (message,) = self.args
+        return message
 
     @override
     def __str__(self) -> str:
-        return f"{self.context.to_str_followed_by('=')}{self.parameter}: {self.message}"
+        return f"{self.context.to_str_followed_by(': ')}{self.message}"
 
 
-class ParameterTypeError(TypeError):
-    expected: type | UnionType
-    found: object
+class TypeCheckError(TypeError):
     context: ErrorContext
 
     def __init__(
         self,
         expected: type | UnionType,
         found: object,
-        context: ErrorContext,
     ) -> None:
-        self.expected = expected
-        self.found = found
-        self.context = context
-        super().__init__(expected, found, context)
+        self.context = ErrorContext()
+        super().__init__(expected, found)
 
     @classmethod
     def check_instance_or_raise(
-        cls, obj: object, expected: type | UnionType, context: ErrorContext
+        cls, obj: object, expected: type | UnionType
     ) -> None | Never:
         if isinstance(obj, expected):
             return None
-        raise cls(expected, obj, context)
+        raise cls(expected, obj)
+
+    @property
+    def expected(self) -> type | UnionType:
+        (expected, _found) = self.args
+        return expected
+
+    @property
+    def found(self) -> object:
+        (_expected, found) = self.args
+        return found
 
     @override
     def __str__(self) -> str:
         return f"{self.context.to_str_followed_by(': ')}expected {self.expected} but found {self.found} of type {type(self.found)}"
 
 
-class LateBoundSelectorIndexError(IndexError):
-    message: str
-    parameter: "Parameter"
+class IndexErrorWithContext(IndexError):
     context: ErrorContext
 
-    def __init__(
-        self, message: str, parameter: "Parameter", context: ErrorContext
-    ) -> None:
-        self.message = message
-        self.parameter = parameter
-        self.context = context
-        super().__init__(message, parameter, context)
+    def __init__(self, message: str) -> None:
+        self.context = ErrorContext()
+        super().__init__(message)
+
+    @property
+    def message(self) -> str:
+        (message,) = self.args
+        return message
 
     @override
     def __str__(self) -> str:
-        return f"{self.context.to_str_followed_by('=')}{self.parameter}: {self.message}"
+        return f"{self.context.to_str_followed_by(': ')}{self.message}"
 
 
 class QuantityOfInterestSyntaxError(SyntaxError):
+    context: ErrorContext
+
     def __init__(self, message: str, lineno: int, column: int) -> None:
+        self.context = ErrorContext()
         super().__init__(message, ("<qoi>", lineno, column, None))
 
     @staticmethod
     def root(message: str) -> "QuantityOfInterestSyntaxError":
         return QuantityOfInterestSyntaxError(message, None, None)  # type: ignore
 
+    @property
+    def message(self) -> str:
+        (message, _info) = self.args
+        return message
+
+    @override
+    def __str__(self) -> str:
+        return f"{self.context.to_str_followed_by(': ')}{self.message}"
+
 
 class LateBoundParameterResolutionError(KeyError):
-    expected: frozenset["Parameter"]
-    provided: frozenset["Parameter"]
+    context: ErrorContext
 
     def __init__(
         self, expected: frozenset["Parameter"], provided: frozenset["Parameter"]
     ):
         assert expected != provided
-        self.expected = expected
-        self.provided = provided
+        self.context = ErrorContext()
         super().__init__(expected, provided)
 
     @staticmethod
@@ -298,6 +402,16 @@ class LateBoundParameterResolutionError(KeyError):
         if expected == provided:
             return None
         raise LateBoundParameterResolutionError(expected, provided)
+
+    @property
+    def expected(self) -> frozenset["Parameter"]:
+        (expected, _provided) = self.args
+        return expected
+
+    @property
+    def provided(self) -> frozenset["Parameter"]:
+        (_expected, provided) = self.args
+        return provided
 
     @override
     def __str__(self) -> str:
@@ -342,7 +456,15 @@ class UnsupportedDateTypeError(TypeError):
 
     @override
     def __str__(self) -> str:
-        return f"unsupported data type {self.dtype.name}, only {', '.join(d.name for d in sorted(self.supported))} are supported"
+        msg = f"unsupported data type {self.dtype.name}"
+
+        if len(self.supported) <= 0:
+            return msg
+
+        return (
+            f"{msg}, only {', '.join(d.name for d in sorted(self.supported))} "
+            + "are supported"
+        )
 
 
 # class ParameterComplexityWarning(UserWarning):

@@ -14,9 +14,9 @@ from typing_extensions import override  # MSPV 3.12
 from ...utils.bindings import Bindings, Parameter
 from ...utils.error import (
     ErrorContext,
-    LateBoundSelectorIndexError,
-    ParameterTypeError,
-    ParameterValueError,
+    IndexErrorWithContext,
+    TypeCheckError,
+    ValueErrorWithContext,
 )
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import JSON, S, T
@@ -73,43 +73,35 @@ class SelectSafeguard(Safeguard):
     ) -> "_SelectPointwiseSafeguard | _SelectStencilSafeguard":
         from ... import SafeguardKind  # noqa: PLC0415
 
-        with ErrorContext(cls.kind).enter() as ctx:
+        with ErrorContext().enter() as ctx, ctx.safeguardty(cls):
             with ctx.parameter("selector"):
-                ParameterTypeError.check_instance_or_raise(
-                    selector, str | Parameter, ctx.ctx
-                )
+                TypeCheckError.check_instance_or_raise(selector, str | Parameter)
                 selector = (
                     selector if isinstance(selector, Parameter) else Parameter(selector)
                 )
 
             with ctx.parameter("safeguards"):
-                ParameterTypeError.check_instance_or_raise(
-                    safeguards, Collection, ctx.ctx
-                )
+                TypeCheckError.check_instance_or_raise(safeguards, Collection)
 
                 if len(safeguards) <= 0:
-                    raise ParameterValueError(
-                        "can only select over at least one safeguard", ctx.ctx
+                    raise ValueErrorWithContext(
+                        "can only select over at least one safeguard"
                     )
 
                 safeguards_: list[PointwiseSafeguard | StencilSafeguard] = []
                 safeguard: dict[str, JSON] | Safeguard
                 for i, safeguard in enumerate(safeguards):
                     with ctx.index(i):
-                        ParameterTypeError.check_instance_or_raise(
-                            safeguard,
-                            dict | PointwiseSafeguard | StencilSafeguard,
-                            ctx.ctx,
+                        TypeCheckError.check_instance_or_raise(
+                            safeguard, dict | PointwiseSafeguard | StencilSafeguard
                         )
                         if isinstance(safeguard, dict):
-                            safeguard = SafeguardKind.from_config(safeguard, ctx.ctx)
+                            safeguard = SafeguardKind.from_config(safeguard)
                         if not isinstance(
                             safeguard, PointwiseSafeguard | StencilSafeguard
                         ):
-                            raise ParameterTypeError(
-                                PointwiseSafeguard | StencilSafeguard,
-                                safeguard,
-                                ctx.ctx,
+                            raise TypeCheckError(
+                                PointwiseSafeguard | StencilSafeguard, safeguard
                             )
                         safeguards_.append(safeguard)
 
@@ -269,9 +261,9 @@ class _SelectSafeguardBase(ABC):
         late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         with (
-            ErrorContext(self.kind).enter() as ctx,
+            ErrorContext().enter() as ctx,
+            ctx.safeguardty(SelectSafeguard),
             ctx.parameter("selector"),
-            ctx.catch(),
         ):
             selector = late_bound.resolve_ndarray_with_lossless_cast(
                 self.selector, data.shape, np.dtype(np.int_)
@@ -285,9 +277,12 @@ class _SelectSafeguardBase(ABC):
         try:
             return np.choose(selector, oks)  # type: ignore
         except IndexError as err:
-            raise LateBoundSelectorIndexError(
-                str(err), self.selector, ErrorContext(self.kind, "selector")
-            )
+            with (
+                ErrorContext().enter() as ctx,
+                ctx.parameter("selector"),
+                ctx.late_bound_parameter(self.selector),
+            ):
+                raise IndexErrorWithContext(str(err)) from None
 
     def compute_safe_intervals(
         self,
@@ -296,9 +291,9 @@ class _SelectSafeguardBase(ABC):
         late_bound: Bindings,
     ) -> IntervalUnion[T, int, int]:
         with (
-            ErrorContext(self.kind).enter() as ctx,
+            ErrorContext().enter() as ctx,
+            ctx.safeguardty(SelectSafeguard),
             ctx.parameter("selector"),
-            ctx.catch(),
         ):
             selector = late_bound.resolve_ndarray_with_lossless_cast(
                 self.selector, data.shape, np.dtype(np.int_)
@@ -340,9 +335,12 @@ class _SelectSafeguardBase(ABC):
                 .T
             )
         except IndexError as err:
-            raise LateBoundSelectorIndexError(
-                str(err), self.selector, ErrorContext(self.kind, "selector")
-            )
+            with (
+                ErrorContext().enter() as ctx,
+                ctx.parameter("selector"),
+                ctx.late_bound_parameter(self.selector),
+            ):
+                raise IndexErrorWithContext(str(err)) from None
 
         return valid
 

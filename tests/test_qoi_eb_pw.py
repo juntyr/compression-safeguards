@@ -15,7 +15,10 @@ from compression_safeguards.safeguards.pointwise.qoi.eb import (
 )
 from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.cast import ToFloatMode
-from compression_safeguards.utils.error import QuantityOfInterestSyntaxError
+from compression_safeguards.utils.error import (
+    QuantityOfInterestSyntaxError,
+    ValueErrorWithContext,
+)
 
 from .codecs import (
     NoiseCodec,
@@ -124,7 +127,9 @@ CHECKS = [
 
 
 def test_sandbox():
-    with pytest.raises(QuantityOfInterestSyntaxError, match="unexpected token"):
+    with pytest.raises(
+        QuantityOfInterestSyntaxError, match=r"qoi_eb_pw\.qoi: unexpected token"
+    ):
         # sandbox escape based on https://stackoverflow.com/q/35804961 and
         #  https://stackoverflow.com/a/35806044
         check_all_codecs(
@@ -771,7 +776,10 @@ def test_to_float_modes(dtype, mode):
     ):
         expectation = does_not_raise()
     else:
-        expectation = pytest.raises(ValueError, match="cannot losslessly cast")
+        expectation = pytest.raises(
+            ValueErrorWithContext,
+            match=rf"qoi_eb_pw\.qoi_dtype: cannot losslessly cast {dtype} to {mode}",
+        )
 
     with expectation:
         encode_decode_mock(
@@ -811,8 +819,8 @@ def test_fuzzer_found_float16_to_float128_cast_invalid_value():
     decoded = np.array([[1.52e-05], [0.00e00], [0.00e00]], dtype=np.float16)
 
     with pytest.raises(
-        ValueError,
-        match=r"cannot cast non-finite values from float16 to saturating finite",
+        ValueErrorWithContext,
+        match=r"qoi_eb_pw\.eb=\$x: cannot cast non-finite values from float16 to saturating finite [a-zA-Z]+128",
     ):
         encode_decode_mock(
             data,

@@ -12,7 +12,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
-from ...utils.error import ErrorContext, ParameterTypeError, ParameterValueError
+from ...utils.error import ErrorContext, TypeCheckError, ValueErrorWithContext
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import JSON, S, T
 from ..abc import Safeguard
@@ -58,35 +58,29 @@ class AllSafeguards(Safeguard):
     ) -> "_AllPointwiseSafeguards | _AllStencilSafeguards":
         from ... import SafeguardKind  # noqa: PLC0415
 
-        with ErrorContext(cls.kind).enter() as ctx:
+        with ErrorContext().enter() as ctx, ctx.safeguardty(cls):
             with ctx.parameter("safeguards"):
-                ParameterTypeError.check_instance_or_raise(
-                    safeguards, Collection, ctx.ctx
-                )
+                TypeCheckError.check_instance_or_raise(safeguards, Collection)
 
                 if len(safeguards) <= 0:
-                    raise ParameterValueError(
-                        "can only combine over at least one safeguard", ctx.ctx
+                    raise ValueErrorWithContext(
+                        "can only combine over at least one safeguard"
                     )
 
                 safeguards_: list[PointwiseSafeguard | StencilSafeguard] = []
                 safeguard: dict[str, JSON] | Safeguard
                 for i, safeguard in enumerate(safeguards):
                     with ctx.index(i):
-                        ParameterTypeError.check_instance_or_raise(
-                            safeguard,
-                            dict | PointwiseSafeguard | StencilSafeguard,
-                            ctx.ctx,
+                        TypeCheckError.check_instance_or_raise(
+                            safeguard, dict | PointwiseSafeguard | StencilSafeguard
                         )
                         if isinstance(safeguard, dict):
-                            safeguard = SafeguardKind.from_config(safeguard, ctx.ctx)
+                            safeguard = SafeguardKind.from_config(safeguard)
                         if not isinstance(
                             safeguard, PointwiseSafeguard | StencilSafeguard
                         ):
-                            raise ParameterTypeError(
-                                PointwiseSafeguard | StencilSafeguard,
-                                safeguard,
-                                ctx.ctx,
+                            raise TypeCheckError(
+                                PointwiseSafeguard | StencilSafeguard, safeguard
                             )
                         safeguards_.append(safeguard)
 

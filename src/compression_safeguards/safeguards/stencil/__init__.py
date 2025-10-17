@@ -15,8 +15,8 @@ from typing_extensions import (
 
 from compression_safeguards.utils.error import (
     ErrorContext,
-    ParameterTypeError,
-    ParameterValueError,
+    TypeCheckError,
+    ValueErrorWithContext,
 )
 
 from ...utils.bindings import Parameter
@@ -107,15 +107,15 @@ class NeighbourhoodAxis:
     ) -> None:
         with ErrorContext().enter() as ctx:
             with ctx.parameter("before"):
-                ParameterTypeError.check_instance_or_raise(before, int, ctx.ctx)
+                TypeCheckError.check_instance_or_raise(before, int)
                 if before < 0:
-                    raise ParameterValueError("must be non-negative", ctx.ctx)
+                    raise ValueErrorWithContext("must be non-negative")
                 self._before = before
 
             with ctx.parameter("after"):
-                ParameterTypeError.check_instance_or_raise(after, int, ctx.ctx)
+                TypeCheckError.check_instance_or_raise(after, int)
                 if after < 0:
-                    raise ParameterValueError("must be non-negative", ctx.ctx)
+                    raise ValueErrorWithContext("must be non-negative")
                 self._after = after
 
     @property
@@ -199,45 +199,34 @@ class NeighbourhoodBoundaryAxis:
     ) -> None:
         with ErrorContext().enter() as ctx:
             with ctx.parameter("axis"):
-                ParameterTypeError.check_instance_or_raise(axis, int, ctx.ctx)
+                TypeCheckError.check_instance_or_raise(axis, int)
                 self._axis = axis
-
-            with ctx.parameter("before"):
-                ParameterTypeError.check_instance_or_raise(before, int, ctx.ctx)
-                if before < 0:
-                    raise ParameterValueError("must be non-negative", ctx.ctx)
-
-            with ctx.parameter("after"):
-                ParameterTypeError.check_instance_or_raise(after, int, ctx.ctx)
-                if after < 0:
-                    raise ParameterValueError("must be non-negative", ctx.ctx)
 
             self._shape = NeighbourhoodAxis(before, after)
 
             with ctx.parameter("boundary"):
-                ParameterTypeError.check_instance_or_raise(
-                    boundary, str | BoundaryCondition, ctx.ctx
+                TypeCheckError.check_instance_or_raise(
+                    boundary, str | BoundaryCondition
                 )
                 self._boundary = (
                     boundary
                     if isinstance(boundary, BoundaryCondition)
-                    else ParameterValueError.lookup_enum_or_raise(
-                        BoundaryCondition, boundary, ctx.ctx
+                    else ValueErrorWithContext.lookup_enum_or_raise(
+                        BoundaryCondition, boundary
                     )
                 )
 
             with ctx.parameter("constant_boundary"):
-                ParameterTypeError.check_instance_or_raise(
-                    constant_boundary, None | int | float | str | Parameter, ctx.ctx
+                TypeCheckError.check_instance_or_raise(
+                    constant_boundary, None | int | float | str | Parameter
                 )
 
                 if (self._boundary != BoundaryCondition.constant) != (
                     constant_boundary is None
                 ):
-                    raise ParameterValueError(
+                    raise ValueErrorWithContext(
                         "must be provided if and only if the constant "
-                        + "boundary condition is used",
-                        ctx.ctx,
+                        + "boundary condition is used"
                     )
 
                 if isinstance(constant_boundary, Parameter):
@@ -249,10 +238,9 @@ class NeighbourhoodBoundaryAxis:
 
                 if isinstance(self._constant_boundary, Parameter):
                     if self._constant_boundary in ["$x", "$X"]:
-                        raise ParameterValueError(
+                        raise ValueErrorWithContext(
                             "must be a scalar but late-bound constant data "
-                            + f"{self._constant_boundary} may not be",
-                            ctx.ctx,
+                            + f"{self._constant_boundary} may not be"
                         )
 
     @property

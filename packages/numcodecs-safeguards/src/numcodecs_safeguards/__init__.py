@@ -452,7 +452,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             # MSPV 3.11
             if getattr(err, "add_note", None) is not None:
                 err.add_note(message)  # type: ignore
-                raise err
+                raise
             else:
                 raise RuntimeError(message) from err
         decoded = numcodecs.compat.ensure_ndarray(decoded)
@@ -482,7 +482,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             # MSPV 3.11
             if getattr(err, "add_note", None) is not None:
                 err.add_note(message)  # type: ignore
-                raise err
+                raise
             else:
                 raise RuntimeError(message) from err
 

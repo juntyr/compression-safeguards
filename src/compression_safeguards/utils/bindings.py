@@ -21,7 +21,7 @@ from .cast import lossless_cast, saturating_finite_float_cast
 from .error import (
     ErrorContext,
     LateBoundParameterResolutionError,
-    LateBoundParameterValueError,
+    ValueErrorWithContext,
 )
 from .typing import JSON, F, Si, T
 
@@ -50,7 +50,9 @@ class Parameter(str):
         if isinstance(param, Parameter):
             return param
         if not param.removeprefix("$").isidentifier():
-            raise ValueError(f"parameter `{param}` must be a valid identifier")
+            raise ValueErrorWithContext(
+                f"parameter `{param}` must be a valid identifier"
+            )
         return super().__new__(cls, param)
 
     @property
@@ -183,19 +185,19 @@ class Bindings:
 
         # cast first then broadcast to allow zero-copy broadcasts of scalars
         #  to arrays of any shape
-        with ErrorContext().enter() as ctx, ctx.catch():
+        with ErrorContext().enter() as ctx, ctx.late_bound_parameter(param):
             value: np.ndarray[tuple[int, ...], np.dtype[T]] = lossless_cast(
                 self._bindings[param], dtype
             )
 
-        try:
-            value_view: np.ndarray[Si, np.dtype[T]] = _broadcast_to(value, shape).view()
-        except ValueError:
-            raise LateBoundParameterValueError(
-                f"cannot broadcast from shape {value.shape} to shape {shape}",
-                param,
-                ErrorContext(),
-            )
+            try:
+                value_view: np.ndarray[Si, np.dtype[T]] = _broadcast_to(
+                    value, shape
+                ).view()
+            except ValueError:
+                raise ValueErrorWithContext(
+                    f"cannot broadcast from shape {value.shape} to shape {shape}"
+                ) from None
 
         value_view.flags.writeable = False
 
@@ -241,19 +243,19 @@ class Bindings:
 
         # cast first then broadcast to allow zero-copy broadcasts of scalars
         #  to arrays of any shape
-        with ErrorContext().enter() as ctx, ctx.catch():
+        with ErrorContext().enter() as ctx, ctx.late_bound_parameter(param):
             value: np.ndarray[tuple[int, ...], np.dtype[F]] = (
                 saturating_finite_float_cast(self._bindings[param], dtype)
             )
 
-        try:
-            value_view: np.ndarray[Si, np.dtype[F]] = _broadcast_to(value, shape).view()
-        except ValueError:
-            raise LateBoundParameterValueError(
-                f"cannot broadcast from shape {value.shape} to shape {shape}",
-                param,
-                ErrorContext(),
-            )
+            try:
+                value_view: np.ndarray[Si, np.dtype[F]] = _broadcast_to(
+                    value, shape
+                ).view()
+            except ValueError:
+                raise ValueErrorWithContext(
+                    f"cannot broadcast from shape {value.shape} to shape {shape}"
+                ) from None
 
         value_view.flags.writeable = False
 
@@ -288,19 +290,16 @@ class Bindings:
                 # scalar array
                 continue
 
-            if value.ndim != len(shape):
-                raise LateBoundParameterValueError(
-                    f"incompatible dimension {value.ndim}, expected {len(shape)}",
-                    param,
-                    ErrorContext(),
-                )
+            with ErrorContext().enter() as ctx, ctx.late_bound_parameter(param):
+                if value.ndim != len(shape):
+                    raise ValueErrorWithContext(
+                        f"incompatible dimension {value.ndim}, expected {len(shape)}"
+                    )
 
-            if not all((v == 1) or (v == s) for v, s in zip(value.shape, shape)):
-                raise LateBoundParameterValueError(
-                    f"incompatible shape {value.shape}, expected {shape}",
-                    param,
-                    ErrorContext(),
-                )
+                if not all((v == 1) or (v == s) for v, s in zip(value.shape, shape)):
+                    raise ValueErrorWithContext(
+                        f"incompatible shape {value.shape}, expected {shape}"
+                    )
 
     def apply_slice_index(self, index: tuple[slice, ...]) -> Self:
         """
@@ -463,9 +462,10 @@ def _decode_value(p: Parameter, v: int | float | str) -> Value:
         return v
 
     if not v.startswith(_NPZ_DATA_URI_BASE64):
-        raise LateBoundParameterValueError(
-            "must be encoded as a .npz data URI in base64 format", p, ErrorContext()
-        )
+        with ErrorContext().enter() as ctx, ctx.parameter(p):
+            raise ValueErrorWithContext(
+                "must be encoded as a .npz data URI in base64 format"
+            )
 
     io = BytesIO(
         standard_b64decode(v[len(_NPZ_DATA_URI_BASE64) :].encode(encoding="ascii"))

@@ -6,7 +6,7 @@ __all__ = ["SafeguardKind"]
 
 from enum import Enum
 
-from ..utils.error import ErrorContext, ParameterTypeError, ParameterValueError
+from ..utils.error import ErrorContext, TypeCheckError, ValueErrorWithContext
 from ..utils.typing import JSON
 from .abc import Safeguard
 from .combinators.all import AllSafeguards
@@ -62,7 +62,7 @@ class SafeguardKind(Enum):
     """Select, pointwise, which safeguard's guarantees to enforce."""
 
     @staticmethod
-    def from_config(config: dict[str, JSON], context: ErrorContext) -> Safeguard:
+    def from_config(config: dict[str, JSON]) -> Safeguard:
         """
         Instantiate a safeguard from a configuration [`dict`][dict].
 
@@ -80,34 +80,26 @@ class SafeguardKind(Enum):
 
         Raises
         ------
-        ParameterValueError
+        ValueError
             if the `config` does not contain the safeguard `kind` or the
             `kind` is unknown.
-        ParameterTypeError
+        TypeError
             if the safeguard `kind` is not a [`str`][str]ing.
-        ParameterValueError
+        ValueError
             if instantiating the safeguard from the `config` fails.
         """
 
         if "kind" not in config:
-            raise ParameterValueError("missing safeguard `kind`", context)
+            raise ValueErrorWithContext("missing safeguard `kind`")
 
         kind = config["kind"]
 
-        with context.enter() as ctx:
+        with ErrorContext().enter() as ctx:
             with ctx.parameter("kind"):
-                ParameterTypeError.check_instance_or_raise(kind, str, ctx.ctx)
-                safeguard: type[Safeguard] = ParameterValueError.lookup_enum_or_raise(
+                TypeCheckError.check_instance_or_raise(kind, str)
+                safeguard: type[Safeguard] = ValueErrorWithContext.lookup_enum_or_raise(
                     SafeguardKind,
                     kind,  # type: ignore
-                    ctx.ctx,
                 ).value
 
-            try:
-                return safeguard.from_config(
-                    {p: v for p, v in config.items() if p != "kind"}
-                )
-            except Exception as err:
-                raise ParameterValueError(
-                    "invalid safeguard configuration", ctx.ctx
-                ) from err
+        return safeguard.from_config({p: v for p, v in config.items() if p != "kind"})

@@ -13,9 +13,9 @@ from compression_safeguards.utils._float128 import _float128_dtype
 from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.cast import ToFloatMode, to_float
 from compression_safeguards.utils.error import (
-    LateBoundParameterValueError,
-    ParameterValueError,
+    IndexErrorWithContext,
     QuantityOfInterestSyntaxError,
+    ValueErrorWithContext,
 )
 
 from .codecs import (
@@ -177,7 +177,7 @@ CHECKS = [
 def test_variables():
     with pytest.raises(
         QuantityOfInterestSyntaxError,
-        match=r'cannot assign to identifier `a`, assign to a variable V\["a"\] instead',
+        match=r'qoi_eb_stencil\.qoi: cannot assign to identifier `a`, assign to a variable V\["a"\] instead',
     ):
         check_all_codecs(np.array([]), "a = 4; return a", [(0, 0)])
     with pytest.raises(
@@ -937,7 +937,8 @@ def test_fuzzer_tuple_index_out_of_range():
     decoded = np.array([], dtype=np.int32)
 
     with pytest.raises(
-        IndexError, match=r"axis index -65 is out of bounds for array of shape \(0,\)"
+        IndexErrorWithContext,
+        match=r"qoi_eb_stencil\.neighbourhood\[0\]\.axis: -65 is out of bounds for array of shape \(0,\)",
     ):
         encode_decode_mock(
             data,
@@ -1007,13 +1008,13 @@ def test_late_bound_broadcast():
     safeguard.compute_safe_intervals(data, late_bound=Bindings(eb=np.ones((1, 1))))
 
     with pytest.raises(
-        LateBoundParameterValueError,
+        ValueErrorWithContext,
         match=r"qoi_eb_stencil\.eb=eb: cannot broadcast from shape \(2, 2\) to shape \(4, 4\)",
     ):
         safeguard.compute_safe_intervals(data, late_bound=Bindings(eb=np.ones((2, 2))))
 
     with pytest.raises(
-        LateBoundParameterValueError,
+        ValueErrorWithContext,
         match=r"qoi_eb_stencil\.eb=eb: cannot broadcast from shape \(4, 4, 1\) to shape \(4, 4\)",
     ):
         safeguard.compute_safe_intervals(
@@ -1046,28 +1047,40 @@ def test_late_bound_lossless_cast():
         data, late_bound=Bindings(c=np.iinfo(np.uint16).max)
     )
 
-    with pytest.raises(ValueError, match="cannot losslessly cast"):
+    with pytest.raises(
+        ValueErrorWithContext,
+        match=r"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from int64 to float32",
+    ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.int32).max - 1)
         )
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.int32).max)
         )
-    with pytest.raises(ValueError, match="cannot losslessly cast"):
+    with pytest.raises(
+        ValueErrorWithContext,
+        match=r"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from int64 to float32",
+    ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.uint32).max - 1)
         )
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.uint32).max)
         )
-    with pytest.raises(ValueError, match="cannot losslessly cast"):
+    with pytest.raises(
+        ValueErrorWithContext,
+        match=r"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from int64 to float32",
+    ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.int64).max - 1)
         )
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.int64).max)
         )
-    with pytest.raises(ValueError, match="cannot losslessly cast"):
+    with pytest.raises(
+        ValueErrorWithContext,
+        match=r"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from uint64 to float32",
+    ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.uint64).max - 1)
         )
@@ -1082,7 +1095,10 @@ def test_late_bound_lossless_cast():
         data, late_bound=Bindings(c=np.finfo(np.float32).smallest_subnormal)
     )
 
-    with pytest.raises(ValueError, match="cannot losslessly cast"):
+    with pytest.raises(
+        ValueErrorWithContext,
+        match=r"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from float64 to float32",
+    ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.finfo(np.float64).smallest_subnormal)
         )
@@ -1279,9 +1295,9 @@ def test_pointwise_normalised_absolute_error(check):
 def test_late_bound_constant_boundary():
     for c in ["$x", "$X"]:
         with pytest.raises(
-            ParameterValueError,
+            ValueErrorWithContext,
             match=re.escape(
-                "qoi_eb_stencil.neighbourhood.[0].constant_boundary: must be "
+                "qoi_eb_stencil.neighbourhood[0].constant_boundary: must be "
                 + f"a scalar but late-bound constant data {c} may not be"
             ),
         ):
@@ -1326,16 +1342,16 @@ def test_late_bound_constant_boundary():
     data = np.arange(6, dtype="uint8").reshape(2, 3)
 
     with pytest.raises(
-        LateBoundParameterValueError,
-        match=r"qoi_eb_stencil.neighbourhood\.\[0\]\.constant_boundary=const: cannot broadcast from shape \(2, 3\) to shape \(\)",
+        ValueErrorWithContext,
+        match=r"qoi_eb_stencil.neighbourhood\[0\]\.constant_boundary=const: cannot broadcast from shape \(2, 3\) to shape \(\)",
     ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(const=data, const2=4)
         )
 
     with pytest.raises(
-        ValueError,
-        match=r"cannot losslessly cast \(some\) values from int64 to uint8",
+        ValueErrorWithContext,
+        match=r"qoi_eb_stencil\.neighbourhood\[1\]\.constant_boundary=const2: cannot losslessly cast \(some\) values from int64 to uint8",
     ):
         safeguard.compute_safe_intervals(data, late_bound=Bindings(const=1, const2=256))
 
