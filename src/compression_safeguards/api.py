@@ -25,6 +25,7 @@ from .utils._compat import _ones, _zeros
 from .utils.bindings import Bindings, Parameter, Value
 from .utils.cast import as_bits
 from .utils.error import (
+    ErrorContext,
     IncompatibleChunkStencilError,
     IncompatibleSafeguardsVersion,
     LateBoundParameterResolutionError,
@@ -76,14 +77,15 @@ class Safeguards:
             )
             IncompatibleSafeguardsVersion.check_or_raise(self.version, _version)
 
-        safeguards_: list[Safeguard] = [
-            safeguard
-            if isinstance(safeguard, Safeguard)
-            else SafeguardKind[safeguard["kind"]].value(  # type: ignore
-                **{p: v for p, v in safeguard.items() if p != "kind"}
-            )
-            for safeguard in safeguards
-        ]
+        safeguards_: list[Safeguard] = []
+        with ErrorContext().enter() as ctx, ctx.parameter("safeguards"):
+            for i, safeguard in enumerate(safeguards):
+                with ctx.index(i):
+                    safeguards_.append(
+                        safeguard
+                        if isinstance(safeguard, Safeguard)
+                        else SafeguardKind.from_config(safeguard)
+                    )
 
         self._pointwise_safeguards = tuple(
             safeguard

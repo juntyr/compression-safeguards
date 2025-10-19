@@ -5,7 +5,7 @@ from sly import Parser
 from typing_extensions import Unpack  # MSPV 3.11
 
 from ...utils.bindings import Parameter
-from ...utils.error import QuantityOfInterestSyntaxError
+from ...utils.error import ErrorContext
 from .expr.abc import AnyExpr
 from .expr.abs import ScalarAbs
 from .expr.addsub import ScalarAdd, ScalarSubtract
@@ -73,7 +73,7 @@ class QoIParser(Parser):
         tokens, tokens2 = itertools.tee(tokens)
 
         if next(tokens2, None) is None:
-            raise QuantityOfInterestSyntaxError.root("expression must not be empty")
+            raise SyntaxError("expression must not be empty") | ErrorContext()
 
         return super().parse(tokens)
 
@@ -788,20 +788,28 @@ class QoIParser(Parser):
         oneof = " one of" if len(actions) > 1 else ""
 
         if t is None:
-            raise QuantityOfInterestSyntaxError.root(
-                f"expected more input but found EOF\nexpected{oneof} {options}"
+            raise (
+                SyntaxError(
+                    f"expected more input but found EOF\nexpected{oneof} {options}"
+                )
+                | ErrorContext()
             )
 
         t_value = f'"{t.value}"' if t.type == "STRING" else t.value
 
-        raise QuantityOfInterestSyntaxError(
-            f"unexpected token `{t_value}`\nexpected{oneof} {options}",
-            t.lineno,
-            self.find_column(t),
+        raise (
+            SyntaxError(
+                f"unexpected token `{t_value}`\nexpected{oneof} {options}",
+                ("<qoi>", t.lineno, self.find_column(t), None),
+            )
+            | ErrorContext()
         )
 
     def raise_error(self, t, message):
-        raise QuantityOfInterestSyntaxError(message, t.lineno, self.find_column(t))
+        raise (
+            SyntaxError(message, ("<qoi>", t.lineno, self.find_column(t), None))
+            | ErrorContext()
+        )
 
     def assert_or_error(self, check, t, message):
         if not check:

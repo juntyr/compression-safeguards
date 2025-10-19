@@ -23,7 +23,7 @@ from typing_extensions import (
     override,  # MSPV 3.12
 )
 
-from compression_safeguards.utils.error import TypeErrorWithContext
+from compression_safeguards.utils.error import ErrorContext, TypeCheckError
 
 from ._compat import _ensure_array, _nextafter, _where
 from ._compat import _maximum_zero_sign_sensitive as _np_maximum
@@ -540,7 +540,7 @@ def _minimum(dtype: np.dtype[T]) -> np.ndarray[tuple[()], np.dtype[T]]:
         bmin = np.iinfo(btype).max  # produces -NaN (0xffff...)
         return np.array(bmin, dtype=btype).view(dtype)
 
-    raise TypeErrorWithContext(f"unsupported interval type {dtype}")
+    raise TypeCheckError(np.integer | np.floating, dtype.type) | ErrorContext()
 
 
 class _Minimum:
@@ -568,7 +568,7 @@ def _maximum(dtype: np.dtype[T]) -> np.ndarray[tuple[()], np.dtype[T]]:
         bmin = np.iinfo(btype).max  # produces -NaN (0xffff...)
         return np.copysign(np.array(bmin, dtype=btype).view(dtype), +1)  # type: ignore
 
-    raise TypeErrorWithContext(f"unsupported interval type {dtype}")
+    raise TypeCheckError(np.integer | np.floating, dtype.type) | ErrorContext()
 
 
 class _Maximum:

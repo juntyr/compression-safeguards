@@ -25,7 +25,7 @@ from ...utils._compat import (
 )
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
-from ...utils.error import ErrorContext, TypeCheckError, ValueErrorWithContext
+from ...utils.error import ErrorContext, TypeCheckError, lookup_enum_or_raise
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import JSON, S, T
 from . import BoundaryCondition, NeighbourhoodAxis, _pad_with_boundary
@@ -158,15 +158,13 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 self._monotonicity = (
                     monotonicity
                     if isinstance(monotonicity, Monotonicity)
-                    else ValueErrorWithContext.lookup_enum_or_raise(
-                        Monotonicity, monotonicity
-                    )
+                    else lookup_enum_or_raise(Monotonicity, monotonicity)
                 )
 
             with ctx.parameter("window"):
                 TypeCheckError.check_instance_or_raise(window, int)
                 if window <= 0:
-                    raise ValueErrorWithContext("must be positive")
+                    raise ValueError("must be positive") | ctx
                 self._window = window
 
             with ctx.parameter("boundary"):
@@ -176,9 +174,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 self._boundary = (
                     boundary
                     if isinstance(boundary, BoundaryCondition)
-                    else ValueErrorWithContext.lookup_enum_or_raise(
-                        BoundaryCondition, boundary
-                    )
+                    else lookup_enum_or_raise(BoundaryCondition, boundary)
                 )
 
             with ctx.parameter("constant_boundary"):
@@ -189,8 +185,11 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 if (self._boundary != BoundaryCondition.constant) != (
                     constant_boundary is None
                 ):
-                    raise ValueErrorWithContext(
-                        "must be provided if and only if the constant boundary condition is used"
+                    raise (
+                        ValueError(
+                            "must be provided if and only if the constant boundary condition is used"
+                        )
+                        | ctx
                     )
 
                 if isinstance(constant_boundary, Parameter):
@@ -203,8 +202,11 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 if isinstance(
                     self._constant_boundary, Parameter
                 ) and self._constant_boundary in ["$x", "$X"]:
-                    raise ValueErrorWithContext(
-                        f"must be scalar but late-bound constant data {self._constant_boundary} may not be"
+                    raise (
+                        ValueError(
+                            f"must be scalar but late-bound constant data {self._constant_boundary} may not be"
+                        )
+                        | ctx
                     )
 
             with ctx.parameter("axis"):

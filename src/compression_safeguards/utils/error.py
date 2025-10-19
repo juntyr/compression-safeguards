@@ -2,12 +2,8 @@ __all__ = [
     "ErrorContext",
     "IncompatibleSafeguardsVersion",
     "UnsupportedSafeguardError",
-    "ValueErrorWithContext",
     "IncompatibleChunkStencilError",
     "TypeCheckError",
-    "TypeErrorWithContext",
-    "QuantityOfInterestSyntaxError",
-    "IndexErrorWithContext",
     "LateBoundParameterResolutionError",
 ]
 
@@ -33,6 +29,8 @@ Ei = TypeVar("Ei", bound=Enum)
 
 
 class ContextFragment(ABC):
+    __slots__: tuple[str, ...] = ()
+
     @override
     @abstractmethod
     def __str__(self) -> str:
@@ -117,6 +115,9 @@ class LateBoundParameterContextFragment(ContextFragment):
         return "="
 
 
+_EXCEPTIONS_WITH_CONTEXT: dict[type[BaseException], type[BaseException]] = dict()
+
+
 class ErrorContext:
     __slots__: tuple[str, ...] = ("_context",)
     _context: tuple[ContextFragment, ...]
@@ -137,6 +138,30 @@ class ErrorContext:
         if self._context == ():
             return ""
         return f"{self}{follow}"
+
+    def __ror__(self, other: BaseException) -> BaseException:
+        if isinstance(other, ErrorContextMixin):
+            other._context = self.extend(other.context)
+            return other
+
+        ty = type(other)
+        ty_with_context = _EXCEPTIONS_WITH_CONTEXT.get(ty, None)
+
+        if ty_with_context is None:
+
+            def __str__with_context(self) -> str:
+                return f"{self.context.to_str_followed_by(': ')}{super(type(self), self).__str__()}"
+
+            ty_with_context = type(
+                ty.__name__,
+                (ty, ErrorContextMixin),
+                dict(__str__=__str__with_context, __module__=ty.__module__),
+            )
+            _EXCEPTIONS_WITH_CONTEXT[ty] = ty_with_context
+
+        other_with_context = ty_with_context(*other.args)
+        other_with_context._context = self  # type: ignore
+        return other_with_context
 
     @override
     def __str__(self) -> str:
@@ -169,15 +194,11 @@ class ErrorContextManager(AbstractContextManager["ErrorContextManager", None]):
     def fragment(self, fragment: ContextFragment):
         try:
             yield
-        except (
-            ValueErrorWithContext,
-            TypeCheckError,
-            IndexErrorWithContext,
-            QuantityOfInterestSyntaxError,
-            LateBoundParameterResolutionError,
-        ) as err:
-            err.context = ErrorContext(fragment).extend(err.context)
-            raise
+        except Exception as err:
+            err2 = err | ErrorContext(fragment)
+            if isinstance(err, ErrorContextMixin):
+                raise
+            raise err2
 
     def parameter(self, name: str):
         return self.fragment(ParameterContextFragment(name))
@@ -194,22 +215,48 @@ class ErrorContextManager(AbstractContextManager["ErrorContextManager", None]):
     def safeguardty(self, safeguard: type["Safeguard"]):
         return self.fragment(SafeguardTypeContextFragment(safeguard))
 
+    def __ror__(self, other: BaseException) -> BaseException:
+        return other | ErrorContext()
+
+
+class ErrorContextMixin:
+    # cannot use slots since they are incompatible with multiple inheritance
+    # __slots__: tuple[str, ...] = ("_context",)
+
+    _context: ErrorContext
+
+    @property
+    def context(self) -> ErrorContext:
+        try:
+            return self._context
+        except AttributeError:
+            context = ErrorContext()
+            self._context = context
+            return context
+
 
 class IncompatibleSafeguardsVersion(ValueError):
-    safeguards: Version
-    incompatible: Version
+    __slots__: tuple[str, ...] = ()
 
     def __init__(self, safeguards: Version, incompatible: Version) -> None:
         assert not incompatible.is_compatible(safeguards)
-        self.safeguards = safeguards
-        self.incompatible = incompatible
         super().__init__(safeguards, incompatible)
 
     @staticmethod
     def check_or_raise(safeguards: Version, version: Version) -> None | Never:
         if version.is_compatible(safeguards):
             return None
-        raise IncompatibleSafeguardsVersion(safeguards, version)
+        raise IncompatibleSafeguardsVersion(safeguards, version) | ErrorContext()
+
+    @property
+    def safeguards(self) -> Version:
+        (safeguards, _incompatible) = self.args
+        return safeguards
+
+    @property
+    def incompatible(self) -> Version:
+        (_safeguards, incompatible) = self.args
+        return incompatible
 
     @override
     def __str__(self) -> str:
@@ -219,12 +266,16 @@ class IncompatibleSafeguardsVersion(ValueError):
         )
 
 
-class UnsupportedSafeguardError(ValueError):
-    safeguards: tuple["Safeguard", ...]
+class UnsupportedSafeguardError(NotImplementedError):
+    __slots__: tuple[str, ...] = ()
 
     def __init__(self, safeguards: tuple["Safeguard", ...]) -> None:
-        self.safeguards = safeguards
         super().__init__(safeguards)
+
+    @property
+    def safeguards(self) -> tuple["Safeguard", ...]:
+        (safeguards,) = self.args
+        return safeguards
 
     @override
     def __str__(self) -> str:
@@ -232,96 +283,69 @@ class UnsupportedSafeguardError(ValueError):
 
 
 class SafeguardsSafetyBug(RuntimeError):
-    message: str
+    __slots__: tuple[str, ...] = ()
 
     def __init__(self, message: str) -> None:
-        self.message = message
-        super().__init__(message)
-
-        message = (
+        note = (
             "This is a bug in the implementation of the "
             + "`compression-safeguards`. Please report it at "
             + "<https://github.com/juntyr/compression-safeguards/issues>."
         )
 
-        # MSPV 3.11
-        if getattr(self, "add_note", None) is not None:
-            self.add_note(message)  # type: ignore
-        else:
-            self.message = f"{self.message}\n\n{message}"
+        if not hasattr(self, "add_note"):
+            message = f"{message}\n\n{note}"
 
-    @override
-    def __str__(self) -> str:
-        return self.message
+        super().__init__(message)
+
+        # MSPV 3.11
+        if hasattr(self, "add_note"):
+            self.add_note(message)  # type: ignore
 
 
 class IncompatibleChunkStencilError(ValueError):
-    message: str
-    axis: int
+    __slots__: tuple[str, ...] = ()
 
     def __init__(self, message: str, axis: int) -> None:
-        self.message = message
-        self.axis = axis
         super().__init__(message, axis)
+
+    @property
+    def message(self) -> str:
+        (message, _axis) = self.args
+        return message
+
+    @property
+    def axis(self) -> int:
+        (_message, axis) = self.args
+        return axis
 
     @override
     def __str__(self) -> str:
         return f"{self.message} on axis {self.axis}"
 
 
-class ValueErrorWithContext(ValueError):
-    context: ErrorContext
+def lookup_enum_or_raise(
+    enum: type[Ei], name: str, error: type[Exception] = ValueError
+) -> Ei | Never:
+    if name in enum.__members__:
+        return enum.__members__[name]
 
-    def __init__(self, message: str) -> None:
-        self.context = ErrorContext()
-        super().__init__(message)
-
-    @property
-    def message(self) -> str:
-        (message,) = self.args
-        return message
-
-    @classmethod
-    def lookup_enum_or_raise(cls, enum: type[Ei], name: str) -> Ei | Never:
-        if name in enum.__members__:
-            return enum.__members__[name]
-
-        raise cls(
+    raise (
+        error(
             f"unknown {enum.__name__} {name!r}, use one of "
             + f"{', '.join(repr(m) for m in enum.__members__)}"
         )
-
-    @override
-    def __str__(self) -> str:
-        return f"{self.context.to_str_followed_by(': ')}{self.message}"
-
-
-class TypeErrorWithContext(TypeError):
-    context: ErrorContext
-
-    def __init__(self, message: str) -> None:
-        self.context = ErrorContext()
-        super().__init__(message)
-
-    @property
-    def message(self) -> str:
-        (message,) = self.args
-        return message
-
-    @override
-    def __str__(self) -> str:
-        return f"{self.context.to_str_followed_by(': ')}{self.message}"
+        | ErrorContext()
+    )
 
 
 class TypeCheckError(TypeError):
-    context: ErrorContext
+    __slots__: tuple[str, ...] = ()
 
     def __init__(
         self,
         expected: type | UnionType,
         found: object,
     ) -> None:
-        self.context = ErrorContext()
         super().__init__(expected, found)
 
     @classmethod
@@ -330,7 +354,7 @@ class TypeCheckError(TypeError):
     ) -> None | Never:
         if isinstance(obj, expected):
             return None
-        raise cls(expected, obj)
+        raise cls(expected, obj) | ErrorContext()
 
     @property
     def expected(self) -> type | UnionType:
@@ -344,55 +368,16 @@ class TypeCheckError(TypeError):
 
     @override
     def __str__(self) -> str:
-        return f"{self.context.to_str_followed_by(': ')}expected {self.expected} but found {self.found} of type {type(self.found)}"
-
-
-class IndexErrorWithContext(IndexError):
-    context: ErrorContext
-
-    def __init__(self, message: str) -> None:
-        self.context = ErrorContext()
-        super().__init__(message)
-
-    @property
-    def message(self) -> str:
-        (message,) = self.args
-        return message
-
-    @override
-    def __str__(self) -> str:
-        return f"{self.context.to_str_followed_by(': ')}{self.message}"
-
-
-class QuantityOfInterestSyntaxError(SyntaxError):
-    context: ErrorContext
-
-    def __init__(self, message: str, lineno: int, column: int) -> None:
-        self.context = ErrorContext()
-        super().__init__(message, ("<qoi>", lineno, column, None))
-
-    @staticmethod
-    def root(message: str) -> "QuantityOfInterestSyntaxError":
-        return QuantityOfInterestSyntaxError(message, None, None)  # type: ignore
-
-    @property
-    def message(self) -> str:
-        (message, _info) = self.args
-        return message
-
-    @override
-    def __str__(self) -> str:
-        return f"{self.context.to_str_followed_by(': ')}{self.message}"
+        return f"expected {self.expected} but found {self.found} of type {type(self.found)}"
 
 
 class LateBoundParameterResolutionError(KeyError):
-    context: ErrorContext
+    __slots__: tuple[str, ...] = ()
 
     def __init__(
         self, expected: frozenset["Parameter"], provided: frozenset["Parameter"]
     ):
         assert expected != provided
-        self.context = ErrorContext()
         super().__init__(expected, provided)
 
     @staticmethod
@@ -401,7 +386,7 @@ class LateBoundParameterResolutionError(KeyError):
     ) -> None | Never:
         if expected == provided:
             return None
-        raise LateBoundParameterResolutionError(expected, provided)
+        raise LateBoundParameterResolutionError(expected, provided) | ErrorContext()
 
     @property
     def expected(self) -> frozenset["Parameter"]:
@@ -439,20 +424,27 @@ class LateBoundParameterResolutionError(KeyError):
 
 
 class UnsupportedDateTypeError(TypeError):
-    dtype: np.dtype
-    supported: frozenset[np.dtype]
+    __slots__: tuple[str, ...] = ()
 
     def __init__(self, dtype: np.dtype, supported: frozenset[np.dtype]):
         assert dtype not in supported
-        self.dtype = dtype
-        self.supported = supported
         super().__init__(dtype, supported)
 
     @staticmethod
     def check_or_raise(dtype: np.dtype, supported: frozenset[np.dtype]) -> None | Never:
         if dtype in supported:
             return None
-        raise UnsupportedDateTypeError(dtype, supported)
+        raise UnsupportedDateTypeError(dtype, supported) | ErrorContext()
+
+    @property
+    def dtype(self) -> np.dtype:
+        (dtype, _supported) = self.args
+        return dtype
+
+    @property
+    def supported(self) -> frozenset[np.dtype]:
+        (_dtype, supported) = self.args
+        return supported
 
     @override
     def __str__(self) -> str:

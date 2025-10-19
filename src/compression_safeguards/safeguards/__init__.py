@@ -6,7 +6,7 @@ __all__ = ["SafeguardKind"]
 
 from enum import Enum
 
-from ..utils.error import ErrorContext, TypeCheckError, ValueErrorWithContext
+from ..utils.error import ErrorContext, TypeCheckError, lookup_enum_or_raise
 from ..utils.typing import JSON
 from .abc import Safeguard
 from .combinators.all import AllSafeguards
@@ -89,15 +89,15 @@ class SafeguardKind(Enum):
             if instantiating the safeguard from the `config` fails.
         """
 
-        if "kind" not in config:
-            raise ValueErrorWithContext("missing safeguard `kind`")
-
-        kind = config["kind"]
-
         with ErrorContext().enter() as ctx:
+            if "kind" not in config:
+                raise ValueError("missing safeguard `kind`") | ctx
+
+            kind = config["kind"]
+
             with ctx.parameter("kind"):
                 TypeCheckError.check_instance_or_raise(kind, str)
-                safeguard: type[Safeguard] = ValueErrorWithContext.lookup_enum_or_raise(
+                safeguard: type[Safeguard] = lookup_enum_or_raise(
                     SafeguardKind,
                     kind,  # type: ignore
                 ).value

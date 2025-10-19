@@ -19,12 +19,7 @@ from ....utils.cast import (
     saturating_finite_float_cast,
     to_float,
 )
-from ....utils.error import (
-    ErrorContext,
-    IndexErrorWithContext,
-    TypeCheckError,
-    ValueErrorWithContext,
-)
+from ....utils.error import ErrorContext, TypeCheckError, lookup_enum_or_raise
 from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import JSON, F, S, T
 from ..._qois import StencilQuantityOfInterest
@@ -190,20 +185,20 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                             else NeighbourhoodBoundaryAxis.from_config(axis)
                         )
                         if axis_.axis in all_axes:
-                            raise ValueErrorWithContext("axis must be unique")
+                            raise ValueError("axis must be unique") | ctx
                         all_axes.append(axis_.axis)
                         neighbourhood_.append(axis_)
                 self._neighbourhood = tuple(neighbourhood_)
 
                 if len(self._neighbourhood) <= 0:
-                    raise ValueErrorWithContext("must not be empty")
+                    raise ValueError("must not be empty") | ctx
 
             with ctx.parameter("type"):
                 TypeCheckError.check_instance_or_raise(type, str | ErrorBound)
                 self._type = (
                     type
                     if isinstance(type, ErrorBound)
-                    else ValueErrorWithContext.lookup_enum_or_raise(ErrorBound, type)
+                    else lookup_enum_or_raise(ErrorBound, type)
                 )
 
             with ctx.parameter("eb"):
@@ -223,9 +218,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 self._qoi_dtype = (
                     qoi_dtype
                     if isinstance(qoi_dtype, ToFloatMode)
-                    else ValueErrorWithContext.lookup_enum_or_raise(
-                        ToFloatMode, qoi_dtype
-                    )
+                    else lookup_enum_or_raise(ToFloatMode, qoi_dtype)
                 )
 
             shape = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
@@ -302,13 +295,19 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             for i, axis in enumerate(self._neighbourhood):
                 with ctx.index(i), ctx.parameter("axis"):
                     if (axis.axis >= len(data_shape)) or (axis.axis < -len(data_shape)):
-                        raise IndexErrorWithContext(
-                            f"{axis.axis} is out of bounds for array of shape {data_shape}"
+                        raise (
+                            IndexError(
+                                f"{axis.axis} is out of bounds for array of shape {data_shape}"
+                            )
+                            | ctx
                         )
                     naxis = axis.axis if axis.axis >= 0 else len(data_shape) + axis.axis
                     if naxis in all_axes:
-                        raise IndexErrorWithContext(
-                            f"duplicate {axis.axis}, normalised to {naxis}, for array of shape {data_shape}"
+                        raise (
+                            IndexError(
+                                f"duplicate {axis.axis}, normalised to {naxis}, for array of shape {data_shape}"
+                            )
+                            | ctx
                         )
                     all_axes.append(naxis)
 
@@ -921,13 +920,19 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         all_axes: list[int] = []
         for axis in self._neighbourhood:
             if (axis.axis >= data.ndim) or (axis.axis < -data.ndim):
-                raise IndexError(
-                    f"axis index {axis.axis} is out of bounds for array of shape {data.shape}"
+                raise (
+                    IndexError(
+                        f"axis index {axis.axis} is out of bounds for array of shape {data.shape}"
+                    )
+                    | ErrorContext()
                 )
             naxis = axis.axis if axis.axis >= 0 else data.ndim + axis.axis
             if naxis in all_axes:
-                raise IndexError(
-                    f"duplicate axis index {axis.axis}, normalised to {naxis}, for array of shape {data.shape}"
+                raise (
+                    IndexError(
+                        f"duplicate axis index {axis.axis}, normalised to {naxis}, for array of shape {data.shape}"
+                    )
+                    | ErrorContext()
                 )
             all_axes.append(naxis)
 
@@ -984,13 +989,19 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         all_axes: list[int] = []
         for axis in self._neighbourhood:
             if (axis.axis >= qoi.ndim) or (axis.axis < -qoi.ndim):
-                raise IndexError(
-                    f"axis index {axis.axis} is out of bounds for array of shape {qoi.shape}"
+                raise (
+                    IndexError(
+                        f"axis index {axis.axis} is out of bounds for array of shape {qoi.shape}"
+                    )
+                    | ErrorContext()
                 )
             naxis = axis.axis if axis.axis >= 0 else qoi.ndim + axis.axis
             if naxis in all_axes:
-                raise IndexError(
-                    f"duplicate axis index {axis.axis}, normalised to {naxis}, for array of shape {qoi.shape}"
+                raise (
+                    IndexError(
+                        f"duplicate axis index {axis.axis}, normalised to {naxis}, for array of shape {qoi.shape}"
+                    )
+                    | ErrorContext()
                 )
             all_axes.append(naxis)
 

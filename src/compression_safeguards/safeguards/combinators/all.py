@@ -12,7 +12,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
-from ...utils.error import ErrorContext, TypeCheckError, ValueErrorWithContext
+from ...utils.error import ErrorContext, TypeCheckError
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import JSON, S, T
 from ..abc import Safeguard
@@ -63,8 +63,8 @@ class AllSafeguards(Safeguard):
                 TypeCheckError.check_instance_or_raise(safeguards, Collection)
 
                 if len(safeguards) <= 0:
-                    raise ValueErrorWithContext(
-                        "can only combine over at least one safeguard"
+                    raise (
+                        ValueError("can only combine over at least one safeguard") | ctx
                     )
 
                 safeguards_: list[PointwiseSafeguard | StencilSafeguard] = []
@@ -79,8 +79,11 @@ class AllSafeguards(Safeguard):
                         if not isinstance(
                             safeguard, PointwiseSafeguard | StencilSafeguard
                         ):
-                            raise TypeCheckError(
-                                PointwiseSafeguard | StencilSafeguard, safeguard
+                            raise (
+                                TypeCheckError(
+                                    PointwiseSafeguard | StencilSafeguard, safeguard
+                                )
+                                | ctx
                             )
                         safeguards_.append(safeguard)
 

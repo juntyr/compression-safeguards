@@ -18,11 +18,7 @@ from typing_extensions import (
 
 from ._compat import _broadcast_to
 from .cast import lossless_cast, saturating_finite_float_cast
-from .error import (
-    ErrorContext,
-    LateBoundParameterResolutionError,
-    ValueErrorWithContext,
-)
+from .error import ErrorContext, LateBoundParameterResolutionError
 from .typing import JSON, F, Si, T
 
 
@@ -50,8 +46,9 @@ class Parameter(str):
         if isinstance(param, Parameter):
             return param
         if not param.removeprefix("$").isidentifier():
-            raise ValueErrorWithContext(
-                f"parameter `{param}` must be a valid identifier"
+            raise (
+                ValueError(f"parameter `{param}` must be a valid identifier")
+                | ErrorContext()
             )
         return super().__new__(cls, param)
 
@@ -181,7 +178,10 @@ class Bindings:
         """
 
         if param not in self._bindings:
-            raise LateBoundParameterResolutionError(frozenset([param]), frozenset([]))
+            raise (
+                LateBoundParameterResolutionError(frozenset([param]), frozenset([]))
+                | ErrorContext()
+            )
 
         # cast first then broadcast to allow zero-copy broadcasts of scalars
         #  to arrays of any shape
@@ -195,8 +195,11 @@ class Bindings:
                     value, shape
                 ).view()
             except ValueError:
-                raise ValueErrorWithContext(
-                    f"cannot broadcast from shape {value.shape} to shape {shape}"
+                raise (
+                    ValueError(
+                        f"cannot broadcast from shape {value.shape} to shape {shape}"
+                    )
+                    | ctx
                 ) from None
 
         value_view.flags.writeable = False
@@ -239,7 +242,10 @@ class Bindings:
         """
 
         if param not in self._bindings:
-            raise LateBoundParameterResolutionError(frozenset([param]), frozenset([]))
+            raise (
+                LateBoundParameterResolutionError(frozenset([param]), frozenset([]))
+                | ErrorContext()
+            )
 
         # cast first then broadcast to allow zero-copy broadcasts of scalars
         #  to arrays of any shape
@@ -253,8 +259,11 @@ class Bindings:
                     value, shape
                 ).view()
             except ValueError:
-                raise ValueErrorWithContext(
-                    f"cannot broadcast from shape {value.shape} to shape {shape}"
+                raise (
+                    ValueError(
+                        f"cannot broadcast from shape {value.shape} to shape {shape}"
+                    )
+                    | ctx
                 ) from None
 
         value_view.flags.writeable = False
@@ -292,13 +301,19 @@ class Bindings:
 
             with ErrorContext().enter() as ctx, ctx.late_bound_parameter(param):
                 if value.ndim != len(shape):
-                    raise ValueErrorWithContext(
-                        f"incompatible dimension {value.ndim}, expected {len(shape)}"
+                    raise (
+                        ValueError(
+                            f"incompatible dimension {value.ndim}, expected {len(shape)}"
+                        )
+                        | ctx
                     )
 
                 if not all((v == 1) or (v == s) for v, s in zip(value.shape, shape)):
-                    raise ValueErrorWithContext(
-                        f"incompatible shape {value.shape}, expected {shape}"
+                    raise (
+                        ValueError(
+                            f"incompatible shape {value.shape}, expected {shape}"
+                        )
+                        | ctx
                     )
 
     def apply_slice_index(self, index: tuple[slice, ...]) -> Self:
@@ -463,8 +478,8 @@ def _decode_value(p: Parameter, v: int | float | str) -> Value:
 
     if not v.startswith(_NPZ_DATA_URI_BASE64):
         with ErrorContext().enter() as ctx, ctx.parameter(p):
-            raise ValueErrorWithContext(
-                "must be encoded as a .npz data URI in base64 format"
+            raise (
+                ValueError("must be encoded as a .npz data URI in base64 format") | ctx
             )
 
     io = BytesIO(

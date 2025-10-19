@@ -3,11 +3,12 @@ __all__ = ["PointwiseQuantityOfInterest", "StencilQuantityOfInterest"]
 from collections.abc import Mapping, Set
 
 import numpy as np
-from typing_extensions import override  # MSPV 3.12
+from typing_extensions import override
+
+from compression_safeguards.utils.error import ErrorContext  # MSPV 3.12
 
 from ...utils._compat import _ensure_array
 from ...utils.bindings import Parameter
-from ...utils.error import QuantityOfInterestSyntaxError
 from ..qois import (
     PointwiseQuantityOfInterestExpression,
     StencilQuantityOfInterestExpression,
@@ -44,15 +45,16 @@ class PointwiseQuantityOfInterest:
         assert isinstance(expr, Expr)
 
         if isinstance(expr, Array):
-            raise QuantityOfInterestSyntaxError.root(
-                "QoI expression must evaluate to a scalar, not an array "
-                + f"expression of shape {expr.shape}"
+            raise (
+                SyntaxError(
+                    "QoI expression must evaluate to a scalar, not an array "
+                    + f"expression of shape {expr.shape}"
+                )
+                | ErrorContext()
             )
 
         if not expr.has_data:
-            raise QuantityOfInterestSyntaxError.root(
-                "QoI expression must not be constant"
-            )
+            raise SyntaxError("QoI expression must not be constant") | ErrorContext()
 
         late_bound_constants = expr.late_bound_constants
 
@@ -210,15 +212,16 @@ class StencilQuantityOfInterest:
         assert isinstance(expr, Expr)
 
         if isinstance(expr, Array):
-            raise QuantityOfInterestSyntaxError.root(
-                "QoI expression must evaluate to a scalar, not an array "
-                + f"expression of shape {expr.shape}"
+            raise (
+                SyntaxError(
+                    "QoI expression must evaluate to a scalar, not an array "
+                    + f"expression of shape {expr.shape}"
+                )
+                | ErrorContext()
             )
 
         if not expr.has_data:
-            raise QuantityOfInterestSyntaxError.root(
-                "QoI expression must not be constant"
-            )
+            raise SyntaxError("QoI expression must not be constant") | ErrorContext()
 
         late_bound_constants = expr.late_bound_constants
 

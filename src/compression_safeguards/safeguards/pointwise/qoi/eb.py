@@ -13,11 +13,7 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import _ensure_array
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import ToFloatMode, saturating_finite_float_cast, to_float
-from ....utils.error import (
-    ErrorContext,
-    TypeCheckError,
-    ValueErrorWithContext,
-)
+from ....utils.error import ErrorContext, TypeCheckError, lookup_enum_or_raise
 from ....utils.intervals import IntervalUnion
 from ....utils.typing import JSON, F, S, T
 from ..._qois import PointwiseQuantityOfInterest
@@ -119,7 +115,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                 self._type = (
                     type
                     if isinstance(type, ErrorBound)
-                    else ValueErrorWithContext.lookup_enum_or_raise(ErrorBound, type)
+                    else lookup_enum_or_raise(ErrorBound, type)
                 )
 
             with ctx.parameter("eb"):
@@ -139,9 +135,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                 self._qoi_dtype = (
                     qoi_dtype
                     if isinstance(qoi_dtype, ToFloatMode)
-                    else ValueErrorWithContext.lookup_enum_or_raise(
-                        ToFloatMode, qoi_dtype
-                    )
+                    else lookup_enum_or_raise(ToFloatMode, qoi_dtype)
                 )
 
             with ctx.parameter("qoi"):

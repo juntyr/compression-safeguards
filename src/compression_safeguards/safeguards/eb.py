@@ -19,7 +19,7 @@ from ..utils._compat import (
     _where,
 )
 from ..utils.cast import from_float, from_total_order, to_float, to_total_order
-from ..utils.error import ValueErrorWithContext
+from ..utils.error import ErrorContext
 from ..utils.typing import F, S, T
 
 
@@ -147,22 +147,26 @@ def _check_error_bound(
     match type:
         case ErrorBound.abs:
             if not np.all(eb >= 0):
-                raise ValueErrorWithContext(
-                    "must be non-negative for an absolute error bound"
+                raise (
+                    ValueError("must be non-negative for an absolute error bound")
+                    | ErrorContext()
                 )
         case ErrorBound.rel:
             if not np.all(eb >= 0):
-                raise ValueErrorWithContext(
-                    "must be non-negative for a relative error bound"
+                raise (
+                    ValueError("must be non-negative for a relative error bound")
+                    | ErrorContext()
                 )
         case ErrorBound.ratio:
             if not np.all(eb >= 1):
-                raise ValueErrorWithContext("must be >= 1 for a ratio error bound")
+                raise (
+                    ValueError("must be >= 1 for a ratio error bound") | ErrorContext()
+                )
         case _:
             assert_never(type)
 
     if (not isinstance(eb, int)) and (not np.all(np.isfinite(eb))):
-        raise ValueErrorWithContext("must be finite")
+        raise ValueError("must be finite") | ErrorContext()
 
     return None
 

@@ -12,12 +12,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
-from ...utils.error import (
-    ErrorContext,
-    IndexErrorWithContext,
-    TypeCheckError,
-    ValueErrorWithContext,
-)
+from ...utils.error import ErrorContext, TypeCheckError
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import JSON, S, T
 from ..abc import Safeguard
@@ -84,8 +79,8 @@ class SelectSafeguard(Safeguard):
                 TypeCheckError.check_instance_or_raise(safeguards, Collection)
 
                 if len(safeguards) <= 0:
-                    raise ValueErrorWithContext(
-                        "can only select over at least one safeguard"
+                    raise (
+                        ValueError("can only select over at least one safeguard") | ctx
                     )
 
                 safeguards_: list[PointwiseSafeguard | StencilSafeguard] = []
@@ -100,8 +95,11 @@ class SelectSafeguard(Safeguard):
                         if not isinstance(
                             safeguard, PointwiseSafeguard | StencilSafeguard
                         ):
-                            raise TypeCheckError(
-                                PointwiseSafeguard | StencilSafeguard, safeguard
+                            raise (
+                                TypeCheckError(
+                                    PointwiseSafeguard | StencilSafeguard, safeguard
+                                )
+                                | ctx
                             )
                         safeguards_.append(safeguard)
 
@@ -274,15 +272,12 @@ class _SelectSafeguardBase(ABC):
             for safeguard in self.safeguards
         ]
 
-        try:
+        with (
+            ErrorContext().enter() as ctx,
+            ctx.parameter("selector"),
+            ctx.late_bound_parameter(self.selector),
+        ):
             return np.choose(selector, oks)  # type: ignore
-        except IndexError as err:
-            with (
-                ErrorContext().enter() as ctx,
-                ctx.parameter("selector"),
-                ctx.late_bound_parameter(self.selector),
-            ):
-                raise IndexErrorWithContext(str(err)) from None
 
     def compute_safe_intervals(
         self,
@@ -315,7 +310,12 @@ class _SelectSafeguardBase(ABC):
         valid: IntervalUnion[T, int, int] = IntervalUnion.empty(
             data.dtype, data.size, umax
         )
-        try:
+
+        with (
+            ErrorContext().enter() as ctx,
+            ctx.parameter("selector"),
+            ctx.late_bound_parameter(self.selector),
+        ):
             valid._lower = (
                 np.take_along_axis(
                     np.stack([v._lower.T for v in valids], axis=0),
@@ -334,13 +334,6 @@ class _SelectSafeguardBase(ABC):
                 .reshape(data.size, umax)
                 .T
             )
-        except IndexError as err:
-            with (
-                ErrorContext().enter() as ctx,
-                ctx.parameter("selector"),
-                ctx.late_bound_parameter(self.selector),
-            ):
-                raise IndexErrorWithContext(str(err)) from None
 
         return valid
 

@@ -16,7 +16,7 @@ from typing_extensions import (
 from compression_safeguards.utils.error import (
     ErrorContext,
     TypeCheckError,
-    ValueErrorWithContext,
+    lookup_enum_or_raise,
 )
 
 from ...utils.bindings import Parameter
@@ -109,13 +109,13 @@ class NeighbourhoodAxis:
             with ctx.parameter("before"):
                 TypeCheckError.check_instance_or_raise(before, int)
                 if before < 0:
-                    raise ValueErrorWithContext("must be non-negative")
+                    raise ValueError("must be non-negative") | ctx
                 self._before = before
 
             with ctx.parameter("after"):
                 TypeCheckError.check_instance_or_raise(after, int)
                 if after < 0:
-                    raise ValueErrorWithContext("must be non-negative")
+                    raise ValueError("must be non-negative") | ctx
                 self._after = after
 
     @property
@@ -211,9 +211,7 @@ class NeighbourhoodBoundaryAxis:
                 self._boundary = (
                     boundary
                     if isinstance(boundary, BoundaryCondition)
-                    else ValueErrorWithContext.lookup_enum_or_raise(
-                        BoundaryCondition, boundary
-                    )
+                    else lookup_enum_or_raise(BoundaryCondition, boundary)
                 )
 
             with ctx.parameter("constant_boundary"):
@@ -224,9 +222,12 @@ class NeighbourhoodBoundaryAxis:
                 if (self._boundary != BoundaryCondition.constant) != (
                     constant_boundary is None
                 ):
-                    raise ValueErrorWithContext(
-                        "must be provided if and only if the constant "
-                        + "boundary condition is used"
+                    raise (
+                        ValueError(
+                            "must be provided if and only if the constant "
+                            + "boundary condition is used"
+                        )
+                        | ctx
                     )
 
                 if isinstance(constant_boundary, Parameter):
@@ -238,9 +239,12 @@ class NeighbourhoodBoundaryAxis:
 
                 if isinstance(self._constant_boundary, Parameter):
                     if self._constant_boundary in ["$x", "$X"]:
-                        raise ValueErrorWithContext(
-                            "must be a scalar but late-bound constant data "
-                            + f"{self._constant_boundary} may not be"
+                        raise (
+                            ValueError(
+                                "must be a scalar but late-bound constant data "
+                                + f"{self._constant_boundary} may not be"
+                            )
+                            | ctx
                         )
 
     @property

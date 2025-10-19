@@ -13,11 +13,7 @@ from typing_extensions import override  # MSPV 3.12
 from ...utils._compat import _ensure_array, _floating_smallest_subnormal
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
-from ...utils.error import (
-    ErrorContext,
-    TypeCheckError,
-    ValueErrorWithContext,
-)
+from ...utils.error import ErrorContext, TypeCheckError
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import JSON, S, T
 from .abc import PointwiseSafeguard
@@ -75,7 +71,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
                 elif isinstance(offset, int) or (not np.isnan(offset)):
                     self._offset = offset
                 else:
-                    raise ValueErrorWithContext("must not be NaN")
+                    raise ValueError("must not be NaN") | ctx
 
     @property
     @override
@@ -141,7 +137,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             if isinstance(self._offset, Parameter):
                 if np.any(np.isnan(offset)):
                     with ctx.late_bound_parameter(self._offset):
-                        raise ValueErrorWithContext("must not contain any NaN values")
+                        raise ValueError("must not contain any NaN values") | ctx
 
         # values equal to the offset (sign=0) stay equal
         # values below (sign=-1) stay below,
@@ -199,7 +195,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             if isinstance(self._offset, Parameter):
                 if np.any(np.isnan(offsetf)):
                     with ctx.late_bound_parameter(self._offset):
-                        raise ValueErrorWithContext("must not contain any NaN values")
+                        raise ValueError("must not contain any NaN values") | ctx
         offsetf_total: np.ndarray[
             tuple[()] | tuple[int], np.dtype[np.unsignedinteger]
         ] = to_total_order(offsetf)
