@@ -1,10 +1,10 @@
 __all__ = [
     "ErrorContext",
-    "IncompatibleSafeguardsVersion",
     "UnsupportedSafeguardError",
     "IncompatibleChunkStencilError",
     "TypeCheckError",
     "LateBoundParameterResolutionError",
+    "lookup_enum_or_raise",
 ]
 
 from abc import ABC, abstractmethod
@@ -14,7 +14,6 @@ from types import UnionType
 from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
-from semver import Version
 from typing_extensions import (
     Never,  # MSPV 3.11
     override,  # MSPV 3.12
@@ -39,6 +38,104 @@ class ContextFragment(ABC):
     @property
     def separator(self) -> str:
         return "."
+
+
+class ErrorContext:
+    __slots__: tuple[str, ...] = ("_context",)
+    _context: tuple[ContextFragment, ...]
+
+    def __init__(self, *context: ContextFragment):
+        self._context = context
+
+    def enter(self) -> "ErrorContextManager":
+        return ErrorContextManager(self)
+
+    def __ror__(self, other: BaseException) -> BaseException:
+        if isinstance(other, ErrorContextMixin):
+            other._context = ErrorContext(*self._context, *other.context._context)
+            return other
+
+        ty = type(other)
+        ty_with_context = _EXCEPTIONS_WITH_CONTEXT.get(ty, None)
+
+        if ty_with_context is None:
+
+            def __str__with_context(self) -> str:
+                context_str = str(self.context)
+                err_str = super(type(self), self).__str__()
+                if context_str == "":
+                    return err_str
+                return f"{context_str}: {err_str}"
+
+            ty_with_context = type(
+                ty.__name__,
+                (ty, ErrorContextMixin),
+                dict(__str__=__str__with_context, __module__=ty.__module__),
+            )
+            _EXCEPTIONS_WITH_CONTEXT[ty] = ty_with_context
+
+        other_with_context = ty_with_context(*other.args)
+        other_with_context._context = self  # type: ignore
+        return other_with_context
+
+    @override
+    def __str__(self) -> str:
+        match self._context:
+            case ():
+                return ""
+            case (c,):
+                return str(c)
+            case _:
+                c, *cs = self._context
+                acc = [str(c)]
+                for c in cs:
+                    acc.append(c.separator)
+                    acc.append(str(c))
+                return "".join(acc)
+
+
+_EXCEPTIONS_WITH_CONTEXT: dict[type[BaseException], type[BaseException]] = dict()
+
+
+class ErrorContextManager(AbstractContextManager["ErrorContextManager", None]):
+    __slots__: tuple[str, ...] = ("_context",)
+    _context: ErrorContext
+
+    def __init__(self, context: ErrorContext):
+        self._context = context
+
+    @override
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        # FIXME: not doing anything here is inconsistent
+        return None
+
+    @contextmanager
+    def fragment(self, fragment: ContextFragment):
+        try:
+            yield
+        except Exception as err:
+            err2 = err | ErrorContext(fragment)
+            if isinstance(err, ErrorContextMixin):
+                raise
+            raise err2
+
+    def parameter(self, name: str):
+        return self.fragment(ParameterContextFragment(name))
+
+    def late_bound_parameter(self, name: "Parameter"):
+        return self.fragment(LateBoundParameterContextFragment(name))
+
+    def index(self, index: int):
+        return self.fragment(IndexContextFragment(index))
+
+    def safeguard(self, safeguard: "Safeguard"):
+        return self.fragment(SafeguardTypeContextFragment(type(safeguard)))
+
+    def safeguardty(self, safeguard: type["Safeguard"]):
+        return self.fragment(SafeguardTypeContextFragment(safeguard))
+
+    def __ror__(self, other: BaseException) -> BaseException:
+        return other | ErrorContext()
 
 
 class IndexContextFragment(ContextFragment):
@@ -115,110 +212,6 @@ class LateBoundParameterContextFragment(ContextFragment):
         return "="
 
 
-_EXCEPTIONS_WITH_CONTEXT: dict[type[BaseException], type[BaseException]] = dict()
-
-
-class ErrorContext:
-    __slots__: tuple[str, ...] = ("_context",)
-    _context: tuple[ContextFragment, ...]
-
-    def __init__(self, *context: ContextFragment):
-        self._context = context
-
-    def enter(self) -> "ErrorContextManager":
-        return ErrorContextManager(self)
-
-    def push(self, c: ContextFragment) -> "ErrorContext":
-        return ErrorContext(*self._context, c)
-
-    def extend(self, other: "ErrorContext") -> "ErrorContext":
-        return ErrorContext(*self._context, *other._context)
-
-    def to_str_followed_by(self, follow: str) -> str:
-        if self._context == ():
-            return ""
-        return f"{self}{follow}"
-
-    def __ror__(self, other: BaseException) -> BaseException:
-        if isinstance(other, ErrorContextMixin):
-            other._context = self.extend(other.context)
-            return other
-
-        ty = type(other)
-        ty_with_context = _EXCEPTIONS_WITH_CONTEXT.get(ty, None)
-
-        if ty_with_context is None:
-
-            def __str__with_context(self) -> str:
-                return f"{self.context.to_str_followed_by(': ')}{super(type(self), self).__str__()}"
-
-            ty_with_context = type(
-                ty.__name__,
-                (ty, ErrorContextMixin),
-                dict(__str__=__str__with_context, __module__=ty.__module__),
-            )
-            _EXCEPTIONS_WITH_CONTEXT[ty] = ty_with_context
-
-        other_with_context = ty_with_context(*other.args)
-        other_with_context._context = self  # type: ignore
-        return other_with_context
-
-    @override
-    def __str__(self) -> str:
-        match self._context:
-            case ():
-                return ""
-            case (c,):
-                return str(c)
-            case _:
-                c, *cs = self._context
-                acc = [str(c)]
-                for c in cs:
-                    acc.append(c.separator)
-                    acc.append(str(c))
-                return "".join(acc)
-
-
-class ErrorContextManager(AbstractContextManager["ErrorContextManager", None]):
-    __slots__: tuple[str, ...] = ("_context",)
-    _context: ErrorContext
-
-    def __init__(self, context: ErrorContext):
-        self._context = context
-
-    @override
-    def __exit__(self, exc_type, exc_value, traceback) -> None:
-        return None
-
-    @contextmanager
-    def fragment(self, fragment: ContextFragment):
-        try:
-            yield
-        except Exception as err:
-            err2 = err | ErrorContext(fragment)
-            if isinstance(err, ErrorContextMixin):
-                raise
-            raise err2
-
-    def parameter(self, name: str):
-        return self.fragment(ParameterContextFragment(name))
-
-    def late_bound_parameter(self, name: "Parameter"):
-        return self.fragment(LateBoundParameterContextFragment(name))
-
-    def index(self, index: int):
-        return self.fragment(IndexContextFragment(index))
-
-    def safeguard(self, safeguard: "Safeguard"):
-        return self.fragment(SafeguardTypeContextFragment(type(safeguard)))
-
-    def safeguardty(self, safeguard: type["Safeguard"]):
-        return self.fragment(SafeguardTypeContextFragment(safeguard))
-
-    def __ror__(self, other: BaseException) -> BaseException:
-        return other | ErrorContext()
-
-
 class ErrorContextMixin:
     # cannot use slots since they are incompatible with multiple inheritance
     # __slots__: tuple[str, ...] = ("_context",)
@@ -233,37 +226,6 @@ class ErrorContextMixin:
             context = ErrorContext()
             self._context = context
             return context
-
-
-class IncompatibleSafeguardsVersion(ValueError):
-    __slots__: tuple[str, ...] = ()
-
-    def __init__(self, safeguards: Version, incompatible: Version) -> None:
-        assert not incompatible.is_compatible(safeguards)
-        super().__init__(safeguards, incompatible)
-
-    @staticmethod
-    def check_or_raise(safeguards: Version, version: Version) -> None | Never:
-        if version.is_compatible(safeguards):
-            return None
-        raise IncompatibleSafeguardsVersion(safeguards, version) | ErrorContext()
-
-    @property
-    def safeguards(self) -> Version:
-        (safeguards, _incompatible) = self.args
-        return safeguards
-
-    @property
-    def incompatible(self) -> Version:
-        (_safeguards, incompatible) = self.args
-        return incompatible
-
-    @override
-    def __str__(self) -> str:
-        return (
-            f"{self.incompatible} is not semantic-versioning-compatible with "
-            + f"the safeguards version {self.safeguards}"
-        )
 
 
 class UnsupportedSafeguardError(NotImplementedError):
@@ -321,21 +283,6 @@ class IncompatibleChunkStencilError(ValueError):
     @override
     def __str__(self) -> str:
         return f"{self.message} on axis {self.axis}"
-
-
-def lookup_enum_or_raise(
-    enum: type[Ei], name: str, error: type[Exception] = ValueError
-) -> Ei | Never:
-    if name in enum.__members__:
-        return enum.__members__[name]
-
-    raise (
-        error(
-            f"unknown {enum.__name__} {name!r}, use one of "
-            + f"{', '.join(repr(m) for m in enum.__members__)}"
-        )
-        | ErrorContext()
-    )
 
 
 class TypeCheckError(TypeError):
@@ -457,6 +404,21 @@ class UnsupportedDateTypeError(TypeError):
             f"{msg}, only {', '.join(d.name for d in sorted(self.supported))} "
             + "are supported"
         )
+
+
+def lookup_enum_or_raise(
+    enum: type[Ei], name: str, error: type[Exception] = ValueError
+) -> Ei | Never:
+    if name in enum.__members__:
+        return enum.__members__[name]
+
+    raise (
+        error(
+            f"unknown {enum.__name__} {name!r}, use one of "
+            + f"{', '.join(repr(m) for m in enum.__members__)}"
+        )
+        | ErrorContext()
+    )
 
 
 # class ParameterComplexityWarning(UserWarning):

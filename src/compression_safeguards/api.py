@@ -27,7 +27,6 @@ from .utils.cast import as_bits
 from .utils.error import (
     ErrorContext,
     IncompatibleChunkStencilError,
-    IncompatibleSafeguardsVersion,
     LateBoundParameterResolutionError,
     SafeguardsSafetyBug,
     UnsupportedDateTypeError,
@@ -56,7 +55,7 @@ class Safeguards:
 
     Raises
     ------
-    IncompatibleSafeguardsVersion
+    ValueError
         if the safeguards are instantiated with a configuration from an
         incompatible version of the safeguards.
     """
@@ -75,7 +74,14 @@ class Safeguards:
             _version = (
                 _version if isinstance(_version, Version) else Version.parse(_version)
             )
-            IncompatibleSafeguardsVersion.check_or_raise(self.version, _version)
+            if not _version.is_compatible(self.version):
+                raise (
+                    ValueError(
+                        f"{_version} is not semantic-versioning-compatible with "
+                        + f"the safeguards version {self.version}"
+                    )
+                    | ErrorContext()
+                )
 
         safeguards_: list[Safeguard] = []
         with ErrorContext().enter() as ctx, ctx.parameter("safeguards"):
