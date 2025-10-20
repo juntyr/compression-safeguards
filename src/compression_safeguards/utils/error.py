@@ -328,6 +328,7 @@ class TypeCheckError(TypeError):
     ) -> None:
         super().__init__(expected, found)
 
+    # TODO: once a TypeAssert exists for Python, return it
     @classmethod
     def check_instance_or_raise(
         cls, obj: object, expected: type | UnionType

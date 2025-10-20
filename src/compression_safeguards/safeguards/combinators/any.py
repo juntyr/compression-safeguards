@@ -76,16 +76,10 @@ class AnySafeguard(Safeguard):
                         )
                         if isinstance(safeguard, dict):
                             safeguard = SafeguardKind.from_config(safeguard)
-                        if not isinstance(
+                        TypeCheckError.check_instance_or_raise(
                             safeguard, PointwiseSafeguard | StencilSafeguard
-                        ):
-                            raise (
-                                TypeCheckError(
-                                    PointwiseSafeguard | StencilSafeguard, safeguard
-                                )
-                                | ctx
-                            )
-                        safeguards_.append(safeguard)
+                        )
+                        safeguards_.append(safeguard)  # type: ignore
 
         if all(isinstance(safeguard, PointwiseSafeguard) for safeguard in safeguards_):
             return _AnyPointwiseSafeguard(*safeguards_)  # type: ignore

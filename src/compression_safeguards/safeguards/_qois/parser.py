@@ -73,7 +73,10 @@ class QoIParser(Parser):
         tokens, tokens2 = itertools.tee(tokens)
 
         if next(tokens2, None) is None:
-            raise SyntaxError("expression must not be empty") | ctx
+            raise (
+                SyntaxError("expression must not be empty", ("<qoi>", None, None, None))
+                | ctx
+            )
 
         return super().parse(tokens)
 
@@ -790,7 +793,13 @@ class QoIParser(Parser):
         if t is None:
             raise (
                 SyntaxError(
-                    f"expected more input but found EOF\nexpected{oneof} {options}"
+                    f"expected more input but found EOF\nexpected{oneof} {options}",
+                    (
+                        "<qoi>",
+                        1 + self._text.count("\n"),
+                        len(self._text) - self._text.rfind("\n"),
+                        self._text[self._text.rfind("\n") + 1 :],
+                    ),
                 )
                 | ctx
             )
@@ -800,13 +809,29 @@ class QoIParser(Parser):
         raise (
             SyntaxError(
                 f"unexpected token `{t_value}`\nexpected{oneof} {options}",
-                ("<qoi>", t.lineno, self.find_column(t), None),
+                (
+                    "<qoi>",
+                    t.lineno,
+                    self.find_column(t),
+                    self._text.splitlines()[t.lineno - 1],
+                ),
             )
             | ctx
         )
 
     def raise_error(self, t, message):
-        raise SyntaxError(message, ("<qoi>", t.lineno, self.find_column(t), None)) | ctx
+        raise (
+            SyntaxError(
+                message,
+                (
+                    "<qoi>",
+                    t.lineno,
+                    self.find_column(t),
+                    self._text.splitlines()[t.lineno - 1],
+                ),
+            )
+            | ctx
+        )
 
     def assert_or_error(self, check, t, message):
         if not check:
@@ -822,7 +847,7 @@ class QoIParser(Parser):
             else:
                 self.raise_error(t, message)
 
-    def find_column(self, token):
+    def find_column(self, token) -> int:
         last_cr = self._text.rfind("\n", 0, token.index)
         if last_cr < 0:
             last_cr = 0

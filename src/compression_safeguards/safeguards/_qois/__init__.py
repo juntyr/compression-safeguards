@@ -47,13 +47,19 @@ class PointwiseQuantityOfInterest:
             raise (
                 SyntaxError(
                     "QoI expression must evaluate to a scalar, not an array "
-                    + f"expression of shape {expr.shape}"
+                    + f"expression of shape {expr.shape}",
+                    ("<qoi>", None, None, None),
                 )
                 | ctx
             )
 
         if not expr.has_data:
-            raise SyntaxError("QoI expression must not be constant") | ctx
+            raise (
+                SyntaxError(
+                    "QoI expression must not be constant", ("<qoi>", None, None, None)
+                )
+                | ctx
+            )
 
         late_bound_constants = expr.late_bound_constants
 
@@ -214,13 +220,19 @@ class StencilQuantityOfInterest:
             raise (
                 SyntaxError(
                     "QoI expression must evaluate to a scalar, not an array "
-                    + f"expression of shape {expr.shape}"
+                    + f"expression of shape {expr.shape}",
+                    ("<qoi>", None, None, None),
                 )
                 | ctx
             )
 
         if not expr.has_data:
-            raise SyntaxError("QoI expression must not be constant") | ctx
+            raise (
+                SyntaxError(
+                    "QoI expression must not be constant", ("<qoi>", None, None, None)
+                )
+                | ctx
+            )
 
         late_bound_constants = expr.late_bound_constants
 

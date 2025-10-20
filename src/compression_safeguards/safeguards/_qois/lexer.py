@@ -252,7 +252,18 @@ class QoILexer(Lexer):
         self.raise_error(t, f"unexpected character `{t.value[0]}`")
 
     def raise_error(self, t, message):
-        raise SyntaxError(message, ("<qoi>", t.lineno, self.find_column(t), None)) | ctx
+        raise (
+            SyntaxError(
+                message,
+                (
+                    "<qoi>",
+                    t.lineno,
+                    self.find_column(t),
+                    self.text.splitlines()[t.lineno - 1],
+                ),
+            )
+            | ctx
+        )
 
     def assert_or_error(self, check, t, message):
         if not check:

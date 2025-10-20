@@ -92,16 +92,10 @@ class SelectSafeguard(Safeguard):
                         )
                         if isinstance(safeguard, dict):
                             safeguard = SafeguardKind.from_config(safeguard)
-                        if not isinstance(
+                        TypeCheckError.check_instance_or_raise(
                             safeguard, PointwiseSafeguard | StencilSafeguard
-                        ):
-                            raise (
-                                TypeCheckError(
-                                    PointwiseSafeguard | StencilSafeguard, safeguard
-                                )
-                                | ctx
-                            )
-                        safeguards_.append(safeguard)
+                        )
+                        safeguards_.append(safeguard)  # type: ignore
 
         if all(isinstance(safeguard, PointwiseSafeguard) for safeguard in safeguards_):
             return _SelectPointwiseSafeguard(selector, *safeguards_)  # type: ignore
@@ -268,7 +262,11 @@ class _SelectSafeguardBase(ABC):
             for safeguard in self.safeguards
         ]
 
-        with ctx.parameter("selector"), ctx.late_bound_parameter(self.selector):
+        with (
+            ctx.safeguardty(SelectSafeguard),
+            ctx.parameter("selector"),
+            ctx.late_bound_parameter(self.selector),
+        ):
             return np.choose(selector, oks)  # type: ignore
 
     def compute_safe_intervals(
@@ -299,7 +297,11 @@ class _SelectSafeguardBase(ABC):
             data.dtype, data.size, umax
         )
 
-        with ctx.parameter("selector"), ctx.late_bound_parameter(self.selector):
+        with (
+            ctx.safeguardty(SelectSafeguard),
+            ctx.parameter("selector"),
+            ctx.late_bound_parameter(self.selector),
+        ):
             valid._lower = (
                 np.take_along_axis(
                     np.stack([v._lower.T for v in valids], axis=0),
