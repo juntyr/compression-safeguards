@@ -3,7 +3,7 @@ __all__ = ["PointwiseQuantityOfInterest", "StencilQuantityOfInterest"]
 from collections.abc import Mapping, Set
 
 import numpy as np
-from typing_extensions import override
+from typing_extensions import override  # MSPV 3.12
 
 from ...utils._compat import _ensure_array
 from ...utils.bindings import Parameter

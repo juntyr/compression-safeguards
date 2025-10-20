@@ -402,6 +402,13 @@ def check_one_input(data) -> None:
             )
     except (ValueError, TypeError, SyntaxError, TimeoutError):
         return
+    except Warning as err:
+        # skip expressions that try to perform a**b with excessive digits
+        if ("symbolic integer evaluation" in str(err)) and (
+            "excessive number of digits" in str(err)
+        ):
+            return
+        raise
 
     grepr = repr(safeguard)
     gconfig = safeguard.get_config()
