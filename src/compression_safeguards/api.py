@@ -25,12 +25,12 @@ from .utils._compat import _ones, _zeros
 from .utils.bindings import Bindings, Parameter, Value
 from .utils.cast import as_bits
 from .utils.error import (
-    ErrorContext,
     IncompatibleChunkStencilError,
     LateBoundParameterResolutionError,
     SafeguardsSafetyBug,
     UnsupportedDateTypeError,
     UnsupportedSafeguardError,
+    ctx,
 )
 from .utils.intervals import IntervalUnion  # noqa: TC001
 from .utils.typing import JSON, C, S, T
@@ -80,11 +80,11 @@ class Safeguards:
                         f"{_version} is not semantic-versioning-compatible with "
                         + f"the safeguards version {self.version}"
                     )
-                    | ErrorContext()
+                    | ctx
                 )
 
         safeguards_: list[Safeguard] = []
-        with ErrorContext().enter() as ctx, ctx.parameter("safeguards"):
+        with ctx.parameter("safeguards"):
             for i, safeguard in enumerate(safeguards):
                 with ctx.index(i):
                     safeguards_.append(

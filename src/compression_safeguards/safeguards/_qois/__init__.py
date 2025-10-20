@@ -5,10 +5,9 @@ from collections.abc import Mapping, Set
 import numpy as np
 from typing_extensions import override
 
-from compression_safeguards.utils.error import ErrorContext  # MSPV 3.12
-
 from ...utils._compat import _ensure_array
 from ...utils.bindings import Parameter
+from ...utils.error import ctx
 from ..qois import (
     PointwiseQuantityOfInterestExpression,
     StencilQuantityOfInterestExpression,
@@ -50,11 +49,11 @@ class PointwiseQuantityOfInterest:
                     "QoI expression must evaluate to a scalar, not an array "
                     + f"expression of shape {expr.shape}"
                 )
-                | ErrorContext()
+                | ctx
             )
 
         if not expr.has_data:
-            raise SyntaxError("QoI expression must not be constant") | ErrorContext()
+            raise SyntaxError("QoI expression must not be constant") | ctx
 
         late_bound_constants = expr.late_bound_constants
 
@@ -217,11 +216,11 @@ class StencilQuantityOfInterest:
                     "QoI expression must evaluate to a scalar, not an array "
                     + f"expression of shape {expr.shape}"
                 )
-                | ErrorContext()
+                | ctx
             )
 
         if not expr.has_data:
-            raise SyntaxError("QoI expression must not be constant") | ErrorContext()
+            raise SyntaxError("QoI expression must not be constant") | ctx
 
         late_bound_constants = expr.late_bound_constants
 

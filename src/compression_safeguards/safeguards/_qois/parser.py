@@ -5,7 +5,7 @@ from sly import Parser
 from typing_extensions import Unpack  # MSPV 3.11
 
 from ...utils.bindings import Parameter
-from ...utils.error import ErrorContext
+from ...utils.error import ctx
 from .expr.abc import AnyExpr
 from .expr.abs import ScalarAbs
 from .expr.addsub import ScalarAdd, ScalarSubtract
@@ -73,7 +73,7 @@ class QoIParser(Parser):
         tokens, tokens2 = itertools.tee(tokens)
 
         if next(tokens2, None) is None:
-            raise SyntaxError("expression must not be empty") | ErrorContext()
+            raise SyntaxError("expression must not be empty") | ctx
 
         return super().parse(tokens)
 
@@ -792,7 +792,7 @@ class QoIParser(Parser):
                 SyntaxError(
                     f"expected more input but found EOF\nexpected{oneof} {options}"
                 )
-                | ErrorContext()
+                | ctx
             )
 
         t_value = f'"{t.value}"' if t.type == "STRING" else t.value
@@ -802,14 +802,11 @@ class QoIParser(Parser):
                 f"unexpected token `{t_value}`\nexpected{oneof} {options}",
                 ("<qoi>", t.lineno, self.find_column(t), None),
             )
-            | ErrorContext()
+            | ctx
         )
 
     def raise_error(self, t, message):
-        raise (
-            SyntaxError(message, ("<qoi>", t.lineno, self.find_column(t), None))
-            | ErrorContext()
-        )
+        raise SyntaxError(message, ("<qoi>", t.lineno, self.find_column(t), None)) | ctx
 
     def assert_or_error(self, check, t, message):
         if not check:

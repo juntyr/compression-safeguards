@@ -19,7 +19,7 @@ from ....utils.cast import (
     saturating_finite_float_cast,
     to_float,
 )
-from ....utils.error import ErrorContext, TypeCheckError, lookup_enum_or_raise
+from ....utils.error import TypeCheckError, ctx, lookup_enum_or_raise
 from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import JSON, F, S, T
 from ..._qois import StencilQuantityOfInterest
@@ -165,7 +165,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         eb: int | float | str | Parameter,
         qoi_dtype: str | ToFloatMode = ToFloatMode.lossless,
     ) -> None:
-        with ErrorContext().enter() as ctx, ctx.safeguard(self):
+        with ctx.safeguard(self):
             with ctx.parameter("qoi"):
                 TypeCheckError.check_instance_or_raise(qoi, str)
 
@@ -287,11 +287,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         ]
 
         all_axes: list[int] = []
-        with (
-            ErrorContext().enter() as ctx,
-            ctx.safeguard(self),
-            ctx.parameter("neighbourhood"),
-        ):
+        with ctx.safeguard(self), ctx.parameter("neighbourhood"):
             for i, axis in enumerate(self._neighbourhood):
                 with ctx.index(i), ctx.parameter("axis"):
                     if (axis.axis >= len(data_shape)) or (axis.axis < -len(data_shape)):
@@ -357,7 +353,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     0, empty_shape[axis.axis] - axis.before - axis.after
                 )
 
-        with ErrorContext().enter() as ctx, ctx.safeguard(self):
+        with ctx.safeguard(self):
             with ctx.parameter("qoi_dtype"):
                 ftype: np.dtype[F] = self._qoi_dtype.floating_point_dtype_for(
                     data.dtype
@@ -485,7 +481,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         if data.size == 0:
             return _ones(data.shape, dtype=np.dtype(np.bool))
 
-        with ErrorContext().enter() as ctx, ctx.safeguard(self):
+        with ctx.safeguard(self):
             constant_boundaries: list[None | np.ndarray[tuple[()], np.dtype[T]]] = []
             with ctx.parameter("neighbourhood"):
                 for i, axis in enumerate(self._neighbourhood):
@@ -675,7 +671,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         if data.size == 0:
             return Interval.full_like(data).into_union()
 
-        with ErrorContext().enter() as ctx, ctx.safeguard(self):
+        with ctx.safeguard(self):
             constant_boundaries: list[None | np.ndarray[tuple[()], np.dtype[T]]] = []
             with ctx.parameter("neighbourhood"):
                 for i, axis in enumerate(self._neighbourhood):
@@ -924,7 +920,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     IndexError(
                         f"axis index {axis.axis} is out of bounds for array of shape {data.shape}"
                     )
-                    | ErrorContext()
+                    | ctx
                 )
             naxis = axis.axis if axis.axis >= 0 else data.ndim + axis.axis
             if naxis in all_axes:
@@ -932,7 +928,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     IndexError(
                         f"duplicate axis index {axis.axis}, normalised to {naxis}, for array of shape {data.shape}"
                     )
-                    | ErrorContext()
+                    | ctx
                 )
             all_axes.append(naxis)
 
@@ -993,7 +989,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     IndexError(
                         f"axis index {axis.axis} is out of bounds for array of shape {qoi.shape}"
                     )
-                    | ErrorContext()
+                    | ctx
                 )
             naxis = axis.axis if axis.axis >= 0 else qoi.ndim + axis.axis
             if naxis in all_axes:
@@ -1001,7 +997,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     IndexError(
                         f"duplicate axis index {axis.axis}, normalised to {naxis}, for array of shape {qoi.shape}"
                     )
-                    | ErrorContext()
+                    | ctx
                 )
             all_axes.append(naxis)
 

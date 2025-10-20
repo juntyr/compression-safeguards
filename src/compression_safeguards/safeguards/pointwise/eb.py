@@ -13,7 +13,7 @@ from typing_extensions import override  # MSPV 3.12
 from ...utils._compat import _ensure_array
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import ToFloatMode, as_bits, saturating_finite_float_cast, to_float
-from ...utils.error import ErrorContext, TypeCheckError, lookup_enum_or_raise
+from ...utils.error import TypeCheckError, ctx, lookup_enum_or_raise
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import JSON, S, T
 from ..eb import (
@@ -67,7 +67,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         *,
         equal_nan: bool = False,
     ) -> None:
-        with ErrorContext().enter() as ctx, ctx.safeguard(self):
+        with ctx.safeguard(self):
             with ctx.parameter("type"):
                 TypeCheckError.check_instance_or_raise(type, str | ErrorBound)
                 self._type = (
@@ -143,7 +143,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             prediction, ftype=ftype
         )
 
-        with ErrorContext().enter() as ctx, ctx.safeguard(self), ctx.parameter("eb"):
+        with ctx.safeguard(self), ctx.parameter("eb"):
             eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
                 late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                     self._eb,
@@ -207,7 +207,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         )
         data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
 
-        with ErrorContext().enter() as ctx, ctx.safeguard(self), ctx.parameter("eb"):
+        with ctx.safeguard(self), ctx.parameter("eb"):
             eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
                 late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                     self._eb,

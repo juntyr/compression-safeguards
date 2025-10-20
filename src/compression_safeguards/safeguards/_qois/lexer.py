@@ -4,7 +4,7 @@ from contextlib import contextmanager
 
 from sly import Lexer
 
-from ...utils.error import ErrorContext
+from ...utils.error import ctx
 
 
 class QoILexer(Lexer):
@@ -252,10 +252,7 @@ class QoILexer(Lexer):
         self.raise_error(t, f"unexpected character `{t.value[0]}`")
 
     def raise_error(self, t, message):
-        raise (
-            SyntaxError(message, ("<qoi>", t.lineno, self.find_column(t), None))
-            | ErrorContext()
-        )
+        raise SyntaxError(message, ("<qoi>", t.lineno, self.find_column(t), None)) | ctx
 
     def assert_or_error(self, check, t, message):
         if not check:

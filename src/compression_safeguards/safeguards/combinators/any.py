@@ -12,7 +12,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
-from ...utils.error import ErrorContext, TypeCheckError
+from ...utils.error import TypeCheckError, ctx
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import JSON, S, T
 from ..abc import Safeguard
@@ -58,7 +58,7 @@ class AnySafeguard(Safeguard):
     ) -> "_AnyPointwiseSafeguard | _AnyStencilSafeguard":
         from ... import SafeguardKind  # noqa: PLC0415
 
-        with ErrorContext().enter() as ctx, ctx.safeguardty(cls):
+        with ctx.safeguardty(cls):
             with ctx.parameter("safeguards"):
                 TypeCheckError.check_instance_or_raise(safeguards, Collection)
 

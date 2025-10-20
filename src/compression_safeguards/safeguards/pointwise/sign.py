@@ -13,7 +13,7 @@ from typing_extensions import override  # MSPV 3.12
 from ...utils._compat import _ensure_array, _floating_smallest_subnormal
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
-from ...utils.error import ErrorContext, TypeCheckError
+from ...utils.error import TypeCheckError, ctx
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import JSON, S, T
 from .abc import PointwiseSafeguard
@@ -59,7 +59,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
     kind: ClassVar[str] = "sign"
 
     def __init__(self, *, offset: int | float | str | Parameter = 0) -> None:
-        with ErrorContext().enter() as ctx, ctx.safeguard(self):
+        with ctx.safeguard(self):
             with ctx.parameter("offset"):
                 TypeCheckError.check_instance_or_raise(
                     offset, int | float | str | Parameter
@@ -120,11 +120,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        with (
-            ErrorContext().enter() as ctx,
-            ctx.safeguard(self),
-            ctx.parameter("offset"),
-        ):
+        with ctx.safeguard(self), ctx.parameter("offset"):
             offset: np.ndarray[tuple[()] | S, np.dtype[T]] = (
                 late_bound.resolve_ndarray_with_lossless_cast(
                     self._offset,
@@ -178,11 +174,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             Union of intervals in which the `data`'s sign is preserved.
         """
 
-        with (
-            ErrorContext().enter() as ctx,
-            ctx.safeguard(self),
-            ctx.parameter("offset"),
-        ):
+        with ctx.safeguard(self), ctx.parameter("offset"):
             offsetf: np.ndarray[tuple[()] | tuple[int], np.dtype[T]] = (
                 late_bound.resolve_ndarray_with_lossless_cast(
                     self._offset,

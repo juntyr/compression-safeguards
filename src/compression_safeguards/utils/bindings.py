@@ -18,7 +18,7 @@ from typing_extensions import (
 
 from ._compat import _broadcast_to
 from .cast import lossless_cast, saturating_finite_float_cast
-from .error import ErrorContext, LateBoundParameterResolutionError
+from .error import LateBoundParameterResolutionError, ctx
 from .typing import JSON, F, Si, T
 
 
@@ -46,10 +46,7 @@ class Parameter(str):
         if isinstance(param, Parameter):
             return param
         if not param.removeprefix("$").isidentifier():
-            raise (
-                ValueError(f"parameter `{param}` must be a valid identifier")
-                | ErrorContext()
-            )
+            raise ValueError(f"parameter `{param}` must be a valid identifier") | ctx
         return super().__new__(cls, param)
 
     @property
@@ -180,12 +177,12 @@ class Bindings:
         if param not in self._bindings:
             raise (
                 LateBoundParameterResolutionError(frozenset([param]), frozenset([]))
-                | ErrorContext()
+                | ctx
             )
 
         # cast first then broadcast to allow zero-copy broadcasts of scalars
         #  to arrays of any shape
-        with ErrorContext().enter() as ctx, ctx.late_bound_parameter(param):
+        with ctx.late_bound_parameter(param):
             value: np.ndarray[tuple[int, ...], np.dtype[T]] = lossless_cast(
                 self._bindings[param], dtype
             )
@@ -244,12 +241,12 @@ class Bindings:
         if param not in self._bindings:
             raise (
                 LateBoundParameterResolutionError(frozenset([param]), frozenset([]))
-                | ErrorContext()
+                | ctx
             )
 
         # cast first then broadcast to allow zero-copy broadcasts of scalars
         #  to arrays of any shape
-        with ErrorContext().enter() as ctx, ctx.late_bound_parameter(param):
+        with ctx.late_bound_parameter(param):
             value: np.ndarray[tuple[int, ...], np.dtype[F]] = (
                 saturating_finite_float_cast(self._bindings[param], dtype)
             )
@@ -299,7 +296,7 @@ class Bindings:
                 # scalar array
                 continue
 
-            with ErrorContext().enter() as ctx, ctx.late_bound_parameter(param):
+            with ctx.late_bound_parameter(param):
                 if value.ndim != len(shape):
                     raise (
                         ValueError(
@@ -477,7 +474,7 @@ def _decode_value(p: Parameter, v: int | float | str) -> Value:
         return v
 
     if not v.startswith(_NPZ_DATA_URI_BASE64):
-        with ErrorContext().enter() as ctx, ctx.parameter(p):
+        with ctx.parameter(p):
             raise (
                 ValueError("must be encoded as a .npz data URI in base64 format") | ctx
             )

@@ -13,7 +13,7 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import _ensure_array
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import ToFloatMode, saturating_finite_float_cast, to_float
-from ....utils.error import ErrorContext, TypeCheckError, lookup_enum_or_raise
+from ....utils.error import TypeCheckError, ctx, lookup_enum_or_raise
 from ....utils.intervals import IntervalUnion
 from ....utils.typing import JSON, F, S, T
 from ..._qois import PointwiseQuantityOfInterest
@@ -106,7 +106,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         eb: int | float | str | Parameter,
         qoi_dtype: str | ToFloatMode = ToFloatMode.lossless,
     ) -> None:
-        with ErrorContext().enter() as ctx, ctx.safeguard(self):
+        with ctx.safeguard(self):
             with ctx.parameter("qoi"):
                 TypeCheckError.check_instance_or_raise(qoi, str)
 
@@ -185,7 +185,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             Evaluated quantity of interest, in floating-point.
         """
 
-        with ErrorContext().enter() as ctx, ctx.safeguard(self):
+        with ctx.safeguard(self):
             with ctx.parameter("qoi_dtype"):
                 ftype: np.dtype[F] = self._qoi_dtype.floating_point_dtype_for(
                     data.dtype
@@ -234,7 +234,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        with ErrorContext().enter() as ctx, ctx.safeguard(self):
+        with ctx.safeguard(self):
             with ctx.parameter("qoi_dtype"):
                 ftype: np.dtype[np.floating] = self._qoi_dtype.floating_point_dtype_for(
                     data.dtype
@@ -310,7 +310,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             Union of intervals in which the error bound is upheld.
         """
 
-        with ErrorContext().enter() as ctx, ctx.safeguard(self):
+        with ctx.safeguard(self):
             with ctx.parameter("qoi_dtype"):
                 ftype: np.dtype[np.floating] = self._qoi_dtype.floating_point_dtype_for(
                     data.dtype

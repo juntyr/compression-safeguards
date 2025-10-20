@@ -1,5 +1,8 @@
 __all__ = [
+    "ContextFragment",
     "ErrorContext",
+    "ErrorContextMixin",
+    "ctx",
     "UnsupportedSafeguardError",
     "IncompatibleChunkStencilError",
     "TypeCheckError",
@@ -8,7 +11,7 @@ __all__ = [
 ]
 
 from abc import ABC, abstractmethod
-from contextlib import AbstractContextManager, contextmanager
+from contextlib import contextmanager
 from enum import Enum
 from types import UnionType
 from typing import TYPE_CHECKING, TypeVar
@@ -16,6 +19,7 @@ from typing import TYPE_CHECKING, TypeVar
 import numpy as np
 from typing_extensions import (
     Never,  # MSPV 3.11
+    Self,  # MSPV 3.11
     override,  # MSPV 3.12
 )
 
@@ -46,9 +50,6 @@ class ErrorContext:
 
     def __init__(self, *context: ContextFragment):
         self._context = context
-
-    def enter(self) -> "ErrorContextManager":
-        return ErrorContextManager(self)
 
     def __ror__(self, other: BaseException) -> BaseException:
         if isinstance(other, ErrorContextMixin):
@@ -97,20 +98,21 @@ class ErrorContext:
 _EXCEPTIONS_WITH_CONTEXT: dict[type[BaseException], type[BaseException]] = dict()
 
 
-class ErrorContextManager(AbstractContextManager["ErrorContextManager", None]):
-    __slots__: tuple[str, ...] = ("_context",)
-    _context: ErrorContext
-
-    def __init__(self, context: ErrorContext):
-        self._context = context
-
+class _ctxmeta(type):
     @override
-    def __exit__(self, exc_type, exc_value, traceback) -> None:
-        # FIXME: not doing anything here is inconsistent
-        return None
+    def __ror__(self, other: BaseException) -> BaseException:  # type: ignore
+        return other | ErrorContext()
+
+
+class ctx(metaclass=_ctxmeta):
+    __slots__: tuple[str, ...] = ()
+
+    def __new__(cls) -> Self:
+        raise TypeError(f"{cls} is a singleton")
 
     @contextmanager
-    def fragment(self, fragment: ContextFragment):
+    @staticmethod
+    def fragment(fragment: ContextFragment):
         try:
             yield
         except Exception as err:
@@ -119,23 +121,29 @@ class ErrorContextManager(AbstractContextManager["ErrorContextManager", None]):
                 raise
             raise err2
 
-    def parameter(self, name: str):
-        return self.fragment(ParameterContextFragment(name))
+    @staticmethod
+    def parameter(name: str):
+        return ctx.fragment(ParameterContextFragment(name))
 
-    def late_bound_parameter(self, name: "Parameter"):
-        return self.fragment(LateBoundParameterContextFragment(name))
+    @staticmethod
+    def late_bound_parameter(name: "Parameter"):
+        return ctx.fragment(LateBoundParameterContextFragment(name))
 
-    def index(self, index: int):
-        return self.fragment(IndexContextFragment(index))
+    @staticmethod
+    def index(index: int):
+        return ctx.fragment(IndexContextFragment(index))
 
-    def safeguard(self, safeguard: "Safeguard"):
-        return self.fragment(SafeguardTypeContextFragment(type(safeguard)))
+    @staticmethod
+    def safeguard(safeguard: "Safeguard"):
+        return ctx.fragment(SafeguardTypeContextFragment(type(safeguard)))
 
-    def safeguardty(self, safeguard: type["Safeguard"]):
-        return self.fragment(SafeguardTypeContextFragment(safeguard))
+    @staticmethod
+    def safeguardty(safeguard: type["Safeguard"]):
+        return ctx.fragment(SafeguardTypeContextFragment(safeguard))
 
-    def __ror__(self, other: BaseException) -> BaseException:
-        return other | ErrorContext()
+    @staticmethod
+    def __ror__(other: BaseException) -> BaseException:  # type: ignore
+        return other | ctx
 
 
 class IndexContextFragment(ContextFragment):
@@ -301,7 +309,7 @@ class TypeCheckError(TypeError):
     ) -> None | Never:
         if isinstance(obj, expected):
             return None
-        raise cls(expected, obj) | ErrorContext()
+        raise cls(expected, obj) | ctx
 
     @property
     def expected(self) -> type | UnionType:
@@ -333,7 +341,7 @@ class LateBoundParameterResolutionError(KeyError):
     ) -> None | Never:
         if expected == provided:
             return None
-        raise LateBoundParameterResolutionError(expected, provided) | ErrorContext()
+        raise LateBoundParameterResolutionError(expected, provided) | ctx
 
     @property
     def expected(self) -> frozenset["Parameter"]:
@@ -381,7 +389,7 @@ class UnsupportedDateTypeError(TypeError):
     def check_or_raise(dtype: np.dtype, supported: frozenset[np.dtype]) -> None | Never:
         if dtype in supported:
             return None
-        raise UnsupportedDateTypeError(dtype, supported) | ErrorContext()
+        raise UnsupportedDateTypeError(dtype, supported) | ctx
 
     @property
     def dtype(self) -> np.dtype:
@@ -417,7 +425,7 @@ def lookup_enum_or_raise(
             f"unknown {enum.__name__} {name!r}, use one of "
             + f"{', '.join(repr(m) for m in enum.__members__)}"
         )
-        | ErrorContext()
+        | ctx
     )
 
 

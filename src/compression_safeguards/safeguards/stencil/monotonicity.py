@@ -25,7 +25,7 @@ from ...utils._compat import (
 )
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
-from ...utils.error import ErrorContext, TypeCheckError, lookup_enum_or_raise
+from ...utils.error import TypeCheckError, ctx, lookup_enum_or_raise
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import JSON, S, T
 from . import BoundaryCondition, NeighbourhoodAxis, _pad_with_boundary
@@ -152,7 +152,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         constant_boundary: None | int | float | str | Parameter = None,
         axis: None | int = None,
     ) -> None:
-        with ErrorContext().enter() as ctx, ctx.safeguard(self):
+        with ctx.safeguard(self):
             with ctx.parameter("monotonicity"):
                 TypeCheckError.check_instance_or_raise(monotonicity, str | Monotonicity)
                 self._monotonicity = (
@@ -303,11 +303,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        with (
-            ErrorContext().enter() as ctx,
-            ctx.safeguard(self),
-            ctx.parameter("constant_boundary"),
-        ):
+        with ctx.safeguard(self), ctx.parameter("constant_boundary"):
             constant_boundary = (
                 None
                 if self._constant_boundary is None
@@ -407,11 +403,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             Union of intervals in which the monotonicity is preserved.
         """
 
-        with (
-            ErrorContext().enter() as ctx,
-            ctx.safeguard(self),
-            ctx.parameter("constant_boundary"),
-        ):
+        with ctx.safeguard(self), ctx.parameter("constant_boundary"):
             constant_boundary = (
                 None
                 if self._constant_boundary is None

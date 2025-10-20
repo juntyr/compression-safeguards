@@ -12,7 +12,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
-from ...utils.error import ErrorContext, TypeCheckError
+from ...utils.error import TypeCheckError, ctx
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import JSON, S, T
 from ..abc import Safeguard
@@ -68,7 +68,7 @@ class SelectSafeguard(Safeguard):
     ) -> "_SelectPointwiseSafeguard | _SelectStencilSafeguard":
         from ... import SafeguardKind  # noqa: PLC0415
 
-        with ErrorContext().enter() as ctx, ctx.safeguardty(cls):
+        with ctx.safeguardty(cls):
             with ctx.parameter("selector"):
                 TypeCheckError.check_instance_or_raise(selector, str | Parameter)
                 selector = (
@@ -258,11 +258,7 @@ class _SelectSafeguardBase(ABC):
         *,
         late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
-        with (
-            ErrorContext().enter() as ctx,
-            ctx.safeguardty(SelectSafeguard),
-            ctx.parameter("selector"),
-        ):
+        with ctx.safeguardty(SelectSafeguard), ctx.parameter("selector"):
             selector = late_bound.resolve_ndarray_with_lossless_cast(
                 self.selector, data.shape, np.dtype(np.int_)
             )
@@ -272,11 +268,7 @@ class _SelectSafeguardBase(ABC):
             for safeguard in self.safeguards
         ]
 
-        with (
-            ErrorContext().enter() as ctx,
-            ctx.parameter("selector"),
-            ctx.late_bound_parameter(self.selector),
-        ):
+        with ctx.parameter("selector"), ctx.late_bound_parameter(self.selector):
             return np.choose(selector, oks)  # type: ignore
 
     def compute_safe_intervals(
@@ -285,11 +277,7 @@ class _SelectSafeguardBase(ABC):
         *,
         late_bound: Bindings,
     ) -> IntervalUnion[T, int, int]:
-        with (
-            ErrorContext().enter() as ctx,
-            ctx.safeguardty(SelectSafeguard),
-            ctx.parameter("selector"),
-        ):
+        with ctx.safeguardty(SelectSafeguard), ctx.parameter("selector"):
             selector = late_bound.resolve_ndarray_with_lossless_cast(
                 self.selector, data.shape, np.dtype(np.int_)
             )
@@ -311,11 +299,7 @@ class _SelectSafeguardBase(ABC):
             data.dtype, data.size, umax
         )
 
-        with (
-            ErrorContext().enter() as ctx,
-            ctx.parameter("selector"),
-            ctx.late_bound_parameter(self.selector),
-        ):
+        with ctx.parameter("selector"), ctx.late_bound_parameter(self.selector):
             valid._lower = (
                 np.take_along_axis(
                     np.stack([v._lower.T for v in valids], axis=0),

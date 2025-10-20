@@ -13,7 +13,7 @@ from typing_extensions import override  # MSPV 3.12
 from ...utils._compat import _ensure_array
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import as_bits, from_total_order, lossless_cast, to_total_order
-from ...utils.error import ErrorContext, TypeCheckError
+from ...utils.error import TypeCheckError, ctx
 from ...utils.intervals import Interval, IntervalUnion, Lower, Maximum, Minimum, Upper
 from ...utils.typing import JSON, S, T
 from .abc import PointwiseSafeguard
@@ -60,7 +60,7 @@ class SameValueSafeguard(PointwiseSafeguard):
     def __init__(
         self, value: int | float | str | Parameter, *, exclusive: bool = False
     ) -> None:
-        with ErrorContext().enter() as ctx, ctx.safeguard(self):
+        with ctx.safeguard(self):
             with ctx.parameter("value"):
                 TypeCheckError.check_instance_or_raise(
                     value, int | float | str | Parameter
@@ -123,7 +123,7 @@ class SameValueSafeguard(PointwiseSafeguard):
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        with ErrorContext().enter() as ctx, ctx.safeguard(self), ctx.parameter("value"):
+        with ctx.safeguard(self), ctx.parameter("value"):
             value: np.ndarray[tuple[()] | S, np.dtype[T]] = (
                 late_bound.resolve_ndarray_with_lossless_cast(
                     self._value,
@@ -173,7 +173,7 @@ class SameValueSafeguard(PointwiseSafeguard):
             Union of intervals in which the same value guarantee is upheld.
         """
 
-        with ErrorContext().enter() as ctx, ctx.safeguard(self), ctx.parameter("value"):
+        with ctx.safeguard(self), ctx.parameter("value"):
             valuef: np.ndarray[tuple[()] | tuple[int], np.dtype[T]] = (
                 late_bound.resolve_ndarray_with_lossless_cast(
                     self._value,
