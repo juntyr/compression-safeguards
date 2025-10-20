@@ -90,9 +90,9 @@ class NeighbourhoodAxis:
 
     Raises
     ------
-    ParameterTypeError
+    TypeError
         if any parameter has the wrong type.
-    ParameterValueError
+    ValueError
         if before or after is negative.
     """
 
@@ -170,14 +170,14 @@ class NeighbourhoodBoundaryAxis:
 
     Raises
     ------
-    ParameterTypeError
+    TypeError
         if any parameter has the wrong type.
-    ParameterValueError
+    ValueError
         if before or after is negative.
-    ParameterValueError
+    ValueError
         if `constant_boundary` is not provided if and only if the `boundary` is
         constant.
-    ParameterValueError
+    ValueError
         if `constant_boundary` uses the non-scalar `$x` or `$X` late-bound
         parameters.
     """

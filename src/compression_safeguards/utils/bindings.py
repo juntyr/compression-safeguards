@@ -170,7 +170,7 @@ class Bindings:
         ------
         LateBoundParameterResolutionError
             if the `param`eter is not contained in the bindings.
-        LateBoundParameterValueError
+        ValueError
             if the `param`eter cannot be broadcast to the `shape`.
         """
 
@@ -234,7 +234,7 @@ class Bindings:
         ------
         LateBoundParameterResolutionError
             if the `param`eter is not contained in the bindings.
-        LateBoundParameterValueError
+        ValueError
             if the `param`eter cannot be broadcast to the `shape`.
         """
 
@@ -279,7 +279,7 @@ class Bindings:
 
         Raises
         ------
-        LateBoundParameterValueError
+        ValueError
             if an array parameter cannot be broadcast to the `shape`
         """
 

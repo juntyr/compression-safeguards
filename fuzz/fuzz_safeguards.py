@@ -1,13 +1,6 @@
 import atheris
 from timeoutcontext import timeout
 
-from compression_safeguards.utils.error import (
-    ErrorContextMixin,
-    IndexContextFragment,
-    LateBoundParameterContextFragment,
-    ParameterContextFragment,
-)
-
 with atheris.instrument_imports():
     import sys
     import types
@@ -35,6 +28,12 @@ with atheris.instrument_imports():
     from compression_safeguards.safeguards.stencil import NeighbourhoodBoundaryAxis
     from compression_safeguards.utils._compat import _ensure_array
     from compression_safeguards.utils.bindings import Parameter
+    from compression_safeguards.utils.error import (
+        ErrorContextMixin,
+        IndexContextFragment,
+        LateBoundParameterContextFragment,
+        ParameterContextFragment,
+    )
     from compression_safeguards.utils.typing import S, T
 
 
