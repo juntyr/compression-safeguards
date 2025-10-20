@@ -271,24 +271,24 @@ def check_one_input(data) -> None:
             (
                 isinstance(err, IndexError)
                 and isinstance(err, ErrorContextMixin)
+                and ("is out of bounds for array of shape" in str(err))
+                and (err.context._context[-1] == ParameterContextFragment("axis"))
+                and isinstance(err.context._context[-2], IndexContextFragment)
                 and (
                     err.context._context[-3]
                     == ParameterContextFragment("neighbourhood")
                 )
-                and isinstance(err.context._context[-2], IndexContextFragment)
-                and (err.context._context[-1] == ParameterContextFragment("axis"))
-                and ("is out of bounds for array of shape" in str(err))
             )
             or (
                 isinstance(err, IndexError)
                 and isinstance(err, ErrorContextMixin)
-                and (err.context._context[-2] == ParameterContextFragment("eb"))
-                and isinstance(
-                    err.context._context[-1], LateBoundParameterContextFragment
-                )
                 and ("duplicate axis index" in str(err))
                 and ("normalised to" in str(err))
                 and ("for array of shape" in str(err))
+                and isinstance(
+                    err.context._context[-1], LateBoundParameterContextFragment
+                )
+                and (err.context._context[-2] == ParameterContextFragment("eb"))
             )
             or (
                 isinstance(err, TypeError | ValueError)
@@ -302,21 +302,21 @@ def check_one_input(data) -> None:
             or (
                 isinstance(err, ValueError)
                 and isinstance(err, ErrorContextMixin)
-                and (err.context._context[-2] == ParameterContextFragment("eb"))
+                and ("must be" in str(err))
                 and isinstance(
                     err.context._context[-1], LateBoundParameterContextFragment
                 )
-                and ("must be" in str(err))
+                and (err.context._context[-2] == ParameterContextFragment("eb"))
             )
             or (isinstance(err, ValueError) and ("fuzzer hash is all ones" in str(err)))
             or (
                 isinstance(err, ValueError)
                 and isinstance(err, ErrorContextMixin)
+                and ("cannot broadcast from shape" in str(err))
+                and ("to shape ()" in str(err))
                 and isinstance(
                     err.context._context[-1], LateBoundParameterContextFragment
                 )
-                and ("cannot broadcast from shape" in str(err))
-                and ("to shape ()" in str(err))
             )
         ):
             return

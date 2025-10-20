@@ -218,7 +218,7 @@ def test_fuzzer_padding_overflow():
 
     with pytest.raises(
         ValueError,
-        match=r"cannot losslessly cast \(some\) values from float64 to float32",
+        match=r"monotonicity\.constant_boundary: cannot losslessly cast \(some\) values from float64 to float32",
     ):
         encode_decode_mock(
             data,
@@ -297,7 +297,7 @@ def test_late_bound_constant_boundary():
 
     with pytest.raises(
         ValueError,
-        match=r"cannot losslessly cast \(some\) values from int64 to uint8",
+        match=r"monotonicity\.constant_boundary=const: cannot losslessly cast \(some\) values from int64 to uint8",
     ):
         correction = safeguards.compute_correction(
             data, decoded, late_bound=Bindings(const=-1)

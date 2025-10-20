@@ -46,7 +46,7 @@ class Parameter(str):
         if isinstance(param, Parameter):
             return param
         if not param.removeprefix("$").isidentifier():
-            raise ValueError(f"parameter `{param}` must be a valid identifier") | ctx
+            raise ValueError(f"parameter `{param}` is not a valid identifier") | ctx
         return super().__new__(cls, param)
 
     @property

@@ -441,7 +441,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         try:
             decoded = self._codec.decode(np.copy(encoded), out=None)
         except Exception as err:
-            message = (
+            note = (
                 "decoding with `out=None` failed\n\n"
                 "consider using wrapping the codec in the "
                 "`numcodecs_combinators.framed.FramedCodecStack(codec)` "
@@ -451,10 +451,10 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
             # MSPV 3.11
             if getattr(err, "add_note", None) is not None:
-                err.add_note(message)  # type: ignore
+                err.add_note(note)  # type: ignore
                 raise
             else:
-                raise RuntimeError(message) from err
+                raise RuntimeError(note) from err
         decoded = numcodecs.compat.ensure_ndarray(decoded)
 
         if self._lossless_for_codec is not None:
@@ -472,7 +472,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             if decoded.shape != data.shape:
                 raise RuntimeError("codec must decode to the data's shape")
         except RuntimeError as err:
-            message = (
+            note = (
                 "consider using wrapping the codec in the "
                 "`numcodecs_combinators.framed.FramedCodecStack(codec)` "
                 "combinator to encode to bytes and preserve the data dtype and"
@@ -481,10 +481,10 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
             # MSPV 3.11
             if getattr(err, "add_note", None) is not None:
-                err.add_note(message)  # type: ignore
+                err.add_note(note)  # type: ignore
                 raise
             else:
-                raise RuntimeError(message) from err
+                raise RuntimeError(note) from err
 
         late_bound = self._late_bound
         late_bound_reqs = self._safeguards.late_bound

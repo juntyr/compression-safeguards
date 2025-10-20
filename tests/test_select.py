@@ -109,7 +109,7 @@ def test_inheritance():
 def test_parameter_validation():
     with pytest.raises(
         ValueError,
-        match=r"parameter `` must be a valid identifier",
+        match=r"safeguards\[0\]\.select\.selector: parameter `` is not a valid identifier",
     ):
         Safeguards(
             safeguards=[

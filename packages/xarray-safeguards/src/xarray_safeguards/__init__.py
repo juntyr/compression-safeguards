@@ -110,7 +110,9 @@ from compression_safeguards.safeguards.stencil import (
 from compression_safeguards.utils.bindings import Parameter, Value
 from compression_safeguards.utils.error import (
     LateBoundParameterResolutionError,
+    TypeCheckError,
     UnsupportedDateTypeError,
+    ctx,
 )
 from compression_safeguards.utils.typing import JSON, S, T
 from typing_extensions import assert_never  # MSPV 3.11
@@ -204,11 +206,12 @@ def produce_data_array_correction(
     LateBoundParameterResolutionError
         if `late_bound` does not resolve all late-bound parameters of the
         safeguards or includes any extraneous parameters.
+    TypeError
+    if a late-bound parameter is not a scalar or
+        [`xarray.DataArray`][xarray.DataArray].
     ValueError
-        if a late-bound parameter is not a scalar or
-        [`xarray.DataArray`][xarray.DataArray], or its dimensions are not a
-        subset of the `data` dimensions, or it is not broadcastable to the
-        `data` shape.
+        if a late-bound parameter's dimensions are not a subset of the `data`
+        dimensions, or it is not broadcastable to the `data` shape.
     """
 
     # small safeguard against the printer problem
@@ -293,24 +296,26 @@ def produce_data_array_correction(
             else data.dtype.type(0)
         )
         late_bound_global["$x_max"] = da_max
-    for k, v in late_bound.items():
-        if isinstance(v, int | float | np.number):
-            late_bound_global[k] = v
-        else:
-            if not isinstance(v, xr.DataArray):
-                raise ValueError(
-                    f"late-bound param {k} must be a scalar or `xarray.DataArray`"
+    with ctx.parameter("late_bound"):
+        for k, v in late_bound.items():
+            with ctx.parameter(k):
+                TypeCheckError.check_instance_or_raise(
+                    v, int | float | np.number | xr.DataArray
                 )
-            if not frozenset(v.dims).issubset(data.dims):
-                raise ValueError(
-                    f"late-bound param {k} dims are not a subset of data dims"
-                )
-            for d, ds in v.sizes.items():
-                if (ds != 1) and (ds != data.sizes[d]):
-                    raise ValueError(
-                        f"late-bound param {k} dim {d} is not broadcastable to the data shape"
-                    )
-            late_bound_data_arrays[k] = v
+                if isinstance(v, int | float | np.number):
+                    late_bound_global[k] = v
+                else:
+                    if not frozenset(v.dims).issubset(data.dims):
+                        raise ValueError("dims are not a subset of data dims") | ctx
+                    for d, ds in v.sizes.items():
+                        if (ds != 1) and (ds != data.sizes[d]):
+                            raise (
+                                ValueError(
+                                    f"dim {d} is not broadcastable to the data shape"
+                                )
+                                | ctx
+                            )
+                    late_bound_data_arrays[k] = v
 
     correction_name = f"{data.name}_sg"
     correction_attrs = dict(

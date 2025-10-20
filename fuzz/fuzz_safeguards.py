@@ -420,24 +420,24 @@ def check_one_input(data) -> None:
             (
                 isinstance(err, IndexError)
                 and isinstance(err, ErrorContextMixin)
+                and ("is out of bounds for array of shape" in str(err))
+                and (err.context._context[-1] == ParameterContextFragment("axis"))
+                and isinstance(err.context._context[-2], IndexContextFragment)
                 and (
                     err.context._context[-3]
                     == ParameterContextFragment("neighbourhood")
                 )
-                and isinstance(err.context._context[-2], IndexContextFragment)
-                and (err.context._context[-1] == ParameterContextFragment("axis"))
-                and ("is out of bounds for array of shape" in str(err))
             )
             or (
                 isinstance(err, IndexError)
                 and isinstance(err, ErrorContextMixin)
-                and (err.context._context[-2] == ParameterContextFragment("eb"))
-                and isinstance(
-                    err.context._context[-1], LateBoundParameterContextFragment
-                )
                 and ("duplicate axis index" in str(err))
                 and ("normalised to" in str(err))
                 and ("for array of shape" in str(err))
+                and isinstance(
+                    err.context._context[-1], LateBoundParameterContextFragment
+                )
+                and (err.context._context[-2] == ParameterContextFragment("eb"))
             )
             or (
                 isinstance(err, TypeError | ValueError)
@@ -452,11 +452,11 @@ def check_one_input(data) -> None:
                 # late-bound select safeguard with invalid selector index
                 isinstance(err, ValueError)
                 and isinstance(err, ErrorContextMixin)
-                and (err.context._context[-2] == ParameterContextFragment("selector"))
+                and ("invalid entry in choice array" in str(err))
                 and isinstance(
                     err.context._context[-1], LateBoundParameterContextFragment
                 )
-                and ("invalid entry in choice array" in str(err))
+                and (err.context._context[-2] == ParameterContextFragment("selector"))
             )
             or (
                 # late-bound select safeguard with invalid selector index
@@ -470,26 +470,26 @@ def check_one_input(data) -> None:
             or (
                 isinstance(err, ValueError)
                 and isinstance(err, ErrorContextMixin)
-                and (err.context._context[-2] == ParameterContextFragment("eb"))
-                and isinstance(
-                    err.context._context[-1], LateBoundParameterContextFragment
-                )
                 and ("must be" in str(err))
-            )
-            or (
-                isinstance(err, ValueError)
-                and isinstance(err, ErrorContextMixin)
-                and (ParameterContextFragment("offset") in err.context._context)
-                and ("must not contain NaNs" in str(err))
-            )
-            or (
-                isinstance(err, ValueError)
-                and isinstance(err, ErrorContextMixin)
                 and isinstance(
                     err.context._context[-1], LateBoundParameterContextFragment
                 )
+                and (err.context._context[-2] == ParameterContextFragment("eb"))
+            )
+            or (
+                isinstance(err, ValueError)
+                and isinstance(err, ErrorContextMixin)
+                and ("must not contain NaNs" in str(err))
+                and (ParameterContextFragment("offset") in err.context._context)
+            )
+            or (
+                isinstance(err, ValueError)
+                and isinstance(err, ErrorContextMixin)
                 and ("cannot broadcast from shape" in str(err))
                 and ("to shape ()" in str(err))
+                and isinstance(
+                    err.context._context[-1], LateBoundParameterContextFragment
+                )
             )
         ):
             return

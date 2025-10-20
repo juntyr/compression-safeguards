@@ -13,11 +13,7 @@ from typing_extensions import (
     override,  # MSPV 3.12
 )
 
-from compression_safeguards.utils.error import (
-    TypeCheckError,
-    ctx,
-    lookup_enum_or_raise,
-)
+from compression_safeguards.utils.error import TypeCheckError, ctx, lookup_enum_or_raise
 
 from ...utils.bindings import Parameter
 from ...utils.typing import JSON, S, T
