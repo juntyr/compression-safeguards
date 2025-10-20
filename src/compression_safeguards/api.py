@@ -25,7 +25,6 @@ from .utils._compat import _ones, _zeros
 from .utils.bindings import Bindings, Parameter, Value
 from .utils.cast import as_bits
 from .utils.error import (
-    IncompatibleChunkStencilError,
     LateBoundParameterResolutionError,
     SafeguardsSafetyBug,
     UnsupportedDateTypeError,
@@ -723,7 +722,7 @@ class Safeguards:
             `prediction_chunk`'s, or if the length of the `data_shape`,
             `chunk_offset`, or `chunk_stencil` do not match the dimensionality
             of the `data`.
-        IncompatibleChunkStencilError
+        ValueError
             if the `chunk_stencil` is not compatible with the required stencil.
         LateBoundParameterResolutionError
             if `late_bound` does not resolve all late-bound parameters of the
@@ -854,7 +853,7 @@ class Safeguards:
             `prediction_chunk`'s, or if the length of the `data_shape`,
             `chunk_offset`, or `chunk_stencil` do not match the dimensionality
             of the `data`.
-        IncompatibleChunkStencilError
+        ValueError
             if the `chunk_stencil` is not compatible with the required stencil.
         LateBoundParameterResolutionError
             if `late_bound` does not resolve all late-bound parameters of the
@@ -1005,162 +1004,210 @@ class Safeguards:
         stencil_roll: list[int] = []
         non_stencil_indices: list[slice] = []
 
-        # (1): check that the chunk stencil is compatible with the required stencil
-        #      this is not trivial since we need to account for huge chunks where
-        #       downgrading the stencil can work out
+        # (1): check that the chunk stencil is compatible with the required
+        #       stencil
+        #      this is not trivial since we need to account for huge chunks
+        #       where downgrading the stencil can work out
         # (2): compute indices to extract just the needed data and data+stencil
-        for i, (c, r) in enumerate(zip(chunk_stencil, required_stencil)):
-            # complete chunks that span the entire data along the axis are
-            #  always allowed
-            if (
-                c[0] in (BoundaryCondition.valid, BoundaryCondition.wrap)
-                and c[1].before == 0
-                and c[1].after == 0
-                and chunk_shape[i] == data_shape[i]
-            ):
-                stencil_indices.append(slice(None))
-                stencil_roll.append(0)
-                non_stencil_indices.append(slice(None))
-                continue
+        with ctx.parameter("chunk_stencil"):
+            for i, (c, r) in enumerate(zip(chunk_stencil, required_stencil)):
+                with ctx.index(i):
+                    # complete chunks that span the entire data along the axis
+                    #  are always allowed
+                    if (
+                        c[0] in (BoundaryCondition.valid, BoundaryCondition.wrap)
+                        and c[1].before == 0
+                        and c[1].after == 0
+                        and chunk_shape[i] == data_shape[i]
+                    ):
+                        stencil_indices.append(slice(None))
+                        stencil_roll.append(0)
+                        non_stencil_indices.append(slice(None))
+                        continue
 
-            match c[0]:
-                case BoundaryCondition.valid:
-                    # we need to check that we requested a valid boundary,
-                    #  which is only compatible with itself
-                    # and that the stencil is large enough
-                    if r[0] != BoundaryCondition.valid:
-                        raise IncompatibleChunkStencilError(
-                            f"requires {r[0].name} stencil boundary but found "
-                            + "valid boundary",
-                            i,
-                        )
-
-                    # what is the required stencil after adjusting for near-
-                    #  boundary stencil truncation?
-                    rs = NeighbourhoodAxis(
-                        before=min(chunk_offset[i], r[1].before),
-                        after=min(
-                            r[1].after,
-                            data_shape[i] - chunk_shape[i] - chunk_offset[i],
-                        ),
-                    )
-                    if c[1].before < rs.before:
-                        raise IncompatibleChunkStencilError(
-                            f"requires stencil with at least {rs.before} point"
-                            + f"(s) before but received only {c[1].before}",
-                            i,
-                        )
-                    if c[1].after < rs.after:
-                        raise IncompatibleChunkStencilError(
-                            f"requires stencil with at least {rs.after} point"
-                            + f"(s) before but received only {c[1].after}",
-                            i,
-                        )
-
-                    stencil_indices.append(
-                        slice(
-                            c[1].before - rs.before,
-                            None if c[1].after == rs.after else rs.after - c[1].after,
-                        )
-                    )
-                    stencil_roll.append(0)
-                    non_stencil_indices.append(
-                        slice(rs.before, None if rs.after == 0 else -rs.after)
-                    )
-                case BoundaryCondition.wrap:
-                    # a wrapping boundary is compatible with any other boundary
-                    if r[0] not in (BoundaryCondition.valid, BoundaryCondition.wrap):
-                        raise IncompatibleChunkStencilError(
-                            f"requires {r[0].name} stencil boundary but found "
-                            + "wrapping boundary",
-                            i,
-                        )
-
-                    # what is the required stencil after adjusting for near-
-                    #  boundary stencil truncation?
-                    # (a) if the chunk is in the middle, where no boundary
-                    #     condition is applied, we just keep the stencil as-is
-                    # (b) if the chunk's stencil only overlaps with the boundary
-                    #     on one side, we keep the stencil on that side as-is,
-                    #     as long as it does not overlap, after wrap-around,
-                    #     with the stencil on the other side
-                    #     in this case, we also need to roll the stencil on the
-                    #     side of the data boundary to the other side, to ensure
-                    #     that other boundary conditions also see a boundary
-                    # (c) otherwise, we can have the full data and remove any
-                    #     excessive stencil so that the per-safeguard stencil
-                    #     correctly sees how points wrap
-                    rs = NeighbourhoodAxis(
-                        before=(
-                            r[1].before  # (a)
-                            if r[1].before <= chunk_offset[i]
-                            else (
-                                min(  # (b)
-                                    r[1].before - chunk_offset[i],
-                                    data_shape[i]
-                                    - chunk_offset[i]
-                                    - chunk_shape[i]
-                                    - r[1].after,
+                    match c[0]:
+                        case BoundaryCondition.valid:
+                            # we need to check that we requested a valid
+                            #  boundary, which is only compatible with itself
+                            # and that the stencil is large enough
+                            if r[0] != BoundaryCondition.valid:
+                                raise (
+                                    ValueError(
+                                        f"requires {r[0].name} stencil "
+                                        + "boundary but found valid boundary"
+                                    )
+                                    | ctx
                                 )
-                                if r[1].after
-                                <= (data_shape[i] - chunk_shape[i] - chunk_offset[i])
-                                else min(chunk_offset[i], r[1].before)  # (c)
-                            )
-                        ),
-                        after=(
-                            r[1].after  # (a)
-                            if r[1].after
-                            <= (data_shape[i] - chunk_shape[i] - chunk_offset[i])
-                            else (
-                                min(  # (b)
-                                    chunk_offset[i]
-                                    + chunk_shape[i]
-                                    + r[1].after
-                                    - data_shape[i],
-                                    chunk_offset[i] - r[1].before,
-                                )
-                                if r[1].before <= chunk_offset[i]
-                                else min(  # (c)
+
+                            # what is the required stencil after adjusting for
+                            #  near-boundary stencil truncation?
+                            rs = NeighbourhoodAxis(
+                                before=min(chunk_offset[i], r[1].before),
+                                after=min(
                                     r[1].after,
                                     data_shape[i] - chunk_shape[i] - chunk_offset[i],
+                                ),
+                            )
+                            if c[1].before < rs.before:
+                                with ctx.parameter("before"):
+                                    raise (
+                                        ValueError(
+                                            "requires stencil with at least "
+                                            + f"{rs.before} point(s) before "
+                                            + f"but received only {c[1].before}"
+                                        )
+                                        | ctx
+                                    )
+                            if c[1].after < rs.after:
+                                with ctx.parameter("after"):
+                                    raise (
+                                        ValueError(
+                                            "requires stencil with at least "
+                                            + f"{rs.after} point(s) after but "
+                                            + f"received only {c[1].after}"
+                                        )
+                                        | ctx
+                                    )
+
+                            stencil_indices.append(
+                                slice(
+                                    c[1].before - rs.before,
+                                    None
+                                    if c[1].after == rs.after
+                                    else rs.after - c[1].after,
                                 )
                             )
-                        ),
-                    )
-                    if c[1].before < rs.before:
-                        raise IncompatibleChunkStencilError(
-                            f"requires stencil with at least {rs.before} point"
-                            + f"(s) before but received only {c[1].before}",
-                            i,
-                        )
-                    if c[1].after < rs.after:
-                        raise IncompatibleChunkStencilError(
-                            f"requires stencil with at least {rs.after} point"
-                            + f"(s) before but received only {c[1].after}",
-                            i,
-                        )
+                            stencil_roll.append(0)
+                            non_stencil_indices.append(
+                                slice(rs.before, None if rs.after == 0 else -rs.after)
+                            )
+                        case BoundaryCondition.wrap:
+                            # a wrapping boundary is compatible with any other
+                            #  boundary
+                            if r[0] not in (
+                                BoundaryCondition.valid,
+                                BoundaryCondition.wrap,
+                            ):
+                                raise (
+                                    ValueError(
+                                        f"requires {r[0].name} stencil "
+                                        + "boundary but found wrapping boundary"
+                                    )
+                                    | ctx
+                                )
 
-                    roll_before = max(0, rs.before - chunk_offset[i])
-                    roll_after = max(
-                        0, chunk_offset[i] + chunk_shape[i] + rs.after - data_shape[i]
-                    )
-                    if (roll_before > 0) and (roll_after > 0):
-                        roll_before, roll_after = 0, 0
+                            # what is the required stencil after adjusting for
+                            #  near-boundary stencil truncation?
+                            # (a) if the chunk is in the middle, where no
+                            #     boundary condition is applied, we just keep
+                            #     the stencil as-is
+                            # (b) if the chunk's stencil only overlaps with the
+                            #     boundary on one side, we keep the stencil on
+                            #     that side as-is, as long as it does not
+                            #     overlap, after wrap-around, with the stencil
+                            #     on the other side in this case, we also need
+                            #     to roll the stencil on the side of the data
+                            #     boundary to the other side, to ensure that
+                            #     other boundary conditions also see a boundary
+                            # (c) otherwise, we can have the full data and
+                            #     remove any excessive stencil so that the
+                            #     per-safeguard stencil correctly sees how
+                            #     points wrap
+                            rs = NeighbourhoodAxis(
+                                before=(
+                                    r[1].before  # (a)
+                                    if r[1].before <= chunk_offset[i]
+                                    else (
+                                        min(  # (b)
+                                            r[1].before - chunk_offset[i],
+                                            data_shape[i]
+                                            - chunk_offset[i]
+                                            - chunk_shape[i]
+                                            - r[1].after,
+                                        )
+                                        if r[1].after
+                                        <= (
+                                            data_shape[i]
+                                            - chunk_shape[i]
+                                            - chunk_offset[i]
+                                        )
+                                        else min(chunk_offset[i], r[1].before)  # (c)
+                                    )
+                                ),
+                                after=(
+                                    r[1].after  # (a)
+                                    if r[1].after
+                                    <= (
+                                        data_shape[i] - chunk_shape[i] - chunk_offset[i]
+                                    )
+                                    else (
+                                        min(  # (b)
+                                            chunk_offset[i]
+                                            + chunk_shape[i]
+                                            + r[1].after
+                                            - data_shape[i],
+                                            chunk_offset[i] - r[1].before,
+                                        )
+                                        if r[1].before <= chunk_offset[i]
+                                        else min(  # (c)
+                                            r[1].after,
+                                            data_shape[i]
+                                            - chunk_shape[i]
+                                            - chunk_offset[i],
+                                        )
+                                    )
+                                ),
+                            )
+                            if c[1].before < rs.before:
+                                with ctx.parameter("before"):
+                                    raise (
+                                        ValueError(
+                                            "requires stencil with at least "
+                                            + f"{rs.before} point(s) before "
+                                            + f"but received only {c[1].before}"
+                                        )
+                                        | ctx
+                                    )
+                            if c[1].after < rs.after:
+                                with ctx.parameter("after"):
+                                    raise (
+                                        ValueError(
+                                            "requires stencil with at least "
+                                            + f"{rs.after} point(s) after but "
+                                            + f"received only {c[1].after}"
+                                        )
+                                        | ctx
+                                    )
 
-                    stencil_indices.append(
-                        slice(
-                            c[1].before - rs.before,
-                            None if c[1].after == rs.after else rs.after - c[1].after,
-                        )
-                    )
-                    stencil_roll.append(-roll_before + roll_after)
-                    nsi_before = rs.before + roll_after - roll_before
-                    nsi_after = rs.after + roll_before - roll_after
-                    non_stencil_indices.append(
-                        slice(nsi_before, None if nsi_after == 0 else -nsi_after)
-                    )
-                case _:
-                    assert_never(c[0])
+                            roll_before = max(0, rs.before - chunk_offset[i])
+                            roll_after = max(
+                                0,
+                                chunk_offset[i]
+                                + chunk_shape[i]
+                                + rs.after
+                                - data_shape[i],
+                            )
+                            if (roll_before > 0) and (roll_after > 0):
+                                roll_before, roll_after = 0, 0
+
+                            stencil_indices.append(
+                                slice(
+                                    c[1].before - rs.before,
+                                    None
+                                    if c[1].after == rs.after
+                                    else rs.after - c[1].after,
+                                )
+                            )
+                            stencil_roll.append(-roll_before + roll_after)
+                            nsi_before = rs.before + roll_after - roll_before
+                            nsi_after = rs.after + roll_before - roll_after
+                            non_stencil_indices.append(
+                                slice(
+                                    nsi_before, None if nsi_after == 0 else -nsi_after
+                                )
+                            )
+                        case _:
+                            assert_never(c[0])
 
         data_chunk_ = np.roll(
             data_chunk[tuple(stencil_indices)],

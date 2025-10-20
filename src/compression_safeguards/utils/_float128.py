@@ -24,7 +24,6 @@ try:
     _float128_dtype: np.dtype[_float128] = np.dtype(np.float128)
     if (np.finfo(np.float128).nmant + np.finfo(np.float128).nexp + 1) != 128:
         raise TypeError("numpy.float128 does not offer true 128 bit precision")
-    assert (np.finfo(np.float128).nmant + np.finfo(np.float128).nexp + 1) == 128
     _float128_min: _float128 = np.finfo(np.float128).min
     _float128_max: _float128 = np.finfo(np.float128).max
     _float128_smallest_normal: _float128 = np.finfo(np.float128).smallest_normal

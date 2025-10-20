@@ -4,7 +4,6 @@ __all__ = [
     "ErrorContextMixin",
     "ctx",
     "UnsupportedSafeguardError",
-    "IncompatibleChunkStencilError",
     "TypeCheckError",
     "LateBoundParameterResolutionError",
     "lookup_enum_or_raise",
@@ -295,27 +294,6 @@ class SafeguardsSafetyBug(RuntimeError):
         # MSPV 3.11
         if hasattr(self, "add_note"):
             self.add_note(message)  # type: ignore
-
-
-class IncompatibleChunkStencilError(ValueError):
-    __slots__: tuple[str, ...] = ()
-
-    def __init__(self, message: str, axis: int) -> None:
-        super().__init__(message, axis)
-
-    @property
-    def message(self) -> str:
-        (message, _axis) = self.args
-        return message
-
-    @property
-    def axis(self) -> int:
-        (_message, axis) = self.args
-        return axis
-
-    @override
-    def __str__(self) -> str:
-        return f"{self.message} on axis {self.axis}"
 
 
 class TypeCheckError(TypeError):

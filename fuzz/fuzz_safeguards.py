@@ -486,7 +486,7 @@ def check_one_input(data) -> None:
             or (
                 isinstance(err, ValueError)
                 and isinstance(err, ErrorContextMixin)
-                and ("must not contain NaNs" in str(err))
+                and ("must not contain any NaN values" in str(err))
                 and (ParameterContextFragment("offset") in err.context._context)
             )
             or (
