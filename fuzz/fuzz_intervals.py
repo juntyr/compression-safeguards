@@ -106,9 +106,9 @@ def check_one_input(data) -> None:
             check_elems = check_elems.union(range(low, high + 1))
 
         assert sorted(elems) == sorted(check_elems)
-    except Exception as err:
+    except Exception:
         print("\n===\n\n" + "\n".join(repr(i) for i in info) + "\n\n===\n")  # noqa: T201
-        raise err
+        raise
 
 
 atheris.Setup(sys.argv, check_one_input)

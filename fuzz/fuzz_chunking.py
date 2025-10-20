@@ -1,6 +1,13 @@
 import atheris
 from timeoutcontext import timeout
 
+from compression_safeguards.utils.error import (
+    ErrorContextMixin,
+    IndexContextFragment,
+    LateBoundParameterContextFragment,
+    ParameterContextFragment,
+)
+
 with atheris.instrument_imports():
     import sys
     import types
@@ -219,7 +226,7 @@ def check_one_input(data) -> None:
             safeguard._qoi_expr._late_bound_constants = (
                 safeguard._qoi_expr._expr.late_bound_constants
             )
-    except (AssertionError, Warning, TimeoutError):
+    except (ValueError, TypeError, SyntaxError, TimeoutError):
         return
 
     da = xr.DataArray(raw, name="da", dims=dims)
@@ -264,11 +271,22 @@ def check_one_input(data) -> None:
         if (
             (
                 isinstance(err, IndexError)
-                and ("axis index" in str(err))
-                and ("out of bounds for array of shape" in str(err))
+                and isinstance(err, ErrorContextMixin)
+                and (
+                    err.context._context[-3]
+                    == ParameterContextFragment("neighbourhood")
+                )
+                and isinstance(err.context._context[-2], IndexContextFragment)
+                and (err.context._context[-1] == ParameterContextFragment("axis"))
+                and ("is out of bounds for array of shape" in str(err))
             )
             or (
                 isinstance(err, IndexError)
+                and isinstance(err, ErrorContextMixin)
+                and (err.context._context[-2] == ParameterContextFragment("eb"))
+                and isinstance(
+                    err.context._context[-1], LateBoundParameterContextFragment
+                )
                 and ("duplicate axis index" in str(err))
                 and ("normalised to" in str(err))
                 and ("for array of shape" in str(err))
@@ -282,15 +300,23 @@ def check_one_input(data) -> None:
                 and ("cannot cast non-finite" in str(err))
                 and ("to saturating finite" in str(err))
             )
-            or (isinstance(err, AssertionError) and str(err).startswith("eb must be"))
-            or (
-                isinstance(err, AssertionError)
-                and ("fuzzer hash is all ones" in str(err))
-            )
             or (
                 isinstance(err, ValueError)
-                and ("cannot broadcast late-bound parameter" in str(err))
-                and ("with shape" in str(err))
+                and isinstance(err, ErrorContextMixin)
+                and (err.context._context[-2] == ParameterContextFragment("eb"))
+                and isinstance(
+                    err.context._context[-1], LateBoundParameterContextFragment
+                )
+                and ("must be" in str(err))
+            )
+            or (isinstance(err, ValueError) and ("fuzzer hash is all ones" in str(err)))
+            or (
+                isinstance(err, ValueError)
+                and isinstance(err, ErrorContextMixin)
+                and isinstance(
+                    err.context._context[-1], LateBoundParameterContextFragment
+                )
+                and ("cannot broadcast from shape" in str(err))
                 and ("to shape ()" in str(err))
             )
         ):
@@ -298,7 +324,7 @@ def check_one_input(data) -> None:
         print(  # noqa: T201
             f"\n===\n\nsafeguard = {safeguard!r}\n\ndata = {raw!r}\n\nlate_bound = {late_bound!r}\n\nchunks = {chunks!r}\n\n===\n"
         )
-        raise err
+        raise
 
 
 atheris.Setup(sys.argv, check_one_input)

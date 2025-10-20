@@ -166,6 +166,10 @@ class IndexContextFragment(ContextFragment):
     def separator(self) -> str:
         return ""
 
+    @override
+    def __eq__(self, value: object, /) -> bool:
+        return isinstance(value, IndexContextFragment) and value._index == self._index
+
 
 class SafeguardTypeContextFragment(ContextFragment):
     __slots__: tuple[str, ...] = ("_safeguard",)
@@ -182,6 +186,13 @@ class SafeguardTypeContextFragment(ContextFragment):
     def __str__(self) -> str:
         return self._safeguard.kind
 
+    @override
+    def __eq__(self, value: object, /) -> bool:
+        return (
+            isinstance(value, SafeguardTypeContextFragment)
+            and value._safeguard is self._safeguard
+        )
+
 
 class ParameterContextFragment(ContextFragment):
     __slots__: tuple[str, ...] = ("_parameter",)
@@ -197,6 +208,13 @@ class ParameterContextFragment(ContextFragment):
     @override
     def __str__(self) -> str:
         return self._parameter
+
+    @override
+    def __eq__(self, value: object, /) -> bool:
+        return (
+            isinstance(value, ParameterContextFragment)
+            and value._parameter == self._parameter
+        )
 
 
 class LateBoundParameterContextFragment(ContextFragment):
@@ -218,6 +236,13 @@ class LateBoundParameterContextFragment(ContextFragment):
     @override
     def separator(self) -> str:
         return "="
+
+    @override
+    def __eq__(self, value: object, /) -> bool:
+        return (
+            isinstance(value, LateBoundParameterContextFragment)
+            and value._parameter == self._parameter
+        )
 
 
 class ErrorContextMixin:

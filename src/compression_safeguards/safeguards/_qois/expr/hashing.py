@@ -192,7 +192,8 @@ def _interval_union_contains(
 def _interval_union_pick(
     self, prediction: np.ndarray[S, np.dtype[T]]
 ) -> np.ndarray[S, np.dtype[T]]:
-    assert not np.all(self._lower == 1), "fuzzer hash is all ones"
+    if np.all(self._lower == 1):
+        raise ValueError("fuzzer hash is all ones")
     return _ensure_array(self._lower[0].reshape(prediction.shape), copy=True)
 
 

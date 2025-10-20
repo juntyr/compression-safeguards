@@ -1,6 +1,13 @@
 import atheris
 from timeoutcontext import timeout
 
+from compression_safeguards.utils.error import (
+    ErrorContextMixin,
+    IndexContextFragment,
+    LateBoundParameterContextFragment,
+    ParameterContextFragment,
+)
+
 with atheris.instrument_imports():
     import sys
     import types
@@ -394,7 +401,7 @@ def check_one_input(data) -> None:
                 safeguards=safeguards,
                 fixed_constants=fixed_constants,
             )
-    except (AssertionError, Warning, TimeoutError):
+    except (ValueError, TypeError, SyntaxError, TimeoutError):
         return
 
     grepr = repr(safeguard)
@@ -413,11 +420,22 @@ def check_one_input(data) -> None:
         if (
             (
                 isinstance(err, IndexError)
-                and ("axis index" in str(err))
-                and ("out of bounds for array of shape" in str(err))
+                and isinstance(err, ErrorContextMixin)
+                and (
+                    err.context._context[-3]
+                    == ParameterContextFragment("neighbourhood")
+                )
+                and isinstance(err.context._context[-2], IndexContextFragment)
+                and (err.context._context[-1] == ParameterContextFragment("axis"))
+                and ("is out of bounds for array of shape" in str(err))
             )
             or (
                 isinstance(err, IndexError)
+                and isinstance(err, ErrorContextMixin)
+                and (err.context._context[-2] == ParameterContextFragment("eb"))
+                and isinstance(
+                    err.context._context[-1], LateBoundParameterContextFragment
+                )
                 and ("duplicate axis index" in str(err))
                 and ("normalised to" in str(err))
                 and ("for array of shape" in str(err))
@@ -432,29 +450,52 @@ def check_one_input(data) -> None:
                 and ("to saturating finite" in str(err))
             )
             or (
-                isinstance(err, ValueError)
                 # late-bound select safeguard with invalid selector index
+                isinstance(err, ValueError)
+                and isinstance(err, ErrorContextMixin)
+                and (err.context._context[-2] == ParameterContextFragment("selector"))
+                and isinstance(
+                    err.context._context[-1], LateBoundParameterContextFragment
+                )
                 and ("invalid entry in choice array" in str(err))
             )
-            or (isinstance(err, AssertionError) and str(err).startswith("eb must be"))
             or (
+                # late-bound select safeguard with invalid selector index
                 isinstance(err, IndexError)
-                and (str(err) == "invalid select safeguard selector indices")
-            )
-            or (
-                isinstance(err, AssertionError)
-                and (str(err) == "offset must not contain NaNs")
+                and isinstance(err, ErrorContextMixin)
+                and isinstance(
+                    err.context._context[-1], LateBoundParameterContextFragment
+                )
+                and (err.context._context[-2] == ParameterContextFragment("selector"))
             )
             or (
                 isinstance(err, ValueError)
-                and ("cannot broadcast late-bound parameter" in str(err))
-                and ("with shape" in str(err))
-                and ("to shape" in str(err))
+                and isinstance(err, ErrorContextMixin)
+                and (err.context._context[-2] == ParameterContextFragment("eb"))
+                and isinstance(
+                    err.context._context[-1], LateBoundParameterContextFragment
+                )
+                and ("must be" in str(err))
+            )
+            or (
+                isinstance(err, ValueError)
+                and isinstance(err, ErrorContextMixin)
+                and (ParameterContextFragment("offset") in err.context._context)
+                and ("must not contain NaNs" in str(err))
+            )
+            or (
+                isinstance(err, ValueError)
+                and isinstance(err, ErrorContextMixin)
+                and isinstance(
+                    err.context._context[-1], LateBoundParameterContextFragment
+                )
+                and ("cannot broadcast from shape" in str(err))
+                and ("to shape ()" in str(err))
             )
         ):
             return
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")  # noqa: T201
-        raise err
+        raise
 
     # test using the safeguards with the zero codec
     safeguard = SafeguardsCodec(
@@ -472,9 +513,9 @@ def check_one_input(data) -> None:
     try:
         encoded = safeguard.encode(raw)
         safeguard.decode(encoded, out=np.empty_like(raw))
-    except Exception as err:
+    except Exception:
         print(f"\n===\n\ncodec = {grepr}\n\ndata = {raw!r}\n\n===\n")  # noqa: T201
-        raise err
+        raise
 
 
 atheris.Setup(sys.argv, check_one_input)
