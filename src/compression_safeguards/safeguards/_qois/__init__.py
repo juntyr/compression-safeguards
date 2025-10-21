@@ -30,6 +30,11 @@ class PointwiseQuantityOfInterest:
     ----------
     qoi : PointwiseQuantityOfInterestExpression
         The pointwise quantity of interest in [`str`][str]ing form.
+
+    Raises
+    ------
+    SyntaxError
+        if the `qoi` is not a valid pointwise quantity of interest expression.
     """
 
     __slots__: tuple[str, ...] = ("_expr", "_late_bound_constants")
@@ -182,6 +187,11 @@ class StencilQuantityOfInterest:
         The shape of the stencil neighbourhood.
     stencil_I : tuple[int, ...]
         The index `I` for the centre of the stencil neighbourhood.
+
+    Raises
+    ------
+    SyntaxError
+        if the `qoi` is not a valid stencil quantity of interest expression.
     """
 
     __slots__: tuple[str, ...] = (

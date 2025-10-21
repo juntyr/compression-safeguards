@@ -51,6 +51,15 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
     equal_nan: bool
         Whether correcting a NaN value to a NaN value with a different bit
         pattern satisfies the error bound.
+
+    Raises
+    ------
+    TypeCheckError
+        if any parameter has the wrong type.
+    ValueError
+        if `type` does not name a valid error bound.
+    ValueError
+        if `eb` is an invalid error bound value for the error bound `type`.
     """
 
     __slots__: tuple[str, ...] = ("_type", "_eb", "_equal_nan")

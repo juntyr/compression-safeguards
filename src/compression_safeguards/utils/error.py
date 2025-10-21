@@ -409,6 +409,11 @@ class TypeCheckError(TypeError):
             The value to type check.
         expected : type | UnionType
             The expected type or type union.
+
+        Raises
+        ------
+        TypeCheckError
+            if `obj` is not an instance of `expected`.
         """
 
         if isinstance(obj, expected):
@@ -468,6 +473,11 @@ class TypeSetError(TypeError):
             The type to check.
         expected : type | UnionType
             The expected type or type union.
+
+        Raises
+        ------
+        TypeSetError
+            if `ty` is not a subclass of `expected`.
         """
 
         if issubclass(ty, expected):
@@ -488,6 +498,11 @@ class TypeSetError(TypeError):
             The data type to check.
         supported : Set[np.dtype]
             The set of supported data types.
+
+        Raises
+        ------
+        TypeSetError
+            if `dtype` is not in `supported`.
         """
 
         if dtype in supported:
@@ -555,6 +570,11 @@ class LateBoundParameterResolutionError(KeyError):
             The expected set of late-bound parameters.
         provided : Set[Parameter]
             The provided set of late-bound parameters.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if `provided` is not equal to `expected`.
         """
 
         if expected == provided:

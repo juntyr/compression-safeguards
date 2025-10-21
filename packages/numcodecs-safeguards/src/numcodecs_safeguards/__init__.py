@@ -214,6 +214,8 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
     LateBoundParameterResolutionError
         if `fixed_constants` does not resolve all late-bound parameters of the
         safeguards or includes any extraneous parameters.
+    ...
+        if instantiating the `codec` or a safeguard raises an exception.
     """
 
     __slots__: tuple[str, ...] = (
@@ -559,7 +561,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         Raises
         ------
         ValueError
-            if `buf` is not a bytes.
+            if `buf` is not a 1D bytes buffer.
         ValueError
             if `buf` has a corrupted header.
         """

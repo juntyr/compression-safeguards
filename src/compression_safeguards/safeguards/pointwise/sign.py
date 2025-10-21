@@ -51,6 +51,13 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         zero. Values that are above / below / equal to the offset are
         guaranteed to stay above / below / equal to the offset, respectively.
         Literal values are (unsafely) cast to the data dtype before comparison.
+
+    Raises
+    ------
+    TypeCheckError
+        if any parameter has the wrong type.
+    ValueError
+        if `offset` is NaN.
     """
 
     __slots__: tuple[str, ...] = ("_offset",)
@@ -118,6 +125,11 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         -------
         ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
+
+        Raises
+        ------
+        ValueError
+            if `offset` is late-bound and contains NaN values.
         """
 
         with ctx.safeguard(self), ctx.parameter("offset"):
@@ -172,6 +184,11 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         -------
         intervals : IntervalUnion[T, int, int]
             Union of intervals in which the `data`'s sign is preserved.
+
+        Raises
+        ------
+        ValueError
+            if `offset` is late-bound and contains NaN values.
         """
 
         with ctx.safeguard(self), ctx.parameter("offset"):

@@ -207,11 +207,13 @@ def produce_data_array_correction(
         if `late_bound` does not resolve all late-bound parameters of the
         safeguards or includes any extraneous parameters.
     TypeError
-    if a late-bound parameter is not a scalar or
+        if a late-bound parameter is not a scalar or
         [`xarray.DataArray`][xarray.DataArray].
     ValueError
         if a late-bound parameter's dimensions are not a subset of the `data`
         dimensions, or it is not broadcastable to the `data` shape.
+    ...
+        if instantiating a safeguard raises an exception.
     """
 
     # small safeguard against the printer problem

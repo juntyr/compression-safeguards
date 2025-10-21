@@ -83,10 +83,10 @@ class SafeguardKind(Enum):
         ValueError
             if the `config` does not contain the safeguard `kind` or the
             `kind` is unknown.
-        TypeError
+        TypeCheckError
             if the safeguard `kind` is not a [`str`][str]ing.
-        ValueError
-            if instantiating the safeguard from the `config` fails.
+        ...
+            if instantiating the safeguard raises an exception.
         """
 
         if "kind" not in config:

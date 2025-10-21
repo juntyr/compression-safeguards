@@ -86,10 +86,10 @@ class NeighbourhoodAxis:
 
     Raises
     ------
-    TypeError
+    TypeCheckError
         if any parameter has the wrong type.
     ValueError
-        if before or after is negative.
+        if `before` or `after` is negative.
     """
 
     __slots__: tuple[str, ...] = ("_before", "_after")
@@ -166,13 +166,15 @@ class NeighbourhoodBoundaryAxis:
 
     Raises
     ------
-    TypeError
+    TypeCheckError
         if any parameter has the wrong type.
     ValueError
-        if before or after is negative.
+        if `before` or `after` is negative.
     ValueError
-        if `constant_boundary` is not provided if and only if the `boundary` is
-        constant.
+        if `boundary` does not name a valid boundary condition variant.
+    ValueError
+        if `constant_boundary` is, not, provided if and only if the `boundary`
+        is constant.
     ValueError
         if `constant_boundary` uses the non-scalar `$x` or `$X` late-bound
         parameters.

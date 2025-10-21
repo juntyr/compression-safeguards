@@ -49,6 +49,11 @@ class SameValueSafeguard(PointwiseSafeguard):
         If [`True`][True], non-`value` elements in the data stay non-`value`
         after applying corrections. If [`False`][False], non-`value` values may
         have the `value` after applying corrections.
+
+    Raises
+    ------
+    TypeCheckError
+        if any parameter has the wrong type.
     """
 
     __slots__: tuple[str, ...] = ("_value", "_exclusive")

@@ -82,6 +82,18 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         The floating-point data type in which the quantity of interest is
         evaluated. By default, the smallest floating-point data type that can
         losslessly represent all input data values is chosen.
+
+    Raises
+    ------
+    TypeCheckError
+        if any parameter has the wrong type.
+    SyntaxError
+        if the `qoi` is not a valid pointwise quantity of interest expression.
+    ValueError
+        if `type` does not name a valid error bound, or the `qoi_dtype` does
+        not name a valid floating-point data type.
+    ValueError
+        if `eb` is an invalid error bound value for the error bound `type`.
     """
 
     __slots__: tuple[str, ...] = (

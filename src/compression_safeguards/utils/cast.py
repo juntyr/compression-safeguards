@@ -78,6 +78,11 @@ class ToFloatMode(Enum):
         ftype : np.dtype[np.floating]
             Floating-point data type that can losslessly represent all values
             from the input `dtype`.
+
+        Raises
+        ------
+        ValueError
+            if `dtype` cannot be losslessly cast to `self`.
         """
 
         match self:
@@ -433,9 +438,6 @@ def lossless_cast(
     ------
     TypeError
         If floating-point values are converted to integer values.
-
-    Raises
-    ------
     ValueError
         If not all values could be losslessly converted.
     """

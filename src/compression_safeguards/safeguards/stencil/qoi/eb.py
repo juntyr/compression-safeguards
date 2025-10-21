@@ -138,6 +138,24 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         The floating-point data type in which the quantity of interest is
         evaluated. By default, the smallest floating-point data type that can
         losslessly represent all input data values is chosen.
+
+    Raises
+    ------
+    TypeCheckError
+        if any parameter has the wrong type.
+    SyntaxError
+        if the `qoi` is not a valid stencil quantity of interest expression.
+    ValueError
+        if the `neighbourhood` is empty.
+    ValueError
+        if any `neighbourhood.axis` is not unique.
+    ValueError
+        if `type` does not name a valid error bound, or the `qoi_dtype` does
+        not name a valid floating-point data type.
+    ValueError
+        if `eb` is an invalid error bound value for the error bound `type`.
+    ...
+        if instantiating a neighbourhood boundary axis raises an exception.
     """
 
     __slots__: tuple[str, ...] = (
@@ -280,6 +298,13 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         -------
         neighbourhood_shape : tuple[dict[BoundaryCondition, NeighbourhoodAxis], ...]
             The shape of the data neighbourhood.
+
+        Raises
+        ------
+        IndexError
+            if any neighbourhood axis is out of bounds in `data_shape`.
+        IndexError
+            if any neighbourhood axis is duplicate.
         """
 
         neighbourhood: list[dict[BoundaryCondition, NeighbourhoodAxis]] = [
@@ -907,6 +932,13 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         -------
         data_truncated : np.ndarray[tuple[int, ...], np.dtype[T]]
             Truncated data array.
+
+        Raises
+        ------
+        IndexError
+            if any neighbourhood axis is out of bounds in `data`.
+        IndexError
+            if any neighbourhood axis is duplicate.
         """
 
         data = _ensure_array(data)
@@ -975,6 +1007,13 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         -------
         qoi_expanded : np.ndarray[tuple[int, ...], np.dtype[T]]
             Zero-expanded QoI array.
+
+        Raises
+        ------
+        IndexError
+            if any neighbourhood axis is out of bounds in `qoi`.
+        IndexError
+            if any neighbourhood axis is duplicate.
         """
 
         qoi = _ensure_array(qoi)

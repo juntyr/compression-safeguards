@@ -46,6 +46,15 @@ class SelectSafeguard(Safeguard):
         [`PointwiseSafeguard`][compression_safeguards.safeguards.pointwise.abc.PointwiseSafeguard]
         or
         [`StencilSafeguard`][compression_safeguards.safeguards.stencil.abc.StencilSafeguard].
+
+    Raises
+    ------
+    TypeCheckError
+        if any parameter has the wrong type.
+    ValueError
+        if the `safeguards` collection is empty.
+    ...
+        if instantiating a safeguard raises an exception.
     """
 
     __slots__: tuple[str, ...] = ()

@@ -59,6 +59,8 @@ class Safeguards:
     NotImplementedError
         if the `safeguards` contain an unsupported kind of safeguard
         (currently: pointwise and stencil safeguards are supported).
+    ...
+        if instantiating a safeguard raises an exception.
     """
 
     __slots__: tuple[str, ...] = ("_pointwise_safeguards", "_stencil_safeguards")
@@ -319,6 +321,7 @@ class Safeguards:
             if `late_bound` does not resolve all late-bound parameters of the
             safeguards or includes any extraneous parameters.
         """
+        # explicitly do not document that SafeguardsSafetyBug can be raised
 
         late_bound = self._prepare_non_chunked_bindings(
             data=data,
@@ -403,6 +406,12 @@ class Safeguards:
             self._stencil_safeguards
         )
 
+        with ctx.parameter("prediction"):
+            if prediction.dtype != data.dtype:
+                raise ValueError("prediction.dtype must match data.dtype") | ctx
+            if prediction.shape != data.shape:
+                raise ValueError("prediction.shape must match data.shape") | ctx
+
         if len(self._stencil_safeguards) > 0 and getattr(data, "chunked", False):
             with ctx.parameter("data"):
                 raise (
@@ -415,12 +424,6 @@ class Safeguards:
                     )
                     | ctx
                 )
-
-        with ctx.parameter("prediction"):
-            if prediction.dtype != data.dtype:
-                raise ValueError("prediction.dtype must match data.dtype") | ctx
-            if prediction.shape != data.shape:
-                raise ValueError("prediction.shape must match data.shape") | ctx
 
         late_bound = (
             late_bound if isinstance(late_bound, Bindings) else Bindings(**late_bound)
@@ -882,6 +885,7 @@ class Safeguards:
             if `late_bound` does not resolve all late-bound parameters of the
             safeguards or includes any extraneous parameters.
         """
+        # explicitly do not document that SafeguardsSafetyBug can be raised
 
         data_chunk_, prediction_chunk_, late_bound_chunk, non_stencil_indices = (
             self._prepare_stencil_chunked_arrays_and_bindings(

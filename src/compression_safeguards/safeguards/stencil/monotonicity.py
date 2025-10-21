@@ -127,6 +127,21 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     axis : None | int
         The axis along which the monotonicity is preserved. The default,
         [`None`][None], is to preserve along all axes.
+
+    Raises
+    ------
+    TypeCheckError
+        if any parameter has the wrong type.
+    ValueError
+        if `window` is not positive.
+    ValueError
+        if `boundary` does not name a valid boundary condition variant.
+    ValueError
+        if `constant_boundary` is, not, provided if and only if the `boundary`
+        is constant.
+    ValueError
+        if `constant_boundary` uses the non-scalar `$x` or `$X` late-bound
+        parameters.
     """
 
     __slots__: tuple[str, ...] = (
