@@ -59,9 +59,9 @@ def check_all_boundaries(data: np.ndarray, chunks: int, constant_boundary=4.2):
                     safeguards=[safeguard],
                 )
                 np.testing.assert_array_equal(chunked_hash.values, global_hash)
-        except Exception as err:
+        except Exception:
             print(before, after, boundary)  # noqa: T201
-            raise err
+            raise
 
 
 def test_empty():

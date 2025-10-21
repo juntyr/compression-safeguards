@@ -78,9 +78,9 @@ def check_all_codecs(data: np.ndarray, qoi: str, shape: list[tuple[int, int]]):
                         )
                     ],
                 )
-            except Exception as err:
+            except Exception:
                 print(encode_decode, qoi, shape, axes, boundaries, type, eb)  # noqa: T201
-                raise err
+                raise
 
 
 def check_empty(qoi: str):

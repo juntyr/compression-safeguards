@@ -1,11 +1,17 @@
+"""
+Exception and warning types and helpers to raise exceptions with context.
+"""
+
 __all__ = [
     "ContextFragment",
     "ErrorContext",
     "ErrorContextMixin",
     "ctx",
-    "UnsupportedSafeguardError",
     "TypeCheckError",
+    "TypeSetError",
     "LateBoundParameterResolutionError",
+    "SafeguardsSafetyBug",
+    "QuantityOfInterestRuntimeWarning",
     "lookup_enum_or_raise",
 ]
 
@@ -13,7 +19,7 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from enum import Enum
 from types import UnionType
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, TypeVar, final
 
 import numpy as np
 from typing_extensions import (
@@ -97,17 +103,19 @@ class ErrorContext:
 _EXCEPTIONS_WITH_CONTEXT: dict[type[BaseException], type[BaseException]] = dict()
 
 
+@final
 class _ctxmeta(type):
     @override
     def __ror__(self, other: BaseException) -> BaseException:  # type: ignore
         return other | ErrorContext()
 
 
+@final
 class ctx(metaclass=_ctxmeta):
     __slots__: tuple[str, ...] = ()
 
     def __new__(cls) -> Self:
-        raise TypeError(f"{cls} is a singleton")
+        raise TypeError(f"{cls} is a singleton") | ctx
 
     @contextmanager
     @staticmethod
@@ -260,42 +268,6 @@ class ErrorContextMixin:
             return context
 
 
-class UnsupportedSafeguardError(NotImplementedError):
-    __slots__: tuple[str, ...] = ()
-
-    def __init__(self, safeguards: tuple["Safeguard", ...]) -> None:
-        super().__init__(safeguards)
-
-    @property
-    def safeguards(self) -> tuple["Safeguard", ...]:
-        (safeguards,) = self.args
-        return safeguards
-
-    @override
-    def __str__(self) -> str:
-        return repr(list(self.safeguards))
-
-
-class SafeguardsSafetyBug(RuntimeError):
-    __slots__: tuple[str, ...] = ()
-
-    def __init__(self, message: str) -> None:
-        note = (
-            "This is a bug in the implementation of the "
-            + "`compression-safeguards`. Please report it at "
-            + "<https://github.com/juntyr/compression-safeguards/issues>."
-        )
-
-        if not hasattr(self, "add_note"):
-            message = f"{message}\n\n{note}"
-
-        super().__init__(message)
-
-        # MSPV 3.11
-        if hasattr(self, "add_note"):
-            self.add_note(message)  # type: ignore
-
-
 class TypeCheckError(TypeError):
     __slots__: tuple[str, ...] = ()
 
@@ -328,6 +300,47 @@ class TypeCheckError(TypeError):
     @override
     def __str__(self) -> str:
         return f"expected {self.expected} but found {self.found} of type {type(self.found)}"
+
+
+class TypeSetError(TypeError):
+    __slots__: tuple[str, ...] = ()
+
+    def __init__(self, expected: type | UnionType, found: type):
+        super().__init__(expected, found)
+
+    # TODO: once a TypeAssert exists for Python, return it
+    @classmethod
+    def check_or_raise(cls, ty: type, expected: type | UnionType) -> None | Never:
+        if issubclass(ty, expected):
+            return None
+        raise cls(expected, ty) | ctx
+
+    @classmethod
+    def check_dtype_or_raise(
+        cls, dtype: np.dtype, supported: frozenset[np.dtype]
+    ) -> None | Never:
+        if dtype in supported:
+            return None
+
+        expected: type | UnionType = Never  # type: ignore
+        for s in sorted(supported, key=lambda d: d.name):
+            expected |= s.type
+
+        raise cls(expected, dtype.type) | ctx
+
+    @property
+    def expected(self) -> type | UnionType:
+        (expected, _found) = self.args
+        return expected
+
+    @property
+    def found(self) -> type:
+        (_expected, found) = self.args
+        return found
+
+    @override
+    def __str__(self) -> str:
+        return f"expected {self.expected} but found {self.found}"
 
 
 class LateBoundParameterResolutionError(KeyError):
@@ -382,40 +395,44 @@ class LateBoundParameterResolutionError(KeyError):
         return f"{missing} and {extraneous}"
 
 
-class UnsupportedDateTypeError(TypeError):
+class SafeguardsSafetyBug(RuntimeError):
     __slots__: tuple[str, ...] = ()
 
-    def __init__(self, dtype: np.dtype, supported: frozenset[np.dtype]):
-        assert dtype not in supported
-        super().__init__(dtype, supported)
-
-    @staticmethod
-    def check_or_raise(dtype: np.dtype, supported: frozenset[np.dtype]) -> None | Never:
-        if dtype in supported:
-            return None
-        raise UnsupportedDateTypeError(dtype, supported) | ctx
-
-    @property
-    def dtype(self) -> np.dtype:
-        (dtype, _supported) = self.args
-        return dtype
-
-    @property
-    def supported(self) -> frozenset[np.dtype]:
-        (_dtype, supported) = self.args
-        return supported
-
-    @override
-    def __str__(self) -> str:
-        msg = f"unsupported data type {self.dtype.name}"
-
-        if len(self.supported) <= 0:
-            return msg
-
-        return (
-            f"{msg}, only {', '.join(d.name for d in sorted(self.supported))} "
-            + "are supported"
+    def __init__(self, message: str) -> None:
+        note = (
+            "This is a bug in the implementation of the "
+            + "`compression-safeguards`. Please report it at "
+            + "<https://github.com/juntyr/compression-safeguards/issues>."
         )
+
+        if not hasattr(self, "add_note"):
+            message = f"{message}\n\n{note}"
+
+        super().__init__(message)
+
+        # MSPV 3.11
+        if hasattr(self, "add_note"):
+            self.add_note(message)  # type: ignore
+
+
+class QuantityOfInterestRuntimeWarning(RuntimeWarning):
+    __slots__: tuple[str, ...] = ()
+
+    def __init__(self, message: str) -> None:
+        note = (
+            "This is a bug in the implementation of the "
+            + "`compression-safeguards`. Please report it at "
+            + "<https://github.com/juntyr/compression-safeguards/issues>."
+        )
+
+        if not hasattr(self, "add_note"):
+            message = f"{message}\n\n{note}"
+
+        super().__init__(message)
+
+        # MSPV 3.11
+        if hasattr(self, "add_note"):
+            self.add_note(message)  # type: ignore
 
 
 def lookup_enum_or_raise(
@@ -431,11 +448,3 @@ def lookup_enum_or_raise(
         )
         | ctx
     )
-
-
-# class ParameterComplexityWarning(UserWarning):
-#     pass
-
-
-# class QuantityOfInterestRuntimeWarning(RuntimeWarning):
-#     pass

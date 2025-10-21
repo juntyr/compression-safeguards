@@ -27,8 +27,7 @@ from .utils.cast import as_bits
 from .utils.error import (
     LateBoundParameterResolutionError,
     SafeguardsSafetyBug,
-    UnsupportedDateTypeError,
-    UnsupportedSafeguardError,
+    TypeSetError,
     ctx,
 )
 from .utils.intervals import IntervalUnion  # noqa: TC001
@@ -102,14 +101,15 @@ class Safeguards:
             for safeguard in safeguards_
             if isinstance(safeguard, StencilSafeguard)
         )
-        unsupported_safeguards = tuple(
+        unsupported_safeguards = [
             safeguard
             for safeguard in safeguards_
             if not isinstance(safeguard, PointwiseSafeguard | StencilSafeguard)
-        )
+        ]
 
         if len(unsupported_safeguards) > 0:
-            raise UnsupportedSafeguardError(unsupported_safeguards)
+            with ctx.parameter("safeguards"):
+                raise NotImplementedError(unsupported_safeguards) | ctx
 
     @property
     def safeguards(self) -> Collection[Safeguard]:
@@ -343,9 +343,12 @@ class Safeguards:
         for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
             intervals = safeguard.compute_safe_intervals(data, late_bound=late_bound)
             if not np.all(intervals.contains(data)):
-                raise SafeguardsSafetyBug(
-                    f"the safe intervals for the {safeguard!r} safeguard do "
-                    + "not contain the original data"
+                raise (
+                    SafeguardsSafetyBug(
+                        f"the safe intervals for the {safeguard!r} safeguard "
+                        + "do not contain the original data"
+                    )
+                    | ctx
                 )
             all_intervals.append(intervals)
 
@@ -356,14 +359,20 @@ class Safeguards:
 
         for safeguard, intervals in zip(self.safeguards, all_intervals):
             if not np.all(intervals.contains(corrected)):
-                raise SafeguardsSafetyBug(
-                    f"the safe intervals for the {safeguard!r} safeguard do "
-                    + "not contain the corrected array"
+                raise (
+                    SafeguardsSafetyBug(
+                        f"the safe intervals for the {safeguard!r} safeguard "
+                        + "do not contain the corrected array"
+                    )
+                    | ctx
                 )
             if not safeguard.check(data, corrected, late_bound=late_bound):
-                raise SafeguardsSafetyBug(
-                    f"the check for the {safeguard!r} safeguard fails with "
-                    + "the corrected array"
+                raise (
+                    SafeguardsSafetyBug(
+                        f"the check for the {safeguard!r} safeguard fails "
+                        + "with the corrected array"
+                    )
+                    | ctx
                 )
 
         prediction_bits: np.ndarray[S, np.dtype[C]] = as_bits(prediction)
@@ -384,7 +393,7 @@ class Safeguards:
         description: str,
         chunked_method_name: str,
     ) -> Bindings:
-        UnsupportedDateTypeError.check_or_raise(data.dtype, _SUPPORTED_DTYPES)
+        TypeSetError.check_dtype_or_raise(data.dtype, _SUPPORTED_DTYPES)
 
         # ensure we don't accidentally forget to handle new kinds of safeguards here
         assert len(self.safeguards) == len(self._pointwise_safeguards) + len(
@@ -392,17 +401,23 @@ class Safeguards:
         )
 
         if len(self._stencil_safeguards) > 0 and getattr(data, "chunked", False):
-            raise RuntimeError(
-                f"{description} for an individual chunk in a chunked array is "
-                + "unsafe when using stencil safeguards since their safety "
-                + "requirements cannot be guaranteed across chunk boundaries; "
-                + f"use {chunked_method_name} instead"
-            )
+            with ctx.parameter("data"):
+                raise (
+                    RuntimeError(
+                        f"{description} for an individual chunk in a chunked "
+                        + "array is unsafe when using stencil safeguards since "
+                        + "their safety requirements cannot be guaranteed "
+                        + f"across chunk boundaries; use {chunked_method_name} "
+                        + "instead"
+                    )
+                    | ctx
+                )
 
-        if data.dtype != prediction.dtype:
-            raise ValueError("data.dtype must match prediction.dtype")
-        if data.shape != prediction.shape:
-            raise ValueError("data.shape must match prediction.shape")
+        with ctx.parameter("prediction"):
+            if prediction.dtype != data.dtype:
+                raise ValueError("prediction.dtype must match data.dtype") | ctx
+            if prediction.shape != data.shape:
+                raise ValueError("prediction.shape must match data.shape") | ctx
 
         late_bound = (
             late_bound if isinstance(late_bound, Bindings) else Bindings(**late_bound)
@@ -459,12 +474,17 @@ class Safeguards:
             the `prediction`'s dtype.
         """
 
-        if correction.dtype != self.correction_dtype_for_data(prediction.dtype):
-            raise ValueError(
-                "correction.dtype must match the correction dtype for prediction.dtype"
-            )
-        if correction.shape != prediction.shape:
-            raise ValueError("correction.shape must match prediction.shape")
+        with ctx.parameter("correction"):
+            if correction.dtype != self.correction_dtype_for_data(prediction.dtype):
+                raise (
+                    ValueError(
+                        "correction.dtype must match the correction dtype for "
+                        + "prediction.dtype"
+                    )
+                    | ctx
+                )
+            if correction.shape != prediction.shape:
+                raise ValueError("correction.shape must match prediction.shape") | ctx
 
         prediction_bits: np.ndarray[S, np.dtype[C]] = as_bits(prediction)
         correction_bits = correction
@@ -918,8 +938,12 @@ class Safeguards:
                 data_chunk_, late_bound=late_bound_chunk
             )
             if not np.all(intervals.contains(data_chunk_)):
-                raise SafeguardsSafetyBug(
-                    f"the safe intervals for the {safeguard!r} safeguard must contain the original data chunk"
+                raise (
+                    SafeguardsSafetyBug(
+                        f"the safe intervals for the {safeguard!r} safeguard "
+                        + "must contain the original data chunk"
+                    )
+                    | ctx
                 )
             all_intervals.append(intervals)
 
@@ -930,16 +954,22 @@ class Safeguards:
 
         for safeguard, intervals in zip(self.safeguards, all_intervals):
             if not np.all(intervals.contains(corrected_chunk)):
-                raise SafeguardsSafetyBug(
-                    f"the safe intervals for the {safeguard!r} safeguard do "
-                    + "not contain the corrected array chunk"
+                raise (
+                    SafeguardsSafetyBug(
+                        f"the safe intervals for the {safeguard!r} safeguard "
+                        + "do not contain the corrected array chunk"
+                    )
+                    | ctx
                 )
             if not safeguard.check(
                 data_chunk_, corrected_chunk, late_bound=late_bound_chunk
             ):
-                raise SafeguardsSafetyBug(
-                    f"the check for the {safeguard!r} safeguard fails with "
-                    + "the corrected array chunk"
+                raise (
+                    SafeguardsSafetyBug(
+                        f"the check for the {safeguard!r} safeguard fails "
+                        + "with the corrected array chunk"
+                    )
+                    | ctx
                 )
 
         prediction_chunk_bits: np.ndarray[tuple[int, ...], np.dtype[C]] = as_bits(
@@ -978,18 +1008,28 @@ class Safeguards:
         Bindings,
         tuple[slice, ...],
     ]:
-        UnsupportedDateTypeError.check_or_raise(data_chunk.dtype, _SUPPORTED_DTYPES)
+        TypeSetError.check_dtype_or_raise(data_chunk.dtype, _SUPPORTED_DTYPES)
 
-        if data_chunk.dtype != prediction_chunk.dtype:
-            raise ValueError("data_chunk.dtype must match prediction_chunk.dtype")
-        if data_chunk.shape != prediction_chunk.shape:
-            raise ValueError("data_chunk.shape must match prediction_chunk.shape")
-        if len(data_shape) != data_chunk.ndim:
-            raise ValueError("len(data_shape) must match data_chunk.ndim")
-        if len(chunk_offset) != data_chunk.ndim:
-            raise ValueError("len(chunk_offset) must match data_chunk.ndim")
-        if len(chunk_stencil) != data_chunk.ndim:
-            raise ValueError("len(chunk_stencil) must match data_chunk.ndim")
+        with ctx.parameter("prediction_chunk"):
+            if prediction_chunk.dtype != data_chunk.dtype:
+                raise (
+                    ValueError("prediction_chunk.dtype must match data_chunk.dtype")
+                    | ctx
+                )
+            if prediction_chunk.shape != data_chunk.shape:
+                raise (
+                    ValueError("prediction_chunk.shape must match data_chunk.shape")
+                    | ctx
+                )
+        with ctx.parameter("data_shape"):
+            if len(data_shape) != data_chunk.ndim:
+                raise ValueError("len(data_shape) must match data_chunk.ndim") | ctx
+        with ctx.parameter("chunk_offset"):
+            if len(chunk_offset) != data_chunk.ndim:
+                raise ValueError("len(chunk_offset) must match data_chunk.ndim") | ctx
+        with ctx.parameter("chunk_stencil"):
+            if len(chunk_stencil) != data_chunk.ndim:
+                raise ValueError("len(chunk_stencil) must match data_chunk.ndim") | ctx
 
         chunk_shape: tuple[int, ...] = tuple(
             a - s[1].before - s[1].after

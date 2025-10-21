@@ -18,12 +18,14 @@ from typing import TypeAlias
 
 import numpy as np
 
+from .error import ctx
+
 try:
     _float128: TypeAlias = np.float128
     _float128_type: TypeAlias = np.float128
     _float128_dtype: np.dtype[_float128] = np.dtype(np.float128)
     if (np.finfo(np.float128).nmant + np.finfo(np.float128).nexp + 1) != 128:
-        raise TypeError("numpy.float128 does not offer true 128 bit precision")
+        raise TypeError("numpy.float128 does not offer true 128 bit precision") | ctx
     _float128_min: _float128 = np.finfo(np.float128).min
     _float128_max: _float128 = np.finfo(np.float128).max
     _float128_smallest_normal: _float128 = np.finfo(np.float128).smallest_normal
@@ -44,8 +46,11 @@ except (AttributeError, TypeError):
         _float128_pi = numpy_quaddtype.pi
         _float128_e = numpy_quaddtype.e
     except ImportError:
-        raise TypeError("""
+        raise (
+            TypeError("""
 compression_safeguards requires float128 support:
 - numpy.float128 either does not exist is does not offer true 128 bit precision
 - numpy_quaddtype is not installed
-""") from None
+""")
+            | ctx
+        ) from None

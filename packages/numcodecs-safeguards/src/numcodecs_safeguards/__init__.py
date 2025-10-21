@@ -92,7 +92,8 @@ from compression_safeguards.utils.bindings import Bindings, Parameter, Value
 from compression_safeguards.utils.cast import as_bits
 from compression_safeguards.utils.error import (
     LateBoundParameterResolutionError,
-    UnsupportedDateTypeError,
+    TypeSetError,
+    ctx,
 )
 from compression_safeguards.utils.typing import JSON
 from numcodecs.abc import Codec
@@ -253,12 +254,16 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         numcodecs_combinators.map_codec(self._codec, check_for_safeguards_codec)
 
         if wraps_safeguards_codec:
-            raise ValueError(
-                "`SafeguardsCodec` should not wrap a codec containing "
-                + "another `SafeguardsCodec` since the safeguards of one "
-                + "might not be upheld by the other (printer problem); merge "
-                + "them into one combined `SafeguardsCodec` instead"
-            )
+            with ctx.parameter("codec"):
+                raise (
+                    ValueError(
+                        "`SafeguardsCodec` should not wrap a codec containing "
+                        + "another `SafeguardsCodec` since the safeguards of one "
+                        + "might not be upheld by the other (printer problem); "
+                        + "merge them into one combined `SafeguardsCodec` instead"
+                    )
+                    | ctx
+                )
 
         self._safeguards = Safeguards(safeguards=safeguards, _version=_version)
 
@@ -430,16 +435,15 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             buf if isinstance(buf, np.ndarray) else numcodecs.compat.ensure_ndarray(buf)
         )
 
-        UnsupportedDateTypeError.check_or_raise(
-            data.dtype, Safeguards.supported_dtypes()
-        )
+        TypeSetError.check_dtype_or_raise(data.dtype, Safeguards.supported_dtypes())
 
         encoded = self._codec.encode(np.copy(data))
         encoded = numcodecs.compat.ensure_ndarray(encoded)
 
         # check that decoding with `out=None` works
         try:
-            decoded = self._codec.decode(np.copy(encoded), out=None)
+            with ctx.parameter("codec"):
+                decoded = self._codec.decode(np.copy(encoded), out=None)
         except Exception as err:
             note = (
                 "decoding with `out=None` failed\n\n"
@@ -454,23 +458,29 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 err.add_note(note)  # type: ignore
                 raise
             else:
-                raise RuntimeError(note) from err
+                raise (RuntimeError(note) | ctx) from err
         decoded = numcodecs.compat.ensure_ndarray(decoded)
 
         if self._lossless_for_codec is not None:
             encoded = self._lossless_for_codec.encode(encoded)
 
         try:
-            if encoded.dtype != np.dtype(np.uint8):
-                raise RuntimeError("codec and lossless must encode to bytes")
-            if encoded.ndim != 1:
-                raise RuntimeError("codec and lossless must encode to 1D bytes")
-            encoded_bytes = numcodecs.compat.ensure_bytes(encoded)
+            with ctx.parameter(
+                "codec" if self._lossless_for_codec is None else "lossless"
+            ):
+                if np.array(encoded, copy=None).dtype != np.dtype(np.uint8):
+                    raise RuntimeError("codec and lossless must encode to bytes") | ctx
+                if np.array(encoded, copy=None).ndim != 1:
+                    raise (
+                        RuntimeError("codec and lossless must encode to 1D bytes") | ctx
+                    )
+                encoded_bytes = numcodecs.compat.ensure_bytes(encoded)
 
-            if decoded.dtype != data.dtype:
-                raise RuntimeError("codec must decode to the data's dtype")
-            if decoded.shape != data.shape:
-                raise RuntimeError("codec must decode to the data's shape")
+            with ctx.parameter("codec"):
+                if decoded.dtype != data.dtype:
+                    raise RuntimeError("codec must decode to the data's dtype") | ctx
+                if decoded.shape != data.shape:
+                    raise RuntimeError("codec must decode to the data's shape") | ctx
         except RuntimeError as err:
             note = (
                 "consider using wrapping the codec in the "
@@ -484,7 +494,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 err.add_note(note)  # type: ignore
                 raise
             else:
-                raise RuntimeError(note) from err
+                raise (RuntimeError(note) | ctx) from err
 
         late_bound = self._late_bound
         late_bound_reqs = self._safeguards.late_bound
@@ -554,17 +564,21 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             if `buf` has a corrupted header.
         """
 
-        buf_array = numcodecs.compat.ensure_ndarray(buf)
-        if buf_array.dtype != np.dtype(np.uint8):
-            raise ValueError("can only decode from bytes buf")
-        if buf_array.ndim != 1:
-            raise ValueError("can only decode from 1D bytes buf")
-        buf_bytes = numcodecs.compat.ensure_bytes(buf)
+        with ctx.parameter("buf"):
+            buf_array = numcodecs.compat.ensure_ndarray(buf)
+            if buf_array.dtype != np.dtype(np.uint8):
+                raise ValueError("can only decode from bytes") | ctx
+            if buf_array.ndim != 1:
+                raise ValueError("can only decode from 1D bytes") | ctx
+            buf_bytes = numcodecs.compat.ensure_bytes(buf)
 
-        buf_io = BytesIO(buf_bytes)
-        correction_len = varint.decode_stream(buf_io)
-        if correction_len < 0:
-            raise ValueError("cannot decode from corrupt buf with invalid header")
+            buf_io = BytesIO(buf_bytes)
+            correction_len = varint.decode_stream(buf_io)
+            if correction_len < 0:
+                raise (
+                    ValueError("cannot decode from corrupt buf with invalid header")
+                    | ctx
+                )
 
         if correction_len > 0:
             encoded = buf_bytes[buf_io.tell() : -correction_len]

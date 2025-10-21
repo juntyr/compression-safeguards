@@ -234,7 +234,7 @@ def check_one_input(data) -> None:
     except TimeoutError:
         # skip expressions that take too long just to build
         return
-    except Warning as err:
+    except RuntimeWarning as err:
         # skip expressions that try to perform a**b with excessive digits
         if ("symbolic integer evaluation" in str(err)) and (
             "excessive number of digits" in str(err)

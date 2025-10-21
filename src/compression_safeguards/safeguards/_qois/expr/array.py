@@ -9,6 +9,7 @@ from typing_extensions import (
 )
 
 from ....utils.bindings import Parameter
+from ....utils.error import ctx
 from .abc import AnyExpr, Expr
 from .addsub import ScalarAdd
 from .constfold import ScalarFoldedConstant
@@ -32,15 +33,19 @@ class Array(Expr[AnyExpr, Unpack[Es]]):
             aels = [el._array]
             for e in els:
                 if not (isinstance(e, Array) and e.shape == el.shape):
-                    raise ValueError(
-                        f"elements must all have the consistent shape {el.shape}"
+                    raise (
+                        ValueError(
+                            "elements must all have the consistent shape "
+                            + f"{el.shape}"
+                        )
+                        | ctx
                     )
                 aels.append(e._array)
             self._array = np.array(aels, copy=None)
         else:
             for e in els:
                 if isinstance(e, Array):
-                    raise ValueError("elements must all be scalar")
+                    raise ValueError("elements must all be scalar") | ctx
             self._array = np.array((el,) + els, copy=None)
 
     @staticmethod
@@ -111,8 +116,12 @@ class Array(Expr[AnyExpr, Unpack[Es]]):
         for i, expr in enumerate(exprs):  # type: ignore
             if isinstance(expr, Array):
                 if shape is not None and expr.shape != shape:
-                    raise ValueError(
-                        f"shape mismatch between operands, expected {shape} but found {expr.shape} for operand {i + 1}"
+                    raise (
+                        ValueError(
+                            f"shape mismatch between operands, expected {shape}"
+                            + f" but found {expr.shape} for operand {i + 1}"
+                        )
+                        | ctx
                     )
                 shape = expr.shape
                 size = expr._array.size
@@ -159,12 +168,16 @@ class Array(Expr[AnyExpr, Unpack[Es]]):
         right: "Array[Unpack[tuple[AnyExpr, ...]]]",
     ) -> "Array[Unpack[tuple[AnyExpr, ...]]]":
         if len(left.shape) != 2:
-            raise ValueError("can only matmul(a, b) a 2D array a")
+            raise ValueError("can only matmul(a, b) a 2D array a") | ctx
         if len(right.shape) != 2:
-            raise ValueError("can only matmul(a, b) a 2D array b")
+            raise ValueError("can only matmul(a, b) a 2D array b") | ctx
         if left.shape[1] != right.shape[0]:
-            raise ValueError(
-                f"can only matmul(a, b) with shapes (n, k) x (k, m) -> (n, m) but got {left.shape} x {right.shape}"
+            raise (
+                ValueError(
+                    "can only matmul(a, b) with shapes (n, k) x (k, m) -> "
+                    + f"(n, m) but got {left.shape} x {right.shape}"
+                )
+                | ctx
             )
         out = Array.__new__(Array)
         out._array = np.empty((left.shape[0], right.shape[1]), dtype=object)

@@ -20,7 +20,7 @@ from typing_extensions import assert_never  # MSPV 3.11
 
 from ._compat import _ensure_array, _is_of_dtype, _nan_to_zero_inf_to_finite
 from ._float128 import _float128_dtype
-from .error import TypeCheckError, ctx
+from .error import TypeSetError, ctx
 from .typing import F, S, T, U
 
 
@@ -314,7 +314,16 @@ def to_total_order(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[U]]:
     -------
     ordered : np.ndarray[S, np.dtype[U]]
         The total-order unsigned binary representation of the array `a`.
+
+    Raises
+    ------
+    TypeSetError
+        if `a` is not a signed/unsigned integer or floating array.
     """
+
+    TypeSetError.check_or_raise(
+        a.dtype.type, np.unsignedinteger | np.signedinteger | np.floating
+    )
 
     if np.issubdtype(a.dtype, np.unsignedinteger):
         return a  # type: ignore
@@ -330,14 +339,6 @@ def to_total_order(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[U]]:
             return (
                 a.view(utype) + np.array(shift, dtype=utype) + np.array(1, dtype=utype)
             )
-
-    if not np.issubdtype(a.dtype, np.floating):
-        raise (
-            TypeCheckError(
-                np.unsignedinteger | np.signedinteger | np.floating, a.dtype.type
-            )
-            | ctx
-        )
 
     itype = a.dtype.str.replace("f", "i")
     bits = np.iinfo(utype).bits
@@ -368,9 +369,19 @@ def from_total_order(
     -------
     array : np.ndarray[S, np.dtype[T]]
         The array with its original `dtype`.
+
+    Raises
+    ------
+    TypeSetError
+        if `a` is not an unsigned integer array.
+    TypeSetError
+        if `dtype` is not a signed/unsigned integer or floating data type.
     """
 
-    assert np.issubdtype(a.dtype, np.unsignedinteger)
+    TypeSetError.check_or_raise(a.dtype.type, np.unsignedinteger)
+    TypeSetError.check_or_raise(
+        dtype.type, np.unsignedinteger | np.signedinteger | np.floating
+    )
 
     if np.issubdtype(dtype, np.unsignedinteger):
         return a  # type: ignore
@@ -382,14 +393,6 @@ def from_total_order(
             under="ignore",
         ):
             return a.view(dtype) + shift + dtype.type(1)
-
-    if not np.issubdtype(dtype, np.floating):
-        raise (
-            TypeCheckError(
-                np.unsignedinteger | np.signedinteger | np.floating, dtype.type
-            )
-            | ctx
-        )
 
     utype = dtype.str.replace("f", "u")
     itype = dtype.str.replace("f", "i")
@@ -453,7 +456,8 @@ def lossless_cast(
     if not np.all(lossless_same):
         raise (
             ValueError(
-                f"cannot losslessly cast (some) values from {dtype_from} to {dtype}"
+                f"cannot losslessly cast (some) values from {dtype_from} to "
+                + f"{dtype}"
             )
             | ctx
         )
@@ -495,7 +499,8 @@ def saturating_finite_float_cast(
     if not isinstance(x, int) and not np.all(np.isfinite(xa)):
         raise (
             ValueError(
-                f"cannot cast non-finite values from {xa.dtype.name} to saturating finite {dtype.name}"
+                f"cannot cast non-finite values from {xa.dtype.name} to "
+                + f"saturating finite {dtype.name}"
             )
             | ctx
         )

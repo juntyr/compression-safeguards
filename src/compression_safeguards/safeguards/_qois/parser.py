@@ -691,6 +691,7 @@ class QoIParser(Parser):
             ScalarMultiply(expr.apply_array_element_offset(axis, o), c)
             for o, c in zip(offsets, coefficients)
         ]
+        # even order=0 produces at least one term
         assert len(terms) > 0
         acc = terms[0]
         for t in terms[1:]:
@@ -700,15 +701,8 @@ class QoIParser(Parser):
         required_axis_after = 0
 
         for idx in acc.data_indices:
-            for x, i, a, c in zip(
-                range(len(self._X.shape)), idx, self._X.shape, self._I
-            ):
-                if x != ((axis + len(self._X.shape)) % len(self._X.shape)):
-                    assert i >= 0
-                    assert i < a
-
-                required_axis_before = max(required_axis_before, c - i)
-                required_axis_after = max(required_axis_after, i - c)
+            required_axis_before = max(required_axis_before, self._I[axis] - idx[axis])
+            required_axis_after = max(required_axis_after, idx[axis] - self._I[axis])
 
         self.assert_or_error(
             (required_axis_before <= self._I[axis])

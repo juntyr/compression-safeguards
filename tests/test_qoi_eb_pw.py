@@ -55,9 +55,9 @@ def check_all_codecs(data: np.ndarray, qoi: str):
                     data,
                     safeguards=[dict(kind="qoi_eb_pw", qoi=qoi, type=type, eb=eb)],
                 )
-            except Exception as err:
+            except Exception:
                 print(encode_decode, qoi, type, eb)  # noqa: T201
-                raise err
+                raise
 
 
 def check_empty(qoi: str):
@@ -464,9 +464,9 @@ def test_dtypes(dtype):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_fuzzer_found(check):
-    with pytest.warns(UserWarning, match="symbolic integer evaluation"):
+    with pytest.warns(RuntimeWarning, match="symbolic integer evaluation"):
         check_all_codecs(np.array([42.0], np.float16), "(((-8054**5852)-x)-1)")
-    with pytest.warns(UserWarning, match="symbolic integer evaluation"):
+    with pytest.warns(RuntimeWarning, match="symbolic integer evaluation"):
         check("(((-8054**5852)-x)-1)")
 
     check_all_codecs(

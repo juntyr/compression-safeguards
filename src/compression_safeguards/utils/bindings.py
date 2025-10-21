@@ -194,7 +194,8 @@ class Bindings:
             except ValueError:
                 raise (
                     ValueError(
-                        f"cannot broadcast from shape {value.shape} to shape {shape}"
+                        f"cannot broadcast from shape {value.shape} to shape "
+                        + f"{shape}"
                     )
                     | ctx
                 ) from None
@@ -258,7 +259,8 @@ class Bindings:
             except ValueError:
                 raise (
                     ValueError(
-                        f"cannot broadcast from shape {value.shape} to shape {shape}"
+                        f"cannot broadcast from shape {value.shape} to shape "
+                        + f"{shape}"
                     )
                     | ctx
                 ) from None
@@ -300,7 +302,8 @@ class Bindings:
                 if value.ndim != len(shape):
                     raise (
                         ValueError(
-                            f"incompatible dimension {value.ndim}, expected {len(shape)}"
+                            f"incompatible dimension {value.ndim}, expected "
+                            + f"{len(shape)}"
                         )
                         | ctx
                     )
