@@ -422,7 +422,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         Raises
         ------
-        UnsupportedDateTypeError
+        TypeSetError
             if the `buf`fer uses an unsupported data type.
         RuntimeError
             if decoding with the `codec` with `out=None` fails.

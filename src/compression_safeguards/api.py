@@ -56,6 +56,9 @@ class Safeguards:
     ValueError
         if the safeguards are instantiated with a configuration from an
         incompatible version of the safeguards.
+    NotImplementedError
+        if the `safeguards` contain an unsupported kind of safeguard
+        (currently: pointwise and stencil safeguards are supported).
     """
 
     __slots__: tuple[str, ...] = ("_pointwise_safeguards", "_stencil_safeguards")
@@ -236,7 +239,7 @@ class Safeguards:
 
         Raises
         ------
-        UnsupportedDateTypeError
+        TypeSetError
             if the `data` uses an unsupported data type.
         ValueError
             if the `data`'s dtype or shape do not match the `prediction`'s.
@@ -306,7 +309,7 @@ class Safeguards:
 
         Raises
         ------
-        UnsupportedDateTypeError
+        TypeSetError
             if the `data` uses an unsupported data type.
         ValueError
             if the `data`'s dtype or shape do not match the `prediction`'s.
@@ -735,7 +738,7 @@ class Safeguards:
 
         Raises
         ------
-        UnsupportedDateTypeError
+        TypeSetError
             if the `data_chunk` uses an unsupported data type.
         ValueError
             if the `data_chunk`'s dtype or shape do not match the
@@ -866,7 +869,7 @@ class Safeguards:
 
         Raises
         ------
-        UnsupportedDateTypeError
+        TypeSetError
             if the `data_chunk` uses an unsupported data type.
         ValueError
             if the `data_chunk`'s dtype or shape do not match the

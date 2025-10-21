@@ -1,9 +1,14 @@
 """
 Exception and warning types and helpers to raise exceptions with context.
+
+Exceptions raised in this package carry
+[`ErrorContext`][compression_safeguards.utils.error.ErrorContext], which can be
+accessed through the
+[`ErrorContextMixin`][compression_safeguards.utils.error.ErrorContextMixin].
 """
 
 __all__ = [
-    "ContextFragment",
+    "ContextLayer",
     "ErrorContext",
     "ErrorContextMixin",
     "ctx",
@@ -12,11 +17,13 @@ __all__ = [
     "LateBoundParameterResolutionError",
     "SafeguardsSafetyBug",
     "QuantityOfInterestRuntimeWarning",
+    "Ei",
     "lookup_enum_or_raise",
 ]
 
 from abc import ABC, abstractmethod
-from contextlib import contextmanager
+from collections.abc import Set
+from contextlib import AbstractContextManager, contextmanager
 from enum import Enum
 from types import UnionType
 from typing import TYPE_CHECKING, TypeVar, final
@@ -36,7 +43,11 @@ Ei = TypeVar("Ei", bound=Enum)
 """ Any enum type (invariant). """
 
 
-class ContextFragment(ABC):
+class ContextLayer(ABC):
+    """
+    Context layer abstract base class.
+    """
+
     __slots__: tuple[str, ...] = ()
 
     @override
@@ -46,14 +57,30 @@ class ContextFragment(ABC):
 
     @property
     def separator(self) -> str:
+        """
+        Separator to print before this layer, `'.'` by default.
+        """
+
         return "."
 
 
 class ErrorContext:
-    __slots__: tuple[str, ...] = ("_context",)
-    _context: tuple[ContextFragment, ...]
+    """
+    Context in which an error was raised.
 
-    def __init__(self, *context: ContextFragment):
+    The context can be added to an exception using the
+    `err | ErrorContext(...)` syntax.
+
+    Parameters
+    ----------
+    *context : ContextLayer
+        The layers of the context.
+    """
+
+    __slots__: tuple[str, ...] = ("_context",)
+    _context: tuple[ContextLayer, ...]
+
+    def __init__(self, *context: ContextLayer):
         self._context = context
 
     def __ror__(self, other: BaseException) -> BaseException:
@@ -112,6 +139,13 @@ class _ctxmeta(type):
 
 @final
 class ctx(metaclass=_ctxmeta):
+    """
+    Singleton error context type with which additional context scopes can be entered.
+
+    An exception can be prepared for receiving context using the `err | ctx`
+    syntax.
+    """
+
     __slots__: tuple[str, ...] = ()
 
     def __new__(cls) -> Self:
@@ -119,41 +153,101 @@ class ctx(metaclass=_ctxmeta):
 
     @contextmanager
     @staticmethod
-    def fragment(fragment: ContextFragment):
+    def layer(layer: ContextLayer):
+        """
+        Context manager that adds one `layer` of context to any exception that
+        is raised within.
+
+        Parameters
+        ----------
+        layer : ContextLayer
+            The layer of context to add.
+        """
+
         try:
             yield
         except Exception as err:
-            err2 = err | ErrorContext(fragment)
+            err2 = err | ErrorContext(layer)
             if isinstance(err, ErrorContextMixin):
                 raise
             raise err2
 
     @staticmethod
-    def parameter(name: str):
-        return ctx.fragment(ParameterContextFragment(name))
+    def parameter(name: str) -> AbstractContextManager[None]:
+        """
+        Context manager that adds one layer of context, the `name` of a
+        parameter, to any exception that is raised within.
+
+        Parameters
+        ----------
+        name : str
+            The name of a parameter to add as a layer of context.
+        """
+
+        return ctx.layer(_ParameterContextLayer(name))
 
     @staticmethod
-    def late_bound_parameter(name: "Parameter"):
-        return ctx.fragment(LateBoundParameterContextFragment(name))
+    def late_bound_parameter(name: "Parameter") -> AbstractContextManager[None]:
+        """
+        Context manager that adds one layer of context, the `name` of a
+        late-bound parameter, to any exception that is raised within.
+
+        Parameters
+        ----------
+        name : Parameter
+            The name of a late-bound parameter to add as a layer of context.
+        """
+
+        return ctx.layer(_LateBoundParameterContextLayer(name))
 
     @staticmethod
-    def index(index: int):
-        return ctx.fragment(IndexContextFragment(index))
+    def index(index: int) -> AbstractContextManager[None]:
+        """
+        Context manager that adds one layer of context, an `index`, to any
+        exception that is raised within.
+
+        Parameters
+        ----------
+        index : int
+            An index to add as a layer of context.
+        """
+
+        return ctx.layer(_IndexContextLayer(index))
 
     @staticmethod
-    def safeguard(safeguard: "Safeguard"):
-        return ctx.fragment(SafeguardTypeContextFragment(type(safeguard)))
+    def safeguard(safeguard: "Safeguard") -> AbstractContextManager[None]:
+        """
+        Context manager that adds one layer of context, the type of a
+        `safeguard`, to any exception that is raised within.
+
+        Parameters
+        ----------
+        safeguard : Safeguard
+            A safeguard whose type to add as a layer of context.
+        """
+
+        return ctx.layer(_SafeguardTypeContextLayer(type(safeguard)))
 
     @staticmethod
-    def safeguardty(safeguard: type["Safeguard"]):
-        return ctx.fragment(SafeguardTypeContextFragment(safeguard))
+    def safeguardty(safeguard: type["Safeguard"]) -> AbstractContextManager[None]:
+        """
+        Context manager that adds one layer of context, the `safeguard` type,
+        to any exception that is raised within.
+
+        Parameters
+        ----------
+        safeguard : type[Safeguard]
+            The type of a safeguard to add as a layer of context.
+        """
+
+        return ctx.layer(_SafeguardTypeContextLayer(safeguard))
 
     @staticmethod
     def __ror__(other: BaseException) -> BaseException:  # type: ignore
         return other | ctx
 
 
-class IndexContextFragment(ContextFragment):
+class _IndexContextLayer(ContextLayer):
     __slots__: tuple[str, ...] = ("_index",)
     _index: int
 
@@ -175,10 +269,10 @@ class IndexContextFragment(ContextFragment):
 
     @override
     def __eq__(self, value: object, /) -> bool:
-        return isinstance(value, IndexContextFragment) and value._index == self._index
+        return isinstance(value, _IndexContextLayer) and value._index == self._index
 
 
-class SafeguardTypeContextFragment(ContextFragment):
+class _SafeguardTypeContextLayer(ContextLayer):
     __slots__: tuple[str, ...] = ("_safeguard",)
     _safeguard: type["Safeguard"]
 
@@ -196,12 +290,12 @@ class SafeguardTypeContextFragment(ContextFragment):
     @override
     def __eq__(self, value: object, /) -> bool:
         return (
-            isinstance(value, SafeguardTypeContextFragment)
+            isinstance(value, _SafeguardTypeContextLayer)
             and value._safeguard is self._safeguard
         )
 
 
-class ParameterContextFragment(ContextFragment):
+class _ParameterContextLayer(ContextLayer):
     __slots__: tuple[str, ...] = ("_parameter",)
     _parameter: str
 
@@ -219,12 +313,12 @@ class ParameterContextFragment(ContextFragment):
     @override
     def __eq__(self, value: object, /) -> bool:
         return (
-            isinstance(value, ParameterContextFragment)
+            isinstance(value, _ParameterContextLayer)
             and value._parameter == self._parameter
         )
 
 
-class LateBoundParameterContextFragment(ContextFragment):
+class _LateBoundParameterContextLayer(ContextLayer):
     __slots__: tuple[str, ...] = ("_parameter",)
     _parameter: "Parameter"
 
@@ -247,12 +341,19 @@ class LateBoundParameterContextFragment(ContextFragment):
     @override
     def __eq__(self, value: object, /) -> bool:
         return (
-            isinstance(value, LateBoundParameterContextFragment)
+            isinstance(value, _LateBoundParameterContextLayer)
             and value._parameter == self._parameter
         )
 
 
 class ErrorContextMixin:
+    """
+    Mixin for exceptions that have [`ErrorContext`][compression_safeguards.utils.error.ErrorContext].
+
+    The `context` can be accessed after checking
+    `isinstance(err, ErrorContextMixin)`.
+    """
+
     # cannot use slots since they are incompatible with multiple inheritance
     # __slots__: tuple[str, ...] = ("_context",)
 
@@ -260,6 +361,10 @@ class ErrorContextMixin:
 
     @property
     def context(self) -> ErrorContext:
+        """
+        The context in which this exception was raised.
+        """
+
         try:
             return self._context
         except AttributeError:
@@ -269,6 +374,17 @@ class ErrorContextMixin:
 
 
 class TypeCheckError(TypeError):
+    """
+    [`TypeError`][TypeError] that is raised when a value fails a type check.
+
+    Parameters
+    ----------
+    expected : type | UnionType
+        The expected type or type union.
+    found : object
+        The value that failed the type check.
+    """
+
     __slots__: tuple[str, ...] = ()
 
     def __init__(
@@ -283,17 +399,37 @@ class TypeCheckError(TypeError):
     def check_instance_or_raise(
         cls, obj: object, expected: type | UnionType
     ) -> None | Never:
+        """
+        Check `isinstance(obj, expected)` or raise a type check error, with
+        context.
+
+        Parameters
+        ----------
+        obj : object
+            The value to type check.
+        expected : type | UnionType
+            The expected type or type union.
+        """
+
         if isinstance(obj, expected):
             return None
         raise cls(expected, obj) | ctx
 
     @property
     def expected(self) -> type | UnionType:
+        """
+        The expected type or type union.
+        """
+
         (expected, _found) = self.args
         return expected
 
     @property
     def found(self) -> object:
+        """
+        The value that failed the type check.
+        """
+
         (_expected, found) = self.args
         return found
 
@@ -303,6 +439,17 @@ class TypeCheckError(TypeError):
 
 
 class TypeSetError(TypeError):
+    """
+    [`TypeError`][TypeError] that is raised when a type is not in a type set.
+
+    Parameters
+    ----------
+    expected : type | UnionType
+        The expected type or type union.
+    found : type
+        The type that failed the type set check.
+    """
+
     __slots__: tuple[str, ...] = ()
 
     def __init__(self, expected: type | UnionType, found: type):
@@ -311,14 +458,38 @@ class TypeSetError(TypeError):
     # TODO: once a TypeAssert exists for Python, return it
     @classmethod
     def check_or_raise(cls, ty: type, expected: type | UnionType) -> None | Never:
+        """
+        Check `issubclass(ty, expected)` or raise a type set error, with
+        context.
+
+        Parameters
+        ----------
+        ty : type
+            The type to check.
+        expected : type | UnionType
+            The expected type or type union.
+        """
+
         if issubclass(ty, expected):
             return None
         raise cls(expected, ty) | ctx
 
     @classmethod
     def check_dtype_or_raise(
-        cls, dtype: np.dtype, supported: frozenset[np.dtype]
+        cls, dtype: np.dtype, supported: Set[np.dtype]
     ) -> None | Never:
+        """
+        Check if `dtype` is in the set of `supported` data types or raise a
+        type set error, with context.
+
+        Parameters
+        ----------
+        dtype : np.dtype
+            The data type to check.
+        supported : Set[np.dtype]
+            The set of supported data types.
+        """
+
         if dtype in supported:
             return None
 
@@ -330,11 +501,19 @@ class TypeSetError(TypeError):
 
     @property
     def expected(self) -> type | UnionType:
+        """
+        The expected type or type union.
+        """
+
         (expected, _found) = self.args
         return expected
 
     @property
     def found(self) -> type:
+        """
+        The type that failed the type set check.
+        """
+
         (_expected, found) = self.args
         return found
 
@@ -344,42 +523,88 @@ class TypeSetError(TypeError):
 
 
 class LateBoundParameterResolutionError(KeyError):
+    """
+    [`KeyError`][KeyError] that is raised when late-bound parameter resolution fails because one or more parameters are missing or extraneous.
+
+    Parameters
+    ----------
+    expected : Set[Parameter]
+        The set of expected late-bound parameters.
+    provided : Set[Parameter]
+        The type that failed the type set check.
+    """
+
     __slots__: tuple[str, ...] = ()
 
-    def __init__(
-        self, expected: frozenset["Parameter"], provided: frozenset["Parameter"]
-    ):
+    def __init__(self, expected: Set["Parameter"], provided: Set["Parameter"]):
         assert expected != provided
         super().__init__(expected, provided)
 
     @staticmethod
     def check_or_raise(
-        expected: frozenset["Parameter"], provided: frozenset["Parameter"]
+        expected: Set["Parameter"], provided: Set["Parameter"]
     ) -> None | Never:
+        """
+        Check if the `expected` set of late-bound parameters matches the
+        `provided` set or raise a late-bound parameter resolution error, with
+        context.
+
+        Parameters
+        ----------
+        expected : Set[Parameter]
+            The expected set of late-bound parameters.
+        provided : Set[Parameter]
+            The provided set of late-bound parameters.
+        """
+
         if expected == provided:
             return None
         raise LateBoundParameterResolutionError(expected, provided) | ctx
 
     @property
-    def expected(self) -> frozenset["Parameter"]:
+    def expected(self) -> Set["Parameter"]:
+        """
+        The expected set of late-bound parameters.
+        """
+
         (expected, _provided) = self.args
         return expected
 
     @property
-    def provided(self) -> frozenset["Parameter"]:
+    def provided(self) -> Set["Parameter"]:
+        """
+        The provided set of late-bound parameters.
+        """
+
         (_expected, provided) = self.args
         return provided
 
+    @property
+    def missing(self) -> Set["Parameter"]:
+        """
+        The missing (expected but not provided) set of late-bound parameters.
+        """
+
+        return self.expected - self.provided
+
+    @property
+    def extraneous(self) -> Set["Parameter"]:
+        """
+        The extraneous (provided but not expected) set of late-bound parameters.
+        """
+
+        return self.provided - self.expected
+
     @override
     def __str__(self) -> str:
-        missing = self.expected - self.provided
+        missing = self.missing
         missing_str = (
             "missing late-bound parameter"
             + ("s " if len(missing) > 1 else " ")
             + ", ".join(f"`{p}`" for p in sorted(missing))
         )
 
-        extraneous = self.provided - self.expected
+        extraneous = self.extraneous
         extraneous_str = (
             "extraneous late-bound parameter"
             + ("s " if len(extraneous) > 1 else " ")
@@ -396,11 +621,30 @@ class LateBoundParameterResolutionError(KeyError):
 
 
 class SafeguardsSafetyBug(RuntimeError):
+    """
+    [`RuntimeError`][RuntimeError] that is raised when a fatal safety bug occurs.
+
+    A fatal safety bug occurs when the safeguards are unable to provide the
+    requested safety requirement.
+
+    By raising this error, the `compression-safeguards` avoid violating the
+    safety requirements.
+
+    When this error is raised, it is a fatal bug in the implementation of the
+    `compression-safeguards`, which should be reported at
+    <https://github.com/juntyr/compression-safeguards/issues>.
+
+    Parameters
+    ----------
+    message : str
+        The error message.
+    """
+
     __slots__: tuple[str, ...] = ()
 
     def __init__(self, message: str) -> None:
         note = (
-            "This is a bug in the implementation of the "
+            "This is a fatal bug in the implementation of the "
             + "`compression-safeguards`. Please report it at "
             + "<https://github.com/juntyr/compression-safeguards/issues>."
         )
@@ -416,11 +660,28 @@ class SafeguardsSafetyBug(RuntimeError):
 
 
 class QuantityOfInterestRuntimeWarning(RuntimeWarning):
+    """
+    [`RuntimeWarning`][RuntimeWarning] that is raised when a recoverable quantity of interest sanity check fails.
+
+    A quantity of interest safeguard raises this warning if it fails at
+    providing the requested safety requirement using regular means but is still
+    able to recover and uphold the requirement in the end.
+
+    When this warning is raised, it is a non-fatal bug in the implementation of
+    the `compression-safeguards`, which should be reported at
+    <https://github.com/juntyr/compression-safeguards/issues>.
+
+    Parameters
+    ----------
+    message : str
+        The warning message.
+    """
+
     __slots__: tuple[str, ...] = ()
 
     def __init__(self, message: str) -> None:
         note = (
-            "This is a bug in the implementation of the "
+            "This is a non-fatal bug in the implementation of the "
             + "`compression-safeguards`. Please report it at "
             + "<https://github.com/juntyr/compression-safeguards/issues>."
         )
@@ -438,6 +699,30 @@ class QuantityOfInterestRuntimeWarning(RuntimeWarning):
 def lookup_enum_or_raise(
     enum: type[Ei], name: str, error: type[Exception] = ValueError
 ) -> Ei | Never:
+    """
+    Look up and return the `enum` member with the given `name` or raise an `error`, with context.
+
+    Parameters
+    ----------
+    enum : type[Ei]
+        The enum in which the `name` is looked up.
+    name : str
+        The enum member name to look up.
+    error : type[Exception]
+        The type of error that is raised if the `name` is not a member of the
+        `enum`.
+
+    Returns
+    -------
+    member : Ei
+        The `enum` member with the given `name`.
+
+    Raises
+    ------
+    error
+        if the `name` is not a member of the `enum`.
+    """
+
     if name in enum.__members__:
         return enum.__members__[name]
 

@@ -30,9 +30,9 @@ with atheris.instrument_imports():
     from compression_safeguards.utils.bindings import Parameter
     from compression_safeguards.utils.error import (
         ErrorContextMixin,
-        IndexContextFragment,
-        LateBoundParameterContextFragment,
-        ParameterContextFragment,
+        _IndexContextLayer,
+        _LateBoundParameterContextLayer,
+        _ParameterContextLayer,
     )
     from compression_safeguards.utils.typing import S, T
 
@@ -428,11 +428,10 @@ def check_one_input(data) -> None:
                 isinstance(err, IndexError)
                 and isinstance(err, ErrorContextMixin)
                 and ("is out of bounds for array of shape" in str(err))
-                and (err.context._context[-1] == ParameterContextFragment("axis"))
-                and isinstance(err.context._context[-2], IndexContextFragment)
+                and (err.context._context[-1] == _ParameterContextLayer("axis"))
+                and isinstance(err.context._context[-2], _IndexContextLayer)
                 and (
-                    err.context._context[-3]
-                    == ParameterContextFragment("neighbourhood")
+                    err.context._context[-3] == _ParameterContextLayer("neighbourhood")
                 )
             )
             or (
@@ -442,9 +441,9 @@ def check_one_input(data) -> None:
                 and ("normalised to" in str(err))
                 and ("for array of shape" in str(err))
                 and isinstance(
-                    err.context._context[-1], LateBoundParameterContextFragment
+                    err.context._context[-1], _LateBoundParameterContextLayer
                 )
-                and (err.context._context[-2] == ParameterContextFragment("eb"))
+                and (err.context._context[-2] == _ParameterContextLayer("eb"))
             )
             or (
                 isinstance(err, TypeError | ValueError)
@@ -461,33 +460,33 @@ def check_one_input(data) -> None:
                 and isinstance(err, ErrorContextMixin)
                 and ("invalid entry in choice array" in str(err))
                 and isinstance(
-                    err.context._context[-1], LateBoundParameterContextFragment
+                    err.context._context[-1], _LateBoundParameterContextLayer
                 )
-                and (err.context._context[-2] == ParameterContextFragment("selector"))
+                and (err.context._context[-2] == _ParameterContextLayer("selector"))
             )
             or (
                 # late-bound select safeguard with invalid selector index
                 isinstance(err, IndexError)
                 and isinstance(err, ErrorContextMixin)
                 and isinstance(
-                    err.context._context[-1], LateBoundParameterContextFragment
+                    err.context._context[-1], _LateBoundParameterContextLayer
                 )
-                and (err.context._context[-2] == ParameterContextFragment("selector"))
+                and (err.context._context[-2] == _ParameterContextLayer("selector"))
             )
             or (
                 isinstance(err, ValueError)
                 and isinstance(err, ErrorContextMixin)
                 and ("must be" in str(err))
                 and isinstance(
-                    err.context._context[-1], LateBoundParameterContextFragment
+                    err.context._context[-1], _LateBoundParameterContextLayer
                 )
-                and (err.context._context[-2] == ParameterContextFragment("eb"))
+                and (err.context._context[-2] == _ParameterContextLayer("eb"))
             )
             or (
                 isinstance(err, ValueError)
                 and isinstance(err, ErrorContextMixin)
                 and ("must not contain any NaN values" in str(err))
-                and (ParameterContextFragment("offset") in err.context._context)
+                and (_ParameterContextLayer("offset") in err.context._context)
             )
             or (
                 isinstance(err, ValueError)
@@ -495,7 +494,7 @@ def check_one_input(data) -> None:
                 and ("cannot broadcast from shape" in str(err))
                 and ("to shape ()" in str(err))
                 and isinstance(
-                    err.context._context[-1], LateBoundParameterContextFragment
+                    err.context._context[-1], _LateBoundParameterContextLayer
                 )
             )
         ):

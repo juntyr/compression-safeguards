@@ -198,7 +198,7 @@ def produce_data_array_correction(
     ValueError
         if the `prediction` has already been corrected, which may create a
         printer problem.
-    UnsupportedDateTypeError
+    TypeSetError
         if the `data` uses an unsupported data type.
     ValueError
         if the `data`'s dimensions, shape, dtype, chunks, or name do not match
