@@ -117,6 +117,12 @@ class ErrorContext:
 
         other_with_context = ty_with_context(*other.args)
         other_with_context._context = self  # type: ignore
+        other_with_context.__cause__ = other.__cause__
+        other_with_context.__context__ = other.__context__
+        other_with_context.__suppress_context__ = other.__suppress_context__
+        other_with_context.__traceback__ = other.__traceback__
+        if hasattr(other, "__notes__"):  # MSPV 3.11
+            other_with_context.__notes__ = other.__notes__  # type: ignore
         return other_with_context
 
     @override
@@ -278,7 +284,7 @@ class _IndexContextLayer(ContextLayer):
 
     @override
     def __eq__(self, value: object, /) -> bool:
-        return isinstance(value, _IndexContextLayer) and value._index == self._index
+        return isinstance(value, _IndexContextLayer) and value.index == self.index
 
 
 class _SafeguardTypeContextLayer(ContextLayer):
@@ -290,7 +296,7 @@ class _SafeguardTypeContextLayer(ContextLayer):
         self._safeguard = safeguard
 
     @property
-    def parameter(self) -> type["Safeguard"]:
+    def safeguard(self) -> type["Safeguard"]:
         return self._safeguard
 
     @override
@@ -301,7 +307,7 @@ class _SafeguardTypeContextLayer(ContextLayer):
     def __eq__(self, value: object, /) -> bool:
         return (
             isinstance(value, _SafeguardTypeContextLayer)
-            and value._safeguard is self._safeguard
+            and value.safeguard == self.safeguard
         )
 
 
@@ -325,7 +331,7 @@ class _ParameterContextLayer(ContextLayer):
     def __eq__(self, value: object, /) -> bool:
         return (
             isinstance(value, _ParameterContextLayer)
-            and value._parameter == self._parameter
+            and value.parameter == self.parameter
         )
 
 
@@ -354,7 +360,7 @@ class _LateBoundParameterContextLayer(ContextLayer):
     def __eq__(self, value: object, /) -> bool:
         return (
             isinstance(value, _LateBoundParameterContextLayer)
-            and value._parameter == self._parameter
+            and value.parameter == self.parameter
         )
 
 
