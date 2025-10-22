@@ -77,15 +77,23 @@ class ErrorContext:
         The layers of the context.
     """
 
-    __slots__: tuple[str, ...] = ("_context",)
-    _context: tuple[ContextLayer, ...]
+    __slots__: tuple[str, ...] = ("_layers",)
+    _layers: tuple[ContextLayer, ...]
 
     def __init__(self, *context: ContextLayer):
-        self._context = context
+        self._layers = context
+
+    @property
+    def layers(self) -> tuple[ContextLayer, ...]:
+        """
+        The layers of the context, from outermost to innermost.
+        """
+
+        return self._layers
 
     def __ror__(self, other: BaseException) -> BaseException:
         if isinstance(other, ErrorContextMixin):
-            other._context = ErrorContext(*self._context, *other.context._context)
+            other._context = ErrorContext(*self.layers, *other.context.layers)
             return other
 
         ty = type(other)
@@ -113,13 +121,13 @@ class ErrorContext:
 
     @override
     def __str__(self) -> str:
-        match self._context:
+        match self.layers:
             case ():
                 return ""
             case (c,):
                 return str(c)
             case _:
-                c, *cs = self._context
+                c, *cs = self.layers
                 acc = [str(c)]
                 for c in cs:
                     acc.append(c.separator)
@@ -249,6 +257,7 @@ class ctx(metaclass=_ctxmeta):
 
 class _IndexContextLayer(ContextLayer):
     __slots__: tuple[str, ...] = ("_index",)
+    __match_args__: tuple[str, ...] = ("index",)
     _index: int
 
     def __init__(self, index: int):
@@ -274,6 +283,7 @@ class _IndexContextLayer(ContextLayer):
 
 class _SafeguardTypeContextLayer(ContextLayer):
     __slots__: tuple[str, ...] = ("_safeguard",)
+    __match_args__: tuple[str, ...] = ("safeguard",)
     _safeguard: type["Safeguard"]
 
     def __init__(self, safeguard: type["Safeguard"]):
@@ -297,6 +307,7 @@ class _SafeguardTypeContextLayer(ContextLayer):
 
 class _ParameterContextLayer(ContextLayer):
     __slots__: tuple[str, ...] = ("_parameter",)
+    __match_args__: tuple[str, ...] = ("parameter",)
     _parameter: str
 
     def __init__(self, parameter: str):
@@ -320,6 +331,7 @@ class _ParameterContextLayer(ContextLayer):
 
 class _LateBoundParameterContextLayer(ContextLayer):
     __slots__: tuple[str, ...] = ("_parameter",)
+    __match_args__: tuple[str, ...] = ("parameter",)
     _parameter: "Parameter"
 
     def __init__(self, parameter: "Parameter"):

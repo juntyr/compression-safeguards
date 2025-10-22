@@ -267,58 +267,71 @@ def check_one_input(data) -> None:
         )
         np.testing.assert_array_equal(chunked_hash.values, global_hash)
     except Exception as err:
-        if (
-            (
-                isinstance(err, IndexError)
-                and isinstance(err, ErrorContextMixin)
-                and ("is out of bounds for array of shape" in str(err))
-                and (err.context._context[-1] == _ParameterContextLayer("axis"))
-                and isinstance(err.context._context[-2], _IndexContextLayer)
-                and (
-                    err.context._context[-3] == _ParameterContextLayer("neighbourhood")
-                )
-            )
-            or (
-                isinstance(err, IndexError)
-                and isinstance(err, ErrorContextMixin)
-                and ("duplicate axis index" in str(err))
-                and ("normalised to" in str(err))
-                and ("for array of shape" in str(err))
-                and isinstance(
-                    err.context._context[-1], _LateBoundParameterContextLayer
-                )
-                and (err.context._context[-2] == _ParameterContextLayer("eb"))
-            )
-            or (
-                isinstance(err, TypeError | ValueError)
-                and ("cannot losslessly cast" in str(err))
-            )
-            or (
-                isinstance(err, ValueError)
-                and ("cannot cast non-finite" in str(err))
-                and ("to saturating finite" in str(err))
-            )
-            or (
-                isinstance(err, ValueError)
-                and isinstance(err, ErrorContextMixin)
-                and ("must be" in str(err))
-                and isinstance(
-                    err.context._context[-1], _LateBoundParameterContextLayer
-                )
-                and (err.context._context[-2] == _ParameterContextLayer("eb"))
-            )
-            or (isinstance(err, ValueError) and ("fuzzer hash is all ones" in str(err)))
-            or (
-                isinstance(err, ValueError)
-                and isinstance(err, ErrorContextMixin)
-                and ("cannot broadcast from shape" in str(err))
-                and ("to shape ()" in str(err))
-                and isinstance(
-                    err.context._context[-1], _LateBoundParameterContextLayer
-                )
-            )
-        ):
+        if isinstance(err, ValueError) and ("fuzzer hash is all ones" in str(err)):
             return
+        if isinstance(err, ErrorContextMixin):
+            match err.context.layers:
+                case (
+                    *_,
+                    _ParameterContextLayer("neighbourhood"),
+                    _IndexContextLayer(_),
+                    _ParameterContextLayer("axis"),
+                ) if isinstance(err, IndexError) and (
+                    "is out of bounds for array of shape" in str(err)
+                ):
+                    return
+                case (
+                    *_,
+                    _ParameterContextLayer("neighbourhood"),
+                    _IndexContextLayer(_),
+                    _ParameterContextLayer("axis"),
+                ) | (
+                    *_,
+                    _ParameterContextLayer("eb"),
+                    _LateBoundParameterContextLayer(_),
+                ) if (
+                    isinstance(err, IndexError)
+                    and ("duplicate axis index" in str(err))
+                    and ("normalised to" in str(err))
+                    and ("for array of shape" in str(err))
+                ):
+                    return
+                case (*_, _ParameterContextLayer(_)) | (
+                    *_,
+                    _ParameterContextLayer(_),
+                    _LateBoundParameterContextLayer(_),
+                ) if isinstance(err, TypeError | ValueError) and (
+                    "cannot losslessly cast" in str(err)
+                ):
+                    return
+                case (
+                    *_,
+                    _ParameterContextLayer("eb"),
+                    _LateBoundParameterContextLayer(_),
+                ) if (
+                    isinstance(err, ValueError)
+                    and ("cannot cast non-finite" in str(err))
+                    and ("to saturating finite" in str(err))
+                ):
+                    return
+                case (
+                    *_,
+                    _ParameterContextLayer("eb"),
+                    _LateBoundParameterContextLayer(_),
+                ) if isinstance(err, ValueError) and ("must be" in str(err)):
+                    return
+                case (
+                    *_,
+                    _ParameterContextLayer(_),
+                    _LateBoundParameterContextLayer(_),
+                ) if (
+                    isinstance(err, ValueError)
+                    and ("cannot broadcast from shape" in str(err))
+                    and ("to shape ()" in str(err))
+                ):
+                    return
+                case _:
+                    pass
         print(  # noqa: T201
             f"\n===\n\nsafeguard = {safeguard!r}\n\ndata = {raw!r}\n\nlate_bound = {late_bound!r}\n\nchunks = {chunks!r}\n\n===\n"
         )

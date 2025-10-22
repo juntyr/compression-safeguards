@@ -423,6 +423,11 @@ class QoIParser(Parser):
         self.assert_or_error(
             self._I is not None, p, "index `I` is not available in pointwise QoIs"
         )
+        self.assert_or_error(
+            (p.integer >= -len(self._I)) and (p.integer < len(self._I)),
+            p,
+            f"axis index {p.integer} is out of bounds for stencil with {len(self._I)} ax{'i' if len(self._I) == 1 else 'e'}s",
+        )
         return Number.from_symbolic_int(self._I[p.integer])
 
     # functions

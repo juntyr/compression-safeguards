@@ -1345,3 +1345,17 @@ def test_late_bound_constant_boundary():
         safeguard.compute_safe_intervals(data, late_bound=Bindings(const=1, const2=256))
 
     safeguard.compute_safe_intervals(data, late_bound=Bindings(const=1, const2=255))
+
+
+def test_fuzzer_found_axis_index_out_of_bounds():
+    with pytest.raises(
+        SyntaxError,
+        match=r"qoi_eb_stencil\.qoi: axis index 1 is out of bounds for stencil with 1 axis",
+    ):
+        check_all_codecs(np.empty(0), "I[1]", [(0, 0)])
+
+    with pytest.raises(
+        SyntaxError,
+        match=r"qoi_eb_stencil\.qoi: axis index -3 is out of bounds for stencil with 2 axes",
+    ):
+        check_all_codecs(np.empty((2, 2)), "I[-3]", [(0, 0), (0, 0)])

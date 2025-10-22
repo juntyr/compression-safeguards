@@ -21,6 +21,8 @@ with atheris.instrument_imports():
 
     from compression_safeguards import SafeguardKind, Safeguards
     from compression_safeguards.safeguards.abc import Safeguard
+    from compression_safeguards.safeguards.combinators.select import SelectSafeguard
+    from compression_safeguards.safeguards.pointwise.sign import SignPreservingSafeguard
     from compression_safeguards.safeguards.qois import (
         PointwiseQuantityOfInterestExpression,
         StencilQuantityOfInterestExpression,
@@ -33,6 +35,7 @@ with atheris.instrument_imports():
         _IndexContextLayer,
         _LateBoundParameterContextLayer,
         _ParameterContextLayer,
+        _SafeguardTypeContextLayer,
     )
     from compression_safeguards.utils.typing import S, T
 
@@ -423,82 +426,98 @@ def check_one_input(data) -> None:
         encoded = safeguard.encode(raw)
         safeguard.decode(encoded, out=np.empty_like(raw))
     except Exception as err:
-        if (
-            (
-                isinstance(err, IndexError)
-                and isinstance(err, ErrorContextMixin)
-                and ("is out of bounds for array of shape" in str(err))
-                and (err.context._context[-1] == _ParameterContextLayer("axis"))
-                and isinstance(err.context._context[-2], _IndexContextLayer)
-                and (
-                    err.context._context[-3] == _ParameterContextLayer("neighbourhood")
-                )
-            )
-            or (
-                isinstance(err, IndexError)
-                and isinstance(err, ErrorContextMixin)
-                and ("duplicate axis index" in str(err))
-                and ("normalised to" in str(err))
-                and ("for array of shape" in str(err))
-                and isinstance(
-                    err.context._context[-1], _LateBoundParameterContextLayer
-                )
-                and (err.context._context[-2] == _ParameterContextLayer("eb"))
-            )
-            or (
-                isinstance(err, TypeError | ValueError)
-                and ("cannot losslessly cast" in str(err))
-            )
-            or (
-                isinstance(err, ValueError)
-                and ("cannot cast non-finite" in str(err))
-                and ("to saturating finite" in str(err))
-            )
-            or (
-                # late-bound select safeguard with invalid selector index
-                isinstance(err, ValueError)
-                and isinstance(err, ErrorContextMixin)
-                and ("invalid entry in choice array" in str(err))
-                and isinstance(
-                    err.context._context[-1], _LateBoundParameterContextLayer
-                )
-                and (err.context._context[-2] == _ParameterContextLayer("selector"))
-            )
-            or (
-                # late-bound select safeguard with invalid selector index
-                isinstance(err, IndexError)
-                and isinstance(err, ErrorContextMixin)
-                and isinstance(
-                    err.context._context[-1], _LateBoundParameterContextLayer
-                )
-                and (err.context._context[-2] == _ParameterContextLayer("selector"))
-            )
-            or (
-                isinstance(err, ValueError)
-                and isinstance(err, ErrorContextMixin)
-                and ("must be" in str(err))
-                and isinstance(
-                    err.context._context[-1], _LateBoundParameterContextLayer
-                )
-                and (err.context._context[-2] == _ParameterContextLayer("eb"))
-            )
-            or (
-                isinstance(err, ValueError)
-                and isinstance(err, ErrorContextMixin)
-                and ("must not contain any NaN values" in str(err))
-                and (_ParameterContextLayer("offset") in err.context._context)
-            )
-            or (
-                isinstance(err, ValueError)
-                and isinstance(err, ErrorContextMixin)
-                and ("cannot broadcast from shape" in str(err))
-                and ("to shape ()" in str(err))
-                and isinstance(
-                    err.context._context[-1], _LateBoundParameterContextLayer
-                )
-            )
-        ):
-            return
+        if isinstance(err, ErrorContextMixin):
+            match err.context.layers:
+                case (
+                    *_,
+                    _ParameterContextLayer("neighbourhood"),
+                    _IndexContextLayer(_),
+                    _ParameterContextLayer("axis"),
+                ) if isinstance(err, IndexError) and (
+                    "is out of bounds for array of shape" in str(err)
+                ):
+                    return
+                case (
+                    *_,
+                    _ParameterContextLayer("neighbourhood"),
+                    _IndexContextLayer(_),
+                    _ParameterContextLayer("axis"),
+                ) | (
+                    *_,
+                    _ParameterContextLayer("eb"),
+                    _LateBoundParameterContextLayer(_),
+                ) if (
+                    isinstance(err, IndexError)
+                    and ("duplicate axis index" in str(err))
+                    and ("normalised to" in str(err))
+                    and ("for array of shape" in str(err))
+                ):
+                    return
+                case (*_, _ParameterContextLayer(_)) | (
+                    *_,
+                    _ParameterContextLayer(_),
+                    _LateBoundParameterContextLayer(_),
+                ) if isinstance(err, TypeError | ValueError) and (
+                    "cannot losslessly cast" in str(err)
+                ):
+                    return
+                case (
+                    *_,
+                    _ParameterContextLayer("eb"),
+                    _LateBoundParameterContextLayer(_),
+                ) if (
+                    isinstance(err, ValueError)
+                    and ("cannot cast non-finite" in str(err))
+                    and ("to saturating finite" in str(err))
+                ):
+                    return
+                case (
+                    *_,
+                    _SafeguardTypeContextLayer(safeguard),
+                    _ParameterContextLayer("selector"),
+                    _LateBoundParameterContextLayer(_),
+                ) if (
+                    isinstance(err, ValueError)
+                    and ("invalid entry in choice array" in str(err))
+                    and safeguard is SelectSafeguard
+                ):
+                    return
+                case (
+                    *_,
+                    _SafeguardTypeContextLayer(safeguard),
+                    _ParameterContextLayer("selector"),
+                    _LateBoundParameterContextLayer(_),
+                ) if isinstance(err, IndexError) and safeguard is SelectSafeguard:
+                    return
+                case (
+                    *_,
+                    _ParameterContextLayer("eb"),
+                    _LateBoundParameterContextLayer(_),
+                ) if isinstance(err, ValueError) and ("must be" in str(err)):
+                    return
+                case (
+                    *_,
+                    _SafeguardTypeContextLayer(safeguard),
+                    _ParameterContextLayer("offset"),
+                    _LateBoundParameterContextLayer(_),
+                ) if (
+                    isinstance(err, ValueError)
+                    and ("must not contain any NaN values" in str(err))
+                    and safeguard is SignPreservingSafeguard
+                ):
+                    return
+                case (
+                    *_,
+                    _ParameterContextLayer(_),
+                    _LateBoundParameterContextLayer(_),
+                ) if (
+                    isinstance(err, ValueError)
+                    and ("cannot broadcast from shape" in str(err))
+                    and ("to shape ()" in str(err))
+                ):
+                    return
+                case _:
+                    pass
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")  # noqa: T201
         raise
 

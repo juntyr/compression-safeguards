@@ -326,7 +326,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     if naxis in all_axes:
                         raise (
                             IndexError(
-                                f"duplicate {axis.axis}, normalised to {naxis}, for array of shape {data_shape}"
+                                f"duplicate axis index {axis.axis}, normalised to {naxis}, for array of shape {data_shape}"
                             )
                             | ctx
                         )
