@@ -126,6 +126,20 @@ class SameValueSafeguard(PointwiseSafeguard):
         -------
         ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the `value` is late-bound but its late-bound parameter is not in
+            `late_bound`.
+        ValueError
+            if the late-bound `value` could not be broadcast to the `data`'s
+            shape.
+        TypeError
+            if the `value` is floating-point but the `data` is integer.
+        ValueError
+            if not all `value`s could not be losslessly converted to the
+            `data`'s type.
         """
 
         with ctx.safeguard(self), ctx.parameter("value"):
@@ -176,6 +190,20 @@ class SameValueSafeguard(PointwiseSafeguard):
         -------
         intervals : IntervalUnion[T, int, int]
             Union of intervals in which the same value guarantee is upheld.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the `value` is late-bound but its late-bound parameter is not in
+            `late_bound`.
+        ValueError
+            if the late-bound `value` could not be broadcast to the `data`'s
+            shape.
+        TypeError
+            if the `value` is floating-point but the `data` is integer.
+        ValueError
+            if not all `value`s could not be losslessly converted to the
+            `data`'s type.
         """
 
         with ctx.safeguard(self), ctx.parameter("value"):

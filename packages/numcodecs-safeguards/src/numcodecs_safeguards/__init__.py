@@ -431,6 +431,9 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         RuntimError
             if `codec` and `lossless` do not encode to 1D bytes or do not
             recreate the data's dtype and shape during decoding.
+        ...
+            if checking a safeguard or computing the correction for a safeguard
+            raises an exception.
         """
 
         data = (
@@ -564,6 +567,8 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             if `buf` is not a 1D bytes buffer.
         ValueError
             if `buf` has a corrupted header.
+        ...
+            if applying the safeguards correction raises an exception.
         """
 
         with ctx.parameter("buf"):

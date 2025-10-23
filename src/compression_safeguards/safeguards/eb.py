@@ -141,7 +141,7 @@ def _check_error_bound(
     Raises
     ------
     ValueError
-        If the error bound `value` is invalid.
+        if the error bound `value` is invalid.
     """
 
     match type:

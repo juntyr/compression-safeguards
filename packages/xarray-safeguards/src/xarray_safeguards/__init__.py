@@ -213,7 +213,8 @@ def produce_data_array_correction(
         if a late-bound parameter's dimensions are not a subset of the `data`
         dimensions, or it is not broadcastable to the `data` shape.
     ...
-        if instantiating a safeguard raises an exception.
+        if instantiating a safeguard, checking a safeguard, or computing the
+        correction for a safeguard raises an exception.
     """
 
     # small safeguard against the printer problem
@@ -799,6 +800,9 @@ def apply_data_array_correction(
     ValueError
         if the `correction` does not contain metadata about the safeguards that
         it was produced with.
+    ...
+        if re-instantiating the safeguards from their configuration metadata
+        raises an exception.
     """
 
     with ctx.parameter("correction"):
@@ -866,6 +870,11 @@ class DatasetSafeguardedAccessor:
         if the dataset does not contain not-yet-applied safeguards corrections.
     RuntimeError
         if the attributes of the safeguards correction are invalid.
+    ValueError
+        if applying a safeguards correction raises an exception.
+    ...
+        if re-instantiating the safeguards from their configuration metadata
+        raises an exception.
     """
 
     __slots__: tuple[str, ...] = ()
@@ -928,6 +937,9 @@ class DataArraySafeguardsAccessor:
     ------
     AttributeError
         if the data array does not have associated safeguards.
+    ...
+        if re-instantiating the safeguards from their configuration metadata
+        raises an exception.
     """
 
     __slots__: tuple[str, ...] = ()

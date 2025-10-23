@@ -316,6 +316,20 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         -------
         ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the `constant_boundary` is late-bound but its late-bound
+            parameter is not in `late_bound`.
+        ValueError
+            if the `constant_boundary` is late-bound but not a scalar.
+        TypeError
+            if the `constant_boundary` is floating-point but the `data` is
+            integer.
+        ValueError
+            if the `constant_boundary` could not be losslessly converted to the
+            `data`'s type.
         """
 
         with ctx.safeguard(self), ctx.parameter("constant_boundary"):
@@ -416,6 +430,20 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         -------
         intervals : IntervalUnion[T, int, int]
             Union of intervals in which the monotonicity is preserved.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the `constant_boundary` is late-bound but its late-bound
+            parameter is not in `late_bound`.
+        ValueError
+            if the `constant_boundary` is late-bound but not a scalar.
+        TypeError
+            if the `constant_boundary` is floating-point but the `data` is
+            integer.
+        ValueError
+            if the `constant_boundary` could not be losslessly converted to the
+            `data`'s type.
         """
 
         with ctx.safeguard(self), ctx.parameter("constant_boundary"):

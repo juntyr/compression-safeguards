@@ -743,7 +743,7 @@ def test_to_float_modes(dtype, mode):
         expectation = does_not_raise()
     else:
         expectation = pytest.raises(
-            ValueError,
+            TypeError,
             match=rf"qoi_eb_pw\.qoi_dtype: cannot losslessly cast {dtype} to {mode}",
         )
 

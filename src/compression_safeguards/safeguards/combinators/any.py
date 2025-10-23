@@ -145,6 +145,11 @@ class AnySafeguard(Safeguard):
         -------
         ok : bool
             `True` if the check succeeded.
+
+        Raises
+        ------
+        ...
+            if checking a safeguard raises an exception.
         """
 
         ...
@@ -173,6 +178,11 @@ class AnySafeguard(Safeguard):
         -------
         ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
+
+        Raises
+        ------
+        ...
+            if checking a safeguard raises an exception.
         """
 
         ...
@@ -198,6 +208,11 @@ class AnySafeguard(Safeguard):
         -------
         intervals : IntervalUnion[T, int, int]
             Union of safe intervals.
+
+        Raises
+        ------
+        ...
+            if computing the safe intervals for a safeguard raises an exception.
         """
 
         ...

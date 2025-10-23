@@ -128,8 +128,19 @@ class SignPreservingSafeguard(PointwiseSafeguard):
 
         Raises
         ------
+        LateBoundParameterResolutionError
+            if the `offset` is late-bound but its late-bound parameter is not in
+            `late_bound`.
         ValueError
-            if `offset` is late-bound and contains NaN values.
+            if the late-bound `offset` could not be broadcast to the `data`'s
+            shape.
+        ValueError
+            if the late-bound `offset` contains NaN values.
+        TypeError
+            if the `offset` is floating-point but the `data` is integer.
+        ValueError
+            if not all `offset`s could not be losslessly converted to the
+            `data`'s type.
         """
 
         with ctx.safeguard(self), ctx.parameter("offset"):
@@ -187,8 +198,19 @@ class SignPreservingSafeguard(PointwiseSafeguard):
 
         Raises
         ------
+        LateBoundParameterResolutionError
+            if the `offset` is late-bound but its late-bound parameter is not
+            in `late_bound`.
         ValueError
-            if `offset` is late-bound and contains NaN values.
+            if the late-bound `offset` could not be broadcast to the `data`'s
+            shape.
+        ValueError
+            if the late-bound `offset` contains NaN values.
+        TypeError
+            if the `offset` is floating-point but the `data` is integer.
+        ValueError
+            if not all `offset`s could not be losslessly converted to the
+            `data`'s type.
         """
 
         with ctx.safeguard(self), ctx.parameter("offset"):

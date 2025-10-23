@@ -302,9 +302,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         Raises
         ------
         IndexError
-            if any neighbourhood axis is out of bounds in `data_shape`.
+            if any `neighbourhood` axis is out of bounds in `data_shape`.
         IndexError
-            if any neighbourhood axis is duplicate.
+            if any `neighbourhood` axis is duplicate.
         """
 
         neighbourhood: list[dict[BoundaryCondition, NeighbourhoodAxis]] = [
@@ -363,6 +363,39 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         -------
         qoi : np.ndarray[tuple[int, ...], np.dtype[F]]
             Evaluated quantity of interest, in floating-point.
+
+        Raises
+        ------
+        IndexError
+            if any `neighbourhood` axis is out of bounds in `data`.
+        IndexError
+            if any `neighbourhood` axis is duplicate.
+        TypeError
+            if the `data` could not be losslessly cast to `qoi_dtype`.
+        LateBoundParameterResolutionError
+            if any `neighbourhood` `axis.constant_boundary` is late-bound but
+            its late-bound parameter is not in `late_bound`.
+        ValueError
+            if any `neighbourhood` `axis.constant_boundary` is late-bound but
+            not a scalar.
+        TypeError
+            if any `neighbourhood` `axis.constant_boundary` is floating-point
+            but the `data` is integer.
+        ValueError
+            if any `neighbourhood` `axis.constant_boundary` could not be
+            losslessly converted to the `data`'s type.
+        LateBoundParameterResolutionError
+            if any of the `qoi`'s late-bound constants is not contained in the
+            bindings.
+        ValueError
+            if any late-bound constant could not be broadcast to the `data`'s
+            shape.
+        TypeError
+            if any late-bound constant is floating-point but the `data` is
+            integer.
+        ValueError
+            if not all values for all late-bound constants could be losslessly
+            converted to the `data`'s type.
         """
 
         # check that the data shape is compatible with the neighbourhood shape
@@ -491,6 +524,48 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         -------
         ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
+
+        Raises
+        ------
+        IndexError
+            if any `neighbourhood` axis is out of bounds in `data`.
+        IndexError
+            if any `neighbourhood` axis is duplicate.
+        TypeError
+            if the `data` could not be losslessly cast to `qoi_dtype`.
+        LateBoundParameterResolutionError
+            if any `neighbourhood` `axis.constant_boundary` is late-bound but
+            its late-bound parameter is not in `late_bound`.
+        ValueError
+            if any `neighbourhood` `axis.constant_boundary` is late-bound but
+            not a scalar.
+        TypeError
+            if any `neighbourhood` `axis.constant_boundary` is floating-point
+            but the `data` is integer.
+        ValueError
+            if any `neighbourhood` `axis.constant_boundary` could not be
+            losslessly converted to the `data`'s type.
+        LateBoundParameterResolutionError
+            if any of the `qoi`'s late-bound constants is not contained in the
+            bindings.
+        ValueError
+            if any late-bound constant could not be broadcast to the `data`'s
+            shape.
+        TypeError
+            if any late-bound constant is floating-point but the `data` is
+            integer.
+        ValueError
+            if not all values for all late-bound constants could be losslessly
+            converted to the `data`'s type.
+        LateBoundParameterResolutionError
+            if the error bound `eb` is late-bound but its late-bound parameter
+            is not in `late_bound`.
+        ValueError
+            if the late-bound `eb` could not be broadcast to the `data`'s
+            shape.
+        ValueError
+            if the late-bound `eb` is non-finite, i.e. infinite or NaN, or an
+            invalid error bound value for the error bound `type`.
         """
 
         # check that the data shape is compatible with the neighbourhood shape
@@ -681,6 +756,48 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         -------
         intervals : IntervalUnion[T, int, int]
             Union of intervals in which the error bound is upheld.
+
+        Raises
+        ------
+        IndexError
+            if any `neighbourhood` axis is out of bounds in `data`.
+        IndexError
+            if any `neighbourhood` axis is duplicate.
+        TypeError
+            if the `data` could not be losslessly cast to `qoi_dtype`.
+        LateBoundParameterResolutionError
+            if any `neighbourhood` `axis.constant_boundary` is late-bound but
+            its late-bound parameter is not in `late_bound`.
+        ValueError
+            if any `neighbourhood` `axis.constant_boundary` is late-bound but
+            not a scalar.
+        TypeError
+            if any `neighbourhood` `axis.constant_boundary` is floating-point
+            but the `data` is integer.
+        ValueError
+            if any `neighbourhood` `axis.constant_boundary` could not be
+            losslessly converted to the `data`'s type.
+        LateBoundParameterResolutionError
+            if any of the `qoi`'s late-bound constants is not contained in the
+            bindings.
+        ValueError
+            if any late-bound constant could not be broadcast to the `data`'s
+            shape.
+        TypeError
+            if any late-bound constant is floating-point but the `data` is
+            integer.
+        ValueError
+            if not all values for all late-bound constants could be losslessly
+            converted to the `data`'s type.
+        LateBoundParameterResolutionError
+            if the error bound `eb` is late-bound but its late-bound parameter
+            is not in `late_bound`.
+        ValueError
+            if the late-bound `eb` could not be broadcast to the `data`'s
+            shape.
+        ValueError
+            if the late-bound `eb` is non-finite, i.e. infinite or NaN, or an
+            invalid error bound value for the error bound `type`.
         """
 
         # check that the data shape is compatible with the neighbourhood shape
@@ -936,9 +1053,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         Raises
         ------
         IndexError
-            if any neighbourhood axis is out of bounds in `data`.
+            if any `neighbourhood` axis is out of bounds in `data`.
         IndexError
-            if any neighbourhood axis is duplicate.
+            if any `neighbourhood` axis is duplicate.
         """
 
         data = _ensure_array(data)
@@ -1011,9 +1128,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         Raises
         ------
         IndexError
-            if any neighbourhood axis is out of bounds in `qoi`.
+            if any `neighbourhood` axis is out of bounds in `qoi`.
         IndexError
-            if any neighbourhood axis is duplicate.
+            if any `neighbourhood` axis is duplicate.
         """
 
         qoi = _ensure_array(qoi)

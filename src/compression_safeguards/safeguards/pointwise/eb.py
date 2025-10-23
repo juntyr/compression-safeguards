@@ -142,6 +142,17 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         -------
         ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the error bound `eb` is late-bound but its late-bound parameter
+            is not in `late_bound`.
+        ValueError
+            if the late-bound `eb` could not be broadcast to the `data`'s shape.
+        ValueError
+            if the late-bound `eb` is non-finite, i.e. infinite or NaN, or an
+            invalid error bound value for the error bound `type`.
         """
 
         ftype: np.dtype[np.floating] = ToFloatMode.lossless.floating_point_dtype_for(
@@ -205,6 +216,17 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         -------
         intervals : IntervalUnion[T, int, int]
             Union of intervals in which the error bound is upheld.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the error bound `eb` is late-bound but its late-bound parameter
+            is not in `late_bound`.
+        ValueError
+            if the late-bound `eb` could not be broadcast to the `data`'s shape.
+        ValueError
+            if the late-bound `eb` is non-finite, i.e. infinite or NaN, or an
+            invalid error bound value for the error bound `type`.
         """
 
         dataf = data.flatten()

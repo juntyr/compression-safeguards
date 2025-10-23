@@ -223,13 +223,13 @@ class ScalarLeftAssociativeSum(
             return facc
 
         # otherwise turn all folded constant terms back into expressions
-        facce = facc if isinstance(facc, Expr) else ScalarFoldedConstant(facc)
-        ftes = [
-            fb if isinstance(fb, Expr) else ScalarFoldedConstant(fb) for fb in fts[i:]
+        faccexpr = facc if isinstance(facc, Expr) else ScalarFoldedConstant(facc)
+        ftexprs = [
+            ft if isinstance(ft, Expr) else ScalarFoldedConstant(ft) for ft in fts[i:]
         ]
 
         # and create a sum of the folded terms
-        return ScalarLeftAssociativeSum(facce, *ftes)
+        return ScalarLeftAssociativeSum(faccexpr, *ftexprs)
 
     @override
     def eval(

@@ -81,7 +81,7 @@ class ToFloatMode(Enum):
 
         Raises
         ------
-        ValueError
+        TypeError
             if `dtype` cannot be losslessly cast to `self`.
         """
 
@@ -111,7 +111,7 @@ class ToFloatMode(Enum):
                 ):
                     return np.dtype(np.float16)
                 raise (
-                    ValueError(f"cannot losslessly cast {dtype.name} to float16") | ctx
+                    TypeError(f"cannot losslessly cast {dtype.name} to float16") | ctx
                 )
             case ToFloatMode.float32:
                 if dtype in (
@@ -124,7 +124,7 @@ class ToFloatMode(Enum):
                 ):
                     return np.dtype(np.float32)
                 raise (
-                    ValueError(f"cannot losslessly cast {dtype.name} to float32") | ctx
+                    TypeError(f"cannot losslessly cast {dtype.name} to float32") | ctx
                 )
             case ToFloatMode.float64:
                 if dtype in (
@@ -140,7 +140,7 @@ class ToFloatMode(Enum):
                 ):
                     return np.dtype(np.float64)
                 raise (
-                    ValueError(f"cannot losslessly cast {dtype.name} to float64") | ctx
+                    TypeError(f"cannot losslessly cast {dtype.name} to float64") | ctx
                 )
             case ToFloatMode.float128:
                 if dtype in (
@@ -158,7 +158,7 @@ class ToFloatMode(Enum):
                 ):
                     return _float128_dtype
                 raise (
-                    ValueError(f"cannot losslessly cast {dtype.name} to float128") | ctx
+                    TypeError(f"cannot losslessly cast {dtype.name} to float128") | ctx
                 )
             case _:
                 assert_never(self)
@@ -438,9 +438,9 @@ def lossless_cast(
     Raises
     ------
     TypeError
-        If floating-point values are converted to integer values.
+        if floating-point values are converted to an integer `dtype`.
     ValueError
-        If not all values could be losslessly converted.
+        if not all values could be losslessly converted to `dtype`.
     """
 
     xa = np.array(x, copy=None)
@@ -492,7 +492,7 @@ def saturating_finite_float_cast(
     Raises
     ------
     ValueError
-        If some values are non-finite, i.e. infinite or NaN.
+        if any values are non-finite, i.e. infinite or NaN.
     """
 
     assert np.issubdtype(dtype, np.floating) or (dtype == _float128_dtype)

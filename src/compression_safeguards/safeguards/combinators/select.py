@@ -166,6 +166,24 @@ class SelectSafeguard(Safeguard):
         -------
         ok : bool
             `True` if the check succeeded.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the `selector`'s late-bound parameter is not in `late_bound`.
+        ValueError
+            if the late-bound `selector` could not be broadcast to the `data`'s
+            shape.
+        TypeError
+            if the late-bound `selector` is floating-point.
+        ValueError
+            if not all late-bound `selector` values could be losslessly
+            converted to integer indices.
+        ValueError
+            if the late-bound `selector` indices are invalid for the
+            selected-over `safeguards`.
+        ...
+            if checking a safeguard raises an exception.
         """
 
         ...
@@ -193,6 +211,24 @@ class SelectSafeguard(Safeguard):
         -------
         ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the `selector`'s late-bound parameter is not in `late_bound`.
+        ValueError
+            if the late-bound `selector` could not be broadcast to the `data`'s
+            shape.
+        TypeError
+            if the late-bound `selector` is floating-point.
+        ValueError
+            if not all late-bound `selector` values could be losslessly
+            converted to integer indices.
+        ValueError
+            if the late-bound `selector` indices are invalid for the
+            selected-over `safeguards`.
+        ...
+            if checking a safeguard raises an exception.
         """
 
         ...
@@ -217,6 +253,24 @@ class SelectSafeguard(Safeguard):
         -------
         intervals : IntervalUnion[T, int, int]
             The safe intervals.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the `selector`'s late-bound parameter is not in `late_bound`.
+        ValueError
+            if the late-bound `selector` could not be broadcast to the `data`'s
+            shape.
+        TypeError
+            if the late-bound `selector` is floating-point.
+        ValueError
+            if not all late-bound `selector` values could be losslessly
+            converted to integer indices.
+        IndexError
+            if the late-bound `selector` indices are invalid for the
+            selected-over `safeguards`.
+        ...
+            if computing the safe intervals for a safeguard raises an exception.
         """
 
         ...

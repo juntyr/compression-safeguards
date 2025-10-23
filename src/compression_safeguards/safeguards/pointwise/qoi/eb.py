@@ -195,6 +195,23 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         -------
         qoi : np.ndarray[S, np.dtype[F]]
             Evaluated quantity of interest, in floating-point.
+
+        Raises
+        ------
+        TypeError
+            if the `data` could not be losslessly cast to `qoi_dtype`.
+        LateBoundParameterResolutionError
+            if any of the `qoi`'s late-bound constants is not contained in the
+            bindings.
+        ValueError
+            if any late-bound constant could not be broadcast to the `data`'s
+            shape.
+        TypeError
+            if any late-bound constant is floating-point but the `data` is
+            integer.
+        ValueError
+            if not all values for all late-bound constants could be losslessly
+            converted to the `data`'s type.
         """
 
         with ctx.safeguard(self):
@@ -244,6 +261,31 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         -------
         ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
+
+        Raises
+        ------
+        TypeError
+            if the `data` could not be losslessly cast to `qoi_dtype`.
+        LateBoundParameterResolutionError
+            if any of the `qoi`'s late-bound constants is not contained in the
+            bindings.
+        ValueError
+            if any late-bound constant could not be broadcast to the `data`'s
+            shape.
+        TypeError
+            if any late-bound constant is floating-point but the `data` is
+            integer.
+        ValueError
+            if not all values for all late-bound constants could be losslessly
+            converted to the `data`'s type.
+        LateBoundParameterResolutionError
+            if the error bound `eb` is late-bound but its late-bound parameter
+            is not in `late_bound`.
+        ValueError
+            if the late-bound `eb` could not be broadcast to the `data`'s shape.
+        ValueError
+            if the late-bound `eb` is non-finite, i.e. infinite or NaN, or an
+            invalid error bound value for the error bound `type`.
         """
 
         with ctx.safeguard(self):
@@ -320,6 +362,31 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         -------
         intervals : IntervalUnion[T, int, int]
             Union of intervals in which the error bound is upheld.
+
+        Raises
+        ------
+        TypeError
+            if the `data` could not be losslessly cast to `qoi_dtype`.
+        LateBoundParameterResolutionError
+            if any of the `qoi`'s late-bound constants is not contained in the
+            bindings.
+        ValueError
+            if any late-bound constant could not be broadcast to the `data`'s
+            shape.
+        TypeError
+            if any late-bound constant is floating-point but the `data` is
+            integer.
+        ValueError
+            if not all values for all late-bound constants could be losslessly
+            converted to the `data`'s type.
+        LateBoundParameterResolutionError
+            if the error bound `eb` is late-bound but its late-bound parameter
+            is not in `late_bound`.
+        ValueError
+            if the late-bound `eb` could not be broadcast to the `data`'s shape.
+        ValueError
+            if the late-bound `eb` is non-finite, i.e. infinite or NaN, or an
+            invalid error bound value for the error bound `type`.
         """
 
         with ctx.safeguard(self):

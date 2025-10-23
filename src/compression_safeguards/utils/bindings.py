@@ -171,7 +171,11 @@ class Bindings:
         LateBoundParameterResolutionError
             if the `param`eter is not contained in the bindings.
         ValueError
-            if the `param`eter cannot be broadcast to the `shape`.
+            if the `param`eter could not be broadcast to the `shape`.
+        TypeError
+            if floating-point values are converted to an integer `dtype`.
+        ValueError
+            if not all values could be losslessly converted to `dtype`.
         """
 
         if param not in self._bindings:
@@ -236,7 +240,9 @@ class Bindings:
         LateBoundParameterResolutionError
             if the `param`eter is not contained in the bindings.
         ValueError
-            if the `param`eter cannot be broadcast to the `shape`.
+            if the `param`eter could not be broadcast to the `shape`.
+        ValueError
+            if any values are non-finite, i.e. infinite or NaN.
         """
 
         if param not in self._bindings:
@@ -282,7 +288,7 @@ class Bindings:
         Raises
         ------
         ValueError
-            if an array parameter cannot be broadcast to the `shape`
+            if an array parameter could not be broadcast to the `shape`.
         """
 
         for param, value in self._bindings.items():

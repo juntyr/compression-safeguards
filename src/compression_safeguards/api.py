@@ -250,6 +250,8 @@ class Safeguards:
         LateBoundParameterResolutionError
             if `late_bound` does not resolve all late-bound parameters of the
             safeguards or includes any extraneous parameters.
+        ...
+            if checking a safeguard raises an exception.
         """
 
         late_bound = self._prepare_non_chunked_bindings(
@@ -320,6 +322,8 @@ class Safeguards:
         LateBoundParameterResolutionError
             if `late_bound` does not resolve all late-bound parameters of the
             safeguards or includes any extraneous parameters.
+        ...
+            if computing the correction for a safeguard raises an exception.
         """
         # explicitly do not document that SafeguardsSafetyBug can be raised
 
@@ -535,6 +539,12 @@ class Safeguards:
         -------
         stencil_shape : tuple[tuple[Literal[BoundaryCondition.valid, BoundaryCondition.wrap], NeighbourhoodAxis], ...]
             The shape of the required stencil neighbourhood around each chunk.
+
+        Raises
+        ------
+        ...
+            if computing the stencil neighbourhood for a safeguard raises an
+            exception.
         """
 
         neighbourhood: list[
@@ -751,8 +761,13 @@ class Safeguards:
         ValueError
             if the `chunk_stencil` is not compatible with the required stencil.
         LateBoundParameterResolutionError
-            if `late_bound` does not resolve all late-bound parameters of the
-            safeguards or includes any extraneous parameters.
+            if `late_bound_chunk` does not resolve all late-bound parameters of
+            the safeguards or includes any extraneous parameters.
+        ValueError
+            if any `late_bound_chunk` array could not be broadcast to the
+            `data_chunk`'s shape.
+        ...
+            if checking a safeguard raises an exception.
         """
 
         data_chunk_, prediction_chunk_, late_bound_chunk, non_stencil_indices = (
@@ -882,8 +897,13 @@ class Safeguards:
         ValueError
             if the `chunk_stencil` is not compatible with the required stencil.
         LateBoundParameterResolutionError
-            if `late_bound` does not resolve all late-bound parameters of the
-            safeguards or includes any extraneous parameters.
+            if `late_bound_chunk` does not resolve all late-bound parameters of
+            the safeguards or includes any extraneous parameters.
+        ValueError
+            if any `late_bound_chunk` array could not be broadcast to the
+            `data_chunk`'s shape.
+        ...
+            if computing the correction for a safeguard raises an exception.
         """
         # explicitly do not document that SafeguardsSafetyBug can be raised
 
