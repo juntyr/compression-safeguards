@@ -4,30 +4,31 @@ build-backend = "hatchling.build"
 
 [project]
 name = "compression-safeguards"
-version = "0.0.1"
+version = "1.0.0"
 description = "Fearless lossy compression using safeguards"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "numpy~=2.0",
     "numpy-quaddtype~=0.2.0; sys_platform != 'emscripten'",
-    "typing-extensions~=4.6",
+    "semver~=3.0",
     "sly~=0.5.0",
+    "typing-extensions~=4.6",
 ]
 
 [dependency-groups]
 bench = [
     "earthkit-data~=0.14.0",
     "earthkit-plots~=0.3.1",
-    "numcodecs-wasm~=0.1.7",
-    "numcodecs-wasm-sz3~=0.6.0",
-    "numcodecs-wasm-zfp~=0.5.3",
-    "numcodecs-wasm-zstd~=0.3.0",
-    "xarray~=2025.4",
-    "netcdf4~=1.7.2",
-    "tqdm~=4.0",
     "matplotlib~=3.10.0",
     "mpl-ascii~=0.10.0",
+    "netcdf4~=1.7.2",
+    "numcodecs-wasm~=0.2.1",
+    "numcodecs-wasm-sz3~=0.7.0",
+    "numcodecs-wasm-zfp~=0.6.0",
+    "numcodecs-wasm-zstd~=0.4.0",
+    "tqdm~=4.0",
+    "xarray~=2025.4",
 ]
 dev = ["ruff~=0.9"]
 examples = [
@@ -35,17 +36,17 @@ examples = [
     "earthkit-data~=0.14.0",
     "earthkit-plots~=0.3.1",
     "jupyterlab",
-    "numcodecs-wasm~=0.1.7",
-    "numcodecs-wasm-sperr~=0.1.0",
-    "numcodecs-wasm-sz3~=0.6.0",
-    "numcodecs-wasm-zfp-classic~=0.3.3",
-    "xarray~=2025.1",
-    "netcdf4~=1.7.2",
     "matplotlib~=3.10.0",
+    "netcdf4~=1.7.2",
+    "numcodecs-wasm~=0.2.1",
+    "numcodecs-wasm-sperr~=0.2.0",
+    "numcodecs-wasm-sz3~=0.7.0",
+    "numcodecs-wasm-zfp~=0.6.0",
     # FIXME: https://github.com/dask/dask/issues/12072
     "pyarrow~=21.0.0",
+    "xarray~=2025.1",
 ]
-fuzz = ["atheris~=2.3", "timeoutcontext~=1.2", "setuptools~=80.0"]
+fuzz = ["atheris~=2.3", "setuptools~=80.0", "timeoutcontext~=1.2"]
 test = [
     "dask~=2025.4",
     "numcodecs-combinators~=0.2.10",
@@ -55,7 +56,7 @@ test = [
     "zarr-any-numcodecs~=0.1.2; python_version >= '3.11'",
 ]
 doctest = ["griffe2md~=1.1", "pytest~=8.3", "pytest-codeblocks~=0.17.0"]
-typing = ["mypy~=1.14"]
+typing = ["mypy~=1.18"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

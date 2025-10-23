@@ -10,6 +10,7 @@ from ...utils._compat import (
     _nan_to_zero_inf_to_finite,
     _nextafter,
 )
+from ...utils.error import QuantityOfInterestRuntimeWarning
 from .expr.typing import Ci, F, Ns, Ps
 
 
@@ -144,7 +145,10 @@ def guarantee_data_within_expr_bounds(
 
         if warn_on_bounds_exceeded:
             warn_on_bounds_exceeded = False
-            warn("guaranteed data bounds do not meet the expression bounds")
+            warn(
+                "guaranteed data bounds do not meet the expression bounds",
+                category=QuantityOfInterestRuntimeWarning,
+            )
 
         # nudge the guess towards the data by 1 ULP
         # TODO: np.nextafter(out=...) once possible
@@ -173,7 +177,10 @@ def guarantee_data_within_expr_bounds(
         backoff = np.divide(backoff, 2)
         np.add(Xs, Xs_diff, out=Xs_bound_guess, where=bounds_exceeded)
 
-    warn("data bounds required excessive nudging")
+    warn(
+        "data bounds required excessive nudging",
+        category=QuantityOfInterestRuntimeWarning,
+    )
 
     return _ensure_array(Xs, copy=True)
 

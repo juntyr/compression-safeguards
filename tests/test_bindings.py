@@ -7,6 +7,7 @@ from numcodecs_safeguards import SafeguardsCodec
 
 from compression_safeguards import Safeguards
 from compression_safeguards.utils.bindings import Bindings
+from compression_safeguards.utils.error import LateBoundParameterResolutionError
 
 
 def test_missing_extraneous_bindings():
@@ -19,10 +20,16 @@ def test_missing_extraneous_bindings():
         ]
     )
 
-    with pytest.raises(AssertionError, match=r"missing bindings.+eb.+,.+zero"):
-        safeguards.compute_correction(data, prediction, late_bound=Bindings.empty())
+    with pytest.raises(
+        LateBoundParameterResolutionError,
+        match="missing late-bound parameters `eb`, `zero`",
+    ):
+        safeguards.compute_correction(data, prediction, late_bound=Bindings.EMPTY)
 
-    with pytest.raises(AssertionError, match=r"extraneous bindings.+\$x"):
+    with pytest.raises(
+        LateBoundParameterResolutionError,
+        match=r"extraneous late-bound parameter `\$x`",
+    ):
         safeguards.compute_correction(
             data, prediction, late_bound=Bindings(eb=0.1, zero=0, **{"$x": prediction})
         )

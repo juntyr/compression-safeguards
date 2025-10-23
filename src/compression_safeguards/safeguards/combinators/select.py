@@ -12,6 +12,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
+from ...utils.error import TypeCheckError, ctx
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import JSON, S, T
 from ..abc import Safeguard
@@ -45,6 +46,15 @@ class SelectSafeguard(Safeguard):
         [`PointwiseSafeguard`][compression_safeguards.safeguards.pointwise.abc.PointwiseSafeguard]
         or
         [`StencilSafeguard`][compression_safeguards.safeguards.stencil.abc.StencilSafeguard].
+
+    Raises
+    ------
+    TypeCheckError
+        if any parameter has the wrong type.
+    ValueError
+        if the `safeguards` collection is empty.
+    ...
+        if instantiating a safeguard raises an exception.
     """
 
     __slots__: tuple[str, ...] = ()
@@ -67,23 +77,34 @@ class SelectSafeguard(Safeguard):
     ) -> "_SelectPointwiseSafeguard | _SelectStencilSafeguard":
         from ... import SafeguardKind  # noqa: PLC0415
 
-        selector = selector if isinstance(selector, Parameter) else Parameter(selector)
+        with ctx.safeguardty(cls):
+            with ctx.parameter("selector"):
+                TypeCheckError.check_instance_or_raise(selector, str | Parameter)
+                selector = (
+                    selector if isinstance(selector, Parameter) else Parameter(selector)
+                )
 
-        assert len(safeguards) > 0, "can only select over at least one safeguard"
+            with ctx.parameter("safeguards"):
+                TypeCheckError.check_instance_or_raise(safeguards, Collection)
 
-        safeguards_ = tuple(
-            safeguard
-            if isinstance(safeguard, PointwiseSafeguard | StencilSafeguard)
-            else SafeguardKind[safeguard["kind"]].value(  # type: ignore
-                **{p: v for p, v in safeguard.items() if p != "kind"}
-            )
-            for safeguard in safeguards
-        )
+                if len(safeguards) <= 0:
+                    raise (
+                        ValueError("can only select over at least one safeguard") | ctx
+                    )
 
-        for safeguard in safeguards_:
-            assert isinstance(safeguard, PointwiseSafeguard | StencilSafeguard), (
-                f"{safeguard!r} is not a pointwise or stencil safeguard"
-            )
+                safeguards_: list[PointwiseSafeguard | StencilSafeguard] = []
+                safeguard: dict[str, JSON] | Safeguard
+                for i, safeguard in enumerate(safeguards):
+                    with ctx.index(i):
+                        TypeCheckError.check_instance_or_raise(
+                            safeguard, dict | PointwiseSafeguard | StencilSafeguard
+                        )
+                        if isinstance(safeguard, dict):
+                            safeguard = SafeguardKind.from_config(safeguard)
+                        TypeCheckError.check_instance_or_raise(
+                            safeguard, PointwiseSafeguard | StencilSafeguard
+                        )
+                        safeguards_.append(safeguard)  # type: ignore
 
         if all(isinstance(safeguard, PointwiseSafeguard) for safeguard in safeguards_):
             return _SelectPointwiseSafeguard(selector, *safeguards_)  # type: ignore
@@ -145,6 +166,24 @@ class SelectSafeguard(Safeguard):
         -------
         ok : bool
             `True` if the check succeeded.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the `selector`'s late-bound parameter is not in `late_bound`.
+        ValueError
+            if the late-bound `selector` could not be broadcast to the `data`'s
+            shape.
+        TypeError
+            if the late-bound `selector` is floating-point.
+        ValueError
+            if not all late-bound `selector` values could be losslessly
+            converted to integer indices.
+        ValueError
+            if the late-bound `selector` indices are invalid for the
+            selected-over `safeguards`.
+        ...
+            if checking a safeguard raises an exception.
         """
 
         ...
@@ -172,6 +211,24 @@ class SelectSafeguard(Safeguard):
         -------
         ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the `selector`'s late-bound parameter is not in `late_bound`.
+        ValueError
+            if the late-bound `selector` could not be broadcast to the `data`'s
+            shape.
+        TypeError
+            if the late-bound `selector` is floating-point.
+        ValueError
+            if not all late-bound `selector` values could be losslessly
+            converted to integer indices.
+        ValueError
+            if the late-bound `selector` indices are invalid for the
+            selected-over `safeguards`.
+        ...
+            if checking a safeguard raises an exception.
         """
 
         ...
@@ -196,6 +253,24 @@ class SelectSafeguard(Safeguard):
         -------
         intervals : IntervalUnion[T, int, int]
             The safe intervals.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the `selector`'s late-bound parameter is not in `late_bound`.
+        ValueError
+            if the late-bound `selector` could not be broadcast to the `data`'s
+            shape.
+        TypeError
+            if the late-bound `selector` is floating-point.
+        ValueError
+            if not all late-bound `selector` values could be losslessly
+            converted to integer indices.
+        IndexError
+            if the late-bound `selector` indices are invalid for the
+            selected-over `safeguards`.
+        ...
+            if computing the safe intervals for a safeguard raises an exception.
         """
 
         ...
@@ -240,19 +315,22 @@ class _SelectSafeguardBase(ABC):
         *,
         late_bound: Bindings,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
-        selector = late_bound.resolve_ndarray_with_lossless_cast(
-            self.selector, data.shape, np.dtype(np.int_)
-        )
+        with ctx.safeguardty(SelectSafeguard), ctx.parameter("selector"):
+            selector = late_bound.resolve_ndarray_with_lossless_cast(
+                self.selector, data.shape, np.dtype(np.int_)
+            )
 
         oks = [
             safeguard.check_pointwise(data, prediction, late_bound=late_bound)
             for safeguard in self.safeguards
         ]
 
-        try:
+        with (
+            ctx.safeguardty(SelectSafeguard),
+            ctx.parameter("selector"),
+            ctx.late_bound_parameter(self.selector),
+        ):
             return np.choose(selector, oks)  # type: ignore
-        except IndexError as err:
-            raise IndexError("invalid select safeguard selector indices") from err
 
     def compute_safe_intervals(
         self,
@@ -260,9 +338,10 @@ class _SelectSafeguardBase(ABC):
         *,
         late_bound: Bindings,
     ) -> IntervalUnion[T, int, int]:
-        selector = late_bound.resolve_ndarray_with_lossless_cast(
-            self.selector, data.shape, np.dtype(np.int_)
-        )
+        with ctx.safeguardty(SelectSafeguard), ctx.parameter("selector"):
+            selector = late_bound.resolve_ndarray_with_lossless_cast(
+                self.selector, data.shape, np.dtype(np.int_)
+            )
 
         valids = [
             safeguard.compute_safe_intervals(data, late_bound=late_bound)
@@ -280,7 +359,12 @@ class _SelectSafeguardBase(ABC):
         valid: IntervalUnion[T, int, int] = IntervalUnion.empty(
             data.dtype, data.size, umax
         )
-        try:
+
+        with (
+            ctx.safeguardty(SelectSafeguard),
+            ctx.parameter("selector"),
+            ctx.late_bound_parameter(self.selector),
+        ):
             valid._lower = (
                 np.take_along_axis(
                     np.stack([v._lower.T for v in valids], axis=0),
@@ -299,8 +383,6 @@ class _SelectSafeguardBase(ABC):
                 .reshape(data.size, umax)
                 .T
             )
-        except IndexError as err:
-            raise IndexError("invalid select safeguard selector indices") from err
 
         return valid
 

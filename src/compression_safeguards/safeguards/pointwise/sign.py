@@ -13,6 +13,7 @@ from typing_extensions import override  # MSPV 3.12
 from ...utils._compat import _ensure_array, _floating_smallest_subnormal
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
+from ...utils.error import TypeCheckError, ctx
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import JSON, S, T
 from .abc import PointwiseSafeguard
@@ -50,6 +51,13 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         zero. Values that are above / below / equal to the offset are
         guaranteed to stay above / below / equal to the offset, respectively.
         Literal values are (unsafely) cast to the data dtype before comparison.
+
+    Raises
+    ------
+    TypeCheckError
+        if any parameter has the wrong type.
+    ValueError
+        if `offset` is NaN.
     """
 
     __slots__: tuple[str, ...] = ("_offset",)
@@ -58,15 +66,19 @@ class SignPreservingSafeguard(PointwiseSafeguard):
     kind: ClassVar[str] = "sign"
 
     def __init__(self, *, offset: int | float | str | Parameter = 0) -> None:
-        if isinstance(offset, Parameter):
-            self._offset = offset
-        elif isinstance(offset, str):
-            self._offset = Parameter(offset)
-        else:
-            assert isinstance(offset, int) or (not np.isnan(offset)), (
-                "offset must not be NaN"
-            )
-            self._offset = offset
+        with ctx.safeguard(self):
+            with ctx.parameter("offset"):
+                TypeCheckError.check_instance_or_raise(
+                    offset, int | float | str | Parameter
+                )
+                if isinstance(offset, Parameter):
+                    self._offset = offset
+                elif isinstance(offset, str):
+                    self._offset = Parameter(offset)
+                elif isinstance(offset, int) or (not np.isnan(offset)):
+                    self._offset = offset
+                else:
+                    raise ValueError("must not be NaN") | ctx
 
     @property
     @override
@@ -113,18 +125,38 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         -------
         ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the `offset` is late-bound but its late-bound parameter is not in
+            `late_bound`.
+        ValueError
+            if the late-bound `offset` could not be broadcast to the `data`'s
+            shape.
+        ValueError
+            if the late-bound `offset` contains NaN values.
+        TypeError
+            if the `offset` is floating-point but the `data` is integer.
+        ValueError
+            if not all `offset`s could not be losslessly converted to the
+            `data`'s type.
         """
 
-        offset: np.ndarray[tuple[()] | S, np.dtype[T]] = (
-            late_bound.resolve_ndarray_with_lossless_cast(
-                self._offset,
-                data.shape,
-                data.dtype,
+        with ctx.safeguard(self), ctx.parameter("offset"):
+            offset: np.ndarray[tuple[()] | S, np.dtype[T]] = (
+                late_bound.resolve_ndarray_with_lossless_cast(
+                    self._offset,
+                    data.shape,
+                    data.dtype,
+                )
+                if isinstance(self._offset, Parameter)
+                else lossless_cast(self._offset, data.dtype)
             )
-            if isinstance(self._offset, Parameter)
-            else lossless_cast(self._offset, data.dtype, "sign safeguard offset")
-        )
-        assert np.all(~np.isnan(offset)), "offset must not contain NaNs"
+            if isinstance(self._offset, Parameter):
+                if np.any(np.isnan(offset)):
+                    with ctx.late_bound_parameter(self._offset):
+                        raise ValueError("must not contain any NaN values") | ctx
 
         # values equal to the offset (sign=0) stay equal
         # values below (sign=-1) stay below,
@@ -163,18 +195,38 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         -------
         intervals : IntervalUnion[T, int, int]
             Union of intervals in which the `data`'s sign is preserved.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the `offset` is late-bound but its late-bound parameter is not
+            in `late_bound`.
+        ValueError
+            if the late-bound `offset` could not be broadcast to the `data`'s
+            shape.
+        ValueError
+            if the late-bound `offset` contains NaN values.
+        TypeError
+            if the `offset` is floating-point but the `data` is integer.
+        ValueError
+            if not all `offset`s could not be losslessly converted to the
+            `data`'s type.
         """
 
-        offsetf: np.ndarray[tuple[()] | tuple[int], np.dtype[T]] = (
-            late_bound.resolve_ndarray_with_lossless_cast(
-                self._offset,
-                data.shape,
-                data.dtype,
-            ).flatten()
-            if isinstance(self._offset, Parameter)
-            else lossless_cast(self._offset, data.dtype, "sign safeguard offset")
-        )
-        assert np.all(~np.isnan(offsetf)), "offset must not contain NaNs"
+        with ctx.safeguard(self), ctx.parameter("offset"):
+            offsetf: np.ndarray[tuple[()] | tuple[int], np.dtype[T]] = (
+                late_bound.resolve_ndarray_with_lossless_cast(
+                    self._offset,
+                    data.shape,
+                    data.dtype,
+                ).flatten()
+                if isinstance(self._offset, Parameter)
+                else lossless_cast(self._offset, data.dtype)
+            )
+            if isinstance(self._offset, Parameter):
+                if np.any(np.isnan(offsetf)):
+                    with ctx.late_bound_parameter(self._offset):
+                        raise ValueError("must not contain any NaN values") | ctx
         offsetf_total: np.ndarray[
             tuple[()] | tuple[int], np.dtype[np.unsignedinteger]
         ] = to_total_order(offsetf)

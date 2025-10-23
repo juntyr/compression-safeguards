@@ -1,3 +1,4 @@
+import re
 from itertools import product
 
 import numpy as np
@@ -166,26 +167,26 @@ def test_monotonicity():
             # if the window activates the safeguard ...
             if data_window in active_allowed:
                 # the check has to return the expected result
-                assert safeguard.check(
-                    data, prediction, late_bound=Bindings.empty()
-                ) == (prediction_window in active_allowed[data_window])
+                assert safeguard.check(data, prediction, late_bound=Bindings.EMPTY) == (
+                    prediction_window in active_allowed[data_window]
+                )
 
                 # correcting the data must pass both checks
                 corrected = safeguard.compute_safe_intervals(
-                    data, late_bound=Bindings.empty()
+                    data, late_bound=Bindings.EMPTY
                 ).pick(prediction)
-                assert safeguard.check(data, corrected, late_bound=Bindings.empty())
+                assert safeguard.check(data, corrected, late_bound=Bindings.EMPTY)
             else:
                 # the window doesn't activate the safeguard so the checks must
                 #  succeed
-                assert safeguard.check(data, prediction, late_bound=Bindings.empty())
+                assert safeguard.check(data, prediction, late_bound=Bindings.EMPTY)
 
                 # the window doesn't activate the safeguard so the corrected
                 #  array should be bit-equivalent to the prediction array
                 assert np.array_equal(
                     as_bits(
                         safeguard.compute_safe_intervals(
-                            data, late_bound=Bindings.empty()
+                            data, late_bound=Bindings.EMPTY
                         ).pick(prediction)
                     ),
                     as_bits(prediction),
@@ -217,7 +218,7 @@ def test_fuzzer_padding_overflow():
 
     with pytest.raises(
         ValueError,
-        match=r"cannot losslessly cast \(some\) monotonicity safeguard constant boundary values from float64 to float32",
+        match=r"monotonicity\.constant_boundary: cannot losslessly cast \(some\) values from float64 to float32",
     ):
         encode_decode_mock(
             data,
@@ -257,8 +258,10 @@ def test_late_bound_constant_boundary():
 
     for c in ["$x", "$X"]:
         with pytest.raises(
-            AssertionError,
-            match="late-bound constant boundary must be a scalar",
+            ValueError,
+            match=re.escape(
+                f"monotonicity.constant_boundary: must be scalar but late-bound constant data {c} may not be"
+            ),
         ):
             safeguards = Safeguards(
                 safeguards=[
@@ -294,7 +297,7 @@ def test_late_bound_constant_boundary():
 
     with pytest.raises(
         ValueError,
-        match=r"cannot losslessly cast \(some\) late-bound parameter const values from int64 to uint8",
+        match=r"monotonicity\.constant_boundary=const: cannot losslessly cast \(some\) values from int64 to uint8",
     ):
         correction = safeguards.compute_correction(
             data, decoded, late_bound=Bindings(const=-1)
@@ -307,7 +310,7 @@ def test_fuzzer_found_broadcast():
 
     with pytest.raises(
         ValueError,
-        match=r"cannot broadcast late-bound parameter 䣿䡈 with shape \(0,\) to shape \(\)",
+        match=r"monotonicity.constant_boundary=䣿䡈: cannot broadcast from shape \(0,\) to shape \(\)",
     ):
         encode_decode_mock(
             data,

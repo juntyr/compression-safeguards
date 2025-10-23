@@ -6,6 +6,7 @@ from compression_safeguards.safeguards.combinators.select import SelectSafeguard
 from compression_safeguards.safeguards.pointwise.abc import PointwiseSafeguard
 from compression_safeguards.safeguards.stencil.abc import StencilSafeguard
 from compression_safeguards.utils.bindings import Bindings
+from compression_safeguards.utils.error import LateBoundParameterResolutionError
 
 from .codecs import encode_decode_mock
 
@@ -107,8 +108,8 @@ def test_inheritance():
 
 def test_parameter_validation():
     with pytest.raises(
-        AssertionError,
-        match=r"parameter `` must be a valid identifier",
+        ValueError,
+        match=r"safeguards\[0\]\.select\.selector: parameter `` is not a valid identifier",
     ):
         Safeguards(
             safeguards=[
@@ -126,8 +127,8 @@ def test_numcodecs_validation():
     decoded = np.array([], dtype=np.uint8)
 
     with pytest.raises(
-        AssertionError,
-        match=r"missing bindings for .+param",
+        LateBoundParameterResolutionError,
+        match="missing late-bound parameter `param`",
     ):
         encode_decode_mock(
             data,
@@ -161,8 +162,8 @@ def test_numcodecs_validation():
 
     for combinator in ["any", "all"]:
         with pytest.raises(
-            AssertionError,
-            match=r"missing bindings for .+param",
+            LateBoundParameterResolutionError,
+            match="missing late-bound parameter `param`",
         ):
             encode_decode_mock(
                 data,

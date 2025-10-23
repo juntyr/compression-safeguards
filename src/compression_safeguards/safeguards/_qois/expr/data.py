@@ -6,6 +6,7 @@ from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import _broadcast_to, _is_of_shape, _ones
 from ....utils.bindings import Parameter
+from ....utils.error import QuantityOfInterestRuntimeWarning
 from ..bound import DataBounds, data_bounds
 from .abc import AnyExpr, EmptyExpr
 from .typing import F, Ns, Ps, PsI
@@ -90,9 +91,15 @@ class Data(EmptyExpr):
         exprv = Xs[(...,) + self._index]
 
         if not np.all((expr_lower <= exprv) | np.isnan(exprv)):
-            warn("data lower bounds are above the data values")
+            warn(
+                "data lower bounds are above the data values",
+                category=QuantityOfInterestRuntimeWarning,
+            )
         if not np.all((expr_upper >= exprv) | np.isnan(exprv)):
-            warn("data upper bounds are below the data values")
+            warn(
+                "data upper bounds are below the data values",
+                category=QuantityOfInterestRuntimeWarning,
+            )
 
         Xs_lower: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(-np.inf))
         Xs_lower[np.isnan(Xs)] = np.nan
@@ -257,12 +264,16 @@ class ScalarAnyDataConstant(EmptyExpr):
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
         assert isinstance(self._const, Xs.dtype.type)
 
-        assert np.all((expr_lower <= self._const) | np.isnan(self._const)), (
-            "data lower bounds are above the any data constant"
-        )
-        assert np.all((expr_upper >= self._const) | np.isnan(self._const)), (
-            "data upper bounds are below the any data constant"
-        )
+        if not np.all((expr_lower <= self._const) | np.isnan(self._const)):
+            warn(
+                "data lower bounds are above the any data constant",
+                category=QuantityOfInterestRuntimeWarning,
+            )
+        if not np.all((expr_upper >= self._const) | np.isnan(self._const)):
+            warn(
+                "data upper bounds are below the any data constant",
+                category=QuantityOfInterestRuntimeWarning,
+            )
 
         Xs_lower: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(-np.inf))
         Xs_lower[np.isnan(Xs)] = np.nan

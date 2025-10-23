@@ -108,6 +108,12 @@ from compression_safeguards.safeguards.stencil import (
     NeighbourhoodAxis,
 )
 from compression_safeguards.utils.bindings import Parameter, Value
+from compression_safeguards.utils.error import (
+    LateBoundParameterResolutionError,
+    TypeCheckError,
+    TypeSetError,
+    ctx,
+)
 from compression_safeguards.utils.typing import JSON, S, T
 from typing_extensions import assert_never  # MSPV 3.11
 
@@ -183,43 +189,94 @@ def produce_data_array_correction(
     -------
     correction : xr.DataArray
         The correction array
+
+    Raises
+    ------
+    ValueError
+        if the `data` has already been corrected by safeguards, i.e. if it is
+        not the original uncorrected data, which will create a printer problem.
+    ValueError
+        if the `prediction` has already been corrected, which may create a
+        printer problem.
+    TypeSetError
+        if the `data` uses an unsupported data type.
+    ValueError
+        if the `data`'s dimensions, shape, dtype, chunks, or name do not match
+        the `prediction`'s, or if the data name is [`None`][None].
+    LateBoundParameterResolutionError
+        if `late_bound` does not resolve all late-bound parameters of the
+        safeguards or includes any extraneous parameters.
+    TypeError
+        if a late-bound parameter is not a scalar or
+        [`xarray.DataArray`][xarray.DataArray].
+    ValueError
+        if a late-bound parameter's dimensions are not a subset of the `data`
+        dimensions, or it is not broadcastable to the `data` shape.
+    ...
+        if instantiating a safeguard, checking a safeguard, or computing the
+        correction for a safeguard raises an exception.
     """
 
     # small safeguard against the printer problem
-    assert "safeguards" not in data.attrs, (
-        "computing the safeguards correction relative to a `data` array that "
-        "has *already* been safeguards-corrected before is unsafe as "
-        "compression errors can accumulate when the original uncompressed data "
-        "is not known; this is also known as the printer problem; please pass "
-        "the original uncompressed and uncorrected `data` to ensure that the "
-        "safeguards can be applied correctly"
-    )
+    if "safeguards" in data.attrs:
+        with ctx.parameter("data"):
+            raise (
+                ValueError(
+                    "computing the safeguards correction relative to a `data` "
+                    + "array that has *already* been safeguards-corrected "
+                    + "before is unsafe as compression errors can accumulate "
+                    + "when the original uncompressed data is not known; this "
+                    + "is also known as the printer problem; please pass the "
+                    + "original uncompressed and uncorrected `data` to ensure "
+                    + "that the safeguards can be applied correctly"
+                )
+                | ctx
+            )
 
     if "safeguards" in prediction.attrs:
         if allow_unsafe_safeguards_override:
             warnings.warn("`allow_unsafe_safeguards_override`=True")
-        else:
-            assert "safeguards" not in prediction.attrs, (
-                "computing the safeguards correction for a `prediction` array "
-                "that has *already* been safeguards-corrected before is unsafe "
-                "as the safety guarantees provided by the previously applied "
-                "safeguards may not be provided by the newly applied "
-                "safeguards, thus violating the earlier guarantees; this is "
-                "also known as the printer problem; please manually inspect "
-                "the `.safeguards` property of the `prediction` array and "
-                "ensure that they are included in the new `safeguards` and "
-                "then pass `allow_unsafe_safeguards_override=True` to this "
-                "function"
+        elif "safeguards" in prediction.attrs:
+            with ctx.parameter("prediction"):
+                raise (
+                    ValueError(
+                        "computing the safeguards correction for a "
+                        + "`prediction` array that has *already* been "
+                        + "safeguards-corrected before is unsafe as the "
+                        + "safety guarantees provided by the previously "
+                        + "applied safeguards may not be provided by the newly "
+                        + "applied safeguards, thus violating the earlier "
+                        + "guarantees; this is also known as the printer "
+                        + "problem; please manually inspect the `.safeguards` "
+                        + "property of the `prediction` array and ensure that "
+                        + "they are included in the new `safeguards` and then "
+                        + "pass `allow_unsafe_safeguards_override=True` to "
+                        + "this function"
+                    )
+                    | ctx
+                )
+    elif allow_unsafe_safeguards_override is not False:
+        with ctx.parameter("allow_unsafe_safeguards_override"):
+            raise (
+                ValueError("unsafe option that must only be passed if instructed") | ctx
             )
-    else:
-        assert allow_unsafe_safeguards_override is False
 
-    assert data.dims == prediction.dims, "data.dims != prediction.dims"
-    assert data.shape == prediction.shape, "data.shape != prediction.shape"
-    assert data.dtype == prediction.dtype, "data.dtype != prediction.dtype"
-    assert data.chunks == prediction.chunks, "data.chunks != prediction.chunks"
-    assert data.name is not None, "data.name is None"
-    assert data.name == prediction.name, "data.name != prediction.name"
+    TypeSetError.check_dtype_or_raise(data.dtype, Safeguards.supported_dtypes())
+
+    with ctx.parameter("prediction"):
+        if prediction.dims != data.dims:
+            raise ValueError("prediction.dims must match data.dims") | ctx
+        if prediction.shape != data.shape:
+            raise ValueError("prediction.shape must match data.shape") | ctx
+        if prediction.dtype != data.dtype:
+            raise ValueError("prediction.dtype must match data.dtype") | ctx
+        if prediction.chunks != data.chunks:
+            raise ValueError("prediction.chunks must match data.chunks") | ctx
+        if prediction.name != data.name:
+            raise ValueError("prediction.name must match data.name") | ctx
+    with ctx.parameter("data"):
+        if data.name is None:
+            raise ValueError("data.name must not be None") | ctx
 
     safeguards_: Safeguards = Safeguards(safeguards=safeguards)
 
@@ -234,10 +291,7 @@ def produce_data_array_correction(
     late_bound_reqs = frozenset(safeguards_late_bound_reqs - builtin_late_bound)
     late_bound_keys = frozenset(Parameter(k) for k in late_bound.keys())
 
-    assert late_bound_reqs == late_bound_keys, (
-        f"late_bound is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} "
-        f"/ has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
-    )
+    LateBoundParameterResolutionError.check_or_raise(late_bound_reqs, late_bound_keys)
 
     # create the global built-in late-bound bindings with $x_min and $x_max
     #  and split-out the late-bound data array bindings that require chunking
@@ -257,21 +311,26 @@ def produce_data_array_correction(
             else data.dtype.type(0)
         )
         late_bound_global["$x_max"] = da_max
-    for k, v in late_bound.items():
-        if isinstance(v, int | float | np.number):
-            late_bound_global[k] = v
-        else:
-            assert isinstance(v, xr.DataArray), (
-                f"late-bound param {k} must be a scalar or `xarray.DataArray`"
-            )
-            assert frozenset(v.dims).issubset(data.dims), (
-                f"late-bound param {k} dims are not a subset of data dims"
-            )
-            for d, ds in v.sizes.items():
-                assert (ds == 1) or (ds == data.sizes[d]), (
-                    "late-bound param {k} dim {d} is not broadcastable to the data size"
+    with ctx.parameter("late_bound"):
+        for k, v in late_bound.items():
+            with ctx.parameter(k):
+                TypeCheckError.check_instance_or_raise(
+                    v, int | float | np.number | xr.DataArray
                 )
-            late_bound_data_arrays[k] = v
+                if isinstance(v, int | float | np.number):
+                    late_bound_global[k] = v
+                else:
+                    if not frozenset(v.dims).issubset(data.dims):
+                        raise ValueError("dims are not a subset of data dims") | ctx
+                    for d, ds in v.sizes.items():
+                        if (ds != 1) and (ds != data.sizes[d]):
+                            raise (
+                                ValueError(
+                                    f"dim {d} is not broadcastable to the data shape"
+                                )
+                                | ctx
+                            )
+                    late_bound_data_arrays[k] = v
 
     correction_name = f"{data.name}_sg"
     correction_attrs = dict(
@@ -731,22 +790,48 @@ def apply_data_array_correction(
     -------
     corrected : xr.DataArray
         The corrected array, which satisfies the safeguards.
+
+    Raises
+    ------
+    ValueError
+        if the `correction`'s dimensions, shape, or chunks do not match the
+        `prediction`'s, or if the `correction`'s dtype does not match the
+        correction dtype for the `prediction`'s dtype.
+    ValueError
+        if the `correction` does not contain metadata about the safeguards that
+        it was produced with.
+    ...
+        if re-instantiating the safeguards from their configuration metadata
+        raises an exception.
     """
 
-    assert correction.dims == prediction.dims, "correction.dims != prediction.dims"
-    assert correction.shape == prediction.shape, "correction.shape != prediction.shape"
-    assert correction.chunks == prediction.chunks, (
-        "correction.chunks != prediction.chunks"
-    )
+    with ctx.parameter("correction"):
+        if correction.dims != prediction.dims:
+            raise ValueError("correction.dims must match prediction.dims") | ctx
+        if correction.shape != prediction.shape:
+            raise ValueError("correction.shape must match prediction.shape") | ctx
+        if correction.chunks != prediction.chunks:
+            raise ValueError("correction.chunks must match prediction.chunks") | ctx
 
-    assert "safeguards" in correction.attrs, (
-        "correction does not contain metadata about the safeguards it was produced with"
-    )
+        if "safeguards" not in correction.attrs:
+            raise (
+                ValueError(
+                    "correction must contain metadata about the safeguards "
+                    + "that it was produced with"
+                )
+                | ctx
+            )
     safeguards = Safeguards.from_config(json.loads(correction.attrs["safeguards"]))
 
-    assert correction.dtype == safeguards.correction_dtype_for_data(prediction.dtype), (
-        "correction dtype mismatch"
-    )
+    with ctx.parameter("correction"):
+        if correction.dtype != safeguards.correction_dtype_for_data(prediction.dtype):
+            raise (
+                ValueError(
+                    "correction.dtype must match the correction dtype for "
+                    + "prediction.dtype"
+                )
+                | ctx
+            )
 
     def _apply_independent_chunk_correction(
         prediction_chunk: xr.DataArray,
@@ -778,6 +863,18 @@ class DatasetSafeguardedAccessor:
     For instance, for a dataset `ds` that contains both a variable `ds.foo` and
     its correction, you can access the corrected variable using
     `ds.safeguarded.foo`.
+
+    Raises
+    ------
+    AttributeError
+        if the dataset does not contain not-yet-applied safeguards corrections.
+    RuntimeError
+        if the attributes of the safeguards correction are invalid.
+    ValueError
+        if applying a safeguards correction raises an exception.
+    ...
+        if re-instantiating the safeguards from their configuration metadata
+        raises an exception.
     """
 
     __slots__: tuple[str, ...] = ()
@@ -785,20 +882,44 @@ class DatasetSafeguardedAccessor:
     def __new__(cls, ds: xr.Dataset) -> xr.Dataset:  # type: ignore
         corrected: dict[str, xr.DataArray] = dict()
 
-        for v in ds.data_vars.values():
+        for vn, v in ds.data_vars.items():
             if "safeguarded" in v.attrs:
                 kp = v.attrs["safeguarded"]
-                assert kp is not None, "safeguarded attr must not be None"
-                assert kp in ds.data_vars, (
-                    "safeguarded attr must refer to another variable"
-                )
-                assert "safeguards" in v.attrs, "safeguards attr must exist"
+                with ctx.parameter(repr(vn)):
+                    if kp is None:
+                        raise (
+                            RuntimeError(
+                                "data variable is a safeguards correction but "
+                                + "its `safeguarded` attribute must not be None"
+                            )
+                            | ctx
+                        )
+                    if kp not in ds.data_vars:
+                        raise (
+                            RuntimeError(
+                                "data variable is a safeguards correction for "
+                                + f"{kp!r} but there is no variable of that "
+                                + "name"
+                            )
+                            | ctx
+                        )
+                    if "safeguards" not in v.attrs:
+                        raise (
+                            RuntimeError(
+                                "data variable is missing the `safeguards` "
+                                + "attribute"
+                            )
+                            | ctx
+                        )
 
                 corrected[kp] = apply_data_array_correction(ds.data_vars[kp], v)
 
         if len(corrected) == 0:
-            raise AttributeError(
-                "not a dataset with not-yet-applied safeguards corrections"
+            raise (
+                AttributeError(
+                    "not a dataset with not-yet-applied safeguards corrections"
+                )
+                | ctx
             )
 
         return xr.Dataset(corrected, attrs=ds.attrs)
@@ -811,11 +932,19 @@ class DataArraySafeguardsAccessor:
     the `.safeguards` property that exposes the collection of
     [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard]s for
     a safeguards correction or corrected array.
+
+    Raises
+    ------
+    AttributeError
+        if the data array does not have associated safeguards.
+    ...
+        if re-instantiating the safeguards from their configuration metadata
+        raises an exception.
     """
 
     __slots__: tuple[str, ...] = ()
 
     def __new__(cls, da: xr.DataArray) -> Collection[Safeguard]:  # type: ignore
         if "safeguards" not in da.attrs:
-            raise AttributeError("not a data array with safeguards")
+            raise AttributeError("not a data array with safeguards") | ctx
         return Safeguards.from_config(json.loads(da.attrs["safeguards"])).safeguards

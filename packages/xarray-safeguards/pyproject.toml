@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "xarray-safeguards"
-version = "0.0.1"
+version = "0.1.0"
 description = "Fearless lossy compression using safeguards"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "compression-safeguards==0.0.1",
+    "compression-safeguards~=1.0",
     "dask>=2024.5.1",
     "numpy~=2.0",
     "typing-extensions~=4.6",

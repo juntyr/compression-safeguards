@@ -23,6 +23,8 @@ from typing_extensions import (
     override,  # MSPV 3.12
 )
 
+from compression_safeguards.utils.error import TypeSetError
+
 from ._compat import _ensure_array, _nextafter, _where
 from ._compat import _maximum_zero_sign_sensitive as _np_maximum
 from ._compat import _minimum_zero_sign_sensitive as _np_minimum
@@ -530,15 +532,14 @@ class IndexedInterval(Generic[T, N]):
 
 
 def _minimum(dtype: np.dtype[T]) -> np.ndarray[tuple[()], np.dtype[T]]:
+    TypeSetError.check_or_raise(dtype.type, np.integer | np.floating)
+
     if np.issubdtype(dtype, np.integer):
         return np.array(np.iinfo(dtype).min, dtype=dtype)  # type: ignore
 
-    if np.issubdtype(dtype, np.floating):
-        btype = dtype.str.replace("f", "u")
-        bmin = np.iinfo(btype).max  # produces -NaN (0xffff...)
-        return np.array(bmin, dtype=btype).view(dtype)
-
-    raise TypeError(f"unsupported interval type {dtype}")
+    btype = dtype.str.replace("f", "u")
+    bmin = np.iinfo(btype).max  # produces -NaN (0xffff...)
+    return np.array(bmin, dtype=btype).view(dtype)
 
 
 class _Minimum:
@@ -558,15 +559,14 @@ Minimum = _Minimum()
 
 
 def _maximum(dtype: np.dtype[T]) -> np.ndarray[tuple[()], np.dtype[T]]:
+    TypeSetError.check_or_raise(dtype.type, np.integer | np.floating)
+
     if np.issubdtype(dtype, np.integer):
         return np.array(np.iinfo(dtype).max, dtype=dtype)  # type: ignore
 
-    if np.issubdtype(dtype, np.floating):
-        btype = dtype.str.replace("f", "u")
-        bmin = np.iinfo(btype).max  # produces -NaN (0xffff...)
-        return np.copysign(np.array(bmin, dtype=btype).view(dtype), +1)  # type: ignore
-
-    raise TypeError(f"unsupported interval type {dtype}")
+    btype = dtype.str.replace("f", "u")
+    bmin = np.iinfo(btype).max  # produces -NaN (0xffff...)
+    return np.copysign(np.array(bmin, dtype=btype).view(dtype), +1)  # type: ignore
 
 
 class _Maximum:

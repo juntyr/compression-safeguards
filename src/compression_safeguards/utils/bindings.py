@@ -18,6 +18,7 @@ from typing_extensions import (
 
 from ._compat import _broadcast_to
 from .cast import lossless_cast, saturating_finite_float_cast
+from .error import LateBoundParameterResolutionError, ctx
 from .typing import JSON, F, Si, T
 
 
@@ -29,6 +30,11 @@ class Parameter(str):
     ----------
     param : str
         Name of the parameter, which must be a valid identifier.
+
+    Raises
+    ------
+    ValueError
+        if `param` is not a valid identifier.
     """
 
     __slots__: tuple[str, ...] = ()
@@ -39,9 +45,8 @@ class Parameter(str):
     def __new__(cls, param: str) -> "Parameter":
         if isinstance(param, Parameter):
             return param
-        assert param.removeprefix("$").isidentifier(), (
-            f"parameter `{param}` must be a valid identifier"
-        )
+        if not param.removeprefix("$").isidentifier():
+            raise ValueError(f"parameter `{param}` is not a valid identifier") | ctx
         return super().__new__(cls, param)
 
     @property
@@ -78,23 +83,15 @@ class Bindings:
     __slots__: tuple[str, ...] = ("_bindings",)
     _bindings: MappingProxyType[Parameter, Value]
 
+    EMPTY: "Bindings"
+    """
+    Empty bindings.
+    """
+
     def __init__(self, **kwargs: Value) -> None:
         self._bindings = MappingProxyType(
             {Parameter(name): value for name, value in kwargs.items()}
         )
-
-    @staticmethod
-    def empty() -> "Bindings":
-        """
-        Create empty bindings.
-
-        Returns
-        -------
-        empty : Bindings
-            Empty bindings.
-        """
-
-        return Bindings()
 
     def update(self, **kwargs: Value) -> Self:
         """
@@ -168,22 +165,44 @@ class Bindings:
         array : np.ndarray[Si, np.dtype[T]]
             A read-only view to the resolved array of the given `shape` and
             `dtype`.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the `param`eter is not contained in the bindings.
+        ValueError
+            if the `param`eter could not be broadcast to the `shape`.
+        TypeError
+            if floating-point values are converted to an integer `dtype`.
+        ValueError
+            if not all values could be losslessly converted to `dtype`.
         """
 
-        assert param in self._bindings, f"LateBound is missing binding for {param}"
+        if param not in self._bindings:
+            raise (
+                LateBoundParameterResolutionError(frozenset([param]), frozenset([]))
+                | ctx
+            )
 
         # cast first then broadcast to allow zero-copy broadcasts of scalars
         #  to arrays of any shape
-        value: np.ndarray[tuple[int, ...], np.dtype[T]] = lossless_cast(
-            self._bindings[param], dtype, f"late-bound parameter {param}"
-        )
-
-        try:
-            value_view: np.ndarray[Si, np.dtype[T]] = _broadcast_to(value, shape).view()
-        except ValueError:
-            raise ValueError(
-                f"cannot broadcast late-bound parameter {param} with shape {value.shape} to shape {shape}"
+        with ctx.late_bound_parameter(param):
+            value: np.ndarray[tuple[int, ...], np.dtype[T]] = lossless_cast(
+                self._bindings[param], dtype
             )
+
+            try:
+                value_view: np.ndarray[Si, np.dtype[T]] = _broadcast_to(
+                    value, shape
+                ).view()
+            except ValueError:
+                raise (
+                    ValueError(
+                        f"cannot broadcast from shape {value.shape} to shape "
+                        + f"{shape}"
+                    )
+                    | ctx
+                ) from None
 
         value_view.flags.writeable = False
 
@@ -215,22 +234,42 @@ class Bindings:
         array : np.ndarray[Si, np.dtype[F]]
             A read-only view to the resolved array of the given `shape` and
             `dtype`.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the `param`eter is not contained in the bindings.
+        ValueError
+            if the `param`eter could not be broadcast to the `shape`.
+        ValueError
+            if any values are non-finite, i.e. infinite or NaN.
         """
 
-        assert param in self._bindings, f"LateBound is missing binding for {param}"
+        if param not in self._bindings:
+            raise (
+                LateBoundParameterResolutionError(frozenset([param]), frozenset([]))
+                | ctx
+            )
 
         # cast first then broadcast to allow zero-copy broadcasts of scalars
         #  to arrays of any shape
-        value: np.ndarray[tuple[int, ...], np.dtype[F]] = saturating_finite_float_cast(
-            self._bindings[param], dtype, f"late-bound parameter {param}"
-        )
-
-        try:
-            value_view: np.ndarray[Si, np.dtype[F]] = _broadcast_to(value, shape).view()
-        except ValueError:
-            raise ValueError(
-                f"cannot broadcast late-bound parameter {param} with shape {value.shape} to shape {shape}"
+        with ctx.late_bound_parameter(param):
+            value: np.ndarray[tuple[int, ...], np.dtype[F]] = (
+                saturating_finite_float_cast(self._bindings[param], dtype)
             )
+
+            try:
+                value_view: np.ndarray[Si, np.dtype[F]] = _broadcast_to(
+                    value, shape
+                ).view()
+            except ValueError:
+                raise (
+                    ValueError(
+                        f"cannot broadcast from shape {value.shape} to shape "
+                        + f"{shape}"
+                    )
+                    | ctx
+                ) from None
 
         value_view.flags.writeable = False
 
@@ -248,8 +287,8 @@ class Bindings:
 
         Raises
         ------
-        AssertionError
-            if an array parameter cannot be broadcast to the `shape`
+        ValueError
+            if an array parameter could not be broadcast to the `shape`.
         """
 
         for param, value in self._bindings.items():
@@ -265,13 +304,23 @@ class Bindings:
                 # scalar array
                 continue
 
-            assert value.ndim == len(shape), (
-                f"param {param} has dimension {value.ndim}, expected {len(shape)}"
-            )
+            with ctx.late_bound_parameter(param):
+                if value.ndim != len(shape):
+                    raise (
+                        ValueError(
+                            f"incompatible dimension {value.ndim}, expected "
+                            + f"{len(shape)}"
+                        )
+                        | ctx
+                    )
 
-            assert all((v == 1) or (v == s) for v, s in zip(value.shape, shape)), (
-                f"param {param} has shape {value.shape}, expected {shape}"
-            )
+                if not all((v == 1) or (v == s) for v, s in zip(value.shape, shape)):
+                    raise (
+                        ValueError(
+                            f"incompatible shape {value.shape}, expected {shape}"
+                        )
+                        | ctx
+                    )
 
     def apply_slice_index(self, index: tuple[slice, ...]) -> Self:
         """
@@ -412,6 +461,9 @@ class Bindings:
         return cls(**{p: _decode_value(Parameter(p), v) for p, v in config.items()})  # type: ignore
 
 
+Bindings.EMPTY = Bindings()
+
+
 _NPZ_DATA_URI_BASE64: str = "data:application/x-npz;base64,"
 
 
@@ -430,9 +482,11 @@ def _decode_value(p: Parameter, v: int | float | str) -> Value:
     if isinstance(v, int | float):
         return v
 
-    assert v.startswith(_NPZ_DATA_URI_BASE64), (
-        "value must be encoded as a .npz data URI in base64 format"
-    )
+    if not v.startswith(_NPZ_DATA_URI_BASE64):
+        with ctx.parameter(p):
+            raise (
+                ValueError("must be encoded as a .npz data URI in base64 format") | ctx
+            )
 
     io = BytesIO(
         standard_b64decode(v[len(_NPZ_DATA_URI_BASE64) :].encode(encoding="ascii"))

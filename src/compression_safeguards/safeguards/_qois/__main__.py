@@ -1,3 +1,5 @@
+from traceback import print_exception
+
 import numpy as np
 
 from ..qois import StencilQuantityOfInterestExpression
@@ -25,4 +27,4 @@ if __name__ == "__main__":
             )
             print(f"eval: {qoi_expr.eval(Xs, dict())}")  # noqa: T201
         except Exception as err:
-            print(f"{type(err).__name__}: {err}")  # noqa: T201
+            print_exception(err, limit=0)

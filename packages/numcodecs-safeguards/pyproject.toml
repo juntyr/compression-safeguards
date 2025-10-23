@@ -4,20 +4,21 @@ build-backend = "hatchling.build"
 
 [project]
 name = "numcodecs-safeguards"
-version = "0.0.1"
+version = "0.1.0"
 description = "Fearless lossy compression using safeguards"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "compression-safeguards==0.0.1",
+    "compression-safeguards~=1.0",
     "numcodecs>=0.13.0,<0.17",
     "numcodecs-combinators~=0.2.10",
     "numcodecs-delta~=0.1.0",
     "numcodecs-huffman~=0.1.0",
     "numcodecs-zero~=0.1.0",
     "numpy~=2.0",
-    "varint~=1.0",
+    "semver~=3.0",
     "typing-extensions~=4.6",
+    "varint~=1.0",
 ]
 
 [project.entry-points."numcodecs.codecs"]

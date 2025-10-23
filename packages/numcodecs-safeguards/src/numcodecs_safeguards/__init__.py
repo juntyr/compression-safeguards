@@ -90,9 +90,15 @@ from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.abc import Safeguard
 from compression_safeguards.utils.bindings import Bindings, Parameter, Value
 from compression_safeguards.utils.cast import as_bits
+from compression_safeguards.utils.error import (
+    LateBoundParameterResolutionError,
+    TypeSetError,
+    ctx,
+)
 from compression_safeguards.utils.typing import JSON
 from numcodecs.abc import Codec
 from numcodecs_combinators.abc import CodecCombinatorMixin
+from semver import Version
 from typing_extensions import (
     Buffer,  # MSPV 3.12
     Self,  # MSPV 3.11
@@ -198,7 +204,18 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         The lossless encoding must encode to a 1D buffer of bytes.
     _version : ...
-        The codecs's version. Do not provide this parameter explicitly.
+        The version of the codec. Do not provide this parameter explicitly.
+
+    Raises
+    ------
+    ValueError
+        if `codec` wraps another `SafeguardsCodec`, which may create a printer
+        problem.
+    LateBoundParameterResolutionError
+        if `fixed_constants` does not resolve all late-bound parameters of the
+        safeguards or includes any extraneous parameters.
+    ...
+        if instantiating the `codec` or a safeguard raises an exception.
     """
 
     __slots__: tuple[str, ...] = (
@@ -221,9 +238,9 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         *,
         codec: dict[str, JSON] | Codec,
         safeguards: Collection[dict[str, JSON] | Safeguard],
-        fixed_constants: Mapping[str | Parameter, Value] | Bindings = Bindings.empty(),
+        fixed_constants: Mapping[str | Parameter, Value] | Bindings = Bindings.EMPTY,
         lossless: None | dict[str, JSON] | Lossless = None,
-        _version: None | str = None,
+        _version: None | str | Version = None,
     ) -> None:
         wraps_safeguards_codec = False
 
@@ -238,12 +255,17 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         numcodecs_combinators.map_codec(self._codec, check_for_safeguards_codec)
 
-        assert not wraps_safeguards_codec, (
-            "`SafeguardsCodec` should not wrap a codec containing another "
-            "`SafeguardsCodec` since the safeguards of one might not be upheld "
-            "by the other (printer problem); merge them into one combined "
-            "`SafeguardsCodec` instead"
-        )
+        if wraps_safeguards_codec:
+            with ctx.parameter("codec"):
+                raise (
+                    ValueError(
+                        "`SafeguardsCodec` should not wrap a codec containing "
+                        + "another `SafeguardsCodec` since the safeguards of one "
+                        + "might not be upheld by the other (printer problem); "
+                        + "merge them into one combined `SafeguardsCodec` instead"
+                    )
+                    | ctx
+                )
 
         self._safeguards = Safeguards(safeguards=safeguards, _version=_version)
 
@@ -253,11 +275,11 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             else Bindings(**fixed_constants)
         )
 
-        late_bound_reqs = self.late_bound - self.builtin_late_bound
+        late_bound_reqs = frozenset(self.late_bound - self.builtin_late_bound)
         late_bound_keys = frozenset(self._late_bound.parameters())
 
-        assert late_bound_reqs == late_bound_keys, (
-            f"fixed_constants is missing bindings for {sorted(late_bound_reqs - late_bound_keys)} / has extraneous bindings {sorted(late_bound_keys - late_bound_reqs)}"
+        LateBoundParameterResolutionError.check_or_raise(
+            late_bound_reqs, late_bound_keys
         )
 
         lossless = (
@@ -399,24 +421,36 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         -------
         enc : bytes
             Encoded data as a bytestring.
+
+        Raises
+        ------
+        TypeSetError
+            if the `buf`fer uses an unsupported data type.
+        RuntimeError
+            if decoding with the `codec` with `out=None` fails.
+        RuntimError
+            if `codec` and `lossless` do not encode to 1D bytes or do not
+            recreate the data's dtype and shape during decoding.
+        ...
+            if checking a safeguard or computing the correction for a safeguard
+            raises an exception.
         """
 
         data = (
             buf if isinstance(buf, np.ndarray) else numcodecs.compat.ensure_ndarray(buf)
         )
 
-        assert data.dtype in Safeguards.supported_dtypes(), (
-            f"can only encode arrays of dtype {', '.join(d.name for d in Safeguards.supported_dtypes())}"
-        )
+        TypeSetError.check_dtype_or_raise(data.dtype, Safeguards.supported_dtypes())
 
         encoded = self._codec.encode(np.copy(data))
         encoded = numcodecs.compat.ensure_ndarray(encoded)
 
         # check that decoding with `out=None` works
         try:
-            decoded = self._codec.decode(np.copy(encoded), out=None)
+            with ctx.parameter("codec"):
+                decoded = self._codec.decode(np.copy(encoded), out=None)
         except Exception as err:
-            message = (
+            note = (
                 "decoding with `out=None` failed\n\n"
                 "consider using wrapping the codec in the "
                 "`numcodecs_combinators.framed.FramedCodecStack(codec)` "
@@ -426,26 +460,34 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
             # MSPV 3.11
             if getattr(err, "add_note", None) is not None:
-                err.add_note(message)  # type: ignore
-                raise err
+                err.add_note(note)  # type: ignore
+                raise
             else:
-                raise ValueError(message) from err
+                raise (RuntimeError(note) | ctx) from err
         decoded = numcodecs.compat.ensure_ndarray(decoded)
 
         if self._lossless_for_codec is not None:
             encoded = self._lossless_for_codec.encode(encoded)
 
         try:
-            assert encoded.dtype == np.dtype("uint8"), (
-                "codec and lossless must encode to bytes"
-            )
-            assert encoded.ndim <= 1, "codec and lossless must encode to 1D bytes"
-            encoded_bytes = numcodecs.compat.ensure_bytes(encoded)
+            with ctx.parameter(
+                "codec" if self._lossless_for_codec is None else "lossless"
+            ):
+                if np.array(encoded, copy=None).dtype != np.dtype(np.uint8):
+                    raise RuntimeError("codec and lossless must encode to bytes") | ctx
+                if np.array(encoded, copy=None).ndim != 1:
+                    raise (
+                        RuntimeError("codec and lossless must encode to 1D bytes") | ctx
+                    )
+                encoded_bytes = numcodecs.compat.ensure_bytes(encoded)
 
-            assert decoded.dtype == data.dtype, "codec must roundtrip dtype"
-            assert decoded.shape == data.shape, "codec must roundtrip shape"
-        except Exception as err:
-            message = (
+            with ctx.parameter("codec"):
+                if decoded.dtype != data.dtype:
+                    raise RuntimeError("codec must decode to the data's dtype") | ctx
+                if decoded.shape != data.shape:
+                    raise RuntimeError("codec must decode to the data's shape") | ctx
+        except RuntimeError as err:
+            note = (
                 "consider using wrapping the codec in the "
                 "`numcodecs_combinators.framed.FramedCodecStack(codec)` "
                 "combinator to encode to bytes and preserve the data dtype and"
@@ -454,10 +496,10 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
             # MSPV 3.11
             if getattr(err, "add_note", None) is not None:
-                err.add_note(message)  # type: ignore
-                raise err
+                err.add_note(note)  # type: ignore
+                raise
             else:
-                raise ValueError(message) from err
+                raise (RuntimeError(note) | ctx) from err
 
         late_bound = self._late_bound
         late_bound_reqs = self._safeguards.late_bound
@@ -518,16 +560,32 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         dec : Buffer
             Decoded data. May be any object supporting the new-style
             buffer protocol.
+
+        Raises
+        ------
+        ValueError
+            if `buf` is not a 1D bytes buffer.
+        ValueError
+            if `buf` has a corrupted header.
+        ...
+            if applying the safeguards correction raises an exception.
         """
 
-        buf_array = numcodecs.compat.ensure_ndarray(buf)
-        assert buf_array.dtype == np.dtype("uint8"), "codec must decode from bytes"
-        assert buf_array.ndim <= 1, "codec must decode from 1D bytes"
-        buf_bytes = numcodecs.compat.ensure_bytes(buf)
+        with ctx.parameter("buf"):
+            buf_array = numcodecs.compat.ensure_ndarray(buf)
+            if buf_array.dtype != np.dtype(np.uint8):
+                raise ValueError("can only decode from bytes") | ctx
+            if buf_array.ndim != 1:
+                raise ValueError("can only decode from 1D bytes") | ctx
+            buf_bytes = numcodecs.compat.ensure_bytes(buf)
 
-        buf_io = BytesIO(buf_bytes)
-        correction_len = varint.decode_stream(buf_io)
-        assert correction_len >= 0
+            buf_io = BytesIO(buf_bytes)
+            correction_len = varint.decode_stream(buf_io)
+            if correction_len < 0:
+                raise (
+                    ValueError("cannot decode from corrupt buf with invalid header")
+                    | ctx
+                )
 
         if correction_len > 0:
             encoded = buf_bytes[buf_io.tell() : -correction_len]
@@ -587,7 +645,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 else self._lossless_for_codec.get_config(),
                 for_safeguards=self._lossless_for_safeguards.get_config(),
             ),
-            _version=self._safeguards.version,
+            _version=str(self._safeguards.version),
         )
 
     @classmethod

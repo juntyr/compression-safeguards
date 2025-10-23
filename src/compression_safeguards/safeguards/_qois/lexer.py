@@ -4,6 +4,8 @@ from contextlib import contextmanager
 
 from sly import Lexer
 
+from ...utils.error import ctx
+
 
 class QoILexer(Lexer):
     # === token declarations ===
@@ -250,7 +252,18 @@ class QoILexer(Lexer):
         self.raise_error(t, f"unexpected character `{t.value[0]}`")
 
     def raise_error(self, t, message):
-        raise SyntaxError(f"{message} at line {t.lineno}, column {self.find_column(t)}")
+        raise (
+            SyntaxError(
+                message,
+                (
+                    "<qoi>",
+                    t.lineno,
+                    self.find_column(t),
+                    self.text.splitlines()[t.lineno - 1],
+                ),
+            )
+            | ctx
+        )
 
     def assert_or_error(self, check, t, message):
         if not check:

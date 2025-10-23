@@ -2,12 +2,12 @@ import itertools
 from contextlib import contextmanager
 
 from sly import Parser
-from typing_extensions import Unpack  # MSPV 3.11
 
 from ...utils.bindings import Parameter
+from ...utils.error import ctx
 from .expr.abc import AnyExpr
 from .expr.abs import ScalarAbs
-from .expr.addsub import ScalarAdd, ScalarSubtract
+from .expr.addsub import ScalarAdd, ScalarLeftAssociativeSum, ScalarSubtract
 from .expr.array import Array
 from .expr.classification import ScalarIsFinite, ScalarIsInf, ScalarIsNaN
 from .expr.data import Data, LateBoundConstant
@@ -50,7 +50,7 @@ from .lexer import QoILexer
 class QoIParser(Parser):
     __slots__: tuple[str, ...] = ("_x", "_X", "_I", "_vars", "_text")
     _x: Data
-    _X: None | Array[Unpack[tuple[AnyExpr, ...]]]
+    _X: None | Array
     _I: None | tuple[int, ...]
     _vars: dict[Parameter, AnyExpr]
     _text: str
@@ -59,7 +59,7 @@ class QoIParser(Parser):
         self,
         *,
         x: Data,
-        X: None | Array[Unpack[tuple[AnyExpr, ...]]],
+        X: None | Array,
         I: None | tuple[int, ...],  # noqa: E741
     ):
         self._x = x
@@ -72,7 +72,10 @@ class QoIParser(Parser):
         tokens, tokens2 = itertools.tee(tokens)
 
         if next(tokens2, None) is None:
-            raise SyntaxError("expression must not be empty")
+            raise (
+                SyntaxError("expression must not be empty", ("<qoi>", None, None, None))
+                | ctx
+            )
 
         return super().parse(tokens)
 
@@ -99,9 +102,9 @@ class QoIParser(Parser):
         self.assert_or_error(
             not isinstance(p.expr, Array),
             p,
-            lambda: f"QoI expression must be a scalar but is an array expression of shape {p.expr.shape}",
+            lambda: f"expression must be a scalar but is an array expression of shape {p.expr.shape}",
         )
-        self.assert_or_error(p.expr.has_data, p, "QoI expression must not be constant")
+        self.assert_or_error(p.expr.has_data, p, "expression must not be constant")
         return p.expr
 
     @_("many_assign return_expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
@@ -113,10 +116,10 @@ class QoIParser(Parser):
         self.assert_or_error(
             not isinstance(p.expr, Array),
             p,
-            lambda: f"QoI return expression must be a scalar but is an array expression of shape {p.expr.shape}",
+            lambda: f"return expression must be a scalar but is an array expression of shape {p.expr.shape}",
         )
         self.assert_or_error(
-            p.expr.has_data, p, "QoI return expression must not be constant"
+            p.expr.has_data, p, "return expression must not be constant"
         )
         return p.expr
 
@@ -419,6 +422,11 @@ class QoIParser(Parser):
         self.assert_or_error(
             self._I is not None, p, "index `I` is not available in pointwise QoIs"
         )
+        self.assert_or_error(
+            (p.integer >= -len(self._I)) and (p.integer < len(self._I)),
+            p,
+            f"axis index {p.integer} is out of bounds for stencil with {len(self._I)} ax{'i' if len(self._I) == 1 else 'e'}s",
+        )
         return Number.from_symbolic_int(self._I[p.integer])
 
     # functions
@@ -687,24 +695,16 @@ class QoIParser(Parser):
             ScalarMultiply(expr.apply_array_element_offset(axis, o), c)
             for o, c in zip(offsets, coefficients)
         ]
+        # even order=0 produces at least one term
         assert len(terms) > 0
-        acc = terms[0]
-        for t in terms[1:]:
-            acc = ScalarAdd(acc, t)
+        sum_ = ScalarLeftAssociativeSum(*terms)
 
         required_axis_before = 0
         required_axis_after = 0
 
-        for idx in acc.data_indices:
-            for x, i, a, c in zip(
-                range(len(self._X.shape)), idx, self._X.shape, self._I
-            ):
-                if x != ((axis + len(self._X.shape)) % len(self._X.shape)):
-                    assert i >= 0
-                    assert i < a
-
-                required_axis_before = max(required_axis_before, c - i)
-                required_axis_after = max(required_axis_after, i - c)
+        for idx in sum_.data_indices:
+            required_axis_before = max(required_axis_before, self._I[axis] - idx[axis])
+            required_axis_after = max(required_axis_after, idx[axis] - self._I[axis])
 
         self.assert_or_error(
             (required_axis_before <= self._I[axis])
@@ -716,8 +716,8 @@ class QoIParser(Parser):
             f"{required_axis_after}",
         )
 
-        assert not isinstance(acc, Array)
-        return Group(acc)
+        assert not isinstance(sum_, Array)
+        return Group(sum_)
 
     @_("COMMA GRID_SPACING EQUAL expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def finite_difference_grid_spacing(self, p):  # noqa: F811
@@ -787,18 +787,47 @@ class QoIParser(Parser):
         oneof = " one of" if len(actions) > 1 else ""
 
         if t is None:
-            raise SyntaxError(
-                f"expected more input but found EOF\nexpected{oneof} {options}"
+            raise (
+                SyntaxError(
+                    f"expected more input but found EOF\nexpected{oneof} {options}",
+                    (
+                        "<qoi>",
+                        1 + self._text.count("\n"),
+                        len(self._text) - self._text.rfind("\n"),
+                        self._text[self._text.rfind("\n") + 1 :],
+                    ),
+                )
+                | ctx
             )
 
         t_value = f'"{t.value}"' if t.type == "STRING" else t.value
 
-        raise SyntaxError(
-            f"unexpected token `{t_value}` at line {t.lineno}, column {self.find_column(t)}\nexpected{oneof} {options}"
+        raise (
+            SyntaxError(
+                f"unexpected token `{t_value}`\nexpected{oneof} {options}",
+                (
+                    "<qoi>",
+                    t.lineno,
+                    self.find_column(t),
+                    self._text.splitlines()[t.lineno - 1],
+                ),
+            )
+            | ctx
         )
 
     def raise_error(self, t, message):
-        raise SyntaxError(f"{message} at line {t.lineno}, column {self.find_column(t)}")
+        raise (
+            SyntaxError(
+                message,
+                (
+                    "<qoi>",
+                    t.lineno,
+                    self.find_column(t),
+                    self._text.splitlines()[t.lineno - 1],
+                ),
+            )
+            | ctx
+        )
 
     def assert_or_error(self, check, t, message):
         if not check:
@@ -814,7 +843,7 @@ class QoIParser(Parser):
             else:
                 self.raise_error(t, message)
 
-    def find_column(self, token):
+    def find_column(self, token) -> int:
         last_cr = self._text.rfind("\n", 0, token.index)
         if last_cr < 0:
             last_cr = 0

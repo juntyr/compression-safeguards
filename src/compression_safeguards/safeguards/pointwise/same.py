@@ -13,6 +13,7 @@ from typing_extensions import override  # MSPV 3.12
 from ...utils._compat import _ensure_array
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import as_bits, from_total_order, lossless_cast, to_total_order
+from ...utils.error import TypeCheckError, ctx
 from ...utils.intervals import Interval, IntervalUnion, Lower, Maximum, Minimum, Upper
 from ...utils.typing import JSON, S, T
 from .abc import PointwiseSafeguard
@@ -48,6 +49,11 @@ class SameValueSafeguard(PointwiseSafeguard):
         If [`True`][True], non-`value` elements in the data stay non-`value`
         after applying corrections. If [`False`][False], non-`value` values may
         have the `value` after applying corrections.
+
+    Raises
+    ------
+    TypeCheckError
+        if any parameter has the wrong type.
     """
 
     __slots__: tuple[str, ...] = ("_value", "_exclusive")
@@ -59,14 +65,21 @@ class SameValueSafeguard(PointwiseSafeguard):
     def __init__(
         self, value: int | float | str | Parameter, *, exclusive: bool = False
     ) -> None:
-        if isinstance(value, Parameter):
-            self._value = value
-        elif isinstance(value, str):
-            self._value = Parameter(value)
-        else:
-            self._value = value
+        with ctx.safeguard(self):
+            with ctx.parameter("value"):
+                TypeCheckError.check_instance_or_raise(
+                    value, int | float | str | Parameter
+                )
+                if isinstance(value, Parameter):
+                    self._value = value
+                elif isinstance(value, str):
+                    self._value = Parameter(value)
+                else:
+                    self._value = value
 
-        self._exclusive = exclusive
+            with ctx.parameter("exclusive"):
+                TypeCheckError.check_instance_or_raise(exclusive, bool)
+                self._exclusive = exclusive
 
     @property
     @override
@@ -113,17 +126,32 @@ class SameValueSafeguard(PointwiseSafeguard):
         -------
         ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the `value` is late-bound but its late-bound parameter is not in
+            `late_bound`.
+        ValueError
+            if the late-bound `value` could not be broadcast to the `data`'s
+            shape.
+        TypeError
+            if the `value` is floating-point but the `data` is integer.
+        ValueError
+            if not all `value`s could not be losslessly converted to the
+            `data`'s type.
         """
 
-        value: np.ndarray[tuple[()] | S, np.dtype[T]] = (
-            late_bound.resolve_ndarray_with_lossless_cast(
-                self._value,
-                data.shape,
-                data.dtype,
+        with ctx.safeguard(self), ctx.parameter("value"):
+            value: np.ndarray[tuple[()] | S, np.dtype[T]] = (
+                late_bound.resolve_ndarray_with_lossless_cast(
+                    self._value,
+                    data.shape,
+                    data.dtype,
+                )
+                if isinstance(self._value, Parameter)
+                else lossless_cast(self._value, data.dtype)
             )
-            if isinstance(self._value, Parameter)
-            else lossless_cast(self._value, data.dtype, "same safeguard value")
-        )
         value_bits: np.ndarray[tuple[()] | S, np.dtype[np.unsignedinteger]] = as_bits(
             value
         )
@@ -162,17 +190,32 @@ class SameValueSafeguard(PointwiseSafeguard):
         -------
         intervals : IntervalUnion[T, int, int]
             Union of intervals in which the same value guarantee is upheld.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the `value` is late-bound but its late-bound parameter is not in
+            `late_bound`.
+        ValueError
+            if the late-bound `value` could not be broadcast to the `data`'s
+            shape.
+        TypeError
+            if the `value` is floating-point but the `data` is integer.
+        ValueError
+            if not all `value`s could not be losslessly converted to the
+            `data`'s type.
         """
 
-        valuef: np.ndarray[tuple[()] | tuple[int], np.dtype[T]] = (
-            late_bound.resolve_ndarray_with_lossless_cast(
-                self._value,
-                data.shape,
-                data.dtype,
-            ).flatten()
-            if isinstance(self._value, Parameter)
-            else lossless_cast(self._value, data.dtype, "same safeguard value")
-        )
+        with ctx.safeguard(self), ctx.parameter("value"):
+            valuef: np.ndarray[tuple[()] | tuple[int], np.dtype[T]] = (
+                late_bound.resolve_ndarray_with_lossless_cast(
+                    self._value,
+                    data.shape,
+                    data.dtype,
+                ).flatten()
+                if isinstance(self._value, Parameter)
+                else lossless_cast(self._value, data.dtype)
+            )
         valuef_bits: np.ndarray[
             tuple[()] | tuple[int], np.dtype[np.unsignedinteger]
         ] = as_bits(valuef)

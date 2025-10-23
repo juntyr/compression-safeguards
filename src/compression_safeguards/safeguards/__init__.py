@@ -6,6 +6,9 @@ __all__ = ["SafeguardKind"]
 
 from enum import Enum
 
+from ..utils.error import TypeCheckError, ctx, lookup_enum_or_raise
+from ..utils.typing import JSON
+from .abc import Safeguard
 from .combinators.all import AllSafeguards
 from .combinators.any import AnySafeguard
 from .combinators.assume_safe import AssumeAlwaysSafeguard
@@ -57,3 +60,45 @@ class SafeguardKind(Enum):
 
     select = SelectSafeguard
     """Select, pointwise, which safeguard's guarantees to enforce."""
+
+    @staticmethod
+    def from_config(config: dict[str, JSON]) -> Safeguard:
+        """
+        Instantiate a safeguard from a configuration [`dict`][dict].
+
+        The `config` must contain the safeguard's `kind`.
+
+        Parameters
+        ----------
+        config : dict[str, JSON]
+            Configuration of the safeguard.
+
+        Returns
+        -------
+        safeguard : Safeguard
+            Instantiated safeguard.
+
+        Raises
+        ------
+        ValueError
+            if the `config` does not contain the safeguard `kind` or the
+            `kind` is unknown.
+        TypeCheckError
+            if the safeguard `kind` is not a [`str`][str]ing.
+        ...
+            if instantiating the safeguard raises an exception.
+        """
+
+        if "kind" not in config:
+            raise ValueError("missing safeguard `kind`") | ctx
+
+        kind = config["kind"]
+
+        with ctx.parameter("kind"):
+            TypeCheckError.check_instance_or_raise(kind, str)
+            safeguard: type[Safeguard] = lookup_enum_or_raise(
+                SafeguardKind,
+                kind,  # type: ignore
+            ).value
+
+        return safeguard.from_config({p: v for p, v in config.items() if p != "kind"})

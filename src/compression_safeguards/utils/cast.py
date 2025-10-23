@@ -20,6 +20,7 @@ from typing_extensions import assert_never  # MSPV 3.11
 
 from ._compat import _ensure_array, _is_of_dtype, _nan_to_zero_inf_to_finite
 from ._float128 import _float128_dtype
+from .error import TypeSetError, ctx
 from .typing import F, S, T, U
 
 
@@ -77,6 +78,11 @@ class ToFloatMode(Enum):
         ftype : np.dtype[np.floating]
             Floating-point data type that can losslessly represent all values
             from the input `dtype`.
+
+        Raises
+        ------
+        TypeError
+            if `dtype` cannot be losslessly cast to `self`.
         """
 
         match self:
@@ -104,7 +110,9 @@ class ToFloatMode(Enum):
                     np.dtype(np.float16),
                 ):
                     return np.dtype(np.float16)
-                raise ValueError(f"cannot losslessly cast {dtype.name} to float16")
+                raise (
+                    TypeError(f"cannot losslessly cast {dtype.name} to float16") | ctx
+                )
             case ToFloatMode.float32:
                 if dtype in (
                     np.dtype(np.int8),
@@ -115,7 +123,9 @@ class ToFloatMode(Enum):
                     np.dtype(np.float32),
                 ):
                     return np.dtype(np.float32)
-                raise ValueError(f"cannot losslessly cast {dtype.name} to float32")
+                raise (
+                    TypeError(f"cannot losslessly cast {dtype.name} to float32") | ctx
+                )
             case ToFloatMode.float64:
                 if dtype in (
                     np.dtype(np.int8),
@@ -129,7 +139,9 @@ class ToFloatMode(Enum):
                     np.dtype(np.float64),
                 ):
                     return np.dtype(np.float64)
-                raise ValueError(f"cannot losslessly cast {dtype.name} to float64")
+                raise (
+                    TypeError(f"cannot losslessly cast {dtype.name} to float64") | ctx
+                )
             case ToFloatMode.float128:
                 if dtype in (
                     np.dtype(np.int8),
@@ -145,7 +157,9 @@ class ToFloatMode(Enum):
                     np.dtype(np.float64),
                 ):
                     return _float128_dtype
-                raise ValueError(f"cannot losslessly cast {dtype.name} to float128")
+                raise (
+                    TypeError(f"cannot losslessly cast {dtype.name} to float128") | ctx
+                )
             case _:
                 assert_never(self)
 
@@ -197,9 +211,10 @@ def to_float(
     if _is_of_dtype(x, ftype):
         return x
 
-    with np.errstate(invalid="ignore"):
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         # lossless cast to floating-point data type with a sufficiently large
         #  mantissa
+        # FIXME: numpy_quaddtype raises warnings even though no overflow occurs
         return x.astype(ftype, casting="safe")
 
 
@@ -305,7 +320,16 @@ def to_total_order(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[U]]:
     -------
     ordered : np.ndarray[S, np.dtype[U]]
         The total-order unsigned binary representation of the array `a`.
+
+    Raises
+    ------
+    TypeSetError
+        if `a` is not a signed/unsigned integer or floating array.
     """
+
+    TypeSetError.check_or_raise(
+        a.dtype.type, np.unsignedinteger | np.signedinteger | np.floating
+    )
 
     if np.issubdtype(a.dtype, np.unsignedinteger):
         return a  # type: ignore
@@ -321,9 +345,6 @@ def to_total_order(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[U]]:
             return (
                 a.view(utype) + np.array(shift, dtype=utype) + np.array(1, dtype=utype)
             )
-
-    if not np.issubdtype(a.dtype, np.floating):
-        raise TypeError(f"unsupported interval type {a.dtype}")
 
     itype = a.dtype.str.replace("f", "i")
     bits = np.iinfo(utype).bits
@@ -354,9 +375,19 @@ def from_total_order(
     -------
     array : np.ndarray[S, np.dtype[T]]
         The array with its original `dtype`.
+
+    Raises
+    ------
+    TypeSetError
+        if `a` is not an unsigned integer array.
+    TypeSetError
+        if `dtype` is not a signed/unsigned integer or floating data type.
     """
 
-    assert np.issubdtype(a.dtype, np.unsignedinteger)
+    TypeSetError.check_or_raise(a.dtype.type, np.unsignedinteger)
+    TypeSetError.check_or_raise(
+        dtype.type, np.unsignedinteger | np.signedinteger | np.floating
+    )
 
     if np.issubdtype(dtype, np.unsignedinteger):
         return a  # type: ignore
@@ -368,9 +399,6 @@ def from_total_order(
             under="ignore",
         ):
             return a.view(dtype) + shift + dtype.type(1)
-
-    if not np.issubdtype(dtype, np.floating):
-        raise TypeError(f"unsupported interval type {dtype}")
 
     utype = dtype.str.replace("f", "u")
     itype = dtype.str.replace("f", "i")
@@ -386,7 +414,6 @@ def from_total_order(
 def lossless_cast(
     x: int | float | np.number | np.ndarray[S, np.dtype[np.number]],
     dtype: np.dtype[T],
-    context: str,
 ) -> np.ndarray[tuple[()] | S, np.dtype[T]]:
     """
     Try to losslessly convert `x` to the provided `dtype`.
@@ -411,21 +438,16 @@ def lossless_cast(
     Raises
     ------
     TypeError
-        If floating-point values are converted to integer values.
-
-    Raises
-    ------
+        if floating-point values are converted to an integer `dtype`.
     ValueError
-        If not all values could be losslessly converted.
+        if not all values could be losslessly converted to `dtype`.
     """
 
     xa = np.array(x, copy=None)
     dtype_from = xa.dtype
 
     if np.issubdtype(dtype_from, np.floating) and not np.issubdtype(dtype, np.floating):
-        raise TypeError(
-            f"cannot losslessly cast {context} from {dtype_from} to {dtype}"
-        )
+        raise TypeError(f"cannot losslessly cast from {dtype_from} to {dtype}") | ctx
 
     # we use unsafe casts here since we later check them for safety
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
@@ -435,8 +457,12 @@ def lossless_cast(
     lossless_same = (xa == xa_back) | (np.isnan(xa) & np.isnan(xa_back))
 
     if not np.all(lossless_same):
-        raise ValueError(
-            f"cannot losslessly cast (some) {context} values from {dtype_from} to {dtype}"
+        raise (
+            ValueError(
+                f"cannot losslessly cast (some) values from {dtype_from} to "
+                + f"{dtype}"
+            )
+            | ctx
         )
 
     return xa_to
@@ -445,7 +471,6 @@ def lossless_cast(
 def saturating_finite_float_cast(
     x: int | float | np.number | np.ndarray[S, np.dtype[np.number]],
     dtype: np.dtype[F],
-    context: str,
 ) -> np.ndarray[tuple[()] | S, np.dtype[F]]:
     """
     Try to convert the finite `x` to the provided floating-point `dtype`.
@@ -467,7 +492,7 @@ def saturating_finite_float_cast(
     Raises
     ------
     ValueError
-        If some values are non-finite, i.e. infinite or NaN.
+        if any values are non-finite, i.e. infinite or NaN.
     """
 
     assert np.issubdtype(dtype, np.floating) or (dtype == _float128_dtype)
@@ -475,8 +500,12 @@ def saturating_finite_float_cast(
     xa = np.array(x, copy=None)
 
     if not isinstance(x, int) and not np.all(np.isfinite(xa)):
-        raise ValueError(
-            f"cannot cast non-finite {context} values from {xa.dtype} to saturating finite {dtype}"
+        raise (
+            ValueError(
+                f"cannot cast non-finite values from {xa.dtype.name} to "
+                + f"saturating finite {dtype.name}"
+            )
+            | ctx
         )
 
     # we use unsafe casts here since but are safe since

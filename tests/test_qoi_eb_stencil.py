@@ -1,3 +1,4 @@
+import re
 from itertools import cycle, permutations, product
 
 import numpy as np
@@ -77,9 +78,9 @@ def check_all_codecs(data: np.ndarray, qoi: str, shape: list[tuple[int, int]]):
                         )
                     ],
                 )
-            except Exception as err:
+            except Exception:
                 print(encode_decode, qoi, shape, axes, boundaries, type, eb)  # noqa: T201
-                raise err
+                raise
 
 
 def check_empty(qoi: str):
@@ -170,36 +171,37 @@ CHECKS = [
 
 def test_variables():
     with pytest.raises(
-        AssertionError,
-        match=r'cannot assign to identifier `a`, assign to a variable V\["a"\] instead',
+        SyntaxError,
+        match=r'qoi_eb_stencil\.qoi: cannot assign to identifier `a`, assign to a variable V\["a"\] instead',
     ):
         check_all_codecs(np.array([]), "a = 4; return a", [(0, 0)])
-    with pytest.raises(
-        AssertionError, match="stencil QoI variables use upper-case `V`"
-    ):
+    with pytest.raises(SyntaxError, match="stencil QoI variables use upper-case `V`"):
         check_all_codecs(np.array([]), 'v["a"]', [(0, 0)])
     with pytest.raises(
-        AssertionError, match='invalid string literal with missing closing `"`'
+        SyntaxError,
+        match='invalid string literal with missing closing `"`',
     ):
         check_all_codecs(np.array([]), 'V["a]', [(0, 0)])
-    with pytest.raises(AssertionError, match="invalid quoted parameter"):
+    with pytest.raises(SyntaxError, match="invalid quoted parameter"):
         check_all_codecs(np.array([]), 'V["123"]', [(0, 0)])
-    with pytest.raises(AssertionError, match="invalid quoted parameter"):
+    with pytest.raises(SyntaxError, match="invalid quoted parameter"):
         check_all_codecs(np.array([]), 'V["a 123"]', [(0, 0)])
     with pytest.raises(
-        AssertionError, match=r"variable name must not be built-in \(start with `\$`\)"
+        SyntaxError,
+        match=r"variable name must not be built-in \(start with `\$`\)",
     ):
         check_all_codecs(np.array([]), 'V["$a"]', [(0, 0)])
-    with pytest.raises(AssertionError, match=r'undefined variable V\["a"\]'):
+    with pytest.raises(SyntaxError, match=r'undefined variable V\["a"\]'):
         check_all_codecs(np.array([]), 'V["a"]', [(0, 0)])
-    with pytest.raises(AssertionError, match=r'undefined variable V\["b"\]'):
+    with pytest.raises(SyntaxError, match=r'undefined variable V\["b"\]'):
         check_all_codecs(np.array([]), 'V["a"] = 3; return x + V["b"];', [(0, 0)])
-    with pytest.raises(AssertionError, match="unexpected token `=`"):
+    with pytest.raises(SyntaxError, match="unexpected token `=`"):
         check_all_codecs(np.array([]), "1 = x", [(0, 0)])
-    with pytest.raises(AssertionError, match=r"expected `\(`"):
+    with pytest.raises(SyntaxError, match=r"expected `\(`"):
         check_all_codecs(np.array([]), 'V["a"] = log; return x + V["a"];', [(0, 0)])
     with pytest.raises(
-        AssertionError, match=r'cannot override already-defined variable V\["a"\]'
+        SyntaxError,
+        match=r'cannot override already-defined variable V\["a"\]',
     ):
         check_all_codecs(
             np.array([]), 'V["a"] = x + 1; V["a"] = V["a"]; return V["a"];', [(0, 0)]
@@ -218,11 +220,12 @@ def test_variables():
     check_all_codecs(np.array([]), 'c["$x"] * x', [(0, 0)])
 
     with pytest.raises(
-        AssertionError, match="index 1 is out of bounds for axis 0 with size 1"
+        SyntaxError,
+        match="index 1 is out of bounds for axis 0 with size 1",
     ):
         check_all_codecs(np.array([]), 'V["a"] = X + 1; return V["a"][1];', [(0, 0)])
     with pytest.raises(
-        AssertionError,
+        SyntaxError,
         match="too many indices for array: array is 1-dimensional, but 2 were indexed",
     ):
         check_all_codecs(np.array([]), 'V["a"] = X + 1; return V["a"][0,1];', [(0, 0)])
@@ -234,9 +237,9 @@ def test_variables():
 
 
 def test_invalid_array():
-    with pytest.raises(AssertionError, match="EOF"):
+    with pytest.raises(SyntaxError, match="EOF"):
         check_all_codecs(np.empty(0), "[[1],", [(0, 0)])
-    with pytest.raises(AssertionError, match="empty array literal"):
+    with pytest.raises(SyntaxError, match="empty array literal"):
         check_all_codecs(np.empty(0), "[]", [(0, 0)])
 
 
@@ -394,7 +397,7 @@ def test_finite_difference_array():
     decoded = np.zeros(5)
 
     with pytest.raises(
-        AssertionError,
+        SyntaxError,
         match="expr must be a scalar array element expression, e.g. the centre value, not an array",
     ):
         encode_decode_mock(
@@ -442,7 +445,7 @@ def test_finite_difference_constant_grid_spacing():
     )
 
     with pytest.raises(
-        AssertionError,
+        SyntaxError,
         match="grid_spacing must be a constant scalar expression, not an array",
     ):
         safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
@@ -501,7 +504,7 @@ def test_finite_difference_arbitrary_grid():
     )
 
     with pytest.raises(
-        AssertionError,
+        SyntaxError,
         match="grid_centre must be a constant scalar array element expression",
     ):
         safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
@@ -539,7 +542,7 @@ def test_finite_difference_arbitrary_grid():
 
 def test_finite_difference_periodic_grid():
     with pytest.raises(
-        AssertionError,
+        SyntaxError,
         match="grid_period must not reference late-bound constants",
     ):
         safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
@@ -590,7 +593,7 @@ def test_finite_difference_periodic_grid():
     )
 
     safeguard.compute_safe_intervals(
-        np.arange(5, dtype=np.uint64), late_bound=Bindings.empty()
+        np.arange(5, dtype=np.uint64), late_bound=Bindings.EMPTY
     )
 
 
@@ -923,7 +926,8 @@ def test_fuzzer_tuple_index_out_of_range():
     decoded = np.array([], dtype=np.int32)
 
     with pytest.raises(
-        IndexError, match=r"axis index -65 is out of bounds for array of shape \(0,\)"
+        IndexError,
+        match=r"qoi_eb_stencil\.neighbourhood\[0\]\.axis: -65 is out of bounds for array of shape \(0,\)",
     ):
         encode_decode_mock(
             data,
@@ -994,13 +998,13 @@ def test_late_bound_broadcast():
 
     with pytest.raises(
         ValueError,
-        match=r"cannot broadcast late-bound parameter eb with shape \(2, 2\) to shape \(4, 4\)",
+        match=r"qoi_eb_stencil\.eb=eb: cannot broadcast from shape \(2, 2\) to shape \(4, 4\)",
     ):
         safeguard.compute_safe_intervals(data, late_bound=Bindings(eb=np.ones((2, 2))))
 
     with pytest.raises(
         ValueError,
-        match=r"cannot broadcast late-bound parameter eb with shape \(4, 4, 1\) to shape \(4, 4\)",
+        match=r"qoi_eb_stencil\.eb=eb: cannot broadcast from shape \(4, 4, 1\) to shape \(4, 4\)",
     ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(eb=np.ones((4, 4, 1)))
@@ -1032,28 +1036,40 @@ def test_late_bound_lossless_cast():
         data, late_bound=Bindings(c=np.iinfo(np.uint16).max)
     )
 
-    with pytest.raises(ValueError, match="cannot losslessly cast"):
+    with pytest.raises(
+        ValueError,
+        match=r"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from int64 to float32",
+    ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.int32).max - 1)
         )
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.int32).max)
         )
-    with pytest.raises(ValueError, match="cannot losslessly cast"):
+    with pytest.raises(
+        ValueError,
+        match=r"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from int64 to float32",
+    ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.uint32).max - 1)
         )
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.uint32).max)
         )
-    with pytest.raises(ValueError, match="cannot losslessly cast"):
+    with pytest.raises(
+        ValueError,
+        match=r"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from int64 to float32",
+    ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.int64).max - 1)
         )
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.int64).max)
         )
-    with pytest.raises(ValueError, match="cannot losslessly cast"):
+    with pytest.raises(
+        ValueError,
+        match=r"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from uint64 to float32",
+    ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.uint64).max - 1)
         )
@@ -1068,7 +1084,10 @@ def test_late_bound_lossless_cast():
         data, late_bound=Bindings(c=np.finfo(np.float32).smallest_subnormal)
     )
 
-    with pytest.raises(ValueError, match="cannot losslessly cast"):
+    with pytest.raises(
+        ValueError,
+        match=r"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from float64 to float32",
+    ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.finfo(np.float64).smallest_subnormal)
         )
@@ -1183,10 +1202,10 @@ def test_finite_difference_dx():
         corrected = safeguards.apply_correction(decoded, correction)
 
         data_finite_difference = safeguards.safeguards[0].evaluate_qoi(
-            data, Bindings.empty()
+            data, Bindings.EMPTY
         )
         corrected_finite_difference = safeguards.safeguards[0].evaluate_qoi(
-            corrected, Bindings.empty()
+            corrected, Bindings.EMPTY
         )
 
         assert data_finite_difference[len(data_finite_difference) // 2] == 10
@@ -1265,8 +1284,11 @@ def test_pointwise_normalised_absolute_error(check):
 def test_late_bound_constant_boundary():
     for c in ["$x", "$X"]:
         with pytest.raises(
-            AssertionError,
-            match="late-bound constant boundary must be a scalar",
+            ValueError,
+            match=re.escape(
+                "qoi_eb_stencil.neighbourhood[0].constant_boundary: must be "
+                + f"a scalar but late-bound constant data {c} may not be"
+            ),
         ):
             safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
                 qoi="X[0,0] - X[2,0]",
@@ -1310,7 +1332,7 @@ def test_late_bound_constant_boundary():
 
     with pytest.raises(
         ValueError,
-        match=r"cannot broadcast late-bound parameter const with shape \(2, 3\) to shape \(\)",
+        match=r"qoi_eb_stencil.neighbourhood\[0\]\.constant_boundary=const: cannot broadcast from shape \(2, 3\) to shape \(\)",
     ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(const=data, const2=4)
@@ -1318,8 +1340,35 @@ def test_late_bound_constant_boundary():
 
     with pytest.raises(
         ValueError,
-        match=r"cannot losslessly cast \(some\) late-bound parameter const2 values from int64 to uint8",
+        match=r"qoi_eb_stencil\.neighbourhood\[1\]\.constant_boundary=const2: cannot losslessly cast \(some\) values from int64 to uint8",
     ):
         safeguard.compute_safe_intervals(data, late_bound=Bindings(const=1, const2=256))
 
     safeguard.compute_safe_intervals(data, late_bound=Bindings(const=1, const2=255))
+
+
+def test_fuzzer_found_axis_index_out_of_bounds():
+    with pytest.raises(
+        SyntaxError,
+        match=r"qoi_eb_stencil\.qoi: axis index 1 is out of bounds for stencil with 1 axis",
+    ):
+        check_all_codecs(np.empty(0), "I[1]", [(0, 0)])
+
+    with pytest.raises(
+        SyntaxError,
+        match=r"qoi_eb_stencil\.qoi: axis index -3 is out of bounds for stencil with 2 axes",
+    ):
+        check_all_codecs(np.empty((2, 2)), "I[-3]", [(0, 0), (0, 0)])
+
+
+def test_fuzzer_found_has_data_recursion_error():
+    StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi="sum(X) / e + 1",
+        neighbourhood=[
+            dict(axis=82, before=50, after=59, boundary="valid"),
+            dict(axis=86, before=82, after=93, boundary="valid"),
+        ],
+        type="abs",
+        eb=0,
+        qoi_dtype="lossless",
+    )

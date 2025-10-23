@@ -28,6 +28,12 @@ with atheris.instrument_imports():
     )
     from compression_safeguards.utils._compat import _ensure_array, _ones
     from compression_safeguards.utils.bindings import Parameter
+    from compression_safeguards.utils.error import (
+        ErrorContextMixin,
+        IndexContextLayer,
+        LateBoundParameterContextLayer,
+        ParameterContextLayer,
+    )
     from compression_safeguards.utils.typing import S, T
 
 
@@ -219,7 +225,7 @@ def check_one_input(data) -> None:
             safeguard._qoi_expr._late_bound_constants = (
                 safeguard._qoi_expr._expr.late_bound_constants
             )
-    except (AssertionError, Warning, TimeoutError):
+    except (ValueError, TypeError, SyntaxError, TimeoutError):
         return
 
     da = xr.DataArray(raw, name="da", dims=dims)
@@ -261,44 +267,75 @@ def check_one_input(data) -> None:
         )
         np.testing.assert_array_equal(chunked_hash.values, global_hash)
     except Exception as err:
-        if (
-            (
-                isinstance(err, IndexError)
-                and ("axis index" in str(err))
-                and ("out of bounds for array of shape" in str(err))
-            )
-            or (
-                isinstance(err, IndexError)
-                and ("duplicate axis index" in str(err))
-                and ("normalised to" in str(err))
-                and ("for array of shape" in str(err))
-            )
-            or (
-                isinstance(err, TypeError | ValueError)
-                and ("cannot losslessly cast" in str(err))
-            )
-            or (
-                isinstance(err, ValueError)
-                and ("cannot cast non-finite" in str(err))
-                and ("to saturating finite" in str(err))
-            )
-            or (isinstance(err, AssertionError) and str(err).startswith("eb must be"))
-            or (
-                isinstance(err, AssertionError)
-                and ("fuzzer hash is all ones" in str(err))
-            )
-            or (
-                isinstance(err, ValueError)
-                and ("cannot broadcast late-bound parameter" in str(err))
-                and ("with shape" in str(err))
-                and ("to shape ()" in str(err))
-            )
-        ):
+        if isinstance(err, ValueError) and ("fuzzer hash is all ones" in str(err)):
             return
+        if isinstance(err, ErrorContextMixin):
+            match err.context.layers:
+                case (
+                    *_,
+                    ParameterContextLayer("neighbourhood"),
+                    IndexContextLayer(_),
+                    ParameterContextLayer("axis"),
+                ) if isinstance(err, IndexError) and (
+                    "is out of bounds for array of shape" in str(err)
+                ):
+                    return
+                case (
+                    *_,
+                    ParameterContextLayer("neighbourhood"),
+                    IndexContextLayer(_),
+                    ParameterContextLayer("axis"),
+                ) | (
+                    *_,
+                    ParameterContextLayer("eb"),
+                    LateBoundParameterContextLayer(_),
+                ) if (
+                    isinstance(err, IndexError)
+                    and ("duplicate axis index" in str(err))
+                    and ("normalised to" in str(err))
+                    and ("for array of shape" in str(err))
+                ):
+                    return
+                case (*_, ParameterContextLayer(_)) | (
+                    *_,
+                    ParameterContextLayer(_),
+                    LateBoundParameterContextLayer(_),
+                ) if isinstance(err, TypeError | ValueError) and (
+                    "cannot losslessly cast" in str(err)
+                ):
+                    return
+                case (
+                    *_,
+                    ParameterContextLayer("eb"),
+                    LateBoundParameterContextLayer(_),
+                ) if (
+                    isinstance(err, ValueError)
+                    and ("cannot cast non-finite" in str(err))
+                    and ("to saturating finite" in str(err))
+                ):
+                    return
+                case (
+                    *_,
+                    ParameterContextLayer("eb"),
+                    LateBoundParameterContextLayer(_),
+                ) if isinstance(err, ValueError) and ("must be" in str(err)):
+                    return
+                case (
+                    *_,
+                    ParameterContextLayer(_),
+                    LateBoundParameterContextLayer(_),
+                ) if (
+                    isinstance(err, ValueError)
+                    and ("cannot broadcast from shape" in str(err))
+                    and ("to shape ()" in str(err))
+                ):
+                    return
+                case _:
+                    pass
         print(  # noqa: T201
             f"\n===\n\nsafeguard = {safeguard!r}\n\ndata = {raw!r}\n\nlate_bound = {late_bound!r}\n\nchunks = {chunks!r}\n\n===\n"
         )
-        raise err
+        raise
 
 
 atheris.Setup(sys.argv, check_one_input)

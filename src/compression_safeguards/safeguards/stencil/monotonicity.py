@@ -25,6 +25,7 @@ from ...utils._compat import (
 )
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
+from ...utils.error import TypeCheckError, ctx, lookup_enum_or_raise
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import JSON, S, T
 from . import BoundaryCondition, NeighbourhoodAxis, _pad_with_boundary
@@ -126,6 +127,21 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     axis : None | int
         The axis along which the monotonicity is preserved. The default,
         [`None`][None], is to preserve along all axes.
+
+    Raises
+    ------
+    TypeCheckError
+        if any parameter has the wrong type.
+    ValueError
+        if `window` is not positive.
+    ValueError
+        if `boundary` does not name a valid boundary condition variant.
+    ValueError
+        if `constant_boundary` is, not, provided if and only if the `boundary`
+        is constant.
+    ValueError
+        if `constant_boundary` uses the non-scalar `$x` or `$X` late-bound
+        parameters.
     """
 
     __slots__: tuple[str, ...] = (
@@ -151,39 +167,66 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         constant_boundary: None | int | float | str | Parameter = None,
         axis: None | int = None,
     ) -> None:
-        self._monotonicity = (
-            monotonicity
-            if isinstance(monotonicity, Monotonicity)
-            else Monotonicity[monotonicity]
-        )
+        with ctx.safeguard(self):
+            with ctx.parameter("monotonicity"):
+                TypeCheckError.check_instance_or_raise(monotonicity, str | Monotonicity)
+                self._monotonicity = (
+                    monotonicity
+                    if isinstance(monotonicity, Monotonicity)
+                    else lookup_enum_or_raise(Monotonicity, monotonicity)
+                )
 
-        assert window > 0, "window size must be positive"
-        self._window = window
+            with ctx.parameter("window"):
+                TypeCheckError.check_instance_or_raise(window, int)
+                if window <= 0:
+                    raise ValueError("must be positive") | ctx
+                self._window = window
 
-        self._boundary = (
-            boundary
-            if isinstance(boundary, BoundaryCondition)
-            else BoundaryCondition[boundary]
-        )
-        assert (self._boundary != BoundaryCondition.constant) == (
-            constant_boundary is None
-        ), (
-            "constant_boundary must be provided if and only if the constant boundary condition is used"
-        )
+            with ctx.parameter("boundary"):
+                TypeCheckError.check_instance_or_raise(
+                    boundary, str | BoundaryCondition
+                )
+                self._boundary = (
+                    boundary
+                    if isinstance(boundary, BoundaryCondition)
+                    else lookup_enum_or_raise(BoundaryCondition, boundary)
+                )
 
-        if isinstance(constant_boundary, Parameter):
-            self._constant_boundary = constant_boundary
-        elif isinstance(constant_boundary, str):
-            self._constant_boundary = Parameter(constant_boundary)
-        else:
-            self._constant_boundary = constant_boundary
+            with ctx.parameter("constant_boundary"):
+                TypeCheckError.check_instance_or_raise(
+                    constant_boundary, None | int | float | str | Parameter
+                )
 
-        if isinstance(self._constant_boundary, Parameter):
-            assert self._constant_boundary not in ["$x", "$X"], (
-                f"late-bound constant boundary must be a scalar but constant data {self._constant_boundary} may not be"
-            )
+                if (self._boundary != BoundaryCondition.constant) != (
+                    constant_boundary is None
+                ):
+                    raise (
+                        ValueError(
+                            "must be provided if and only if the constant boundary condition is used"
+                        )
+                        | ctx
+                    )
 
-        self._axis = axis
+                if isinstance(constant_boundary, Parameter):
+                    self._constant_boundary = constant_boundary
+                elif isinstance(constant_boundary, str):
+                    self._constant_boundary = Parameter(constant_boundary)
+                else:
+                    self._constant_boundary = constant_boundary
+
+                if isinstance(
+                    self._constant_boundary, Parameter
+                ) and self._constant_boundary in ["$x", "$X"]:
+                    raise (
+                        ValueError(
+                            f"must be scalar but late-bound constant data {self._constant_boundary} may not be"
+                        )
+                        | ctx
+                    )
+
+            with ctx.parameter("axis"):
+                TypeCheckError.check_instance_or_raise(axis, None | int)
+                self._axis = axis
 
     @property
     @override
@@ -273,21 +316,32 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         -------
         ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the `constant_boundary` is late-bound but its late-bound
+            parameter is not in `late_bound`.
+        ValueError
+            if the `constant_boundary` is late-bound but not a scalar.
+        TypeError
+            if the `constant_boundary` is floating-point but the `data` is
+            integer.
+        ValueError
+            if the `constant_boundary` could not be losslessly converted to the
+            `data`'s type.
         """
 
-        constant_boundary = (
-            None
-            if self._constant_boundary is None
-            else late_bound.resolve_ndarray_with_lossless_cast(
-                self._constant_boundary, (), data.dtype
+        with ctx.safeguard(self), ctx.parameter("constant_boundary"):
+            constant_boundary = (
+                None
+                if self._constant_boundary is None
+                else late_bound.resolve_ndarray_with_lossless_cast(
+                    self._constant_boundary, (), data.dtype
+                )
+                if isinstance(self._constant_boundary, Parameter)
+                else lossless_cast(self._constant_boundary, data.dtype)
             )
-            if isinstance(self._constant_boundary, Parameter)
-            else lossless_cast(
-                self._constant_boundary,
-                data.dtype,
-                "monotonicity safeguard constant boundary",
-            )
-        )
 
         ok: np.ndarray[S, np.dtype[np.bool]] = _ones(
             data.shape, dtype=np.dtype(np.bool)
@@ -376,21 +430,32 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         -------
         intervals : IntervalUnion[T, int, int]
             Union of intervals in which the monotonicity is preserved.
+
+        Raises
+        ------
+        LateBoundParameterResolutionError
+            if the `constant_boundary` is late-bound but its late-bound
+            parameter is not in `late_bound`.
+        ValueError
+            if the `constant_boundary` is late-bound but not a scalar.
+        TypeError
+            if the `constant_boundary` is floating-point but the `data` is
+            integer.
+        ValueError
+            if the `constant_boundary` could not be losslessly converted to the
+            `data`'s type.
         """
 
-        constant_boundary = (
-            None
-            if self._constant_boundary is None
-            else late_bound.resolve_ndarray_with_lossless_cast(
-                self._constant_boundary, (), data.dtype
+        with ctx.safeguard(self), ctx.parameter("constant_boundary"):
+            constant_boundary = (
+                None
+                if self._constant_boundary is None
+                else late_bound.resolve_ndarray_with_lossless_cast(
+                    self._constant_boundary, (), data.dtype
+                )
+                if isinstance(self._constant_boundary, Parameter)
+                else lossless_cast(self._constant_boundary, data.dtype)
             )
-            if isinstance(self._constant_boundary, Parameter)
-            else lossless_cast(
-                self._constant_boundary,
-                data.dtype,
-                "monotonicity safeguard constant boundary",
-            )
-        )
 
         window = 1 + self._window * 2
 

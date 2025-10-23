@@ -18,6 +18,7 @@ from ....utils._compat import (
     _zeros,
 )
 from ....utils.bindings import Parameter
+from ....utils.error import QuantityOfInterestRuntimeWarning
 from ..bound import DataBounds, data_bounds_checks, guarantee_data_within_expr_bounds
 from .typing import Es, F, Ns, Ps, PsI
 
@@ -356,9 +357,15 @@ class Expr(ABC, Generic[Unpack[Es]]):
         ):
             exprv: np.ndarray[Ps, np.dtype[F]] = self.eval(X.shape, Xs, late_bound)
             if not np.all((expr_lower <= exprv) | np.isnan(exprv)):
-                warn("expression lower bounds are above the expression values")
+                warn(
+                    "expression lower bounds are above the expression values",
+                    category=QuantityOfInterestRuntimeWarning,
+                )
             if not np.all((expr_upper >= exprv) | np.isnan(exprv)):
-                warn("expression upper bounds are below the expression values")
+                warn(
+                    "expression upper bounds are below the expression values",
+                    category=QuantityOfInterestRuntimeWarning,
+                )
         else:
             exprv = None  # type: ignore
 

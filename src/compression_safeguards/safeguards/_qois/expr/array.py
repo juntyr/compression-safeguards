@@ -3,27 +3,23 @@ from collections.abc import Callable, Iterator, Mapping
 
 import numpy as np
 from typing_extensions import (
-    TypeVarTuple,  # MSPV 3.11
+    Self,  # MSPV 3.11
     Unpack,  # MSPV 3.11
     override,  # MSPV 3.12
 )
 
 from ....utils.bindings import Parameter
+from ....utils.error import ctx
 from .abc import AnyExpr, Expr
-from .addsub import ScalarAdd
+from .addsub import ScalarLeftAssociativeSum
 from .constfold import ScalarFoldedConstant
 from .data import Data
 from .divmul import ScalarMultiply
 from .group import Group
 from .typing import Es, F, Ns, Ps, PsI
 
-# FIXME: actually bound the types to be Expr
-# https://discuss.python.org/t/how-to-use-typevartuple/67502
-Es2 = TypeVarTuple("Es2")
-""" Tuple of [`Expr`][compression_safeguards.safeguards._qois.expr.abc.Expr]s. """
 
-
-class Array(Expr[AnyExpr, Unpack[Es]]):
+class Array(Expr[AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
     __slots__: tuple[str, ...] = ("_array",)
     _array: np.ndarray
 
@@ -32,19 +28,23 @@ class Array(Expr[AnyExpr, Unpack[Es]]):
             aels = [el._array]
             for e in els:
                 if not (isinstance(e, Array) and e.shape == el.shape):
-                    raise ValueError(
-                        f"elements must all have the consistent shape {el.shape}"
+                    raise (
+                        ValueError(
+                            "elements must all have the consistent shape "
+                            + f"{el.shape}"
+                        )
+                        | ctx
                     )
                 aels.append(e._array)
             self._array = np.array(aels, copy=None)
         else:
             for e in els:
                 if isinstance(e, Array):
-                    raise ValueError("elements must all be scalar")
+                    raise ValueError("elements must all be scalar") | ctx
             self._array = np.array((el,) + els, copy=None)
 
     @staticmethod
-    def from_data_shape(shape: tuple[int, ...]) -> "Array[Unpack[tuple[AnyExpr, ...]]]":
+    def from_data_shape(shape: tuple[int, ...]) -> "Array":
         out = Array.__new__(Array)
         out._array = np.empty(shape, dtype=object)
 
@@ -55,19 +55,19 @@ class Array(Expr[AnyExpr, Unpack[Es]]):
 
     @property
     @override
-    def args(self) -> tuple[AnyExpr, Unpack[Es]]:
+    def args(self) -> tuple[AnyExpr, Unpack[tuple[AnyExpr, ...]]]:
         if self._array.ndim == 1:
             return tuple(self._array)
         return tuple(a for a in self._array)
 
     @override
-    def with_args(self, el: AnyExpr, *els: Unpack[Es]) -> "Array[Unpack[Es]]":
-        return Array(el, *els)  # type: ignore
+    def with_args(self, el: AnyExpr, *els: AnyExpr) -> Self:
+        return type(self)(el, *els)
 
     @override
     def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return Array.map(
-            lambda e: ScalarFoldedConstant.constant_fold_expr(e, dtype),  # type: ignore
+            lambda e: ScalarFoldedConstant.constant_fold_expr(e, dtype),
             self,
         )
 
@@ -100,7 +100,7 @@ class Array(Expr[AnyExpr, Unpack[Es]]):
         return self._array.size
 
     @staticmethod
-    def map(map: Callable[[Unpack[Es2]], AnyExpr], *exprs: Unpack[Es2]) -> AnyExpr:
+    def map(map: Callable[[Unpack[Es]], AnyExpr], *exprs: Unpack[Es]) -> AnyExpr:
         if not any(isinstance(e, Array) for e in exprs):
             return map(*exprs)
 
@@ -111,8 +111,12 @@ class Array(Expr[AnyExpr, Unpack[Es]]):
         for i, expr in enumerate(exprs):  # type: ignore
             if isinstance(expr, Array):
                 if shape is not None and expr.shape != shape:
-                    raise ValueError(
-                        f"shape mismatch between operands, expected {shape} but found {expr.shape} for operand {i + 1}"
+                    raise (
+                        ValueError(
+                            f"shape mismatch between operands, expected {shape}"
+                            + f" but found {expr.shape} for operand {i + 1}"
+                        )
+                        | ctx
                     )
                 shape = expr.shape
                 size = expr._array.size
@@ -136,51 +140,47 @@ class Array(Expr[AnyExpr, Unpack[Es]]):
             return out
         return a
 
-    def transpose(self) -> "Array[Unpack[tuple[AnyExpr, ...]]]":
-        out = Array.__new__(Array)
+    def transpose(self) -> Self:
+        out = Array.__new__(type(self))
         out._array = self._array.T
         return out
 
     def sum(self) -> AnyExpr:
-        acc = None
-        for e in self._array.flat:
-            if acc is None:
-                acc = e
-            else:
-                acc = ScalarAdd(acc, e)
-        assert acc is not None
-        # we can return a group here since acc is not an array
-        assert not isinstance(acc, Array)
-        return Group(acc)
+        sum_: AnyExpr = ScalarLeftAssociativeSum(*list(self._array.flat))
+        # we can return a group here since sum_ is not an array
+        assert not isinstance(sum_, Array)
+        return Group(sum_)
 
     @staticmethod
     def matmul(
-        left: "Array[Unpack[tuple[AnyExpr, ...]]]",
-        right: "Array[Unpack[tuple[AnyExpr, ...]]]",
-    ) -> "Array[Unpack[tuple[AnyExpr, ...]]]":
+        left: "Array",
+        right: "Array",
+    ) -> "Array":
         if len(left.shape) != 2:
-            raise ValueError("can only matmul(a, b) a 2D array a")
+            raise ValueError("can only matmul(a, b) a 2D array a") | ctx
         if len(right.shape) != 2:
-            raise ValueError("can only matmul(a, b) a 2D array b")
+            raise ValueError("can only matmul(a, b) a 2D array b") | ctx
         if left.shape[1] != right.shape[0]:
-            raise ValueError(
-                f"can only matmul(a, b) with shapes (n, k) x (k, m) -> (n, m) but got {left.shape} x {right.shape}"
+            raise (
+                ValueError(
+                    "can only matmul(a, b) with shapes (n, k) x (k, m) -> "
+                    + f"(n, m) but got {left.shape} x {right.shape}"
+                )
+                | ctx
             )
         out = Array.__new__(Array)
         out._array = np.empty((left.shape[0], right.shape[1]), dtype=object)
         for n in range(left.shape[0]):
             for m in range(right.shape[1]):
-                acc: None | AnyExpr = None
-                for k in range(left.shape[1]):
-                    kk = ScalarMultiply(left._array[n, k], right._array[k, m])
-                    if acc is None:
-                        acc = kk
-                    else:
-                        acc = ScalarAdd(acc, kk)
-                assert acc is not None
-                # we can apply a group here since acc is not an array
-                assert not isinstance(acc, Array)
-                out._array[n, m] = Group(acc)
+                sum_: AnyExpr = ScalarLeftAssociativeSum(
+                    *[
+                        ScalarMultiply(left._array[n, k], right._array[k, m])
+                        for k in range(left.shape[1])
+                    ]
+                )
+                # we can apply a group here since sum_ is not an array
+                assert not isinstance(sum_, Array)
+                out._array[n, m] = Group(sum_)
         return out
 
     @override

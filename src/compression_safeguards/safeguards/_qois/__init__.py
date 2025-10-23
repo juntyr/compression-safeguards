@@ -7,6 +7,7 @@ from typing_extensions import override  # MSPV 3.12
 
 from ...utils._compat import _ensure_array
 from ...utils.bindings import Parameter
+from ...utils.error import ctx
 from ..qois import (
     PointwiseQuantityOfInterestExpression,
     StencilQuantityOfInterestExpression,
@@ -29,6 +30,11 @@ class PointwiseQuantityOfInterest:
     ----------
     qoi : PointwiseQuantityOfInterestExpression
         The pointwise quantity of interest in [`str`][str]ing form.
+
+    Raises
+    ------
+    SyntaxError
+        if the `qoi` is not a valid pointwise quantity of interest expression.
     """
 
     __slots__: tuple[str, ...] = ("_expr", "_late_bound_constants")
@@ -41,10 +47,24 @@ class PointwiseQuantityOfInterest:
 
         expr = parser.parse(qoi, lexer.tokenize(qoi))
         assert isinstance(expr, Expr)
-        assert not isinstance(expr, Array), (
-            f"QoI expression must be a scalar but is an array expression of shape {expr.shape}"
-        )
-        assert expr.has_data, "QoI expression must not be constant"
+
+        if isinstance(expr, Array):
+            raise (
+                SyntaxError(
+                    "QoI expression must evaluate to a scalar, not an array "
+                    + f"expression of shape {expr.shape}",
+                    ("<qoi>", None, None, None),
+                )
+                | ctx
+            )
+
+        if not expr.has_data:
+            raise (
+                SyntaxError(
+                    "QoI expression must not be constant", ("<qoi>", None, None, None)
+                )
+                | ctx
+            )
 
         late_bound_constants = expr.late_bound_constants
 
@@ -167,6 +187,11 @@ class StencilQuantityOfInterest:
         The shape of the stencil neighbourhood.
     stencil_I : tuple[int, ...]
         The index `I` for the centre of the stencil neighbourhood.
+
+    Raises
+    ------
+    SyntaxError
+        if the `qoi` is not a valid stencil quantity of interest expression.
     """
 
     __slots__: tuple[str, ...] = (
@@ -200,10 +225,24 @@ class StencilQuantityOfInterest:
 
         expr = parser.parse(qoi, lexer.tokenize(qoi))
         assert isinstance(expr, Expr)
-        assert not isinstance(expr, Array), (
-            f"QoI expression must be a scalar but is an array expression of shape {expr.shape}"
-        )
-        assert expr.has_data, "QoI expression must not be constant"
+
+        if isinstance(expr, Array):
+            raise (
+                SyntaxError(
+                    "QoI expression must evaluate to a scalar, not an array "
+                    + f"expression of shape {expr.shape}",
+                    ("<qoi>", None, None, None),
+                )
+                | ctx
+            )
+
+        if not expr.has_data:
+            raise (
+                SyntaxError(
+                    "QoI expression must not be constant", ("<qoi>", None, None, None)
+                )
+                | ctx
+            )
 
         late_bound_constants = expr.late_bound_constants
 

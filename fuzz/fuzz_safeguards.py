@@ -21,6 +21,8 @@ with atheris.instrument_imports():
 
     from compression_safeguards import SafeguardKind, Safeguards
     from compression_safeguards.safeguards.abc import Safeguard
+    from compression_safeguards.safeguards.combinators.select import SelectSafeguard
+    from compression_safeguards.safeguards.pointwise.sign import SignPreservingSafeguard
     from compression_safeguards.safeguards.qois import (
         PointwiseQuantityOfInterestExpression,
         StencilQuantityOfInterestExpression,
@@ -28,6 +30,13 @@ with atheris.instrument_imports():
     from compression_safeguards.safeguards.stencil import NeighbourhoodBoundaryAxis
     from compression_safeguards.utils._compat import _ensure_array
     from compression_safeguards.utils.bindings import Parameter
+    from compression_safeguards.utils.error import (
+        ErrorContextMixin,
+        IndexContextLayer,
+        LateBoundParameterContextLayer,
+        ParameterContextLayer,
+        SafeguardTypeContextLayer,
+    )
     from compression_safeguards.utils.typing import S, T
 
 
@@ -394,8 +403,15 @@ def check_one_input(data) -> None:
                 safeguards=safeguards,
                 fixed_constants=fixed_constants,
             )
-    except (AssertionError, Warning, TimeoutError):
+    except (ValueError, TypeError, SyntaxError, TimeoutError):
         return
+    except RuntimeWarning as err:
+        # skip expressions that try to perform a**b with excessive digits
+        if ("symbolic integer evaluation" in str(err)) and (
+            "excessive number of digits" in str(err)
+        ):
+            return
+        raise
 
     grepr = repr(safeguard)
     gconfig = safeguard.get_config()
@@ -410,51 +426,100 @@ def check_one_input(data) -> None:
         encoded = safeguard.encode(raw)
         safeguard.decode(encoded, out=np.empty_like(raw))
     except Exception as err:
-        if (
-            (
-                isinstance(err, IndexError)
-                and ("axis index" in str(err))
-                and ("out of bounds for array of shape" in str(err))
-            )
-            or (
-                isinstance(err, IndexError)
-                and ("duplicate axis index" in str(err))
-                and ("normalised to" in str(err))
-                and ("for array of shape" in str(err))
-            )
-            or (
-                isinstance(err, TypeError | ValueError)
-                and ("cannot losslessly cast" in str(err))
-            )
-            or (
-                isinstance(err, ValueError)
-                and ("cannot cast non-finite" in str(err))
-                and ("to saturating finite" in str(err))
-            )
-            or (
-                isinstance(err, ValueError)
-                # late-bound select safeguard with invalid selector index
-                and ("invalid entry in choice array" in str(err))
-            )
-            or (isinstance(err, AssertionError) and str(err).startswith("eb must be"))
-            or (
-                isinstance(err, IndexError)
-                and (str(err) == "invalid select safeguard selector indices")
-            )
-            or (
-                isinstance(err, AssertionError)
-                and (str(err) == "offset must not contain NaNs")
-            )
-            or (
-                isinstance(err, ValueError)
-                and ("cannot broadcast late-bound parameter" in str(err))
-                and ("with shape" in str(err))
-                and ("to shape" in str(err))
-            )
-        ):
-            return
+        if isinstance(err, ErrorContextMixin):
+            match err.context.layers:
+                case (
+                    *_,
+                    ParameterContextLayer("neighbourhood"),
+                    IndexContextLayer(_),
+                    ParameterContextLayer("axis"),
+                ) if isinstance(err, IndexError) and (
+                    "is out of bounds for array of shape" in str(err)
+                ):
+                    return
+                case (
+                    *_,
+                    ParameterContextLayer("neighbourhood"),
+                    IndexContextLayer(_),
+                    ParameterContextLayer("axis"),
+                ) | (
+                    *_,
+                    ParameterContextLayer("eb"),
+                    LateBoundParameterContextLayer(_),
+                ) if (
+                    isinstance(err, IndexError)
+                    and ("duplicate axis index" in str(err))
+                    and ("normalised to" in str(err))
+                    and ("for array of shape" in str(err))
+                ):
+                    return
+                case (*_, ParameterContextLayer(_)) | (
+                    *_,
+                    ParameterContextLayer(_),
+                    LateBoundParameterContextLayer(_),
+                ) if isinstance(err, TypeError | ValueError) and (
+                    "cannot losslessly cast" in str(err)
+                ):
+                    return
+                case (
+                    *_,
+                    ParameterContextLayer("eb"),
+                    LateBoundParameterContextLayer(_),
+                ) if (
+                    isinstance(err, ValueError)
+                    and ("cannot cast non-finite" in str(err))
+                    and ("to saturating finite" in str(err))
+                ):
+                    return
+                case (
+                    *_,
+                    SafeguardTypeContextLayer(safeguard),
+                    ParameterContextLayer("selector"),
+                    LateBoundParameterContextLayer(_),
+                ) if (
+                    isinstance(err, ValueError)
+                    and ("invalid entry in choice array" in str(err))
+                    and safeguard is SelectSafeguard
+                ):
+                    return
+                case (
+                    *_,
+                    SafeguardTypeContextLayer(safeguard),
+                    ParameterContextLayer("selector"),
+                    LateBoundParameterContextLayer(_),
+                ) if isinstance(err, IndexError) and safeguard is SelectSafeguard:
+                    return
+                case (
+                    *_,
+                    ParameterContextLayer("eb"),
+                    LateBoundParameterContextLayer(_),
+                ) if isinstance(err, ValueError) and ("must be" in str(err)):
+                    return
+                case (
+                    *_,
+                    SafeguardTypeContextLayer(safeguard),
+                    ParameterContextLayer("offset"),
+                    LateBoundParameterContextLayer(_),
+                ) if (
+                    isinstance(err, ValueError)
+                    and ("must not contain any NaN values" in str(err))
+                    and safeguard is SignPreservingSafeguard
+                ):
+                    return
+                case (
+                    *_,
+                    ParameterContextLayer(_),
+                    LateBoundParameterContextLayer(_),
+                ) if (
+                    isinstance(err, ValueError)
+                    and ("cannot broadcast from shape" in str(err))
+                    and ("to shape ()" in str(err))
+                ):
+                    return
+                case _:
+                    pass
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")  # noqa: T201
-        raise err
+        raise
 
     # test using the safeguards with the zero codec
     safeguard = SafeguardsCodec(
@@ -472,9 +537,9 @@ def check_one_input(data) -> None:
     try:
         encoded = safeguard.encode(raw)
         safeguard.decode(encoded, out=np.empty_like(raw))
-    except Exception as err:
+    except Exception:
         print(f"\n===\n\ncodec = {grepr}\n\ndata = {raw!r}\n\n===\n")  # noqa: T201
-        raise err
+        raise
 
 
 atheris.Setup(sys.argv, check_one_input)

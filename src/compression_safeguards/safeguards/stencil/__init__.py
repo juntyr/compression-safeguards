@@ -13,6 +13,8 @@ from typing_extensions import (
     override,  # MSPV 3.12
 )
 
+from compression_safeguards.utils.error import TypeCheckError, ctx, lookup_enum_or_raise
+
 from ...utils.bindings import Parameter
 from ...utils.typing import JSON, S, T
 
@@ -81,6 +83,13 @@ class NeighbourhoodAxis:
 
         e.g. setting `after=2` means that the neighbourhood contains the
         two next values.
+
+    Raises
+    ------
+    TypeCheckError
+        if any parameter has the wrong type.
+    ValueError
+        if `before` or `after` is negative.
     """
 
     __slots__: tuple[str, ...] = ("_before", "_after")
@@ -92,13 +101,17 @@ class NeighbourhoodAxis:
         before: int,
         after: int,
     ) -> None:
-        assert type(before) is int, "before must be an integer"
-        assert before >= 0, "before must be non-negative"
-        self._before = before
+        with ctx.parameter("before"):
+            TypeCheckError.check_instance_or_raise(before, int)
+            if before < 0:
+                raise ValueError("must be non-negative") | ctx
+            self._before = before
 
-        assert type(after) is int, "after must be an integer"
-        assert after >= 0, "after must be non-negative"
-        self._after = after
+        with ctx.parameter("after"):
+            TypeCheckError.check_instance_or_raise(after, int)
+            if after < 0:
+                raise ValueError("must be non-negative") | ctx
+            self._after = after
 
     @property
     def before(self) -> int:
@@ -150,6 +163,21 @@ class NeighbourhoodBoundaryAxis:
         The optional value of or the late-bound parameter name for the constant
         value with which the data array domain is extended for a constant
         boundary. The value must be losslessly convertible to the data dtype.
+
+    Raises
+    ------
+    TypeCheckError
+        if any parameter has the wrong type.
+    ValueError
+        if `before` or `after` is negative.
+    ValueError
+        if `boundary` does not name a valid boundary condition variant.
+    ValueError
+        if `constant_boundary` is, not, provided if and only if the `boundary`
+        is constant.
+    ValueError
+        if `constant_boundary` uses the non-scalar `$x` or `$X` late-bound
+        parameters.
     """
 
     __slots__: tuple[str, ...] = ("_axis", "_shape", "_boundary", "_constant_boundary")
@@ -166,31 +194,52 @@ class NeighbourhoodBoundaryAxis:
         boundary: str | BoundaryCondition,
         constant_boundary: None | int | float | str | Parameter = None,
     ) -> None:
-        self._axis = axis
+        with ctx.parameter("axis"):
+            TypeCheckError.check_instance_or_raise(axis, int)
+            self._axis = axis
+
         self._shape = NeighbourhoodAxis(before, after)
 
-        self._boundary = (
-            boundary
-            if isinstance(boundary, BoundaryCondition)
-            else BoundaryCondition[boundary]
-        )
-        assert (self._boundary != BoundaryCondition.constant) == (
-            constant_boundary is None
-        ), (
-            "constant_boundary must be provided if and only if the constant boundary condition is used"
-        )
-
-        if isinstance(constant_boundary, Parameter):
-            self._constant_boundary = constant_boundary
-        elif isinstance(constant_boundary, str):
-            self._constant_boundary = Parameter(constant_boundary)
-        else:
-            self._constant_boundary = constant_boundary
-
-        if isinstance(self._constant_boundary, Parameter):
-            assert self._constant_boundary not in ["$x", "$X"], (
-                f"late-bound constant boundary must be a scalar but constant data {self._constant_boundary} may not be"
+        with ctx.parameter("boundary"):
+            TypeCheckError.check_instance_or_raise(boundary, str | BoundaryCondition)
+            self._boundary = (
+                boundary
+                if isinstance(boundary, BoundaryCondition)
+                else lookup_enum_or_raise(BoundaryCondition, boundary)
             )
+
+        with ctx.parameter("constant_boundary"):
+            TypeCheckError.check_instance_or_raise(
+                constant_boundary, None | int | float | str | Parameter
+            )
+
+            if (self._boundary != BoundaryCondition.constant) != (
+                constant_boundary is None
+            ):
+                raise (
+                    ValueError(
+                        "must be provided if and only if the constant "
+                        + "boundary condition is used"
+                    )
+                    | ctx
+                )
+
+            if isinstance(constant_boundary, Parameter):
+                self._constant_boundary = constant_boundary
+            elif isinstance(constant_boundary, str):
+                self._constant_boundary = Parameter(constant_boundary)
+            else:
+                self._constant_boundary = constant_boundary
+
+            if isinstance(self._constant_boundary, Parameter):
+                if self._constant_boundary in ["$x", "$X"]:
+                    raise (
+                        ValueError(
+                            "must be a scalar but late-bound constant data "
+                            + f"{self._constant_boundary} may not be"
+                        )
+                        | ctx
+                    )
 
     @property
     def axis(self) -> int:

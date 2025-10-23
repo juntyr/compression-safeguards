@@ -55,9 +55,9 @@ def check_all_codecs(data: np.ndarray, qoi: str):
                     data,
                     safeguards=[dict(kind="qoi_eb_pw", qoi=qoi, type=type, eb=eb)],
                 )
-            except Exception as err:
+            except Exception:
                 print(encode_decode, qoi, type, eb)  # noqa: T201
-                raise err
+                raise
 
 
 def check_empty(qoi: str):
@@ -123,9 +123,7 @@ CHECKS = [
 
 
 def test_sandbox():
-    with pytest.raises(
-        AssertionError, match="failed to parse pointwise QoI expression"
-    ):
+    with pytest.raises(SyntaxError, match=r"qoi_eb_pw\.qoi: unexpected token"):
         # sandbox escape based on https://stackoverflow.com/q/35804961 and
         #  https://stackoverflow.com/a/35806044
         check_all_codecs(
@@ -136,18 +134,18 @@ def test_sandbox():
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_empty(check):
-    with pytest.raises(AssertionError, match="empty"):
+    with pytest.raises(SyntaxError, match="expression must not be empty"):
         check("")
-    with pytest.raises(AssertionError, match="empty"):
+    with pytest.raises(SyntaxError, match="expression must not be empty"):
         check("  \t   \n   ")
-    with pytest.raises(AssertionError, match="empty"):
+    with pytest.raises(SyntaxError, match="expression must not be empty"):
         check(" # just a comment ")
 
 
 def test_non_expression():
-    with pytest.raises(AssertionError, match="EOF"):
+    with pytest.raises(SyntaxError, match="expected more input but found EOF"):
         check_all_codecs(np.empty(0), "exp")
-    with pytest.raises(AssertionError, match="unexpected token `x`"):
+    with pytest.raises(SyntaxError, match="unexpected token `x`"):
         check_all_codecs(np.empty(0), "e x p")
 
 
@@ -170,36 +168,40 @@ def test_comment():
 
 def test_variables():
     with pytest.raises(
-        AssertionError,
+        SyntaxError,
         match=r'cannot assign to identifier `a`, assign to a variable v\["a"\] instead',
     ):
         check_all_codecs(np.array([]), "a = 4; return a")
     with pytest.raises(
-        AssertionError, match="pointwise QoI variables use lower-case `v`"
+        SyntaxError,
+        match="pointwise QoI variables use lower-case `v`",
     ):
         check_all_codecs(np.array([]), 'V["a"]')
     with pytest.raises(
-        AssertionError, match='invalid string literal with missing closing `"`'
+        SyntaxError,
+        match='invalid string literal with missing closing `"`',
     ):
         check_all_codecs(np.array([]), 'v["a]')
-    with pytest.raises(AssertionError, match="invalid quoted parameter"):
+    with pytest.raises(SyntaxError, match="invalid quoted parameter"):
         check_all_codecs(np.array([]), 'v["123"]')
-    with pytest.raises(AssertionError, match="invalid quoted parameter"):
+    with pytest.raises(SyntaxError, match="invalid quoted parameter"):
         check_all_codecs(np.array([]), 'v["a 123"]')
     with pytest.raises(
-        AssertionError, match=r"variable name must not be built-in \(start with `\$`\)"
+        SyntaxError,
+        match=r"variable name must not be built-in \(start with `\$`\)",
     ):
         check_all_codecs(np.array([]), 'v["$a"]')
-    with pytest.raises(AssertionError, match=r'undefined variable v\["a"\]'):
+    with pytest.raises(SyntaxError, match=r'undefined variable v\["a"\]'):
         check_all_codecs(np.array([]), 'v["a"]')
-    with pytest.raises(AssertionError, match=r'undefined variable v\["b"\]'):
+    with pytest.raises(SyntaxError, match=r'undefined variable v\["b"\]'):
         check_all_codecs(np.array([]), 'v["a"] = 3; return x + v["b"];')
-    with pytest.raises(AssertionError, match="unexpected token `=`"):
+    with pytest.raises(SyntaxError, match="unexpected token `=`"):
         check_all_codecs(np.array([]), "1 = x")
-    with pytest.raises(AssertionError, match=r"expected `\(`"):
+    with pytest.raises(SyntaxError, match=r"expected `\(`"):
         check_all_codecs(np.array([]), 'v["a"] = log; return x + v["a"];')
     with pytest.raises(
-        AssertionError, match=r'cannot override already-defined variable v\["a"\]'
+        SyntaxError,
+        match=r'cannot override already-defined variable v\["a"\]',
     ):
         check_all_codecs(
             np.array([]), 'v["a"] = x + 1; v["a"] = v["a"]; return v["a"];'
@@ -216,19 +218,19 @@ def test_variables():
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_constant(check):
-    with pytest.raises(AssertionError, match="constant"):
+    with pytest.raises(SyntaxError, match="expression must not be constant"):
         check("0")
-    with pytest.raises(AssertionError, match="constant"):
+    with pytest.raises(SyntaxError, match="expression must not be constant"):
         check("NaN")
-    with pytest.raises(AssertionError, match="constant"):
+    with pytest.raises(SyntaxError, match="expression must not be constant"):
         check("Inf")
-    with pytest.raises(AssertionError, match="constant"):
+    with pytest.raises(SyntaxError, match="expression must not be constant"):
         check("-Inf")
-    with pytest.raises(AssertionError, match="constant"):
+    with pytest.raises(SyntaxError, match="expression must not be constant"):
         check("pi")
-    with pytest.raises(AssertionError, match="constant"):
+    with pytest.raises(SyntaxError, match="expression must not be constant"):
         check("e")
-    with pytest.raises(AssertionError, match="constant"):
+    with pytest.raises(SyntaxError, match="expression must not be constant"):
         check("-(-(-e))")
 
 
@@ -442,7 +444,7 @@ def test_where(check):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_size(check):
-    with pytest.raises(AssertionError, match="scalar non-array expression has no size"):
+    with pytest.raises(SyntaxError, match="scalar non-array expression has no size"):
         check("size(x) + x")
     check("size([x]) + x")
 
@@ -462,9 +464,9 @@ def test_dtypes(dtype):
 
 @pytest.mark.parametrize("check", CHECKS)
 def test_fuzzer_found(check):
-    with pytest.warns(UserWarning, match="symbolic integer evaluation"):
+    with pytest.warns(RuntimeWarning, match="symbolic integer evaluation"):
         check_all_codecs(np.array([42.0], np.float16), "(((-8054**5852)-x)-1)")
-    with pytest.warns(UserWarning, match="symbolic integer evaluation"):
+    with pytest.warns(RuntimeWarning, match="symbolic integer evaluation"):
         check("(((-8054**5852)-x)-1)")
 
     check_all_codecs(
@@ -607,7 +609,7 @@ def test_gaussian_kernel():
 
     assert (
         safeguard.evaluate_qoi(
-            np.array(1.0, dtype=np.float64), late_bound=Bindings.empty()
+            np.array(1.0, dtype=np.float64), late_bound=Bindings.EMPTY
         )
         == kernel[5, 5]
     )
@@ -740,7 +742,10 @@ def test_to_float_modes(dtype, mode):
     ):
         expectation = does_not_raise()
     else:
-        expectation = pytest.raises(ValueError, match="cannot losslessly cast")
+        expectation = pytest.raises(
+            TypeError,
+            match=rf"qoi_eb_pw\.qoi_dtype: cannot losslessly cast {dtype} to {mode}",
+        )
 
     with expectation:
         encode_decode_mock(
@@ -781,7 +786,7 @@ def test_fuzzer_found_float16_to_float128_cast_invalid_value():
 
     with pytest.raises(
         ValueError,
-        match=r"cannot cast non-finite late-bound parameter \$x values from float16 to saturating finite",
+        match=r"qoi_eb_pw\.eb=\$x: cannot cast non-finite values from float16 to saturating finite [a-zA-Z]+128",
     ):
         encode_decode_mock(
             data,
@@ -795,3 +800,45 @@ def test_fuzzer_found_float16_to_float128_cast_invalid_value():
                 ),
             ],
         )
+
+
+def test_fuzzer_found_to_float_overflow():
+    data = np.array(
+        [[6.832903672767793e-317], [-9.706944532730097e091], [6.857669879119945e303]],
+        dtype=np.float64,
+    )
+    decoded = np.array(
+        [[-9.706941444477356e091], [-7.377431574923020e-200], [6.857665745901998e303]],
+        dtype=np.float64,
+    )
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            PointwiseQuantityOfInterestErrorBoundSafeguard(
+                qoi="log(exp2(x), base=e) * 1",
+                type="abs",
+                eb="$x_max",
+                qoi_dtype="float128",
+            ),
+        ],
+    )
+
+
+def test_fuzzer_found_float_upper_negative_zero_rounding():
+    data = np.array([[-5568], [2577], [16448]], dtype=np.int16)
+
+    codec = SafeguardsCodec(
+        codec=dict(id="zero"),
+        safeguards=[
+            PointwiseQuantityOfInterestErrorBoundSafeguard(
+                qoi="cosh(log(pi / x, base=pi))",
+                type="rel",
+                eb=22,
+                qoi_dtype="lossless",
+            ),
+        ],
+    )
+
+    codec.decode(codec.encode(data))

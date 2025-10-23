@@ -12,6 +12,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
+from ...utils.error import TypeCheckError, ctx
 from ...utils.intervals import IntervalUnion
 from ...utils.typing import JSON, S, T
 from ..abc import Safeguard
@@ -37,6 +38,15 @@ class AnySafeguard(Safeguard):
         [`PointwiseSafeguard`][compression_safeguards.safeguards.pointwise.abc.PointwiseSafeguard]
         or
         [`StencilSafeguard`][compression_safeguards.safeguards.stencil.abc.StencilSafeguard].
+
+    Raises
+    ------
+    TypeCheckError
+        if any parameter has the wrong type.
+    ValueError
+        if the `safeguards` collection is empty.
+    ...
+        if instantiating a safeguard raises an exception.
     """
 
     __slots__: tuple[str, ...] = ()
@@ -57,21 +67,28 @@ class AnySafeguard(Safeguard):
     ) -> "_AnyPointwiseSafeguard | _AnyStencilSafeguard":
         from ... import SafeguardKind  # noqa: PLC0415
 
-        assert len(safeguards) > 0, "can only combine over at least one safeguard"
+        with ctx.safeguardty(cls):
+            with ctx.parameter("safeguards"):
+                TypeCheckError.check_instance_or_raise(safeguards, Collection)
 
-        safeguards_ = tuple(
-            safeguard
-            if isinstance(safeguard, PointwiseSafeguard | StencilSafeguard)
-            else SafeguardKind[safeguard["kind"]].value(  # type: ignore
-                **{p: v for p, v in safeguard.items() if p != "kind"}
-            )
-            for safeguard in safeguards
-        )
+                if len(safeguards) <= 0:
+                    raise (
+                        ValueError("can only combine over at least one safeguard") | ctx
+                    )
 
-        for safeguard in safeguards_:
-            assert isinstance(safeguard, PointwiseSafeguard | StencilSafeguard), (
-                f"{safeguard!r} is not a pointwise or stencil safeguard"
-            )
+                safeguards_: list[PointwiseSafeguard | StencilSafeguard] = []
+                safeguard: dict[str, JSON] | Safeguard
+                for i, safeguard in enumerate(safeguards):
+                    with ctx.index(i):
+                        TypeCheckError.check_instance_or_raise(
+                            safeguard, dict | PointwiseSafeguard | StencilSafeguard
+                        )
+                        if isinstance(safeguard, dict):
+                            safeguard = SafeguardKind.from_config(safeguard)
+                        TypeCheckError.check_instance_or_raise(
+                            safeguard, PointwiseSafeguard | StencilSafeguard
+                        )
+                        safeguards_.append(safeguard)  # type: ignore
 
         if all(isinstance(safeguard, PointwiseSafeguard) for safeguard in safeguards_):
             return _AnyPointwiseSafeguard(*safeguards_)  # type: ignore
@@ -128,6 +145,11 @@ class AnySafeguard(Safeguard):
         -------
         ok : bool
             `True` if the check succeeded.
+
+        Raises
+        ------
+        ...
+            if checking a safeguard raises an exception.
         """
 
         ...
@@ -156,6 +178,11 @@ class AnySafeguard(Safeguard):
         -------
         ok : np.ndarray[S, np.dtype[np.bool]]
             Pointwise, `True` if the check succeeded for this element.
+
+        Raises
+        ------
+        ...
+            if checking a safeguard raises an exception.
         """
 
         ...
@@ -181,6 +208,11 @@ class AnySafeguard(Safeguard):
         -------
         intervals : IntervalUnion[T, int, int]
             Union of safe intervals.
+
+        Raises
+        ------
+        ...
+            if computing the safe intervals for a safeguard raises an exception.
         """
 
         ...

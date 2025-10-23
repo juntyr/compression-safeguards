@@ -12,6 +12,7 @@ with atheris.instrument_imports():
     from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
     from compression_safeguards.safeguards._qois.expr.addsub import (
         ScalarAdd,
+        ScalarLeftAssociativeSum,
         ScalarSubtract,
     )
     from compression_safeguards.safeguards._qois.expr.classification import (
@@ -164,6 +165,7 @@ TERNARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr, AnyExpr], AnyExpr]] = [
     lambda a, b, c: ScalarAdd(a, ScalarAdd(b, c)),
     lambda a, b, c: ScalarAdd(ScalarSubtract(a, b), c),
     lambda a, b, c: ScalarSubtract(ScalarAdd(a, b), c),
+    lambda a, b, c: ScalarLeftAssociativeSum(a, b, c),
     lambda a, b, c: ScalarMultiply(ScalarMultiply(a, b), c),
     lambda a, b, c: ScalarMultiply(a, ScalarMultiply(b, c)),
     lambda a, b, c: ScalarMultiply(ScalarDivide(a, b), c),
@@ -234,13 +236,13 @@ def check_one_input(data) -> None:
     except TimeoutError:
         # skip expressions that take too long just to build
         return
-    except Warning as err:
+    except RuntimeWarning as err:
         # skip expressions that try to perform a**b with excessive digits
         if ("symbolic integer evaluation" in str(err)) and (
             "excessive number of digits" in str(err)
         ):
             return
-        raise err
+        raise
 
     # skip if the expression is constant
     if not expr.has_data:
@@ -280,7 +282,7 @@ def check_one_input(data) -> None:
             X_lower, X_upper = expr.compute_data_bounds(
                 expr_lower, expr_upper, X, X, dict()
             )
-    except Exception as err:
+    except Exception:
         print(  # noqa: T201
             "\n===\n\n"
             + "\n".join(
@@ -295,7 +297,7 @@ def check_one_input(data) -> None:
             )
             + "\n\n===\n"
         )
-        raise err
+        raise
     X_lower, X_upper = np.array(X_lower), np.array(X_upper)
     exprv_X_lower = expr.eval((), X_lower, late_bound=dict())
     exprv_X_upper = expr.eval((), X_upper, late_bound=dict())
@@ -352,7 +354,7 @@ def check_one_input(data) -> None:
         assert np.isnan(exprv) or (
             (exprv_X_test >= expr_lower) and (exprv_X_test <= expr_upper)
         ), "exprv_X_test outside bounds"
-    except Exception as err:
+    except Exception:
         print(  # noqa: T201
             "\n===\n\n"
             + "\n".join(
@@ -373,7 +375,7 @@ def check_one_input(data) -> None:
             )
             + "\n\n===\n"
         )
-        raise err
+        raise
 
 
 atheris.Setup(sys.argv, check_one_input)

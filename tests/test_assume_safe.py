@@ -17,7 +17,7 @@ def test_dtypes(dtype):
     safeguard = AssumeAlwaysSafeguard()
 
     intervals = safeguard.compute_safe_intervals(
-        np.zeros(1, dtype=dtype), late_bound=Bindings.empty()
+        np.zeros(1, dtype=dtype), late_bound=Bindings.EMPTY
     )
 
     np.testing.assert_equal(
@@ -32,5 +32,5 @@ def test_dtypes(dtype):
     assert safeguard.check(
         np.array([24], dtype=dtype),
         np.array([42], dtype=dtype),
-        late_bound=Bindings.empty(),
+        late_bound=Bindings.EMPTY,
     )

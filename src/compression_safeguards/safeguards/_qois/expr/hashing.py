@@ -9,6 +9,7 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import _broadcast_to, _ensure_array, _is_of_shape, _ones, _zeros
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import from_float
+from ....utils.error import ctx
 from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import S, T
 from ..bound import DataBounds, data_bounds
@@ -192,7 +193,8 @@ def _interval_union_contains(
 def _interval_union_pick(
     self, prediction: np.ndarray[S, np.dtype[T]]
 ) -> np.ndarray[S, np.dtype[T]]:
-    assert not np.all(self._lower == 1), "fuzzer hash is all ones"
+    if np.all(self._lower == 1):
+        raise ValueError("fuzzer hash is all ones") | ctx
     return _ensure_array(self._lower[0].reshape(prediction.shape), copy=True)
 
 
