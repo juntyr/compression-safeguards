@@ -688,13 +688,15 @@ class SafeguardsSafetyBug(RuntimeError):
         )
 
         if not hasattr(self, "add_note"):
-            message = f"{message}\n\n{note}"
+            if note not in message:
+                message = f"{message}\n\n{note}"
 
         super().__init__(message)
 
         # MSPV 3.11
         if hasattr(self, "add_note"):
-            self.add_note(message)  # type: ignore
+            if note not in getattr(self, "__notes__", []):
+                self.add_note(note)  # type: ignore
 
 
 class QuantityOfInterestRuntimeWarning(RuntimeWarning):
@@ -725,13 +727,15 @@ class QuantityOfInterestRuntimeWarning(RuntimeWarning):
         )
 
         if not hasattr(self, "add_note"):
-            message = f"{message}\n\n{note}"
+            if note not in message:
+                message = f"{message}\n\n{note}"
 
         super().__init__(message)
 
         # MSPV 3.11
         if hasattr(self, "add_note"):
-            self.add_note(message)  # type: ignore
+            if note not in getattr(self, "__notes__", []):
+                self.add_note(note)  # type: ignore
 
 
 def lookup_enum_or_raise(

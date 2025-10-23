@@ -824,3 +824,21 @@ def test_fuzzer_found_to_float_overflow():
             ),
         ],
     )
+
+
+def test_fuzzer_found_float_upper_negative_zero_rounding():
+    data = np.array([[-5568], [2577], [16448]], dtype=np.int16)
+
+    codec = SafeguardsCodec(
+        codec=dict(id="zero"),
+        safeguards=[
+            PointwiseQuantityOfInterestErrorBoundSafeguard(
+                qoi="cosh(log(pi / x, base=pi))",
+                type="rel",
+                eb=22,
+                qoi_dtype="lossless",
+            ),
+        ],
+    )
+
+    codec.decode(codec.encode(data))
