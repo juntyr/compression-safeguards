@@ -11,7 +11,7 @@ from typing_extensions import (
 from ....utils.bindings import Parameter
 from ....utils.error import ctx
 from .abc import AnyExpr, Expr
-from .addsub import ScalarAdd
+from .addsub import ScalarLeftAssociativeSum
 from .constfold import ScalarFoldedConstant
 from .data import Data
 from .divmul import ScalarMultiply
@@ -151,16 +151,10 @@ class Array(Expr[AnyExpr, Unpack[Es]]):
         return out
 
     def sum(self) -> AnyExpr:
-        acc = None
-        for e in self._array.flat:
-            if acc is None:
-                acc = e
-            else:
-                acc = ScalarAdd(acc, e)
-        assert acc is not None
-        # we can return a group here since acc is not an array
-        assert not isinstance(acc, Array)
-        return Group(acc)
+        sum_: AnyExpr = ScalarLeftAssociativeSum(*list(self._array.flat))
+        # we can return a group here since sum_ is not an array
+        assert not isinstance(sum_, Array)
+        return Group(sum_)
 
     @staticmethod
     def matmul(
@@ -183,17 +177,15 @@ class Array(Expr[AnyExpr, Unpack[Es]]):
         out._array = np.empty((left.shape[0], right.shape[1]), dtype=object)
         for n in range(left.shape[0]):
             for m in range(right.shape[1]):
-                acc: None | AnyExpr = None
-                for k in range(left.shape[1]):
-                    kk = ScalarMultiply(left._array[n, k], right._array[k, m])
-                    if acc is None:
-                        acc = kk
-                    else:
-                        acc = ScalarAdd(acc, kk)
-                assert acc is not None
-                # we can apply a group here since acc is not an array
-                assert not isinstance(acc, Array)
-                out._array[n, m] = Group(acc)
+                sum_: AnyExpr = ScalarLeftAssociativeSum(
+                    *[
+                        ScalarMultiply(left._array[n, k], right._array[k, m])
+                        for k in range(left.shape[1])
+                    ]
+                )
+                # we can apply a group here since sum_ is not an array
+                assert not isinstance(sum_, Array)
+                out._array[n, m] = Group(sum_)
         return out
 
     @override

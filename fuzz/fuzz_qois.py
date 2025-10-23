@@ -12,6 +12,7 @@ with atheris.instrument_imports():
     from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
     from compression_safeguards.safeguards._qois.expr.addsub import (
         ScalarAdd,
+        ScalarLeftAssociativeSum,
         ScalarSubtract,
     )
     from compression_safeguards.safeguards._qois.expr.classification import (
@@ -164,6 +165,7 @@ TERNARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr, AnyExpr], AnyExpr]] = [
     lambda a, b, c: ScalarAdd(a, ScalarAdd(b, c)),
     lambda a, b, c: ScalarAdd(ScalarSubtract(a, b), c),
     lambda a, b, c: ScalarSubtract(ScalarAdd(a, b), c),
+    lambda a, b, c: ScalarLeftAssociativeSum(a, b, c),
     lambda a, b, c: ScalarMultiply(ScalarMultiply(a, b), c),
     lambda a, b, c: ScalarMultiply(a, ScalarMultiply(b, c)),
     lambda a, b, c: ScalarMultiply(ScalarDivide(a, b), c),

@@ -1359,3 +1359,16 @@ def test_fuzzer_found_axis_index_out_of_bounds():
         match=r"qoi_eb_stencil\.qoi: axis index -3 is out of bounds for stencil with 2 axes",
     ):
         check_all_codecs(np.empty((2, 2)), "I[-3]", [(0, 0), (0, 0)])
+
+
+def test_fuzzer_found_has_data_recursion_error():
+    StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi="sum(X) / e + 1",
+        neighbourhood=[
+            dict(axis=82, before=50, after=59, boundary="valid"),
+            dict(axis=86, before=82, after=93, boundary="valid"),
+        ],
+        type="abs",
+        eb=0,
+        qoi_dtype="lossless",
+    )

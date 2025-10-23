@@ -8,7 +8,7 @@ from ...utils.bindings import Parameter
 from ...utils.error import ctx
 from .expr.abc import AnyExpr
 from .expr.abs import ScalarAbs
-from .expr.addsub import ScalarAdd, ScalarSubtract
+from .expr.addsub import ScalarAdd, ScalarLeftAssociativeSum, ScalarSubtract
 from .expr.array import Array
 from .expr.classification import ScalarIsFinite, ScalarIsInf, ScalarIsNaN
 from .expr.data import Data, LateBoundConstant
@@ -698,14 +698,12 @@ class QoIParser(Parser):
         ]
         # even order=0 produces at least one term
         assert len(terms) > 0
-        acc = terms[0]
-        for t in terms[1:]:
-            acc = ScalarAdd(acc, t)
+        sum_ = ScalarLeftAssociativeSum(*terms)
 
         required_axis_before = 0
         required_axis_after = 0
 
-        for idx in acc.data_indices:
+        for idx in sum_.data_indices:
             required_axis_before = max(required_axis_before, self._I[axis] - idx[axis])
             required_axis_after = max(required_axis_after, idx[axis] - self._I[axis])
 
@@ -719,8 +717,8 @@ class QoIParser(Parser):
             f"{required_axis_after}",
         )
 
-        assert not isinstance(acc, Array)
-        return Group(acc)
+        assert not isinstance(sum_, Array)
+        return Group(sum_)
 
     @_("COMMA GRID_SPACING EQUAL expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def finite_difference_grid_spacing(self, p):  # noqa: F811

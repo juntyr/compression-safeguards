@@ -800,3 +800,27 @@ def test_fuzzer_found_float16_to_float128_cast_invalid_value():
                 ),
             ],
         )
+
+
+def test_fuzzer_found_to_float_overlflow():
+    data = np.array(
+        [[6.832903672767793e-317], [-9.706944532730097e091], [6.857669879119945e303]],
+        dtype=np.float64,
+    )
+    decoded = np.array(
+        [[-9.706941444477356e091], [-7.377431574923020e-200], [6.857665745901998e303]],
+        dtype=np.float64,
+    )
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            PointwiseQuantityOfInterestErrorBoundSafeguard(
+                qoi="log(exp2(x), base=e) * 1",
+                type="abs",
+                eb="$x_max",
+                qoi_dtype="float128",
+            ),
+        ],
+    )

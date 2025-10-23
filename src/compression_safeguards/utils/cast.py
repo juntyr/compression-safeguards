@@ -211,9 +211,10 @@ def to_float(
     if _is_of_dtype(x, ftype):
         return x
 
-    with np.errstate(invalid="ignore"):
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         # lossless cast to floating-point data type with a sufficiently large
         #  mantissa
+        # FIXME: numpy_quaddtype raises warnings even though no overflow occurs
         return x.astype(ftype, casting="safe")
 
 
