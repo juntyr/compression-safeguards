@@ -2,7 +2,6 @@ import itertools
 from contextlib import contextmanager
 
 from sly import Parser
-from typing_extensions import Unpack  # MSPV 3.11
 
 from ...utils.bindings import Parameter
 from ...utils.error import ctx
@@ -51,7 +50,7 @@ from .lexer import QoILexer
 class QoIParser(Parser):
     __slots__: tuple[str, ...] = ("_x", "_X", "_I", "_vars", "_text")
     _x: Data
-    _X: None | Array[Unpack[tuple[AnyExpr, ...]]]
+    _X: None | Array
     _I: None | tuple[int, ...]
     _vars: dict[Parameter, AnyExpr]
     _text: str
@@ -60,7 +59,7 @@ class QoIParser(Parser):
         self,
         *,
         x: Data,
-        X: None | Array[Unpack[tuple[AnyExpr, ...]]],
+        X: None | Array,
         I: None | tuple[int, ...],  # noqa: E741
     ):
         self._x = x

@@ -3,7 +3,7 @@ from collections.abc import Callable, Iterator, Mapping
 
 import numpy as np
 from typing_extensions import (
-    TypeVarTuple,  # MSPV 3.11
+    Self,  # MSPV 3.11
     Unpack,  # MSPV 3.11
     override,  # MSPV 3.12
 )
@@ -18,13 +18,8 @@ from .divmul import ScalarMultiply
 from .group import Group
 from .typing import Es, F, Ns, Ps, PsI
 
-# FIXME: actually bound the types to be Expr
-# https://discuss.python.org/t/how-to-use-typevartuple/67502
-Es2 = TypeVarTuple("Es2")
-""" Tuple of [`Expr`][compression_safeguards.safeguards._qois.expr.abc.Expr]s. """
 
-
-class Array(Expr[AnyExpr, Unpack[Es]]):
+class Array(Expr[AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
     __slots__: tuple[str, ...] = ("_array",)
     _array: np.ndarray
 
@@ -49,7 +44,7 @@ class Array(Expr[AnyExpr, Unpack[Es]]):
             self._array = np.array((el,) + els, copy=None)
 
     @staticmethod
-    def from_data_shape(shape: tuple[int, ...]) -> "Array[Unpack[tuple[AnyExpr, ...]]]":
+    def from_data_shape(shape: tuple[int, ...]) -> "Array":
         out = Array.__new__(Array)
         out._array = np.empty(shape, dtype=object)
 
@@ -60,19 +55,19 @@ class Array(Expr[AnyExpr, Unpack[Es]]):
 
     @property
     @override
-    def args(self) -> tuple[AnyExpr, Unpack[Es]]:
+    def args(self) -> tuple[AnyExpr, Unpack[tuple[AnyExpr, ...]]]:
         if self._array.ndim == 1:
             return tuple(self._array)
         return tuple(a for a in self._array)
 
     @override
-    def with_args(self, el: AnyExpr, *els: Unpack[Es]) -> "Array[Unpack[Es]]":
-        return Array(el, *els)  # type: ignore
+    def with_args(self, el: AnyExpr, *els: AnyExpr) -> Self:
+        return type(self)(el, *els)
 
     @override
     def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         return Array.map(
-            lambda e: ScalarFoldedConstant.constant_fold_expr(e, dtype),  # type: ignore
+            lambda e: ScalarFoldedConstant.constant_fold_expr(e, dtype),
             self,
         )
 
@@ -105,7 +100,7 @@ class Array(Expr[AnyExpr, Unpack[Es]]):
         return self._array.size
 
     @staticmethod
-    def map(map: Callable[[Unpack[Es2]], AnyExpr], *exprs: Unpack[Es2]) -> AnyExpr:
+    def map(map: Callable[[Unpack[Es]], AnyExpr], *exprs: Unpack[Es]) -> AnyExpr:
         if not any(isinstance(e, Array) for e in exprs):
             return map(*exprs)
 
@@ -145,8 +140,8 @@ class Array(Expr[AnyExpr, Unpack[Es]]):
             return out
         return a
 
-    def transpose(self) -> "Array[Unpack[tuple[AnyExpr, ...]]]":
-        out = Array.__new__(Array)
+    def transpose(self) -> Self:
+        out = Array.__new__(type(self))
         out._array = self._array.T
         return out
 
@@ -158,9 +153,9 @@ class Array(Expr[AnyExpr, Unpack[Es]]):
 
     @staticmethod
     def matmul(
-        left: "Array[Unpack[tuple[AnyExpr, ...]]]",
-        right: "Array[Unpack[tuple[AnyExpr, ...]]]",
-    ) -> "Array[Unpack[tuple[AnyExpr, ...]]]":
+        left: "Array",
+        right: "Array",
+    ) -> "Array":
         if len(left.shape) != 2:
             raise ValueError("can only matmul(a, b) a 2D array a") | ctx
         if len(right.shape) != 2:

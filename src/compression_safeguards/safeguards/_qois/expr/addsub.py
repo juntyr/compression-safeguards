@@ -21,7 +21,7 @@ from .abs import ScalarAbs
 from .constfold import ScalarFoldedConstant
 from .literal import Number
 from .neg import ScalarNegate
-from .typing import Es, F, Ns, Ps, PsI
+from .typing import F, Ns, Ps, PsI
 
 
 class ScalarAdd(Expr[AnyExpr, AnyExpr]):
@@ -142,23 +142,31 @@ class ScalarSubtract(Expr[AnyExpr, AnyExpr]):
         return f"{self._a!r} - {self._b!r}"
 
 
-class ScalarLeftAssociativeSum(Expr[AnyExpr, AnyExpr, Unpack[Es]]):
-    __slots__: tuple[str, ...] = ("_a", "_b", "_cs")
+# left-associative sum over at least three terms, i.e. a + b + c = (a + b) + c
+#  - zero terms: sum identity = 0
+#  - one term: term
+#  - two terms: binary sum
+# this class avoids the deep nesting that's required to represent a
+#  left-associative sum with ScalarAdd's
+class ScalarLeftAssociativeSum(
+    Expr[AnyExpr, AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]
+):
+    __slots__: tuple[str, ...] = ("_a", "_b", "_c", "_ds")
     _a: AnyExpr
     _b: AnyExpr
-    _cs: tuple[AnyExpr, ...]
+    _c: AnyExpr
+    _ds: tuple[AnyExpr, ...]
 
-    def __init__(self, *ts: AnyExpr) -> None:
-        pass
-
-    def __new__(cls, *ts: AnyExpr) -> "AnyExpr | Number":  # type: ignore[misc]
+    def __new__(cls, *ts: AnyExpr) -> AnyExpr | Number:  # type: ignore[misc]
+        # base case: sum identity
         if len(ts) == 0:
             return Number.ZERO
 
-        a = ts[0]
+        # we can only fold consecutive symbolic integers from the left
+        a, *tsr = ts
         i = 0
         broken = False
-        for i, b in enumerate(ts[1:]):
+        for i, b in enumerate(tsr):
             ab = Number.symbolic_fold_binary(a, b, operator.add)
             if ab is None:
                 broken = True
@@ -166,52 +174,62 @@ class ScalarLeftAssociativeSum(Expr[AnyExpr, AnyExpr, Unpack[Es]]):
             a = ab
         i += not broken
 
-        match ts[i + 1 :]:
+        match tsr[i:]:
+            # addition over one term
             case ():
                 return a
+            # binary addition
             case (b,):
                 return ScalarAdd(a, b)
-            case _:
+            # sum over at least three terms
+            case tsri:
                 sum_ = super().__new__(cls)
                 sum_._a = a
-                sum_._b = ts[i + 1]
-                sum_._cs = ts[i + 2 :]
-                return sum_  # type: ignore
+                sum_._b, sum_._c, *ds = tsri
+                sum_._ds = tuple(ds)
+                return sum_
 
     @property
     @override
-    def args(self) -> tuple[AnyExpr, AnyExpr, Unpack[Es]]:
-        return (self._a, self._b, *self._cs)  # type: ignore
+    def args(self) -> tuple[AnyExpr, AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]:
+        return (self._a, self._b, self._c, *self._ds)
 
     @override
-    def with_args(self, a: AnyExpr, b: AnyExpr, *cs: AnyExpr) -> "AnyExpr | Number":  # type: ignore[override]
-        return ScalarLeftAssociativeSum(a, b, *cs)
+    def with_args(  # type: ignore[override]
+        self, a: AnyExpr, b: AnyExpr, c: AnyExpr, *ds: AnyExpr
+    ) -> AnyExpr | Number:
+        return ScalarLeftAssociativeSum(a, b, c, *ds)
 
     @override
     def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
-        fa = self._a.constant_fold(dtype)
-        fts = [self._b.constant_fold(dtype)] + [
-            c.constant_fold(dtype) for c in self._cs
+        # we first individually fold each term
+        facc = self._a.constant_fold(dtype)
+        fts = [self._b.constant_fold(dtype), self._c.constant_fold(dtype)] + [
+            d.constant_fold(dtype) for d in self._ds
         ]
 
+        # next, we can only combine consecutive folded terms from the left
         i = 0
         broken = False
-        for i, fb in enumerate(fts):
-            if isinstance(fa, Expr) or isinstance(fb, Expr):
+        for i, ft in enumerate(fts):
+            if isinstance(facc, Expr) or isinstance(ft, Expr):
                 broken = True
                 break
-            fa = np.add(fa, fb)
+            facc = np.add(facc, ft)
         i += not broken
 
+        # if all were folded, return the folded constant
         if not broken:
-            return fa
+            return facc
 
-        fae = fa if isinstance(fa, Expr) else ScalarFoldedConstant(fa)
+        # otherwise turn all folded constant terms back into expressions
+        facce = facc if isinstance(facc, Expr) else ScalarFoldedConstant(facc)
         ftes = [
             fb if isinstance(fb, Expr) else ScalarFoldedConstant(fb) for fb in fts[i:]
         ]
 
-        return ScalarLeftAssociativeSum(fae, *ftes)
+        # and create a sum of the folded terms
+        return ScalarLeftAssociativeSum(facce, *ftes)
 
     @override
     def eval(
@@ -220,12 +238,15 @@ class ScalarLeftAssociativeSum(Expr[AnyExpr, AnyExpr, Unpack[Es]]):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> np.ndarray[PsI, np.dtype[F]]:
+        # evaluate the sum left-associative, i.e. a + b + c = (a + b) + c
         acc: np.ndarray[PsI, np.dtype[F]] = np.add(
             self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound)
         )
 
-        for c in self._cs:
-            acc += c.eval(x, Xs, late_bound)
+        acc += self._c.eval(x, Xs, late_bound)
+
+        for d in self._ds:
+            acc += d.eval(x, Xs, late_bound)
 
         return acc
 
@@ -239,26 +260,22 @@ class ScalarLeftAssociativeSum(Expr[AnyExpr, AnyExpr, Unpack[Es]]):
         Xs: np.ndarray[Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
     ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        self_: ScalarLeftAssociativeSum[Unpack[tuple[AnyExpr, ...]]] = self  # type: ignore
-
         return compute_left_associate_sum_data_bounds(
-            self_, expr_lower, expr_upper, X, Xs, late_bound
+            self, expr_lower, expr_upper, X, Xs, late_bound
         )
 
     @override
     def __repr__(self) -> str:
-        ab = f"{self._a!r} + {self._b!r}"
+        abc = f"{self._a!r} + {self._b!r} + {self._c!r}"
 
-        if len(self._cs) <= 0:
-            return ab
+        if len(self._ds) <= 0:
+            return abc
 
-        return f"{ab} + {' + '.join(repr(c) for c in self._cs)}"
+        return f"{abc} + {' + '.join(repr(d) for d in self._ds)}"
 
 
 def compute_left_associate_sum_data_bounds(
-    expr: ScalarAdd
-    | ScalarSubtract
-    | ScalarLeftAssociativeSum[Unpack[tuple[AnyExpr, ...]]],
+    expr: ScalarAdd | ScalarSubtract | ScalarLeftAssociativeSum,
     expr_lower: np.ndarray[Ps, np.dtype[F]],
     expr_upper: np.ndarray[Ps, np.dtype[F]],
     X: np.ndarray[Ps, np.dtype[F]],
@@ -522,15 +539,16 @@ def compute_left_associate_sum_data_bounds(
 
 
 def as_left_associative_sum(
-    expr: ScalarAdd
-    | ScalarSubtract
-    | ScalarLeftAssociativeSum[Unpack[tuple[AnyExpr, ...]]],
+    expr: ScalarAdd | ScalarSubtract | ScalarLeftAssociativeSum,
 ) -> tuple[AnyExpr, ...]:
     terms_rev: list[AnyExpr] = []
 
     while True:
+        # a left associative sum ((a + b) + c) + d
+        # has the reverse stack d, c, b, a
         if isinstance(expr, ScalarLeftAssociativeSum):
-            terms_rev.extend(expr._cs[::-1])
+            terms_rev.extend(expr._ds[::-1])
+            terms_rev.append(expr._c)
 
         # rewrite ( a - b ) as ( a + (-b) ), which is bitwsie equivalent for
         #  floating-point numbers
