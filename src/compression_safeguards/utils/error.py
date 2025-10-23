@@ -10,8 +10,12 @@ accessed through the
 __all__ = [
     "ContextLayer",
     "ErrorContext",
-    "ErrorContextMixin",
     "ctx",
+    "ErrorContextMixin",
+    "SafeguardTypeContextLayer",
+    "ParameterContextLayer",
+    "LateBoundParameterContextLayer",
+    "IndexContextLayer",
     "TypeCheckError",
     "TypeSetError",
     "LateBoundParameterResolutionError",
@@ -187,52 +191,13 @@ class ctx(metaclass=_ctxmeta):
             raise err2
 
     @staticmethod
-    def parameter(name: str) -> AbstractContextManager[None]:
-        """
-        Context manager that adds one layer of context, the `name` of a
-        parameter, to any exception that is raised within.
-
-        Parameters
-        ----------
-        name : str
-            The name of a parameter to add as a layer of context.
-        """
-
-        return ctx.layer(_ParameterContextLayer(name))
-
-    @staticmethod
-    def late_bound_parameter(name: "Parameter") -> AbstractContextManager[None]:
-        """
-        Context manager that adds one layer of context, the `name` of a
-        late-bound parameter, to any exception that is raised within.
-
-        Parameters
-        ----------
-        name : Parameter
-            The name of a late-bound parameter to add as a layer of context.
-        """
-
-        return ctx.layer(_LateBoundParameterContextLayer(name))
-
-    @staticmethod
-    def index(index: int) -> AbstractContextManager[None]:
-        """
-        Context manager that adds one layer of context, an `index`, to any
-        exception that is raised within.
-
-        Parameters
-        ----------
-        index : int
-            An index to add as a layer of context.
-        """
-
-        return ctx.layer(_IndexContextLayer(index))
-
-    @staticmethod
     def safeguard(safeguard: "Safeguard") -> AbstractContextManager[None]:
         """
         Context manager that adds one layer of context, the type of a
         `safeguard`, to any exception that is raised within.
+
+        The added context layer will be a
+        [`SafeguardTypeContextLayer`][compression_safeguards.utils.error.SafeguardTypeContextLayer].
 
         Parameters
         ----------
@@ -240,7 +205,7 @@ class ctx(metaclass=_ctxmeta):
             A safeguard whose type to add as a layer of context.
         """
 
-        return ctx.layer(_SafeguardTypeContextLayer(type(safeguard)))
+        return ctx.layer(SafeguardTypeContextLayer(type(safeguard)))
 
     @staticmethod
     def safeguardty(safeguard: type["Safeguard"]) -> AbstractContextManager[None]:
@@ -248,120 +213,71 @@ class ctx(metaclass=_ctxmeta):
         Context manager that adds one layer of context, the `safeguard` type,
         to any exception that is raised within.
 
+        The added context layer will be a
+        [`SafeguardTypeContextLayer`][compression_safeguards.utils.error.SafeguardTypeContextLayer].
+
         Parameters
         ----------
         safeguard : type[Safeguard]
             The type of a safeguard to add as a layer of context.
         """
 
-        return ctx.layer(_SafeguardTypeContextLayer(safeguard))
+        return ctx.layer(SafeguardTypeContextLayer(safeguard))
+
+    @staticmethod
+    def parameter(name: str) -> AbstractContextManager[None]:
+        """
+        Context manager that adds one layer of context, the `name` of a
+        parameter, to any exception that is raised within.
+
+        The added context layer will be a
+        [`ParameterContextLayer`][compression_safeguards.utils.error.ParameterContextLayer].
+
+        Parameters
+        ----------
+        name : str
+            The name of a parameter to add as a layer of context.
+        """
+
+        return ctx.layer(ParameterContextLayer(name))
+
+    @staticmethod
+    def late_bound_parameter(name: "Parameter") -> AbstractContextManager[None]:
+        """
+        Context manager that adds one layer of context, the `name` of a
+        late-bound parameter, to any exception that is raised within.
+
+        The added context layer will be a
+        [`LateBoundParamaterContextLayer`][compression_safeguards.utils.error.LateBoundParameterContextLayer].
+
+        Parameters
+        ----------
+        name : Parameter
+            The name of a late-bound parameter to add as a layer of context.
+        """
+
+        return ctx.layer(LateBoundParameterContextLayer(name))
+
+    @staticmethod
+    def index(index: int) -> AbstractContextManager[None]:
+        """
+        Context manager that adds one layer of context, an `index`, to any
+        exception that is raised within.
+
+        The added context layer will be an
+        [`IndexContextLayer`][compression_safeguards.utils.error.IndexContextLayer].
+
+        Parameters
+        ----------
+        index : int
+            An index to add as a layer of context.
+        """
+
+        return ctx.layer(IndexContextLayer(index))
 
     @staticmethod
     def __ror__(other: BaseException) -> BaseException:  # type: ignore
         return other | ctx
-
-
-class _IndexContextLayer(ContextLayer):
-    __slots__: tuple[str, ...] = ("_index",)
-    __match_args__: tuple[str, ...] = ("index",)
-    _index: int
-
-    def __init__(self, index: int):
-        self._index = index
-
-    @property
-    def index(self) -> int:
-        return self._index
-
-    @override
-    def __str__(self) -> str:
-        return f"[{self.index}]"
-
-    @property
-    @override
-    def separator(self) -> str:
-        return ""
-
-    @override
-    def __eq__(self, value: object, /) -> bool:
-        return isinstance(value, _IndexContextLayer) and value.index == self.index
-
-
-class _SafeguardTypeContextLayer(ContextLayer):
-    __slots__: tuple[str, ...] = ("_safeguard",)
-    __match_args__: tuple[str, ...] = ("safeguard",)
-    _safeguard: type["Safeguard"]
-
-    def __init__(self, safeguard: type["Safeguard"]):
-        self._safeguard = safeguard
-
-    @property
-    def safeguard(self) -> type["Safeguard"]:
-        return self._safeguard
-
-    @override
-    def __str__(self) -> str:
-        return self._safeguard.kind
-
-    @override
-    def __eq__(self, value: object, /) -> bool:
-        return (
-            isinstance(value, _SafeguardTypeContextLayer)
-            and value.safeguard == self.safeguard
-        )
-
-
-class _ParameterContextLayer(ContextLayer):
-    __slots__: tuple[str, ...] = ("_parameter",)
-    __match_args__: tuple[str, ...] = ("parameter",)
-    _parameter: str
-
-    def __init__(self, parameter: str):
-        self._parameter = parameter
-
-    @property
-    def parameter(self) -> str:
-        return self._parameter
-
-    @override
-    def __str__(self) -> str:
-        return self._parameter
-
-    @override
-    def __eq__(self, value: object, /) -> bool:
-        return (
-            isinstance(value, _ParameterContextLayer)
-            and value.parameter == self.parameter
-        )
-
-
-class _LateBoundParameterContextLayer(ContextLayer):
-    __slots__: tuple[str, ...] = ("_parameter",)
-    __match_args__: tuple[str, ...] = ("parameter",)
-    _parameter: "Parameter"
-
-    def __init__(self, parameter: "Parameter"):
-        self._parameter = parameter
-
-    @property
-    def parameter(self) -> str:
-        return str(self._parameter)
-
-    @override
-    def __str__(self) -> str:
-        return str(self._parameter)
-
-    @property
-    @override
-    def separator(self) -> str:
-        return "="
-
-    @override
-    def __eq__(self, value: object, /) -> bool:
-        return (
-            isinstance(value, _LateBoundParameterContextLayer)
-            and value.parameter == self.parameter
-        )
 
 
 class ErrorContextMixin:
@@ -389,6 +305,169 @@ class ErrorContextMixin:
             context = ErrorContext()
             self._context = context
             return context
+
+
+class SafeguardTypeContextLayer(ContextLayer):
+    """
+    Safeguard type context layer.
+
+    Parameters
+    ----------
+    safeguard : type[Safeguard]
+        The safeguard type.
+    """
+
+    __slots__: tuple[str, ...] = ("_safeguard",)
+    __match_args__: tuple[str, ...] = ("safeguard",)
+    _safeguard: type["Safeguard"]
+
+    def __init__(self, safeguard: type["Safeguard"]):
+        self._safeguard = safeguard
+
+    @property
+    def safeguard(self) -> type["Safeguard"]:
+        """
+        The safeguard type.
+        """
+
+        return self._safeguard
+
+    @override
+    def __str__(self) -> str:
+        return self._safeguard.kind
+
+    @override
+    def __eq__(self, value: object, /) -> bool:
+        return (
+            isinstance(value, SafeguardTypeContextLayer)
+            and value.safeguard == self.safeguard
+        )
+
+
+class ParameterContextLayer(ContextLayer):
+    """
+    Parameter context layer.
+
+    Parameters
+    ----------
+    parameter : str
+        The name of the parameter.
+    """
+
+    __slots__: tuple[str, ...] = ("_parameter",)
+    __match_args__: tuple[str, ...] = ("parameter",)
+    _parameter: str
+
+    def __init__(self, parameter: str):
+        self._parameter = parameter
+
+    @property
+    def parameter(self) -> str:
+        """
+        The name of the parameter.
+        """
+
+        return self._parameter
+
+    @override
+    def __str__(self) -> str:
+        return self._parameter
+
+    @override
+    def __eq__(self, value: object, /) -> bool:
+        return (
+            isinstance(value, ParameterContextLayer)
+            and value.parameter == self.parameter
+        )
+
+
+class LateBoundParameterContextLayer(ContextLayer):
+    """
+    Late-bound parameter context layer.
+
+    Parameters
+    ----------
+    parameter : Parameter
+        The late-bound parameter.
+    """
+
+    __slots__: tuple[str, ...] = ("_parameter",)
+    __match_args__: tuple[str, ...] = ("parameter",)
+    _parameter: "Parameter"
+
+    def __init__(self, parameter: "Parameter"):
+        self._parameter = parameter
+
+    @property
+    def parameter(self) -> "Parameter":
+        """
+        The late-bound parameter.
+        """
+
+        return self._parameter
+
+    @override
+    def __str__(self) -> str:
+        return str(self._parameter)
+
+    @property
+    @override
+    def separator(self) -> str:
+        """
+        `'='` separator to print before this layer.
+        """
+
+        return "="
+
+    @override
+    def __eq__(self, value: object, /) -> bool:
+        return (
+            isinstance(value, LateBoundParameterContextLayer)
+            and value.parameter == self.parameter
+        )
+
+
+class IndexContextLayer(ContextLayer):
+    """
+    Index context layer.
+
+    Parameters
+    ----------
+    index : int
+        The index.
+    """
+
+    __slots__: tuple[str, ...] = ("_index",)
+    __match_args__: tuple[str, ...] = ("index",)
+    _index: int
+
+    def __init__(self, index: int):
+        self._index = index
+
+    @property
+    def index(self) -> int:
+        """
+        The index.
+        """
+
+        return self._index
+
+    @override
+    def __str__(self) -> str:
+        return f"[{self.index}]"
+
+    @property
+    @override
+    def separator(self) -> str:
+        """
+        Empty `""` separator to print before this layer.
+        """
+
+        return ""
+
+    @override
+    def __eq__(self, value: object, /) -> bool:
+        return isinstance(value, IndexContextLayer) and value.index == self.index
 
 
 class TypeCheckError(TypeError):

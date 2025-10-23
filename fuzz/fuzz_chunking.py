@@ -30,9 +30,9 @@ with atheris.instrument_imports():
     from compression_safeguards.utils.bindings import Parameter
     from compression_safeguards.utils.error import (
         ErrorContextMixin,
-        _IndexContextLayer,
-        _LateBoundParameterContextLayer,
-        _ParameterContextLayer,
+        IndexContextLayer,
+        LateBoundParameterContextLayer,
+        ParameterContextLayer,
     )
     from compression_safeguards.utils.typing import S, T
 
@@ -273,22 +273,22 @@ def check_one_input(data) -> None:
             match err.context.layers:
                 case (
                     *_,
-                    _ParameterContextLayer("neighbourhood"),
-                    _IndexContextLayer(_),
-                    _ParameterContextLayer("axis"),
+                    ParameterContextLayer("neighbourhood"),
+                    IndexContextLayer(_),
+                    ParameterContextLayer("axis"),
                 ) if isinstance(err, IndexError) and (
                     "is out of bounds for array of shape" in str(err)
                 ):
                     return
                 case (
                     *_,
-                    _ParameterContextLayer("neighbourhood"),
-                    _IndexContextLayer(_),
-                    _ParameterContextLayer("axis"),
+                    ParameterContextLayer("neighbourhood"),
+                    IndexContextLayer(_),
+                    ParameterContextLayer("axis"),
                 ) | (
                     *_,
-                    _ParameterContextLayer("eb"),
-                    _LateBoundParameterContextLayer(_),
+                    ParameterContextLayer("eb"),
+                    LateBoundParameterContextLayer(_),
                 ) if (
                     isinstance(err, IndexError)
                     and ("duplicate axis index" in str(err))
@@ -296,18 +296,18 @@ def check_one_input(data) -> None:
                     and ("for array of shape" in str(err))
                 ):
                     return
-                case (*_, _ParameterContextLayer(_)) | (
+                case (*_, ParameterContextLayer(_)) | (
                     *_,
-                    _ParameterContextLayer(_),
-                    _LateBoundParameterContextLayer(_),
+                    ParameterContextLayer(_),
+                    LateBoundParameterContextLayer(_),
                 ) if isinstance(err, TypeError | ValueError) and (
                     "cannot losslessly cast" in str(err)
                 ):
                     return
                 case (
                     *_,
-                    _ParameterContextLayer("eb"),
-                    _LateBoundParameterContextLayer(_),
+                    ParameterContextLayer("eb"),
+                    LateBoundParameterContextLayer(_),
                 ) if (
                     isinstance(err, ValueError)
                     and ("cannot cast non-finite" in str(err))
@@ -316,14 +316,14 @@ def check_one_input(data) -> None:
                     return
                 case (
                     *_,
-                    _ParameterContextLayer("eb"),
-                    _LateBoundParameterContextLayer(_),
+                    ParameterContextLayer("eb"),
+                    LateBoundParameterContextLayer(_),
                 ) if isinstance(err, ValueError) and ("must be" in str(err)):
                     return
                 case (
                     *_,
-                    _ParameterContextLayer(_),
-                    _LateBoundParameterContextLayer(_),
+                    ParameterContextLayer(_),
+                    LateBoundParameterContextLayer(_),
                 ) if (
                     isinstance(err, ValueError)
                     and ("cannot broadcast from shape" in str(err))
