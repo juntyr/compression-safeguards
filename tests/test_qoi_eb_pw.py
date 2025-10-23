@@ -802,7 +802,7 @@ def test_fuzzer_found_float16_to_float128_cast_invalid_value():
         )
 
 
-def test_fuzzer_found_to_float_overlflow():
+def test_fuzzer_found_to_float_overflow():
     data = np.array(
         [[6.832903672767793e-317], [-9.706944532730097e091], [6.857669879119945e303]],
         dtype=np.float64,

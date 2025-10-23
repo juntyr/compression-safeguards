@@ -252,7 +252,7 @@ class ScalarLeftAssociativeSum(Expr[AnyExpr, AnyExpr, Unpack[Es]]):
         if len(self._cs) <= 0:
             return ab
 
-        return ab + " + ".join(repr(c) for c in self._cs)
+        return f"{ab} + {' + '.join(repr(c) for c in self._cs)}"
 
 
 def compute_left_associate_sum_data_bounds(
