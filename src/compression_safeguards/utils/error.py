@@ -248,7 +248,7 @@ class ctx(metaclass=_ctxmeta):
         late-bound parameter, to any exception that is raised within.
 
         The added context layer will be a
-        [`LateBoundParamaterContextLayer`][compression_safeguards.utils.error.LateBoundParameterContextLayer].
+        [`LateBoundParameterContextLayer`][compression_safeguards.utils.error.LateBoundParameterContextLayer].
 
         Parameters
         ----------

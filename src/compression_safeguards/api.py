@@ -154,7 +154,7 @@ class Safeguards:
         The semantic version [^1] of the safeguards provided by this package,
         which covers
 
-        - the guarantees provided by the safeguards (can only be weaked in a
+        - the guarantees provided by the safeguards (can only be weakened in a
           new breaking major release)
         - the configurations of the safeguards (can be extended backwards-
           compatibly in a new minor release)
