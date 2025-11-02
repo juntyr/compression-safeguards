@@ -311,7 +311,7 @@ class StencilQuantityOfInterest:
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, Xs.dtype)
         exprv = _ensure_array(expr.eval(Xs, late_bound))
         assert exprv.dtype == Xs.dtype
-        assert exprv.shape == Xs.shape[1:]
+        assert exprv.shape == Xs.shape[:1]
         return exprv
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")

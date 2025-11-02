@@ -366,7 +366,7 @@ class _SelectSafeguardBase(ABC):
         for i, safeguard in enumerate(self.safeguards):
             where_i = (selector == i) & where
             if np.any(where_i):
-                valid = valid.union(
+                valid = valid.intersect(
                     safeguard.compute_safe_intervals(
                         data, late_bound=late_bound, where=where_i
                     )

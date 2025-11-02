@@ -1,7 +1,7 @@
 __all__ = ["T", "F", "Fi", "J", "Ps", "Ns", "np_sndarray", "Ci", "Es"]
 
 from collections.abc import Callable
-from typing import TypeAlias, TypeVar
+from typing import TYPE_CHECKING, TypeAlias, TypeVar
 
 import numpy as np
 from typing_extensions import (
@@ -27,8 +27,12 @@ Ps = TypeVar("Ps", bound=int, covariant=True)
 Ns = TypeVar("Ns", bound=tuple[int, ...], covariant=True)
 """ Any stencil neighbourhood array shape [*S.shape] (covariant). """
 
-np_sndarray: TypeAlias = np.ndarray[tuple[Ps, Unpack[Ns]], T]  # type: ignore
-""" Any stencil-extended [`np.ndarray[tuple[Ps, Unpack[Ns]], T]`][np.ndarray]. """
+if TYPE_CHECKING:
+    np_sndarray: TypeAlias = np.ndarray[tuple[Ps, Unpack[Ns]], T]  # type: ignore
+    """ Any stencil-extended [`np.ndarray[tuple[Ps, Unpack[Ns]], T]`][np.ndarray]. """
+else:
+    # Unpack[TypeVar(bound=tuple)] is not yet supported
+    np_sndarray: TypeAlias = np.ndarray[tuple[Ps, Ns], T]  # type: ignore
 
 Ci = TypeVar("Ci", bound=Callable)
 """ Any callable type (invariant). """

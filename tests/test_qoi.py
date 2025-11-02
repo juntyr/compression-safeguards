@@ -168,7 +168,6 @@ def test_sign_same():
             np.sign(X),
             np.sign(X),
             X,
-            X,
             dict(),
         )
         valid = compute_safe_data_lower_upper_interval_union(
@@ -259,7 +258,6 @@ def test_sign_one_off():
             np.sign(X) - 1,
             np.sign(X) + 1,
             X,
-            X,
             dict(),
         )
         valid = compute_safe_data_lower_upper_interval_union(
@@ -348,7 +346,6 @@ def test_sign_any():
         X_lower, X_upper = expr.compute_data_bounds(
             np.sign(X) - 2,
             np.sign(X) + 2,
-            X,
             X,
             dict(),
         )
@@ -439,7 +436,6 @@ def test_square():
             np.square(X) - 1,
             np.square(X) + 1,
             X,
-            X,
             dict(),
         )
         valid = compute_safe_data_lower_upper_interval_union(
@@ -527,7 +523,6 @@ def test_reciprocal():
             np.reciprocal(X) - 1,
             np.reciprocal(X) + 1,
             X,
-            X,
             dict(),
         )
         valid = compute_safe_data_lower_upper_interval_union(
@@ -578,7 +573,6 @@ def test_sin():
         X_lower, X_upper = expr.compute_data_bounds(
             np.sin(X) - 1,
             np.sin(X) + 1,
-            X,
             X,
             dict(),
         )
@@ -668,7 +662,6 @@ def test_asin():
         X_lower, X_upper = expr.compute_data_bounds(
             np.asin(X) - 1,
             np.asin(X) + 1,
-            X,
             X,
             dict(),
         )

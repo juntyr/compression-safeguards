@@ -620,17 +620,17 @@ def test_constant_fold():
         Number.from_symbolic_int(100), Number.from_symbolic_int(10)
     )
     assert f"{expr!r}" == "log(100, base=10)"
-    assert expr.eval(np.empty(0, dtype=np.float64), {}) == 2
+    assert expr.eval(np.array(0, dtype=np.float64), {}).item() == 2
 
     assert expr.constant_fold(np.dtype(np.float64)) == 2
 
     expr = ScalarLogWithBase(Data.SCALAR, Number.from_symbolic_int(10))
     assert f"{expr!r}" == "log(x, base=10)"
-    assert expr.eval(np.array(100, dtype=np.float64), {}) == 2
+    assert expr.eval(np.array(100, dtype=np.float64), {}).item() == 2
 
     expr = expr.constant_fold(np.dtype(np.float64))
     assert f"{expr!r}" == f"ln(x) / ({np.log(np.float64(10))!r})"
-    assert expr.eval(np.array(100, dtype=np.float64), {}) == 2
+    assert expr.eval(np.array(100, dtype=np.float64), {}).item() == 2
 
 
 def test_fuzzer_found_sign_constant_fold():

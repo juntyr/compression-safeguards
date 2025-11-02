@@ -2,6 +2,7 @@ import itertools
 from collections.abc import Mapping
 from contextlib import contextmanager
 from hashlib import blake2b
+from typing import Literal
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
@@ -202,6 +203,7 @@ def _stencil_qoi_check_pointwise(
     prediction: np.ndarray[S, np.dtype[T]],
     *,
     late_bound: Bindings,
+    where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
 ) -> np.ndarray[S, np.dtype[np.bool]]:
     if np.all(prediction == 1):
         return _zeros(data.shape, dtype=np.dtype(np.bool))

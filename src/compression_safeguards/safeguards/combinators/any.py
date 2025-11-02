@@ -439,7 +439,7 @@ class _AnyStencilSafeguard(_AnySafeguardBase, StencilSafeguard):
         for i, safeguard in enumerate(stencil):
             where_i = (selector == (i + has_pointwise)) & where
             if np.any(where_i):
-                valid = valid.union(
+                valid = valid.intersect(
                     safeguard.compute_safe_intervals(
                         data, late_bound=late_bound, where=where_i
                     )
@@ -447,6 +447,8 @@ class _AnyStencilSafeguard(_AnySafeguardBase, StencilSafeguard):
 
         if has_pointwise:
             where_i = (selector == 0) & where
-            valid = valid.union(valid_pointwise.preserve_only_where(where_i.flatten()))
+            valid = valid.intersect(
+                valid_pointwise.preserve_only_where(where_i.flatten())
+            )
 
         return valid
