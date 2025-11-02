@@ -9,11 +9,13 @@ from collections.abc import Collection, Set
 from typing import ClassVar, Literal
 
 import numpy as np
-from typing_extensions import override  # MSPV 3.12
+from typing_extensions import override
+
+from compression_safeguards.utils.cast import to_total_order  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
 from ...utils.error import TypeCheckError, ctx
-from ...utils.intervals import IntervalUnion
+from ...utils.intervals import Interval, IntervalUnion
 from ...utils.typing import JSON, S, T
 from ..abc import Safeguard
 from ..pointwise.abc import PointwiseSafeguard
@@ -273,27 +275,6 @@ class _AnySafeguardBase(ABC):
 
         return ok
 
-    def compute_safe_intervals(
-        self,
-        data: np.ndarray[S, np.dtype[T]],
-        *,
-        late_bound: Bindings,
-        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
-    ) -> IntervalUnion[T, int, int]:
-        front, *tail = self.safeguards
-
-        # FIXME: this implementation is UNSAFE for stencil safeguards
-        valid = front.compute_safe_intervals(data, late_bound=late_bound, where=where)
-
-        for safeguard in tail:
-            valid = valid.union(
-                safeguard.compute_safe_intervals(
-                    data, late_bound=late_bound, where=where
-                )
-            )
-
-        return valid
-
     def get_config(self) -> dict[str, JSON]:
         return dict(
             kind=type(self).kind,
@@ -315,6 +296,27 @@ class _AnyPointwiseSafeguard(_AnySafeguardBase, PointwiseSafeguard):
                 f"{safeguard!r} is not a pointwise safeguard"
             )
         self._safeguards = safeguards
+
+    @override
+    def compute_safe_intervals(
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> IntervalUnion[T, int, int]:
+        front, *tail = self.safeguards
+
+        valid = front.compute_safe_intervals(data, late_bound=late_bound, where=where)
+
+        for safeguard in tail:
+            valid = valid.union(
+                safeguard.compute_safe_intervals(
+                    data, late_bound=late_bound, where=where
+                )
+            )
+
+        return valid
 
 
 class _AnyStencilSafeguard(_AnySafeguardBase, StencilSafeguard):
@@ -356,3 +358,95 @@ class _AnyStencilSafeguard(_AnySafeguardBase, StencilSafeguard):
                         neighbourhood[i][b] = s
 
         return tuple(neighbourhood)
+
+    @override
+    def compute_safe_intervals(
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> IntervalUnion[T, int, int]:
+        pointwise: list[PointwiseSafeguard] = []
+        stencil: list[StencilSafeguard] = []
+        for safeguard in self.safeguards:
+            assert isinstance(safeguard, PointwiseSafeguard | StencilSafeguard)
+            if isinstance(safeguard, PointwiseSafeguard):
+                pointwise.append(safeguard)
+            else:
+                stencil.append(safeguard)
+
+        valids = [
+            safeguard.compute_safe_intervals(data, late_bound=late_bound, where=where)
+            for safeguard in stencil
+        ]
+
+        # we cannot pointwise pick safe intervals from different stencil
+        #  safeguards, since the stencil requirements may be violated by
+        #  neighbouring picks
+
+        has_pointwise = len(pointwise) > 0
+        if has_pointwise:
+            front, *tail = pointwise
+
+            valid_pointwise = front.compute_safe_intervals(
+                data, late_bound=late_bound, where=where
+            )
+
+            for safeguard in tail:
+                valid_pointwise = valid_pointwise.union(
+                    safeguard.compute_safe_intervals(
+                        data, late_bound=late_bound, where=where
+                    )
+                )
+
+            # we move the pointwise interval first to prioritise it later
+            valids.insert(0, valid_pointwise)
+
+        # simple heuristic: pick the safeguard with the largest interval
+        sizes: list[np.ndarray[tuple[int], np.dtype[np.unsignedinteger]]] = []
+        for v in valids:
+            interval_size_acc: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
+                np.zeros((v.n,), dtype=to_total_order(v._lower).dtype)
+            )
+
+            for i in range(v.u):
+                lt: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
+                    to_total_order(v._lower[i])
+                )
+                ut: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
+                    to_total_order(v._upper[i])
+                )
+                np.add(
+                    interval_size_acc,
+                    ut - lt + 1,
+                    out=interval_size_acc,
+                    where=(ut >= lt),
+                )
+
+            # safeguards must always return intervals with at least one
+            #  element, the original data, so the size must be at least one,
+            # but a full interval will overflow the size back to zero, so here
+            #  we shift the size from zero (single element) to max (full)
+            interval_size_acc -= 1
+
+            sizes.append(interval_size_acc)
+
+        selector = np.argmax(sizes, axis=0)
+
+        valid: IntervalUnion[T, int, int] = Interval.full_like(data).into_union()
+
+        for i, safeguard in enumerate(stencil):
+            where_i = (selector == (i + has_pointwise)) & where
+            if np.any(where_i):
+                valid = valid.union(
+                    safeguard.compute_safe_intervals(
+                        data, late_bound=late_bound, where=where_i
+                    )
+                )
+
+        if has_pointwise:
+            where_i = (selector == 0) & where
+            valid = valid.union(valid_pointwise.preserve_only_where(where_i.flatten()))
+
+        return valid

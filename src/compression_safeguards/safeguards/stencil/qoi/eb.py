@@ -766,6 +766,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         )
         ok[tuple(s)] = windows_ok
 
+        # TODO: optimize - only compute where necessary
+        if where is not True:
+            ok[~where] = True
+
         return ok
 
     @override
@@ -1074,6 +1078,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         data_float_upper: np.ndarray[S, np.dtype[np.floating]] = np.amin(
             data_windows_float_upper_flat[reverse_indices_windows], axis=1
         ).reshape(data.shape)
+
+        # TODO: take where into account
 
         return compute_safe_data_lower_upper_interval_union(
             data, data_float_lower, data_float_upper

@@ -194,7 +194,8 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         np.copyto(ok, same_bits, where=~np.isfinite(data), casting="no")
         if self._equal_nan:
             np.copyto(ok, both_nan, where=np.isnan(data), casting="no")
-
+        if where is not True:
+            ok[~where] = True
         return ok
 
     @override
@@ -266,7 +267,13 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
 
         Lower(lower.flatten()) <= valid[np.isfinite(dataf)] <= Upper(upper.flatten())
 
-        return valid.preserve_any_nan(dataf, equal_nan=self._equal_nan)
+        wheref: Literal[True] | np.ndarray[tuple[int], np.dtype[np.bool]] = (
+            True if where is True else where.flatten()
+        )
+
+        return valid.preserve_any_nan(
+            dataf, equal_nan=self._equal_nan
+        ).preserve_only_where(wheref)
 
     @override
     def get_config(self) -> dict[str, JSON]:

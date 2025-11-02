@@ -241,7 +241,7 @@ class Interval(Generic[T, N]):
         Returns
         -------
         self : Self
-            Returns the modified `self`
+            The modified `self`.
         """
 
         if not np.issubdtype(a.dtype, np.floating):
@@ -275,7 +275,7 @@ class Interval(Generic[T, N]):
         Returns
         -------
         self : Self
-            Returns the modified `self`
+            The modified `self`.
         """
 
         if not np.issubdtype(a.dtype, np.floating):
@@ -336,8 +336,8 @@ class Interval(Generic[T, N]):
         Returns
         -------
         union : IntervalUnion[T, N, int]
-            Returns the union of the existing intervals for non-NaN values and
-            the NaN-preserving intervals for NaN values.
+            The union of the existing intervals for non-NaN values and the
+            NaN-preserving intervals for NaN values.
         """
 
         if not np.issubdtype(a.dtype, np.floating):
@@ -388,7 +388,7 @@ class Interval(Generic[T, N]):
         Returns
         -------
         self : Self
-            Returns the modified `self`
+            The modified `self`.
         """
 
         if not np.issubdtype(a.dtype, np.floating):
@@ -424,7 +424,7 @@ class Interval(Generic[T, N]):
         Returns
         -------
         self : Self
-            Returns the modified `self`
+            The modified `self`.
         """
 
         if not np.issubdtype(a.dtype, np.floating):
@@ -449,7 +449,7 @@ class Interval(Generic[T, N]):
         Returns
         -------
         intersection : Interval[T, N]
-            The intersection of `self` and `other`
+            The intersection of `self` and `other`.
         """
 
         (n,) = self._lower.shape
@@ -488,7 +488,7 @@ class Interval(Generic[T, N]):
         Returns
         -------
         intersection : IntervalUnion[T, N, int]
-            The union of `self` and `other`
+            The union of `self` and `other`.
         """
 
         return self.into_union().union(other)
@@ -507,6 +507,34 @@ class Interval(Generic[T, N]):
             _lower=self._lower.reshape(1, -1),  # type: ignore
             _upper=self._upper.reshape(1, -1),  # type: ignore
         )
+
+    def preserve_only_where(
+        self, where: Literal[True] | np.ndarray[tuple[N], np.dtype[np.bool]]
+    ) -> Self:
+        """
+        Preserve safe intervals only at the data points where the `where`
+        condition is [`True`][True].
+
+        This method must only be used for pointwise safe intervals.
+
+        Parameters
+        ----------
+        where : Literal[True] | np.ndarray[tuple[N], np.dtype[np.bool]]
+            Only preserve safe intervals at data points where the condition is
+            [`True`][True].
+
+        Returns
+        -------
+        self : Self
+            The modified `self`.
+        """
+
+        if where is True:
+            return self
+
+        # reset all elements where where is False to a full interval
+        Minimum <= self[~where] <= Maximum
+        return self
 
     @override
     def __repr__(self) -> str:
@@ -758,7 +786,7 @@ class IntervalUnion(Generic[T, N, U]):
         Returns
         -------
         intersection : IntervalUnion[T, N, int]
-            The intersection of `self` and `other`
+            The intersection of `self` and `other`.
         """
 
         ((u, n), (v, _)) = self._lower.shape, other._lower.shape
@@ -820,7 +848,7 @@ class IntervalUnion(Generic[T, N, U]):
         Returns
         -------
         union : IntervalUnion[T, N, int]
-            The union of `self` and `other`
+            The union of `self` and `other`.
         """
 
         otheru = other if isinstance(other, IntervalUnion) else other.into_union()
@@ -964,6 +992,35 @@ class IntervalUnion(Generic[T, N, U]):
         uv = np.amax(n_intervals)
 
         return IntervalUnion(_lower=out._lower[:uv], _upper=out._upper[:uv])  # type: ignore
+
+    def preserve_only_where(
+        self, where: Literal[True] | np.ndarray[tuple[N], np.dtype[np.bool]]
+    ) -> "IntervalUnion[T, N, int]":
+        """
+        Preserve safe intervals only at the data points where the `where`
+        condition is [`True`][True].
+
+        This method must only be used for pointwise safe intervals.
+
+        Parameters
+        ----------
+        where : Literal[True] | np.ndarray[tuple[N], np.dtype[np.bool]]
+            Only preserve safe intervals at data points where the condition is
+            [`True`][True].
+
+        Returns
+        -------
+        self : IntervalUnion[T, N, int]
+            The interval union where only safe intervals at data points where
+            the condition is [`True`][True] are preserved.
+        """
+
+        if where is True:
+            return self
+
+        return self.union(
+            Interval.empty(self._lower.dtype, self.n).preserve_only_where(where)
+        )
 
     def contains(
         self, other: np.ndarray[S, np.dtype[T]]

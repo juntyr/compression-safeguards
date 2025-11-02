@@ -409,6 +409,10 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
             ok[s] &= ~axis_ok.reshape(ok[s].shape)
 
+        # TODO: optimize - only compute where necessary
+        if where is not True:
+            ok[~where] = True
+
         return ok
 
     @override
@@ -759,6 +763,8 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         Lower(data.flatten()) <= zero_valid[
             (data.flatten() == 0) & any_restriction.flatten()
         ] <= Upper(data.flatten())
+
+        # TODO: take where into account
 
         return filtered_valid.union(zero_valid)
 

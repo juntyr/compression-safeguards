@@ -357,7 +357,9 @@ class _SelectSafeguardBase(ABC):
                 self.selector, data.shape, np.dtype(np.int_)
             )
 
-        # TODO: check that the indices are in bounds and normalise them
+            with ctx.late_bound_parameter(self.selector):
+                if np.any(selector < 0) or np.any(selector >= len(self.safeguards)):
+                    raise ValueError("invalid entry in choice array") | ctx
 
         valid: IntervalUnion[T, int, int] = Interval.full_like(data).into_union()
 

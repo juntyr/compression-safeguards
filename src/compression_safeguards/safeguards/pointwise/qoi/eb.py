@@ -357,6 +357,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         ok: np.ndarray[S, np.dtype[np.bool]] = _ensure_array(finite_ok)
         np.equal(qoi_data, qoi_prediction, out=ok, where=np.isinf(qoi_data))
         np.isnan(qoi_prediction, out=ok, where=np.isnan(qoi_data))
+        # TODO: optimize - only compute where necessary
+        if where is not True:
+            ok[~where] = True
 
         return ok
 
@@ -479,9 +482,14 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             data_float_upper_.reshape(data.shape)  # type: ignore
         )
 
+        # TODO: optimize - only compute where necessary
+        wheref: Literal[True] | np.ndarray[tuple[int], np.dtype[np.bool]] = (
+            True if where is True else where.flatten()
+        )
+
         return compute_safe_data_lower_upper_interval_union(
             data, data_float_lower, data_float_upper
-        )
+        ).preserve_only_where(wheref)
 
     @override
     def get_config(self) -> dict[str, JSON]:

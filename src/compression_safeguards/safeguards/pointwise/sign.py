@@ -174,6 +174,8 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             where=np.isnan(data),
             casting="no",
         )
+        if where is not True:
+            ok[~where] = True
 
         return ok
 
@@ -271,7 +273,11 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         valid[dataf < offsetf] <= Upper(below_upper)
         Lower(above_lower) <= valid[dataf > offsetf]
 
-        return valid.into_union()
+        wheref: Literal[True] | np.ndarray[tuple[int], np.dtype[np.bool]] = (
+            True if where is True else where.flatten()
+        )
+
+        return valid.preserve_only_where(wheref).into_union()
 
     @override
     def get_config(self) -> dict[str, JSON]:

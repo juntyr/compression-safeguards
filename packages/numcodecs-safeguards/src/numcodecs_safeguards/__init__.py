@@ -528,6 +528,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 data,
                 decoded,
                 late_bound=late_bound,
+                where=True,
             )
         )
 

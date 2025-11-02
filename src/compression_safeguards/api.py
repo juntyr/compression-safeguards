@@ -209,6 +209,7 @@ class Safeguards:
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Mapping[str | Parameter, Value] | Bindings = Bindings.EMPTY,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> bool:
         """
         Check if the `prediction` array upholds the properties enforced by the safeguards with respect to the `data` array.
@@ -233,6 +234,8 @@ class Safeguards:
 
             The safeguards automatically provide the `$x` and `$X` built-in
             constants, which must not be included.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only check at data points where the condition is [`True`][True].
 
         Returns
         -------
@@ -263,7 +266,9 @@ class Safeguards:
         )
 
         for safeguard in self.safeguards:
-            if not safeguard.check(data, prediction, late_bound=late_bound):
+            if not safeguard.check(
+                data, prediction, late_bound=late_bound, where=where
+            ):
                 return False
 
         return True
@@ -274,6 +279,7 @@ class Safeguards:
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Mapping[str | Parameter, Value] | Bindings = Bindings.EMPTY,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[C]]:
         """
         Compute the correction required to make the `prediction` array satisfy the safeguards relative to the `data` array.
@@ -305,6 +311,9 @@ class Safeguards:
 
             The safeguards automatically provide the `$x` and `$X` built-in
             constants, which must not be included.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the correction at data points where the condition
+            is [`True`][True].
 
         Returns
         -------
@@ -337,7 +346,9 @@ class Safeguards:
 
         all_ok = True
         for safeguard in self.safeguards:
-            if not safeguard.check(data, prediction, late_bound=late_bound):
+            if not safeguard.check(
+                data, prediction, late_bound=late_bound, where=where
+            ):
                 all_ok = False
                 break
 
@@ -351,7 +362,9 @@ class Safeguards:
 
         all_intervals: list[IntervalUnion[T, int, int]] = []
         for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
-            intervals = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+            intervals = safeguard.compute_safe_intervals(
+                data, late_bound=late_bound, where=where
+            )
             if not np.all(intervals.contains(data)):
                 raise (
                     SafeguardsSafetyBug(
@@ -376,7 +389,7 @@ class Safeguards:
                     )
                     | ctx
                 )
-            if not safeguard.check(data, corrected, late_bound=late_bound):
+            if not safeguard.check(data, corrected, late_bound=late_bound, where=where):
                 raise (
                     SafeguardsSafetyBug(
                         f"the check for the {safeguard!r} safeguard fails "
@@ -692,6 +705,7 @@ class Safeguards:
             ...,
         ],
         late_bound_chunk: Mapping[str | Parameter, Value] | Bindings = Bindings.EMPTY,
+        where_chunk: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> bool:
         """
         Check if the `prediction_chunk` array chunk upholds the properties enforced by the safeguards with respect to the `data_chunk` array chunk.
@@ -743,6 +757,8 @@ class Safeguards:
 
             The safeguards automatically provide the `$x` and `$X` built-in
             constants, which must not be included.
+        where_chunk : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only check at data points where the condition is [`True`][True].
 
         Returns
         -------
@@ -770,15 +786,20 @@ class Safeguards:
             if checking a safeguard raises an exception.
         """
 
-        data_chunk_, prediction_chunk_, late_bound_chunk, non_stencil_indices = (
-            self._prepare_stencil_chunked_arrays_and_bindings(
-                data_chunk=data_chunk,
-                prediction_chunk=prediction_chunk,
-                data_shape=data_shape,
-                chunk_offset=chunk_offset,
-                chunk_stencil=chunk_stencil,
-                late_bound_chunk=late_bound_chunk,
-            )
+        (
+            data_chunk_,
+            prediction_chunk_,
+            late_bound_chunk,
+            where_chunk_,
+            non_stencil_indices,
+        ) = self._prepare_stencil_chunked_arrays_and_bindings(
+            data_chunk=data_chunk,
+            prediction_chunk=prediction_chunk,
+            data_shape=data_shape,
+            chunk_offset=chunk_offset,
+            chunk_stencil=chunk_stencil,
+            late_bound_chunk=late_bound_chunk,
+            where_chunk=where_chunk,
         )
 
         # ensure we don't accidentally forget to handle new kinds of safeguards here
@@ -794,7 +815,10 @@ class Safeguards:
         #  non-stencil check results
         for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
             all_ok &= safeguard.check_pointwise(
-                data_chunk_, prediction_chunk_, late_bound=late_bound_chunk
+                data_chunk_,
+                prediction_chunk_,
+                late_bound=late_bound_chunk,
+                where=where_chunk_,
             )[tuple(non_stencil_indices)]
 
             if not np.all(all_ok):
@@ -818,6 +842,7 @@ class Safeguards:
         ],
         any_chunk_check_failed: bool,
         late_bound_chunk: Mapping[str | Parameter, Value] | Bindings = Bindings.EMPTY,
+        where_chunk: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[tuple[int, ...], np.dtype[C]]:
         """
         Compute the correction required to make the `prediction_chunk` array chunk satisfy the safeguards relative to the `data_chunk` array chunk.
@@ -877,6 +902,9 @@ class Safeguards:
 
             The safeguards automatically provide the `$x` and `$X` built-in
             constants, which must not be included.
+        where_chunk : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the correction at data points where the condition is
+            [`True`][True].
 
         Returns
         -------
@@ -907,15 +935,20 @@ class Safeguards:
         """
         # explicitly do not document that SafeguardsSafetyBug can be raised
 
-        data_chunk_, prediction_chunk_, late_bound_chunk, non_stencil_indices = (
-            self._prepare_stencil_chunked_arrays_and_bindings(
-                data_chunk=data_chunk,
-                prediction_chunk=prediction_chunk,
-                data_shape=data_shape,
-                chunk_offset=chunk_offset,
-                chunk_stencil=chunk_stencil,
-                late_bound_chunk=late_bound_chunk,
-            )
+        (
+            data_chunk_,
+            prediction_chunk_,
+            late_bound_chunk,
+            where_chunk_,
+            non_stencil_indices,
+        ) = self._prepare_stencil_chunked_arrays_and_bindings(
+            data_chunk=data_chunk,
+            prediction_chunk=prediction_chunk,
+            data_shape=data_shape,
+            chunk_offset=chunk_offset,
+            chunk_stencil=chunk_stencil,
+            late_bound_chunk=late_bound_chunk,
+            where_chunk=where_chunk,
         )
 
         # if no chunk requires a correction, this one doesn't either
@@ -938,7 +971,10 @@ class Safeguards:
             #  non-stencil check results
             for safeguard in self._pointwise_safeguards:
                 all_ok &= safeguard.check_pointwise(
-                    data_chunk_, prediction_chunk_, late_bound=late_bound_chunk
+                    data_chunk_,
+                    prediction_chunk_,
+                    late_bound=late_bound_chunk,
+                    where=where_chunk_,
                 )[tuple(non_stencil_indices)]
 
                 if not np.all(all_ok):
@@ -962,7 +998,7 @@ class Safeguards:
         all_intervals: list[IntervalUnion[T, int, int]] = []
         for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
             intervals = safeguard.compute_safe_intervals(
-                data_chunk_, late_bound=late_bound_chunk
+                data_chunk_, late_bound=late_bound_chunk, where=where_chunk_
             )
             if not np.all(intervals.contains(data_chunk_)):
                 raise (
@@ -989,7 +1025,10 @@ class Safeguards:
                     | ctx
                 )
             if not safeguard.check(
-                data_chunk_, corrected_chunk, late_bound=late_bound_chunk
+                data_chunk_,
+                corrected_chunk,
+                late_bound=late_bound_chunk,
+                where=where_chunk_,
             ):
                 raise (
                     SafeguardsSafetyBug(
@@ -1029,10 +1068,12 @@ class Safeguards:
             ...,
         ],
         late_bound_chunk: Mapping[str | Parameter, Value] | Bindings,
+        where_chunk: Literal[True] | np.ndarray[S, np.dtype[np.bool]],
     ) -> tuple[
         np.ndarray[tuple[int, ...], np.dtype[T]],
         np.ndarray[tuple[int, ...], np.dtype[T]],
         Bindings,
+        Literal[True] | np.ndarray[tuple[int, ...], np.dtype[np.bool]],
         tuple[slice, ...],
     ]:
         TypeSetError.check_dtype_or_raise(data_chunk.dtype, _SUPPORTED_DTYPES)
@@ -1312,10 +1353,21 @@ class Safeguards:
         if len(late_bound_builtin) > 0:
             late_bound_chunk = late_bound_chunk.update(**late_bound_builtin)  # type: ignore
 
+        where_chunk_: Literal[True] | np.ndarray[tuple[int, ...], np.dtype[np.bool]] = (
+            True
+            if where_chunk is True
+            else np.roll(
+                where_chunk[tuple(stencil_indices)],
+                shift=tuple(stencil_roll),
+                axis=tuple(range(where_chunk.ndim)),
+            )
+        )
+
         return (
             data_chunk_,
             prediction_chunk_,
             late_bound_chunk,
+            where_chunk_,
             tuple(non_stencil_indices),
         )
 

@@ -362,7 +362,10 @@ def produce_data_array_correction(
         da_correction = (
             data.copy(
                 data=safeguards_.compute_correction(
-                    data.values, prediction.values, late_bound=late_bound_full
+                    data.values,
+                    prediction.values,
+                    late_bound=late_bound_full,
+                    where=True,
                 )
             )
             .rename(correction_name)
@@ -423,7 +426,7 @@ def produce_data_array_correction(
             )
 
             return safeguards.compute_correction(
-                data_chunk, prediction_chunk, late_bound=late_bound_chunk
+                data_chunk, prediction_chunk, late_bound=late_bound_chunk, where=True
             )
 
         da_correction = (
@@ -573,6 +576,7 @@ def produce_data_array_correction(
             chunk_offset=chunk_offset,
             chunk_stencil=chunk_stencil,
             late_bound_chunk=late_bound_chunk,
+            where_chunk=True,
         )
 
         # broadcast the boolean check scalar to the output chunk shape
@@ -718,6 +722,7 @@ def produce_data_array_correction(
                 chunk_stencil=chunk_stencil,
                 any_chunk_check_failed=any_chunk_check_failed,
                 late_bound_chunk=late_bound_chunk,
+                where_chunk=True,
             )
         )
         assert correction.shape == chunk_shape, "invalid correction chunk shape"

@@ -164,12 +164,18 @@ class SameValueSafeguard(PointwiseSafeguard):
             prediction
         )
 
+        ok: np.ndarray[S, np.dtype[np.bool]]
         if self._exclusive:
             # value if and only if where value
-            return (data_bits == value_bits) == (prediction_bits == value_bits)
+            ok = (data_bits == value_bits) == (prediction_bits == value_bits)
+        else:
+            # value must stay value, everything else can be arbitrary
+            ok = (data_bits != value_bits) | (prediction_bits == value_bits)
+        ok = _ensure_array(ok)
+        if where is not True:
+            ok[~where] = True
 
-        # value must stay value, everything else can be arbitrary
-        return (data_bits != value_bits) | (prediction_bits == value_bits)
+        return ok
 
     @override
     def compute_safe_intervals(
@@ -232,13 +238,17 @@ class SameValueSafeguard(PointwiseSafeguard):
             dataf
         )
 
+        wheref: Literal[True] | np.ndarray[tuple[int], np.dtype[np.bool]] = (
+            True if where is True else where.flatten()
+        )
+
         valid = Interval.empty_like(dataf)
 
         if not self._exclusive:
             # preserve value elements exactly, do not constrain other elements
             valid = Interval.full_like(dataf)
             Lower(valuef) <= valid[dataf_bits == valuef_bits] <= Upper(valuef)
-            return valid.into_union()
+            return valid.preserve_only_where(wheref).into_union()
 
         valuef_total: np.ndarray[
             tuple[()] | tuple[int], np.dtype[np.unsignedinteger]
@@ -266,7 +276,7 @@ class SameValueSafeguard(PointwiseSafeguard):
             (dataf_bits != valuef_bits) & (valuef_total < total_max)
         ] <= Maximum
 
-        return valid_below.union(valid_above)
+        return valid_below.union(valid_above).preserve_only_where(wheref)
 
     @override
     def get_config(self) -> dict[str, JSON]:

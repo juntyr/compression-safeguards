@@ -484,13 +484,6 @@ def check_one_input(data) -> None:
                     return
                 case (
                     *_,
-                    SafeguardTypeContextLayer(safeguard),
-                    ParameterContextLayer("selector"),
-                    LateBoundParameterContextLayer(_),
-                ) if isinstance(err, IndexError) and safeguard is SelectSafeguard:
-                    return
-                case (
-                    *_,
                     ParameterContextLayer("eb"),
                     LateBoundParameterContextLayer(_),
                 ) if isinstance(err, ValueError) and ("must be" in str(err)):
