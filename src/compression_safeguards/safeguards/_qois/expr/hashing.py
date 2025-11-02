@@ -6,7 +6,7 @@ from hashlib import blake2b
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import _broadcast_to, _ensure_array, _is_of_shape, _ones, _zeros
+from ....utils._compat import _broadcast_to, _ensure_array, _ones, _zeros
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import from_float
 from ....utils.error import ctx
@@ -14,7 +14,7 @@ from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import S, T
 from ..bound import DataBounds, data_bounds
 from .abc import AnyExpr, EmptyExpr
-from .typing import F, Ns, Ps, PsI
+from .typing import F, Ns, Ps, np_sndarray
 
 
 class HashingExpr(EmptyExpr):
@@ -57,11 +57,10 @@ class HashingExpr(EmptyExpr):
     @override  # type: ignore
     def eval_has_data(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[np.bool]]:
-        return _ones(x, dtype=np.dtype(np.bool))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[np.bool]]:
+        return _ones(Xs.shape[:1], dtype=np.dtype(np.bool))
 
     @property  # type: ignore
     @override
@@ -96,11 +95,10 @@ class HashingExpr(EmptyExpr):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        x_size = int(np.prod(x, dtype=int))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        x_size: Ps = Xs.shape[0]
 
         Xs_flat = Xs.reshape((x_size, Xs.size // x_size))
         late_bound_flat = {
@@ -108,7 +106,7 @@ class HashingExpr(EmptyExpr):
             for param, value in late_bound.items()
         }
 
-        hash_: np.ndarray[tuple[int], np.dtype[F]] = np.empty(x_size, dtype=Xs.dtype)
+        hash: np.ndarray[tuple[Ps], np.dtype[F]] = np.empty(x_size, dtype=Xs.dtype)
 
         # hash Xs and late_bound stencils for every element in X
         for i in range(x_size):
@@ -119,25 +117,25 @@ class HashingExpr(EmptyExpr):
             ):
                 hasher.update(param.encode())
                 hasher.update(value_flat[i].tobytes())
-            hash_[i] = np.frombuffer(hasher.digest(), dtype=Xs.dtype, count=1)[0]
+            hash[i] = np.frombuffer(hasher.digest(), dtype=Xs.dtype, count=1)[0]
 
-        hash = hash_.reshape(x)
-        assert _is_of_shape(hash, x)
         return hash
 
     @data_bounds(DataBounds.infallible)
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        X_hash: np.ndarray[Ps, np.dtype[F]] = self.eval(X.shape, Xs, late_bound)
-        Xs_hash: np.ndarray[Ns, np.dtype[F]] = _broadcast_to(
-            X_hash.reshape(X.shape + (1,) * (Xs.ndim - X.ndim)), Xs.shape
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
+        X_hash: np.ndarray[tuple[Ps], np.dtype[F]] = self.eval(Xs, late_bound)
+        Xs_hash: np_sndarray[Ps, Ns, np.dtype[F]] = _broadcast_to(
+            X_hash.reshape(Xs.shape[:1] + (1,) * (Xs.ndim - 1)), Xs.shape
         )
         return _ensure_array(Xs_hash, copy=True), _ensure_array(Xs_hash, copy=True)
 

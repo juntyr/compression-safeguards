@@ -21,7 +21,9 @@ if __name__ == "__main__":
                 stencil_I=(1,),
             )
             print(f"parsed: {qoi_expr!r}")  # noqa: T201
-            Xs = np.array([[1.0, 2.0, 3.0]])
+            Xs: np.ndarray[tuple[int, int], np.dtype[np.float64]] = np.array(  # type: ignore
+                [[1.0, 2.0, 3.0]]
+            )
             print(  # noqa: T201
                 f"folded: {ScalarFoldedConstant.constant_fold_expr(qoi_expr._expr, Xs.dtype)!r}"
             )

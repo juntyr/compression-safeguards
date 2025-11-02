@@ -8,7 +8,7 @@ from ....utils.bindings import Parameter
 from ..bound import DataBounds, data_bounds
 from .abc import AnyExpr, Expr
 from .literal import Number
-from .typing import F, Ns, Ps, PsI
+from .typing import F, Ns, Ps, np_sndarray
 
 
 class Reporter(ABC):
@@ -96,11 +96,10 @@ class ReportingExpr(Expr[AnyExpr]):
     @override  # type: ignore
     def eval_has_data(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[np.bool]]:
-        return self._expr.eval_has_data(x, Xs, late_bound)
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[np.bool]]:
+        return self._expr.eval_has_data(Xs, late_bound)
 
     @override
     def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
@@ -114,26 +113,27 @@ class ReportingExpr(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return self._expr.eval(x, Xs, late_bound)
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return self._expr.eval(Xs, late_bound)
 
     @data_bounds(DataBounds.infallible)
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         self._reporter.enter(self._expr)
         try:
             return self._expr.compute_data_bounds(
-                expr_lower, expr_upper, X, Xs, late_bound
+                expr_lower, expr_upper, Xs, late_bound
             )
         finally:
             self._reporter.exit(self._expr)

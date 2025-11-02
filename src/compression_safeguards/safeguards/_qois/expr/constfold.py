@@ -6,7 +6,7 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import _broadcast_to
 from ....utils.bindings import Parameter
 from .abc import AnyExpr, EmptyExpr, Expr
-from .typing import F, Ns, Ps, PsI
+from .typing import F, Ns, Ps, np_sndarray
 
 
 class ScalarFoldedConstant(EmptyExpr):
@@ -33,22 +33,23 @@ class ScalarFoldedConstant(EmptyExpr):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         assert isinstance(self._const, Xs.dtype.type)
-        return _broadcast_to(self._const, x)
+        return _broadcast_to(self._const, Xs.shape[:1])
 
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         assert False, "folded constants have no data bounds"
 
     @staticmethod

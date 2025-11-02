@@ -5,7 +5,7 @@ Sign-preserving safeguard.
 __all__ = ["SignPreservingSafeguard"]
 
 from collections.abc import Set
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
@@ -107,6 +107,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check for which elements in the `prediction` array the signs match the
@@ -120,6 +121,8 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only check at data points where the condition is [`True`][True].
 
         Returns
         -------
@@ -180,6 +183,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         data: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the `data`'s sign is preserved.
@@ -190,6 +194,9 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the safe intervals at data points where the condition
+            is [`True`][True].
 
         Returns
         -------

@@ -11,17 +11,19 @@ from ...utils._compat import (
     _nextafter,
 )
 from ...utils.error import QuantityOfInterestRuntimeWarning
-from .expr.typing import Ci, F, Ns, Ps
+from .expr.typing import Ci, F, J, Ns, Ps, np_sndarray
 
 
 def guarantee_arg_within_expr_bounds(
-    expr: Callable[[np.ndarray[Ps, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]],
-    exprv: np.ndarray[Ps, np.dtype[F]],
-    argv: np.ndarray[Ps, np.dtype[F]],
-    argv_bound_guess: np.ndarray[Ps, np.dtype[F]],
-    expr_lower: np.ndarray[Ps, np.dtype[F]],
-    expr_upper: np.ndarray[Ps, np.dtype[F]],
-) -> np.ndarray[Ps, np.dtype[F]]:
+    expr: Callable[
+        [np.ndarray[tuple[Ps], np.dtype[F]]], np.ndarray[tuple[Ps], np.dtype[F]]
+    ],
+    exprv: np.ndarray[tuple[Ps], np.dtype[F]],
+    argv: np.ndarray[tuple[Ps], np.dtype[F]],
+    argv_bound_guess: np.ndarray[tuple[Ps], np.dtype[F]],
+    expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+    expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+) -> np.ndarray[tuple[Ps], np.dtype[F]]:
     """
     Ensure that `argv_bound_guess`, a guess for a lower or upper bound on
     argument `argv`, meets the lower and upper bounds `expr_lower` and
@@ -29,50 +31,104 @@ def guarantee_arg_within_expr_bounds(
 
     Parameters
     ----------
-    expr : Callable[[np.ndarray[Ps, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]]
+    expr : Callable[[np.ndarray[tuple[Ps], np.dtype[F]]], np.ndarray[tuple[Ps], np.dtype[F]]]
         Evaluate the expression, given the argument `argv`.
-    exprv : np.ndarray[Ps, np.dtype[F]]
+    exprv : np.ndarray[tuple[Ps], np.dtype[F]]
         Evaluation of the expression on the argument `argv`.
-    argv : np.ndarray[Ps, np.dtype[F]]
+    argv : np.ndarray[tuple[Ps], np.dtype[F]]
         Pointwise expression argument.
-    argv_bound_guess : np.ndarray[Ps, np.dtype[F]]
+    argv_bound_guess : np.ndarray[tuple[Ps], np.dtype[F]]
         Provided guess for the bound on the argument `argv`.
-    expr_lower : np.ndarray[Ps, np.dtype[F]]
+    expr_lower : np.ndarray[tuple[Ps], np.dtype[F]]
         Pointwise lower bound on the expression, must be less than or equal to
         `exprv`.
-    expr_upper : np.ndarray[Ps, np.dtype[F]]
+    expr_upper : np.ndarray[tuple[Ps], np.dtype[F]]
         Pointwise upper bound on the expression, must be greater than or equal
         to `exprv`.
 
     Returns
     -------
-    argv_bound_guess : np.ndarray[Ns, np.dtype[F]]
+    argv_bound_guess : np.ndarray[Ps, np.dtype[F]]
+        Refined bound that guarantees that
+        `expr_lower <= expr(argv_bound_guess) <= expr_upper` or
+        `isnan(exprv) & isnan(expr(argv_bound_guess))`.
+    """
+
+    return guarantee_data_within_expr_bounds(  # type: ignore
+        expr,  # type: ignore
+        exprv,  # type: ignore
+        argv,  # type: ignore
+        argv_bound_guess,  # type: ignore
+        expr_lower,  # type: ignore
+        expr_upper,  # type: ignore
+        warn_on_bounds_exceeded=False,
+    )
+
+
+def guarantee_stacked_arg_within_expr_bounds(
+    expr: Callable[
+        [np.ndarray[tuple[J, Ps], np.dtype[F]]], np.ndarray[tuple[J, Ps], np.dtype[F]]
+    ],
+    exprv: np.ndarray[tuple[J, Ps], np.dtype[F]],
+    argv: np.ndarray[tuple[J, Ps], np.dtype[F]],
+    argv_bound_guess: np.ndarray[tuple[J, Ps], np.dtype[F]],
+    expr_lower: np.ndarray[tuple[J, Ps], np.dtype[F]],
+    expr_upper: np.ndarray[tuple[J, Ps], np.dtype[F]],
+) -> np.ndarray[tuple[J, Ps], np.dtype[F]]:
+    """
+    Ensure that `argv_bound_guess`, a guess for a lower or upper bound on
+    argument `argv`, meets the lower and upper bounds `expr_lower` and
+    `expr_upper` on the expression `expr`, where `exprv = expr(argv)`.
+
+    Parameters
+    ----------
+    expr : Callable[[np.ndarray[tuple[J, Ps], np.dtype[F]]], np.ndarray[tuple[J, Ps], np.dtype[F]]]
+        Evaluate the expression, given the argument `argv`.
+    exprv : np.ndarray[tuple[J, Ps], np.dtype[F]]
+        Evaluation of the expression on the argument `argv`.
+    argv : np.ndarray[tuple[J, Ps], np.dtype[F]]
+        Pointwise expression argument.
+    argv_bound_guess : np.ndarray[tuple[J, Ps], np.dtype[F]]
+        Provided guess for the bound on the argument `argv`.
+    expr_lower : np.ndarray[tuple[J, Ps], np.dtype[F]]
+        Pointwise lower bound on the expression, must be less than or equal to
+        `exprv`.
+    expr_upper : np.ndarray[tuple[J, Ps], np.dtype[F]]
+        Pointwise upper bound on the expression, must be greater than or equal
+        to `exprv`.
+
+    Returns
+    -------
+    argv_bound_guess : np.ndarray[tuple[J, Ps], np.dtype[F]]
         Refined bound that guarantees that
         `expr_lower <= expr(argv_bound_guess) <= expr_upper` or
         `isnan(exprv) & isnan(expr(argv_bound_guess))`.
     """
 
     return guarantee_data_within_expr_bounds(
-        expr,
-        exprv,
-        argv,
-        argv_bound_guess,
-        expr_lower,
-        expr_upper,
+        expr,  # type: ignore
+        exprv,  # type: ignore
+        argv,  # type: ignore
+        argv_bound_guess,  # type: ignore
+        expr_lower,  # type: ignore
+        expr_upper,  # type: ignore
         warn_on_bounds_exceeded=False,
     )
 
 
 def guarantee_data_within_expr_bounds(
-    expr: Callable[[np.ndarray[Ns, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]],
-    exprv: np.ndarray[Ps, np.dtype[F]],
-    Xs: np.ndarray[Ns, np.dtype[F]],
-    Xs_bound_guess: np.ndarray[Ns, np.dtype[F]],
-    expr_lower: np.ndarray[Ps, np.dtype[F]],
-    expr_upper: np.ndarray[Ps, np.dtype[F]],
+    expr: Callable[
+        [np_sndarray[Ps, Ns, np.dtype[F]]],
+        np.ndarray[tuple[Ps], np.dtype[F]],
+    ],
+    exprv: np.ndarray[tuple[Ps], np.dtype[F]],
+    Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+    Xs_bound_guess: np_sndarray[Ps, Ns, np.dtype[F]],
+    expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+    expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
     *,
     warn_on_bounds_exceeded: bool,
-) -> np.ndarray[Ns, np.dtype[F]]:
+) -> np_sndarray[Ps, Ns, np.dtype[F]]:
     """
     Ensure that `Xs_bound_guess`, a guess for a lower or upper bound on `Xs`,
     meets the lower and upper bounds `expr_lower` and `expr_upper` on the
@@ -80,18 +136,18 @@ def guarantee_data_within_expr_bounds(
 
     Parameters
     ----------
-    expr : Callable[[np.ndarray[Ns, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]]
+    expr : Callable[[PsNsArray[Ps, Ns, F]], np.ndarray[tuple[Ps], np.dtype[F]]]
         Evaluate the expression, given the stencil-extended data `Xs`.
-    exprv : np.ndarray[Ps, np.dtype[F]]
+    exprv : np.ndarray[tuple[Ps], np.dtype[F]]
         Evaluation of the expression on the stencil-extended data `Xs`.
-    Xs : np.ndarray[Ns, np.dtype[F]]
+    Xs : PsNsArray[Ps, Ns, F]
         Stencil-extended data.
-    Xs_bound_guess : np.ndarray[Ns, np.dtype[F]]
+    Xs_bound_guess : PsNsArray[Ps, Ns, F]
         Provided guess for the bound on the stencil-extended data `Xs`.
-    expr_lower : np.ndarray[Ps, np.dtype[F]]
+    expr_lower : np.ndarray[tuple[Ps], np.dtype[F]]
         Pointwise lower bound on the expression, must be less than or equal to
         `exprv`.
-    expr_upper : np.ndarray[Ps, np.dtype[F]]
+    expr_upper : np.ndarray[tuple[Ps], np.dtype[F]]
         Pointwise upper bound on the expression, must be greater than or equal
         to `exprv`.
     warn_on_bounds_exceeded : bool
@@ -100,7 +156,7 @@ def guarantee_data_within_expr_bounds(
 
     Returns
     -------
-    Xs_bound_guess : np.ndarray[Ns, np.dtype[F]]
+    Xs_bound_guess : PsNsArray[Ps, Ns, F]
         Refined bound that guarantees that
         `expr_lower <= expr(Xs_bound_guess) <= expr_upper` or
         `isnan(exprv) & isnan(expr(Xs_bound_guess))`.
@@ -119,18 +175,18 @@ def guarantee_data_within_expr_bounds(
 
     # check if any derived expression exceeds the expression bounds
     def exceeds_expr_bounds(
-        Xs_bound_guess: np.ndarray[Ns, np.dtype[F]],
-    ) -> np.ndarray[Ns, np.dtype[np.bool]]:
+        Xs_bound_guess: np_sndarray[Ps, Ns, np.dtype[F]],
+    ) -> np_sndarray[Ps, Ns, np.dtype[np.bool]]:
         exprv_Xs_bound_guess = expr(Xs_bound_guess)
 
-        in_bounds: np.ndarray[Ps, np.dtype[np.bool]] = (
+        in_bounds: np.ndarray[tuple[Ps], np.dtype[np.bool]] = (
             np.isnan(exprv) & np.isnan(exprv_Xs_bound_guess)
         ) | (
             np.greater_equal(exprv_Xs_bound_guess, expr_lower)
             & np.less_equal(exprv_Xs_bound_guess, expr_upper)
         )
 
-        bounds_exceeded: np.ndarray[Ns, np.dtype[np.bool]] = _broadcast_to(
+        bounds_exceeded: np_sndarray[Ps, Ns, np.dtype[np.bool]] = _broadcast_to(
             (~in_bounds).reshape(exprv.shape + (1,) * (Xs.ndim - exprv.ndim)),
             Xs.shape,
         )

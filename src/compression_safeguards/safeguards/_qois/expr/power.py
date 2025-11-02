@@ -15,14 +15,19 @@ from ....utils._compat import (
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
     _nextafter,
+    _stack,
     _where,
 )
 from ....utils.bindings import Parameter
-from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
+from ..bound import (
+    checked_data_bounds,
+    guarantee_arg_within_expr_bounds,
+    guarantee_stacked_arg_within_expr_bounds,
+)
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
 from .literal import Number
-from .typing import F, Ns, Ps, PsI
+from .typing import F, Ns, Ps, np_sndarray
 
 
 class ScalarPower(Expr[AnyExpr, AnyExpr]):
@@ -62,33 +67,32 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.power(
-            self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound)
-        )
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return np.power(self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound))
 
     @override
     @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         a_const = not self._a.has_data
         b_const = not self._b.has_data
         assert not (a_const and b_const), "constant power has no data bounds"
 
         # evaluate a, b, and power(a, b)
         a, b = self._a, self._b
-        av = a.eval(X.shape, Xs, late_bound)
-        bv = b.eval(X.shape, Xs, late_bound)
-        exprv: np.ndarray[Ps, np.dtype[F]] = np.power(av, bv)
+        av = a.eval(Xs, late_bound)
+        bv = b.eval(Xs, late_bound)
+        exprv: np.ndarray[tuple[Ps], np.dtype[F]] = np.power(av, bv)
 
         # powers of negative numbers are just too tricky, so we just force
         #  av and bv to remain the same if av < 0 and handle av = 0 by cases
@@ -98,8 +102,8 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         expr_lower = _ensure_array(expr_lower, copy=True)
         expr_lower[_is_sign_positive_number(av) & (expr_lower <= 0)] = +0.0
 
-        b_lower: np.ndarray[Ps, np.dtype[F]]
-        b_upper: np.ndarray[Ps, np.dtype[F]]
+        b_lower: np.ndarray[tuple[Ps], np.dtype[F]]
+        b_upper: np.ndarray[tuple[Ps], np.dtype[F]]
 
         if a_const:
             av_log = np.log(av)
@@ -118,7 +122,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             np.copyto(b_lower, bv, where=(expr_lower == expr_upper), casting="no")
             np.copyto(b_upper, bv, where=(expr_lower == expr_upper), casting="no")
 
-            smallest_subnormal = _floating_smallest_subnormal(X.dtype)
+            smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
 
             # handle 0 ** bv
             # - +-0 ** +-0 = 1 -> discontinuous, force bv = +-0
@@ -187,13 +191,12 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             return b.compute_data_bounds(
                 b_lower,
                 b_upper,
-                X,
                 Xs,
                 late_bound,
             )
 
-        a_lower: np.ndarray[Ps, np.dtype[F]]
-        a_upper: np.ndarray[Ps, np.dtype[F]]
+        a_lower: np.ndarray[tuple[Ps], np.dtype[F]]
+        a_upper: np.ndarray[tuple[Ps], np.dtype[F]]
 
         if b_const:
             # TODO: optimise bounds for a ** int
@@ -224,10 +227,10 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             a_upper[(bv == 0)] = np.inf
 
             one_plus_eps = _nextafter(
-                np.array(1, dtype=X.dtype), np.array(2, dtype=X.dtype)
+                np.array(1, dtype=Xs.dtype), np.array(2, dtype=Xs.dtype)
             )
             one_minus_eps = _nextafter(
-                np.array(1, dtype=X.dtype), np.array(0, dtype=X.dtype)
+                np.array(1, dtype=Xs.dtype), np.array(0, dtype=Xs.dtype)
             )
 
             # handle av ** +-inf
@@ -281,16 +284,15 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             return a.compute_data_bounds(
                 a_lower,
                 a_upper,
-                X,
                 Xs,
                 late_bound,
             )
 
         one_plus_eps = _nextafter(
-            np.array(1, dtype=X.dtype), np.array(2, dtype=X.dtype)
+            np.array(1, dtype=Xs.dtype), np.array(2, dtype=Xs.dtype)
         )
         one_minus_eps = _nextafter(
-            np.array(1, dtype=X.dtype), np.array(0, dtype=X.dtype)
+            np.array(1, dtype=Xs.dtype), np.array(0, dtype=Xs.dtype)
         )
 
         expr_upper = _ensure_array(expr_upper, copy=True)
@@ -349,21 +351,21 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         #  former can work with finite logarithm results
         exprv_log_abs = np.multiply(av_log_abs, bv_abs)
 
-        fmax = _floating_max(X.dtype)
-        smallest_subnormal = _floating_smallest_subnormal(X.dtype)
+        fmax = _floating_max(Xs.dtype)
+        smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
 
         # we are given l <= e <= u, which we translate into e/lf <= e <= e*uf
         # - if the factor is infinite, we limit it to fmax
         # - if the factor is NaN, e.g. from 0/0, we set the factor to 1
         # finally we split the factor geometrically in two using the sqrt
-        expr_log_abs_lower_factor: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+        expr_log_abs_lower_factor: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
             np.divide(exprv_log_abs, expr_log_abs_lower)
         )
         expr_log_abs_lower_factor[np.isinf(expr_log_abs_lower_factor)] = fmax
         np.sqrt(expr_log_abs_lower_factor, out=expr_log_abs_lower_factor)
         expr_log_abs_lower_factor[np.isnan(expr_log_abs_lower_factor)] = 1
 
-        expr_log_abs_upper_factor: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+        expr_log_abs_upper_factor: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
             np.divide(
                 expr_log_abs_upper,
                 # we avoid division by zero here
@@ -388,10 +390,10 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
 
         # derive the bounds on ln(a) and b based on the bounds on abs(ln(a))
         #  and abs(b), and on a based on ln(a)
-        a_log_lower: np.ndarray[Ps, np.dtype[F]] = _where(
+        a_log_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _where(
             _is_sign_negative_number(av_log), -a_log_abs_upper, a_log_abs_lower
         )
-        a_log_upper: np.ndarray[Ps, np.dtype[F]] = _where(
+        a_log_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _where(
             _is_sign_negative_number(av_log), -a_log_abs_lower, a_log_abs_upper
         )
 
@@ -486,13 +488,13 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
 
         # stack the bounds on a and b so that we can nudge their bounds, if
         #  necessary, together
-        tl_stack = np.stack([a_lower, b_lower])
-        tu_stack = np.stack([a_upper, b_upper])
+        tl_stack = _stack([a_lower, b_lower])
+        tu_stack = _stack([a_upper, b_upper])
 
         def compute_term_power(
-            t_stack: np.ndarray[tuple[int, ...], np.dtype[F]],
-        ) -> np.ndarray[tuple[int, ...], np.dtype[F]]:
-            total_power: np.ndarray[tuple[int, ...], np.dtype[F]] = np.power(
+            t_stack: np.ndarray[tuple[int, Ps], np.dtype[F]],
+        ) -> np.ndarray[tuple[int, Ps], np.dtype[F]]:
+            total_power: np.ndarray[tuple[Ps], np.dtype[F]] = np.power(
                 t_stack[0], t_stack[1]
             )
 
@@ -505,13 +507,13 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         expr_lower = _ensure_array(expr_lower)
         expr_upper = _ensure_array(expr_upper)
 
-        tl_stack = guarantee_arg_within_expr_bounds(
+        tl_stack = guarantee_stacked_arg_within_expr_bounds(
             compute_term_power,
             _broadcast_to(
                 exprv.reshape((1,) + exprv.shape),
                 (tl_stack.shape[0],) + exprv.shape,
             ),
-            np.stack([av, bv]),
+            _stack([av, bv]),
             tl_stack,
             _broadcast_to(
                 expr_lower.reshape((1,) + exprv.shape),
@@ -522,13 +524,13 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
                 (tl_stack.shape[0],) + exprv.shape,
             ),
         )
-        tu_stack = guarantee_arg_within_expr_bounds(
+        tu_stack = guarantee_stacked_arg_within_expr_bounds(
             compute_term_power,
             _broadcast_to(
                 exprv.reshape((1,) + exprv.shape),
                 (tu_stack.shape[0],) + exprv.shape,
             ),
-            np.stack([av, bv]),
+            _stack([av, bv]),
             tu_stack,
             _broadcast_to(
                 expr_lower.reshape((1,) + exprv.shape),
@@ -555,7 +557,6 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         Xs_lower, Xs_upper = a.compute_data_bounds(
             a_lower,
             a_upper,
-            X,
             Xs,
             late_bound,
         )
@@ -563,7 +564,6 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         bl, bu = b.compute_data_bounds(
             b_lower,
             b_upper,
-            X,
             Xs,
             late_bound,
         )

@@ -7,7 +7,7 @@ __all__ = ["Monotonicity", "MonotonicityPreservingSafeguard"]
 from collections.abc import Set
 from enum import Enum
 from operator import ge, gt, le, lt
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
@@ -298,6 +298,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which monotonic sequences centred on the points in the `data`
@@ -311,6 +312,8 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only check at data points where the condition is [`True`][True].
 
         Returns
         -------
@@ -414,6 +417,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         data: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the monotonicity of the `data` is
@@ -425,6 +429,9 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the safe intervals at data points where the condition
+            is [`True`][True].
 
         Returns
         -------

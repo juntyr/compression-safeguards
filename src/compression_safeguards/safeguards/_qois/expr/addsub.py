@@ -13,15 +13,16 @@ from ....utils._compat import (
     _floating_max,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
+    _stack,
 )
 from ....utils.bindings import Parameter
-from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
+from ..bound import checked_data_bounds, guarantee_stacked_arg_within_expr_bounds
 from .abc import AnyExpr, Expr
 from .abs import ScalarAbs
 from .constfold import ScalarFoldedConstant
 from .literal import Number
 from .neg import ScalarNegate
-from .typing import F, Ns, Ps, PsI
+from .typing import F, Ns, Ps, np_sndarray
 
 
 class ScalarAdd(Expr[AnyExpr, AnyExpr]):
@@ -57,24 +58,25 @@ class ScalarAdd(Expr[AnyExpr, AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.add(self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return np.add(self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         return compute_left_associate_sum_data_bounds(
-            self, expr_lower, expr_upper, X, Xs, late_bound
+            self, expr_lower, expr_upper, Xs, late_bound
         )
 
     @override
@@ -115,26 +117,25 @@ class ScalarSubtract(Expr[AnyExpr, AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.subtract(
-            self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound)
-        )
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return np.subtract(self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         return compute_left_associate_sum_data_bounds(
-            self, expr_lower, expr_upper, X, Xs, late_bound
+            self, expr_lower, expr_upper, Xs, late_bound
         )
 
     @override
@@ -234,19 +235,18 @@ class ScalarLeftAssociativeSum(
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         # evaluate the sum left-associative, i.e. a + b + c = (a + b) + c
-        acc: np.ndarray[PsI, np.dtype[F]] = np.add(
-            self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound)
+        acc: np.ndarray[tuple[Ps], np.dtype[F]] = np.add(
+            self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound)
         )
 
-        acc += self._c.eval(x, Xs, late_bound)
+        acc += self._c.eval(Xs, late_bound)
 
         for d in self._ds:
-            acc += d.eval(x, Xs, late_bound)
+            acc += d.eval(Xs, late_bound)
 
         return acc
 
@@ -254,14 +254,16 @@ class ScalarLeftAssociativeSum(
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         return compute_left_associate_sum_data_bounds(
-            self, expr_lower, expr_upper, X, Xs, late_bound
+            self, expr_lower, expr_upper, Xs, late_bound
         )
 
     @override
@@ -276,45 +278,47 @@ class ScalarLeftAssociativeSum(
 
 def compute_left_associate_sum_data_bounds(
     expr: ScalarAdd | ScalarSubtract | ScalarLeftAssociativeSum,
-    expr_lower: np.ndarray[Ps, np.dtype[F]],
-    expr_upper: np.ndarray[Ps, np.dtype[F]],
-    X: np.ndarray[Ps, np.dtype[F]],
-    Xs: np.ndarray[Ns, np.dtype[F]],
-    late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+    expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+    expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+    Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+    late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+) -> tuple[
+    np_sndarray[Ps, Ns, np.dtype[F]],
+    np_sndarray[Ps, Ns, np.dtype[F]],
+]:
     def _zero_add(
-        a: np.ndarray[Ps, np.dtype[F]], b: np.ndarray[Ps, np.dtype[F]]
-    ) -> np.ndarray[Ps, np.dtype[F]]:
-        sum_: np.ndarray[Ps, np.dtype[F]] = _ensure_array(np.add(a, b))
+        a: np.ndarray[tuple[Ps], np.dtype[F]], b: np.ndarray[tuple[Ps], np.dtype[F]]
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        sum_: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(np.add(a, b))
         np.copyto(sum_, a, where=(b == 0), casting="no")
         return sum_
 
     left_associative_sum = as_left_associative_sum(expr)
 
-    termvs: list[np.ndarray[Ps, np.dtype[F]]] = []
-    abs_factorvs: list[None | np.ndarray[Ps, np.dtype[F]]] = []
+    termvs: list[np.ndarray[tuple[Ps], np.dtype[F]]] = []
+    abs_factorvs: list[None | np.ndarray[tuple[Ps], np.dtype[F]]] = []
 
     for term in left_associative_sum:
         abs_factor = get_expr_left_associative_abs_factor_approximate(term)
-        termvs.append(term.eval(X.shape, Xs, late_bound))
+        termvs.append(term.eval(Xs, late_bound))
         abs_factorvs.append(
             None
             if abs_factor is None
             else np.multiply(
-                abs_factor.eval(X.shape, Xs, late_bound),
-                _ensure_array(term.eval_has_data(X.shape, Xs, late_bound)).astype(
-                    X.dtype
-                ),
+                abs_factor.eval(Xs, late_bound),
+                _ensure_array(term.eval_has_data(Xs, late_bound)).astype(Xs.dtype),
             )
         )
 
     # evaluate the total expression sum
-    exprv: np.ndarray[Ps, np.dtype[F]] = _ensure_array(sum(termvs[1:], start=termvs[0]))
+    exprv: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+        sum(termvs[1:], start=termvs[0])
+    )
     expr_lower = _ensure_array(expr_lower)
     expr_upper = _ensure_array(expr_upper)
 
     # compute the sum of absolute factors
-    total_abs_factor_: None | np.ndarray[Ps, np.dtype[F]] = None
+    total_abs_factor_: None | np.ndarray[tuple[Ps], np.dtype[F]] = None
     for abs_factorv in abs_factorvs:
         if abs_factorv is None:
             continue
@@ -323,16 +327,16 @@ def compute_left_associate_sum_data_bounds(
         else:
             total_abs_factor_ += abs_factorv
     assert total_abs_factor_ is not None
-    total_abs_factor: np.ndarray[Ps, np.dtype[F]] = total_abs_factor_
+    total_abs_factor: np.ndarray[tuple[Ps], np.dtype[F]] = total_abs_factor_
 
     # drop into expression difference bounds to divide up the bound
     # for NaN sums, we use a zero difference to ensure NaNs don't
     #  accidentally propagate into the term difference bounds
-    expr_lower_diff: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+    expr_lower_diff: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
         np.subtract(expr_lower, exprv)
     )
     expr_lower_diff[np.isnan(expr_lower_diff)] = 0
-    expr_upper_diff: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+    expr_upper_diff: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
         np.subtract(expr_upper, exprv)
     )
     expr_upper_diff[np.isnan(expr_upper_diff)] = 0
@@ -345,14 +349,14 @@ def compute_left_associate_sum_data_bounds(
     #      zero
     #  (b) -inf - inf and inf - -inf are +-inf, so expr_[lower|upper]_diff is
     #      the same infinity as expr_[lower|upper]
-    tfl: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+    tfl: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
         np.divide(expr_lower_diff, total_abs_factor)
     )
-    tfu: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+    tfu: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
         np.divide(expr_upper_diff, total_abs_factor)
     )
 
-    fmax = _floating_max(X.dtype)
+    fmax = _floating_max(Xs.dtype)
 
     # ensure that the bounds never contain both -inf and +inf since that would
     #  allow NaN to sneak in
@@ -360,7 +364,7 @@ def compute_left_associate_sum_data_bounds(
     tfl[inf_clash] = -fmax
     tfu[inf_clash] = fmax
 
-    any_nan: np.ndarray[Ps, np.dtype[np.bool]] = np.isnan(termvs[0])
+    any_nan: np.ndarray[tuple[Ps], np.dtype[np.bool]] = np.isnan(termvs[0])
     for termv in termvs[1:]:
         any_nan |= np.isnan(termv)
 
@@ -373,11 +377,11 @@ def compute_left_associate_sum_data_bounds(
     #  should keep the same value (unless the term is finite and there is any
     #  NaN term, see above)
     # otherwise we split up the difference bound for the terms by their factors
-    tl_stack_: list[np.ndarray[Ps, np.dtype[F]]] = []
+    tl_stack_: list[np.ndarray[tuple[Ps], np.dtype[F]]] = []
     for termv, abs_factorv in zip(termvs, abs_factorvs):
         if abs_factorv is None:
             continue
-        tl: np.ndarray[Ps, np.dtype[F]] = _ensure_array(termv, copy=True)
+        tl: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(termv, copy=True)
         tl[np.isfinite(termv) & any_nan] = -fmax
         np.copyto(
             tl,
@@ -398,12 +402,12 @@ def compute_left_associate_sum_data_bounds(
             & np.isfinite(abs_factorv)
         ] = -fmax
         tl_stack_.append(tl)
-    tl_stack = np.stack(tl_stack_)
-    tu_stack_: list[np.ndarray[Ps, np.dtype[F]]] = []
+    tl_stack = _stack(tl_stack_)
+    tu_stack_: list[np.ndarray[tuple[Ps], np.dtype[F]]] = []
     for termv, abs_factorv in zip(termvs, abs_factorvs):
         if abs_factorv is None:
             continue
-        tu: np.ndarray[Ps, np.dtype[F]] = _ensure_array(termv, copy=True)
+        tu: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(termv, copy=True)
         tu[np.isfinite(termv) & any_nan] = fmax
         np.copyto(
             tu,
@@ -424,12 +428,12 @@ def compute_left_associate_sum_data_bounds(
             & np.isfinite(abs_factorv)
         ] = fmax
         tu_stack_.append(tu)
-    tu_stack = np.stack(tu_stack_)
+    tu_stack = _stack(tu_stack_)
 
     def compute_term_sum(
-        t_stack: np.ndarray[tuple[int, ...], np.dtype[F]],
-    ) -> np.ndarray[tuple[int, ...], np.dtype[F]]:
-        total_sum: None | np.ndarray[tuple[int, ...], np.dtype[F]] = None
+        t_stack: np.ndarray[tuple[int, Ps], np.dtype[F]],
+    ) -> np.ndarray[tuple[int, Ps], np.dtype[F]]:
+        total_sum: None | np.ndarray[tuple[Ps], np.dtype[F]] = None
         i = 0
 
         for termv, abs_factorv in zip(termvs, abs_factorvs):
@@ -452,12 +456,12 @@ def compute_left_associate_sum_data_bounds(
         )
 
     # handle rounding errors in the total absolute factor early
-    tl_stack = guarantee_arg_within_expr_bounds(
+    tl_stack = guarantee_stacked_arg_within_expr_bounds(
         compute_term_sum,
         _broadcast_to(
             exprv.reshape((1,) + exprv.shape), (tl_stack.shape[0],) + exprv.shape
         ),
-        np.stack(
+        _stack(
             [
                 termv
                 for termv, abs_factorv in zip(termvs, abs_factorvs)
@@ -474,12 +478,12 @@ def compute_left_associate_sum_data_bounds(
             (tl_stack.shape[0],) + exprv.shape,
         ),
     )
-    tu_stack = guarantee_arg_within_expr_bounds(
+    tu_stack = guarantee_stacked_arg_within_expr_bounds(
         compute_term_sum,
         _broadcast_to(
             exprv.reshape((1,) + exprv.shape), (tu_stack.shape[0],) + exprv.shape
         ),
-        np.stack(
+        _stack(
             [
                 termv
                 for termv, abs_factorv in zip(termvs, abs_factorvs)
@@ -497,10 +501,10 @@ def compute_left_associate_sum_data_bounds(
         ),
     )
 
-    xl: np.ndarray[Ns, np.dtype[F]]
-    xu: np.ndarray[Ns, np.dtype[F]]
-    Xs_lower_: None | np.ndarray[Ns, np.dtype[F]] = None
-    Xs_upper_: None | np.ndarray[Ns, np.dtype[F]] = None
+    xl: np_sndarray[Ps, Ns, np.dtype[F]]
+    xu: np_sndarray[Ps, Ns, np.dtype[F]]
+    Xs_lower_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
+    Xs_upper_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
     i = 0
     for term, abs_factorv in zip(left_associative_sum, abs_factorvs):
         if abs_factorv is None:
@@ -510,7 +514,6 @@ def compute_left_associate_sum_data_bounds(
         xl, xu = term.compute_data_bounds(
             tl_stack[i],
             tu_stack[i],
-            X,
             Xs,
             late_bound,
         )
@@ -529,8 +532,8 @@ def compute_left_associate_sum_data_bounds(
 
     assert Xs_lower_ is not None
     assert Xs_upper_ is not None
-    Xs_lower: np.ndarray[Ns, np.dtype[F]] = Xs_lower_
-    Xs_upper: np.ndarray[Ns, np.dtype[F]] = Xs_upper_
+    Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_lower_
+    Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_upper_
 
     Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
     Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)

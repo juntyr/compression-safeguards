@@ -16,7 +16,7 @@ from .divmul import ScalarDivide, ScalarMultiply
 from .group import Group
 from .literal import Number
 from .neg import ScalarNegate
-from .typing import F, Fi, Ns, Ps, PsI
+from .typing import F, Fi, Ns, Ps, np_sndarray
 
 
 class ScalarSymmetricModulo(Expr[AnyExpr, AnyExpr]):
@@ -50,23 +50,24 @@ class ScalarSymmetricModulo(Expr[AnyExpr, AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         return _symmetric_modulo(
-            self._a.eval(x, Xs, late_bound), self._b.eval(x, Xs, late_bound)
+            self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound)
         )
 
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         assert False, "cannot compute the data bounds for symmetric_modulo"
 
     @override

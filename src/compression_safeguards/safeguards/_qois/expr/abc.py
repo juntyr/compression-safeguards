@@ -20,7 +20,7 @@ from ....utils._compat import (
 from ....utils.bindings import Parameter
 from ....utils.error import QuantityOfInterestRuntimeWarning
 from ..bound import DataBounds, data_bounds_checks, guarantee_data_within_expr_bounds
-from .typing import Es, F, Ns, Ps, PsI
+from .typing import Es, F, Ns, Ps, np_sndarray
 
 if TYPE_CHECKING:
     from .literal import Number
@@ -122,23 +122,41 @@ class Expr(ABC, Generic[Unpack[Es]]):
     @final
     def eval_has_data(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[np.bool]]:
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[np.bool]]:
+        """
+        Evaluate if the pointwise expression values references the data `x` or
+        `X[i]`.
+
+        Parameters
+        ----------
+        Xs : PsNsArray[Ps, Ns, F]
+            The stencil-extended data, in floating-point format, which must be
+            of shape [Ps, ...stencil_shape].
+        late_bound : Mapping[Parameter, PsNsArray[Ps, Ns, F]]
+            The late-bound constants parameters for this expression, with the
+            same shape and floating-point dtype as the stencil-extended data.
+
+        Returns
+        -------
+        vals : np.ndarray[tuple[Ps], np.dtype[np.bool]]
+            Pointwise [`True`][True] if the point references the data.
+        """
+
         if not self.has_data:
-            return _zeros(x, dtype=np.dtype(np.bool))
+            return _zeros((Xs.shape[0],), dtype=np.dtype(np.bool))
 
         args: tuple[AnyExpr, ...] = self.args  # type: ignore
 
         match args:
             case ():
-                return _zeros(x, dtype=np.dtype(np.bool))
+                return _zeros((Xs.shape[0],), dtype=np.dtype(np.bool))
             case _:
                 a, *as_ = args
-                has_data = a.eval_has_data(x, Xs, late_bound)
+                has_data = a.eval_has_data(Xs, late_bound)
                 for a in as_:
-                    has_data |= a.eval_has_data(x, Xs, late_bound)
+                    has_data |= a.eval_has_data(Xs, late_bound)
                 return has_data
 
     @final
@@ -232,39 +250,38 @@ class Expr(ABC, Generic[Unpack[Es]]):
     @abstractmethod
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         """
         Evaluate this expression on the stencil-extended data `Xs`.
 
         Parameters
         ----------
-        x : PsI
-            The shape of the pointwise data.
-        Xs : np.ndarray[Ns, np.dtype[F]]
+        Xs : PsNsArray[Ps, Ns, F]
             The stencil-extended data, in floating-point format, which must be
-            of shape [...PsI, ...stencil_shape].
-        late_bound : Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]]
+            of shape [Ps, ...stencil_shape].
+        late_bound : Mapping[Parameter, PsNsArray[Ps, Ns, F]]
             The late-bound constants parameters for this expression, with the
             same shape and floating-point dtype as the stencil-extended data.
 
         Returns
         -------
-        vals : np.ndarray[PsI, np.dtype[F]]
+        vals : np.ndarray[tuple[Ps], np.dtype[F]]
             The pointwise expression values.
         """
 
     @abstractmethod
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         """
         Compute the lower-upper bounds on the stencil-extended data `Xs` that
         that satisfy the lower-upper bounds `expr_lower` and `expr_lower` on
@@ -282,23 +299,20 @@ class Expr(ABC, Generic[Unpack[Es]]):
 
         Parameters
         ----------
-        expr_lower : np.ndarray[Ps, np.dtype[F]]
+        expr_lower : np.ndarray[tuple[Ps], np.dtype[F]]
             The pointwise lower bound on this expression.
-        expr_upper : np.ndarray[Ps, np.dtype[F]]
+        expr_upper : np.ndarray[tuple[Ps], np.dtype[F]]
             The pointwise upper bound on this expression.
-        X : np.ndarray[Ps, np.dtype[F]]
-            The pointwise data, in floating-point format, which must be
-            of shape Ps.
-        Xs : np.ndarray[Ps, np.dtype[F]]
+        Xs : PsNsArray[Ps, Ns, F]
             The stencil-extended data, in floating-point format, which must be
-            of shape [...Ps, ...stencil_shape].
-        late_bound : Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]]
+            of shape [Ps, ...stencil_shape].
+        late_bound : Mapping[Parameter, PsNsArray[Ps, Ns, F]]
             The late-bound constants parameters for this expression, with the
             same shape and floating-point dtype as the stencil-extended data.
 
         Returns
         -------
-        Xs_lower, Xs_upper : tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]
+        Xs_lower, Xs_upper : tuple[PsNsArray[Ps, Ns, F], PsNsArray[Ps, Ns, F]]
             The stencil-extended lower and upper bounds on the stencil-extended
             data `Xs`.
 
@@ -309,12 +323,14 @@ class Expr(ABC, Generic[Unpack[Es]]):
     @final
     def compute_data_bounds(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         """
         Compute the lower-upper bounds on the stencil-extended data `Xs` that
         that satisfy the lower-upper bounds `expr_lower` and `expr_lower` on
@@ -327,23 +343,20 @@ class Expr(ABC, Generic[Unpack[Es]]):
 
         Parameters
         ----------
-        expr_lower : np.ndarray[Ps, np.dtype[F]]
+        expr_lower : np.ndarray[tuple[Ps], np.dtype[F]]
             The pointwise lower bound on this expression.
-        expr_upper : np.ndarray[Ps, np.dtype[F]]
+        expr_upper : np.ndarray[tuple[Ps], np.dtype[F]]
             The pointwise upper bound on this expression.
-        X : np.ndarray[Ps, np.dtype[F]]
-            The pointwise data, in floating-point format, which must be
-            of shape Ps.
-        Xs : np.ndarray[Ps, np.dtype[F]]
+        Xs : PsNsArray[Ps, Ns, F]
             The stencil-extended data, in floating-point format, which must be
-            of shape [...Ps, ...stencil_shape].
-        late_bound : Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]]
+            of shape [Ps, ...stencil_shape].
+        late_bound : Mapping[Parameter, PsNsArray[Ps, Ns, F]]
             The late-bound constants parameters for this expression, with the
             same shape and floating-point dtype as the stencil-extended data.
 
         Returns
         -------
-        Xs_lower, Xs_upper : tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]
+        Xs_lower, Xs_upper : tuple[PsNsArray[Ps, Ns, F], PsNsArray[Ps, Ns, F]]
             The stencil-extended lower and upper bounds on the stencil-extended
             data `Xs`.
 
@@ -355,7 +368,7 @@ class Expr(ABC, Generic[Unpack[Es]]):
             data_bounds_checks(self.compute_data_bounds_unchecked)
             != DataBounds.infallible
         ):
-            exprv: np.ndarray[Ps, np.dtype[F]] = self.eval(X.shape, Xs, late_bound)
+            exprv: np.ndarray[tuple[Ps], np.dtype[F]] = self.eval(Xs, late_bound)
             if not np.all((expr_lower <= exprv) | np.isnan(exprv)):
                 warn(
                     "expression lower bounds are above the expression values",
@@ -369,10 +382,10 @@ class Expr(ABC, Generic[Unpack[Es]]):
         else:
             exprv = None  # type: ignore
 
-        Xs_lower: np.ndarray[Ns, np.dtype[F]]
-        Xs_upper: np.ndarray[Ns, np.dtype[F]]
+        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]]
+        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]]
         Xs_lower, Xs_upper = self.compute_data_bounds_unchecked(
-            expr_lower, expr_upper, X, Xs, late_bound
+            expr_lower, expr_upper, Xs, late_bound
         )
 
         warn_on_bounds_exceeded: bool
@@ -396,7 +409,6 @@ class Expr(ABC, Generic[Unpack[Es]]):
         # handle rounding errors in the lower bound computation
         Xs_lower = guarantee_data_within_expr_bounds(
             lambda Xs_lower: self.eval(
-                X.shape,
                 Xs_lower,
                 late_bound,
             ),
@@ -409,7 +421,6 @@ class Expr(ABC, Generic[Unpack[Es]]):
         )
         Xs_upper = guarantee_data_within_expr_bounds(
             lambda Xs_upper: self.eval(
-                X.shape,
                 Xs_upper,
                 late_bound,
             ),

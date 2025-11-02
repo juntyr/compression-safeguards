@@ -16,7 +16,7 @@ from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
-from .typing import F, Ns, Ps, PsI
+from .typing import F, Ns, Ps, np_sndarray
 
 
 class ScalarSin(Expr[AnyExpr]):
@@ -44,34 +44,35 @@ class ScalarSin(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.sin(self._a.eval(x, Xs, late_bound))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return np.sin(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         # evaluate arg and sin(arg)
         arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
+        argv = arg.eval(Xs, late_bound)
         exprv = np.sin(argv)
 
         # apply the inverse function to get the bounds on arg
         # ensure that the bounds on sin(...) are in [-1, +1]
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.asin(
-            _maximum_zero_sign_sensitive(X.dtype.type(-1), expr_lower)
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.asin(
+            _maximum_zero_sign_sensitive(Xs.dtype.type(-1), expr_lower)
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.asin(
-            _minimum_zero_sign_sensitive(expr_upper, X.dtype.type(1))
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = np.asin(
+            _minimum_zero_sign_sensitive(expr_upper, Xs.dtype.type(1))
         )
 
         # sin(...) is periodic, so we need to drop to difference bounds before
@@ -87,11 +88,11 @@ class ScalarSin(Expr[AnyExpr]):
         needs_flip = np.cos(argv) < 0
 
         # check for the case where any finite value would work
-        full_domain: np.ndarray[Ps, np.dtype[np.bool]] = np.less_equal(
+        full_domain: np.ndarray[tuple[Ps], np.dtype[np.bool]] = np.less_equal(
             expr_lower, -1
         ) & np.greater_equal(expr_upper, 1)
 
-        fmax = _floating_max(X.dtype)
+        fmax = _floating_max(Xs.dtype)
 
         # sin(+-inf) = NaN, so force infinite argv to have exact bounds
         # sin(finite) in [-1, +1] so allow any finite argv if the all of
@@ -146,7 +147,6 @@ class ScalarSin(Expr[AnyExpr]):
         return arg.compute_data_bounds(
             arg_lower,
             arg_upper,
-            X,
             Xs,
             late_bound,
         )
@@ -181,34 +181,35 @@ class ScalarCos(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.cos(self._a.eval(x, Xs, late_bound))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return np.cos(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         # evaluate arg and cos(arg)
         arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
+        argv = arg.eval(Xs, late_bound)
         exprv = np.cos(argv)
 
         # apply the inverse function to get the bounds on arg
         # ensure that the bounds on cos(...) are in [-1, +1]
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.acos(
-            _maximum_zero_sign_sensitive(X.dtype.type(-1), expr_lower)
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.acos(
+            _maximum_zero_sign_sensitive(Xs.dtype.type(-1), expr_lower)
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.acos(
-            _minimum_zero_sign_sensitive(expr_upper, X.dtype.type(1))
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = np.acos(
+            _minimum_zero_sign_sensitive(expr_upper, Xs.dtype.type(1))
         )
 
         # cos(...) is periodic, so we need to drop to difference bounds before
@@ -224,11 +225,11 @@ class ScalarCos(Expr[AnyExpr]):
         needs_flip = np.sin(argv) >= 0
 
         # check for the case where any finite value would work
-        full_domain: np.ndarray[Ps, np.dtype[np.bool]] = np.less_equal(
+        full_domain: np.ndarray[tuple[Ps], np.dtype[np.bool]] = np.less_equal(
             expr_lower, -1
         ) & np.greater_equal(expr_upper, 1)
 
-        fmax = _floating_max(X.dtype)
+        fmax = _floating_max(Xs.dtype)
 
         # cps(+-inf) = NaN, so force infinite argv to have exact bounds
         # cos(finite) in [-1, +1] so allow any finite argv if the all of
@@ -278,7 +279,6 @@ class ScalarCos(Expr[AnyExpr]):
         return arg.compute_data_bounds(
             arg_lower,
             arg_upper,
-            X,
             Xs,
             late_bound,
         )
@@ -313,30 +313,31 @@ class ScalarTan(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.tan(self._a.eval(x, Xs, late_bound))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return np.tan(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         # evaluate arg and tan(arg)
         arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
+        argv = arg.eval(Xs, late_bound)
         exprv = np.tan(argv)
 
         # apply the inverse function to get the bounds on arg
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.atan(expr_lower)
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.atan(expr_upper)
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.atan(expr_lower)
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = np.atan(expr_upper)
 
         # tan(...) is periodic, so we need to drop to difference bounds before
         #  applying the difference to argv to stay in the same period
@@ -345,11 +346,11 @@ class ScalarTan(Expr[AnyExpr]):
         arg_upper_diff = arg_upper - argv_atan
 
         # check for the case where any finite value would work
-        full_domain: np.ndarray[Ps, np.dtype[np.bool]] = (
-            expr_lower == X.dtype.type(-np.inf)
-        ) & (expr_upper == X.dtype.type(np.inf))
+        full_domain: np.ndarray[tuple[Ps], np.dtype[np.bool]] = (
+            expr_lower == Xs.dtype.type(-np.inf)
+        ) & (expr_upper == Xs.dtype.type(np.inf))
 
-        fmax = _floating_max(X.dtype)
+        fmax = _floating_max(Xs.dtype)
 
         # tan(+-inf) = NaN, so force infinite argv to have exact bounds
         # tan(finite) in [-inf, +inf] so allow any finite argv if the all of
@@ -398,7 +399,6 @@ class ScalarTan(Expr[AnyExpr]):
         return arg.compute_data_bounds(
             arg_lower,
             arg_upper,
-            X,
             Xs,
             late_bound,
         )
@@ -433,44 +433,45 @@ class ScalarAsin(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.asin(self._a.eval(x, Xs, late_bound))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return np.asin(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         # evaluate arg and asin(arg)
         arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
+        argv = arg.eval(Xs, late_bound)
         exprv = np.asin(argv)
 
-        pi = _pi(X.dtype)
+        pi = _pi(Xs.dtype)
         pi_2: F = np.divide(pi, 2)
-        one_eps = _nextafter(np.array(1, dtype=X.dtype), np.array(2, dtype=X.dtype))
+        one_eps = _nextafter(np.array(1, dtype=Xs.dtype), np.array(2, dtype=Xs.dtype))
 
         # apply the inverse function to get the bounds on arg
         # asin(...) is NaN when abs(...) > 1 and can then take any value > 1
         # otherwise ensure that the bounds on asin(...) are in [-pi/2, +pi/2]
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
             np.sin(_maximum_zero_sign_sensitive(-pi_2, expr_lower))
         )
         arg_lower[np.greater(argv, 1)] = one_eps
         arg_lower[np.less(argv, -1)] = -np.inf
         arg_lower = _ensure_array(_minimum_zero_sign_sensitive(argv, arg_lower))
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
             np.sin(_minimum_zero_sign_sensitive(expr_upper, pi_2))
         )
         arg_upper[np.greater(argv, 1)] = np.inf
@@ -512,7 +513,6 @@ class ScalarAsin(Expr[AnyExpr]):
         return arg.compute_data_bounds(
             arg_lower,
             arg_upper,
-            X,
             Xs,
             late_bound,
         )
@@ -547,29 +547,30 @@ class ScalarAcos(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.acos(self._a.eval(x, Xs, late_bound))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return np.acos(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         # evaluate arg and acos(arg)
         arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
+        argv = arg.eval(Xs, late_bound)
         exprv = np.acos(argv)
 
-        pi = _pi(X.dtype)
-        one_eps = _nextafter(np.array(1, dtype=X.dtype), np.array(2, dtype=X.dtype))
+        pi = _pi(Xs.dtype)
+        one_eps = _nextafter(np.array(1, dtype=Xs.dtype), np.array(2, dtype=Xs.dtype))
 
         # apply the inverse function to get the bounds on arg
         # acos(...) is NaN when abs(...) > 1 and can then take any value > 1
@@ -578,15 +579,15 @@ class ScalarAcos(Expr[AnyExpr]):
         #  bounds get switched
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
             np.cos(_minimum_zero_sign_sensitive(expr_upper, pi))
         )
         arg_lower[np.greater(argv, 1)] = one_eps
         arg_lower[np.less(argv, -1)] = -np.inf
         arg_lower = _ensure_array(_minimum_zero_sign_sensitive(argv, arg_lower))
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
-            np.cos(_maximum_zero_sign_sensitive(X.dtype.type(0), expr_lower))
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            np.cos(_maximum_zero_sign_sensitive(Xs.dtype.type(0), expr_lower))
         )
         arg_upper[np.greater(argv, 1)] = np.inf
         arg_upper[np.less(argv, -1)] = -one_eps
@@ -627,7 +628,6 @@ class ScalarAcos(Expr[AnyExpr]):
         return arg.compute_data_bounds(
             arg_lower,
             arg_upper,
-            X,
             Xs,
             late_bound,
         )
@@ -662,33 +662,34 @@ class ScalarAtan(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.atan(self._a.eval(x, Xs, late_bound))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return np.atan(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         # evaluate arg and atan(arg)
         arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
+        argv = arg.eval(Xs, late_bound)
         exprv = np.atan(argv)
 
         # compute pi/2 but guard against rounding error to ensure that
         #  tan(pi/2) >> 0
-        atan_max: F = np.atan(X.dtype.type(np.inf))
+        atan_max: F = np.atan(Xs.dtype.type(np.inf))
         if np.tan(atan_max) < 0:
-            atan_max = X.dtype.type(
-                _nextafter(np.array(atan_max), np.array(X.dtype.type(0)))
+            atan_max = Xs.dtype.type(
+                _nextafter(np.array(atan_max), np.array(Xs.dtype.type(0)))
             )
         assert np.tan(atan_max) > 0
 
@@ -697,14 +698,14 @@ class ScalarAtan(Expr[AnyExpr]):
         #  arg_lower is also -0.0, same for arg_upper
         # ensure that the bounds on atan(...) are in [-pi/2, +pi/2]
         # since tan is discontinuous at +-pi/2, we need to be extra careful
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.tan(
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.tan(
             _minimum_zero_sign_sensitive(
                 _maximum_zero_sign_sensitive(-atan_max, expr_lower), atan_max
             )
         )
         arg_lower = _ensure_array(_minimum_zero_sign_sensitive(argv, arg_lower))
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.tan(
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = np.tan(
             _minimum_zero_sign_sensitive(
                 _maximum_zero_sign_sensitive(-atan_max, expr_upper), atan_max
             )
@@ -736,7 +737,6 @@ class ScalarAtan(Expr[AnyExpr]):
         return arg.compute_data_bounds(
             arg_lower,
             arg_upper,
-            X,
             Xs,
             late_bound,
         )

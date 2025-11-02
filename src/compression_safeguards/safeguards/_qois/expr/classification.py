@@ -9,7 +9,7 @@ from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
-from .typing import F, Fi, Ns, Ps, PsI
+from .typing import F, Fi, Ns, Ps, np_sndarray
 
 
 class ScalarIsFinite(Expr[AnyExpr]):
@@ -40,44 +40,44 @@ class ScalarIsFinite(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return classify_to_dtype(np.isfinite, self._a.eval(x, Xs, late_bound), Xs.dtype)
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return classify_to_dtype(np.isfinite, self._a.eval(Xs, late_bound), Xs.dtype)
 
     @override
     @checked_data_bounds
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         # evaluate arg
         arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
+        argv = arg.eval(Xs, late_bound)
 
-        fmax = _floating_max(X.dtype)
+        fmax = _floating_max(Xs.dtype)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, isfinite(Xs) = True, so Xs must be finite
         # if expr_upper < 1, isfinite(Xs) = False, Xs must stay non-finite
         # otherwise, isfinite(Xs) in [True, False] and Xs can be anything
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, -fmax)
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(Xs.shape[:1], -fmax)
         arg_lower[np.less_equal(expr_lower, 0)] = -np.inf
         np.copyto(arg_lower, argv, where=np.less(expr_upper, 1), casting="no")
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, fmax)
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(Xs.shape[:1], fmax)
         arg_upper[np.less_equal(expr_lower, 0)] = np.inf
         np.copyto(arg_upper, argv, where=np.less(expr_upper, 1), casting="no")
 
         return arg.compute_data_bounds(
             arg_lower,
             arg_upper,
-            X,
             Xs,
             late_bound,
         )
@@ -115,44 +115,44 @@ class ScalarIsInf(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return classify_to_dtype(np.isinf, self._a.eval(x, Xs, late_bound), Xs.dtype)
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return classify_to_dtype(np.isinf, self._a.eval(Xs, late_bound), Xs.dtype)
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         # evaluate arg
         arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
+        argv = arg.eval(Xs, late_bound)
 
-        fmax = _floating_max(X.dtype)
+        fmax = _floating_max(Xs.dtype)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, isinf(Xs) = True, so Xs must stay infinite
         # if expr_upper < 0, isinf(Xs) = False, Xs must be non-infinite
         # otherwise, isinf(Xs) in [True, False] and Xs can be anything
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, -fmax)
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(Xs.shape[:1], -fmax)
         arg_lower[np.greater_equal(expr_upper, 1)] = -np.inf
         np.copyto(arg_lower, argv, where=np.greater(expr_lower, 0), casting="no")
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, fmax)
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(Xs.shape[:1], fmax)
         arg_upper[np.greater_equal(expr_upper, 1)] = np.inf
         np.copyto(arg_upper, argv, where=np.greater(expr_lower, 0), casting="no")
 
         return arg.compute_data_bounds(
             arg_lower,
             arg_upper,
-            X,
             Xs,
             late_bound,
         )
@@ -190,40 +190,44 @@ class ScalarIsNaN(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return classify_to_dtype(np.isnan, self._a.eval(x, Xs, late_bound), Xs.dtype)
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return classify_to_dtype(np.isnan, self._a.eval(Xs, late_bound), Xs.dtype)
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         # evaluate arg
         arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
+        argv = arg.eval(Xs, late_bound)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, isnan(Xs) = True, so Xs must stay NaN
         # if expr_upper < 0, isnan(Xs) = False, Xs must be non-NaN
         # otherwise, isnan(Xs) in [True, False] and Xs can be anything
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, X.dtype.type(-np.inf))
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
+            Xs.shape[:1], Xs.dtype.type(-np.inf)
+        )
         np.copyto(arg_lower, argv, where=np.greater(expr_lower, 0), casting="no")
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, X.dtype.type(np.inf))
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
+            Xs.shape[:1], Xs.dtype.type(np.inf)
+        )
         np.copyto(arg_upper, argv, where=np.greater(expr_lower, 0), casting="no")
 
         return arg.compute_data_bounds(
             arg_lower,
             arg_upper,
-            X,
             Xs,
             late_bound,
         )
@@ -236,11 +240,11 @@ class ScalarIsNaN(Expr[AnyExpr]):
 @overload
 def classify_to_dtype(
     classify: Callable[
-        [np.ndarray[Ps, np.dtype[F]]], np.ndarray[Ps, np.dtype[np.bool]]
+        [np.ndarray[tuple[Ps], np.dtype[F]]], np.ndarray[tuple[Ps], np.dtype[np.bool]]
     ],
-    a: np.ndarray[Ps, np.dtype[F]],
+    a: np.ndarray[tuple[Ps], np.dtype[F]],
     dtype: np.dtype[F],
-) -> np.ndarray[Ps, np.dtype[F]]: ...
+) -> np.ndarray[tuple[Ps], np.dtype[F]]: ...
 
 
 @overload

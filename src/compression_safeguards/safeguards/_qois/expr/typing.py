@@ -1,10 +1,16 @@
-__all__ = ["F", "Fi", "Ps", "PsI", "Ns", "Ci", "Es"]
+__all__ = ["T", "F", "Fi", "J", "Ps", "Ns", "np_sndarray", "Ci", "Es"]
 
 from collections.abc import Callable
-from typing import TypeVar
+from typing import TypeAlias, TypeVar
 
 import numpy as np
-from typing_extensions import TypeVarTuple  # MSPV 3.11
+from typing_extensions import (
+    TypeVarTuple,  # MSPV 3.11
+    Unpack,  # MSPV 3.11
+)
+
+T = TypeVar("T", bound=np.dtype[np.generic], covariant=True)
+""" Any numpy [`dtype`][numpy.dtype] (covariant). """
 
 F = TypeVar("F", bound=np.floating, covariant=True)
 """ Any numpy [`floating`][numpy.floating]-point data type (covariant). """
@@ -12,14 +18,17 @@ F = TypeVar("F", bound=np.floating, covariant=True)
 Fi = TypeVar("Fi", bound=np.floating)
 """ Any numpy [`floating`][numpy.floating]-point data type (invariant). """
 
-Ps = TypeVar("Ps", bound=tuple[int, ...], covariant=True)
-""" Any pointwise array shape [...X] (covariant). """
+J = TypeVar("J", bound=int, covariant=True)
+""" Any [`int`][int] (covariant). """
 
-PsI = TypeVar("PsI", bound=tuple[int, ...])
-""" Any pointwise array shape [...X] (invariant). """
+Ps = TypeVar("Ps", bound=int, covariant=True)
+""" Any flattend pointwise array shape [X.size] (covariant). """
 
 Ns = TypeVar("Ns", bound=tuple[int, ...], covariant=True)
-""" Any stencil neighbourhood array shape [...X, ...S] (covariant). """
+""" Any stencil neighbourhood array shape [*S.shape] (covariant). """
+
+np_sndarray: TypeAlias = np.ndarray[tuple[Ps, Unpack[Ns]], T]  # type: ignore
+""" Any stencil-extended [`np.ndarray[tuple[Ps, Unpack[Ns]], T]`][np.ndarray]. """
 
 Ci = TypeVar("Ci", bound=Callable)
 """ Any callable type (invariant). """

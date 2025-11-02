@@ -11,6 +11,7 @@ __all__ = [
     "_maximum_zero_sign_sensitive",
     "_where",
     "_broadcast_to",
+    "_stack",
     "_ensure_array",
     "_ones",
     "_zeros",
@@ -26,7 +27,8 @@ __all__ = [
     "_e",
 ]
 
-from typing import TypeGuard, overload
+from collections.abc import Sequence
+from typing import Literal, TypeGuard, TypeVar, overload
 
 import numpy as np
 
@@ -42,6 +44,9 @@ from ._float128 import (
     _float128_type,
 )
 from .typing import F, Fi, S, Si, T, Ti
+
+N = TypeVar("N", bound=int, covariant=True)
+""" Any [`int`][int] (covariant). """
 
 
 # reimplementation of np.nan_to_num that also works for numpy_quaddtype and
@@ -299,6 +304,23 @@ def _broadcast_to(a: Ti, shape: Si) -> np.ndarray[Si, np.dtype[Ti]]: ...
 
 def _broadcast_to(a, shape):
     return np.broadcast_to(a, shape)
+
+
+# wrapper around np.stack but with better type hints
+@overload
+def _stack(
+    arrays: tuple[np.ndarray[tuple[N], np.dtype[T]]],
+) -> np.ndarray[tuple[Literal[2], N], np.dtype[T]]: ...
+
+
+@overload
+def _stack(
+    arrays: Sequence[np.ndarray[tuple[N], np.dtype[T]]],
+) -> np.ndarray[tuple[int, N], np.dtype[T]]: ...
+
+
+def _stack(arrays):
+    return np.stack(arrays)
 
 
 # wrapper around np.array(a, copy=(copy=None)) but with better type hints

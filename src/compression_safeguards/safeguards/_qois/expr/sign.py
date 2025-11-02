@@ -8,7 +8,7 @@ from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
-from .typing import F, Ns, Ps, PsI
+from .typing import F, Ns, Ps, np_sndarray
 
 
 class ScalarSign(Expr[AnyExpr]):
@@ -39,32 +39,33 @@ class ScalarSign(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.sign(self._a.eval(x, Xs, late_bound))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return np.sign(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         # evaluate arg and sign(arg)
         arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
-        exprv: np.ndarray[Ps, np.dtype[F]] = np.sign(argv)
+        argv = arg.eval(Xs, late_bound)
+        exprv: np.ndarray[tuple[Ps], np.dtype[F]] = np.sign(argv)
 
         # evaluate the lower and upper sign bounds that satisfy the expression bound
         expr_lower = np.ceil(expr_lower)
         expr_upper = np.floor(expr_upper)
 
-        smallest_subnormal = _floating_smallest_subnormal(X.dtype)
+        smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
 
         # compute the lower and upper arg bounds that produce the sign bounds
         # sign(-0.0) = +0.0 and sign(+0.0) = +0.0
@@ -72,12 +73,16 @@ class ScalarSign(Expr[AnyExpr]):
         # - expr_lower = +0.0 (exprv >= +0.0) -> arg_lower = -0.0, exprv = +0.0
         # - expr_upper = -0.0 (exprv < 0) -> arg_upper = -subnormal, exprv = -1
         # - expr_upper = +0.0 (exprv <= +0.0) -> arg_upper = +0.0, exprv = +0.0
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, smallest_subnormal)
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
+            Xs.shape[:1], smallest_subnormal
+        )
         arg_lower[np.less_equal(expr_lower, -1)] = -np.inf
         arg_lower[expr_lower == 0] = -0.0
         np.copyto(arg_lower, exprv, where=np.isnan(exprv), casting="no")
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = np.full(X.shape, -smallest_subnormal)
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
+            Xs.shape[:1], -smallest_subnormal
+        )
         arg_upper[np.greater_equal(expr_upper, +1)] = np.inf
         arg_upper[_is_positive_zero(expr_upper)] = +0.0
         np.copyto(arg_upper, exprv, where=np.isnan(exprv), casting="no")
@@ -85,7 +90,6 @@ class ScalarSign(Expr[AnyExpr]):
         return arg.compute_data_bounds(
             arg_lower,
             arg_upper,
-            X,
             Xs,
             late_bound,
         )

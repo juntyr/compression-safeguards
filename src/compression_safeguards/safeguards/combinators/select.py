@@ -6,14 +6,14 @@ __all__ = ["SelectSafeguard"]
 
 from abc import ABC
 from collections.abc import Collection, Set
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
 from ...utils.error import TypeCheckError, ctx
-from ...utils.intervals import IntervalUnion
+from ...utils.intervals import Interval, IntervalUnion
 from ...utils.typing import JSON, S, T
 from ..abc import Safeguard
 from ..pointwise.abc import PointwiseSafeguard
@@ -149,6 +149,7 @@ class SelectSafeguard(Safeguard):
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> bool:
         """
         Check if, for all elements, the selected safeguard succeed the check.
@@ -161,6 +162,8 @@ class SelectSafeguard(Safeguard):
             Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only check at data points where the condition is [`True`][True].
 
         Returns
         -------
@@ -194,6 +197,7 @@ class SelectSafeguard(Safeguard):
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check for which elements the selected safeguard succeed the check.
@@ -206,6 +210,8 @@ class SelectSafeguard(Safeguard):
             Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only check at data points where the condition is [`True`][True].
 
         Returns
         -------
@@ -238,6 +244,7 @@ class SelectSafeguard(Safeguard):
         data: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the safe intervals for the selected safeguard.
@@ -248,6 +255,9 @@ class SelectSafeguard(Safeguard):
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the safe intervals at data points where the condition
+            is [`True`][True].
 
         Returns
         -------
@@ -314,6 +324,7 @@ class _SelectSafeguardBase(ABC):
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         with ctx.safeguardty(SelectSafeguard), ctx.parameter("selector"):
             selector = late_bound.resolve_ndarray_with_lossless_cast(
@@ -321,7 +332,9 @@ class _SelectSafeguardBase(ABC):
             )
 
         oks = [
-            safeguard.check_pointwise(data, prediction, late_bound=late_bound)
+            safeguard.check_pointwise(
+                data, prediction, late_bound=late_bound, where=where
+            )
             for safeguard in self.safeguards
         ]
 
@@ -337,52 +350,25 @@ class _SelectSafeguardBase(ABC):
         data: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> IntervalUnion[T, int, int]:
         with ctx.safeguardty(SelectSafeguard), ctx.parameter("selector"):
             selector = late_bound.resolve_ndarray_with_lossless_cast(
                 self.selector, data.shape, np.dtype(np.int_)
             )
 
-        valids = [
-            safeguard.compute_safe_intervals(data, late_bound=late_bound)
-            for safeguard in self.safeguards
-        ]
+        # TODO: check that the indices are in bounds and normalise them
 
-        umax = max(valid.u for valid in valids)
+        valid: IntervalUnion[T, int, int] = Interval.full_like(data).into_union()
 
-        for i, v in enumerate(valids):
-            vnew = IntervalUnion.empty(data.dtype, data.size, umax)
-            vnew._lower[: v.u] = v._lower
-            vnew._upper[: v.u] = v._upper
-            valids[i] = vnew
-
-        valid: IntervalUnion[T, int, int] = IntervalUnion.empty(
-            data.dtype, data.size, umax
-        )
-
-        with (
-            ctx.safeguardty(SelectSafeguard),
-            ctx.parameter("selector"),
-            ctx.late_bound_parameter(self.selector),
-        ):
-            valid._lower = (
-                np.take_along_axis(
-                    np.stack([v._lower.T for v in valids], axis=0),
-                    selector.flatten().reshape((1, data.size, 1)),
-                    axis=0,
+        for i, safeguard in enumerate(self.safeguards):
+            where_i = (selector == i) & where
+            if np.any(where_i):
+                valid = valid.union(
+                    safeguard.compute_safe_intervals(
+                        data, late_bound=late_bound, where=where_i
+                    )
                 )
-                .reshape(data.size, umax)
-                .T
-            )
-            valid._upper = (
-                np.take_along_axis(
-                    np.stack([v._upper.T for v in valids], axis=0),
-                    selector.flatten().reshape((1, data.size, 1)),
-                    axis=0,
-                )
-                .reshape(data.size, umax)
-                .T
-            )
 
         return valid
 

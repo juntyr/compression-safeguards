@@ -6,7 +6,7 @@ __all__ = ["AllSafeguards"]
 
 from abc import ABC
 from collections.abc import Collection, Set
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
@@ -127,6 +127,7 @@ class AllSafeguards(Safeguard):
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> bool:
         """
         Check if, for all elements, all of the combined safeguards succeed the
@@ -140,6 +141,8 @@ class AllSafeguards(Safeguard):
             Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only check at data points where the condition is [`True`][True].
 
         Returns
         -------
@@ -160,6 +163,7 @@ class AllSafeguards(Safeguard):
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check for which elements all of the combined safeguards succeed the
@@ -173,6 +177,8 @@ class AllSafeguards(Safeguard):
             Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only check at data points where the condition is [`True`][True].
 
         Returns
         -------
@@ -192,6 +198,7 @@ class AllSafeguards(Safeguard):
         data: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intersection of the safe intervals of the combined
@@ -203,6 +210,9 @@ class AllSafeguards(Safeguard):
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the safe intervals at data points where the condition
+            is [`True`][True].
 
         Returns
         -------
@@ -250,13 +260,16 @@ class _AllSafeguardsBase(ABC):
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         front, *tail = self.safeguards
 
-        ok = front.check_pointwise(data, prediction, late_bound=late_bound)
+        ok = front.check_pointwise(data, prediction, late_bound=late_bound, where=where)
 
         for safeguard in tail:
-            ok &= safeguard.check_pointwise(data, prediction, late_bound=late_bound)
+            ok &= safeguard.check_pointwise(
+                data, prediction, late_bound=late_bound, where=where
+            )
 
         return ok
 
@@ -265,14 +278,17 @@ class _AllSafeguardsBase(ABC):
         data: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> IntervalUnion[T, int, int]:
         front, *tail = self.safeguards
 
-        valid = front.compute_safe_intervals(data, late_bound=late_bound)
+        valid = front.compute_safe_intervals(data, late_bound=late_bound, where=where)
 
         for safeguard in tail:
             valid = valid.intersect(
-                safeguard.compute_safe_intervals(data, late_bound=late_bound)
+                safeguard.compute_safe_intervals(
+                    data, late_bound=late_bound, where=where
+                )
             )
 
         return valid

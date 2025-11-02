@@ -8,7 +8,7 @@ from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
-from .typing import F, Ns, Ps, PsI
+from .typing import F, Ns, Ps, np_sndarray
 
 
 class ScalarAbs(Expr[AnyExpr]):
@@ -36,25 +36,26 @@ class ScalarAbs(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.abs(self._a.eval(x, Xs, late_bound))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return np.abs(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         # evaluate arg
         arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
+        argv = arg.eval(Xs, late_bound)
 
         # flip and swap the expr bounds to get the bounds on arg
         # abs(...) cannot be negative, but
@@ -63,13 +64,17 @@ class ScalarAbs(Expr[AnyExpr]):
         #  - el <= 0 -> al = -eu, au = eu
         # TODO: an interval union could represent that the two sometimes-
         #       disjoint intervals in the future
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(expr_lower, copy=True)
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            expr_lower, copy=True
+        )
         np.negative(
             expr_upper,
             out=arg_lower,
             where=(np.less_equal(expr_lower, 0) | _is_sign_negative_number(argv)),
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(expr_upper, copy=True)
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            expr_upper, copy=True
+        )
         np.negative(
             expr_lower,
             out=arg_upper,
@@ -79,7 +84,6 @@ class ScalarAbs(Expr[AnyExpr]):
         return arg.compute_data_bounds(
             arg_lower,
             arg_upper,
-            X,
             Xs,
             late_bound,
         )
