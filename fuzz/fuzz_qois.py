@@ -257,7 +257,7 @@ def check_one_input(data) -> None:
         return
 
     # evaluate the expression on the data
-    exprv = expr.eval(X, late_bound=dict())
+    exprv = expr.eval(np.array([X]), late_bound=dict()).squeeze()[()]
 
     # generate the lower and upper bounds on the expression
     expr_lower = np.array(ConsumeDtypeElement(data, dtype))
@@ -280,8 +280,9 @@ def check_one_input(data) -> None:
     try:
         with timeout(1):
             X_lower, X_upper = expr.compute_data_bounds(
-                expr_lower, expr_upper, X, dict()
+                np.array([expr_lower]), np.array([expr_upper]), np.array([X]), dict()
             )
+            X_lower, X_upper = X_lower.squeeze()[()], X_upper.squeeze()[()]
     except Exception:
         print(  # noqa: T201
             "\n===\n\n"
@@ -299,8 +300,8 @@ def check_one_input(data) -> None:
         )
         raise
     X_lower, X_upper = np.array(X_lower), np.array(X_upper)
-    exprv_X_lower = expr.eval(X_lower, late_bound=dict())
-    exprv_X_upper = expr.eval(X_upper, late_bound=dict())
+    exprv_X_lower = expr.eval(np.array([X_lower]), late_bound=dict()).squeeze()[()]
+    exprv_X_upper = expr.eval(np.array([X_upper]), late_bound=dict()).squeeze()[()]
 
     # generate a test data value
     X_test = np.array(ConsumeDtypeElement(data, dtype))
@@ -316,7 +317,7 @@ def check_one_input(data) -> None:
     X_test = np.array(X_test)
 
     # evaluate the expression on X_test
-    exprv_X_test = expr.eval(X_test, late_bound=dict())
+    exprv_X_test = expr.eval(np.array([X_test]), late_bound=dict()).squeeze()[()]
 
     try:
         # ASSERT: X bounds must only be NaN if X is NaN

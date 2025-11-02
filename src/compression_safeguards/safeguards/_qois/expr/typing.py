@@ -22,7 +22,7 @@ J = TypeVar("J", bound=int, covariant=True)
 """ Any [`int`][int] (covariant). """
 
 Ps = TypeVar("Ps", bound=int, covariant=True)
-""" Any flattend pointwise array shape [X.size] (covariant). """
+""" Any flattened pointwise array shape [X.size] (covariant). """
 
 Ns = TypeVar("Ns", bound=tuple[int, ...], covariant=True)
 """ Any stencil neighbourhood array shape [*S.shape] (covariant). """
