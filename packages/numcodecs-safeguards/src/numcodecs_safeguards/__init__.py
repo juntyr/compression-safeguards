@@ -609,7 +609,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 numcodecs.compat.ensure_ndarray(
                     self._lossless_for_safeguards.decode(correction_bytes)
                 )
-                .view(as_bits(decoded).dtype)
+                .view(as_bits(np.array((), dtype=decoded.dtype)).dtype)
                 .reshape(decoded.shape)
             )
 

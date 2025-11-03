@@ -9,9 +9,7 @@ from collections.abc import Collection, Set
 from typing import ClassVar, Literal
 
 import numpy as np
-from typing_extensions import override
-
-from compression_safeguards.utils.cast import to_total_order  # MSPV 3.12
+from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
 from ...utils.error import TypeCheckError, ctx
@@ -404,35 +402,7 @@ class _AnyStencilSafeguard(_AnySafeguardBase, StencilSafeguard):
             valids.insert(0, valid_pointwise)
 
         # simple heuristic: pick the safeguard with the largest interval
-        sizes: list[np.ndarray[tuple[int], np.dtype[np.unsignedinteger]]] = []
-        for v in valids:
-            interval_size_acc: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
-                np.zeros((v.n,), dtype=to_total_order(v._lower).dtype)
-            )
-
-            for i in range(v.u):
-                lt: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
-                    to_total_order(v._lower[i])
-                )
-                ut: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
-                    to_total_order(v._upper[i])
-                )
-                np.add(
-                    interval_size_acc,
-                    ut - lt + 1,
-                    out=interval_size_acc,
-                    where=(ut >= lt),
-                )
-
-            # safeguards must always return intervals with at least one
-            #  element, the original data, so the size must be at least one,
-            # but a full interval will overflow the size back to zero, so here
-            #  we shift the size from zero (single element) to max (full)
-            interval_size_acc -= 1
-
-            sizes.append(interval_size_acc)
-
-        selector = np.argmax(sizes, axis=0)
+        selector = np.argmax([v.non_empty_width() for v in valids], axis=0)
 
         valid: IntervalUnion[T, int, int] = Interval.full_like(data).into_union()
 

@@ -25,7 +25,7 @@ from typing_extensions import (
 
 from compression_safeguards.utils.error import TypeSetError
 
-from ._compat import _ensure_array, _nextafter, _where
+from ._compat import _ensure_array, _nextafter, _where, _zeros
 from ._compat import _maximum_zero_sign_sensitive as _np_maximum
 from ._compat import _minimum_zero_sign_sensitive as _np_minimum
 from .cast import as_bits, from_total_order, to_total_order
@@ -133,6 +133,32 @@ class Interval(Generic[T, N]):
         """
         (n,) = self._lower.shape
         return n
+
+    def non_empty_width(self) -> np.ndarray[tuple[N], np.dtype[np.unsignedinteger]]:
+        """
+        Binary width of the interval.
+
+        The interval must not have any empty entries.
+
+        Single-element intervals have width zero, full intervals have maximum
+        width.
+
+        Returns
+        -------
+        widths : np.ndarray[tuple[N], np.dtype[np.unsignedinteger]]
+            The binary widths of the intervals.
+        """
+
+        lt: np.ndarray[tuple[N], np.dtype[np.unsignedinteger]] = to_total_order(
+            self._lower
+        )
+        ut: np.ndarray[tuple[N], np.dtype[np.unsignedinteger]] = to_total_order(
+            self._upper
+        )
+
+        assert np.all(lt <= ut)
+
+        return ut - lt
 
     @staticmethod
     def empty(dtype: np.dtype[T], n: Ni) -> "Interval[T, Ni]":
@@ -747,6 +773,48 @@ class IntervalUnion(Generic[T, N, U]):
         u, n = self._lower.shape
         return u
 
+    def non_empty_width(self) -> np.ndarray[tuple[N], np.dtype[np.unsignedinteger]]:
+        """
+        Binary width of the interval union.
+
+        The interval union must not have any empty entries.
+
+        Single-element intervals have width zero, full intervals have maximum
+        width.
+
+        Returns
+        -------
+        widths : np.ndarray[tuple[N], np.dtype[np.unsignedinteger]]
+            The binary widths of the intervals.
+        """
+
+        (u, n) = self._lower.shape
+        interval_width_acc: np.ndarray[tuple[N], np.dtype[np.unsignedinteger]] = _zeros(
+            (n,), dtype=to_total_order(np.array((), dtype=self._lower.dtype)).dtype
+        )
+
+        for i in range(u):
+            lt: np.ndarray[tuple[N], np.dtype[np.unsignedinteger]] = to_total_order(
+                self._lower[i]
+            )
+            ut: np.ndarray[tuple[N], np.dtype[np.unsignedinteger]] = to_total_order(
+                self._upper[i]
+            )
+
+            if i == 0:
+                assert np.all(lt <= ut)
+
+            np.add(
+                interval_width_acc,
+                ut - lt + 1,
+                out=interval_width_acc,
+                where=(ut >= lt),
+            )
+
+        interval_width_acc -= 1
+
+        return interval_width_acc
+
     @staticmethod
     def empty(dtype: np.dtype[T], n: Ni, u: Ui) -> "IntervalUnion[T, Ni, Ui]":
         """
@@ -1076,8 +1144,18 @@ class IntervalUnion(Generic[T, N, U]):
             return prediction
 
         (u, n) = self._lower.shape
-        interval_size_acc: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
-            np.zeros((n,), dtype=to_total_order(self._lower).dtype)
+        interval_width_acc = self.non_empty_width()
+
+        # use endpoint-inclusive sampling since the single-element width is
+        #  zero and the full-interval width is maximal (so +1 would overflow)
+        pick_indices: np.ndarray[tuple[N], np.dtype[np.unsignedinteger]] = rng.integers(
+            interval_width_acc, dtype=interval_width_acc.dtype, endpoint=True
+        )
+
+        interval_width_acc[:] = 0
+
+        pick_flat: np.ndarray[tuple[N], np.dtype[T]] = np.empty(
+            (n,), dtype=self._lower.dtype
         )
 
         for i in range(u):
@@ -1087,42 +1165,23 @@ class IntervalUnion(Generic[T, N, U]):
             ut: np.ndarray[tuple[N], np.dtype[np.unsignedinteger]] = to_total_order(
                 self._upper[i]
             )
-            np.add(
-                interval_size_acc, ut - lt + 1, out=interval_size_acc, where=(ut >= lt)
-            )
-
-        # if lt = 0 and ut = max, a full interval, (ut - lt + 1) overflows
-        # so we subtract 1 from the accumulated size and use endpoint-inclusive
-        #  sampling to undo any overflow from a full interval
-        pick_indices: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
-            rng.integers(
-                interval_size_acc - 1, dtype=interval_size_acc.dtype, endpoint=True
-            )
-        )
-
-        interval_size_acc[:] = 0
-
-        pick_flat: np.ndarray[tuple[N], np.dtype[T]] = np.empty(
-            (n,), dtype=self._lower.dtype
-        )
-
-        for i in range(u):
-            lt = to_total_order(self._lower[i])
-            ut = to_total_order(self._upper[i])
             np.copyto(
                 pick_flat,
                 from_total_order(
-                    lt + (pick_indices - interval_size_acc), dtype=self._lower.dtype
+                    lt + (pick_indices - interval_width_acc), dtype=self._lower.dtype
                 ),
                 where=(
                     (ut >= lt)
-                    & (pick_indices >= interval_size_acc)
-                    & (pick_indices <= (interval_size_acc + (ut - lt)))
+                    & (pick_indices >= interval_width_acc)
+                    & (pick_indices <= (interval_width_acc + (ut - lt)))
                 ),
                 casting="no",
             )
             np.add(
-                interval_size_acc, ut - lt + 1, out=interval_size_acc, where=(ut >= lt)
+                interval_width_acc,
+                ut - lt + 1,
+                out=interval_width_acc,
+                where=(ut >= lt),
             )
 
         pick: np.ndarray[S, np.dtype[T]] = pick_flat.reshape(prediction.shape)  # type: ignore
