@@ -492,8 +492,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             data_float_lower = data_float_lower_.reshape(data.shape)  # type: ignore
             data_float_upper = data_float_upper_.reshape(data.shape)  # type: ignore
         else:
-            data_float_lower = to_float(data, ftype).copy()
-            data_float_upper = data_float_lower.copy()
+            data_float_lower = np.full(data.shape, -np.inf, ftype)
+            data_float_upper = np.full(data.shape, np.inf, ftype)
             np.place(data_float_lower, where, data_float_lower_)
             np.place(data_float_upper, where, data_float_upper_)
 
