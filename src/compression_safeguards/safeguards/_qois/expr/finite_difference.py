@@ -178,12 +178,14 @@ def finite_difference_coefficients(
                             ),
                         )
                     )
-                    coeffs_denom[(m, n, v)] = ScalarMultiply(
+                    coeffs_denom[(m, n, v)] = Group(
                         ScalarMultiply(
-                            coeffs_denom[(m, n - 1, v)],
-                            coeffs_denom[(m - 1, n - 1, v)],
-                        ),
-                        c3,
+                            ScalarMultiply(
+                                coeffs_denom[(m, n - 1, v)],
+                                coeffs_denom[(m - 1, n - 1, v)],
+                            ),
+                            c3,
+                        )
                     )
                 else:
                     coeffs_num[(m, n, v)] = Group(
@@ -223,12 +225,14 @@ def finite_difference_coefficients(
                         ),
                     )
                 )
-                coeffs_denom[(m, n, n)] = ScalarMultiply(
+                coeffs_denom[(m, n, n)] = Group(
                     ScalarMultiply(
-                        coeffs_denom[(m - 1, n - 1, n - 1)],
-                        coeffs_denom[(m, n - 1, n - 1)],
-                    ),
-                    c2,
+                        ScalarMultiply(
+                            coeffs_denom[(m - 1, n - 1, n - 1)],
+                            coeffs_denom[(m, n - 1, n - 1)],
+                        ),
+                        c2,
+                    )
                 )
             else:
                 coeffs_num[(m, n, n)] = Group(
