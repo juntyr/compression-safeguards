@@ -33,6 +33,7 @@ from . import (
     NeighbourhoodAxis,
     NeighbourhoodBoundaryAxis,
     _pad_with_boundary,
+    _reverse_neighbourhood_indices,
 )
 from .abc import StencilSafeguard
 
@@ -858,11 +859,40 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 end = None if naxis.after == 0 else -naxis.after
                 valid_slice[naxis.axis] = slice(start, end)
 
-        footprint = np.zeros_like(foot)
-        footprint[tuple(valid_slice)] = np.logical_or.reduce(
-            foot_windows.reshape(foot_windows.shape[: foot.ndim] + (-1,)),
-            axis=footprint.ndim,
+        # all window elements are used in the monotonicity safeguard
+        window_used = _ones(foot_windows.shape[foot.ndim :], dtype=np.dtype(np.bool))
+
+        # compute the reverse: for each data element, which windows is it in
+        # i.e. for each data element, which QoI elements does it contribute to
+        #      and thus which foot elements affect it
+        reverse_indices_windows = _reverse_neighbourhood_indices(
+            foot.shape,
+            tuple(neighbourhood),
+            window_used,
+            True if where is True else where[tuple(valid_slice)].flatten(),
         )
+
+        # flatten the foot and append False, which is indexed if an element did
+        #  not contribute to the maximum number of windows
+        # the foot elements are reduced inside each window and then broadcast
+        #  back to the window to ensure that if one window element has a foot,
+        #  all elements will get the footprint
+        foot_windows_flat = np.full(foot_windows.size + 1, False)
+        foot_windows_flat[:-1] = np.repeat(
+            np.logical_or.reduce(
+                foot_windows.reshape(foot_windows.shape[: foot.ndim] + (-1,)),
+                axis=foot.ndim,
+            ).flatten(),
+            window_used.size,
+        )
+
+        # for each data element, reduce over the foot elements that affect it
+        # since some data elements may have no foot elements that affect them,
+        #  e.g. because of the valid boundary condition, they may have no
+        #  footprint
+        footprint: np.ndarray[S, np.dtype[np.bool]] = np.logical_or.reduce(
+            foot_windows_flat[reverse_indices_windows], axis=1
+        ).reshape(foot.shape)
 
         return footprint
 

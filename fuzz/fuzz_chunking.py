@@ -26,7 +26,7 @@ with atheris.instrument_imports():
     from compression_safeguards.safeguards.stencil.qoi.eb import (
         StencilQuantityOfInterestErrorBoundSafeguard,
     )
-    from compression_safeguards.utils._compat import _ensure_array, _ones
+    from compression_safeguards.utils._compat import _ensure_array
     from compression_safeguards.utils.bindings import Parameter
     from compression_safeguards.utils.error import (
         ErrorContextMixin,
@@ -229,7 +229,7 @@ def check_one_input(data) -> None:
         return
 
     da = xr.DataArray(raw, name="da", dims=dims)
-    da_prediction = xr.DataArray(_ones(raw.shape, raw.dtype), name="da", dims=dims)
+    da_prediction = xr.DataArray(np.ones_like(raw), name="da", dims=dims)
 
     # xarray-safeguards provides `$x_min` and `$x_max`,
     #  but the compression-safeguards do not
