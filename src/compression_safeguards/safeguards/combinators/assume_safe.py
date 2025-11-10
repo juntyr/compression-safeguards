@@ -114,6 +114,38 @@ class AssumeAlwaysSafeguard(PointwiseSafeguard):
         return Interval.full_like(data).into_union()
 
     @override
+    def compute_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the footprint of the `foot` array, e.g. for expanding pointwise
+        check fails into the points that could have contributed to the failures.
+
+        The footprint is [`False`][False] everywhere.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the footprint at data points where the condition is
+            [`True`][True].
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The footprint of the `foot` array.
+        """
+
+        return np.zeros_like(foot)
+
+    @override
     def get_config(self) -> dict[str, JSON]:
         """
         Returns the configuration of the safeguard.

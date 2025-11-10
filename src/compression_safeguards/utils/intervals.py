@@ -23,12 +23,11 @@ from typing_extensions import (
     override,  # MSPV 3.12
 )
 
-from compression_safeguards.utils.error import TypeSetError
-
 from ._compat import _ensure_array, _nextafter, _where, _zeros
 from ._compat import _maximum_zero_sign_sensitive as _np_maximum
 from ._compat import _minimum_zero_sign_sensitive as _np_minimum
 from .cast import as_bits, from_total_order, to_total_order
+from .error import TypeSetError
 from .typing import S, T
 
 N = TypeVar("N", bound=int, covariant=True)

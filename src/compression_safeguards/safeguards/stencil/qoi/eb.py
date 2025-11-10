@@ -40,6 +40,7 @@ from .. import (
     NeighbourhoodAxis,
     NeighbourhoodBoundaryAxis,
     _pad_with_boundary,
+    _reverse_neighbourhood_indices,
 )
 from ..abc import StencilSafeguard
 
@@ -337,7 +338,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
                     neighbourhood[naxis][axis.boundary] = axis.shape
 
-        if np.prod(data_shape) == 0:
+        if any(a == 0 for a in data_shape):
             return tuple(dict() for _ in data_shape)
 
         return tuple(neighbourhood)
@@ -406,8 +407,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         empty_shape = list(data.shape)
 
-        # if the neighbourhood is empty, e.g. because we in valid mode and the
-        #  neighbourhood shape exceeds the data shape, return empty
+        # if the neighbourhood is empty, e.g. because we are in valid mode and
+        #  the neighbourhood shape exceeds the data shape, return empty
         for axis in self._neighbourhood:
             if axis.boundary == BoundaryCondition.valid:
                 empty_shape[axis.axis] = max(
@@ -588,8 +589,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         window = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
 
-        # if the neighbourhood is empty, e.g. because we in valid mode and the
-        #  neighbourhood shape exceeds the data shape, allow all values
+        # if the neighbourhood is empty, e.g. because we are in valid mode and
+        #  the neighbourhood shape exceeds the data shape, allow all values
         for axis, w in zip(self._neighbourhood, window):
             if data.shape[axis.axis] < w and axis.boundary == BoundaryCondition.valid:
                 return _ones(data.shape, dtype=np.dtype(np.bool))
@@ -865,8 +866,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         window = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
 
-        # if the neighbourhood is empty, e.g. because we in valid mode and the
-        #  neighbourhood shape exceeds the data shape, allow all values
+        # if the neighbourhood is empty, e.g. because we are in valid mode and
+        #  the neighbourhood shape exceeds the data shape, allow all values
         for axis, w in zip(self._neighbourhood, window):
             if data.shape[axis.axis] < w and axis.boundary == BoundaryCondition.valid:
                 return Interval.full_like(data).into_union()
@@ -1058,25 +1059,6 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 axis=0,
             )
 
-        # compute how the data indices are distributed into windows
-        # i.e. for each QoI element, which data does it depend on
-        indices_boundary = np.arange(data.size).reshape(data.shape)
-        for axis in self._neighbourhood:
-            indices_boundary = _pad_with_boundary(
-                indices_boundary,
-                axis.boundary,
-                axis.before,
-                axis.after,
-                None if axis.constant_boundary is None else np.array(data.size),  # type: ignore
-                axis.axis,
-            )
-        indices_windows = sliding_window_view(  # type: ignore
-            indices_boundary,
-            window,
-            axis=tuple(axis.axis for axis in self._neighbourhood),
-            writeable=False,
-        ).reshape((-1, np.prod(window)))
-
         # only contribute window elements that are used in the QoI
         window_used = _zeros(window, dtype=np.dtype(np.bool))
         for idxs in self._qoi_expr.data_indices:
@@ -1085,54 +1067,24 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         # compute the reverse: for each data element, which windows is it in
         # i.e. for each data element, which QoI elements does it contribute to
         #      and thus which data bounds affect it
-        reverse_indices_windows = np.full(
-            (data.size, np.sum(window_used)), indices_windows.size
+        reverse_indices_windows = _reverse_neighbourhood_indices(
+            data.shape,
+            self._neighbourhood,
+            window_used,
+            True if where is True else where_flat,
         )
-        reverse_indices_counter = np.zeros(data.size, dtype=int)
-        for i, u in enumerate(window_used.flat):
-            # skip window indices that are not used in the QoI
-            if not u:
-                continue
-            # manual loop to account for potential aliasing:
-            # with a wrapping boundary, more than one j for the same window
-            #  position j could refer back to the same data element
-            for j in range(indices_windows.shape[0]):
-                # skip back-contributions from data elements where the safety
-                #  requirements are disabled
-                if (where is not True) and (not where_flat[j]):
-                    continue
-                idx = indices_windows[j, i]
-                if idx != data.size:
-                    # lazily allocate more to account for all possible edge cases
-                    if reverse_indices_counter[idx] >= reverse_indices_windows.shape[1]:
-                        new_reverse_indices_windows = np.full(
-                            (data.size, reverse_indices_windows.shape[1] * 2),
-                            indices_windows.size,
-                        )
-                        new_reverse_indices_windows[
-                            :, : reverse_indices_windows.shape[1]
-                        ] = reverse_indices_windows
-                        reverse_indices_windows = new_reverse_indices_windows
-                    # update the reverse mapping
-                    reverse_indices_windows[idx][reverse_indices_counter[idx]] = (
-                        j * window_used.size
-                    ) + i
-                    reverse_indices_counter[idx] += 1
-
-        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
 
         # flatten the QoI data bounds and append an infinite value,
         # which is indexed if an element did not contribute to the maximum
         # number of windows
-        with np.errstate(invalid="ignore"):
-            data_windows_float_lower_flat = np.full(
-                data_windows_float_lower.size + 1, -np.inf, data_float.dtype
-            )
-            data_windows_float_lower_flat[:-1] = data_windows_float_lower.flatten()
-            data_windows_float_upper_flat = np.full(
-                data_windows_float_upper.size + 1, np.inf, data_float.dtype
-            )
-            data_windows_float_upper_flat[:-1] = data_windows_float_upper.flatten()
+        data_windows_float_lower_flat = np.full(
+            data_windows_float_lower.size + 1, -np.inf, dtype=ftype
+        )
+        data_windows_float_lower_flat[:-1] = data_windows_float_lower.flatten()
+        data_windows_float_upper_flat = np.full(
+            data_windows_float_upper.size + 1, np.inf, dtype=ftype
+        )
+        data_windows_float_upper_flat[:-1] = data_windows_float_upper.flatten()
 
         # for each data element, reduce over the data bounds that affect it
         # since some data elements may have no data bounds that affect them,
@@ -1151,7 +1103,92 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         #  account
         return compute_safe_data_lower_upper_interval_union(
             data, data_float_lower, data_float_upper
-        ).preserve_only_where((reverse_indices_counter > 0).flatten())
+        ).preserve_only_where(
+            (  # type: ignore
+                reverse_indices_windows[:, 0] < data_windows_float_lower.size
+            )
+            # where `where` is not False, at least the isnan stays isnan rule
+            #  should always be honoured, anything else would be unexpected
+            | (True if where is True else where.flatten())
+        )
+
+    def compute_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the footprint of the `foot` array, e.g. for expanding pointwise
+        check fails into the points that could have contributed to the failures.
+
+        The footprint usually extends beyond `foot & where`.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the footprint at data points where the condition is
+            [`True`][True].
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The footprint of the `foot` array.
+        """
+
+        # check that the foot shape is compatible with the neighbourhood shape
+        self.compute_check_neighbourhood_for_data_shape(foot.shape)
+
+        window = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
+
+        # if the neighbourhood is empty, e.g. because we are in valid mode and
+        #  the neighbourhood shape exceeds the data shape, the footprint is
+        #  empty
+        for axis, w in zip(self._neighbourhood, window):
+            if foot.shape[axis.axis] < w and axis.boundary == BoundaryCondition.valid:
+                return _zeros(foot.shape, dtype=np.dtype(np.bool))
+        if foot.size == 0:
+            return _zeros(foot.shape, dtype=np.dtype(np.bool))
+
+        foot_boundary: np.ndarray[tuple[int, ...], np.dtype[np.bool]] = foot & where
+        for axis in self._neighbourhood:
+            foot_boundary = _pad_with_boundary(
+                foot_boundary,
+                axis.boundary,
+                axis.before,
+                axis.after,
+                None if axis.constant_boundary is None else np.array(False),  # type: ignore
+                axis.axis,
+            )
+
+        foot_windows: np.ndarray[tuple[int, ...], np.dtype[np.bool]] = (
+            sliding_window_view(  # type: ignore
+                foot_boundary,
+                window,
+                axis=tuple(axis.axis for axis in self._neighbourhood),
+                writeable=False,
+            )
+        )
+
+        valid_slice = [slice(None)] * foot.ndim
+        for axis in self._neighbourhood:
+            if axis.boundary == BoundaryCondition.valid:
+                start = None if axis.before == 0 else axis.before
+                end = None if axis.after == 0 else -axis.after
+                valid_slice[axis.axis] = slice(start, end)
+
+        footprint = np.zeros_like(foot)
+        footprint[tuple(valid_slice)] = np.logical_or.reduce(
+            foot_windows.reshape(foot_windows.shape[: foot.ndim] + (-1,)),
+            axis=footprint.ndim,
+        )
+
+        return footprint
 
     def truncate_data_to_qoi_shape(
         self, data: np.ndarray[tuple[int, ...], np.dtype[T]]

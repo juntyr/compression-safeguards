@@ -227,6 +227,35 @@ class AnySafeguard(Safeguard):
 
         ...
 
+    def compute_footprint(  # type: ignore
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the footprint of the `foot` array, e.g. for expanding pointwise
+        check fails into the points that could have contributed to the failures.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the footprint at data points where the condition is
+            [`True`][True].
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The footprint of the `foot` array.
+        """
+
+        ...
+
     @override
     def get_config(self) -> dict[str, JSON]:  # type: ignore
         """
@@ -272,6 +301,25 @@ class _AnySafeguardBase(ABC):
             )
 
         return ok
+
+    def compute_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        footprint = np.zeros_like(foot)
+
+        # we cannot be more clever here without knowing the data and going
+        #  through the entire safe interval computation, which would defeat the
+        #  entire point of this cheaper method
+        for safeguard in self.safeguards:
+            footprint |= safeguard.compute_footprint(
+                foot, late_bound=late_bound, where=where
+            )
+
+        return footprint
 
     def get_config(self) -> dict[str, JSON]:
         return dict(

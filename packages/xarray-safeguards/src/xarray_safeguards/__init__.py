@@ -483,7 +483,7 @@ def produce_data_array_correction(
     def _check_overlapping_stencil_chunk(
         data_chunk: np.ndarray[S, np.dtype[T]],
         prediction_chunk: np.ndarray[S, np.dtype[T]],
-        data_indices_chunk: np.ndarray[S, np.dtype[np.int_]],
+        data_indices_chunk: np.ndarray[S, np.dtype[np.intp]],
         *late_bound_chunks: np.ndarray[S, np.dtype[T]],
         late_bound_names: tuple[str, ...],
         late_bound_global: dict[str, int | float | np.number],
@@ -546,7 +546,7 @@ def produce_data_array_correction(
                 assert_never(boundary_)
 
         # extract the indices of the non-stencil-extended data indices chunk
-        data_indices_chunk_: np.ndarray[tuple[int, ...], np.dtype[np.int_]] = (
+        data_indices_chunk_: np.ndarray[tuple[int, ...], np.dtype[np.intp]] = (
             data_indices_chunk[
                 tuple(
                     slice(a.before, None if a.after == 0 else -a.after)
@@ -621,7 +621,7 @@ def produce_data_array_correction(
     def _compute_overlapping_stencil_chunk_correction(
         data_chunk: np.ndarray[S, np.dtype[T]],
         prediction_chunk: np.ndarray[S, np.dtype[T]],
-        data_indices_chunk: np.ndarray[S, np.dtype[np.int_]],
+        data_indices_chunk: np.ndarray[S, np.dtype[np.intp]],
         *late_bound_chunks: np.ndarray[S, np.dtype[T]],
         late_bound_names: tuple[str, ...],
         late_bound_global: dict[str, int | float | np.number],
@@ -688,7 +688,7 @@ def produce_data_array_correction(
                 assert_never(boundary_)
 
         # extract the indices of the non-stencil-extended data indices chunk
-        data_indices_chunk_: np.ndarray[tuple[int, ...], np.dtype[np.int_]] = (
+        data_indices_chunk_: np.ndarray[tuple[int, ...], np.dtype[np.intp]] = (
             data_indices_chunk[
                 tuple(
                     slice(a.before, None if a.after == 0 else -a.after)

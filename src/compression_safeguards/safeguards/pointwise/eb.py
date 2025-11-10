@@ -170,11 +170,11 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
                 late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                     self._eb,
-                    data_float.shape,
-                    data_float.dtype,
+                    data.shape,
+                    ftype,
                 )
                 if isinstance(self._eb, Parameter)
-                else saturating_finite_float_cast(self._eb, data_float.dtype)
+                else saturating_finite_float_cast(self._eb, ftype)
             )
             if isinstance(self._eb, Parameter):
                 _eb: Parameter = self._eb
@@ -237,24 +237,19 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             invalid error bound value for the error bound `type`.
         """
 
-        dataf = data.flatten()
-
-        valid = Interval.empty_like(dataf).preserve_inf(dataf)
-
         ftype: np.dtype[np.floating] = ToFloatMode.lossless.floating_point_dtype_for(
             data.dtype
         )
-        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
 
         with ctx.safeguard(self), ctx.parameter("eb"):
             eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
                 late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                     self._eb,
-                    data_float.shape,
-                    data_float.dtype,
+                    data.shape,
+                    ftype,
                 )
                 if isinstance(self._eb, Parameter)
-                else saturating_finite_float_cast(self._eb, data_float.dtype)
+                else saturating_finite_float_cast(self._eb, ftype)
             )
             if isinstance(self._eb, Parameter):
                 _eb: Parameter = self._eb
@@ -265,6 +260,9 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             self._type, eb, data, to_float(data, ftype=ftype)
         )
 
+        dataf: np.ndarray[tuple[int], np.dtype[T]] = data.flatten()
+        valid = Interval.empty_like(dataf).preserve_inf(dataf)
+
         Lower(lower.flatten()) <= valid[np.isfinite(dataf)] <= Upper(upper.flatten())
 
         wheref: Literal[True] | np.ndarray[tuple[int], np.dtype[np.bool]] = (
@@ -274,6 +272,38 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         return valid.preserve_any_nan(
             dataf, equal_nan=self._equal_nan
         ).preserve_only_where(wheref)
+
+    @override
+    def compute_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the footprint of the `foot` array, e.g. for expanding pointwise
+        check fails into the points that could have contributed to the failures.
+
+        The footprint is equivalent to `foot & where`.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the footprint at data points where the condition is
+            [`True`][True].
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The footprint of the `foot` array.
+        """
+
+        return foot & where  # type: ignore
 
     @override
     def get_config(self) -> dict[str, JSON]:

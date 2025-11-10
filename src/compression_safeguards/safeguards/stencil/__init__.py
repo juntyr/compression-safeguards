@@ -5,17 +5,19 @@ Implementations for the provided [`StencilSafeguard`][compression_safeguards.saf
 __all__ = ["BoundaryCondition", "NeighbourhoodAxis", "NeighbourhoodBoundaryAxis"]
 
 from enum import Enum, auto
+from functools import reduce
+from typing import Literal
 
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
 from typing_extensions import (
     Self,  # MSPV 3.11
     assert_never,  # MSPV 3.11
     override,  # MSPV 3.12
 )
 
-from compression_safeguards.utils.error import TypeCheckError, ctx, lookup_enum_or_raise
-
 from ...utils.bindings import Parameter
+from ...utils.error import TypeCheckError, ctx, lookup_enum_or_raise
 from ...utils.typing import JSON, S, T
 
 
@@ -372,3 +374,73 @@ def _pad_with_boundary(
             assert_never(boundary)
 
     return np.pad(a, pad_width, mode, **kwargs)  # type: ignore
+
+
+def _reverse_neighbourhood_indices(
+    data_shape: tuple[int, ...],
+    neighbourhood: tuple[NeighbourhoodBoundaryAxis, ...],
+    window_used: np.ndarray[tuple[int, ...], np.dtype[np.bool]],
+    where_flat: Literal[True] | np.ndarray[tuple[int], np.dtype[np.bool]],
+) -> np.ndarray[tuple[int, int], np.dtype[np.intp]]:
+    data_size = reduce(lambda x, y: x * y, data_shape, 1)
+
+    window = tuple(axis.before + 1 + axis.after for axis in neighbourhood)
+    window_size = reduce(lambda x, y: x * y, window, 1)
+
+    # compute how the data indices are distributed into windows
+    # i.e. for each derived element, which data does it depend on
+    indices_boundary = np.arange(data_size).reshape(data_shape)
+    for axis in neighbourhood:
+        indices_boundary = _pad_with_boundary(
+            indices_boundary,
+            axis.boundary,
+            axis.before,
+            axis.after,
+            None if axis.constant_boundary is None else np.array(data_size),  # type: ignore
+            axis.axis,
+        )
+    indices_windows = sliding_window_view(  # type: ignore
+        indices_boundary,
+        window,
+        axis=tuple(axis.axis for axis in neighbourhood),
+        writeable=False,
+    ).reshape((-1, window_size))
+
+    # compute the reverse: for each data element, which windows is it in
+    # i.e. for each data element, which derived elements does it contribute to
+    #      and thus which data bounds affect it
+    reverse_indices_windows = np.full(
+        (data_size, np.sum(window_used)), indices_windows.size
+    )
+    reverse_indices_counter = np.zeros(data_size, dtype=np.intp)
+    for i, u in enumerate(window_used.flat):
+        # skip window indices that are not used
+        if not u:
+            continue
+        # manual loop to account for potential aliasing:
+        # with a wrapping boundary, more than one j for the same window
+        #  position j could refer back to the same data element
+        for j in range(indices_windows.shape[0]):
+            # skip back-contributions from data elements where the safety
+            #  requirements are disabled
+            if (where_flat is not True) and (not where_flat[j]):
+                continue
+            idx = indices_windows[j, i]
+            if idx != data_size:
+                # lazily allocate more to account for all possible edge cases
+                if reverse_indices_counter[idx] >= reverse_indices_windows.shape[1]:
+                    new_reverse_indices_windows = np.full(
+                        (data_size, reverse_indices_windows.shape[1] * 2),
+                        indices_windows.size,
+                    )
+                    new_reverse_indices_windows[
+                        :, : reverse_indices_windows.shape[1]
+                    ] = reverse_indices_windows
+                    reverse_indices_windows = new_reverse_indices_windows
+                # update the reverse mapping
+                reverse_indices_windows[idx][reverse_indices_counter[idx]] = (
+                    j * window_used.size
+                ) + i
+                reverse_indices_counter[idx] += 1
+
+    return reverse_indices_windows  # type: ignore

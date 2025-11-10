@@ -231,7 +231,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                     with ctx.parameter(c):
                         late_bound_constants[c] = (
                             late_bound.resolve_ndarray_with_lossless_cast(
-                                c, data.shape, data_float.dtype
+                                c, data.shape, ftype
                             ).flatten()
                         )
 
@@ -317,7 +317,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                     with ctx.parameter(c):
                         late_bound_constants[c] = (
                             late_bound.resolve_ndarray_with_lossless_cast(
-                                c, data.shape, data_float.dtype
+                                c, data.shape, ftype
                             ).flatten()
                         )
 
@@ -443,7 +443,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                     with ctx.parameter(c):
                         late_bound_constants[c] = (
                             late_bound.resolve_ndarray_with_lossless_cast(
-                                c, data.shape, data_float.dtype
+                                c, data.shape, ftype
                             ).flatten()
                         )
 
@@ -451,6 +451,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             #  necessary
             if where is not True:
                 data_float = np.extract(where, data_float)
+                late_bound_constants = {
+                    c: np.extract(where, cv) for (c, cv) in late_bound_constants.items()
+                }
 
             data_qoi: np.ndarray[tuple[int], np.dtype[np.floating]] = (
                 self._qoi_expr.eval(data_float, late_bound_constants)
@@ -504,6 +507,38 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         return compute_safe_data_lower_upper_interval_union(
             data, data_float_lower, data_float_upper
         ).preserve_only_where(wheref)
+
+    @override
+    def compute_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the footprint of the `foot` array, e.g. for expanding pointwise
+        check fails into the points that could have contributed to the failures.
+
+        The footprint is equivalent to `foot & where`.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the footprint at data points where the condition is
+            [`True`][True].
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The footprint of the `foot` array.
+        """
+
+        return foot & where  # type: ignore
 
     @override
     def get_config(self) -> dict[str, JSON]:

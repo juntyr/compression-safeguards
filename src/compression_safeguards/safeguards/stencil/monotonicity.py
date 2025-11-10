@@ -28,7 +28,12 @@ from ...utils.cast import from_total_order, lossless_cast, to_total_order
 from ...utils.error import TypeCheckError, ctx, lookup_enum_or_raise
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import JSON, S, T
-from . import BoundaryCondition, NeighbourhoodAxis, _pad_with_boundary
+from . import (
+    BoundaryCondition,
+    NeighbourhoodAxis,
+    NeighbourhoodBoundaryAxis,
+    _pad_with_boundary,
+)
 from .abc import StencilSafeguard
 
 _STRICT = ((lt, gt, False, False),) * 2
@@ -767,6 +772,99 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         # TODO: take where into account
 
         return filtered_valid.union(zero_valid)
+
+    def compute_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the footprint of the `foot` array, e.g. for expanding pointwise
+        check fails into the points that could have contributed to the failures.
+
+        The footprint usually extends beyond `foot & where`.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the footprint at data points where the condition is
+            [`True`][True].
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The footprint of the `foot` array.
+        """
+
+        neighbourhood: list[NeighbourhoodBoundaryAxis] = []
+        foot_boundary: np.ndarray[tuple[int, ...], np.dtype[np.bool]] = foot & where
+        for axis, alen in enumerate(foot.shape):
+            if (
+                self._axis is not None
+                and axis != self._axis
+                and axis != (foot.ndim + self._axis)
+            ):
+                continue
+
+            if self._boundary == BoundaryCondition.valid and alen < (
+                1 + self._window * 2
+            ):
+                continue
+
+            if alen == 0:
+                continue
+
+            neighbourhood.append(
+                NeighbourhoodBoundaryAxis(
+                    axis,
+                    before=self._window,
+                    after=self._window,
+                    boundary=self._boundary,
+                    constant_boundary=self._constant_boundary,
+                )
+            )
+
+            foot_boundary = _pad_with_boundary(
+                foot_boundary,
+                self._boundary,
+                self._window,
+                self._window,
+                None if axis.constant_boundary is None else np.array(False),  # type: ignore
+                axis,
+            )
+
+        if len(neighbourhood) == 0:
+            return np.zeros_like(foot)
+
+        foot_windows: np.ndarray[tuple[int, ...], np.dtype[np.bool]] = (
+            sliding_window_view(  # type: ignore
+                foot_boundary,
+                tuple(axis.before + 1 + axis.after for axis in neighbourhood),
+                axis=tuple(axis.axis for axis in neighbourhood),
+                writeable=False,
+            )
+        )
+
+        valid_slice = [slice(None)] * foot.ndim
+        for naxis in neighbourhood:
+            if naxis.boundary == BoundaryCondition.valid:
+                start = None if naxis.before == 0 else naxis.before
+                end = None if naxis.after == 0 else -naxis.after
+                valid_slice[naxis.axis] = slice(start, end)
+
+        footprint = np.zeros_like(foot)
+        footprint[tuple(valid_slice)] = np.logical_or.reduce(
+            foot_windows.reshape(foot_windows.shape[: foot.ndim] + (-1,)),
+            axis=footprint.ndim,
+        )
+
+        return footprint
 
     @override
     def get_config(self) -> dict[str, JSON]:

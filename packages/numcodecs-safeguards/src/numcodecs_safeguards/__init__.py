@@ -105,6 +105,7 @@ from typing_extensions import (
     override,  # MSPV 3.12
 )
 
+from .compute import Compute, _refine_correction_iteratively
 from .lossless import Lossless
 
 
@@ -203,6 +204,10 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
           Zstandard compression is applied.
 
         The lossless encoding must encode to a 1D buffer of bytes.
+    compute: None | dict[str, JSON] | Compute, optional
+        Compute configuration that may affect the compression ratio and time
+        required to compute the safeguards corrections, without impacting the
+        safety of the corrections.
     _version : ...
         The version of the codec. Do not provide this parameter explicitly.
 
@@ -224,12 +229,14 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         "_late_bound",
         "_lossless_for_codec",
         "_lossless_for_safeguards",
+        "_compute",
     )
     _codec: Codec
     _safeguards: Safeguards
     _late_bound: Bindings
     _lossless_for_codec: None | Codec
     _lossless_for_safeguards: Codec
+    _compute: Compute
 
     codec_id: ClassVar[str] = "safeguards"  # type: ignore
 
@@ -240,6 +247,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         safeguards: Collection[dict[str, JSON] | Safeguard],
         fixed_constants: Mapping[str | Parameter, Value] | Bindings = Bindings.EMPTY,
         lossless: None | dict[str, JSON] | Lossless = None,
+        compute: None | dict[str, JSON] = None,
         _version: None | str | Version = None,
     ) -> None:
         wraps_safeguards_codec = False
@@ -300,6 +308,14 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             lossless.for_safeguards
             if isinstance(lossless.for_safeguards, Codec)
             else numcodecs.registry.get_codec(lossless.for_safeguards)
+        )
+
+        self._compute = (
+            compute
+            if isinstance(compute, Compute)
+            else Compute(**compute)  # type: ignore
+            if compute is not None
+            else Compute()
         )
 
     @property
@@ -531,6 +547,11 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 where=True,
             )
         )
+
+        if self._compute._unstable_iterative:
+            correction = _refine_correction_iteratively(
+                self._safeguards, data, decoded, correction, late_bound
+            )
 
         if np.all(correction == 0):
             correction_bytes = b""
