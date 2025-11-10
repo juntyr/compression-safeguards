@@ -51,6 +51,7 @@ N = TypeVar("N", bound=int, covariant=True)
 
 # reimplementation of np.nan_to_num that also works for numpy_quaddtype and
 #  makes all values finite
+# FIXME: https://github.com/numpy/numpy-user-dtypes/issues/163
 @np.errstate(invalid="ignore")
 def _nan_to_zero_inf_to_finite(
     a: np.ndarray[S, np.dtype[T]],
@@ -73,6 +74,7 @@ def _nan_to_zero_inf_to_finite(
 
 # wrapper around np.nextafter that also works for numpy_quaddtype
 # Implementation is variant 2 from https://stackoverflow.com/a/70512834
+# FIXME: https://github.com/numpy/numpy-user-dtypes/issues/163
 @np.errstate(invalid="ignore")
 def _nextafter(
     a: np.ndarray[S, np.dtype[F]], b: np.ndarray[S, np.dtype[F]]

@@ -1044,8 +1044,14 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             where_indices = np.nonzero(where_flat)[0].reshape(
                 (-1,) + tuple(1 for _ in window)
             )
-            data_windows_float_lower = np.full(qoi_stencil_shape, -np.inf, dtype=ftype)
-            data_windows_float_upper = np.full(qoi_stencil_shape, np.inf, dtype=ftype)
+            # FIXME: https://github.com/numpy/numpy-user-dtypes/issues/163
+            with np.errstate(invalid="ignore"):
+                data_windows_float_lower = np.full(
+                    qoi_stencil_shape, -np.inf, dtype=ftype
+                )
+                data_windows_float_upper = np.full(
+                    qoi_stencil_shape, np.inf, dtype=ftype
+                )
             np.put_along_axis(
                 data_windows_float_lower,
                 where_indices,
@@ -1075,15 +1081,17 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         )
 
         # flatten the QoI data bounds and append an infinite value,
-        # which is indexed if an element did not contribute to the maximum
-        # number of windows
-        data_windows_float_lower_flat = np.full(
-            data_windows_float_lower.size + 1, -np.inf, dtype=ftype
-        )
+        #  which is indexed if an element did not contribute to the maximum
+        #  number of windows
+        # FIXME: https://github.com/numpy/numpy-user-dtypes/issues/163
+        with np.errstate(invalid="ignore"):
+            data_windows_float_lower_flat = np.full(
+                data_windows_float_lower.size + 1, -np.inf, dtype=ftype
+            )
+            data_windows_float_upper_flat = np.full(
+                data_windows_float_upper.size + 1, np.inf, dtype=ftype
+            )
         data_windows_float_lower_flat[:-1] = data_windows_float_lower.flatten()
-        data_windows_float_upper_flat = np.full(
-            data_windows_float_upper.size + 1, np.inf, dtype=ftype
-        )
         data_windows_float_upper_flat[:-1] = data_windows_float_upper.flatten()
 
         # for each data element, reduce over the data bounds that affect it
