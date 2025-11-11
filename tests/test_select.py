@@ -261,3 +261,14 @@ def test_fuzzer_found_select_shape_mismatch():
             ),
         ],
     )
+
+
+def test_fuzzer_found_invalid_literal_index():
+    with pytest.raises(IndexError, match=r"select\.selector: invalid index"):
+        SelectSafeguard(
+            selector=39,
+            safeguards=[
+                dict(kind="same", value=0, exclusive=False),
+                dict(kind="same", value=0, exclusive=False),
+            ],
+        )

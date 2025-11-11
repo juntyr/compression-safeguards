@@ -403,7 +403,7 @@ def check_one_input(data) -> None:
                 safeguards=safeguards,
                 fixed_constants=fixed_constants,
             )
-    except (ValueError, TypeError, SyntaxError, TimeoutError):
+    except (IndexError, ValueError, TypeError, SyntaxError, TimeoutError):
         return
     except RuntimeWarning as err:
         # skip expressions that try to perform a**b with excessive digits
