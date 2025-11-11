@@ -478,7 +478,7 @@ def check_one_input(data) -> None:
                     LateBoundParameterContextLayer(_),
                 ) if (
                     isinstance(err, ValueError)
-                    and ("invalid entry in choice array" in str(err))
+                    and ("invalid indices" in str(err))
                     and safeguard is SelectSafeguard
                 ):
                     return

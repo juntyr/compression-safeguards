@@ -46,6 +46,31 @@ def test_select():
     )
 
 
+def test_select_literal():
+    safeguard = SelectSafeguard(
+        selector=1,
+        safeguards=[
+            dict(kind="eb", type="abs", eb=100),
+            dict(kind="eb", type="abs", eb=10),
+            dict(kind="eb", type="abs", eb=1),
+        ],
+    )
+
+    data = np.arange(10).reshape(2, 5)
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=Bindings.EMPTY)
+    assert np.all(valid._lower == (data.flatten() - 10))
+    assert np.all(valid._upper == (data.flatten() + 10))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=Bindings.EMPTY)
+    assert np.all(
+        ok
+        == np.array(
+            [True, True, True, True, True, True, False, False, False, False]
+        ).reshape(2, 5)
+    )
+
+
 def test_inheritance():
     pointwise_config = dict(kind="eb", type="abs", eb=1)
     stencil_config = dict(

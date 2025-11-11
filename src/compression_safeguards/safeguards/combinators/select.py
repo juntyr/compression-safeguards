@@ -37,9 +37,9 @@ class SelectSafeguard(Safeguard):
 
     Parameters
     ----------
-    selector : str | Parameter
-        Late-bound parameter name that is used to select between the
-        `safeguards`.
+    selector : int | str | Parameter
+        Literal index or late-bound parameter name that is used to select
+        between the `safeguards`.
     safeguards : Collection[dict[str, JSON] | PointwiseSafeguard | StencilSafeguard]
         At least one safeguard configuration [`dict`][dict]s or already
         initialized [`PointwiseSafeguard`][....pointwise.abc.PointwiseSafeguard]
@@ -51,6 +51,9 @@ class SelectSafeguard(Safeguard):
         if any parameter has the wrong type.
     ValueError
         if the `safeguards` collection is empty.
+    IndexError
+        if the `selector` is a literal [`int`][int] index that is not within
+        the `0 <= selector < len(safeguards)` bounds.
     ...
         if instantiating a safeguard raises an exception.
     """
@@ -62,7 +65,7 @@ class SelectSafeguard(Safeguard):
     def __init__(
         self,
         *,
-        selector: str | Parameter,
+        selector: int | str | Parameter,
         safeguards: Collection[dict[str, JSON] | PointwiseSafeguard | StencilSafeguard],
     ) -> None:
         pass
@@ -70,16 +73,16 @@ class SelectSafeguard(Safeguard):
     def __new__(  # type: ignore
         cls,
         *,
-        selector: str | Parameter,
+        selector: int | str | Parameter,
         safeguards: Collection[dict[str, JSON] | PointwiseSafeguard | StencilSafeguard],
     ) -> "_SelectPointwiseSafeguard | _SelectStencilSafeguard":
         from ... import SafeguardKind  # noqa: PLC0415
 
         with ctx.safeguardty(cls):
             with ctx.parameter("selector"):
-                TypeCheckError.check_instance_or_raise(selector, str | Parameter)
+                TypeCheckError.check_instance_or_raise(selector, int | str | Parameter)
                 selector = (
-                    selector if isinstance(selector, Parameter) else Parameter(selector)
+                    Parameter(selector) if isinstance(selector, str) else selector
                 )
 
             with ctx.parameter("safeguards"):
@@ -104,15 +107,21 @@ class SelectSafeguard(Safeguard):
                         )
                         safeguards_.append(safeguard)  # type: ignore
 
+            with ctx.parameter("selector"):
+                if isinstance(selector, int) and (
+                    (selector < 0) or (selector >= len(safeguards_))
+                ):
+                    raise IndexError("invalid index") | ctx
+
         if all(isinstance(safeguard, PointwiseSafeguard) for safeguard in safeguards_):
             return _SelectPointwiseSafeguard(selector, *safeguards_)  # type: ignore
         else:
             return _SelectStencilSafeguard(selector, *safeguards_)
 
     @property
-    def selector(self) -> Parameter:  # type: ignore
+    def selector(self) -> int | Parameter:  # type: ignore
         """
-        The late-bound selector parameter.
+        The selector index or late-bound selector parameter.
         """
         ...
 
@@ -180,7 +189,7 @@ class SelectSafeguard(Safeguard):
         ValueError
             if not all late-bound `selector` values could be losslessly
             converted to integer indices.
-        ValueError
+        IndexError
             if the late-bound `selector` indices are invalid for the
             selected-over `safeguards`.
         ...
@@ -228,7 +237,7 @@ class SelectSafeguard(Safeguard):
         ValueError
             if not all late-bound `selector` values could be losslessly
             converted to integer indices.
-        ValueError
+        IndexError
             if the late-bound `selector` indices are invalid for the
             selected-over `safeguards`.
         ...
@@ -332,7 +341,7 @@ class _SelectSafeguardBase(ABC):
     kind: ClassVar[str] = "select"
 
     @property
-    def selector(self) -> Parameter:
+    def selector(self) -> int | Parameter:
         return self._selector  # type: ignore
 
     @property
@@ -341,9 +350,12 @@ class _SelectSafeguardBase(ABC):
 
     @property
     def late_bound(self) -> Set[Parameter]:
-        return frozenset(
-            [self.selector] + [b for s in self.safeguards for b in s.late_bound]
-        )
+        parameters = frozenset(b for s in self.safeguards for b in s.late_bound)
+
+        if isinstance(self.selector, Parameter):
+            parameters = parameters.union([self.selector])
+
+        return parameters
 
     def check_pointwise(
         self,
@@ -353,10 +365,19 @@ class _SelectSafeguardBase(ABC):
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
+        if isinstance(self.selector, int):
+            return self.safeguards[self.selector].check_pointwise(
+                data, prediction, late_bound=late_bound, where=where
+            )
+
         with ctx.safeguardty(SelectSafeguard), ctx.parameter("selector"):
             selector = late_bound.resolve_ndarray_with_lossless_cast(
                 self.selector, data.shape, np.dtype(np.intp)
             )
+
+            with ctx.late_bound_parameter(self.selector):
+                if np.any(selector < 0) or np.any(selector >= len(self.safeguards)):
+                    raise IndexError("invalid indices") | ctx
 
         oks = [
             safeguard.check_pointwise(
@@ -379,6 +400,11 @@ class _SelectSafeguardBase(ABC):
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> IntervalUnion[T, int, int]:
+        if isinstance(self.selector, int):
+            return self.safeguards[self.selector].compute_safe_intervals(
+                data, late_bound=late_bound, where=where
+            )
+
         with ctx.safeguardty(SelectSafeguard), ctx.parameter("selector"):
             selector = late_bound.resolve_ndarray_with_lossless_cast(
                 self.selector, data.shape, np.dtype(np.intp)
@@ -386,7 +412,7 @@ class _SelectSafeguardBase(ABC):
 
             with ctx.late_bound_parameter(self.selector):
                 if np.any(selector < 0) or np.any(selector >= len(self.safeguards)):
-                    raise ValueError("invalid entry in choice array") | ctx
+                    raise IndexError("invalid indices") | ctx
 
         valid: IntervalUnion[T, int, int] = Interval.full_like(data).into_union()
 
@@ -408,6 +434,11 @@ class _SelectSafeguardBase(ABC):
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
+        if isinstance(self.selector, int):
+            return self.safeguards[self.selector].compute_footprint(
+                foot, late_bound=late_bound, where=where
+            )
+
         with ctx.safeguardty(SelectSafeguard), ctx.parameter("selector"):
             selector = late_bound.resolve_ndarray_with_lossless_cast(
                 self.selector, foot.shape, np.dtype(np.intp)
@@ -415,7 +446,7 @@ class _SelectSafeguardBase(ABC):
 
             with ctx.late_bound_parameter(self.selector):
                 if np.any(selector < 0) or np.any(selector >= len(self.safeguards)):
-                    raise ValueError("invalid entry in choice array") | ctx
+                    raise IndexError("invalid indices") | ctx
 
         footprint = np.zeros_like(foot)
 
@@ -431,7 +462,9 @@ class _SelectSafeguardBase(ABC):
     def get_config(self) -> dict[str, JSON]:
         return dict(
             kind=type(self).kind,
-            selector=self.selector,
+            selector=str(self.selector)
+            if isinstance(self.selector, Parameter)
+            else self.selector,
             safeguards=[safeguard.get_config() for safeguard in self.safeguards],
         )
 
@@ -442,10 +475,12 @@ class _SelectSafeguardBase(ABC):
 
 class _SelectPointwiseSafeguard(_SelectSafeguardBase, PointwiseSafeguard):
     __slots__: tuple[str, ...] = ("_selector", "_safeguards")
-    _selector: Parameter
+    _selector: int | Parameter
     _safeguards: tuple[PointwiseSafeguard, ...]
 
-    def __init__(self, selector: Parameter, *safeguards: PointwiseSafeguard) -> None:
+    def __init__(
+        self, selector: int | Parameter, *safeguards: PointwiseSafeguard
+    ) -> None:
         self._selector = selector
 
         for safeguard in safeguards:
@@ -457,11 +492,13 @@ class _SelectPointwiseSafeguard(_SelectSafeguardBase, PointwiseSafeguard):
 
 class _SelectStencilSafeguard(_SelectSafeguardBase, StencilSafeguard):
     __slots__: tuple[str, ...] = ("_selector", "_safeguards")
-    _selector: Parameter
+    _selector: int | Parameter
     _safeguards: tuple[PointwiseSafeguard | StencilSafeguard, ...]
 
     def __init__(
-        self, selector: Parameter, *safeguards: PointwiseSafeguard | StencilSafeguard
+        self,
+        selector: int | Parameter,
+        *safeguards: PointwiseSafeguard | StencilSafeguard,
     ) -> None:
         self._selector = selector
 

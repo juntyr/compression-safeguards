@@ -399,7 +399,8 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             )
 
             valid_slice = [slice(None)] * data.ndim
-            valid_slice[axis] = slice(self._window, -self._window)
+            if self._boundary == BoundaryCondition.valid:
+                valid_slice[axis] = slice(self._window, -self._window)
 
             # optimization: only evaluate the monotonicity where necessary
             if where is not True:
