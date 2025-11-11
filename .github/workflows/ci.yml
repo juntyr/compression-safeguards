@@ -150,6 +150,10 @@ jobs:
       - name: Install mkdocs dependencies
         run: uv pip install -r docs/requirements.txt
 
+      # https://github.com/mkdocstrings/python/issues/167
+      - name: Reduce docs duplication
+        run: sed -i 's/__all__ = \["Safeguards", "SafeguardKind"\]/__all__ = \[\]/g' src/compression_safeguards/__init__.py
+
       - name: Check docs build
         run: uv run mkdocs build
 
