@@ -387,35 +387,49 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 axis,
             )
 
-            data_windows = sliding_window_view(data_boundary, window, axis=axis)
-            prediction_windows = sliding_window_view(
-                prediction_boundary, window, axis=axis
+            data_windows: np.ndarray[tuple[int, int], np.dtype[T]] = (
+                sliding_window_view(data_boundary, window, axis=axis).reshape(
+                    (-1, window)
+                )
+            )
+            prediction_windows: np.ndarray[tuple[int, int], np.dtype[T]] = (
+                sliding_window_view(prediction_boundary, window, axis=axis).reshape(
+                    (-1, window)
+                )
             )
 
-            data_monotonic = self._monotonic_sign(data_windows, is_prediction=False)
-            prediction_monotonic = self._monotonic_sign(
-                prediction_windows, is_prediction=True
+            valid_slice = [slice(None)] * data.ndim
+            valid_slice[axis] = slice(self._window, -self._window)
+
+            # optimization: only evaluate the monotonicity where necessary
+            if where is not True:
+                where_flat = where[slice(valid_slice)].flatten()
+                data_windows = np.compress(where_flat, data_windows, axis=0)
+                prediction_windows = np.compress(where_flat, prediction_windows, axis=0)
+
+            data_monotonic: np.ndarray[tuple[int], np.dtype[np.float64]] = (
+                self._monotonic_sign(data_windows, is_prediction=False)  # type: ignore
+            )
+            prediction_monotonic: np.ndarray[tuple[int], np.dtype[np.float64]] = (
+                self._monotonic_sign(prediction_windows, is_prediction=True)  # type: ignore
             )
 
             # for monotonic windows, check that the monotonicity matches
-            axis_ok = self._monotonic_sign_not_equal(
+            axis_ok_ = self._monotonic_sign_not_equal(
                 data_monotonic, prediction_monotonic
             )
 
-            if self._boundary == BoundaryCondition.valid:
-                s = tuple(
-                    [slice(None)] * axis
-                    + [slice(self._window, -self._window)]
-                    + [slice(None)] * (data.ndim - axis - 1)
-                )
+            # the check succeeds where `where` is False
+            axis_ok: np.ndarray[tuple[int], np.dtype[np.bool]]
+            if where is True:
+                axis_ok = axis_ok_
             else:
-                s = tuple([slice(None)] * data.ndim)
+                axis_ok = _ones(where_flat.shape, np.dtype(np.bool))
+                np.place(axis_ok, where_flat, axis_ok_)
 
-            ok[s] &= ~axis_ok.reshape(ok[s].shape)
-
-        # TODO: optimize - only compute where necessary
-        if where is not True:
-            ok[~where] = True
+            # the check succeeds for boundary points that were excluded by a
+            #  valid boundary
+            ok[tuple(valid_slice)] &= ~axis_ok.reshape(ok[tuple(valid_slice)].shape)
 
         return ok
 
@@ -531,16 +545,16 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 )
 
                 if w > 0:
-                    elem_lt_left[s] |= data_monotonic[..., 0] == -1
+                    elem_lt_left[s] |= data_monotonic == -1
                 if w < (window - 1):
-                    elem_lt_right[s] |= data_monotonic[..., 0] == -1
+                    elem_lt_right[s] |= data_monotonic == -1
 
-                elem_eq[s] |= data_monotonic[..., 0] == 0
+                elem_eq[s] |= data_monotonic == 0
 
                 if w > 0:
-                    elem_gt_left[s] |= data_monotonic[..., 0] == +1
+                    elem_gt_left[s] |= data_monotonic == +1
                 if w < (window - 1):
-                    elem_gt_right[s] |= data_monotonic[..., 0] == +1
+                    elem_gt_right[s] |= data_monotonic == +1
 
             if self._boundary == BoundaryCondition.valid:
                 s = tuple([slice(None)] * data.ndim)
@@ -948,8 +962,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         # NaN: any(isnan(x[i]))
         monotonic[np.any(np.isnan(x), axis=-1)] = np.nan
 
-        # return the result in a shape that's broadcastable to x
-        return monotonic[..., np.newaxis]
+        return monotonic
 
     def _monotonic_sign_not_equal(
         self,
