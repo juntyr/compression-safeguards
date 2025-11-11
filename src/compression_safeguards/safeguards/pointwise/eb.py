@@ -38,8 +38,8 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
 
     The error bound can be verified by casting the data and error bound to a
     sufficiently large floating-point type, selected by
-    [`ToFloatMode.lossless.floating_point_dtype_for`][compression_safeguards.utils.cast.ToFloatMode.floating_point_dtype_for],
-    using [`to_float`][compression_safeguards.utils.cast.to_float].
+    [`ToFloatMode.lossless.floating_point_dtype_for`][.....utils.cast.ToFloatMode.floating_point_dtype_for],
+    using [`to_float`][.....utils.cast.to_float].
 
     Parameters
     ----------

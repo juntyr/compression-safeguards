@@ -48,11 +48,10 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
     The error bound can be verified by evaluating the QoI in the floating-point
     data type selected by `qoi_dtype` parameter using the
-    [`evaluate_qoi`][compression_safeguards.safeguards.pointwise.qoi.eb.PointwiseQuantityOfInterestErrorBoundSafeguard.evaluate_qoi]
-    method.
+    [`evaluate_qoi`][.evaluate_qoi] method.
 
     Please refer to the
-    [`PointwiseQuantityOfInterestExpression`][compression_safeguards.safeguards.qois.PointwiseQuantityOfInterestExpression]
+    [`PointwiseQuantityOfInterestExpression`][.....qois.PointwiseQuantityOfInterestExpression]
     for the EBNF grammar that specifies the language in which the quantities of
     interest are written.
 

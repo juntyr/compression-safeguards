@@ -28,9 +28,9 @@ class ErrorBound(Enum):
     Different types of error bounds that can be guaranteed by various
     safeguards, including:
 
-    - [`ErrorBoundSafeguard`][compression_safeguards.safeguards.pointwise.eb.ErrorBoundSafeguard]
-    - [`PointwiseQuantityOfInterestErrorBoundSafeguard`][compression_safeguards.safeguards.pointwise.qoi.eb.PointwiseQuantityOfInterestErrorBoundSafeguard]
-    - [`StencilQuantityOfInterestErrorBoundSafeguard`][compression_safeguards.safeguards.stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard]
+    - [`ErrorBoundSafeguard`][...pointwise.eb.ErrorBoundSafeguard]
+    - [`PointwiseQuantityOfInterestErrorBoundSafeguard`][...pointwise.qoi.eb.PointwiseQuantityOfInterestErrorBoundSafeguard]
+    - [`StencilQuantityOfInterestErrorBoundSafeguard`][...stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard]
     """
 
     abs = auto()

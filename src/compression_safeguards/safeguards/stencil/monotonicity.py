@@ -46,7 +46,7 @@ _WEAK = ((le, ge, False, True), (le, ge, True, True))
 class Monotonicity(Enum):
     """
     Different levels of monotonicity that can be preserved by the
-    [`MonotonicityPreservingSafeguard`][compression_safeguards.safeguards.stencil.monotonicity.MonotonicityPreservingSafeguard].
+    [`MonotonicityPreservingSafeguard`][..MonotonicityPreservingSafeguard].
     """
 
     strict = _STRICT
@@ -100,20 +100,18 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     noise, i.e. $>1$, but small enough to capture details.
 
     The safeguard supports enforcing four levels of
-    [`Monotonicity`][compression_safeguards.safeguards.stencil.monotonicity.Monotonicity]:
-    `strict`, `strict_with_consts`, `strict_to_weak`, `weak`.
+    [`Monotonicity`][..Monotonicity]: `strict`, `strict_with_consts`,
+    `strict_to_weak`, and `weak`.
 
     Windows that are not monotonic or contain NaN values are skipped.
 
     If the provided `axis` index is out of range for some data shape, the
     safeguard is not applied to that data.
 
-    If the
-    [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
-    `boundary` condition is used, axes that have fewer elements than
-    $(1 + window \cdot 2)$ are skipped. Using a different
-    [`BoundaryCondition`][compression_safeguards.safeguards.stencil.BoundaryCondition]
-    ensures that the safeguard is always applied.
+    If the [valid][...BoundaryCondition.valid] `boundary` condition is used,
+    axes that have fewer elements than $(1 + window \cdot 2)$ are skipped.
+    Using a different [`BoundaryCondition`][...BoundaryCondition] ensures that
+    the safeguard is always applied.
 
     Parameters
     ----------

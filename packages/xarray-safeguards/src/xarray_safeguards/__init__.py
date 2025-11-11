@@ -4,7 +4,7 @@
 Lossy compression can be *scary* as valuable information or features of the
 data may be lost.
 
-By using [`Safeguards`][compression_safeguards.Safeguards] to **guarantee**
+By using [`Safeguards`][compression_safeguards.api.Safeguards] to **guarantee**
 your safety requirements, lossy compression can be applied safely and
 *without fear*.
 
@@ -16,18 +16,16 @@ data by yourself is very difficult and error-prone, this package handles all of
 the complexity for you with a simple and safe API.
 
 In particular, `xarray-safeguards` provides the
-[`produce_data_array_correction`][xarray_safeguards.produce_data_array_correction]
+[`produce_data_array_correction`][.produce_data_array_correction]
 function to produce a correction such that certain properties of the original
 data are preserved after compression, which can be stored in the same or a
 different dataset (or file).
 
 This correction can be applied to the decompressed data using the
-[`apply_data_array_correction`][xarray_safeguards.apply_data_array_correction]
-function or the [`.safeguarded`][xarray_safeguards.DatasetSafeguardedAccessor]
-accessor on datasets.
+[`apply_data_array_correction`][.apply_data_array_correction] function or the
+[`.safeguarded`][.DatasetSafeguardedAccessor] accessor on datasets.
 
-This package also provides the
-[`.safeguards`][xarray_safeguards.DataArraySafeguardsAccessor]
+This package also provides the [`.safeguards`][.DataArraySafeguardsAccessor]
 accessor on correction or corrected data arrays to inspect the safeguards that
 were applied.
 
@@ -79,7 +77,7 @@ np.testing.assert_allclose(ds_safeguarded["da"].values, da.values, rtol=0, atol=
 ```
 
 Please refer to the
-[`compression_safeguards.SafeguardKind`][compression_safeguards.SafeguardKind]
+[`compression_safeguards.SafeguardKind`][compression_safeguards.safeguards.SafeguardKind]
 for an enumeration of all supported safeguards.
 """
 

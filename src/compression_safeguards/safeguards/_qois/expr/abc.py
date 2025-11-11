@@ -50,7 +50,7 @@ class Expr(ABC, Generic[Unpack[Es]]):
         ----------
         *args : Unpack[Es]
             The modified sub-expression arguments, derived from
-            [`self.args`][compression_safeguards.safeguards._qois.expr.abc.Expr.abc].
+            [`self.args`][..args].
 
         Returns
         -------
@@ -291,11 +291,11 @@ class Expr(ABC, Generic[Unpack[Es]]):
 
         This method is allowed to return slightly wrongly-rounded results
         that are then corrected by
-        [`compute_data_bounds`][compression_safeguards.safeguards._qois.expr.abc.Expr.compute_data_bounds].
+        [`compute_data_bounds`][..compute_data_bounds].
 
         If this method is known to have no rounding errors and always return
         the correct data bounds, it can be decorated with
-        [`@guaranteed_data_bounds`][compression_safeguards.safeguards._qois.bound.guaranteed_data_bounds].
+        [`@data_bounds(DataBounds.infallible)`][.....bound.data_bounds].
 
         Parameters
         ----------
@@ -337,7 +337,7 @@ class Expr(ABC, Generic[Unpack[Es]]):
         this expression.
 
         This method, by default, calls into
-        [`compute_data_bounds_unchecked`][compression_safeguards.safeguards._qois.expr.abc.Expr.compute_data_bounds_unchecked]
+        [`compute_data_bounds_unchecked`][..compute_data_bounds_unchecked]
         and then applies extensive rounding checks to ensure that the returned
         bounds satisfy the bounds on this expression.
 

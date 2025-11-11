@@ -43,11 +43,10 @@ class Safeguards:
     safeguards : Collection[dict[str, JSON] | Safeguard]
         The safeguards that will be applied. They can either be passed as a
         safeguard configuration [`dict`][dict] or an already initialized
-        [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard].
+        [`Safeguard`][...safeguards.abc.Safeguard].
 
-        Please refer to the
-        [`SafeguardKind`][compression_safeguards.safeguards.SafeguardKind]
-        for an enumeration of all supported safeguards.
+        Please refer to the [`SafeguardKind`][...safeguards.SafeguardKind] for
+        an enumeration of all supported safeguards.
     _version : ...
         The version of the safeguards. Do not provide this parameter explicitly.
 
@@ -161,9 +160,8 @@ class Safeguards:
         - the format of the safeguards corrections (can only be changed in a
           new breaking major release)
 
-        The [`Safeguards`][compression_safeguards.api.Safeguards] can only load
-        configurations for and apply corrections produced by safeguards with a
-        compatible semantic version.
+        The [`Safeguards`][..] can only load configurations for and apply
+        corrections produced by safeguards with a compatible semantic version.
 
         Note that the version of the safeguards may be different from the
         version of the `compression-safeguards` package, which may make changes
@@ -216,9 +214,8 @@ class Safeguards:
 
         The `data` array must contain the complete data, i.e. not just a chunk
         of data, so that non-pointwise safeguards are correctly applied. Please
-        use the
-        [`check_chunk`][compression_safeguards.api.Safeguards.check_chunk]
-        method instead when working with individual chunks of data.
+        use the [`check_chunk`][..check_chunk] method instead when working with
+        individual chunks of data.
 
         Parameters
         ----------
@@ -286,15 +283,13 @@ class Safeguards:
 
         The `data` array must contain the complete data, i.e. not just a chunk
         of data, so that non-pointwise safeguards are correctly applied. Please
-        use the
-        [`compute_chunked_correction`][compression_safeguards.api.Safeguards.compute_chunked_correction]
+        use the [`compute_chunked_correction`][..compute_chunked_correction]
         method instead when working with individual chunks of data.
 
         The correction is defined as `as_bits(corrected) - as_bits(prediction)`
         using wrapping unsigned integer arithmetic. It has the corresponding
         binary unsigned integer data type with the same bit size. The
-        correction can be applied using
-        [`apply_correction`][compression_safeguards.api.Safeguards.apply_correction]
+        correction can be applied using [`apply_correction`][..apply_correction]
         to get the corrected `prediction`.
 
         Parameters
@@ -535,10 +530,9 @@ class Safeguards:
         Compute the shape of the stencil neighbourhood around chunks of the complete data that is required to compute the chunked corrections.
 
         For each data dimension, the stencil might require either a
-        [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
-        or
-        [wrapping][compression_safeguards.safeguards.stencil.BoundaryCondition.wrap]
-        boundary condition.
+        [valid][....safeguards.stencil.BoundaryCondition.valid] or
+        [wrapping][....safeguards.stencil.BoundaryCondition.wrap] boundary
+        condition.
 
         This method also checks that the data shape is compatible with the
         safeguards.
@@ -714,7 +708,7 @@ class Safeguards:
         the chunk, and the shape of this applied stencil is specified in the
         `chunk_stencil` parameter. This stencil must be compatible with the
         required stencil returned by
-        [`compute_required_stencil_for_chunked_correction(data_shape)`][compression_safeguards.api.Safeguards.compute_required_stencil_for_chunked_correction]:
+        [`compute_required_stencil_for_chunked_correction(data_shape)`][..compute_required_stencil_for_chunked_correction]:
         - a wrapping boundary is always compatible with a valid boundary.
         - a larger stencil is always compatible with a smaller stencil.
         - a smaller stencil is sometimes compatible with a larger stencil, iff
@@ -725,8 +719,7 @@ class Safeguards:
 
         This advanced method should only be used when working with individual
         chunks of data, for non-chunked data please use the simpler and more
-        efficient [`check`][compression_safeguards.api.Safeguards.check] method
-        instead.
+        efficient [`check`][..check] method instead.
 
         Parameters
         ----------
@@ -851,7 +844,7 @@ class Safeguards:
         the chunk, and the shape of this applied stencil is specified in the
         `chunk_stencil` parameter. This stencil must be compatible with the
         required stencil returned by
-        [`compute_required_stencil_for_chunked_correction(data_shape)`][compression_safeguards.api.Safeguards.compute_required_stencil_for_chunked_correction]:
+        [`compute_required_stencil_for_chunked_correction(data_shape)`][..compute_required_stencil_for_chunked_correction]:
         - a wrapping boundary is always compatible with a valid boundary.
         - a larger stencil is always compatible with a smaller stencil.
         - a smaller stencil is sometimes compatible with a larger stencil, iff
@@ -862,17 +855,14 @@ class Safeguards:
 
         This advanced method should only be used when working with individual
         chunks of data, for non-chunked data please use the simpler and more
-        efficient
-        [`compute_correction`][compression_safeguards.api.Safeguards.compute_correction]
-        method instead.
+        efficient [`compute_correction`][..compute_correction] method instead.
 
         The (chunked) correction is defined as
         `as_bits(corrected) - as_bits(prediction)` using wrapping unsigned
         integer arithmetic. It has the corresponding binary unsigned integer
         data type with the same bit size. The chunked correction can be applied
-        using
-        [`apply_correction`][compression_safeguards.api.Safeguards.apply_correction]
-        to get the corrected chunked `prediction`.
+        using [`apply_correction`][..apply_correction] to get the corrected
+        chunked `prediction`.
 
         Parameters
         ----------

@@ -8,12 +8,11 @@ safeguard not just properties on the data but also on these derived quantities
 of interest (QoIs).
 
 The `compression-safeguards` package provides the
-[`PointwiseQuantityOfInterestErrorBoundSafeguard`][compression_safeguards.safeguards.pointwise.qoi.eb.PointwiseQuantityOfInterestErrorBoundSafeguard]
+[`PointwiseQuantityOfInterestErrorBoundSafeguard`][..pointwise.qoi.eb.PointwiseQuantityOfInterestErrorBoundSafeguard]
 and
-[`StencilQuantityOfInterestErrorBoundSafeguard`][compression_safeguards.safeguards.stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard]
-safeguards to preserve various
-[`ErrorBound`][compression_safeguards.safeguards.eb.ErrorBound]s on
-pointwise[^1] and stencil[^2] quantities of interest, respectively.
+[`StencilQuantityOfInterestErrorBoundSafeguard`][..stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard]
+safeguards to preserve various [`ErrorBound`][..eb.ErrorBound]s on pointwise[^1]
+and stencil[^2] quantities of interest, respectively.
 
 [^1]: A pointwise QoI is computed independently for each data point, taking
     only the value of this data point as input.
@@ -209,7 +208,7 @@ newline `\\n`) and single-line inline comments starting with a hash `#`.
 ### Floating-point data type
 
 QoIs can be evaluated on any data type supported by the safeguards (see
-[`Safeguards.supported_dtypes`][compression_safeguards.api.Safeguards.supported_dtypes]).
+[`Safeguards.supported_dtypes`][...api.Safeguards.supported_dtypes]).
 Since the QoIs support many functions with floating-point outputs, they
 are evaluated using floating-point arithmetic.
 
@@ -226,8 +225,7 @@ larger bit width (e.g. at least [`np.float64`][numpy.float64] for
 [`np.int32`][numpy.int32] or [`np.uint32`][numpy.uint32] data).
 
 The specific floating-point data type in which the quantities of interest are
-evaluated is configured using the
-[`ToFloatMode`][compression_safeguards.utils.cast.ToFloatMode]
+evaluated is configured using the [`ToFloatMode`][...utils.cast.ToFloatMode]
 enum, please refer to its documentation for further information.
 
 ### Literals

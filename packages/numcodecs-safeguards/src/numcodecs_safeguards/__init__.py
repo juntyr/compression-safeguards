@@ -4,14 +4,13 @@ r"""
 Lossy compression can be *scary* as valuable information or features of the
 data may be lost.
 
-By using [`Safeguards`][compression_safeguards.Safeguards] to **guarantee**
+By using [`Safeguards`][compression_safeguards.api.Safeguards] to **guarantee**
 your safety requirements, lossy compression can be applied safely and
 *without fear*.
 
 ## Overview
 
-This package provides the
-[`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec] adapter /
+This package provides the [`SafeguardsCodec`][.SafeguardsCodec] adapter /
 meta-compressor that can be wrapped around *any* existing (lossy)
 [`numcodecs.abc.Codec`][numcodecs.abc.Codec] to *guarantee* that certain
 properties of the original data are preserved by compression.
@@ -70,7 +69,7 @@ assert np.all(np.sign(data) == np.sign(decoded))
 ```
 
 Please refer to the
-[`compression_safeguards.SafeguardKind`][compression_safeguards.SafeguardKind]
+[`compression_safeguards.SafeguardKind`][compression_safeguards.safeguards.SafeguardKind]
 for an enumeration of all supported safeguards.
 """
 
@@ -111,9 +110,9 @@ from .lossless import Lossless
 
 class SafeguardsCodec(Codec, CodecCombinatorMixin):
     """
-    An adaptor codec that uses [`Safeguards`][compression_safeguards.Safeguards]
-    to guarantee certain properties / safety requirements are upheld by the
-    wrapped codec.
+    An adaptor codec that uses
+    [`Safeguards`][compression_safeguards.api.Safeguards] to guarantee certain
+    properties / safety requirements are upheld by the wrapped codec.
 
     Parameters
     ----------
@@ -128,8 +127,8 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         It is desirable to perform lossless compression after applying the
         safeguards (rather than before), e.g. by customising the
-        [`Lossless.for_codec`][numcodecs_safeguards.lossless.Lossless.for_codec]
-        field of the `lossless` parameter.
+        [`Lossless.for_codec`][..lossless.Lossless.for_codec] field of the
+        `lossless` parameter.
 
         The `codec` combined with its `lossless` encoding must encode to a 1D
         buffer of bytes. It is also recommended that the `codec` can
@@ -176,29 +175,27 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         The provided values must have a compatible shape and values for *any*
         data that will be encoded with this codec, otherwise
-        [`encode`][numcodecs_safeguards.SafeguardsCodec.encode] will fail.
+        [`encode`][.encode] will fail.
 
-        You can use the
-        [`update_fixed_constants`][numcodecs_safeguards.SafeguardsCodec.update_fixed_constants]
+        You can use the [`update_fixed_constants`][.update_fixed_constants]
         method inside a `with` statement to temporarily update the late-bound
         parameters.
 
-        The fixed constants are included in the
-        [config][numcodecs_safeguards.SafeguardsCodec.get_config] of the codec.
-        While [`int`][int] and [`float`][float] scalars are included as-is,
-        numpy scalars and arrays are encoded to the losslessly compressed
-        [`.npz`][numpy.savez_compressed] format and stored in a
+        The fixed constants are included in the [config][.get_config] of the
+        codec. While [`int`][int] and [`float`][float] scalars are included
+        as-is, numpy scalars and arrays are encoded to the losslessly
+        compressed [`.npz`][numpy.savez_compressed] format and stored in a
         `data:application/x-npz;base64,<data>`
         [data URI](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Schemes/data).
     lossless : None | dict[str, JSON] | Lossless, optional
         The lossless encoding that is applied after the codec and the
         safeguards:
 
-        - [`Lossless.for_codec`][numcodecs_safeguards.lossless.Lossless.for_codec]
-          specifies the lossless encoding that is applied to the encoded output
-          of the wrapped `codec`. By default, no additional lossless encoding
-          is applied.
-        - [`Lossless.for_safeguards`][numcodecs_safeguards.lossless.Lossless.for_safeguards]
+        - [`Lossless.for_codec`][..lossless.Lossless.for_codec] specifies the
+          lossless encoding that is applied to the encoded output of the
+          wrapped `codec`. By default, no additional lossless encoding is
+          applied.
+        - [`Lossless.for_safeguards`][..lossless.Lossless.for_safeguards]
           specifies the lossless encoding that is applied to the corrections
           that the safeguards produce. By default, Huffman coding followed by
           Zstandard compression is applied.
@@ -341,8 +338,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         The late-bound parameters must be provided as fixed constants. They
         must have a compatible shape and values for any data that will be
-        encoded with this codec, otherwise
-        [`encode`][numcodecs_safeguards.SafeguardsCodec.encode] will fail.
+        encoded with this codec, otherwise [`encode`][..encode] will fail.
         """
 
         return self._safeguards.late_bound
@@ -369,7 +365,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         The provided values must have a compatible shape and values for *any*
         data that will be encoded with this codec, otherwise
-        [`encode`][numcodecs_safeguards.SafeguardsCodec.encode] will fail.
+        [`encode`][..encode] will fail.
 
         This method can be used inside a `with` statement to temporarily update
         the late-bound parameters.
@@ -704,8 +700,8 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
     def map(self, mapper: Callable[[Codec], Codec]) -> "SafeguardsCodec":
         """
         Apply the `mapper` to this codec with safeguards.
-        In the returned
-        [`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec], the codec is
+
+        In the returned [`SafeguardsCodec`][..], the codec is
         replaced by its mapped codec.
 
         The `mapper` should recursively apply itself to any inner codecs that

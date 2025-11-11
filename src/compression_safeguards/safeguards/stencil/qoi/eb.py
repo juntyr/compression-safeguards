@@ -73,15 +73,14 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     axes. For instance, a 2d QoI is applied to independently to all 2d slices
     in a 3d data cube.
 
-    If the data neighbourhood uses the
-    [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
+    If the data neighbourhood uses the [valid][....BoundaryCondition.valid]
     boundary condition along an axis, the safeguard is only applied to data
     neighbourhoods centred on data points that have sufficient points before
     and after to satisfy the neighbourhood shape, i.e. it is not applied to
     all data points. If the axis is smaller than required by the neighbourhood
     along this axis, the safeguard is not applied. Using a different
-    [`BoundaryCondition`][compression_safeguards.safeguards.stencil.BoundaryCondition]
-    ensures that the safeguard is always applied to all data points.
+    [`BoundaryCondition`][....BoundaryCondition] ensures that the safeguard is
+    always applied to all data points.
 
     If the derived quantity of interest for a data neighbourhood evaluates to
     an infinite value, this safeguard guarantees that the quantity of interest
@@ -92,11 +91,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
     The error bound can be verified by evaluating the QoI in the floating-point
     data type selected by `qoi_dtype` parameter using the
-    [`evaluate_qoi`][compression_safeguards.safeguards.stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard.evaluate_qoi]
-    method.
+    [`evaluate_qoi`][.evaluate_qoi] method.
 
     Please refer to the
-    [`StencilQuantityOfInterestExpression`][compression_safeguards.safeguards.qois.StencilQuantityOfInterestExpression]
+    [`StencilQuantityOfInterestExpression`][.....qois.StencilQuantityOfInterestExpression]
     for the EBNF grammar that specifies the language in which the quantities of
     interest are written.
 
@@ -134,8 +132,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         If `eb` is a late-bound parameter, its late-bound value must be
         broadcastable to the shape of the data to be safeguarded, not the shape
         of the QoI that has been evaluated (even though it is only applied to
-        the QoI). The
-        [`expand_qoi_to_data_shape`][compression_safeguards.safeguards.stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard.expand_qoi_to_data_shape]
+        the QoI). The [`expand_qoi_to_data_shape`][.expand_qoi_to_data_shape]
         method can be used to expand an error-bound from the QoI shape to the
         data shape.
     qoi_dtype : str | ToFloatMode
@@ -353,8 +350,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         floating-point data type selected by the `qoi_dtype` parameter.
 
         The quantity of interest may have a different shape if the
-        [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
-        boundary condition is used along any axis.
+        [valid][.....BoundaryCondition.valid] boundary condition is used along
+        any axis.
 
         Parameters
         ----------
@@ -1235,16 +1232,13 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         """
         Truncate the `data` array to the shape of the `qoi` array that would be evaluated from it.
 
-        For neighbourhoods without any
-        [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
+        For neighbourhoods without any [valid][.....BoundaryCondition.valid]
         boundaries, this method simply copies the `data` array. Along axes with
-        a
-        [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
-        boundary, the `data` is truncated before and after by as many elements as
-        the boundary cuts off.
+        a [valid][.....BoundaryCondition.valid] boundary, the `data` is
+        truncated before and after by as many elements as the boundary cuts off.
 
         This method is the *lossy* inverse of
-        [`expand_qoi_to_data_shape`][compression_safeguards.safeguards.stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard.expand_qoi_to_data_shape].
+        [`expand_qoi_to_data_shape`][..expand_qoi_to_data_shape].
 
         Parameters
         ----------
@@ -1303,23 +1297,20 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         Expand the `qoi` array to the shape of the data it was evaluated from.
 
         The `qoi` array is assumed to have been produced by the
-        [`evaluate_qoi`][compression_safeguards.safeguards.stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard.evaluate_qoi]
-        method.
+        [`evaluate_qoi`][..evaluate_qoi] method.
 
-        For neighbourhoods without any
-        [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
+        For neighbourhoods without any [valid][.....BoundaryCondition.valid]
         boundaries, this method simply copies the `qoi` array. Along axes with
-        a
-        [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
-        boundary, the `qoi` is expanded before and after by as many elements as
-        the boundary cut off. These new elements are filled with zeros.
+        a [valid][.....BoundaryCondition.valid] boundary, the `qoi` is expanded
+        before and after by as many elements as the boundary cut off. These new
+        elements are filled with zeros.
 
         This method can be used to produce the array for the late-bound `eb`
         parameter by first deriving the error bound from an evaluated QoI array
         (shape) and then expanding it to the data shape.
 
         This method is the *lossy* inverse of
-        [`truncate_data_to_qoi_shape`][compression_safeguards.safeguards.stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard.truncate_data_to_qoi_shape].
+        [`truncate_data_to_qoi_shape`][..truncate_data_to_qoi_shape].
 
         Parameters
         ----------

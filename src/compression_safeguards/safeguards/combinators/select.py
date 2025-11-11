@@ -42,10 +42,8 @@ class SelectSafeguard(Safeguard):
         `safeguards`.
     safeguards : Collection[dict[str, JSON] | PointwiseSafeguard | StencilSafeguard]
         At least one safeguard configuration [`dict`][dict]s or already
-        initialized
-        [`PointwiseSafeguard`][compression_safeguards.safeguards.pointwise.abc.PointwiseSafeguard]
-        or
-        [`StencilSafeguard`][compression_safeguards.safeguards.stencil.abc.StencilSafeguard].
+        initialized [`PointwiseSafeguard`][....pointwise.abc.PointwiseSafeguard]
+        or [`StencilSafeguard`][....stencil.abc.StencilSafeguard].
 
     Raises
     ------

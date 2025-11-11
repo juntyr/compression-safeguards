@@ -23,9 +23,8 @@ class AssumeAlwaysSafeguard(PointwiseSafeguard):
     and are thus always safe.
 
     This safeguards can be used with the
-    [`SelectSafeguard`][compression_safeguards.safeguards.combinators.select.SelectSafeguard]
-    to express regions that are *not* of interest, i.e. where no additional
-    safety requirements are imposed.
+    [`SelectSafeguard`][...select.SelectSafeguard] to express regions that are
+    *not* of interest, i.e. where no additional safety requirements are imposed.
     """
 
     __slots__: tuple[str, ...] = ()

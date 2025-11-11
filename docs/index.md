@@ -21,7 +21,7 @@ Safeguards are a declarative way to describe the safety requirements that you ha
 
 By declaring your safety requirements as safeguards, we can **guarantee** that any lossy compression protected by these safeguards will *always* uphold your safety requirements.
 
-The [`compression-safeguards`][compression_safeguards] package provides several [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard]s with which you can express *your* safety requirements. Please refer to the [provided safeguards](#provided-safeguards) section or the [`SafeguardKind`][compression_safeguards.SafeguardKind] documentation for a complete list of the supported safeguards.
+The [`compression-safeguards`][compression_safeguards] package provides several [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard]s with which you can express *your* safety requirements. Please refer to the [provided safeguards](#provided-safeguards) section or the [`SafeguardKind`][compression_safeguards.safeguards.SafeguardKind] documentation for a complete list of the supported safeguards.
 
 We also provide the following integrations of the safeguards with popular compression APIs:
 
@@ -72,7 +72,7 @@ Note that the packages in this repository are provided as reference implementati
 
 ## Provided safeguards
 
-This package currently implements the following [safeguards][compression_safeguards.SafeguardKind]:
+This package currently implements the following [safeguards][compression_safeguards.safeguards.SafeguardKind]:
 
 ### Error Bounds (pointwise)
 
@@ -285,7 +285,7 @@ Please refer to the [`compression-safeguards`][compression_safeguards] documenta
 
 ### (b) Safeguards for developers of lossy compressors
 
-The safeguards can also fill the role of a quantizer, which is part of many (predictive) (error-bounded) compressors. If you currently use e.g. a linear quantizer module in your compressor to provide an absolute error bound, you could instead adapt the [`Safeguards`][compression_safeguards.Safeguards], quantize to their [`Safeguards.compute_correction`][compression_safeguards.Safeguards.compute_correction] values, and thereby offer a larger selection of safety requirements that your compressor can then guarantee. Note, however, that only pointwise safeguards can be used when quantizing data elements one-by-one.
+The safeguards can also fill the role of a quantizer, which is part of many (predictive) (error-bounded) compressors. If you currently use e.g. a linear quantizer module in your compressor to provide an absolute error bound, you could instead adapt the [`Safeguards`][compression_safeguards.api.Safeguards], quantize to their [`Safeguards.compute_correction`][compression_safeguards.api.Safeguards.compute_correction] values, and thereby offer a larger selection of safety requirements that your compressor can then guarantee. Note, however, that only pointwise safeguards can be used when quantizing data elements one-by-one.
 
 
 ## How to safeguard ...?

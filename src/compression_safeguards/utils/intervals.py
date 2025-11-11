@@ -51,14 +51,10 @@ class Interval(Generic[T, N]):
 
     An interval should only be constructed using
 
-    - [`Interval.empty`][compression_safeguards.utils.intervals.Interval.empty]
-      or
-      [`Interval.empty_like`][compression_safeguards.utils.intervals.Interval.empty_like]
-      for an empty interval that contains no values
-    - [`Interval.full`][compression_safeguards.utils.intervals.Interval.full]
-      or
-      [`Interval.full_like`][compression_safeguards.utils.intervals.Interval.full_like]
-      for a full interval that contains all possible values
+    - [`Interval.empty`][.empty] or [`Interval.empty_like`][.empty_like] for an
+      empty interval that contains no values
+    - [`Interval.full`][.full] or [`Interval.full_like`][.full_like] for a
+      full interval that contains all possible values
 
     ## Overriding lower and upper bounds
 
@@ -86,23 +82,21 @@ class Interval(Generic[T, N]):
 
     The following common lower and upper bounds are provided for ease of use:
 
-    - [`Interval.preserve_inf`][compression_safeguards.utils.intervals.Interval.preserve_inf]
-    - [`Interval.preserve_signed_nan`][compression_safeguards.utils.intervals.Interval.preserve_signed_nan]
-    - [`Interval.preserve_any_nan`][compression_safeguards.utils.intervals.Interval.preserve_any_nan]
-    - [`Interval.preserve_finite`][compression_safeguards.utils.intervals.Interval.preserve_finite]
-    - [`Interval.preserve_non_nan`][compression_safeguards.utils.intervals.Interval.preserve_non_nan]
+    - [`Interval.preserve_inf`][.preserve_inf]
+    - [`Interval.preserve_signed_nan`][.preserve_signed_nan]
+    - [`Interval.preserve_any_nan`][.preserve_any_nan]
+    - [`Interval.preserve_finite`][.preserve_finite]
+    - [`Interval.preserve_non_nan`][.preserve_non_nan]
 
     ## Interval operations
 
     Two intervals can be
 
-    - intersected using
-      [`Interval.intersect`][compression_safeguards.utils.intervals.Interval.intersect]
-    - unioned using
-      [`Interval.union`][compression_safeguards.utils.intervals.Interval.union]
+    - intersected using [`Interval.intersect`][.intersect]
+    - unioned using [`Interval.union`][.union]
 
     or converted into a single-member union of intervals using
-    [`Interval.into_union`][compression_safeguards.utils.intervals.Interval.into_union].
+    [`Interval.into_union`][.into_union].
     """
 
     __slots__: tuple[str, ...] = ("_lower", "_upper")

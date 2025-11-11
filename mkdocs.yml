@@ -15,6 +15,7 @@ extra_javascript:
   - js/katex.js
   - https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/katex.min.js
   - https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/contrib/auto-render.min.js
+  - https://unpkg.com/mermaid@10.9.0/dist/mermaid.min.js
 
 extra_css:
   - https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/katex.min.css
@@ -86,6 +87,7 @@ plugins:
             separate_signature: true
             show_signature_annotations: true
             signature_crossrefs: true
+            relative_crossrefs: true
             show_root_toc_entry: false
             merge_init_into_class: true
             summary:
@@ -93,6 +95,9 @@ plugins:
               classes: true
               functions: true
               modules: true
+            backlinks: tree
+            show_inheritance_diagram: true
+            inheritance_diagram_direction: LR
           inventories:
             - https://docs.python.org/3.12/objects.inv
             - https://numcodecs.readthedocs.io/en/v0.15.0/objects.inv

@@ -49,7 +49,7 @@ class ReportingExpr(Expr[AnyExpr]):
 
     Parameters
     ----------
-    expr : Expr
+    expr : AnyExpr
         The expression that will be wrapped and reported on.
     reporter : Reporter
         The reporter that will report on the expression.
@@ -58,6 +58,9 @@ class ReportingExpr(Expr[AnyExpr]):
     __slots__: tuple[str, ...] = ("_expr", "_reporter")
     _expr: AnyExpr
     _reporter: Reporter
+
+    def __init__(self, expr: AnyExpr, reporter: Reporter) -> None:
+        pass
 
     def __new__(cls, expr: AnyExpr, reporter: Reporter) -> "ReportingExpr | Number":  # type: ignore[misc]
         if isinstance(expr, ReportingExpr | Number):

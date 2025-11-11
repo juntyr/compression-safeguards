@@ -29,7 +29,7 @@ Ns = TypeVar("Ns", bound=tuple[int, ...], covariant=True)
 
 if TYPE_CHECKING:
     np_sndarray: TypeAlias = np.ndarray[tuple[Ps, Unpack[Ns]], T]  # type: ignore
-    """ Any stencil-extended [`np.ndarray[tuple[Ps, Unpack[Ns]], T]`][np.ndarray]. """
+    """ Any stencil-extended [`np.ndarray[tuple[Ps, Unpack[Ns]], T]`][numpy.ndarray]. """
 else:
     # Unpack[TypeVar(bound=tuple)] is not yet supported
     np_sndarray: TypeAlias = np.ndarray[tuple[Ps, Ns], T]  # type: ignore
@@ -40,4 +40,4 @@ Ci = TypeVar("Ci", bound=Callable)
 # FIXME: actually bound the types to be Expr
 # https://discuss.python.org/t/how-to-use-typevartuple/67502
 Es = TypeVarTuple("Es")
-""" Tuple of [`Expr`][compression_safeguards.safeguards._qois.expr.abc.Expr]s. """
+""" Tuple of [`Expr`][...abc.Expr]s. """
