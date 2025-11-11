@@ -1372,3 +1372,20 @@ def test_fuzzer_found_has_data_recursion_error():
         eb=0,
         qoi_dtype="lossless",
     )
+
+
+def test_fuzzer_found_has_data_2d_array():
+    with pytest.raises(
+        SyntaxError,
+        match=r"qoi_eb_stencil\.qoi: `finite_difference` expr must be a scalar array element expression, e.g. the centre value, not an array",
+    ):
+        StencilQuantityOfInterestErrorBoundSafeguard(
+            qoi="sqrt(reciprocal(sum(finite_difference(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(X, ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), order=3, accuracy=4, type=1, axis=0, grid_spacing=-1.6989962450678104e+308) + X, ), ), ) / e / e / 1",
+            neighbourhood=[
+                dict(axis=42, before=101, after=97, boundary="valid"),
+                dict(axis=0, before=0, after=0, boundary="valid"),
+            ],
+            type="abs",
+            eb=0,
+            qoi_dtype="lossless",
+        )

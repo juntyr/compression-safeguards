@@ -58,7 +58,7 @@ class Array(Expr[AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
     def args(self) -> tuple[AnyExpr, Unpack[tuple[AnyExpr, ...]]]:
         if self._array.ndim == 1:
             return tuple(self._array)
-        return tuple(a for a in self._array)
+        return tuple(Array(*a) for a in self._array)
 
     @override
     def with_args(self, el: AnyExpr, *els: AnyExpr) -> Self:
