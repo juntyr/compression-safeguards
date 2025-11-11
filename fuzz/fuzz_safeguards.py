@@ -477,7 +477,7 @@ def check_one_input(data) -> None:
                     ParameterContextLayer("selector"),
                     LateBoundParameterContextLayer(_),
                 ) if (
-                    isinstance(err, ValueError)
+                    isinstance(err, IndexError)
                     and ("invalid indices" in str(err))
                     and safeguard is SelectSafeguard
                 ):
