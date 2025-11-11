@@ -523,6 +523,11 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             data_windows = sliding_window_view(data_boundary, window, axis=axis)
             data_monotonic = self._monotonic_sign(data_windows, is_prediction=False)
 
+            valid_slice = [slice(None)] * data.ndim
+            if self._boundary == BoundaryCondition.valid:
+                valid_slice[axis] = slice(self._window, -self._window)
+            where_ = True if where is True else where[slice(valid_slice)]
+
             # compute, pointwise, if the element has a decreasing (lt),
             #  increasing (gt), or equality (eq) constraint imposed upon it
             # for the lt and gt variants, compute both a mask for accesses to
@@ -545,17 +550,21 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                     + [slice(None)] * (data_boundary.ndim - axis - 1)
                 )
 
+                # `where` is taken into account by only imposing constraints
+                #  from elements where the condition is True
+                # in the future, the monotonicity safeguard could be optimized
+                #  to only compute the monotonicity for those elements
                 if w > 0:
-                    elem_lt_left[s] |= data_monotonic == -1
+                    elem_lt_left[s] |= (data_monotonic == -1) & where_
                 if w < (window - 1):
-                    elem_lt_right[s] |= data_monotonic == -1
+                    elem_lt_right[s] |= (data_monotonic == -1) & where_
 
-                elem_eq[s] |= data_monotonic == 0
+                elem_eq[s] |= (data_monotonic == 0) & where_
 
                 if w > 0:
-                    elem_gt_left[s] |= data_monotonic == +1
+                    elem_gt_left[s] |= (data_monotonic == +1) & where_
                 if w < (window - 1):
-                    elem_gt_right[s] |= data_monotonic == +1
+                    elem_gt_right[s] |= (data_monotonic == +1) & where_
 
             if self._boundary == BoundaryCondition.valid:
                 s = tuple([slice(None)] * data.ndim)
@@ -782,8 +791,6 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         Lower(data.flatten()) <= zero_valid[
             (data.flatten() == 0) & any_restriction.flatten()
         ] <= Upper(data.flatten())
-
-        # TODO: take where into account
 
         return filtered_valid.union(zero_valid)
 
