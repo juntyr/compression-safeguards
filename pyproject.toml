@@ -44,6 +44,7 @@ examples = [
     "numcodecs-wasm-zfp~=0.6.0",
     # FIXME: https://github.com/dask/dask/issues/12072
     "pyarrow~=21.0.0",
+    "scikit-image~=0.25.0",
     "xarray~=2025.1",
 ]
 fuzz = ["atheris~=2.3", "setuptools~=80.0", "timeoutcontext~=1.2"]
