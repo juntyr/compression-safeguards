@@ -113,8 +113,14 @@ class SelectSafeguard(Safeguard):
                 ):
                     raise IndexError("invalid index") | ctx
 
-        if all(isinstance(safeguard, PointwiseSafeguard) for safeguard in safeguards_):
-            return _SelectPointwiseSafeguard(selector, *safeguards_)  # type: ignore
+        pointwise_safeguards_: list[PointwiseSafeguard] = [
+            safeguard
+            for safeguard in safeguards_
+            if isinstance(safeguard, PointwiseSafeguard)
+        ]
+
+        if len(pointwise_safeguards_) == len(safeguards_):
+            return _SelectPointwiseSafeguard(selector, *pointwise_safeguards_)
         else:
             return _SelectStencilSafeguard(selector, *safeguards_)
 

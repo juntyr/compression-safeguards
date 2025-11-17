@@ -1000,15 +1000,15 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                             eb_
                         )  # and then truncate it
                         _check_error_bound(self._type, eb_)
-                eb: np.ndarray[tuple[()] | tuple[int, ...], np.dtype[np.floating]] = (
-                    eb_ if eb_.shape == () else eb_.flatten()
+                eb: np.ndarray[tuple[()] | tuple[int], np.dtype[np.floating]] = (
+                    eb_ if eb_.shape == () else eb_.flatten()  # type: ignore
                 )
                 if where is not True and eb.shape != ():
                     eb = np.compress(where_flat, eb, axis=0)
 
         qoi_lower_upper: tuple[
-            np.ndarray[tuple[int, ...], np.dtype[np.floating]],
-            np.ndarray[tuple[int, ...], np.dtype[np.floating]],
+            np.ndarray[tuple[int], np.dtype[np.floating]],
+            np.ndarray[tuple[int], np.dtype[np.floating]],
         ] = _apply_finite_qoi_error_bound(
             self._type,
             eb,
@@ -1019,8 +1019,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         # compute the bounds in data space
         data_windows_float_lower_, data_windows_float_upper_ = (
             self._qoi_expr.compute_data_bounds(
-                qoi_lower.flatten(),
-                qoi_upper.flatten(),
+                qoi_lower,
+                qoi_upper,
                 data_windows_float,
                 late_bound_constants,
             )

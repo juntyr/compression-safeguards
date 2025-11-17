@@ -72,8 +72,8 @@ Land values, where there is no valid atmospheric data, are designated with the v
 | PRECIP | Total Precipitation (QGRAUP+QRAIN+QSNOW) | 0.00000/0.01672 | kg/kg |
 | P   | Pressure; weight of the atmosphere above a grid point | -5471.85791/3225.42578 | Pascals |
 | TC  | Temperature | -83.00402/31.51576 | Degrees Celsius |
-| U   | X wind component; west-east wind component in model coordinate, postive means winds blow from west to east | -79.47297/85.17703 | m s-1 |
-| V   | Y wind component; south-north wind component in model coordinate, postive means winds blow from south to north | -76.03391/82.95293 | m s-1 |
+| U   | X wind component; west-east wind component in model coordinate, positive means winds blow from west to east | -79.47297/85.17703 | m s-1 |
+| V   | Y wind component; south-north wind component in model coordinate, positive means winds blow from south to north | -76.03391/82.95293 | m s-1 |
 | W   | Z wind component; vertical wind component in model coordinate, positive means upward motion | -9.06026/28.61434 | m s-1 |
 
 Note: All of the 'Q' variables represent moisture in the atmosphere in one form or another. For example, rain water differs from cloud water in terms of their particle sizes. Rain water has larger drop sizes so they can fall through the air, while cloud water has smaller drop sizes so they stay in the air. Rain water differs from snow and graupel in terms of their densities, and so does cloud water from cloud ice.

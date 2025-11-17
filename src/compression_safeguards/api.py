@@ -452,7 +452,9 @@ class Safeguards:
         )
 
         if len(late_bound_builtin) > 0:
-            late_bound = late_bound.update(**late_bound_builtin)  # type: ignore
+            late_bound = late_bound.update(
+                **{str(p): v for p, v in late_bound_builtin.items()}
+            )
 
         return late_bound
 
@@ -1341,7 +1343,9 @@ class Safeguards:
         )
 
         if len(late_bound_builtin) > 0:
-            late_bound_chunk = late_bound_chunk.update(**late_bound_builtin)  # type: ignore
+            late_bound_chunk = late_bound_chunk.update(
+                **{str(p): v for p, v in late_bound_builtin.items()}
+            )
 
         where_chunk_: Literal[True] | np.ndarray[tuple[int, ...], np.dtype[np.bool]] = (
             True

@@ -88,8 +88,14 @@ class AllSafeguards(Safeguard):
                         )
                         safeguards_.append(safeguard)  # type: ignore
 
-        if all(isinstance(safeguard, PointwiseSafeguard) for safeguard in safeguards_):
-            return _AllPointwiseSafeguards(*safeguards_)  # type: ignore
+        pointwise_safeguards_: list[PointwiseSafeguard] = [
+            safeguard
+            for safeguard in safeguards_
+            if isinstance(safeguard, PointwiseSafeguard)
+        ]
+
+        if len(pointwise_safeguards_) == len(safeguards_):
+            return _AllPointwiseSafeguards(*pointwise_safeguards_)
         else:
             return _AllStencilSafeguards(*safeguards_)
 
