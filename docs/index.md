@@ -26,7 +26,7 @@ The [`compression-safeguards`][compression_safeguards] package provides several 
 We also provide the following integrations of the safeguards with popular compression APIs:
 
 - [`numcodecs-safeguards`][numcodecs_safeguards]: provides the [`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec] meta-compressor that conveniently applies safeguards to any compressor using the [`numcodecs.abc.Codec`][numcodecs.abc.Codec] API.
-- [`xarray-safeguards`][xarray_safeguards]: provides functionality to use safeguards with (chunked) [`xarray.DataArray`][xarray.DataArray]s.
+- [`xarray-safeguards`][xarray_safeguards]: provides functionality to use safeguards with (chunked) [`xarray.DataArray`][xarray.DataArray]s and cross-chunk boundary conditions.
 
 The safeguards can be adopted easily:
 
@@ -313,7 +313,7 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
 - ... a global extrema (minimum / maximum)?
 
-    > Use the `sign` safeguard with the `offset` corresponding to the extrema to ensure the extrema itself and its relationship to other values is preserved
+    > Use the `sign` safeguard with the `offset` corresponding to the extrema to ensure the extrema itself and its relationship to other values is preserved. When using the `numcodecs-safeguards` or `xarray-safeguards` frontend, the offset can be set to the automatically-provided `"$x_min"` or `"$x_max"` late-bound parameters directly. Note that two `sign` safeguards are necessary to preserve both the global minimum and global maximum.
 
 - ... local extrema or other topological features?
 

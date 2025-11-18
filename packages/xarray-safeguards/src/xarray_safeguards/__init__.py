@@ -11,9 +11,10 @@ your safety requirements, lossy compression can be applied safely and
 ## Overview
 
 This package provides functionality to use safeguards with (chunked)
-[`xarray.DataArray`][xarray.DataArray]s. Since applying safeguards to chunked
-data by yourself is very difficult and error-prone, this package handles all of
-the complexity for you with a simple and safe API.
+[`xarray.DataArray`][xarray.DataArray]s and cross-chunk boundary conditions.
+Since applying safeguards to chunked data by yourself is very difficult and
+error-prone, this package handles all of the complexity for you with a simple
+and safe API.
 
 In particular, `xarray-safeguards` provides the
 [`produce_data_array_correction`][.produce_data_array_correction]
