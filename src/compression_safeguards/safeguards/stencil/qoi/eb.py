@@ -8,13 +8,18 @@ from collections.abc import Sequence, Set
 from typing import ClassVar, Literal
 
 import numpy as np
-from numpy.lib.stride_tricks import sliding_window_view
 from typing_extensions import (
     Unpack,  # MSPV 3.11
     override,  # MSPV 3.12
 )
 
-from ....utils._compat import _ensure_array, _ones, _zeros
+from ....utils._compat import (
+    _ensure_array,
+    _ones,
+    _reshape,
+    _sliding_window_view,
+    _zeros,
+)
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import (
     ToFloatMode,
@@ -451,18 +456,18 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             window = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
 
             data_windows_float_: np.ndarray[tuple[int, ...], np.dtype[F]] = to_float(
-                sliding_window_view(
+                _sliding_window_view(
                     data_boundary,
                     window,
                     axis=tuple(axis.axis for axis in self._neighbourhood),
                     writeable=False,
-                ),  # type: ignore
+                ),
                 ftype=ftype,
             )
             qoi_shape: tuple[int, ...] = data_windows_float_.shape[: -len(window)]
             data_windows_float: np.ndarray[
                 tuple[int, Unpack[tuple[int, ...]]], np.dtype[F]
-            ] = data_windows_float_.reshape((-1,) + window)  # type: ignore
+            ] = _reshape(data_windows_float_, (-1, *window))
 
             late_bound_constants: dict[
                 Parameter, np.ndarray[tuple[int, Unpack[tuple[int, ...]]], np.dtype[F]]
@@ -488,18 +493,18 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                         )
                     late_windows_float_: np.ndarray[tuple[int, ...], np.dtype[F]] = (
                         to_float(
-                            sliding_window_view(
+                            _sliding_window_view(
                                 late_boundary,
                                 window,
                                 axis=tuple(axis.axis for axis in self._neighbourhood),
                                 writeable=False,
-                            ),  # type: ignore
+                            ),
                             ftype=ftype,
                         )
                     )
                     late_windows_float: np.ndarray[
                         tuple[int, Unpack[tuple[int, ...]]], np.dtype[F]
-                    ] = late_windows_float_.reshape((-1,) + window)  # type: ignore
+                    ] = _reshape(late_windows_float_, (-1, *window))
                     late_bound_constants[c] = late_windows_float
 
         qoi_: np.ndarray[tuple[int], np.dtype[F]] = self._qoi_expr.eval(
@@ -638,12 +643,12 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
             data_windows_float_: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
                 to_float(
-                    sliding_window_view(
+                    _sliding_window_view(
                         data_boundary,
                         window,
                         axis=tuple(axis.axis for axis in self._neighbourhood),
                         writeable=False,
-                    ),  # type: ignore
+                    ),
                     ftype=ftype,
                 )
             )
@@ -651,21 +656,21 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             prediction_windows_float_: np.ndarray[
                 tuple[int, ...], np.dtype[np.floating]
             ] = to_float(
-                sliding_window_view(
+                _sliding_window_view(
                     prediction_boundary,
                     window,
                     axis=tuple(axis.axis for axis in self._neighbourhood),
                     writeable=False,
-                ),  # type: ignore
+                ),
                 ftype=ftype,
             )
 
             data_windows_float: np.ndarray[
                 tuple[int, Unpack[tuple[int, ...]]], np.dtype[np.floating]
-            ] = data_windows_float_.reshape((-1,) + window)  # type: ignore
+            ] = _reshape(data_windows_float_, (-1, *window))
             prediction_windows_float: np.ndarray[
                 tuple[int, Unpack[tuple[int, ...]]], np.dtype[np.floating]
-            ] = prediction_windows_float_.reshape((-1,) + window)  # type: ignore
+            ] = _reshape(prediction_windows_float_, (-1, *window))
 
             late_bound_constants: dict[
                 Parameter,
@@ -693,17 +698,17 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     late_windows_float_: np.ndarray[
                         tuple[int, ...], np.dtype[np.floating]
                     ] = to_float(
-                        sliding_window_view(
+                        _sliding_window_view(
                             late_boundary,
                             window,
                             axis=tuple(axis.axis for axis in self._neighbourhood),
                             writeable=False,
-                        ),  # type: ignore
+                        ),
                         ftype=ftype,
                     )
                     late_windows_float: np.ndarray[
                         tuple[int, Unpack[tuple[int, ...]]], np.dtype[np.floating]
-                    ] = late_windows_float_.reshape((-1,) + window)  # type: ignore
+                    ] = _reshape(late_windows_float_, (-1, *window))
                     late_bound_constants[c] = late_windows_float
 
             valid_slice = [slice(None)] * data.ndim
@@ -906,19 +911,19 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
             data_windows_float_: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
                 to_float(
-                    sliding_window_view(
+                    _sliding_window_view(
                         data_boundary,
                         window,
                         axis=tuple(axis.axis for axis in self._neighbourhood),
                         writeable=False,
-                    ),  # type: ignore
+                    ),
                     ftype=ftype,
                 )
             )
             qoi_stencil_shape: tuple[int, ...] = data_windows_float_.shape
             data_windows_float: np.ndarray[
                 tuple[int, Unpack[tuple[int, ...]]], np.dtype[np.floating]
-            ] = data_windows_float_.reshape((-1,) + window)  # type: ignore
+            ] = _reshape(data_windows_float_, (-1, *window))
 
             late_bound_constants: dict[
                 Parameter,
@@ -946,17 +951,17 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     late_windows_float_: np.ndarray[
                         tuple[int, ...], np.dtype[np.floating]
                     ] = to_float(
-                        sliding_window_view(
+                        _sliding_window_view(
                             late_boundary,
                             window,
                             axis=tuple(axis.axis for axis in self._neighbourhood),
                             writeable=False,
-                        ),  # type: ignore
+                        ),
                         ftype=ftype,
                     )
                     late_windows_float: np.ndarray[
                         tuple[int, Unpack[tuple[int, ...]]], np.dtype[np.floating]
-                    ] = late_windows_float_.reshape((-1,) + window)  # type: ignore
+                    ] = _reshape(late_windows_float_, (-1, *window))
                     late_bound_constants[c] = late_windows_float
 
             valid_slice = [slice(None)] * data.ndim
@@ -1167,12 +1172,14 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 axis.boundary,
                 axis.before,
                 axis.after,
-                None if axis.constant_boundary is None else np.array(False),  # type: ignore
+                None
+                if axis.constant_boundary is None
+                else _zeros((), np.dtype(np.bool)),
                 axis.axis,
             )
 
         foot_windows: np.ndarray[tuple[int, ...], np.dtype[np.bool]] = (
-            sliding_window_view(  # type: ignore
+            _sliding_window_view(
                 foot_boundary,
                 window,
                 axis=tuple(axis.axis for axis in self._neighbourhood),

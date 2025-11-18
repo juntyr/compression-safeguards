@@ -6,10 +6,10 @@ from typing_extensions import override  # MSPV 3.12
 
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
+from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
 from .literal import Number
-from .typing import F, Ns, Ps, np_sndarray
 
 
 class ScalarNegate(Expr[AnyExpr]):

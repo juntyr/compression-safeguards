@@ -7,8 +7,8 @@ from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import _broadcast_to, _e, _pi
 from ....utils.bindings import Parameter
+from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, EmptyExpr
-from .typing import F, Ns, Ps, np_sndarray
 
 
 class Number(EmptyExpr):

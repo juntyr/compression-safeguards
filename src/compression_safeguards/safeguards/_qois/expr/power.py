@@ -24,10 +24,10 @@ from ..bound import (
     guarantee_arg_within_expr_bounds,
     guarantee_stacked_arg_within_expr_bounds,
 )
+from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
 from .literal import Number
-from .typing import F, Ns, Ps, np_sndarray
 
 
 class ScalarPower(Expr[AnyExpr, AnyExpr]):

@@ -6,9 +6,9 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import _ensure_array, _is_sign_negative_number
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
+from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
-from .typing import F, Ns, Ps, np_sndarray
 
 
 class ScalarAbs(Expr[AnyExpr]):

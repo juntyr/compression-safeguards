@@ -67,7 +67,7 @@ class QoIParser(Parser):
         self._I = I
         self._vars = dict()
 
-    def parse(self, text: str, tokens):  # type: ignore
+    def parse2(self, text: str, tokens):
         self._text = text
         tokens, tokens2 = itertools.tee(tokens)
 

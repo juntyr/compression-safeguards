@@ -20,7 +20,7 @@ from ....utils._compat import (
 from ....utils.bindings import Parameter
 from ....utils.error import QuantityOfInterestRuntimeWarning
 from ..bound import DataBounds, data_bounds_checks, guarantee_data_within_expr_bounds
-from .typing import Es, F, Ns, Ps, np_sndarray
+from ..typing import Es, F, Ns, Ps, np_sndarray
 
 if TYPE_CHECKING:
     from .literal import Number
@@ -447,4 +447,4 @@ if sys.version_info >= (3, 11) or TYPE_CHECKING:
     EmptyExpr: TypeAlias = Expr[()]
     """ Expression with zero arguments """
 else:
-    EmptyExpr: TypeAlias = Expr  # type: ignore
+    EmptyExpr: TypeAlias = Expr

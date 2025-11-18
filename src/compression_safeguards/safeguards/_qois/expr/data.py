@@ -8,8 +8,8 @@ from ....utils._compat import _broadcast_to, _is_of_shape, _ones
 from ....utils.bindings import Parameter
 from ....utils.error import QuantityOfInterestRuntimeWarning
 from ..bound import DataBounds, data_bounds
+from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, EmptyExpr
-from .typing import F, Ns, Ps, np_sndarray
 
 
 class Data(EmptyExpr):
@@ -152,7 +152,7 @@ class LateBoundConstant(EmptyExpr):
         return ()
 
     @override
-    def with_args(self) -> "LateBoundConstant":  # type: ignore
+    def with_args(self) -> "LateBoundConstant":
         return LateBoundConstant(self._name, self._index)
 
     @override  # type: ignore

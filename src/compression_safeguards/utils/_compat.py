@@ -10,11 +10,14 @@ __all__ = [
     "_minimum_zero_sign_sensitive",
     "_maximum_zero_sign_sensitive",
     "_where",
+    "_reshape",
     "_broadcast_to",
     "_stack",
     "_ensure_array",
     "_ones",
     "_zeros",
+    "_logical_and",
+    "_sliding_window_view",
     "_is_sign_negative_number",
     "_is_negative_zero",
     "_is_sign_positive_number",
@@ -31,6 +34,7 @@ from collections.abc import Sequence
 from typing import Literal, TypeGuard, TypeVar, overload
 
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
 
 from ._float128 import (
     _float128,
@@ -43,7 +47,7 @@ from ._float128 import (
     _float128_smallest_subnormal,
     _float128_type,
 )
-from .typing import F, Fi, S, Si, T, Ti
+from .typing import TB, F, Fi, S, Si, T, Ti
 
 N = TypeVar("N", bound=int, covariant=True)
 """ Any [`int`][int] (covariant). """
@@ -266,17 +270,9 @@ def _maximum_zero_sign_sensitive(a, b):
 @overload
 def _where(
     cond: np.ndarray[S, np.dtype[np.bool]],
-    a: np.ndarray[S, np.dtype[T]],
-    b: np.ndarray[S, np.dtype[T]],
-) -> np.ndarray[S, np.dtype[T]]: ...
-
-
-@overload
-def _where(
-    cond: np.ndarray[S, np.dtype[np.bool]],
-    a: np.ndarray[S, np.dtype[np.bool]],
-    b: np.ndarray[S, np.dtype[np.bool]],
-) -> np.ndarray[S, np.dtype[np.bool]]: ...
+    a: np.ndarray[S, np.dtype[TB]],
+    b: np.ndarray[S, np.dtype[TB]],
+) -> np.ndarray[S, np.dtype[TB]]: ...
 
 
 @overload
@@ -287,17 +283,18 @@ def _where(cond, a, b):
     return np.where(cond, a, b)
 
 
+# wrapper around np.reshape but with better type hints
+def _reshape(
+    a: np.ndarray[tuple[int, ...], np.dtype[TB]], shape: Si
+) -> np.ndarray[Si, np.dtype[TB]]:
+    return np.reshape(a, shape)
+
+
 # wrapper around np.broadcast_to but with better type hints
 @overload
 def _broadcast_to(
-    a: np.ndarray[tuple[int, ...], np.dtype[T]], shape: Si
-) -> np.ndarray[Si, np.dtype[T]]: ...
-
-
-@overload
-def _broadcast_to(
-    a: np.ndarray[tuple[int, ...], np.dtype[np.bool]], shape: Si
-) -> np.ndarray[Si, np.dtype[np.bool]]: ...
+    a: np.ndarray[tuple[int, ...], np.dtype[TB]], shape: Si
+) -> np.ndarray[Si, np.dtype[TB]]: ...
 
 
 @overload
@@ -326,48 +323,45 @@ def _stack(arrays):
 
 
 # wrapper around np.array(a, copy=(copy=None)) but with better type hints
-@overload
 def _ensure_array(
-    a: np.ndarray[S, np.dtype[T]], copy: None | bool = None
-) -> np.ndarray[S, np.dtype[T]]: ...
-
-
-@overload
-def _ensure_array(
-    a: np.ndarray[S, np.dtype[np.bool]], copy: None | bool = None
-) -> np.ndarray[S, np.dtype[np.bool]]: ...
-
-
-def _ensure_array(a, copy=None):
-    return np.array(a, copy=copy)  # type: ignore
+    a: np.ndarray[S, np.dtype[TB]], copy: None | bool = None
+) -> np.ndarray[S, np.dtype[TB]]:
+    return np.array(a, copy=copy)
 
 
 # wrapper around np.ones but with better type hints
-@overload
-def _ones(shape: Si, dtype: np.dtype[T]) -> np.ndarray[Si, np.dtype[T]]: ...
-
-
-@overload
-def _ones(shape: Si, dtype: np.dtype[np.bool]) -> np.ndarray[Si, np.dtype[np.bool]]: ...
-
-
-def _ones(shape, dtype):
+def _ones(shape: Si, dtype: np.dtype[TB]) -> np.ndarray[Si, np.dtype[TB]]:
     return np.ones(shape, dtype=dtype)
 
 
 # wrapper around np.zeros but with better type hints
-@overload
-def _zeros(shape: Si, dtype: np.dtype[T]) -> np.ndarray[Si, np.dtype[T]]: ...
-
-
-@overload
-def _zeros(
-    shape: Si, dtype: np.dtype[np.bool]
-) -> np.ndarray[Si, np.dtype[np.bool]]: ...
-
-
-def _zeros(shape, dtype):
+def _zeros(shape: Si, dtype: np.dtype[TB]) -> np.ndarray[Si, np.dtype[TB]]:
     return np.zeros(shape, dtype=dtype)
+
+
+# wrapper around np.logical_and with better type hints
+def _logical_and(
+    a: np.ndarray[S, np.dtype[np.bool]],
+    b: Literal[True] | np.ndarray[S, np.dtype[np.bool]],
+) -> np.ndarray[S, np.dtype[np.bool]]:
+    return a & b  # type: ignore
+
+
+# wrapper around np.lib.stride_tricks.sliding_window_view with better type hints
+def _sliding_window_view(
+    a: np.ndarray[tuple[int, ...], np.dtype[TB]],
+    window_shape: int | tuple[int, ...],
+    *,
+    axis: int | tuple[int, ...],
+    writeable: Literal[False],
+) -> np.ndarray[tuple[int, ...], np.dtype[TB]]:
+    return sliding_window_view(
+        a,
+        window_shape,
+        # the docs say that tuple[int, ...] is allowed here
+        axis=axis,  # type: ignore
+        writeable=writeable,
+    )
 
 
 # wrapper around a < 0 that also works for -0.0 (is negative) but excludes NaNs

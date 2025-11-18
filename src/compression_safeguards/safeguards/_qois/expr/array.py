@@ -10,13 +10,13 @@ from typing_extensions import (
 
 from ....utils.bindings import Parameter
 from ....utils.error import ctx
+from ..typing import Es, F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .addsub import ScalarLeftAssociativeSum
 from .constfold import ScalarFoldedConstant
 from .data import Data
 from .divmul import ScalarMultiply
 from .group import Group
-from .typing import Es, F, Ns, Ps, np_sndarray
 
 
 class Array(Expr[AnyExpr, Unpack[tuple[AnyExpr, ...]]]):

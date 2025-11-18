@@ -235,7 +235,7 @@ def from_float(
     ----------
     x : np.ndarray[S, np.dtype[F]]
         The floating-point array to re-convert.
-    dtype : np.dtype
+    dtype : np.dtype[T]
         The original dtype.
 
     Returns

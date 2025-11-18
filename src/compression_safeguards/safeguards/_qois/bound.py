@@ -11,7 +11,7 @@ from ...utils._compat import (
     _nextafter,
 )
 from ...utils.error import QuantityOfInterestRuntimeWarning
-from .expr.typing import Ci, F, J, Ns, Ps, np_sndarray
+from .typing import Ci, F, J, Ns, Ps, Ps2, np_sndarray, np_sndarray2
 
 
 def guarantee_arg_within_expr_bounds(
@@ -54,13 +54,13 @@ def guarantee_arg_within_expr_bounds(
         `isnan(exprv) & isnan(expr(argv_bound_guess))`.
     """
 
-    return guarantee_data_within_expr_bounds(  # type: ignore
-        expr,  # type: ignore
-        exprv,  # type: ignore
-        argv,  # type: ignore
-        argv_bound_guess,  # type: ignore
-        expr_lower,  # type: ignore
-        expr_upper,  # type: ignore
+    return _guarantee_data_within_expr_bounds_inner(
+        expr,
+        exprv,
+        argv,
+        argv_bound_guess,
+        expr_lower,
+        expr_upper,
         warn_on_bounds_exceeded=False,
     )
 
@@ -105,13 +105,13 @@ def guarantee_stacked_arg_within_expr_bounds(
         `isnan(exprv) & isnan(expr(argv_bound_guess))`.
     """
 
-    return guarantee_data_within_expr_bounds(
-        expr,  # type: ignore
-        exprv,  # type: ignore
-        argv,  # type: ignore
-        argv_bound_guess,  # type: ignore
-        expr_lower,  # type: ignore
-        expr_upper,  # type: ignore
+    return _guarantee_data_within_expr_bounds_inner(
+        expr,
+        exprv,
+        argv,
+        argv_bound_guess,
+        expr_lower,
+        expr_upper,
         warn_on_bounds_exceeded=False,
     )
 
@@ -162,6 +162,30 @@ def guarantee_data_within_expr_bounds(
         `isnan(exprv) & isnan(expr(Xs_bound_guess))`.
     """
 
+    return _guarantee_data_within_expr_bounds_inner(
+        expr,
+        exprv,
+        Xs,
+        Xs_bound_guess,
+        expr_lower,
+        expr_upper,
+        warn_on_bounds_exceeded=warn_on_bounds_exceeded,
+    )
+
+
+def _guarantee_data_within_expr_bounds_inner(
+    expr: Callable[
+        [np_sndarray2[Ps2, Ns, np.dtype[F]]],
+        np.ndarray[Ps2, np.dtype[F]],
+    ],
+    exprv: np.ndarray[Ps2, np.dtype[F]],
+    Xs: np_sndarray2[Ps2, Ns, np.dtype[F]],
+    Xs_bound_guess: np_sndarray2[Ps2, Ns, np.dtype[F]],
+    expr_lower: np.ndarray[Ps2, np.dtype[F]],
+    expr_upper: np.ndarray[Ps2, np.dtype[F]],
+    *,
+    warn_on_bounds_exceeded: bool,
+) -> np_sndarray2[Ps2, Ns, np.dtype[F]]:
     exprv = _ensure_array(exprv)
     Xs = _ensure_array(Xs)
     Xs_bound_guess = _ensure_array(Xs_bound_guess, copy=True)
@@ -175,18 +199,18 @@ def guarantee_data_within_expr_bounds(
 
     # check if any derived expression exceeds the expression bounds
     def exceeds_expr_bounds(
-        Xs_bound_guess: np_sndarray[Ps, Ns, np.dtype[F]],
-    ) -> np_sndarray[Ps, Ns, np.dtype[np.bool]]:
+        Xs_bound_guess: np_sndarray2[Ps2, Ns, np.dtype[F]],
+    ) -> np_sndarray2[Ps2, Ns, np.dtype[np.bool]]:
         exprv_Xs_bound_guess = expr(Xs_bound_guess)
 
-        in_bounds: np.ndarray[tuple[Ps], np.dtype[np.bool]] = (
+        in_bounds: np.ndarray[Ps2, np.dtype[np.bool]] = (
             np.isnan(exprv) & np.isnan(exprv_Xs_bound_guess)
         ) | (
             np.greater_equal(exprv_Xs_bound_guess, expr_lower)
             & np.less_equal(exprv_Xs_bound_guess, expr_upper)
         )
 
-        bounds_exceeded: np_sndarray[Ps, Ns, np.dtype[np.bool]] = _broadcast_to(
+        bounds_exceeded: np_sndarray2[Ps2, Ns, np.dtype[np.bool]] = _broadcast_to(
             (~in_bounds).reshape(exprv.shape + (1,) * (Xs.ndim - exprv.ndim)),
             Xs.shape,
         )

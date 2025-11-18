@@ -17,12 +17,12 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_stacked_arg_within_expr_bounds
+from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .abs import ScalarAbs
 from .constfold import ScalarFoldedConstant
 from .literal import Number
 from .neg import ScalarNegate
-from .typing import F, Ns, Ps, np_sndarray
 
 
 class ScalarAdd(Expr[AnyExpr, AnyExpr]):

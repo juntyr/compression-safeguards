@@ -14,8 +14,8 @@ from ....utils.error import ctx
 from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import S, T
 from ..bound import DataBounds, data_bounds
+from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, EmptyExpr
-from .typing import F, Ns, Ps, np_sndarray
 
 
 class HashingExpr(EmptyExpr):

@@ -18,7 +18,7 @@ from typing_extensions import (
 
 from ._compat import _broadcast_to
 from .cast import lossless_cast, saturating_finite_float_cast
-from .error import LateBoundParameterResolutionError, ctx
+from .error import LateBoundParameterResolutionError, TypeCheckError, ctx
 from .typing import JSON, F, Si, T
 
 
@@ -109,7 +109,7 @@ class Bindings:
             The updated bindings.
         """
 
-        return type(self)(**self._bindings, **kwargs)  # type: ignore
+        return type(self)(**{str(p): v for p, v in self._bindings.items()}, **kwargs)
 
     def __contains__(self, param: Parameter) -> bool:
         """
@@ -373,9 +373,9 @@ class Bindings:
             )
             return value[value_index]
 
-        return type(self)(  # type: ignore
+        return type(self)(
             **{
-                param: apply_index_to_value(value)
+                str(param): apply_index_to_value(value)
                 for param, value in self._bindings.items()
             }
         )
@@ -423,9 +423,9 @@ class Bindings:
             value_shift = tuple(s if a > 1 else 0 for s, a in zip(shift, value.shape))
             return np.roll(value, value_shift, axis=tuple(range(value.ndim)))
 
-        return type(self)(  # type: ignore
+        return type(self)(
             **{
-                param: apply_roll_to_value(value)
+                str(param): apply_roll_to_value(value)
                 for param, value in self._bindings.items()
             }
         )
@@ -469,8 +469,10 @@ _NPZ_DATA_URI_BASE64: str = "data:application/x-npz;base64,"
 
 def _encode_value(p: Parameter, v: Value) -> int | float | str:
     # we cannot use isinstance here since np.float64 is a subclass of float
-    if type(v) in (int, float):
-        return v  # type: ignore
+    if type(v) is int:
+        return v
+    if type(v) is float:
+        return v
 
     io = BytesIO()
     np.savez_compressed(io, allow_pickle=False, **{str(p): v})
@@ -479,6 +481,8 @@ def _encode_value(p: Parameter, v: Value) -> int | float | str:
 
 
 def _decode_value(p: Parameter, v: int | float | str) -> Value:
+    TypeCheckError.check_instance_or_raise(v, int | float | str)
+
     if isinstance(v, int | float):
         return v
 

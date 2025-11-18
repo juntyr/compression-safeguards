@@ -10,7 +10,7 @@ from typing import ClassVar, Literal
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ...utils._compat import _ensure_array
+from ...utils._compat import _ensure_array, _logical_and
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import ToFloatMode, as_bits, saturating_finite_float_cast, to_float
 from ...utils.error import TypeCheckError, ctx, lookup_enum_or_raise
@@ -303,7 +303,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             The footprint of the `foot` array.
         """
 
-        return foot & where  # type: ignore
+        return _logical_and(foot, where)
 
     @override
     def get_config(self) -> dict[str, JSON]:

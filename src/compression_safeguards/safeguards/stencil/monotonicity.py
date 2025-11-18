@@ -10,7 +10,6 @@ from operator import ge, gt, le, lt
 from typing import ClassVar, Literal
 
 import numpy as np
-from numpy.lib.stride_tricks import sliding_window_view
 from typing_extensions import (
     assert_never,  # MSPV 3.11
     override,  # MSPV 3.12
@@ -21,6 +20,7 @@ from ...utils._compat import (
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
     _ones,
+    _sliding_window_view,
     _zeros,
 )
 from ...utils.bindings import Bindings, Parameter
@@ -388,14 +388,14 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             )
 
             data_windows: np.ndarray[tuple[int, int], np.dtype[T]] = (
-                sliding_window_view(data_boundary, window, axis=axis).reshape(
-                    (-1, window)
-                )
+                _sliding_window_view(
+                    data_boundary, window, axis=axis, writeable=False
+                ).reshape((-1, window))
             )
             prediction_windows: np.ndarray[tuple[int, int], np.dtype[T]] = (
-                sliding_window_view(prediction_boundary, window, axis=axis).reshape(
-                    (-1, window)
-                )
+                _sliding_window_view(
+                    prediction_boundary, window, axis=axis, writeable=False
+                ).reshape((-1, window))
             )
 
             valid_slice = [slice(None)] * data.ndim
@@ -520,7 +520,9 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 constant_boundary,
                 axis,
             )
-            data_windows = sliding_window_view(data_boundary, window, axis=axis)
+            data_windows = _sliding_window_view(
+                data_boundary, window, axis=axis, writeable=False
+            )
             data_monotonic = self._monotonic_sign(data_windows, is_prediction=False)
 
             valid_slice = [slice(None)] * data.ndim
@@ -766,8 +768,12 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
         # Hacker's Delight's algorithm to compute (a + b) / 2:
         #  ((a ^ b) >> 1) + (a & b)
-        valid._lower = from_total_order(((lt ^ dt) >> 1) + (lt & dt), data.dtype)  # type: ignore
-        valid._upper = from_total_order(((ut ^ dt) >> 1) + (ut & dt), data.dtype)  # type: ignore
+        valid._lower = from_total_order(
+            (np.bitwise_xor(lt, dt) >> 1) + (lt & dt), data.dtype
+        )
+        valid._upper = from_total_order(
+            (np.bitwise_xor(ut, dt) >> 1) + (ut & dt), data.dtype
+        )
 
         # ensure that non-NaN values remain non-NaN since they can otherwise
         #  invalidate the monotonicity of their window
@@ -856,7 +862,9 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 self._boundary,
                 self._window,
                 self._window,
-                None if axis.constant_boundary is None else np.array(False),  # type: ignore
+                None
+                if self._constant_boundary is None
+                else _zeros((), np.dtype(np.bool)),
                 axis,
             )
 
@@ -864,7 +872,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             return np.zeros_like(foot)
 
         foot_windows: np.ndarray[tuple[int, ...], np.dtype[np.bool]] = (
-            sliding_window_view(  # type: ignore
+            _sliding_window_view(
                 foot_boundary,
                 tuple(axis.before + 1 + axis.after for axis in neighbourhood),
                 axis=tuple(axis.axis for axis in neighbourhood),

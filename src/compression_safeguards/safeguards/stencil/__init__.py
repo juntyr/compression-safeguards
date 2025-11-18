@@ -9,16 +9,16 @@ from functools import reduce
 from typing import Literal
 
 import numpy as np
-from numpy.lib.stride_tricks import sliding_window_view
 from typing_extensions import (
     Self,  # MSPV 3.11
     assert_never,  # MSPV 3.11
     override,  # MSPV 3.12
 )
 
+from ...utils._compat import _sliding_window_view
 from ...utils.bindings import Parameter
 from ...utils.error import TypeCheckError, ctx, lookup_enum_or_raise
-from ...utils.typing import JSON, S, T
+from ...utils.typing import JSON, TB, S
 
 
 class BoundaryCondition(Enum):
@@ -339,20 +339,20 @@ class NeighbourhoodBoundaryAxis:
 
 
 def _pad_with_boundary(
-    a: np.ndarray[S, np.dtype[T]],
+    a: np.ndarray[S, np.dtype[TB]],
     boundary: BoundaryCondition,
     pad_before: int,
     pad_after: int,
-    constant: None | np.ndarray[tuple[()], np.dtype[T]],
+    constant: None | np.ndarray[tuple[()], np.dtype[TB]],
     axis: int,
-) -> np.ndarray[tuple[int, ...], np.dtype[T]]:
+) -> np.ndarray[tuple[int, ...], np.dtype[TB]]:
     if (axis >= a.ndim) or (axis < -a.ndim):
         return a
 
     pad_width = [(0, 0)] * a.ndim
     pad_width[axis] = (pad_before, pad_after)
 
-    kwargs = dict()
+    kwargs: dict[str, None | str | np.ndarray[tuple[()], np.dtype[TB]]] = dict()
     match boundary:
         case BoundaryCondition.valid:
             return a
@@ -363,10 +363,10 @@ def _pad_with_boundary(
             mode = "edge"
         case BoundaryCondition.reflect:
             mode = "reflect"
-            kwargs["reflect_type"] = "even"  # type: ignore
+            kwargs["reflect_type"] = "even"
         case BoundaryCondition.symmetric:
             mode = "symmetric"
-            kwargs["reflect_type"] = "even"  # type: ignore
+            kwargs["reflect_type"] = "even"
         case BoundaryCondition.wrap:
             mode = "wrap"
         case _:
@@ -395,10 +395,10 @@ def _reverse_neighbourhood_indices(
             axis.boundary,
             axis.before,
             axis.after,
-            None if axis.constant_boundary is None else np.array(data_size),  # type: ignore
+            None if axis.constant_boundary is None else np.full((), data_size),
             axis.axis,
         )
-    indices_windows = sliding_window_view(  # type: ignore
+    indices_windows = _sliding_window_view(
         indices_boundary,
         window,
         axis=tuple(axis.axis for axis in neighbourhood),
@@ -409,7 +409,7 @@ def _reverse_neighbourhood_indices(
     # i.e. for each data element, which derived elements does it contribute to
     #      and thus which data bounds affect it
     reverse_indices_windows = np.full(
-        (data_size, np.sum(window_used)), indices_windows.size
+        (data_size, np.sum(window_used.astype(int))), indices_windows.size
     )
     reverse_indices_counter = np.zeros(data_size, dtype=np.intp)
     for i, u in enumerate(window_used.flat):
@@ -442,4 +442,4 @@ def _reverse_neighbourhood_indices(
                 ) + i
                 reverse_indices_counter[idx] += 1
 
-    return reverse_indices_windows  # type: ignore
+    return reverse_indices_windows

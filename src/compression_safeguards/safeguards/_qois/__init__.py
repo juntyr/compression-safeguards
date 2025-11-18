@@ -5,7 +5,7 @@ from collections.abc import Mapping, Set
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ...utils._compat import _ensure_array
+from ...utils._compat import _ensure_array, _zeros
 from ...utils.bindings import Parameter
 from ...utils.error import ctx
 from ..qois import (
@@ -16,9 +16,9 @@ from .expr.abc import AnyExpr, Expr
 from .expr.array import Array
 from .expr.constfold import ScalarFoldedConstant
 from .expr.data import Data
-from .expr.typing import F, Ns, Ps, np_sndarray
 from .lexer import QoILexer
 from .parser import QoIParser
+from .typing import F, Ns, Ps, coerce_to_flat, np_sndarray
 
 
 class PointwiseQuantityOfInterest:
@@ -45,7 +45,7 @@ class PointwiseQuantityOfInterest:
         lexer = QoILexer()
         parser = QoIParser(x=Data.SCALAR, X=None, I=None)
 
-        expr = parser.parse(qoi, lexer.tokenize(qoi))
+        expr = parser.parse2(qoi, lexer.tokenize(qoi))
         assert isinstance(expr, Expr)
 
         if isinstance(expr, Array):
@@ -68,6 +68,10 @@ class PointwiseQuantityOfInterest:
 
         late_bound_constants = expr.late_bound_constants
 
+        dummy_pointwise: np.ndarray[tuple[int], np.dtype[np.float64]] = _zeros(
+            (0,), np.dtype(np.float64)
+        )
+
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
@@ -76,10 +80,10 @@ class PointwiseQuantityOfInterest:
             _canary_data_bounds = ScalarFoldedConstant.constant_fold_expr(
                 expr, np.dtype(np.float64)
             ).compute_data_bounds(
-                np.empty(0, dtype=np.float64),
-                np.empty(0, dtype=np.float64),
-                np.empty(0, dtype=np.float64),
-                {c: np.empty(0, dtype=np.float64) for c in late_bound_constants},
+                dummy_pointwise,
+                dummy_pointwise,
+                dummy_pointwise,
+                {c: dummy_pointwise for c in late_bound_constants},
             )
 
         self._expr = expr
@@ -157,11 +161,16 @@ class PointwiseQuantityOfInterest:
         qoi_upper = _ensure_array(qoi_upper)
         X = _ensure_array(X)
         expr = ScalarFoldedConstant.constant_fold_expr(self._expr, X.dtype)
-        X_lower: np.ndarray[tuple[Ps], np.dtype[F]]
-        X_upper: np.ndarray[tuple[Ps], np.dtype[F]]
-        X_lower, X_upper = expr.compute_data_bounds(qoi_lower, qoi_upper, X, late_bound)  # type: ignore
-        X_lower = _ensure_array(X_lower)
-        X_upper = _ensure_array(X_upper)
+        X_lower_upper: tuple[
+            np_sndarray[Ps, tuple[()], np.dtype[F]],
+            np_sndarray[Ps, tuple[()], np.dtype[F]],
+        ] = expr.compute_data_bounds(qoi_lower, qoi_upper, X, late_bound)
+        X_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            coerce_to_flat(X_lower_upper[0])
+        )
+        X_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            coerce_to_flat(X_lower_upper[1])
+        )
         assert X_lower.dtype == X.dtype
         assert X_upper.dtype == X.dtype
         assert X_lower.shape == X.shape
@@ -222,7 +231,7 @@ class StencilQuantityOfInterest:
             x=Data(index=stencil_I), X=Array.from_data_shape(stencil_shape), I=stencil_I
         )
 
-        expr = parser.parse(qoi, lexer.tokenize(qoi))
+        expr = parser.parse2(qoi, lexer.tokenize(qoi))
         assert isinstance(expr, Expr)
 
         if isinstance(expr, Array):
@@ -245,6 +254,13 @@ class StencilQuantityOfInterest:
 
         late_bound_constants = expr.late_bound_constants
 
+        dummy_pointwise: np.ndarray[tuple[int], np.dtype[np.float64]] = _zeros(
+            (0,), np.dtype(np.float64)
+        )
+        dummy_stencil: np_sndarray[int, tuple[int, ...], np.dtype[np.float64]] = _zeros(
+            (0, *stencil_shape), np.dtype(np.float64)
+        )
+
         with np.errstate(
             divide="ignore", over="ignore", under="ignore", invalid="ignore"
         ):
@@ -253,13 +269,10 @@ class StencilQuantityOfInterest:
             _canary_data_bounds = ScalarFoldedConstant.constant_fold_expr(
                 expr, np.dtype(np.float64)
             ).compute_data_bounds(
-                np.empty((0,), dtype=np.float64),
-                np.empty((0,), dtype=np.float64),
-                np.empty((0,) + stencil_shape, dtype=np.float64),  # type: ignore
-                {
-                    c: np.empty((0,) + stencil_shape, dtype=np.float64)  # type: ignore
-                    for c in late_bound_constants
-                },
+                dummy_pointwise,
+                dummy_pointwise,
+                dummy_stencil,
+                {c: dummy_stencil for c in late_bound_constants},
             )
 
         self._expr = expr

@@ -23,7 +23,7 @@ from typing_extensions import (
     override,  # MSPV 3.12
 )
 
-from ._compat import _ensure_array, _nextafter, _where, _zeros
+from ._compat import _ensure_array, _nextafter, _reshape, _where, _zeros
 from ._compat import _maximum_zero_sign_sensitive as _np_maximum
 from ._compat import _minimum_zero_sign_sensitive as _np_minimum
 from .cast import as_bits, from_total_order, to_total_order
@@ -171,10 +171,10 @@ class Interval(Generic[T, N]):
             The empty interval
         """
 
-        single = IntervalUnion.empty(dtype, n, 1)
+        single: IntervalUnion[T, Ni, Literal[1]] = IntervalUnion.empty(dtype, n, 1)
         return Interval(
-            _lower=single._lower.reshape(-1),  # type: ignore
-            _upper=single._upper.reshape(-1),  # type: ignore
+            _lower=single._lower[0],
+            _upper=single._upper[0],
         )
 
     @staticmethod
@@ -523,8 +523,8 @@ class Interval(Generic[T, N]):
         """
 
         return IntervalUnion(
-            _lower=self._lower.reshape(1, -1),  # type: ignore
-            _upper=self._upper.reshape(1, -1),  # type: ignore
+            _lower=_reshape(self._lower, (1, self.n)),
+            _upper=_reshape(self._upper, (1, self.n)),
         )
 
     def preserve_only_where(
@@ -1113,7 +1113,7 @@ class IntervalUnion(Generic[T, N, U]):
                 other_flat <= to_total_order(self._upper[i])
             )
 
-        return is_contained.reshape(other.shape)  # type: ignore
+        return _reshape(is_contained, other.shape)
 
     def _pick_simple(
         self, prediction: np.ndarray[S, np.dtype[T]]
@@ -1177,8 +1177,7 @@ class IntervalUnion(Generic[T, N, U]):
                 where=(ut >= lt),
             )
 
-        pick: np.ndarray[S, np.dtype[T]] = pick_flat.reshape(prediction.shape)  # type: ignore
-        return pick
+        return _reshape(pick_flat, prediction.shape)
 
     def _pick_more_zeros(
         self, prediction: np.ndarray[S, np.dtype[T]]
@@ -1194,7 +1193,7 @@ class IntervalUnion(Generic[T, N, U]):
         # 1. convert everything to bits in total order
         prediction_bits: np.ndarray[
             tuple[Literal[1], int], np.dtype[np.unsignedinteger]
-        ] = to_total_order(prediction).reshape(1, -1)  # type: ignore
+        ] = _reshape(to_total_order(prediction), (1, -1))
 
         lower: np.ndarray[tuple[U, N], np.dtype[np.unsignedinteger]] = to_total_order(
             self._lower
@@ -1286,9 +1285,9 @@ class IntervalUnion(Generic[T, N, U]):
         np.copyto(pick_bits, prediction_bits, where=contains_prediction, casting="no")
 
         # 13. convert everything back from total-ordered bits to value space
-        pick: np.ndarray[S, np.dtype[T]] = from_total_order(
-            pick_bits, prediction.dtype
-        ).reshape(prediction.shape)  # type: ignore
+        pick: np.ndarray[S, np.dtype[T]] = _reshape(
+            from_total_order(pick_bits, prediction.dtype), prediction.shape
+        )
         assert np.all(self.contains(pick))
 
         return pick
@@ -1341,16 +1340,16 @@ def _count_leading_zeros(
     if nbits <= 16:
         # safe cast from integer type to a larger integer type,
         # then lossless truncation of the number of leading zeros
-        return (nbits - np.frexp(x.astype(np.uint32, casting="safe"))[1]).astype(  # type: ignore
-            np.uint8, casting="unsafe"
-        )
+        return np.subtract(
+            nbits, np.frexp(x.astype(np.uint32, casting="safe"))[1]
+        ).astype(np.uint8, casting="unsafe")
 
     if nbits <= 32:
         # safe cast from integer type to a larger integer type,
         # then lossless truncation of the number of leading zeros
-        return (nbits - np.frexp(x.astype(np.uint64, casting="safe"))[1]).astype(  # type: ignore
-            np.uint8, casting="unsafe"
-        )
+        return np.subtract(
+            nbits, np.frexp(x.astype(np.uint64, casting="safe"))[1]
+        ).astype(np.uint8, casting="unsafe")
 
     # nbits <= 64
     # safe cast from integer type to a larger integer type,
@@ -1360,4 +1359,4 @@ def _count_leading_zeros(
     high_exp += 32
     exp = _ensure_array(low_exp)
     np.copyto(exp, high_exp, where=(high_exp > 32), casting="no")
-    return (nbits - exp).astype(np.uint8, casting="unsafe")  # type: ignore
+    return (nbits - exp).astype(np.uint8, casting="unsafe")

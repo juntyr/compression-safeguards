@@ -10,7 +10,7 @@ from typing import ClassVar, Literal
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ...utils._compat import _ensure_array, _floating_smallest_subnormal
+from ...utils._compat import _ensure_array, _floating_smallest_subnormal, _logical_and
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
 from ...utils.error import TypeCheckError, ctx
@@ -209,7 +209,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             The footprint of the `foot` array.
         """
 
-        return foot & where  # type: ignore
+        return _logical_and(foot, where)
 
     @override
     def compute_safe_intervals(

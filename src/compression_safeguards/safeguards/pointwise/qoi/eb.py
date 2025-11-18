@@ -10,7 +10,7 @@ from typing import ClassVar, Literal
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import _ensure_array, _ones
+from ....utils._compat import _ensure_array, _logical_and, _ones, _reshape
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import ToFloatMode, saturating_finite_float_cast, to_float
 from ....utils.error import TypeCheckError, ctx, lookup_enum_or_raise
@@ -238,7 +238,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             data_float,
             late_bound_constants,
         )
-        qoi: np.ndarray[S, np.dtype[F]] = qoi_.reshape(data.shape)  # type: ignore
+        qoi: np.ndarray[S, np.dtype[F]] = _reshape(qoi_, data.shape)
         return qoi
 
     @override
@@ -365,7 +365,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         # the check succeeds where `where` is False
         ok: np.ndarray[S, np.dtype[np.bool]]
         if where is True:
-            ok = ok_.reshape(data.shape)  # type: ignore
+            ok = _reshape(ok_, data.shape)
         else:
             ok = _ones(data.shape, np.dtype(np.bool))
             np.place(ok, where, ok_)
@@ -491,8 +491,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         data_float_lower: np.ndarray[S, np.dtype[np.floating]]
         data_float_upper: np.ndarray[S, np.dtype[np.floating]]
         if where is True:
-            data_float_lower = data_float_lower_.reshape(data.shape)  # type: ignore
-            data_float_upper = data_float_upper_.reshape(data.shape)  # type: ignore
+            data_float_lower = _reshape(data_float_lower_, data.shape)
+            data_float_upper = _reshape(data_float_upper_, data.shape)
         else:
             data_float_lower = np.full(data.shape, -np.inf, ftype)
             data_float_upper = np.full(data.shape, np.inf, ftype)
@@ -537,7 +537,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             The footprint of the `foot` array.
         """
 
-        return foot & where  # type: ignore
+        return _logical_and(foot, where)
 
     @override
     def get_config(self) -> dict[str, JSON]:
