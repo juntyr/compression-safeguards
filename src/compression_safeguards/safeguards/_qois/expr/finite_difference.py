@@ -106,7 +106,7 @@ def finite_difference_offsets(
         case FiniteDifference.central:
             noffsets = order + (order % 2) - 1 + accuracy
             p = (noffsets - 1) // 2
-            return (0,) + tuple(j for i in range(1, p + 1) for j in (i, -i))
+            return (0, *tuple(j for i in range(1, p + 1) for j in (i, -i)))
         case FiniteDifference.forward:
             return tuple(i for i in range(order + accuracy))
         case FiniteDifference.backwards:

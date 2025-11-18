@@ -1044,7 +1044,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
         else:
             where_indices = np.nonzero(where_flat)[0].reshape(
-                (-1,) + tuple(1 for _ in window)
+                (-1, *tuple(1 for _ in window))
             )
             # FIXME: https://github.com/numpy/numpy-user-dtypes/issues/163
             with np.errstate(invalid="ignore"):

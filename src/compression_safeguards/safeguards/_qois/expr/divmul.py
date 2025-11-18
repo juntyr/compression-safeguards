@@ -295,42 +295,42 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
             )
 
             return _broadcast_to(
-                _ensure_array(total_product).reshape((1,) + exprv_abs.shape),
-                (t_stack.shape[0],) + exprv_abs.shape,
+                _ensure_array(total_product).reshape((1, *exprv_abs.shape)),
+                (t_stack.shape[0], *exprv_abs.shape),
             )
 
         tl_abs_stack = guarantee_stacked_arg_within_expr_bounds(
             compute_term_product,
             _broadcast_to(
-                exprv_abs.reshape((1,) + exprv_abs.shape),
-                (tl_abs_stack.shape[0],) + exprv_abs.shape,
+                exprv_abs.reshape((1, *exprv_abs.shape)),
+                (tl_abs_stack.shape[0], *exprv_abs.shape),
             ),
             _stack([av_abs, bv_abs]),
             tl_abs_stack,
             _broadcast_to(
-                expr_abs_lower.reshape((1,) + exprv_abs.shape),
-                (tl_abs_stack.shape[0],) + exprv_abs.shape,
+                expr_abs_lower.reshape((1, *exprv_abs.shape)),
+                (tl_abs_stack.shape[0], *exprv_abs.shape),
             ),
             _broadcast_to(
-                expr_abs_upper.reshape((1,) + exprv_abs.shape),
-                (tl_abs_stack.shape[0],) + exprv_abs.shape,
+                expr_abs_upper.reshape((1, *exprv_abs.shape)),
+                (tl_abs_stack.shape[0], *exprv_abs.shape),
             ),
         )
         tu_abs_stack = guarantee_stacked_arg_within_expr_bounds(
             compute_term_product,
             _broadcast_to(
-                exprv_abs.reshape((1,) + exprv_abs.shape),
-                (tu_abs_stack.shape[0],) + exprv_abs.shape,
+                exprv_abs.reshape((1, *exprv_abs.shape)),
+                (tu_abs_stack.shape[0], *exprv_abs.shape),
             ),
             _stack([av_abs, bv_abs]),
             tu_abs_stack,
             _broadcast_to(
-                expr_abs_lower.reshape((1,) + exprv_abs.shape),
-                (tu_abs_stack.shape[0],) + exprv_abs.shape,
+                expr_abs_lower.reshape((1, *exprv_abs.shape)),
+                (tu_abs_stack.shape[0], *exprv_abs.shape),
             ),
             _broadcast_to(
-                expr_abs_upper.reshape((1,) + exprv_abs.shape),
-                (tu_abs_stack.shape[0],) + exprv_abs.shape,
+                expr_abs_upper.reshape((1, *exprv_abs.shape)),
+                (tu_abs_stack.shape[0], *exprv_abs.shape),
             ),
         )
 
@@ -764,42 +764,42 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             )
 
             return _broadcast_to(
-                _ensure_array(total_product).reshape((1,) + exprv_abs.shape),
-                (t_stack.shape[0],) + exprv_abs.shape,
+                _ensure_array(total_product).reshape((1, *exprv_abs.shape)),
+                (t_stack.shape[0], *exprv_abs.shape),
             )
 
         tl_abs_stack = guarantee_stacked_arg_within_expr_bounds(
             compute_term_product,
             _broadcast_to(
-                exprv_abs.reshape((1,) + exprv_abs.shape),
-                (tl_abs_stack.shape[0],) + exprv_abs.shape,
+                exprv_abs.reshape((1, *exprv_abs.shape)),
+                (tl_abs_stack.shape[0], *exprv_abs.shape),
             ),
             _stack([av_abs, bv_abs]),
             tl_abs_stack,
             _broadcast_to(
-                expr_abs_lower.reshape((1,) + exprv_abs.shape),
-                (tl_abs_stack.shape[0],) + exprv_abs.shape,
+                expr_abs_lower.reshape((1, *exprv_abs.shape)),
+                (tl_abs_stack.shape[0], *exprv_abs.shape),
             ),
             _broadcast_to(
-                expr_abs_upper.reshape((1,) + exprv_abs.shape),
-                (tl_abs_stack.shape[0],) + exprv_abs.shape,
+                expr_abs_upper.reshape((1, *exprv_abs.shape)),
+                (tl_abs_stack.shape[0], *exprv_abs.shape),
             ),
         )
         tu_abs_stack = guarantee_stacked_arg_within_expr_bounds(
             compute_term_product,
             _broadcast_to(
-                exprv_abs.reshape((1,) + exprv_abs.shape),
-                (tu_abs_stack.shape[0],) + exprv_abs.shape,
+                exprv_abs.reshape((1, *exprv_abs.shape)),
+                (tu_abs_stack.shape[0], *exprv_abs.shape),
             ),
             _stack([av_abs, bv_abs]),
             tu_abs_stack,
             _broadcast_to(
-                expr_abs_lower.reshape((1,) + exprv_abs.shape),
-                (tu_abs_stack.shape[0],) + exprv_abs.shape,
+                expr_abs_lower.reshape((1, *exprv_abs.shape)),
+                (tu_abs_stack.shape[0], *exprv_abs.shape),
             ),
             _broadcast_to(
-                expr_abs_upper.reshape((1,) + exprv_abs.shape),
-                (tu_abs_stack.shape[0],) + exprv_abs.shape,
+                expr_abs_upper.reshape((1, *exprv_abs.shape)),
+                (tu_abs_stack.shape[0], *exprv_abs.shape),
             ),
         )
 

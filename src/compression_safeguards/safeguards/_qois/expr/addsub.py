@@ -451,15 +451,15 @@ def compute_left_associate_sum_data_bounds(
         assert total_sum is not None
 
         return _broadcast_to(
-            _ensure_array(total_sum).reshape((1,) + exprv.shape),
-            (t_stack.shape[0],) + exprv.shape,
+            _ensure_array(total_sum).reshape((1, *exprv.shape)),
+            (t_stack.shape[0], *exprv.shape),
         )
 
     # handle rounding errors in the total absolute factor early
     tl_stack = guarantee_stacked_arg_within_expr_bounds(
         compute_term_sum,
         _broadcast_to(
-            exprv.reshape((1,) + exprv.shape), (tl_stack.shape[0],) + exprv.shape
+            exprv.reshape((1, *exprv.shape)), (tl_stack.shape[0], *exprv.shape)
         ),
         _stack(
             [
@@ -470,18 +470,18 @@ def compute_left_associate_sum_data_bounds(
         ),
         tl_stack,
         _broadcast_to(
-            expr_lower.reshape((1,) + exprv.shape),
-            (tl_stack.shape[0],) + exprv.shape,
+            expr_lower.reshape((1, *exprv.shape)),
+            (tl_stack.shape[0], *exprv.shape),
         ),
         _broadcast_to(
-            expr_upper.reshape((1,) + exprv.shape),
-            (tl_stack.shape[0],) + exprv.shape,
+            expr_upper.reshape((1, *exprv.shape)),
+            (tl_stack.shape[0], *exprv.shape),
         ),
     )
     tu_stack = guarantee_stacked_arg_within_expr_bounds(
         compute_term_sum,
         _broadcast_to(
-            exprv.reshape((1,) + exprv.shape), (tu_stack.shape[0],) + exprv.shape
+            exprv.reshape((1, *exprv.shape)), (tu_stack.shape[0], *exprv.shape)
         ),
         _stack(
             [
@@ -492,12 +492,12 @@ def compute_left_associate_sum_data_bounds(
         ),
         tu_stack,
         _broadcast_to(
-            expr_lower.reshape((1,) + exprv.shape),
-            (tu_stack.shape[0],) + exprv.shape,
+            expr_lower.reshape((1, *exprv.shape)),
+            (tu_stack.shape[0], *exprv.shape),
         ),
         _broadcast_to(
-            expr_upper.reshape((1,) + exprv.shape),
-            (tu_stack.shape[0],) + exprv.shape,
+            expr_upper.reshape((1, *exprv.shape)),
+            (tu_stack.shape[0], *exprv.shape),
         ),
     )
 
