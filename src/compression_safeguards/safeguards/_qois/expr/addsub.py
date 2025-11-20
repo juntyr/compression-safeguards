@@ -11,6 +11,8 @@ from ....utils._compat import (
     _broadcast_to,
     _ensure_array,
     _floating_max,
+    _is_negative_zero,
+    _is_positive_zero,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
     _stack,
@@ -401,6 +403,8 @@ def compute_left_associate_sum_data_bounds(
             & np.isfinite(tfl)
             & np.isfinite(abs_factorv)
         ] = -fmax
+        # optimistically try to include -0.0
+        tl[(tl == 0) & ~_is_positive_zero(expr_lower)] = -0.0
         tl_stack_.append(tl)
     tl_stack = _stack(tl_stack_)
     tu_stack_: list[np.ndarray[tuple[Ps], np.dtype[F]]] = []
@@ -427,6 +431,8 @@ def compute_left_associate_sum_data_bounds(
             & np.isfinite(tfl)
             & np.isfinite(abs_factorv)
         ] = fmax
+        # optimistically try to include +0.0
+        tu[(tu == 0) & ~_is_negative_zero(expr_upper)] = +0.0
         tu_stack_.append(tu)
     tu_stack = _stack(tu_stack_)
 

@@ -232,7 +232,6 @@ def _guarantee_data_within_expr_bounds_inner(
         bounds_exceeded = exceeds_expr_bounds(Xs_bound_guess)
 
         if not np.any(bounds_exceeded):
-            np.copyto(Xs_bound_guess, Xs, where=(Xs_bound_guess == Xs), casting="no")
             return Xs_bound_guess
 
         if warn_on_bounds_exceeded:
@@ -260,7 +259,6 @@ def _guarantee_data_within_expr_bounds_inner(
         bounds_exceeded = exceeds_expr_bounds(Xs_bound_guess)
 
         if not np.any(bounds_exceeded):
-            np.copyto(Xs_bound_guess, Xs, where=(Xs_bound_guess == Xs), casting="no")
             return Xs_bound_guess
 
         # shove the guess towards the data by exponentially reducing the

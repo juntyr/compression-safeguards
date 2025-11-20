@@ -452,6 +452,10 @@ def _apply_finite_qoi_error_bound(
                     np.add(qoi_float, eb_abs)
                 )
 
+            # optimistically allow both -0.0 and +0.0
+            lower[lower == 0] = -0.0
+            upper[upper == 0] = +0.0
+
             # correct rounding errors in the lower and upper bound
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"

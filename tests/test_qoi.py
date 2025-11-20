@@ -31,6 +31,7 @@ from compression_safeguards.safeguards._qois.expr.neg import ScalarNegate
 from compression_safeguards.safeguards._qois.expr.power import ScalarPower
 from compression_safeguards.safeguards._qois.expr.reciprocal import ScalarReciprocal
 from compression_safeguards.safeguards._qois.expr.round import (
+    ScalarCeil,
     ScalarRoundTiesEven,
     ScalarTrunc,
 )
@@ -48,7 +49,11 @@ from compression_safeguards.safeguards._qois.expr.where import ScalarWhere
 from compression_safeguards.safeguards._qois.interval import (
     compute_safe_data_lower_upper_interval_union,
 )
-from compression_safeguards.utils._compat import _is_negative_zero, _is_positive_zero
+from compression_safeguards.utils._compat import (
+    _floating_max,
+    _is_negative_zero,
+    _is_positive_zero,
+)
 from compression_safeguards.utils._float128 import _float128, _float128_dtype
 
 np.set_printoptions(floatmode="unique")
@@ -992,7 +997,7 @@ def test_fuzzer_found_nan_power_zero():
     expr_upper = np.array(_float128(1.0))
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
-    assert X_lower == np.array(_float128(0.0))
+    assert X_lower == np.array(_float128(-0.5))
     assert X_upper == np.array(_float128(0.5))
 
     assert expr.eval(np.array(X_lower), dict()) == np.array(_float128(1.0))
@@ -1723,3 +1728,41 @@ def test_fuzzer_found_sum_upper_bound_negative_zero():
 
     assert np.all(np.isnan(expr.eval(X_lower, dict())))
     assert np.all(np.isnan(expr.eval(X_upper, dict())))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_negative_zero_excessive_nudging():
+    X = np.array(_float128(0.0))
+
+    expr = ScalarDivide(ScalarMultiply(ScalarCeil(Data.SCALAR), Number.ZERO), Euler())
+
+    assert expr.eval(X, dict()) == np.array(_float128(0.0))
+
+    expr_lower = np.array(_float128(0.0))
+    expr_upper = np.array(_float128(0.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(_float128(0.0))
+    assert X_upper == np.array(_floating_max(_float128_dtype))
+
+    assert expr.eval(X_lower, dict()) == np.array(_float128(0.0))
+    assert expr.eval(X_upper, dict()) == np.array(_float128(0.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_upper_data_bounds_below():
+    X = np.array(np.float16(1.09e-05))
+
+    expr = ScalarSubtract(ScalarTrunc(Data.SCALAR), ScalarTrunc(Data.SCALAR))
+
+    assert expr.eval(X, dict()) == np.array(np.float16(0.0))
+
+    expr_lower = np.array(np.float16(0.0))
+    expr_upper = np.array(np.float16(0.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(np.float16(0.0))
+    assert X_upper == np.array(np.float16(0.9995))
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(0.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.0))

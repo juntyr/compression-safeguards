@@ -258,27 +258,27 @@ def test_polynomial(check):
     # x * 0
     check("x * 0")
 
-    # x + (inf / -inf, NaN)
+    # x + (inf, -inf, NaN)
     check("x + (1/0)")
     check("x + (-1/0)")
     check("x + (0/0)")
 
-    # x * (inf / -inf, NaN)
+    # x * (inf, -inf, NaN)
     check("x * (1/0)")
     check("x * (-1/0)")
     check("x * (0/0)")
 
-    # x / (inf / -inf, NaN)
+    # x / (inf, -inf, NaN)
     check("x / (1/0)")
     check("x / (-1/0)")
     check("x / (0/0)")
 
-    # (inf / -inf, NaN) / x
+    # (inf, -inf, NaN) / x
     check("(1/0) / x")
     check("(-1/0) / x")
     check("(0/0) / x")
 
-    # sum(x * (inf / -inf, NaN), 0)
+    # sum(x * (inf, -inf, NaN) + 0)
     check("x * (1/0) + 0")
     check("x * (-1/0) + 0")
     check("x * (0/0) + 0")
