@@ -6,6 +6,7 @@ from compression_safeguards.safeguards.stencil.abc import StencilSafeguard
 
 from .codecs import (
     encode_decode_identity,
+    encode_decode_mock,
     encode_decode_neg,
     encode_decode_noise,
     encode_decode_zero,
@@ -168,3 +169,42 @@ def test_inheritance():
         assert len(safeguards.safeguards) == 1
         assert not isinstance(safeguards.safeguards[0], PointwiseSafeguard)
         assert isinstance(safeguards.safeguards[0], StencilSafeguard)
+
+
+def test_fuzzer_found_any_selector_shape():
+    data = np.array(
+        [
+            [-1.849731611000141e095, np.nan, np.nan],
+            [np.nan, np.nan, 5.915260930833873e-270],
+            [5.686073566141173e-270, 5.686073566141173e-270, 5.686073566141173e-270],
+        ],
+        dtype=np.float64,
+    )
+    decoded = np.array(
+        [
+            [5.686073566141173e-270, 5.686073566141173e-270, 5.686073566141173e-270],
+            [5.686073566141173e-270, 5.686073566141173e-270, np.nan],
+            [np.nan, np.nan, np.nan],
+        ],
+        dtype=np.float64,
+    )
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(kind="sign", offset=43),
+            dict(
+                kind="any",
+                safeguards=[
+                    dict(
+                        kind="monotonicity",
+                        monotonicity="weak",
+                        window=1,
+                        boundary="valid",
+                        axis=None,
+                    ),
+                ],
+            ),
+        ],
+    )

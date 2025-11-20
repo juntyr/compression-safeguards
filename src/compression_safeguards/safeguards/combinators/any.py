@@ -454,7 +454,9 @@ class _AnyStencilSafeguard(_AnySafeguardBase, StencilSafeguard):
             valids.insert(0, valid_pointwise)
 
         # simple heuristic: pick the safeguard with the largest interval
-        selector = np.argmax([v.non_empty_width() for v in valids], axis=0)
+        selector = np.argmax([v.non_empty_width() for v in valids], axis=0).reshape(
+            data.shape
+        )
 
         valid: IntervalUnion[T, int, int] = Interval.full_like(data).into_union()
 
