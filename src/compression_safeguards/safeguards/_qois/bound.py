@@ -7,6 +7,8 @@ import numpy as np
 from ...utils._compat import (
     _broadcast_to,
     _ensure_array,
+    _is_sign_negative_number,
+    _is_sign_positive_number,
     _nan_to_zero_inf_to_finite,
     _nextafter,
 )
@@ -207,7 +209,17 @@ def _guarantee_data_within_expr_bounds_inner(
             np.isnan(exprv) & np.isnan(exprv_Xs_bound_guess)
         ) | (
             np.greater_equal(exprv_Xs_bound_guess, expr_lower)
+            # if lower >= +0.0, then guess must be >= +0.0
+            & (
+                ~_is_sign_positive_number(expr_lower)
+                | _is_sign_positive_number(exprv_Xs_bound_guess)
+            )
             & np.less_equal(exprv_Xs_bound_guess, expr_upper)
+            # if upper <= -0.0, then guess must be <= -0.0
+            & (
+                ~_is_sign_negative_number(expr_upper)
+                | _is_sign_negative_number(exprv_Xs_bound_guess)
+            )
         )
 
         bounds_exceeded: np_sndarray2[Ps2, Ns, np.dtype[np.bool]] = _broadcast_to(

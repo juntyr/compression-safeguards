@@ -404,7 +404,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
 
             # optimization: only evaluate the monotonicity where necessary
             if where is not True:
-                where_flat = where[slice(valid_slice)].flatten()
+                where_flat = where[tuple(valid_slice)].flatten()
                 data_windows = np.compress(where_flat, data_windows, axis=0)
                 prediction_windows = np.compress(where_flat, prediction_windows, axis=0)
 
@@ -528,7 +528,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             valid_slice = [slice(None)] * data.ndim
             if self._boundary == BoundaryCondition.valid:
                 valid_slice[axis] = slice(self._window, -self._window)
-            where_ = True if where is True else where[slice(valid_slice)]
+            where_ = True if where is True else where[tuple(valid_slice)]
 
             # compute, pointwise, if the element has a decreasing (lt),
             #  increasing (gt), or equality (eq) constraint imposed upon it

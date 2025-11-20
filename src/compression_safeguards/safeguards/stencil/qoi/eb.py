@@ -720,7 +720,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
             # optimization: only evaluate the QoI where necessary
             if where is not True:
-                where_flat = where[slice(valid_slice)].flatten()
+                where_flat = where[tuple(valid_slice)].flatten()
                 data_windows_float = np.compress(where_flat, data_windows_float, axis=0)
                 prediction_windows_float = np.compress(
                     where_flat, prediction_windows_float, axis=0
@@ -974,7 +974,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             # optimization: only evaluate the QoI and compute data bounds where
             #  necessary
             if where is not True:
-                where_flat = where[slice(valid_slice)].flatten()
+                where_flat = where[tuple(valid_slice)].flatten()
                 data_windows_float = np.compress(where_flat, data_windows_float, axis=0)
                 late_bound_constants = {
                     c: np.compress(where_flat, cv, axis=0)

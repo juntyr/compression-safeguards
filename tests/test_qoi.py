@@ -1697,3 +1697,29 @@ def test_fuzzer_found_power_tanh_acos_excessive_nudging():
 
     assert expr.eval(X_lower, dict()) == np.array(np.float32(0.0))
     assert expr.eval(X_upper, dict()) == np.array(np.float32(0.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_sum_upper_bound_negative_zero():
+    X = np.array([np.float16(131.0), np.float16(187.0)])
+
+    expr = ScalarAcosh(
+        ScalarReciprocal(
+            ScalarSubtract(
+                ScalarSqrt(Number.from_symbolic_int(2632)),
+                Data.SCALAR,
+            )
+        ),
+    )
+
+    assert np.all(np.isnan(expr.eval(X, dict())))
+
+    expr_lower = np.array([np.float16(np.nan), np.float16(np.nan)])
+    expr_upper = np.array([np.float16(np.nan), np.float16(np.nan)])
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    assert np.all(X_lower == np.array([np.float16(51.34), np.float16(51.34)]))
+    assert np.all(X_upper == np.array([np.float16(np.inf), np.float16(np.inf)]))
+
+    assert np.all(np.isnan(expr.eval(X_lower, dict())))
+    assert np.all(np.isnan(expr.eval(X_upper, dict())))

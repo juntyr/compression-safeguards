@@ -327,3 +327,29 @@ def test_fuzzer_found_broadcast():
             ],
             fixed_constants={"䣿䡈": np.array([], dtype=np.int64)},
         )
+
+
+def test_fuzzer_found_slice_indexing():
+    data = np.array([[1431655765]], dtype=np.uint32)
+
+    encode_decode_zero(
+        data,
+        safeguards=[
+            dict(kind="same", value="$x_max", exclusive=True),
+            dict(
+                kind="select",
+                selector="UU",
+                safeguards=[
+                    dict(
+                        kind="monotonicity",
+                        monotonicity="strict_with_consts",
+                        window=85,
+                        boundary="constant",
+                        constant_boundary=85,
+                        axis=None,
+                    )
+                ],
+            ),
+        ],
+        fixed_constants=dict(UU=0),
+    )
