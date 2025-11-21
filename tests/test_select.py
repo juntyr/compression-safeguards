@@ -272,3 +272,41 @@ def test_fuzzer_found_invalid_literal_index():
                 dict(kind="same", value=0, exclusive=False),
             ],
         )
+
+
+def test_unsafely_shadowed_stencil_requirements():
+    data = np.array([256, 256], dtype=np.int16)
+    decoded = np.array([0, 0], dtype=np.int16)
+
+    # prior to https://github.com/juntyr/compression-safeguards/pull/48,
+    #  the select safeguard would choose safe intervals per-point and the
+    #  stencil safety could thus be shadowed by neighbouring points
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(
+                kind="select",
+                selector="select",
+                safeguards=[
+                    dict(kind="assume_safe"),
+                    dict(
+                        kind="qoi_eb_stencil",
+                        qoi="sum(X)",
+                        neighbourhood=[
+                            dict(
+                                axis=0,
+                                before=1,
+                                after=1,
+                                boundary="constant",
+                                constant_boundary="$x_max",
+                            ),
+                        ],
+                        type="abs",
+                        eb=1,
+                    ),
+                ],
+            ),
+        ],
+        fixed_constants=dict(select=np.array([0, 1])),
+    )
