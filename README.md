@@ -381,6 +381,8 @@ SZ3's error compression can provide higher compression ratios if most data eleme
 
 > Liang, X., Zhao, K., Di, S., Li, S., Underwood, R., Gok, A. M., Tian, J., Deng, J., Calhoun, J. C., Tao, D., Chen, Z., & Cappello, F. (2022). SZ3: A modular framework for composing Prediction-Based Error-Bounded lossy compressors. *IEEE Transactions on Big Data*, 9(2), 485–498. Available from: [doi:10.1109/tbdata.2022.3201176](https://doi.org/10.1109/tbdata.2022.3201176).
 
+You can easily try out SZ3 using the [`numcodecs-wasm-sz3`](https://numcodecs-wasm.readthedocs.io/en/latest/api/numcodecs_wasm_sz3/) Python package.
+
 
 #### SPERR outlier correction
 
@@ -394,6 +396,8 @@ Note that SPERR is known to [^5] sometimes violate its pointwise absolute error 
 
 > Li, S., Lindstrom, P., & Clyne, J. (2023). Lossy Scientific Data Compression With SPERR. *2023 IEEE International Parallel and Distributed Processing Symposium (IPDPS)*, 1007–1017. Available from: [doi:10.1109/ipdps54959.2023.00104](https://doi.org/10.1109/ipdps54959.2023.00104).
 
+You can easily try out SPERR using the [`numcodecs-wasm-sperr`](https://numcodecs-wasm.readthedocs.io/en/latest/api/numcodecs_wasm_sperr/) Python package.
+
 
 #### EBCC residual compression
 
@@ -402,6 +406,17 @@ The [EBCC](https://github.com/spcl/EBCC) (Error Bounded Climate-data) compressor
 **TLDR:** You can use EBCC to bound a (globally constant) pointwise absolute or range-relative error, for which EBCC uses efficient residual compression. Use `compression-safeguards` to guarantee a variety of safety requirements, for *any* compressor, including EBCC.
 
 > Huang, L., Fusco, L., Scheidl, F., Zibell, J., Sprenger, M. A., Schemm, S., & Hoefler, T. (2025). Error bounded compression for weather and climate applications. *arXiv*. Available from: [doi:10.48550/arxiv.2510.22265](https://doi.org/10.48550/arxiv.2510.22265).
+
+
+#### LC
+
+[LC](https://github.com/burtscher/LC-framework) is a framework for building custom lossless and lossy error-bounded compressors from an extensive collection of components. LC takes particular care with handling all edge cases of floating point lossy compression correctly and reproducibly across both CPU and GPU implementations. The framework is written in C and C++ with Python scripts that search for an optimal compressor pipeline, either exhaustively or using a genetic algorithm.
+
+LC implements lossy error-bounded compression by providing specific quantizers for absolute / relative / pointwise normalised error bounds. During decompression, these quantizers can optionally decorrelate the resulting compression error by randomising the decompressed values within their quantisation bins.
+
+**TLDR:** You can use LC to build a custom compressor with guaranteed error bounds across different CPUs and GPUs. Use `compression-safeguards` to guarantee a variety of safety requirements, including arbitrary combinations of different error bounds, for *any* compressor, including those created with LC.
+
+> Fallin, A., & Burtscher, M. (2024). Lessons learned on the path to guaranteeing the error bound in lossy quantizers. *arXiv*. Available from: [doi:10.48550/arxiv.2407.15037](https://doi.org/10.48550/arxiv.2407.15037).
 
 
 ### Preserving Quantities of Interest
@@ -422,6 +437,8 @@ The [QPET](https://github.com/JLiu-1/QPET-Artifact) compressor is the successor 
 **TLDR:** You can use QPET to preserve an absolute or range-relative error bound over a variety of differentiable quantities of interest. QPET's approximate data error bounds and outlier correction result in high compression ratios. QPET can be combined with the `compression-safeguards` to guarantee an even greater variety of safety requirements.
 
 > Liu, J., Jiao, P., Zhao, K., Liang, X., Di, S., & Cappello, F. (2025). QPET: a versatile and portable Quantity-of-Interest-Preservation Framework for Error-Bounded Lossy Compression. *Proceedings of the VLDB Endowment*, 18(8), 2440–2453. Available from: [doi:10.14778/3742728.3742739](https://doi.org/10.14778/3742728.3742739).
+
+You can easily try out QPET-SPERR using the [`numcodecs-wasm-qpet-sperr`](https://numcodecs-wasm.readthedocs.io/en/latest/api/numcodecs_wasm_qpet_sperr/) Python package.
 
 
 ## Citation
