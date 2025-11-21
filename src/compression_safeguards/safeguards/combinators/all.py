@@ -297,6 +297,7 @@ class _AllSafeguardsBase(ABC):
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         front, *tail = self.safeguards
 
+        # pointwise check succeeds if all safeguards' pointwise check succeeds
         ok = front.check_pointwise(data, prediction, late_bound=late_bound, where=where)
 
         for safeguard in tail:
@@ -315,6 +316,7 @@ class _AllSafeguardsBase(ABC):
     ) -> IntervalUnion[T, int, int]:
         front, *tail = self.safeguards
 
+        # only the intersection of all safeguards' safe intervals is safe
         valid = front.compute_safe_intervals(data, late_bound=late_bound, where=where)
 
         for safeguard in tail:
@@ -333,9 +335,13 @@ class _AllSafeguardsBase(ABC):
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
-        footprint = np.zeros_like(foot)
+        front, *tail = self.safeguards
 
-        for safeguard in self.safeguards:
+        # since all safeguards can contribute to the footprint, the union of
+        #  their footprints forms the combined footprint
+        footprint = front.compute_footprint(foot, late_bound=late_bound, where=where)
+
+        for safeguard in tail:
             footprint |= safeguard.compute_footprint(
                 foot, late_bound=late_bound, where=where
             )

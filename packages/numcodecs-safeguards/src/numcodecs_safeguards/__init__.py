@@ -201,10 +201,13 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
           Zstandard compression is applied.
 
         The lossless encoding must encode to a 1D buffer of bytes.
-    compute: None | dict[str, JSON] | Compute, optional
-        Compute configuration that may affect the compression ratio and time
-        required to compute the safeguards corrections, without impacting the
-        safety of the corrections.
+    compute : None | dict[str, JSON] | Compute, optional
+        Compute configuration with options that may affect the compression
+        ratio and time cost of computing the safeguards corrections.
+
+        While these options can change the particular corrections that are
+        produced, the resulting corrections always satisfy the safety
+        requirements.
     _version : ...
         The version of the codec. Do not provide this parameter explicitly.
 

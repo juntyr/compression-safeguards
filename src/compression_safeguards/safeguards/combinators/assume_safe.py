@@ -121,10 +121,8 @@ class AssumeAlwaysSafeguard(PointwiseSafeguard):
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Compute the footprint of the `foot` array, e.g. for expanding pointwise
-        check fails into the points that could have contributed to the failures.
-
-        The footprint is [`False`][False] everywhere.
+        Since all values are always safe, the footprint of the `foot` array is
+        [`False`][False] everywhere.
 
         Parameters
         ----------

@@ -371,6 +371,7 @@ class _SelectSafeguardBase(ABC):
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
+        # if a single safeguard is selected, just forward to it
         if isinstance(self.selector, int):
             return self.safeguards[self.selector].check_pointwise(
                 data, prediction, late_bound=late_bound, where=where
@@ -385,13 +386,15 @@ class _SelectSafeguardBase(ABC):
                 if np.any(selector < 0) or np.any(selector >= len(self.safeguards)):
                     raise IndexError("invalid indices") | ctx
 
+        # only perform the checks where selected
         oks = [
             safeguard.check_pointwise(
-                data, prediction, late_bound=late_bound, where=where
+                data, prediction, late_bound=late_bound, where=(selector == i) & where
             )
-            for safeguard in self.safeguards
+            for i, safeguard in enumerate(self.safeguards)
         ]
 
+        # choose the check result from the selected safeguard
         with (
             ctx.safeguardty(SelectSafeguard),
             ctx.parameter("selector"),
@@ -406,6 +409,7 @@ class _SelectSafeguardBase(ABC):
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> IntervalUnion[T, int, int]:
+        # if a single safeguard is selected, just forward to it
         if isinstance(self.selector, int):
             return self.safeguards[self.selector].compute_safe_intervals(
                 data, late_bound=late_bound, where=where
@@ -422,6 +426,11 @@ class _SelectSafeguardBase(ABC):
 
         valid: IntervalUnion[T, int, int] = Interval.full_like(data).into_union()
 
+        # compute the safe intervals only where needed and then intersect
+        # the `where` condition ensures that we only compute restrictions for
+        #  the data points for which a safeguard was selected (and that other
+        #  points do not impose such requirements)
+        # but that the computed requirements can extend beyond the pointwise
         for i, safeguard in enumerate(self.safeguards):
             where_i = (selector == i) & where
             if np.any(where_i):
@@ -440,6 +449,7 @@ class _SelectSafeguardBase(ABC):
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
+        # if a single safeguard is selected, just forward to it
         if isinstance(self.selector, int):
             return self.safeguards[self.selector].compute_footprint(
                 foot, late_bound=late_bound, where=where
@@ -456,6 +466,10 @@ class _SelectSafeguardBase(ABC):
 
         footprint = np.zeros_like(foot)
 
+        # per point, only the selected safeguard contributes to the combined
+        #  footprint
+        # the union of the footprints is taken since the per-point footprint
+        #  from a stencil safeguard may extend to neighbouring points
         for i, safeguard in enumerate(self.safeguards):
             where_i = (selector == i) & where
             if np.any(where_i):

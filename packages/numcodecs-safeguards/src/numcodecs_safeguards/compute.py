@@ -18,9 +18,12 @@ from compression_safeguards.utils.typing import C, S, T
 @dataclass
 class Compute:
     """
-    Compute configuration that may affect the compression ratio and time
-    required to compute the safeguards corrections, without impacting the
-    safety of the corrections.
+    Compute configuration with options that may affect the compression
+    ratio and time cost of computing the safeguards corrections.
+
+    While these options can change the particular corrections that are
+    produced, the resulting corrections always satisfy the safety
+    requirements.
 
     Some configuration options are unstable, i.e. they should not be relied
     upon in production code since they might be removed or changed without a

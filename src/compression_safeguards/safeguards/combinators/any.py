@@ -297,6 +297,8 @@ class _AnySafeguardBase(ABC):
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         front, *tail = self.safeguards
 
+        # pointwise check succeeds if, per point, at least one safeguards'
+        #  pointwise check succeeds
         ok = front.check_pointwise(data, prediction, late_bound=late_bound, where=where)
 
         for safeguard in tail:
@@ -313,12 +315,18 @@ class _AnySafeguardBase(ABC):
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
-        footprint = np.zeros_like(foot)
+        front, *tail = self.safeguards
 
-        # we cannot be more clever here without knowing the data and going
-        #  through the entire safe interval computation, which would defeat the
-        #  entire point of this cheaper method
-        for safeguard in self.safeguards:
+        # not all safeguards (just one per point) need to contribute to the
+        #  footprint
+        # however, we cannot be more clever here without knowing the data and
+        #  going through the entire safe interval computation, which would
+        #  defeat the entire point of this cheaper method
+        # so, conservatively, all safeguards contribute to the footprint and
+        #  the union of their footprints forms the combined footprint
+        footprint = front.compute_footprint(foot, late_bound=late_bound, where=where)
+
+        for safeguard in tail:
             footprint |= safeguard.compute_footprint(
                 foot, late_bound=late_bound, where=where
             )
@@ -357,6 +365,8 @@ class _AnyPointwiseSafeguard(_AnySafeguardBase, PointwiseSafeguard):
     ) -> IntervalUnion[T, int, int]:
         front, *tail = self.safeguards
 
+        # for only-pointwise safeguards, the union over any safeguard's safe
+        #  intervals is safe
         valid = front.compute_safe_intervals(data, late_bound=late_bound, where=where)
 
         for safeguard in tail:
@@ -433,7 +443,14 @@ class _AnyStencilSafeguard(_AnySafeguardBase, StencilSafeguard):
 
         # we cannot pointwise pick safe intervals from different stencil
         #  safeguards, since the stencil requirements may be violated by
-        #  neighbouring picks
+        #  valid neighbouring picks
+        # very conservatively, the any combinator could be implemented using
+        #  the all combinator
+        # less conservatively, we try to pick one safeguard per point that we
+        #  want to satisfy and then intersect all of their non-pointwise
+        #  requirements
+        # as an optimisation, we first combine all pointwise safeguards to
+        #  favour picking their union of safe intervals
 
         has_pointwise = len(pointwise) > 0
         if has_pointwise:
@@ -460,6 +477,11 @@ class _AnyStencilSafeguard(_AnySafeguardBase, StencilSafeguard):
 
         valid: IntervalUnion[T, int, int] = Interval.full_like(data).into_union()
 
+        # compute the safe intervals only where needed and then intersect
+        # the `where` condition ensures that we only compute restrictions for
+        #  the data points for which a safeguard was chosen (and that other
+        #  points do not impose such requirements)
+        # but that the computed requirements can extend beyond the pointwise
         for i, safeguard in enumerate(stencil):
             where_i = (selector == (i + has_pointwise)) & where
             if np.any(where_i):
@@ -469,6 +491,8 @@ class _AnyStencilSafeguard(_AnySafeguardBase, StencilSafeguard):
                     )
                 )
 
+        # finally, also include the combined pointwise safe intervals, if
+        #  selected
         if has_pointwise:
             where_i = (selector == 0) & where
             valid = valid.intersect(
