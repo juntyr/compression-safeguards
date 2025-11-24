@@ -353,3 +353,51 @@ def test_fuzzer_found_slice_indexing():
         ],
         fixed_constants=dict(UU=0),
     )
+
+
+def test_fuzzer_found_foo():
+    data = np.array(
+        [
+            [135, 135, 1, 44, 1, 0],
+            [43, 1, 26, 0, 255, 255],
+            [112, 255, 255, 112, 112, 112],
+        ],
+        dtype=np.uint8,
+    )
+
+    # 0[
+    #     [na, -1, na, -1, na, na],
+    #     [na, na, 1, na, na, na],
+    #     [1, na, na, na, -1, -1],
+    # ]
+
+    # 1[
+    #     [na, na, na, na, -1, na],
+    #     [-1, na, na, na, na, na],
+    #     [na, na, na, na, 0, !0!],
+    # ]
+    #
+    # [
+    #     [x, x, x, x, x, x],
+    #     [x, x, x, o, o, x],
+    #     [x, x, x, x, x, x],
+    # ]
+
+    # [
+    #     [124-195, 69-194, 1-13, 23-77, 1-22, 0-0],
+    #     [23-77, 1-21, 14-140, 0-21, 184-255, 184-255],
+    #     [!78-123!, 196-255, 141-255, 112-112, 112-112, 112-112],
+    # ]
+
+    encode_decode_zero(
+        data,
+        safeguards=[
+            dict(
+                kind="monotonicity",
+                monotonicity="strict_with_consts",
+                window=1,
+                boundary="wrap",
+                axis=None,
+            )
+        ],
+    )

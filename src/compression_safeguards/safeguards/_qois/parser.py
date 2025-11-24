@@ -10,6 +10,7 @@ from .expr.abs import ScalarAbs
 from .expr.addsub import ScalarAdd, ScalarLeftAssociativeSum, ScalarSubtract
 from .expr.array import Array
 from .expr.classification import ScalarIsFinite, ScalarIsInf, ScalarIsNaN
+from .expr.comparison import ScalarMonotonicity
 from .expr.data import Data, LateBoundConstant
 from .expr.divmul import ScalarDivide, ScalarMultiply
 from .expr.finite_difference import (
@@ -774,6 +775,37 @@ class QoIParser(Parser):
     @_("maybe_comma")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def finite_difference_grid_period(self, p):  # noqa: F811
         pass
+
+    # comparison
+    @_(  # type: ignore[name-defined, no-redef]  # noqa: F821
+        "MONOTONICITY LPAREN expr COMMA STRICT EQUAL integer maybe_comma RPAREN"
+    )
+    def expr(self, p):  # noqa: F811
+        expr = p.expr
+        self.assert_or_error(
+            isinstance(expr, Array) and len(expr.shape) == 1 and expr.size >= 2,
+            p,
+            "`compare` expr must be a 1D array expression with at least two elements",
+        )
+        a, b, *cs = expr.flatlist()
+
+        # must not fail since flat Array elements cannot be arrays themselves
+        assert not isinstance(a, Array)
+        assert not isinstance(b, Array)
+        assert not any(isinstance(c, Array) for c in cs)
+
+        BOOLS: dict[int, bool] = {  # type: ignore
+            0: False,
+            1: True,
+        }
+
+        strict = p.integer
+        self.assert_or_error(
+            strict in BOOLS, p, "`compare` strict must be 0 (false) or 1 (true)"
+        )
+        strict = BOOLS[strict]
+
+        return ScalarMonotonicity(a, b, *cs, strict=strict)
 
     # empty rule
     @_("")  # type: ignore[name-defined]  # noqa: F821

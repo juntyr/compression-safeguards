@@ -103,7 +103,9 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     [`Monotonicity`][..Monotonicity]: `strict`, `strict_with_consts`,
     `strict_to_weak`, and `weak`.
 
-    Windows that are not monotonic or contain NaN values are skipped.
+    Windows that are not monotonic or contain NaN values are skipped, i.e. in
+    this windows the (lack of) monotonicity is *not* preserved and the windows
+    *may* be monotonic in the output.
 
     If the provided `axis` index is out of range for some data shape, the
     safeguard is not applied to that data.

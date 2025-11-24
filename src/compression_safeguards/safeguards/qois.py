@@ -197,6 +197,10 @@ functions =
           | ",", "grid_period", "=", expr, [","]  (* optional grid period, e.g. 2*pi or 360 *)
         )
   , ")"
+  | "monotonicity", "("  (* monotonicity of a 1D array: -1 (decreasing), 0 (const), +1 (increasing), or NaN (not monotonic) *)
+      , expr, ","  (* 1D array with at least two elements *)
+      , "strict", "=", ("0" | "1"), [","]  (* weak | strict monotonicity *)
+  , ")"
 ;
 ```
 

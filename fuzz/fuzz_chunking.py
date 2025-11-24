@@ -193,10 +193,10 @@ def check_one_input(data) -> None:
         elif c == 1:
             late_bound[p] = data.ConsumeFloat()
         elif c == 2:
-            b = data.ConsumeBytes(size * np.dtype(int).itemsize)
-            if len(b) != size * np.dtype(int).itemsize:
+            b = data.ConsumeBytes(size * np.dtype(np.intp).itemsize)
+            if len(b) != size * np.dtype(np.intp).itemsize:
                 return
-            late_bound[p] = np.frombuffer(b, dtype=int).reshape(raw.shape)
+            late_bound[p] = np.frombuffer(b, dtype=np.intp).reshape(raw.shape)
         elif c == 3:
             b = data.ConsumeBytes(size * np.dtype(float).itemsize)
             if len(b) != size * np.dtype(float).itemsize:

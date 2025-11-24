@@ -263,6 +263,9 @@ def generate_parameter(
                 "matmul": 2,
                 # finite difference
                 "finite_difference": 1,
+                # comparison
+                "monotonicity-weak": 1,
+                "monotonicity-strict": 1,
             }
 
         atoms = []
@@ -310,6 +313,10 @@ def generate_parameter(
                 atoms.append(
                     f"finite_difference({atom1}, order={data.ConsumeIntInRange(0, 3)}, accuracy={data.ConsumeIntInRange(1, 4)}, type={data.ConsumeIntInRange(-1, 1)}, axis={data.ConsumeIntInRange(0, 1)}, grid_spacing={consume_float_str(data)})"
                 )
+            elif op == "monotonicity-weak":
+                atoms.append(f"monotonicity({atom1}, strict=0)")
+            elif op == "monotonicity-strict":
+                atoms.append(f"monotonicity({atom1}, strict=1)")
             else:
                 atoms.append(f"{op}({atom1}, {', '.join(atomn)})")
         [atom] = atoms
@@ -375,17 +382,22 @@ def check_one_input(data) -> None:
 
     fixed_constants = dict()
     for p in late_bound:
-        c = data.ConsumeIntInRange(0, 4)
+        c = data.ConsumeIntInRange(0, 5)
         if c == 0:
             fixed_constants[p] = data.ConsumeInt(1)
         elif c == 1:
             fixed_constants[p] = data.ConsumeFloat()
         elif c == 2:
-            b = data.ConsumeBytes(size * np.dtype(int).itemsize)
-            if len(b) != size * np.dtype(int).itemsize:
-                return
-            fixed_constants[p] = np.frombuffer(b, dtype=int).reshape(raw.shape)
+            # small integers that likely work as select.selector indices
+            fixed_constants[p] = np.array(
+                [data.ConsumeIntInRange(0, 3) for _ in range(raw.size)], dtype=np.intp
+            ).reshape(raw.shape)
         elif c == 3:
+            b = data.ConsumeBytes(size * np.dtype(np.intp).itemsize)
+            if len(b) != size * np.dtype(np.intp).itemsize:
+                return
+            fixed_constants[p] = np.frombuffer(b, dtype=np.intp).reshape(raw.shape)
+        elif c == 4:
             b = data.ConsumeBytes(size * np.dtype(float).itemsize)
             if len(b) != size * np.dtype(float).itemsize:
                 return

@@ -152,6 +152,9 @@ class Array(Expr[AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
         assert not isinstance(sum_, Array)
         return Group(sum_)
 
+    def flatlist(self) -> list[AnyExpr]:
+        return list(self._array.flat)
+
     @staticmethod
     def matmul(
         left: "Array",
