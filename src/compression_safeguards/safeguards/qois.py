@@ -178,6 +178,9 @@ functions =
   | "isfinite", "(", expr, [","], ")"  (* 1 if finite, 0 if inf or NaN *)
   | "isinf", "(", expr, [","], ")"  (* 1 if inf, 0 if finite or NaN *)
   | "isnan", "(", expr, [","], ")"  (* 1 if NaN, 0 if finite or inf *)
+  | "not", "(", expr, [","], ")"  (* 1 if == 0, 0 if != 0 *)
+  | "all", "(", expr, [","], ")"  (* 1 if all array elements != 0, 0 if any array element == 0 *)
+  | "any", "(", expr, [","], ")"  (* 1 if any array element != 0, 0 if all array elements == 0 *)
   | "where", "(", expr, ",", expr, ",", expr, [","], ")"  (* where(c, x, y) = x if (c != 0) else y *)
   | "size", "(", expr, [","], ")"  (* array size *)
   | "sum", "(", expr, [","], ")"  (* array sum *)
@@ -196,10 +199,6 @@ functions =
             [","]
           | ",", "grid_period", "=", expr, [","]  (* optional grid period, e.g. 2*pi or 360 *)
         )
-  , ")"
-  | "monotonicity", "("  (* monotonicity of a 1D array: -1 (decreasing), 0 (const), +1 (increasing), or NaN (not monotonic) *)
-      , expr, ","  (* 1D array with at least two elements *)
-      , "strict", "=", ("0" | "1"), [","]  (* weak | strict monotonicity *)
   , ")"
 ;
 ```

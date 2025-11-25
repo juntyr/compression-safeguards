@@ -88,14 +88,15 @@ class QoILexer(Lexer):
         ISFINITE,  # type: ignore[name-defined]  # noqa: F821
         ISINF,  # type: ignore[name-defined]  # noqa: F821
         ISNAN,  # type: ignore[name-defined]  # noqa: F821
-        # conditional
+        # combinators
+        NOT,  # type: ignore[name-defined]  # noqa: F821
+        ALL,  # type: ignore[name-defined]  # noqa: F821
+        ANY,  # type: ignore[name-defined]  # noqa: F821
         WHERE,  # type: ignore[name-defined]  # noqa: F821
         # array operations
         SIZE,  # type: ignore[name-defined]  # noqa: F821
         SUM,  # type: ignore[name-defined]  # noqa: F821
         MATMUL,  # type: ignore[name-defined]  # noqa: F821
-        # comparison
-        MONOTONICITY,  # type: ignore[name-defined]  # noqa: F821
         # finite difference
         FINITE_DIFFERENCE,  # type: ignore[name-defined]  # noqa: F821
         # keyword arguments
@@ -109,8 +110,6 @@ class QoILexer(Lexer):
         GRID_SPACING,  # type: ignore[name-defined]  # noqa: F821
         GRID_CENTRE,  # type: ignore[name-defined]  # noqa: F821
         GRID_PERIOD,  # type: ignore[name-defined]  # noqa: F821
-        #  comparison
-        STRICT,  # type: ignore[name-defined]  # noqa: F821
     }
 
     # === ignored whitespace patterns ===
@@ -234,7 +233,10 @@ class QoILexer(Lexer):
     ID["isfinite"] = ISFINITE  # type: ignore[index, name-defined]  # noqa: F821
     ID["isinf"] = ISINF  # type: ignore[index, name-defined]  # noqa: F821
     ID["isnan"] = ISNAN  # type: ignore[index, name-defined]  # noqa: F821
-    # conditional
+    # combinators
+    ID["not"] = NOT  # type: ignore[index, name-defined]  # noqa: F821
+    ID["all"] = ALL  # type: ignore[index, name-defined]  # noqa: F821
+    ID["any"] = ANY  # type: ignore[index, name-defined]  # noqa: F821
     ID["where"] = WHERE  # type: ignore[index, name-defined]  # noqa: F821
     # array operations
     ID["size"] = SIZE  # type: ignore[index, name-defined]  # noqa: F821
@@ -242,8 +244,6 @@ class QoILexer(Lexer):
     ID["matmul"] = MATMUL  # type: ignore[index, name-defined]  # noqa: F821
     # finite difference
     ID["finite_difference"] = FINITE_DIFFERENCE  # type: ignore[index, name-defined]  # noqa: F821
-    # comparison
-    ID["monotonicity"] = MONOTONICITY  # type: ignore[index, name-defined]  # noqa: F821
 
     # keyword arguments
     #  logarithm
@@ -256,8 +256,6 @@ class QoILexer(Lexer):
     ID["grid_spacing"] = GRID_SPACING  # type: ignore[index, name-defined]  # noqa: F821
     ID["grid_centre"] = GRID_CENTRE  # type: ignore[index, name-defined]  # noqa: F821
     ID["grid_period"] = GRID_PERIOD  # type: ignore[index, name-defined]  # noqa: F821
-    #  comparison
-    ID["strict"] = STRICT  # type: ignore[index, name-defined]  # noqa: F821
 
     # === lexer error handling ===
     def error(self, t):
@@ -376,7 +374,10 @@ class QoILexer(Lexer):
             "ISFINITE": "`isfinite`",
             "ISINF": "`isinf`",
             "ISNAN": "`isnan`",
-            # conditional
+            # combinators
+            "NOT": "`not`",
+            "ALL": "`all`",
+            "ANY": "`any`",
             "WHERE": "`where`",
             # array operations
             "SIZE": "`size`",
@@ -384,8 +385,6 @@ class QoILexer(Lexer):
             "MATMUL": "`matmul`",
             # finite difference
             "FINITE_DIFFERENCE": "`finite_difference`",
-            # comparison
-            "MONOTONICITY": "`monotonicity`",
             # keyword arguments
             #  logarithm
             "BASE": "`base`",
@@ -397,6 +396,4 @@ class QoILexer(Lexer):
             "GRID_SPACING": "`grid_spacing`",
             "GRID_CENTRE": "`grid_centre`",
             "GRID_PERIOD": "`grid_period`",
-            #  comparison
-            "STRICT": "`strict`",
         }.get(token, f"<{token}>")

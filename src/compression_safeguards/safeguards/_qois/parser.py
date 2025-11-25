@@ -10,7 +10,7 @@ from .expr.abs import ScalarAbs
 from .expr.addsub import ScalarAdd, ScalarLeftAssociativeSum, ScalarSubtract
 from .expr.array import Array
 from .expr.classification import ScalarIsFinite, ScalarIsInf, ScalarIsNaN
-from .expr.comparison import ScalarMonotonicity
+from .expr.combinators import ScalarAll, ScalarAny, ScalarNot
 from .expr.data import Data, LateBoundConstant
 from .expr.divmul import ScalarDivide, ScalarMultiply
 from .expr.finite_difference import (
@@ -564,7 +564,49 @@ class QoIParser(Parser):
     def expr(self, p):  # noqa: F811
         return Array.map(ScalarIsNaN, p.expr)
 
-    # conditional
+    # combinators
+    @_("NOT LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        return Array.map(ScalarNot, p.expr)
+
+    @_(  # type: ignore[name-defined, no-redef]  # noqa: F821
+        "ALL LPAREN expr maybe_comma RPAREN"
+    )
+    def expr(self, p):  # noqa: F811
+        expr = p.expr
+        self.assert_or_error(
+            isinstance(expr, Array) and expr.size >= 2,
+            p,
+            "`all` expr must be an array expression with at least two elements",
+        )
+        a, b, *cs = expr.flatlist()
+
+        # must not fail since flat Array elements cannot be arrays themselves
+        assert not isinstance(a, Array)
+        assert not isinstance(b, Array)
+        assert not any(isinstance(c, Array) for c in cs)
+
+        return ScalarAll(a, b, *cs)
+
+    @_(  # type: ignore[name-defined, no-redef]  # noqa: F821
+        "ANY LPAREN expr maybe_comma RPAREN"
+    )
+    def expr(self, p):  # noqa: F811
+        expr = p.expr
+        self.assert_or_error(
+            isinstance(expr, Array) and expr.size >= 2,
+            p,
+            "`any` expr must be an array expression with at least two elements",
+        )
+        a, b, *cs = expr.flatlist()
+
+        # must not fail since flat Array elements cannot be arrays themselves
+        assert not isinstance(a, Array)
+        assert not isinstance(b, Array)
+        assert not any(isinstance(c, Array) for c in cs)
+
+        return ScalarAny(a, b, *cs)
+
     @_("WHERE LPAREN expr COMMA expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
@@ -775,37 +817,6 @@ class QoIParser(Parser):
     @_("maybe_comma")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def finite_difference_grid_period(self, p):  # noqa: F811
         pass
-
-    # comparison
-    @_(  # type: ignore[name-defined, no-redef]  # noqa: F821
-        "MONOTONICITY LPAREN expr COMMA STRICT EQUAL integer maybe_comma RPAREN"
-    )
-    def expr(self, p):  # noqa: F811
-        expr = p.expr
-        self.assert_or_error(
-            isinstance(expr, Array) and len(expr.shape) == 1 and expr.size >= 2,
-            p,
-            "`compare` expr must be a 1D array expression with at least two elements",
-        )
-        a, b, *cs = expr.flatlist()
-
-        # must not fail since flat Array elements cannot be arrays themselves
-        assert not isinstance(a, Array)
-        assert not isinstance(b, Array)
-        assert not any(isinstance(c, Array) for c in cs)
-
-        BOOLS: dict[int, bool] = {  # type: ignore
-            0: False,
-            1: True,
-        }
-
-        strict = p.integer
-        self.assert_or_error(
-            strict in BOOLS, p, "`compare` strict must be 0 (false) or 1 (true)"
-        )
-        strict = BOOLS[strict]
-
-        return ScalarMonotonicity(a, b, *cs, strict=strict)
 
     # empty rule
     @_("")  # type: ignore[name-defined]  # noqa: F821

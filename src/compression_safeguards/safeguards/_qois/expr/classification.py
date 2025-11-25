@@ -64,9 +64,9 @@ class ScalarIsFinite(Expr[AnyExpr]):
         fmax = _floating_max(Xs.dtype)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
-        # if expr_lower > 0, isfinite(Xs) = True, so Xs must be finite
-        # if expr_upper < 1, isfinite(Xs) = False, Xs must stay non-finite
-        # otherwise, isfinite(Xs) in [True, False] and Xs can be anything
+        # if expr_lower > 0, isfinite(arg) = True, so arg must be finite
+        # if expr_upper < 1, isfinite(arg) = False, arg must stay non-finite
+        # otherwise, isfinite(arg) in [True, False] and arg can be anything
         arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(Xs.shape[:1], -fmax)
         arg_lower[np.less_equal(expr_lower, 0)] = -np.inf
         np.copyto(arg_lower, argv, where=np.less(expr_upper, 1), casting="no")
@@ -139,9 +139,9 @@ class ScalarIsInf(Expr[AnyExpr]):
         fmax = _floating_max(Xs.dtype)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
-        # if expr_lower > 0, isinf(Xs) = True, so Xs must stay infinite
-        # if expr_upper < 0, isinf(Xs) = False, Xs must be non-infinite
-        # otherwise, isinf(Xs) in [True, False] and Xs can be anything
+        # if expr_lower > 0, isinf(arg) = True, so arg must stay infinite
+        # if expr_upper < 0, isinf(arg) = False, arg must be non-infinite
+        # otherwise, isinf(arg) in [True, False] and arg can be anything
         arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(Xs.shape[:1], -fmax)
         arg_lower[np.greater_equal(expr_upper, 1)] = -np.inf
         np.copyto(arg_lower, argv, where=np.greater(expr_lower, 0), casting="no")
@@ -212,9 +212,9 @@ class ScalarIsNaN(Expr[AnyExpr]):
         argv = arg.eval(Xs, late_bound)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
-        # if expr_lower > 0, isnan(Xs) = True, so Xs must stay NaN
-        # if expr_upper < 0, isnan(Xs) = False, Xs must be non-NaN
-        # otherwise, isnan(Xs) in [True, False] and Xs can be anything
+        # if expr_lower > 0, isnan(arg) = True, so arg must stay NaN
+        # if expr_upper < 0, isnan(arg) = False, arg must be non-NaN
+        # otherwise, isnan(arg) in [True, False] and arg can be anything
         arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
             Xs.shape[:1], Xs.dtype.type(-np.inf)
         )

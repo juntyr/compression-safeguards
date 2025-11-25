@@ -238,7 +238,10 @@ def generate_parameter(
             "isfinite": 1,
             "isinf": 1,
             "isnan": 1,
-            # conditional
+            # combinators
+            "not": 1,
+            "all": 2,
+            "any": 2,
             "where": 3,
         }
 
@@ -263,9 +266,6 @@ def generate_parameter(
                 "matmul": 2,
                 # finite difference
                 "finite_difference": 1,
-                # comparison
-                "monotonicity-weak": 1,
-                "monotonicity-strict": 1,
             }
 
         atoms = []
@@ -313,10 +313,6 @@ def generate_parameter(
                 atoms.append(
                     f"finite_difference({atom1}, order={data.ConsumeIntInRange(0, 3)}, accuracy={data.ConsumeIntInRange(1, 4)}, type={data.ConsumeIntInRange(-1, 1)}, axis={data.ConsumeIntInRange(0, 1)}, grid_spacing={consume_float_str(data)})"
                 )
-            elif op == "monotonicity-weak":
-                atoms.append(f"monotonicity({atom1}, strict=0)")
-            elif op == "monotonicity-strict":
-                atoms.append(f"monotonicity({atom1}, strict=1)")
             else:
                 atoms.append(f"{op}({atom1}, {', '.join(atomn)})")
         [atom] = atoms
