@@ -8,8 +8,10 @@ from typing_extensions import (
 )
 
 from ....utils._compat import (
+    _as_logical,
     _ensure_array,
     _floating_smallest_subnormal,
+    _logical_not,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
     _stack,
@@ -43,7 +45,7 @@ class ScalarNot(Expr[AnyExpr]):
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
-            lambda x: combine_to_dtype(np.logical_not, x, dtype),
+            lambda x: combine_to_dtype(_logical_not, x, dtype),
             ScalarNot,
         )
 
@@ -53,7 +55,7 @@ class ScalarNot(Expr[AnyExpr]):
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
-        return combine_to_dtype(np.logical_not, self._a.eval(Xs, late_bound), Xs.dtype)
+        return combine_to_dtype(_logical_not, self._a.eval(Xs, late_bound), Xs.dtype)
 
     @override
     @checked_data_bounds
@@ -160,7 +162,7 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         return reduce_combine_to_dtype(
-            lambda a: np.all(a, axis=0),
+            lambda a: np.all(_as_logical(a), axis=0),
             _stack(
                 [self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound)]
                 + [c.eval(Xs, late_bound) for c in self._cs]
@@ -350,7 +352,7 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         return reduce_combine_to_dtype(
-            lambda a: np.any(a, axis=0),
+            lambda a: np.any(_as_logical(a), axis=0),
             _stack(
                 [self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound)]
                 + [c.eval(Xs, late_bound) for c in self._cs]

@@ -409,8 +409,30 @@ class QoIParser(Parser):
     def comma_index(self, p):
         return p.index_
 
-    @_("expr")  # type: ignore[name-defined]  # noqa: F821
+    @_("integer_expr")  # type: ignore[name-defined]  # noqa: F821
     def index_(self, p):
+        return p.integer_expr
+
+    @_("maybe_integer_expr COLON maybe_integer_expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def index_(self, p):  # noqa: F811
+        return slice(p.maybe_integer_expr0, p.maybe_integer_expr1, None)
+
+    @_("maybe_integer_expr COLON maybe_integer_expr COLON maybe_integer_expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def index_(self, p):  # noqa: F811
+        return slice(
+            p.maybe_integer_expr0, p.maybe_integer_expr1, p.maybe_integer_expr2
+        )
+
+    @_("integer_expr")  # type: ignore[name-defined]  # noqa: F821
+    def maybe_integer_expr(self, p):
+        return p.integer_expr
+
+    @_("empty")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def maybe_integer_expr(self, p):  # noqa: F811
+        return None
+
+    @_("expr")  # type: ignore[name-defined]  # noqa: F821
+    def integer_expr(self, p):
         self.assert_or_error(
             isinstance(p.expr, Number) and p.expr.as_int() is not None,
             p,

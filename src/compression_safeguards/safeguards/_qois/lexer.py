@@ -32,6 +32,7 @@ class QoILexer(Lexer):
         RBRACK,  # type: ignore[name-defined]  # noqa: F821
         # separators
         COMMA,  # type: ignore[name-defined]  # noqa: F821
+        COLON,  # type: ignore[name-defined]  # noqa: F821
         SEMI,  # type: ignore[name-defined]  # noqa: F821
         # identifiers
         ID,  # type: ignore[name-defined]  # noqa: F821
@@ -167,6 +168,7 @@ class QoILexer(Lexer):
 
     # separators
     COMMA = r","
+    COLON = r":"
     SEMI = r";"
 
     # identifiers
@@ -318,6 +320,7 @@ class QoILexer(Lexer):
             "RBRACK": "`]`",
             # separators
             "COMMA": "`,`",
+            "COLON": "`:`",
             "SEMI": "`;`",
             # identifiers
             "ID": "identifier",

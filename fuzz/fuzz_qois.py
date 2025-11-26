@@ -21,9 +21,9 @@ with atheris.instrument_imports():
         ScalarIsNaN,
     )
     from compression_safeguards.safeguards._qois.expr.combinators import (
-        ScalarNot,
         ScalarAll,
         ScalarAny,
+        ScalarNot,
     )
     from compression_safeguards.safeguards._qois.expr.constfold import (
         ScalarFoldedConstant,

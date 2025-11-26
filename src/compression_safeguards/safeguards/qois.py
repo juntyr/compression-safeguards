@@ -50,6 +50,7 @@ expr =
   | late_bound_constant
   | variable
   | array_indexing
+  | stencil_info
   | functions
 ;
 
@@ -141,9 +142,18 @@ array_indexing =
   | expr, "[", index, { ",", index }, [","], "]"  (* array indexing *)
 ;
 
+stencil_info =
+    "I", "[", integer, "]"  (* stencil neighbourhood centre for an axis, only available in stencil QoIs *)
+;
+
 index =
-    expr  (* symbolic integer-only expression *)
-  | "I", "[", integer, "]"  (* stencil neighbourhood centre, only available in stencil QoIs *)
+    integer_expr  (* single index *)
+  | [ integer_expr ], ":", [ integer_expr ]  (* slice index from (inclusive) to (exclusive) *)
+  | [ integer_expr ], ":", [ integer_expr ], ":", [ integer_expr ]  (* slice index with step *)
+;
+
+integer_expr =
+    ? symbolic integer-only expression ?
 ;
 
 functions =

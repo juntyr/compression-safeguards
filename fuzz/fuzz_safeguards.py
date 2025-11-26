@@ -258,6 +258,7 @@ def generate_parameter(
                 "indexI": 1,
                 "index1": 2,
                 "index2": 3,
+                "indexFTS": 4,
                 # array transpose
                 "transpose": 1,
                 # array operations
@@ -307,6 +308,10 @@ def generate_parameter(
                 atoms.append(f"({atom1})[{atomn[0]}]")
             elif op == "index2":
                 atoms.append(f"({atom1})[{atomn[0]}, {atomn[1]}]")
+            elif op == "indexFTS":
+                atoms.append(
+                    f"({atom1})[{atomn[0] if data.ConsumeBool() else ''}:{atomn[1] if data.ConsumeBool() else ''}:{atomn[2] if data.ConsumeBool() else ''}]"
+                )
             elif op == "transpose":
                 atoms.append(f"({atom1}).T")
             elif op == "finite_difference":

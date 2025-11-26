@@ -6,6 +6,8 @@ equivalent behaviour for all supported dtypes, e.g. numpy_quaddtype.
 __all__ = [
     "_nan_to_zero_inf_to_finite",
     "_nextafter",
+    "_logical_not",
+    "_as_logical",
     "_symmetric_modulo",
     "_minimum_zero_sign_sensitive",
     "_maximum_zero_sign_sensitive",
@@ -151,6 +153,34 @@ def _nextafter(
     np.add(out, b, out=out, where=(np.isnan(a) | np.isnan(b)))
 
     return out
+
+
+# wrapper around np.logical_not that also works for numpy_quaddtype
+@overload
+def _logical_not(a: Ti) -> bool: ...
+
+
+@overload
+def _logical_not(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[np.bool]]: ...
+
+
+def _logical_not(a):
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
+        return np.logical_not(a)
+
+    return a == 0
+
+
+# helper for around np.any and np.all that also works for numpy_quaddtype
+def _as_logical(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T | np.bool]]:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
+        return a
+
+    return a != 0
 
 
 # wrapper around np.mod(p, q) that guarantees that the result is in [-q/2, q/2]
