@@ -11,6 +11,14 @@ from .expr.addsub import ScalarAdd, ScalarLeftAssociativeSum, ScalarSubtract
 from .expr.array import Array
 from .expr.classification import ScalarIsFinite, ScalarIsInf, ScalarIsNaN
 from .expr.combinators import ScalarAll, ScalarAny, ScalarNot
+from .expr.comparison import (
+    ScalarEqual,
+    ScalarGreater,
+    ScalarGreaterEqual,
+    ScalarLess,
+    ScalarLessEqual,
+    ScalarNotEqual,
+)
 from .expr.data import Data, LateBoundConstant
 from .expr.divmul import ScalarDivide, ScalarMultiply
 from .expr.finite_difference import (
@@ -271,6 +279,38 @@ class QoIParser(Parser):
     def expr(self, p):  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map(ScalarPower, p.expr0, p.expr1)
+
+    # binary comparison operators
+    #  expr := expr OP expr
+    @_("expr LESS_EQUAL expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
+            return Array.map(ScalarLessEqual, p.expr0, p.expr1)
+
+    @_("expr LESS expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
+            return Array.map(ScalarLess, p.expr0, p.expr1)
+
+    @_("expr EQUAL expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
+            return Array.map(ScalarEqual, p.expr0, p.expr1)
+
+    @_("expr NOT_EQUAL expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
+            return Array.map(ScalarNotEqual, p.expr0, p.expr1)
+
+    @_("expr GREATER_EQUAL expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
+            return Array.map(ScalarGreaterEqual, p.expr0, p.expr1)
+
+    @_("expr GREATER expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
+            return Array.map(ScalarGreater, p.expr0, p.expr1)
 
     # array transpose: expr := expr.T
     @_("expr TRANSPOSE")  # type: ignore[name-defined, no-redef]  # noqa: F821
@@ -849,7 +889,7 @@ class QoIParser(Parser):
     # === parser error handling ===
     def error(self, t):
         actions = self._lrtable.lr_action[self.state]
-        options = ", ".join(QoILexer.token_to_name(t) for t in actions)
+        options = ", ".join(QoILexer.token_to_name(a) for a in actions)
         oneof = " one of" if len(actions) > 1 else ""
 
         if t is None:

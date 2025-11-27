@@ -200,6 +200,13 @@ def generate_parameter(
             "*": 2,
             "/": 2,
             "**": 2,
+            # binary comparison operators
+            "<=": 2,
+            "<": 2,
+            "==": 2,
+            "!=": 2,
+            ">=": 2,
+            ">": 2,
             # logarithms and exponentials
             "ln": 1,
             "log2": 1,

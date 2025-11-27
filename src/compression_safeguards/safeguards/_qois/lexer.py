@@ -315,11 +315,13 @@ class QoILexer(Lexer):
     @staticmethod
     def token_to_name(token: str) -> str:
         return {
+            # special
+            "$end": "EOF",
             # literals
             "INTEGER": "integer",
             "FLOAT": "floating-point number",
-            "Inf": "`Inf`",
-            "NaN": "`NaN`",
+            "INF": "`Inf`",
+            "NAN": "`NaN`",
             "STRING": "string",
             # operators
             "PLUS": "`+`",
