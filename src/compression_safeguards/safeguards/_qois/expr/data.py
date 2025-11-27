@@ -96,7 +96,6 @@ class Data(EmptyExpr):
                 category=QuantityOfInterestRuntimeWarning,
             )
         if not np.all((expr_upper >= exprv) | np.isnan(exprv)):
-            assert False
             warn(
                 "data upper bounds are below the data values",
                 category=QuantityOfInterestRuntimeWarning,

@@ -197,13 +197,13 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
         smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
 
         a_const_zero = (av == 0) & (
-            True if a_const else a.eval_has_data(Xs, late_bound)
+            True if a_const else ~a.eval_has_data(Xs, late_bound)
         )
         b_const_zero = (bv == 0) & (
-            True if b_const else b.eval_has_data(Xs, late_bound)
+            True if b_const else ~b.eval_has_data(Xs, late_bound)
         )
         cs_const_zero = [
-            (cv == 0) & (True if c_const else c.eval_has_data(Xs, late_bound))
+            (cv == 0) & (True if c_const else ~c.eval_has_data(Xs, late_bound))
             for c_const, c, cv in zip(cs_const, cs, cvs)
         ]
 
@@ -381,13 +381,13 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
         smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
 
         a_const_non_zero = (av != 0) & (
-            True if a_const else a.eval_has_data(Xs, late_bound)
+            True if a_const else ~a.eval_has_data(Xs, late_bound)
         )
         b_const_non_zero = (bv != 0) & (
-            True if b_const else b.eval_has_data(Xs, late_bound)
+            True if b_const else ~b.eval_has_data(Xs, late_bound)
         )
         cs_const_non_zero = [
-            (cv != 0) & (True if c_const else c.eval_has_data(Xs, late_bound))
+            (cv != 0) & (True if c_const else ~c.eval_has_data(Xs, late_bound))
             for c_const, c, cv in zip(cs_const, cs, cvs)
         ]
 
@@ -437,7 +437,7 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
             )
             term_upper[
                 np.greater(expr_lower, 0)
-                & (tv == 0)
+                & (tv != 0)
                 & (~any_constant_non_zero | t_const_non_zero)
                 & np.less(tv, 0)
             ] = -smallest_subnormal

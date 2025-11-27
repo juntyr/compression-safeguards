@@ -89,6 +89,12 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             np.divide(_nan_to_zero_inf_to_finite(av), Xs.dtype.type(2)),
             np.divide(_nan_to_zero_inf_to_finite(bv), Xs.dtype.type(2)),
         )
+        av_mid_bv = _maximum_zero_sign_sensitive(
+            av_mid_bv, _minimum_zero_sign_sensitive(av, bv)
+        )
+        av_mid_bv = _minimum_zero_sign_sensitive(
+            av_mid_bv, _maximum_zero_sign_sensitive(av, bv)
+        )
 
         # compute the next value from b towards a that can be part of a's
         #  safe interval
@@ -157,6 +163,9 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
 
+            a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, a_lower))
+            a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
+
             # recurse into arg a
             Xs_lower_, Xs_upper_ = a.compute_data_bounds(
                 a_lower,
@@ -191,6 +200,9 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
 
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
+
+            b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
+            b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
 
             # recurse into arg b
             xl, xu = b.compute_data_bounds(
@@ -296,6 +308,12 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             np.divide(_nan_to_zero_inf_to_finite(av), Xs.dtype.type(2)),
             np.divide(_nan_to_zero_inf_to_finite(bv), Xs.dtype.type(2)),
         )
+        av_mid_bv = _maximum_zero_sign_sensitive(
+            av_mid_bv, _minimum_zero_sign_sensitive(av, bv)
+        )
+        av_mid_bv = _minimum_zero_sign_sensitive(
+            av_mid_bv, _maximum_zero_sign_sensitive(av, bv)
+        )
 
         # compute the next value from b towards a that can be part of a's
         #  safe interval
@@ -364,6 +382,9 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
 
+            a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, a_lower))
+            a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
+
             # recurse into arg a
             Xs_lower_, Xs_upper_ = a.compute_data_bounds(
                 a_lower,
@@ -398,6 +419,9 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
 
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
+
+            b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
+            b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
 
             # recurse into arg b
             xl, xu = b.compute_data_bounds(
@@ -503,6 +527,12 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             np.divide(_nan_to_zero_inf_to_finite(av), Xs.dtype.type(2)),
             np.divide(_nan_to_zero_inf_to_finite(bv), Xs.dtype.type(2)),
         )
+        av_mid_bv = _maximum_zero_sign_sensitive(
+            av_mid_bv, _minimum_zero_sign_sensitive(av, bv)
+        )
+        av_mid_bv = _minimum_zero_sign_sensitive(
+            av_mid_bv, _maximum_zero_sign_sensitive(av, bv)
+        )
 
         # compute the next value from b towards a that can be part of a's
         #  safe interval
@@ -567,6 +597,9 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
 
+            a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, a_lower))
+            a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
+
             # recurse into arg a
             Xs_lower_, Xs_upper_ = a.compute_data_bounds(
                 a_lower,
@@ -599,6 +632,9 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
 
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
+
+            b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
+            b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
 
             # recurse into arg b
             xl, xu = b.compute_data_bounds(
@@ -704,6 +740,12 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             np.divide(_nan_to_zero_inf_to_finite(av), Xs.dtype.type(2)),
             np.divide(_nan_to_zero_inf_to_finite(bv), Xs.dtype.type(2)),
         )
+        av_mid_bv = _maximum_zero_sign_sensitive(
+            av_mid_bv, _minimum_zero_sign_sensitive(av, bv)
+        )
+        av_mid_bv = _minimum_zero_sign_sensitive(
+            av_mid_bv, _maximum_zero_sign_sensitive(av, bv)
+        )
 
         # compute the next value from b towards a that can be part of a's
         #  safe interval
@@ -768,6 +810,9 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
 
+            a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, a_lower))
+            a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
+
             # recurse into arg a
             Xs_lower_, Xs_upper_ = a.compute_data_bounds(
                 a_lower,
@@ -800,6 +845,9 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
 
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
+
+            b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
+            b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
 
             # recurse into arg b
             xl, xu = b.compute_data_bounds(
@@ -905,6 +953,12 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
             np.divide(_nan_to_zero_inf_to_finite(av), Xs.dtype.type(2)),
             np.divide(_nan_to_zero_inf_to_finite(bv), Xs.dtype.type(2)),
         )
+        av_mid_bv = _maximum_zero_sign_sensitive(
+            av_mid_bv, _minimum_zero_sign_sensitive(av, bv)
+        )
+        av_mid_bv = _minimum_zero_sign_sensitive(
+            av_mid_bv, _maximum_zero_sign_sensitive(av, bv)
+        )
 
         # compute the next value from b towards a that can be part of a's
         #  safe interval
@@ -969,6 +1023,9 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
 
+            a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, a_lower))
+            a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
+
             # recurse into arg a
             Xs_lower_, Xs_upper_ = a.compute_data_bounds(
                 a_lower,
@@ -998,6 +1055,9 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
                 where=(np.less(expr_upper, 1) & (av > bv)),
                 casting="no",
             )
+
+            b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
+            b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
 
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
@@ -1106,6 +1166,12 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
             np.divide(_nan_to_zero_inf_to_finite(av), Xs.dtype.type(2)),
             np.divide(_nan_to_zero_inf_to_finite(bv), Xs.dtype.type(2)),
         )
+        av_mid_bv = _maximum_zero_sign_sensitive(
+            av_mid_bv, _minimum_zero_sign_sensitive(av, bv)
+        )
+        av_mid_bv = _minimum_zero_sign_sensitive(
+            av_mid_bv, _maximum_zero_sign_sensitive(av, bv)
+        )
 
         # compute the next value from b towards a that can be part of a's
         #  safe interval
@@ -1170,6 +1236,9 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
 
+            a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, a_lower))
+            a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
+
             # recurse into arg a
             Xs_lower_, Xs_upper_ = a.compute_data_bounds(
                 a_lower,
@@ -1202,6 +1271,9 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
 
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
+
+            b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
+            b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
 
             # recurse into arg b
             xl, xu = b.compute_data_bounds(
