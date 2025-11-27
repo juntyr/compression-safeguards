@@ -396,28 +396,19 @@ def test_fuzzer_found_foo():
                 kind="qoi_eb_stencil",
                 qoi="""
                     all([
+                        # strictly decreasing sequences stay strictly decreasing
                         all(X[1:] < X[:-1]) == all(C["$X"][1:] < C["$X"][:-1]),
+                        # constant sequences stay constant
                         all(X[1:] == X[:-1]) == all(C["$X"][1:] == C["$X"][:-1]),
+                        # strictly increasing sequences stay strictly increasing
                         all(X[1:] > X[:-1]) == all(C["$X"][1:] > C["$X"][:-1]),
                     ])
                 """,
-                neighbourhood=[dict(axis=0, before=1, after=1, boundary="wrap")],
+                neighbourhood=[dict(axis=axis, before=1, after=1, boundary="wrap")],
                 type="abs",
                 eb=0,
-            ),
-            dict(
-                kind="qoi_eb_stencil",
-                qoi="""
-                    all([
-                        all(X[1:] < X[:-1]) == all(C["$X"][1:] < C["$X"][:-1]),
-                        all(X[1:] == X[:-1]) == all(C["$X"][1:] == C["$X"][:-1]),
-                        all(X[1:] > X[:-1]) == all(C["$X"][1:] > C["$X"][:-1]),
-                    ])
-                """,
-                neighbourhood=[dict(axis=1, before=1, after=1, boundary="wrap")],
-                type="abs",
-                eb=0,
-            ),
+            )
+            for axis in range(data.ndim)
         ],
     )
 
