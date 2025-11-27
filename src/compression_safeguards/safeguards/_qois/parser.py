@@ -84,7 +84,8 @@ class QoIParser(Parser):
 
     # === operator precedence and associativity ===
     precedence = (
-        # lowest precedence: add and subtract
+        # lowest precedence: comparisons
+        ("nonassoc", LESS, LESS_EQUAL, EQUAL, NOT_EQUAL, GREATER_EQUAL, GREATER),  # type: ignore[name-defined]  # noqa: F821
         ("left", PLUS, MINUS),  # type: ignore[name-defined]  # noqa: F821
         ("left", TIMES, DIVIDE),  # type: ignore[name-defined]  # noqa: F821
         ("right", UPLUS, UMINUS),  # type: ignore[name-defined]  # noqa: F821
@@ -125,7 +126,7 @@ class QoIParser(Parser):
         return p.expr
 
     # variable assignment: assign := V["id"] = expr;
-    @_("VS LBRACK quotedparameter RBRACK EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("VS LBRACK quotedparameter RBRACK ASSIGN expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def assign(self, p):  # noqa: F811
         self.assert_or_error(
             self._X is None, p, "stencil QoI variables use upper-case `V`"
@@ -142,7 +143,7 @@ class QoIParser(Parser):
         )
         self._vars[p.quotedparameter] = Array.map(Group, p.expr)
 
-    @_("VA LBRACK quotedparameter RBRACK EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("VA LBRACK quotedparameter RBRACK ASSIGN expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def assign(self, p):  # noqa: F811
         self.assert_or_error(
             self._X is not None, p, "pointwise QoI variables use lower-case `v`"
@@ -159,7 +160,7 @@ class QoIParser(Parser):
         )
         self._vars[p.quotedparameter] = Array.map(Group, p.expr)
 
-    @_("ID EQUAL expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("ID ASSIGN expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def assign(self, p):  # noqa: F811
         self.raise_error(
             p,
@@ -467,7 +468,7 @@ class QoIParser(Parser):
     def expr(self, p):  # noqa: F811
         return Array.map(lambda e: ScalarLog(Logarithm.log10, e), p.expr)
 
-    @_("LOG LPAREN expr COMMA BASE EQUAL expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("LOG LPAREN expr COMMA BASE ASSIGN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map(ScalarLogWithBase, p.expr0, p.expr1)
@@ -666,7 +667,7 @@ class QoIParser(Parser):
 
     # finite difference
     @_(  # type: ignore[name-defined, no-redef]  # noqa: F821
-        "FINITE_DIFFERENCE LPAREN expr COMMA ORDER EQUAL integer COMMA ACCURACY EQUAL integer COMMA TYPE EQUAL integer COMMA AXIS EQUAL integer finite_difference_grid_spacing finite_difference_grid_period RPAREN"
+        "FINITE_DIFFERENCE LPAREN expr COMMA ORDER ASSIGN integer COMMA ACCURACY ASSIGN integer COMMA TYPE ASSIGN integer COMMA AXIS ASSIGN integer finite_difference_grid_spacing finite_difference_grid_period RPAREN"
     )
     def expr(self, p):  # noqa: F811
         self.assert_or_error(
@@ -784,7 +785,7 @@ class QoIParser(Parser):
         assert not isinstance(sum_, Array)
         return Group(sum_)
 
-    @_("COMMA GRID_SPACING EQUAL expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("COMMA GRID_SPACING ASSIGN expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def finite_difference_grid_spacing(self, p):  # noqa: F811
         self.assert_or_error(
             not p.expr.has_data,
@@ -798,7 +799,7 @@ class QoIParser(Parser):
         )
         return dict(spacing=p.expr)
 
-    @_("COMMA GRID_CENTRE EQUAL expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("COMMA GRID_CENTRE ASSIGN expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def finite_difference_grid_spacing(self, p):  # noqa: F811
         self.assert_or_error(
             not p.expr.has_data,
@@ -817,7 +818,7 @@ class QoIParser(Parser):
         )
         return dict(centre=p.expr)
 
-    @_("COMMA GRID_PERIOD EQUAL expr maybe_comma")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("COMMA GRID_PERIOD ASSIGN expr maybe_comma")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def finite_difference_grid_period(self, p):  # noqa: F811
         self.assert_or_error(
             not p.expr.has_data,

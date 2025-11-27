@@ -22,7 +22,13 @@ class QoILexer(Lexer):
         POWER,  # type: ignore[name-defined]  # noqa: F821
         TIMES,  # type: ignore[name-defined]  # noqa: F821
         DIVIDE,  # type: ignore[name-defined]  # noqa: F821
+        LESS_EQUAL,  # type: ignore[name-defined]  # noqa: F821
+        LESS,  # type: ignore[name-defined]  # noqa: F821
         EQUAL,  # type: ignore[name-defined]  # noqa: F821
+        NOT_EQUAL,  # type: ignore[name-defined]  # noqa: F821
+        GREATER_EQUAL,  # type: ignore[name-defined]  # noqa: F821
+        GREATER,  # type: ignore[name-defined]  # noqa: F821
+        ASSIGN,  # type: ignore[name-defined]  # noqa: F821
         # array transpose
         TRANSPOSE,  # type: ignore[name-defined]  # noqa: F821
         # groups
@@ -152,10 +158,21 @@ class QoILexer(Lexer):
     # operators
     PLUS = r"\+"
     MINUS = r"-"
-    POWER = r"\*\*"  # comes before TIMES so as to not parse ** as TIMES TIMES
+    # comes before TIMES so as to not parse ** as TIMES TIMES
+    POWER = r"\*\*"
     TIMES = r"\*"
     DIVIDE = r"/"
-    EQUAL = r"="
+    # comes before LESS and ASSIGN so as to not parse <= as LESS ASSIGN
+    LESS_EQUAL = r"<="
+    LESS = r"<"
+    # comes before ASSIGN so as to not parse == as ASSIGN ASSIGN
+    EQUAL = r"=="
+    # comes before ASSIGN so as to not parse != as ! ASSIGN
+    NOT_EQUAL = r"!="
+    # comes before GREATER and ASSIGN so as to not parse >= as GREATER ASSIGN
+    GREATER_EQUAL = r">="
+    GREATER = r">"
+    ASSIGN = r"="
 
     # array transpose
     TRANSPOSE = r"\.T"
@@ -310,7 +327,13 @@ class QoILexer(Lexer):
             "POWER": "`**`",
             "TIMES": "`*`",
             "DIVIDE": "`/`",
-            "EQUAL": "`=`",
+            "LESS_EQUAL": "`<=`",
+            "LESS": "`<`",
+            "EQUAL": "`==`",
+            "NOT_EQUAL": "`!=`",
+            "GREATER_EQUAL": "`>=`",
+            "GREATER": "`>`",
+            "ASSIGN": "`=`",
             # array transpose
             "TRANSPOSE": "`.T`",
             # groups
