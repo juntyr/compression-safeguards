@@ -8,6 +8,7 @@ from compression_safeguards.safeguards._qois.expr.classification import (
     ScalarIsInf,
     ScalarIsNaN,
 )
+from compression_safeguards.safeguards._qois.expr.combinators import ScalarNot
 from compression_safeguards.safeguards._qois.expr.constfold import ScalarFoldedConstant
 from compression_safeguards.safeguards._qois.expr.data import Data
 from compression_safeguards.safeguards._qois.expr.divmul import (
@@ -51,6 +52,7 @@ from compression_safeguards.safeguards._qois.interval import (
 )
 from compression_safeguards.utils._compat import (
     _floating_max,
+    _floating_smallest_subnormal,
     _is_negative_zero,
     _is_positive_zero,
 )
@@ -1766,3 +1768,20 @@ def test_fuzzer_found_upper_data_bounds_below():
 
     assert expr.eval(X_lower, dict()) == np.array(np.float16(0.0))
     assert expr.eval(X_upper, dict()) == np.array(np.float16(0.0))
+
+
+def test_fuzzer_found_not_data_bound():
+    X = np.array(np.float64(3.1e-322))
+
+    expr = ScalarNot(Data.SCALAR)
+
+    assert expr.eval(X, dict()) == np.array(np.float64(0.0))
+
+    expr_lower = np.array(np.float64(0.0))
+    expr_upper = np.array(np.float64(0.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(
+        np.float64(_floating_smallest_subnormal(np.dtype(np.float64)))
+    )
+    assert X_upper == np.array(np.float64(np.inf))

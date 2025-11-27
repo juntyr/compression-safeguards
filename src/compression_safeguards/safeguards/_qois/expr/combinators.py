@@ -83,18 +83,14 @@ class ScalarNot(Expr[AnyExpr]):
         arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
             Xs.shape[:1], Xs.dtype.type(-np.inf)
         )
-        arg_lower[np.greater_equal(expr_lower, 0)] = -0.0
-        arg_lower[np.less_equal(expr_upper, 1) & np.greater_equal(argv, 0)] = (
-            smallest_subnormal
-        )
+        arg_lower[np.greater(expr_lower, 0)] = -0.0
+        arg_lower[np.less(expr_upper, 1) & np.greater(argv, 0)] = smallest_subnormal
 
         arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
             Xs.shape[:1], Xs.dtype.type(np.inf)
         )
-        arg_upper[np.greater_equal(expr_lower, 0)] = +0.0
-        arg_upper[
-            np.less_equal(expr_upper, 1) & np.less_equal(argv, 0)
-        ] = -smallest_subnormal
+        arg_upper[np.greater(expr_lower, 0)] = +0.0
+        arg_upper[np.less(expr_upper, 1) & np.less(argv, 0)] = -smallest_subnormal
 
         # TODO: an interval union could represent that the two disjoint
         #       intervals in the future
@@ -243,25 +239,19 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
             term_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
-            term_lower[np.greater_equal(expr_lower, 0) & np.greater_equal(tv, 0)] = (
+            term_lower[np.greater(expr_lower, 0) & np.greater(tv, 0)] = (
                 smallest_subnormal
             )
             term_lower[
-                np.less_equal(expr_upper, 1)
-                & (tv == 0)
-                & (~any_constant_zero | t_const_zero)
+                np.less(expr_upper, 1) & (tv == 0) & (~any_constant_zero | t_const_zero)
             ] = -0.0
 
             term_upper: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(np.inf)
             )
+            term_upper[np.greater(expr_lower, 0) & np.less(tv, 0)] = -smallest_subnormal
             term_upper[
-                np.greater_equal(expr_lower, 0) & np.less_equal(tv, 0)
-            ] = -smallest_subnormal
-            term_upper[
-                np.less_equal(expr_upper, 1)
-                & (tv == 0)
-                & (~any_constant_zero | t_const_zero)
+                np.less(expr_upper, 1) & (tv == 0) & (~any_constant_zero | t_const_zero)
             ] = +0.0
 
             # TODO: an interval union could represent that the two disjoint
@@ -435,23 +425,23 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
             term_lower[
-                np.greater_equal(expr_lower, 0)
+                np.greater(expr_lower, 0)
                 & (tv != 0)
                 & (~any_constant_non_zero | t_const_non_zero)
-                & np.greater_equal(tv, 0)
+                & np.greater(tv, 0)
             ] = smallest_subnormal
-            term_lower[np.less_equal(expr_upper, 1)] = -0.0
+            term_lower[np.less(expr_upper, 1)] = -0.0
 
             term_upper: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(np.inf)
             )
             term_upper[
-                np.greater_equal(expr_lower, 0)
+                np.greater(expr_lower, 0)
                 & (tv == 0)
                 & (~any_constant_non_zero | t_const_non_zero)
-                & np.less_equal(tv, 0)
+                & np.less(tv, 0)
             ] = -smallest_subnormal
-            term_upper[np.less_equal(expr_upper, 1)] = +0.0
+            term_upper[np.less(expr_upper, 1)] = +0.0
 
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future

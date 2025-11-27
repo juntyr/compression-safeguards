@@ -135,22 +135,22 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
-            np.copyto(a_lower, av, where=np.greater_equal(expr_lower, 0), casting="no")
+            np.copyto(a_lower, av, where=np.greater(expr_lower, 0), casting="no")
             np.copyto(
                 a_lower,
                 bv_nxt_av,
-                where=(np.less_equal(expr_upper, 1) & (av > bv)),
+                where=(np.less(expr_upper, 1) & (av > bv)),
                 casting="no",
             )
 
             a_upper: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(np.inf)
             )
-            np.copyto(a_upper, av, where=np.greater_equal(expr_lower, 0), casting="no")
+            np.copyto(a_upper, av, where=np.greater(expr_lower, 0), casting="no")
             np.copyto(
                 a_upper,
                 bv_nxt_av,
-                where=(np.less_equal(expr_upper, 1) & (av < bv)),
+                where=(np.less(expr_upper, 1) & (av < bv)),
                 casting="no",
             )
 
@@ -170,22 +170,22 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
-            np.copyto(b_lower, bv, where=np.greater_equal(expr_lower, 0), casting="no")
+            np.copyto(b_lower, bv, where=np.greater(expr_lower, 0), casting="no")
             np.copyto(
                 b_lower,
                 av_nxt_bv,
-                where=(np.less_equal(expr_upper, 1) & (bv > av)),
+                where=(np.less(expr_upper, 1) & (bv > av)),
                 casting="no",
             )
 
             b_upper: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(np.inf)
             )
-            np.copyto(b_upper, bv, where=np.greater_equal(expr_lower, 0), casting="no")
+            np.copyto(b_upper, bv, where=np.greater(expr_lower, 0), casting="no")
             np.copyto(
                 b_upper,
                 av_nxt_bv,
-                where=(np.less_equal(expr_upper, 1) & (bv < av)),
+                where=(np.less(expr_upper, 1) & (bv < av)),
                 casting="no",
             )
 
@@ -345,10 +345,10 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 a_lower,
                 bv_nxt_av,
-                where=(np.greater_equal(expr_lower, 0) & (av > bv)),
+                where=(np.greater(expr_lower, 0) & (av > bv)),
                 casting="no",
             )
-            np.copyto(a_lower, av, where=np.less_equal(expr_upper, 1), casting="no")
+            np.copyto(a_lower, av, where=np.less(expr_upper, 1), casting="no")
 
             a_upper: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(np.inf)
@@ -356,10 +356,10 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 a_upper,
                 bv_nxt_av,
-                where=(np.greater_equal(expr_lower, 0) & (av < bv)),
+                where=(np.greater(expr_lower, 0) & (av < bv)),
                 casting="no",
             )
-            np.copyto(a_upper, av, where=np.less_equal(expr_upper, 1), casting="no")
+            np.copyto(a_upper, av, where=np.less(expr_upper, 1), casting="no")
 
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
@@ -380,10 +380,10 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 b_lower,
                 av_nxt_bv,
-                where=(np.greater_equal(expr_lower, 0) & (bv > av)),
+                where=(np.greater(expr_lower, 0) & (bv > av)),
                 casting="no",
             )
-            np.copyto(b_lower, bv, where=np.less_equal(expr_upper, 1), casting="no")
+            np.copyto(b_lower, bv, where=np.less(expr_upper, 1), casting="no")
 
             b_upper: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(np.inf)
@@ -391,10 +391,10 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 b_upper,
                 av_nxt_bv,
-                where=(np.greater_equal(expr_lower, 0) & (bv < av)),
+                where=(np.greater(expr_lower, 0) & (bv < av)),
                 casting="no",
             )
-            np.copyto(b_upper, bv, where=np.less_equal(expr_upper, 1), casting="no")
+            np.copyto(b_upper, bv, where=np.less(expr_upper, 1), casting="no")
 
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
@@ -550,7 +550,7 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 a_lower,
                 bv_nxt_av,  # a >= b and bv_nxt_av >= b and >= mid_b
-                where=(np.less_equal(expr_upper, 1) & (av >= bv)),
+                where=(np.less(expr_upper, 1) & (av >= bv)),
                 casting="no",
             )
 
@@ -560,7 +560,7 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 a_upper,
                 bv_nxt_av,  # a < b and bv_nxt_av < b and < mid_b
-                where=np.greater_equal(expr_lower, 0),
+                where=np.greater(expr_lower, 0),
                 casting="no",
             )
 
@@ -583,7 +583,7 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 b_lower,
                 av_nxt_bv,  # a < b and av_nxt_bv > a and > mid_a
-                where=np.greater_equal(expr_lower, 0),
+                where=np.greater(expr_lower, 0),
                 casting="no",
             )
 
@@ -593,7 +593,7 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 b_upper,
                 av_nxt_bv,  # a >= b and av_nxt_bv <= a and <= mid_a
-                where=(np.less_equal(expr_upper, 1) & (av >= bv)),
+                where=(np.less(expr_upper, 1) & (av >= bv)),
                 casting="no",
             )
 
@@ -751,7 +751,7 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 a_lower,
                 bv_nxt_av,  # a >= b and bv_nxt_av >= b and >= mid_b
-                where=np.greater_equal(expr_lower, 0),
+                where=np.greater(expr_lower, 0),
                 casting="no",
             )
 
@@ -761,7 +761,7 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 a_upper,
                 bv_nxt_av,  # a < b and bv_nxt_av < b and < mid_b
-                where=(np.less_equal(expr_upper, 1) & (av < bv)),
+                where=(np.less(expr_upper, 1) & (av < bv)),
                 casting="no",
             )
 
@@ -784,7 +784,7 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 b_lower,
                 av_nxt_bv,  # a < b and av_nxt_bv > a and > mid_a
-                where=(np.less_equal(expr_upper, 1) & (av < bv)),
+                where=(np.less(expr_upper, 1) & (av < bv)),
                 casting="no",
             )
 
@@ -794,7 +794,7 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 b_upper,
                 av_nxt_bv,  # a >= b and av_nxt_bv <= a and <= mid_a
-                where=np.greater_equal(expr_lower, 0),
+                where=np.greater(expr_lower, 0),
                 casting="no",
             )
 
@@ -952,7 +952,7 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 a_lower,
                 bv_nxt_av,  # a > b and bv_nxt_av > b and > mid_b
-                where=(np.less_equal(expr_upper, 1) & (av > bv)),
+                where=(np.less(expr_upper, 1) & (av > bv)),
                 casting="no",
             )
 
@@ -962,7 +962,7 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 a_upper,
                 bv_nxt_av,  # a <= b and bv_nxt_av <= b and <= mid_b
-                where=np.greater_equal(expr_lower, 0),
+                where=np.greater(expr_lower, 0),
                 casting="no",
             )
 
@@ -985,7 +985,7 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 b_lower,
                 av_nxt_bv,  # a <= b and av_nxt_bv >= a and >= mid_a
-                where=np.greater_equal(expr_lower, 0),
+                where=np.greater(expr_lower, 0),
                 casting="no",
             )
 
@@ -995,7 +995,7 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 b_upper,
                 av_nxt_bv,  # a > b and av_nxt_bv < a and < mid_a
-                where=(np.less_equal(expr_upper, 1) & (av > bv)),
+                where=(np.less(expr_upper, 1) & (av > bv)),
                 casting="no",
             )
 
@@ -1153,7 +1153,7 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 a_lower,
                 bv_nxt_av,  # a > b and bv_nxt_av > b and > mid_b
-                where=np.greater_equal(expr_lower, 0),
+                where=np.greater(expr_lower, 0),
                 casting="no",
             )
 
@@ -1163,7 +1163,7 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 a_upper,
                 bv_nxt_av,  # a <= b and bv_nxt_av <= b and <= mid_b
-                where=(np.less_equal(expr_upper, 1) & (av <= bv)),
+                where=(np.less(expr_upper, 1) & (av <= bv)),
                 casting="no",
             )
 
@@ -1186,7 +1186,7 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 b_lower,
                 av_nxt_bv,  # a <= b and av_nxt_bv >= a and >= mid_a
-                where=(np.less_equal(expr_upper, 1) & (av <= bv)),
+                where=(np.less(expr_upper, 1) & (av <= bv)),
                 casting="no",
             )
 
@@ -1196,7 +1196,7 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
             np.copyto(
                 b_upper,
                 av_nxt_bv,  # a > b and av_nxt_bv < a and < mid_a
-                where=np.greater_equal(expr_lower, 0),
+                where=np.greater(expr_lower, 0),
                 casting="no",
             )
 
