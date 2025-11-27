@@ -389,8 +389,39 @@ def test_fuzzer_found_foo():
     #     [!78-123!, 196-255, 141-255, 112-112, 112-112, 112-112],
     # ]
 
-    encode_decode_zero(
+    decoded = encode_decode_zero(
         data,
+        safeguards=[
+            dict(
+                kind="qoi_eb_stencil",
+                qoi="""
+                    all([
+                        all(X[1:] < X[:-1]) == all(C["$X"][1:] < C["$X"][:-1]),
+                        all(X[1:] == X[:-1]) == all(C["$X"][1:] == C["$X"][:-1]),
+                        all(X[1:] > X[:-1]) == all(C["$X"][1:] > C["$X"][:-1]),
+                    ])
+                """,
+                neighbourhood=[dict(axis=0, before=1, after=1, boundary="wrap")],
+                type="abs",
+                eb=0,
+            ),
+            dict(
+                kind="qoi_eb_stencil",
+                qoi="""
+                    all([
+                        all(X[1:] < X[:-1]) == all(C["$X"][1:] < C["$X"][:-1]),
+                        all(X[1:] == X[:-1]) == all(C["$X"][1:] == C["$X"][:-1]),
+                        all(X[1:] > X[:-1]) == all(C["$X"][1:] > C["$X"][:-1]),
+                    ])
+                """,
+                neighbourhood=[dict(axis=1, before=1, after=1, boundary="wrap")],
+                type="abs",
+                eb=0,
+            ),
+        ],
+    )
+
+    assert Safeguards(
         safeguards=[
             dict(
                 kind="monotonicity",
@@ -399,5 +430,5 @@ def test_fuzzer_found_foo():
                 boundary="wrap",
                 axis=None,
             )
-        ],
-    )
+        ]
+    ).check(data, decoded)
