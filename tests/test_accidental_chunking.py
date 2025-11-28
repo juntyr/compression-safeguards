@@ -48,10 +48,18 @@ def test_codec_stack_stencil():
             codec=dict(id="zero"),
             safeguards=[
                 dict(
-                    kind="monotonicity",
-                    monotonicity="strict",
-                    window=1,
-                    boundary="valid",
+                    kind="qoi_eb_stencil",
+                    qoi="""
+                        all([
+                            # strictly decreasing sequences stay strictly decreasing
+                            any([all(X[1:] < X[:-1]), not(all(C["$X"][1:] < C["$X"][:-1]))]),
+                            # strictly increasing sequences stay strictly increasing
+                            any([all(X[1:] > X[:-1]), not(all(C["$X"][1:] > C["$X"][:-1]))]),
+                        ])
+                    """,
+                    neighbourhood=[dict(axis=0, before=1, after=1, boundary="valid")],
+                    type="abs",
+                    eb=0,
                 )
             ],
         ),
@@ -61,7 +69,7 @@ def test_codec_stack_stencil():
 
     encoded = stack.encode(data)
     decoded = stack.decode(encoded)
-    assert np.all(decoded[2:] > decoded[:-2])
+    assert np.all(decoded[1:] > decoded[:-1])
 
     encoded_decoded = stack.encode_decode(data)
     assert np.all(encoded_decoded == decoded)
@@ -133,10 +141,20 @@ def test_zarr_stencil():
                         codec=dict(id="zero"),
                         safeguards=[
                             dict(
-                                kind="monotonicity",
-                                monotonicity="strict",
-                                window=1,
-                                boundary="valid",
+                                kind="qoi_eb_stencil",
+                                qoi="""
+                                    all([
+                                        # strictly decreasing sequences stay strictly decreasing
+                                        any([all(X[1:] < X[:-1]), not(all(C["$X"][1:] < C["$X"][:-1]))]),
+                                        # strictly increasing sequences stay strictly increasing
+                                        any([all(X[1:] > X[:-1]), not(all(C["$X"][1:] > C["$X"][:-1]))]),
+                                    ])
+                                """,
+                                neighbourhood=[
+                                    dict(axis=0, before=1, after=1, boundary="valid")
+                                ],
+                                type="abs",
+                                eb=0,
                             )
                         ],
                     ),

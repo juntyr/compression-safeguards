@@ -571,22 +571,55 @@ def test_different_chunks_and_safeguards():
             [
                 dict(kind="same", value=10),
                 dict(
-                    kind="monotonicity",
-                    monotonicity="strict",
-                    window=2,
-                    boundary="valid",
+                    kind="qoi_eb_stencil",
+                    qoi="""
+                        all([
+                            # strictly decreasing sequences stay strictly decreasing
+                            any([all(X[1:] < X[:-1]), not(all(C["$X"][1:] < C["$X"][:-1]))]),
+                            # strictly increasing sequences stay strictly increasing
+                            any([all(X[1:] > X[:-1]), not(all(C["$X"][1:] > C["$X"][:-1]))]),
+                        ])
+                    """,
+                    neighbourhood=[dict(axis=0, before=2, after=2, boundary="valid")],
+                    type="abs",
+                    eb=0,
                 ),
             ],
             [
                 dict(kind="same", value=10),
                 dict(
-                    kind="monotonicity",
-                    monotonicity="strict",
-                    window=2,
-                    boundary="valid",
+                    kind="qoi_eb_stencil",
+                    qoi="""
+                        all([
+                            # strictly decreasing sequences stay strictly decreasing
+                            any([all(X[1:] < X[:-1]), not(all(C["$X"][1:] < C["$X"][:-1]))]),
+                            # strictly increasing sequences stay strictly increasing
+                            any([all(X[1:] > X[:-1]), not(all(C["$X"][1:] > C["$X"][:-1]))]),
+                        ])
+                    """,
+                    neighbourhood=[dict(axis=0, before=2, after=2, boundary="valid")],
+                    type="abs",
+                    eb=0,
                 ),
                 dict(
-                    kind="monotonicity", monotonicity="weak", window=1, boundary="wrap"
+                    kind="qoi_eb_stencil",
+                    qoi="""
+                        all([
+                            # weakly decreasing & not constant sequences stay weakly decreasing
+                            any([all(X[1:] <= X[:-1]), not(all([
+                                all(C["$X"][1:] <= C["$X"][:-1]),
+                                not(all(C["$X"][1:] == C["$X"][:-1])),
+                            ]))]),
+                            # weakly increasing & not constant sequences stay weakly increasing
+                            any([all(X[1:] >= X[:-1]), not(all([
+                                all(C["$X"][1:] >= C["$X"][:-1]),
+                                not(all(C["$X"][1:] == C["$X"][:-1])),
+                            ]))]),
+                        ])
+                    """,
+                    neighbourhood=[dict(axis=0, before=1, after=1, boundary="wrap")],
+                    type="abs",
+                    eb=0,
                 ),
             ],
         ]:

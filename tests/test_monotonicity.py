@@ -6,9 +6,6 @@ import pytest
 
 from compression_safeguards import Safeguards
 from compression_safeguards.safeguards.stencil import BoundaryCondition
-from compression_safeguards.safeguards.stencil.monotonicity import (
-    MonotonicityPreservingSafeguard,
-)
 from compression_safeguards.safeguards.stencil.qoi.eb import (
     StencilQuantityOfInterestErrorBoundSafeguard,
 )
@@ -22,9 +19,10 @@ from .codecs import (
     encode_decode_noise,
     encode_decode_zero,
 )
+from .monotonicity import Monotonicity, MonotonicityPreservingSafeguard
 
-MONOTONICITY_QOIS: dict[str, str] = dict(
-    strict="""
+MONOTONICITY_QOIS: dict[Monotonicity, str] = {
+    Monotonicity.strict: """
         all([
             # strictly decreasing sequences stay strictly decreasing
             all(X[1:] < X[:-1]) == all(C["$X"][1:] < C["$X"][:-1]),
@@ -32,7 +30,7 @@ MONOTONICITY_QOIS: dict[str, str] = dict(
             all(X[1:] > X[:-1]) == all(C["$X"][1:] > C["$X"][:-1]),
         ])
     """,
-    strict_with_consts="""
+    Monotonicity.strict_with_consts: """
         all([
             # strictly decreasing sequences stay strictly decreasing
             all(X[1:] < X[:-1]) == all(C["$X"][1:] < C["$X"][:-1]),
@@ -42,7 +40,7 @@ MONOTONICITY_QOIS: dict[str, str] = dict(
             all(X[1:] > X[:-1]) == all(C["$X"][1:] > C["$X"][:-1]),
         ])
     """,
-    strict_to_weak="""
+    Monotonicity.strict_to_weak: """
         all([
             # strictly decreasing sequences become weakly decreasing
             #  (1) x strictly decreasing -> x' weakly decreasing or const
@@ -58,7 +56,7 @@ MONOTONICITY_QOIS: dict[str, str] = dict(
             any([not(all(X[1:] > X[:-1])), all(C["$X"][1:] > C["$X"][:-1])]),
         ])
     """,
-    weak="""
+    Monotonicity.weak: """
         all([
             # weakly decreasing & not constant sequences stay weakly decreasing
             #  (1) x weakly decreasing & not constant -> x' weakly decreasing
@@ -92,12 +90,12 @@ MONOTONICITY_QOIS: dict[str, str] = dict(
             ])]),
         ])
     """,
-)
+}
 
 
 # a -> b is equivalent to any(not(a), b)
-MONOTONICITY_ALLOW_SPURIOUS_QOIS: dict[str, str] = dict(
-    strict="""
+MONOTONICITY_ALLOW_SPURIOUS_QOIS: dict[Monotonicity, str] = {
+    Monotonicity.strict: """
         all([
             # strictly decreasing sequences stay strictly decreasing
             any([all(X[1:] < X[:-1]), not(all(C["$X"][1:] < C["$X"][:-1]))]),
@@ -105,7 +103,7 @@ MONOTONICITY_ALLOW_SPURIOUS_QOIS: dict[str, str] = dict(
             any([all(X[1:] > X[:-1]), not(all(C["$X"][1:] > C["$X"][:-1]))]),
         ])
     """,
-    strict_with_consts="""
+    Monotonicity.strict_with_consts: """
         all([
             # strictly decreasing sequences stay strictly decreasing
             any([all(X[1:] < X[:-1]), not(all(C["$X"][1:] < C["$X"][:-1]))]),
@@ -115,7 +113,7 @@ MONOTONICITY_ALLOW_SPURIOUS_QOIS: dict[str, str] = dict(
             any([all(X[1:] > X[:-1]), not(all(C["$X"][1:] > C["$X"][:-1]))]),
         ])
     """,
-    strict_to_weak="""
+    Monotonicity.strict_to_weak: """
         all([
             # strictly decreasing sequences become weakly decreasing
             any([all(X[1:] <= X[:-1]), not(all(C["$X"][1:] < C["$X"][:-1]))]),
@@ -123,7 +121,7 @@ MONOTONICITY_ALLOW_SPURIOUS_QOIS: dict[str, str] = dict(
             any([all(X[1:] >= X[:-1]), not(all(C["$X"][1:] > C["$X"][:-1]))]),
         ])
     """,
-    weak="""
+    Monotonicity.weak: """
         all([
             # weakly decreasing & not constant sequences stay weakly decreasing
             any([all(X[1:] <= X[:-1]), not(all([
@@ -137,13 +135,13 @@ MONOTONICITY_ALLOW_SPURIOUS_QOIS: dict[str, str] = dict(
             ]))]),
         ])
     """,
-)
+}
 
 
 def check_all_codecs(data: np.ndarray, constant_boundary=4.2):
     for qois, monotonicity, window, boundary in product(
         [MONOTONICITY_QOIS, MONOTONICITY_ALLOW_SPURIOUS_QOIS],
-        ["strict", "strict_with_consts", "strict_to_weak", "weak"],
+        Monotonicity,
         range(1, 3 + 1),
         BoundaryCondition,
     ):
@@ -170,8 +168,7 @@ def check_all_codecs(data: np.ndarray, constant_boundary=4.2):
 
         sanity_safeguards = Safeguards(
             safeguards=[
-                dict(
-                    kind="monotonicity",
+                MonotonicityPreservingSafeguard(
                     monotonicity=monotonicity,
                     window=window,
                     boundary=boundary,
@@ -511,7 +508,7 @@ def test_fuzzer_sign_flip():
         safeguards=[
             dict(
                 kind="qoi_eb_stencil",
-                qoi=MONOTONICITY_QOIS["strict_to_weak"],
+                qoi=MONOTONICITY_QOIS[Monotonicity.strict_to_weak],
                 neighbourhood=[
                     dict(
                         axis=axis,
@@ -530,9 +527,8 @@ def test_fuzzer_sign_flip():
 
     assert Safeguards(
         safeguards=[
-            dict(
-                kind="monotonicity",
-                monotonicity="strict_to_weak",
+            MonotonicityPreservingSafeguard(
+                monotonicity=Monotonicity.strict_to_weak,
                 window=1,
                 boundary="valid",
             ),
@@ -555,7 +551,7 @@ def test_fuzzer_padding_overflow():
             safeguards=[
                 dict(
                     kind="qoi_eb_stencil",
-                    qoi=MONOTONICITY_QOIS["weak"],
+                    qoi=MONOTONICITY_QOIS[Monotonicity.weak],
                     neighbourhood=[
                         dict(
                             axis=axis,
@@ -584,7 +580,7 @@ def test_late_bound_constant_boundary():
         safeguards=[
             dict(
                 kind="qoi_eb_stencil",
-                qoi=MONOTONICITY_QOIS["strict_to_weak"],
+                qoi=MONOTONICITY_QOIS[Monotonicity.strict_to_weak],
                 neighbourhood=[
                     dict(
                         axis=axis,
@@ -604,9 +600,8 @@ def test_late_bound_constant_boundary():
 
     assert Safeguards(
         safeguards=[
-            dict(
-                kind="monotonicity",
-                monotonicity="strict_to_weak",
+            MonotonicityPreservingSafeguard(
+                monotonicity=Monotonicity.strict_to_weak,
                 window=1,
                 boundary="constant",
                 constant_boundary=4,
@@ -626,7 +621,7 @@ def test_late_bound_constant_boundary():
                 safeguards=[
                     dict(
                         kind="qoi_eb_stencil",
-                        qoi=MONOTONICITY_QOIS["strict_to_weak"],
+                        qoi=MONOTONICITY_QOIS[Monotonicity.strict_to_weak],
                         neighbourhood=[
                             dict(
                                 axis=axis,
@@ -647,7 +642,7 @@ def test_late_bound_constant_boundary():
         safeguards=[
             dict(
                 kind="qoi_eb_stencil",
-                qoi=MONOTONICITY_QOIS["strict_to_weak"],
+                qoi=MONOTONICITY_QOIS[Monotonicity.strict_to_weak],
                 neighbourhood=[
                     dict(
                         axis=axis,
@@ -672,9 +667,8 @@ def test_late_bound_constant_boundary():
 
     assert Safeguards(
         safeguards=[
-            dict(
-                kind="monotonicity",
-                monotonicity="strict_to_weak",
+            MonotonicityPreservingSafeguard(
+                monotonicity=Monotonicity.strict_to_weak,
                 window=1,
                 boundary="constant",
                 constant_boundary="const",
@@ -706,7 +700,7 @@ def test_fuzzer_found_broadcast():
             safeguards=[
                 dict(
                     kind="qoi_eb_stencil",
-                    qoi=MONOTONICITY_QOIS["strict"],
+                    qoi=MONOTONICITY_QOIS[Monotonicity.strict],
                     neighbourhood=[
                         dict(
                             axis=axis,
@@ -739,7 +733,7 @@ def test_fuzzer_found_slice_indexing():
                 safeguards=[
                     dict(
                         kind="qoi_eb_stencil",
-                        qoi=MONOTONICITY_QOIS["strict_with_consts"],
+                        qoi=MONOTONICITY_QOIS[Monotonicity.strict_with_consts],
                         neighbourhood=[
                             dict(
                                 axis=axis,
@@ -766,9 +760,8 @@ def test_fuzzer_found_slice_indexing():
                 kind="select",
                 selector="UU",
                 safeguards=[
-                    dict(
-                        kind="monotonicity",
-                        monotonicity="strict_with_consts",
+                    MonotonicityPreservingSafeguard(
+                        monotonicity=Monotonicity.strict_with_consts,
                         window=85,
                         boundary="constant",
                         constant_boundary=85,
@@ -795,7 +788,7 @@ def test_fuzzer_found_wrapping_const_sequence():
         safeguards=[
             dict(
                 kind="qoi_eb_stencil",
-                qoi=MONOTONICITY_QOIS["strict_with_consts"],
+                qoi=MONOTONICITY_QOIS[Monotonicity.strict_with_consts],
                 neighbourhood=[dict(axis=axis, before=1, after=1, boundary="wrap")],
                 type="abs",
                 eb=0,
@@ -806,9 +799,8 @@ def test_fuzzer_found_wrapping_const_sequence():
 
     assert Safeguards(
         safeguards=[
-            dict(
-                kind="monotonicity",
-                monotonicity="strict_with_consts",
+            MonotonicityPreservingSafeguard(
+                monotonicity=Monotonicity.strict_with_consts,
                 window=1,
                 boundary="wrap",
                 axis=None,

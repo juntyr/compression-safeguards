@@ -43,6 +43,7 @@ expr =
   | array
   | unary_operator
   | binary_operator
+  | binary_comparison
   | array_transpose
   | subexpression
   | constant
@@ -94,6 +95,15 @@ binary_operator =
   | expr, "*", expr  (* multiplication *)
   | expr, "/", expr  (* division *)
   | expr, "**", expr  (* exponentiation / power *)
+;
+
+binary_comparison =
+    expr, "<", expr  (* 1 if a less than b, 0 otherwise (e.g. with NaN) *)
+  | expr, "<=", expr  (* 1 if a less than or equal to b, 0 otherwise (e.g. with NaN) *)
+  | expr, "==", expr  (* 1 if a equal to b, 0 otherwise (e.g. with NaN) *)
+  | expr, "!=", expr  (* 1 if a not equal to b, 0 otherwise; 1 for NaN != NaN *)
+  | expr, ">=", expr  (* 1 if a greater than or equal to b, 0 otherwise (e.g. with NaN) *)
+  | expr, ">", expr  (* 1 if a greater than b, 0 otherwise (e.g. with NaN) *)
 ;
 
 array_transpose =

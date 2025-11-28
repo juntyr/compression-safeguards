@@ -199,20 +199,29 @@ def test_fuzzer_found_any_selector_shape():
     encode_decode_mock(
         data,
         decoded,
-        safeguards=[
-            dict(kind="sign", offset=43),
+        safeguards=[dict(kind="sign", offset=43)]
+        + [
             dict(
-                kind="any",
-                safeguards=[
-                    dict(
-                        kind="monotonicity",
-                        monotonicity="weak",
-                        window=1,
-                        boundary="valid",
-                        axis=None,
-                    ),
-                ],
-            ),
+                kind="qoi_eb_stencil",
+                qoi="""
+                    all([
+                        # weakly decreasing & not constant sequences stay weakly decreasing
+                        any([all(X[1:] <= X[:-1]), not(all([
+                            all(C["$X"][1:] <= C["$X"][:-1]),
+                            not(all(C["$X"][1:] == C["$X"][:-1])),
+                        ]))]),
+                        # weakly increasing & not constant sequences stay weakly increasing
+                        any([all(X[1:] >= X[:-1]), not(all([
+                            all(C["$X"][1:] >= C["$X"][:-1]),
+                            not(all(C["$X"][1:] == C["$X"][:-1])),
+                        ]))]),
+                    ])
+                """,
+                neighbourhood=[dict(axis=axis, before=1, after=1, boundary="valid")],
+                type="abs",
+                eb=0,
+            )
+            for axis in range(data.ndim)
         ],
     )
 

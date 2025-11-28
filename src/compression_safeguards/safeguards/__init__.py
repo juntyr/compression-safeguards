@@ -17,7 +17,6 @@ from .pointwise.eb import ErrorBoundSafeguard
 from .pointwise.qoi.eb import PointwiseQuantityOfInterestErrorBoundSafeguard
 from .pointwise.same import SameValueSafeguard
 from .pointwise.sign import SignPreservingSafeguard
-from .stencil.monotonicity import MonotonicityPreservingSafeguard
 from .stencil.qoi.eb import StencilQuantityOfInterestErrorBoundSafeguard
 
 
@@ -43,10 +42,6 @@ class SafeguardKind(Enum):
 
     qoi_eb_stencil = StencilQuantityOfInterestErrorBoundSafeguard
     """Enforce an error bound on a derived quantity of interest over a data neighbourhood."""
-
-    # monotonicity
-    monotonicity = MonotonicityPreservingSafeguard
-    """Enforce that monotonic sequences remain monotonic."""
 
     # logical combinators
     all = AllSafeguards
