@@ -329,11 +329,54 @@ def test_fuzzer_found_broadcast():
         )
 
 
+MONOTONICITY_QOIS: dict[str, str] = dict(
+    strict_with_consts="""
+        all([
+            # strictly decreasing sequences stay strictly decreasing
+            all(X[1:] < X[:-1]) == all(C["$X"][1:] < C["$X"][:-1]),
+            # constant sequences stay constant
+            all(X[1:] == X[:-1]) == all(C["$X"][1:] == C["$X"][:-1]),
+            # strictly increasing sequences stay strictly increasing
+            all(X[1:] > X[:-1]) == all(C["$X"][1:] > C["$X"][:-1]),
+        ])
+    """
+)
+
+
 def test_fuzzer_found_slice_indexing():
     data = np.array([[1431655765]], dtype=np.uint32)
 
-    encode_decode_zero(
+    decoded = encode_decode_zero(
         data,
+        safeguards=[
+            dict(kind="same", value="$x_max", exclusive=True),
+            dict(
+                kind="select",
+                selector="UU",
+                safeguards=[
+                    dict(
+                        kind="qoi_eb_stencil",
+                        qoi=MONOTONICITY_QOIS["strict_with_consts"],
+                        neighbourhood=[
+                            dict(
+                                axis=axis,
+                                before=85,
+                                after=85,
+                                boundary="constant",
+                                constant_boundary=85,
+                            )
+                        ],
+                        type="abs",
+                        eb=0,
+                    )
+                    for axis in range(data.ndim)
+                ],
+            ),
+        ],
+        fixed_constants=dict(UU=0),
+    )
+
+    assert Safeguards(
         safeguards=[
             dict(kind="same", value="$x_max", exclusive=True),
             dict(
@@ -350,12 +393,11 @@ def test_fuzzer_found_slice_indexing():
                     )
                 ],
             ),
-        ],
-        fixed_constants=dict(UU=0),
-    )
+        ]
+    ).check(data, decoded, late_bound={"UU": 0, "$x_max": np.nanmax(data)})
 
 
-def test_fuzzer_found_foo():
+def test_fuzzer_found_wrapping_const_sequence():
     data = np.array(
         [
             [135, 135, 1, 44, 1, 0],
@@ -365,45 +407,12 @@ def test_fuzzer_found_foo():
         dtype=np.uint8,
     )
 
-    # 0[
-    #     [na, -1, na, -1, na, na],
-    #     [na, na, 1, na, na, na],
-    #     [1, na, na, na, -1, -1],
-    # ]
-
-    # 1[
-    #     [na, na, na, na, -1, na],
-    #     [-1, na, na, na, na, na],
-    #     [na, na, na, na, 0, !0!],
-    # ]
-    #
-    # [
-    #     [x, x, x, x, x, x],
-    #     [x, x, x, o, o, x],
-    #     [x, x, x, x, x, x],
-    # ]
-
-    # [
-    #     [124-195, 69-194, 1-13, 23-77, 1-22, 0-0],
-    #     [23-77, 1-21, 14-140, 0-21, 184-255, 184-255],
-    #     [!78-123!, 196-255, 141-255, 112-112, 112-112, 112-112],
-    # ]
-
     decoded = encode_decode_zero(
         data,
         safeguards=[
             dict(
                 kind="qoi_eb_stencil",
-                qoi="""
-                    all([
-                        # strictly decreasing sequences stay strictly decreasing
-                        all(X[1:] < X[:-1]) == all(C["$X"][1:] < C["$X"][:-1]),
-                        # constant sequences stay constant
-                        all(X[1:] == X[:-1]) == all(C["$X"][1:] == C["$X"][:-1]),
-                        # strictly increasing sequences stay strictly increasing
-                        all(X[1:] > X[:-1]) == all(C["$X"][1:] > C["$X"][:-1]),
-                    ])
-                """,
+                qoi=MONOTONICITY_QOIS["strict_with_consts"],
                 neighbourhood=[dict(axis=axis, before=1, after=1, boundary="wrap")],
                 type="abs",
                 eb=0,

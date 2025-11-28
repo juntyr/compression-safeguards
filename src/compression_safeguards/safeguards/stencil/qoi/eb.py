@@ -1050,10 +1050,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             with np.errstate(invalid="ignore"):
                 data_windows_float_lower = np.full(
                     qoi_stencil_shape, -np.inf, dtype=ftype
-                )
+                ).reshape(-1, *window)
                 data_windows_float_upper = np.full(
                     qoi_stencil_shape, np.inf, dtype=ftype
-                )
+                ).reshape(-1, *window)
             np.put_along_axis(
                 data_windows_float_lower,
                 where_indices,
@@ -1065,6 +1065,12 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 where_indices,
                 data_windows_float_upper_,
                 axis=0,
+            )
+            data_windows_float_lower = data_windows_float_lower.reshape(
+                qoi_stencil_shape
+            )
+            data_windows_float_upper = data_windows_float_upper.reshape(
+                qoi_stencil_shape
             )
 
         # only contribute window elements that are used in the QoI
