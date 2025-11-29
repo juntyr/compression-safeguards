@@ -42,6 +42,7 @@ examples = [
     "numcodecs-wasm-sperr~=0.2.0",
     "numcodecs-wasm-sz3~=0.7.0",
     "numcodecs-wasm-zfp~=0.6.0",
+    "numcodecs-zero~=0.1.0",
     # FIXME: https://github.com/dask/dask/issues/12072
     "pyarrow~=21.0.0",
     "scikit-image~=0.25.0",

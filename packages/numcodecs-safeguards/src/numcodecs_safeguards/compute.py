@@ -89,6 +89,10 @@ def _refine_correction_iteratively(
                 data,
                 corrected_iterative,
                 late_bound=late_bound_resolved,
+                # a reduced where would only include the inverse footprint of
+                #  the data points that were newly corrected in the last round,
+                # i.e. which points might now have re-evaluate their checks
+                #  since they depend on these point
                 where=True,
             )
 

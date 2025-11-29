@@ -45,7 +45,14 @@ class Data(EmptyExpr):
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[np.bool]]:
-        return _ones(Xs.shape[:1], dtype=np.dtype(np.bool))
+        # we could just return all True here, since all data is ... data
+        # but we also currently guarantee that NaN data values stay NaN,
+        #  i.e. that the values are constant, so not really data dependent
+        # therefore, we say that only non-NaN data is actually data
+        data = self.eval(Xs, late_bound)
+        data_is_not_nan = np.isnan(data)
+        np.logical_not(data_is_not_nan, out=data_is_not_nan)
+        return data_is_not_nan
 
     @property  # type: ignore
     @override

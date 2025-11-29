@@ -271,27 +271,27 @@ def test_monotonicities_spurious():
     # mapping for each monotonicity
     # - keys: which windows activate the safeguard
     # - values: which windows validate without correction
-    monotonicities = dict(
-        strict=dict(
+    monotonicities = {
+        Monotonicity.strict: dict(
             si=("si",),
             sd=("sd",),
         ),
-        strict_with_consts=dict(
+        Monotonicity.strict_with_consts: dict(
             si=("si",),
             sd=("sd",),
             co=("co",),
         ),
-        strict_to_weak=dict(
+        Monotonicity.strict_to_weak: dict(
             si=("si", "wi", "co"),
             sd=("sd", "wd", "co"),
         ),
-        weak=dict(
+        Monotonicity.weak: dict(
             si=("si", "wi", "co"),
             sd=("sd", "wd", "co"),
             wi=("si", "wi", "co"),
             wd=("sd", "wd", "co"),
         ),
-    )
+    }
 
     # test for all monotonicities
     for monotonicity, active_allowed in monotonicities.items():
@@ -383,15 +383,15 @@ def test_monotonicities_non_spurious():
     # - keys: which data windows activate the safeguard
     # - values: which prediction windows validate without correction
     # and set of all prediction windows that can activate the safeguard
-    monotonicities = dict(
-        strict=(
+    monotonicities = {
+        Monotonicity.strict: (
             dict(
                 si=("si",),
                 sd=("sd",),
             ),
             ["si", "sd"],
         ),
-        strict_with_consts=(
+        Monotonicity.strict_with_consts: (
             dict(
                 si=("si",),
                 sd=("sd",),
@@ -399,14 +399,14 @@ def test_monotonicities_non_spurious():
             ),
             ["si", "sd", "co"],
         ),
-        strict_to_weak=(
+        Monotonicity.strict_to_weak: (
             dict(
                 si=("si", "wi", "co"),
                 sd=("sd", "wd", "co"),
             ),
             ["si", "sd"],
         ),
-        weak=(
+        Monotonicity.weak: (
             dict(
                 si=("si", "wi", "co"),
                 sd=("sd", "wd", "co"),
@@ -415,7 +415,7 @@ def test_monotonicities_non_spurious():
             ),
             ["si", "sd", "wi", "wd"],
         ),
-    )
+    }
 
     # test for all monotonicities
     for monotonicity, (active_allowed, trigger) in monotonicities.items():
