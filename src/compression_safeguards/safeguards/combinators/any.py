@@ -215,8 +215,8 @@ class AnySafeguard(Safeguard):
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
         where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
-            Only compute the safe intervals at data points where the condition
-            is [`True`][True].
+            Only compute the safe intervals at pointwise checks where the
+            condition is [`True`][True].
 
         Returns
         -------
@@ -239,8 +239,8 @@ class AnySafeguard(Safeguard):
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Compute the footprint of the `foot` array, e.g. for expanding pointwise
-        check fails into the points that could have contributed to the failures.
+        Compute the footprint of the `foot` array, e.g. for expanding data
+        points into the pointwise checks that they contribute to.
 
         Parameters
         ----------
@@ -249,13 +249,43 @@ class AnySafeguard(Safeguard):
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
         where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
-            Only compute the footprint at data points where the condition is
-            [`True`][True].
+            Only compute the inverse footprint at pointwise checks where the
+            condition is [`True`][True].
 
         Returns
         -------
         print : np.ndarray[S, np.dtype[np.bool]]
             The footprint of the `foot` array.
+        """
+
+        ...
+
+    def compute_inverse_footprint(  # type: ignore
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the inverse footprint of the `foot` array, e.g. for expanding
+        pointwise check fails into the points that could have contributed to
+        the failures.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the inverse footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the inverse footprint at pointwise checks where the
+            condition is [`True`][True].
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The inverse footprint of the `foot` array.
         """
 
         ...
@@ -328,6 +358,33 @@ class _AnySafeguardBase(ABC):
 
         for safeguard in tail:
             footprint |= safeguard.compute_footprint(
+                foot, late_bound=late_bound, where=where
+            )
+
+        return footprint
+
+    def compute_inverse_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        front, *tail = self.safeguards
+
+        # not all safeguards (just one per point) need to contribute to the
+        #  footprint
+        # however, we cannot be more clever here without knowing the data and
+        #  going through the entire safe interval computation, which would
+        #  defeat the entire point of this cheaper method
+        # so, conservatively, all safeguards contribute to the footprint and
+        #  the union of their footprints forms the combined footprint
+        footprint = front.compute_inverse_footprint(
+            foot, late_bound=late_bound, where=where
+        )
+
+        for safeguard in tail:
+            footprint |= safeguard.compute_inverse_footprint(
                 foot, late_bound=late_bound, where=where
             )
 

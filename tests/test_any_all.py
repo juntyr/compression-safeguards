@@ -364,5 +364,19 @@ class SometimesSafeguard(PointwiseSafeguard):
         return (is_safe == 0) & where
 
     @override
+    def compute_inverse_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        is_safe = late_bound.resolve_ndarray_with_lossless_cast(
+            self._is_safe, foot.shape, np.dtype(np.intp)
+        )
+
+        return (is_safe == 0) & where
+
+    @override
     def get_config(self) -> dict[str, JSON]:
         return dict(kind=type(self).kind, is_safe=str(self._is_safe))

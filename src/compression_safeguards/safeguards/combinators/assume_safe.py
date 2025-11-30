@@ -100,8 +100,8 @@ class AssumeAlwaysSafeguard(PointwiseSafeguard):
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
         where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
-            Only compute the safe intervals at data points where the condition
-            is [`True`][True].
+            Only compute the safe intervals at pointwise checks where the
+            condition is [`True`][True].
 
         Returns
         -------
@@ -131,13 +131,43 @@ class AssumeAlwaysSafeguard(PointwiseSafeguard):
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
         where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
-            Only compute the footprint at data points where the condition is
-            [`True`][True].
+            Only compute the footprint at pointwise checks where the condition
+            is [`True`][True].
 
         Returns
         -------
         print : np.ndarray[S, np.dtype[np.bool]]
             The footprint of the `foot` array.
+        """
+
+        return np.zeros_like(foot)
+
+    @override
+    def compute_inverse_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Since all values are always safe, the inverse footprint of the `foot`
+        array is [`False`][False] everywhere.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the inverse footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the inverse footprint at pointwise checks where the
+            condition is [`True`][True].
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The inverse footprint of the `foot` array.
         """
 
         return np.zeros_like(foot)

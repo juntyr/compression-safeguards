@@ -70,6 +70,7 @@ def _refine_correction_iteratively(
     correction_iterative = np.zeros_like(correction)
     corrected_iterative = prediction.copy()
     last_needs_correction = np.zeros(data.shape, dtype=np.bool)
+    last_correction_change = np.ones(data.shape, dtype=np.bool)
 
     # resolve the late-bound bindings using the Safeguards API, since we use
     #  lower-level APIs from now on
@@ -82,6 +83,14 @@ def _refine_correction_iteratively(
     )
 
     while True:
+        where = np.zeros(data.shape, dtype=np.bool)
+        for safeguard in safeguards_:
+            where |= safeguard.compute_footprint(
+                last_correction_change,
+                late_bound=late_bound_resolved,
+                where=True,
+            )
+
         # check for data points all pointwise checks succeed
         check_pointwise = np.ones(data.shape, dtype=np.bool)
         for safeguard in safeguards_:
@@ -119,20 +128,26 @@ def _refine_correction_iteratively(
         # for these sticky failures, expand the failure footprint to correct
         #  all data points that could have contributed to the failure
         sticky_needs_correction_pointwise = (~check_pointwise) & last_needs_correction
-        sticky_needs_correction_footprint = np.zeros_like(
+        sticky_needs_correction_inverse_footprint = np.zeros_like(
             sticky_needs_correction_pointwise
         )
         for safeguard in safeguards_:
-            sticky_needs_correction_footprint |= safeguard.compute_footprint(
-                sticky_needs_correction_pointwise,
-                late_bound=late_bound_resolved,
-                where=True,
+            sticky_needs_correction_inverse_footprint |= (
+                safeguard.compute_inverse_footprint(
+                    sticky_needs_correction_pointwise,
+                    late_bound=late_bound_resolved,
+                    where=True,
+                )
             )
 
         # determine the data points that need a correction
-        needs_correction = sticky_needs_correction_footprint
+        needs_correction = sticky_needs_correction_inverse_footprint
         needs_correction |= ~check_pointwise
         last_needs_correction[:] = needs_correction
+
+        # determine the data points that get a new correction
+        np.equal(corrected_iterative, 0, out=last_correction_change)
+        last_correction_change &= needs_correction
 
         # use the pre-computed correction where needed
         correction_iterative[needs_correction] = correction_full[needs_correction]

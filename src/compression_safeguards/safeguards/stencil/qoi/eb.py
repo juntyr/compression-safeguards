@@ -812,8 +812,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
         where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
-            Only compute the safe intervals at data points where the condition
-            is [`True`][True].
+            Only compute the safe intervals at pointwise checks where the
+            condition is [`True`][True].
 
         Returns
         -------
@@ -1128,6 +1128,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             | (True if where is True else where.flatten())
         )
 
+    @override
     def compute_footprint(
         self,
         foot: np.ndarray[S, np.dtype[np.bool]],
@@ -1136,8 +1137,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Compute the footprint of the `foot` array, e.g. for expanding pointwise
-        check fails into the points that could have contributed to the failures.
+        Compute the footprint of the `foot` array, e.g. for expanding data
+        points into the pointwise checks that they contribute to.
 
         The footprint usually extends beyond `foot & where`.
 
@@ -1148,13 +1149,104 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
         where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
-            Only compute the footprint at data points where the condition is
-            [`True`][True].
+            Only compute the footprint at pointwise checks where the condition
+            is [`True`][True].
 
         Returns
         -------
         print : np.ndarray[S, np.dtype[np.bool]]
             The footprint of the `foot` array.
+        """
+
+        # check that the foot shape is compatible with the neighbourhood shape
+        self.compute_check_neighbourhood_for_data_shape(foot.shape)
+
+        window = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
+
+        # if the neighbourhood is empty, e.g. because we are in valid mode and
+        #  the neighbourhood shape exceeds the data shape, the footprint is
+        #  empty
+        for axis, w in zip(self._neighbourhood, window):
+            if foot.shape[axis.axis] < w and axis.boundary == BoundaryCondition.valid:
+                return _zeros(foot.shape, dtype=np.dtype(np.bool))
+        if foot.size == 0:
+            return _zeros(foot.shape, dtype=np.dtype(np.bool))
+
+        foot_boundary: np.ndarray[tuple[int, ...], np.dtype[np.bool]] = foot
+        for axis in self._neighbourhood:
+            foot_boundary = _pad_with_boundary(
+                foot_boundary,
+                axis.boundary,
+                axis.before,
+                axis.after,
+                None
+                if axis.constant_boundary is None
+                else _zeros((), np.dtype(np.bool)),
+                axis.axis,
+            )
+
+        foot_windows: np.ndarray[tuple[int, ...], np.dtype[np.bool]] = (
+            _sliding_window_view(
+                foot_boundary,
+                window,
+                axis=tuple(axis.axis for axis in self._neighbourhood),
+                writeable=False,
+            )
+        )
+
+        valid_slice = [slice(None)] * foot.ndim
+        for axis in self._neighbourhood:
+            if axis.boundary == BoundaryCondition.valid:
+                start = None if axis.before == 0 else axis.before
+                end = None if axis.after == 0 else -axis.after
+                valid_slice[axis.axis] = slice(start, end)
+
+        # only contribute window elements that are used in the QoI
+        window_used = _zeros(window, dtype=np.dtype(np.bool))
+        for idxs in self._qoi_expr.data_indices:
+            window_used[idxs] = True
+
+        # expand into the footprint
+        footprint = np.zeros_like(foot)
+        footprint[tuple(valid_slice)] = np.logical_or.reduce(
+            (foot_windows & window_used.reshape(((1,) * foot.ndim) + window)).reshape(
+                foot_windows.shape[: foot.ndim] + (-1,)
+            ),
+            axis=foot.ndim,
+        )
+        footprint &= where
+
+        return footprint
+
+    @override
+    def compute_inverse_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the inverse footprint of the `foot` array, e.g. for expanding
+        pointwise check fails into the points that could have contributed to
+        the failures.
+
+        The inverse footprint usually extends beyond `foot & where`.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the inverse footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the inverse footprint at pointwise checks where the
+            condition is [`True`][True].
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The inverse footprint of the `foot` array.
         """
 
         # check that the foot shape is compatible with the neighbourhood shape

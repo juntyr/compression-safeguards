@@ -267,6 +267,15 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         raise NotImplementedError()
 
+    def compute_inverse_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        raise NotImplementedError()
+
     @override
     def get_config(self) -> dict[str, JSON]:
         config: dict[str, JSON] = dict(
