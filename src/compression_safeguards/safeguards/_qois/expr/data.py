@@ -4,7 +4,7 @@ from warnings import warn
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import _broadcast_to, _is_of_shape, _ones
+from ....utils._compat import _broadcast_to, _ensure_array, _is_of_shape, _ones
 from ....utils.bindings import Parameter
 from ....utils.error import QuantityOfInterestRuntimeWarning
 from ..bound import DataBounds, data_bounds
@@ -50,7 +50,7 @@ class Data(EmptyExpr):
         #  i.e. that the values are constant, so not really data dependent
         # therefore, we say that only non-NaN data is actually data
         data = self.eval(Xs, late_bound)
-        data_is_not_nan = np.isnan(data)
+        data_is_not_nan = _ensure_array(np.isnan(data))
         np.logical_not(data_is_not_nan, out=data_is_not_nan)
         return data_is_not_nan
 

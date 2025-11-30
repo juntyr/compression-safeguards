@@ -12,7 +12,10 @@ from compression_safeguards.safeguards._qois.expr.combinators import (
     ScalarAny,
     ScalarNot,
 )
-from compression_safeguards.safeguards._qois.expr.comparison import ScalarLess
+from compression_safeguards.safeguards._qois.expr.comparison import (
+    ScalarEqual,
+    ScalarLess,
+)
 from compression_safeguards.safeguards._qois.expr.constfold import ScalarFoldedConstant
 from compression_safeguards.safeguards._qois.expr.data import Data
 from compression_safeguards.safeguards._qois.expr.divmul import (
@@ -22,6 +25,7 @@ from compression_safeguards.safeguards._qois.expr.divmul import (
 from compression_safeguards.safeguards._qois.expr.hyperbolic import (
     ScalarAcosh,
     ScalarAsinh,
+    ScalarCosh,
     ScalarTanh,
 )
 from compression_safeguards.safeguards._qois.expr.literal import Euler, Number, Pi
@@ -1849,3 +1853,21 @@ def test_fuzzer_found_any_zero_singularity():
 
     assert expr.eval(X_lower, dict()) == np.array(np.float32(1.0))
     assert expr.eval(X_upper, dict()) == np.array(np.float32(1.0))
+
+
+def test_fuzzer_found_cosh_equal_isfinite():
+    X = np.array(0.04678, dtype=np.float16)
+
+    expr = ScalarEqual(ScalarCosh(Data.SCALAR), ScalarIsFinite(Data.SCALAR))
+
+    assert expr.eval(X, dict()) == np.array(np.float16(0.0))
+
+    expr_lower = np.array(np.float16(0.0))
+    expr_upper = np.array(np.float16(0.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(np.float16(0.0442))
+    assert X_upper == np.array(np.float16(np.inf))
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(0.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.0))

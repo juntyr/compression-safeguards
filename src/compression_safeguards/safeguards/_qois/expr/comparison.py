@@ -82,6 +82,8 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
         av = a.eval(Xs, late_bound)
         bv = b.eval(Xs, late_bound)
 
+        bv_nxt_av = _ensure_array(_nextafter(bv, av))
+
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
         #  - since we use finite values, mid(-Inf, +Inf) = 0
@@ -89,18 +91,19 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             np.divide(_nan_to_zero_inf_to_finite(av), Xs.dtype.type(2)),
             np.divide(_nan_to_zero_inf_to_finite(bv), Xs.dtype.type(2)),
         )
+        # the midpoint must be in range [av, bv), unless av == bv, since we
+        #  later want to be able to step from the midpoint closer towards bv
         av_mid_bv = _maximum_zero_sign_sensitive(
-            av_mid_bv, _minimum_zero_sign_sensitive(av, bv)
+            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av)
         )
         av_mid_bv = _minimum_zero_sign_sensitive(
-            av_mid_bv, _maximum_zero_sign_sensitive(av, bv)
+            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av)
         )
 
         # compute the next value from b towards a that can be part of a's
         #  safe interval
         # if b is const this is the literal next value
         # otherwise it is the midpoint
-        bv_nxt_av = _ensure_array(_nextafter(bv, av))
         if not b_const:
             np.copyto(
                 bv_nxt_av,
@@ -301,6 +304,8 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
         av = a.eval(Xs, late_bound)
         bv = b.eval(Xs, late_bound)
 
+        bv_nxt_av = _ensure_array(_nextafter(bv, av))
+
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
         #  - since we use finite values, mid(-Inf, +Inf) = 0
@@ -308,18 +313,19 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             np.divide(_nan_to_zero_inf_to_finite(av), Xs.dtype.type(2)),
             np.divide(_nan_to_zero_inf_to_finite(bv), Xs.dtype.type(2)),
         )
+        # the midpoint must be in range [av, bv), unless av == bv, since we
+        #  later want to be able to step from the midpoint closer towards bv
         av_mid_bv = _maximum_zero_sign_sensitive(
-            av_mid_bv, _minimum_zero_sign_sensitive(av, bv)
+            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av)
         )
         av_mid_bv = _minimum_zero_sign_sensitive(
-            av_mid_bv, _maximum_zero_sign_sensitive(av, bv)
+            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av)
         )
 
         # compute the next value from b towards a that can be part of a's
         #  safe interval
         # if b is const this is the literal next value
         # otherwise it is the midpoint
-        bv_nxt_av = _ensure_array(_nextafter(bv, av))
         if not b_const:
             np.copyto(
                 bv_nxt_av,
@@ -520,6 +526,8 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
         av = a.eval(Xs, late_bound)
         bv = b.eval(Xs, late_bound)
 
+        bv_nxt_av = _ensure_array(_nextafter(bv, av))
+
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
         #  - since we use finite values, mid(-Inf, +Inf) = 0
@@ -527,18 +535,19 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             np.divide(_nan_to_zero_inf_to_finite(av), Xs.dtype.type(2)),
             np.divide(_nan_to_zero_inf_to_finite(bv), Xs.dtype.type(2)),
         )
+        # the midpoint must be in range [av, bv), unless av == bv, since we
+        #  later want to be able to step from the midpoint closer towards bv
         av_mid_bv = _maximum_zero_sign_sensitive(
-            av_mid_bv, _minimum_zero_sign_sensitive(av, bv)
+            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av)
         )
         av_mid_bv = _minimum_zero_sign_sensitive(
-            av_mid_bv, _maximum_zero_sign_sensitive(av, bv)
+            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av)
         )
 
         # compute the next value from b towards a that can be part of a's
         #  safe interval
         # if b is const this is the literal next value
         # otherwise it is the midpoint
-        bv_nxt_av = _ensure_array(_nextafter(bv, av))
         if not b_const:
             np.copyto(
                 bv_nxt_av,
@@ -733,6 +742,8 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
         av = a.eval(Xs, late_bound)
         bv = b.eval(Xs, late_bound)
 
+        bv_nxt_av = _ensure_array(_nextafter(bv, av))
+
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
         #  - since we use finite values, mid(-Inf, +Inf) = 0
@@ -740,18 +751,19 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             np.divide(_nan_to_zero_inf_to_finite(av), Xs.dtype.type(2)),
             np.divide(_nan_to_zero_inf_to_finite(bv), Xs.dtype.type(2)),
         )
+        # the midpoint must be in range [av, bv), unless av == bv, since we
+        #  later want to be able to step from the midpoint closer towards bv
         av_mid_bv = _maximum_zero_sign_sensitive(
-            av_mid_bv, _minimum_zero_sign_sensitive(av, bv)
+            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av)
         )
         av_mid_bv = _minimum_zero_sign_sensitive(
-            av_mid_bv, _maximum_zero_sign_sensitive(av, bv)
+            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av)
         )
 
         # compute the next value from b towards a that can be part of a's
         #  safe interval
         # if b is const this is the literal next value
         # otherwise it is the midpoint
-        bv_nxt_av = _ensure_array(_nextafter(bv, av))
         if not b_const:
             np.copyto(
                 bv_nxt_av,
@@ -946,6 +958,8 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
         av = a.eval(Xs, late_bound)
         bv = b.eval(Xs, late_bound)
 
+        av_nxt_bv = _ensure_array(_nextafter(av, bv))
+
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
         #  - since we use finite values, mid(-Inf, +Inf) = 0
@@ -953,11 +967,13 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
             np.divide(_nan_to_zero_inf_to_finite(av), Xs.dtype.type(2)),
             np.divide(_nan_to_zero_inf_to_finite(bv), Xs.dtype.type(2)),
         )
+        # the midpoint must be in range (av, bv], unless av == bv, since we
+        #  later want to be able to step from the midpoint closer towards av
         av_mid_bv = _maximum_zero_sign_sensitive(
-            av_mid_bv, _minimum_zero_sign_sensitive(av, bv)
+            av_mid_bv, _minimum_zero_sign_sensitive(av_nxt_bv, bv)
         )
         av_mid_bv = _minimum_zero_sign_sensitive(
-            av_mid_bv, _maximum_zero_sign_sensitive(av, bv)
+            av_mid_bv, _maximum_zero_sign_sensitive(av_nxt_bv, bv)
         )
 
         # compute the next value from b towards a that can be part of a's
@@ -978,7 +994,6 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
         #  safe interval
         # if a is const this is the literal next value
         # otherwise it is the midpoint
-        av_nxt_bv = _ensure_array(_nextafter(av, bv))
         if not a_const:
             np.copyto(
                 av_nxt_bv,
@@ -1159,6 +1174,8 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
         av = a.eval(Xs, late_bound)
         bv = b.eval(Xs, late_bound)
 
+        av_nxt_bv = _ensure_array(_nextafter(av, bv))
+
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
         #  - since we use finite values, mid(-Inf, +Inf) = 0
@@ -1166,11 +1183,13 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
             np.divide(_nan_to_zero_inf_to_finite(av), Xs.dtype.type(2)),
             np.divide(_nan_to_zero_inf_to_finite(bv), Xs.dtype.type(2)),
         )
+        # the midpoint must be in range (av, bv], unless av == bv, since we
+        #  later want to be able to step from the midpoint closer towards av
         av_mid_bv = _maximum_zero_sign_sensitive(
-            av_mid_bv, _minimum_zero_sign_sensitive(av, bv)
+            av_mid_bv, _minimum_zero_sign_sensitive(av_nxt_bv, bv)
         )
         av_mid_bv = _minimum_zero_sign_sensitive(
-            av_mid_bv, _maximum_zero_sign_sensitive(av, bv)
+            av_mid_bv, _maximum_zero_sign_sensitive(av_nxt_bv, bv)
         )
 
         # compute the next value from b towards a that can be part of a's
@@ -1191,7 +1210,6 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
         #  safe interval
         # if a is const this is the literal next value
         # otherwise it is the midpoint
-        av_nxt_bv = _ensure_array(_nextafter(av, bv))
         if not a_const:
             np.copyto(
                 av_nxt_bv,
