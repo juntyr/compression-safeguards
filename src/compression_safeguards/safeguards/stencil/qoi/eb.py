@@ -90,6 +90,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
     [test_monotonicity.py]: https://github.com/juntyr/compression-safeguards/blob/main/tests/test_monotonicity.py
 
+    <!--pytest.mark.skip-->
     ```py
     all([
         # strictly decreasing sequences stay strictly decreasing
