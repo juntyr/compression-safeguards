@@ -534,6 +534,27 @@ def check_one_input(data) -> None:
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")  # noqa: T201
         raise
 
+    # test using iterative corrections
+    safeguard = SafeguardsCodec(
+        codec=FuzzCodec(raw, decoded),
+        safeguards=safeguards,
+        fixed_constants=fixed_constants,
+        compute=dict(_unstable_iterative=True),
+    )
+
+    grepr = repr(safeguard)
+    gconfig = safeguard.get_config()
+
+    safeguard = numcodecs.registry.get_codec(gconfig)
+    assert safeguard.get_config() == gconfig
+
+    try:
+        encoded = safeguard.encode(raw)
+        safeguard.decode(encoded, out=np.empty_like(raw))
+    except Exception:
+        print(f"\n===\n\ncodec = {grepr}\n\n===\n")  # noqa: T201
+        raise
+
     # test using the safeguards with the zero codec
     safeguard = SafeguardsCodec(
         codec=dict(id="zero"),
@@ -552,6 +573,38 @@ def check_one_input(data) -> None:
         safeguard.decode(encoded, out=np.empty_like(raw))
     except Exception:
         print(f"\n===\n\ncodec = {grepr}\n\ndata = {raw!r}\n\n===\n")  # noqa: T201
+        raise
+
+    # test where using top-level select
+    safeguard = SafeguardsCodec(
+        codec=FuzzCodec(raw, decoded),
+        safeguards=[
+            dict(
+                kind="select",
+                selector="__where__",
+                safeguards=safeguards + [dict(kind="assume_safe")],
+            )
+        ],
+        fixed_constants={
+            **fixed_constants,
+            "__where__": np.array(
+                [data.ConsumeIntInRange(0, len(safeguards)) for _ in range(raw.size)],
+                dtype=np.intp,
+            ).reshape(raw.shape),
+        },
+    )
+
+    grepr = repr(safeguard)
+    gconfig = safeguard.get_config()
+
+    safeguard = numcodecs.registry.get_codec(gconfig)
+    assert safeguard.get_config() == gconfig
+
+    try:
+        encoded = safeguard.encode(raw)
+        safeguard.decode(encoded, out=np.empty_like(raw))
+    except Exception:
+        print(f"\n===\n\ncodec = {grepr}\n\n===\n")  # noqa: T201
         raise
 
 

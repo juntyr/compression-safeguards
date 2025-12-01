@@ -22,7 +22,7 @@ def _default_lossless_for_safeguards() -> Codec:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Lossless:
     """
     Configuration for the lossless encoding used by the

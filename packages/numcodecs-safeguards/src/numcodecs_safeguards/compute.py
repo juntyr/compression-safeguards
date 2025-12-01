@@ -4,6 +4,8 @@ Helper classes for configuring the compute behaviour of the codec with safeguard
 
 __all__ = ["Compute"]
 
+import dataclasses
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -12,10 +14,11 @@ from compression_safeguards.safeguards.pointwise.abc import PointwiseSafeguard
 from compression_safeguards.safeguards.stencil.abc import StencilSafeguard
 from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.error import SafeguardsSafetyBug, ctx
-from compression_safeguards.utils.typing import C, S, T
+from compression_safeguards.utils.typing import JSON, C, S, T
+from typing_extensions import Self  # MSPV 3.11
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Compute:
     """
     Compute configuration with options that may affect the compression
@@ -36,6 +39,61 @@ class Compute:
     corrections that need to be applied, which can improve the compression
     ratio at the cost of requiring additional time to compute the corrections.
     """
+
+    def get_config(self) -> dict[str, JSON]:
+        """
+        Returns the compute configuration.
+
+        Returns
+        -------
+        config : dict[str, JSON]
+            Compute configuration.
+        """
+
+        return dataclasses.asdict(self)
+
+    @classmethod
+    def from_config(cls, config: dict[str, JSON]) -> Self:
+        """
+        Instantiate the compute configuration from a [`dict`][dict].
+
+        Parameters
+        ----------
+        config : dict[str, JSON]
+            Compute configuration.
+
+        Returns
+        -------
+        safeguards : Self
+            Instantiated compute configuration.
+        """
+
+        FIELDS: tuple[str, ...] = tuple(f.name for f in dataclasses.fields(cls))
+        STABILISED: dict[str, str] = dict()
+        REMOVED_UNSTABLE: tuple[str, ...] = ()
+
+        clean_config = dict()
+
+        for name, value in config.items():
+            if name in FIELDS:
+                clean_config[name] = value
+            elif name in STABILISED:
+                # automatically upgrade unstable options
+                warnings.warn(
+                    f"compute configuration `{name}` has been stabilised as `{STABILISED[name]}`",
+                    category=PendingDeprecationWarning,
+                )
+                clean_config[STABILISED[name]] = value
+            elif name in REMOVED_UNSTABLE:
+                # skip removed unstable options
+                warnings.warn(
+                    f"compute configuration `{name}` has been removed",
+                    category=DeprecationWarning,
+                )
+            else:
+                raise TypeError(f"unknown compute configuration `{name}`") | ctx
+
+        return cls(**clean_config)  # type: ignore
 
 
 def _refine_correction_iteratively(

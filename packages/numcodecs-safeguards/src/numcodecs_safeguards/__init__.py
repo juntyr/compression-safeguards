@@ -313,7 +313,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         self._compute = (
             compute
             if isinstance(compute, Compute)
-            else Compute(**compute)  # type: ignore
+            else Compute.from_config(compute)
             if compute is not None
             else Compute()
         )
@@ -666,6 +666,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 else self._lossless_for_codec.get_config(),
                 for_safeguards=self._lossless_for_safeguards.get_config(),
             ),
+            compute=self._compute.get_config(),
             _version=str(self._safeguards.version),
         )
 
