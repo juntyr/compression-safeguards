@@ -36,9 +36,30 @@ _WEAK = ((le, ge, False, True), (le, ge, True, True))
 
 class Monotonicity(Enum):
     strict = _STRICT
+    """
+    Strictly increasing/decreasing sequences in the input array are guaranteed
+    to be strictly increasing/decreasing in the corrected array.
+    """
+
     strict_with_consts = _STRICT_WITH_CONSTS
+    """
+    Strictly increasing/decreasing/constant sequences in the input array are
+    guaranteed to be strictly increasing/decreasing/constant in the corrected
+    array.
+    """
+
     strict_to_weak = _STRICT_TO_WEAK
+    """
+    Strictly increasing/decreasing sequences in the input array are guaranteed
+    to be *weakly* increasing/decreasing (or constant) in the corrected array.
+    """
+
     weak = _WEAK
+    """
+    Weakly increasing/decreasing (but not constant) sequences in the input
+    array are guaranteed to be weakly increasing/decreasing (or constant) in
+    the corrected array.
+    """
 
 
 class MonotonicityPreservingSafeguard(StencilSafeguard):

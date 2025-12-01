@@ -66,10 +66,39 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     Note that `X` can be indexed absolute or relative to the centred data point
     `x` using the index array `I`.
 
+    /// details | Tip: Finite Differences
+        type: tip
     The stencil QoI safeguard can also be used to bound the pointwise error of
     the finite-difference-approximated derivative (of arbitrary order,
     accuracy, and grid spacing) over the data by using the `finite_difference`
     function in the `qoi` expression.
+    ///
+
+    /// details | Tip: Monotonic Sequences
+        type: tip
+    The stencil QoI safeguard can also be used to preserve the monotonicity of
+    a sequence of values, i.e. to guarantee that a sequence that was originally
+    strictly/weakly monotonically increasing/decreasing/constant still is. The
+    sequence can be arbitrary within the stencil neighbourhood, e.g. along a
+    single axis, in a zigzag, etc. Preserving the monotonicity of multiple
+    sequences, e.g. along several axes, requires multiple stencil QoI
+    safeguards. For instance, to guarantee that strictly increasing/decreasing
+    sequences along a single axis stay strictly increasing/decreasing, use the
+    following `qoi` expression with an absolute error bound of zero (more
+    monotonicity QoIs, including strict vs weak monotonicity and constant
+    sequences, can be found in [test_monotonicity.py]):
+
+    [test_monotonicity.py]: https://github.com/juntyr/compression-safeguards/blob/main/tests/test_monotonicity.py
+
+    ```py
+    all([
+        # strictly decreasing sequences stay strictly decreasing
+        all(X[1:] < X[:-1]) == all(C["$X"][1:] < C["$X"][:-1]),
+        # strictly increasing sequences stay strictly increasing
+        all(X[1:] > X[:-1]) == all(C["$X"][1:] > C["$X"][:-1]),
+    ])
+    ```
+    ///
 
     The shape of the data neighbourhood is specified as an ordered list of
     unique data axes and boundary conditions that are applied to these axes.
