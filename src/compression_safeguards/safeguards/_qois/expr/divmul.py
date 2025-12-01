@@ -98,7 +98,18 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
             smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
 
             # for x*0, we can allow any finite x, unless the output +-0.0 sign
-            #  is restricted, then we need to restrict the sign of x
+            #  is restricted, then we need to restrict the sign of x:
+            #   | constv | expr_lower | expr_upper | term_lower | term_upper |
+            #   | +0.0   | >= +0.0    | >= +0.0    | +0.0       | +fmax      |
+            #   | +0.0   | <= -0.0    | <= -0.0    | -fmax      | -0.0       |
+            #   | +0.0   | <= -0.0    | >= +0.0    | -fmax      | +fmax      |
+            #   | -0.0   | >= +0.0    | >= +0.0    | -fmax      | -0.0       |
+            #   | -0.0   | <= -0.0    | <= -0.0    | +0.0       | +fmax      |
+            #   | -0.0   | <= -0.0    | >= +0.0    | -fmax      | +fmax      |
+            #  - term_lower := +0.0 if
+            #    signbit(constv) == signbit(expr_lower) == signbit(expr_upper)
+            #  - term_upper := -0.0 if
+            #    ~signbit(constv) == signbit(expr_lower) == signbit(expr_upper)
             # for x*Inf, we can allow any non-zero non-NaN x with the same sign
             # for x*NaN, we can allow any x but only propagate [-inf, inf]
             #  since [-NaN, NaN] would be misunderstood as only NaN
@@ -124,6 +135,7 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
             term_lower[
                 (constv == 0)
                 & (_is_positive_zero(constv) == _is_sign_positive_number(expr_lower))
+                & (_is_positive_zero(constv) == _is_sign_positive_number(expr_upper))
             ] = +0.0
             term_lower = _ensure_array(_minimum_zero_sign_sensitive(termv, term_lower))
 
@@ -148,6 +160,7 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
             term_upper[constv == 0] = fmax
             term_upper[
                 (constv == 0)
+                & (_is_negative_zero(constv) != _is_sign_negative_number(expr_lower))
                 & (_is_negative_zero(constv) != _is_sign_negative_number(expr_upper))
             ] = -0.0
             term_upper = _ensure_array(_maximum_zero_sign_sensitive(termv, term_upper))
@@ -581,7 +594,18 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             term, termv, constv = a, av, bv
 
             # for x/Inf, we can allow any finite x, unless the output +-0.0 sign
-            #  is restricted, then we need to restrict the sign of x
+            #  is restricted, then we need to restrict the sign of x:
+            #   | constv | expr_lower | expr_upper | term_lower | term_upper |
+            #   | +Inf   | >= +0.0    | >= +0.0    | +0.0       | +fmax      |
+            #   | +Inf   | <= -0.0    | <= -0.0    | -fmax      | -0.0       |
+            #   | +Inf   | <= -0.0    | >= +0.0    | -fmax      | +fmax      |
+            #   | -Inf   | >= +0.0    | >= +0.0    | -fmax      | -0.0       |
+            #   | -Inf   | <= -0.0    | <= -0.0    | +0.0       | +fmax      |
+            #   | -Inf   | <= -0.0    | >= +0.0    | -fmax      | +fmax      |
+            #  - term_lower := +0.0 if
+            #    signbit(constv) == signbit(expr_lower) == signbit(expr_upper)
+            #  - term_upper := -0.0 if
+            #    ~signbit(constv) == signbit(expr_lower) == signbit(expr_upper)
             # for x/0, we can allow any non-zero non-NaN x with the same sign
             # for x/NaN, we can allow any x but only propagate [-inf, inf]
             #  since [-NaN, NaN] would be misunderstood as only NaN
@@ -608,6 +632,10 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
                     _is_sign_positive_number(constv)
                     == _is_sign_positive_number(expr_lower)
                 )
+                & (
+                    _is_sign_positive_number(constv)
+                    == _is_sign_positive_number(expr_upper)
+                )
             ] = +0.0
             term_lower = _ensure_array(_minimum_zero_sign_sensitive(termv, term_lower))
 
@@ -630,6 +658,10 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             term_upper[np.isinf(constv)] = fmax
             term_upper[
                 np.isinf(constv)
+                & (
+                    _is_sign_negative_number(constv)
+                    != _is_sign_negative_number(expr_lower)
+                )
                 & (
                     _is_sign_negative_number(constv)
                     != _is_sign_negative_number(expr_upper)
