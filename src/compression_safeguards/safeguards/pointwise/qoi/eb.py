@@ -10,7 +10,7 @@ from typing import ClassVar, Literal
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import _ensure_array, _logical_and, _ones, _reshape
+from ....utils._compat import _ensure_array, _logical_and, _ones, _place, _reshape
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import ToFloatMode, saturating_finite_float_cast, to_float
 from ....utils.error import TypeCheckError, ctx, lookup_enum_or_raise
@@ -368,7 +368,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             ok = _reshape(ok_, data.shape)
         else:
             ok = _ones(data.shape, np.dtype(np.bool))
-            np.place(ok, where, ok_)
+            _place(ok, where, ok_)
 
         return ok
 
@@ -498,8 +498,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             with np.errstate(invalid="ignore"):
                 data_float_lower = np.full(data.shape, -np.inf, ftype)
                 data_float_upper = np.full(data.shape, np.inf, ftype)
-            np.place(data_float_lower, where, data_float_lower_)
-            np.place(data_float_upper, where, data_float_upper_)
+            _place(data_float_lower, where, data_float_lower_)
+            _place(data_float_upper, where, data_float_upper_)
 
         wheref: Literal[True] | np.ndarray[tuple[int], np.dtype[np.bool]] = (
             True if where is True else where.flatten()

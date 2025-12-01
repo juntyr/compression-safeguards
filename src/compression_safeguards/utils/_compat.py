@@ -6,6 +6,7 @@ equivalent behaviour for all supported dtypes, e.g. numpy_quaddtype.
 __all__ = [
     "_nan_to_zero_inf_to_finite",
     "_nextafter",
+    "_place",
     "_logical_not",
     "_as_logical",
     "_symmetric_modulo",
@@ -153,6 +154,21 @@ def _nextafter(
     np.add(out, b, out=out, where=(np.isnan(a) | np.isnan(b)))
 
     return out
+
+
+# wrapper around np.place that also works for numpy_quaddtype
+# FIXME: https://github.com/numpy/numpy-user-dtypes/issues/236
+def _place(
+    a: np.ndarray[S, np.dtype[TB]],
+    mask: np.ndarray[S, np.dtype[np.bool]],
+    vals: np.ndarray[tuple[int], np.dtype[TB]],
+) -> None:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
+        return np.place(a, mask, vals)
+
+    return np.put(a, np.flatnonzero(mask), vals)
 
 
 # wrapper around np.logical_not that also works for numpy_quaddtype

@@ -1389,3 +1389,101 @@ def test_fuzzer_found_has_data_2d_array():
             eb=0,
             qoi_dtype="lossless",
         )
+
+
+def test_fuzzer_found_where_invalid_cast():
+    data = np.array(
+        [
+            [0],
+            [0],
+            [33],
+            [33],
+            [10],
+            [81],
+            [126],
+            [16],
+            [-27],
+            [-113],
+            [-38],
+            [33],
+            [33],
+            [33],
+            [33],
+            [33],
+            [33],
+            [33],
+        ],
+        dtype=np.int8,
+    )
+    decoded = np.array(
+        [
+            [39],
+            [-39],
+            [-31],
+            [39],
+            [39],
+            [39],
+            [39],
+            [39],
+            [39],
+            [64],
+            [64],
+            [64],
+            [64],
+            [64],
+            [64],
+            [1],
+            [33],
+            [0],
+        ],
+        dtype=np.int8,
+    )
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(
+                kind="select",
+                selector="__where__",
+                safeguards=[
+                    dict(kind="any", safeguards=[dict(kind="sign", offset=0)]),
+                    dict(
+                        kind="qoi_eb_stencil",
+                        qoi="acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(reciprocal(reciprocal(reciprocal(reciprocal(reciprocal(log2(reciprocal(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(trunc(trunc(trunc(trunc(trunc(atanh(exp10(x))))))))))))))))))))))))))))))))))))))))))))))))) ** e)",
+                        neighbourhood=[
+                            dict(axis=0, before=0, after=0, boundary="valid")
+                        ],
+                        type="abs",
+                        eb=0,
+                        qoi_dtype="float128",
+                    ),
+                    dict(kind="assume_safe"),
+                ],
+            )
+        ],
+        fixed_constants=dict(
+            __where__=np.array(
+                [
+                    [0],
+                    [0],
+                    [0],
+                    [0],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [0],
+                    [0],
+                    [0],
+                ]
+            )
+        ),
+    )

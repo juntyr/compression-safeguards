@@ -21,10 +21,7 @@ from compression_safeguards.safeguards.stencil import (
     _pad_with_boundary,
 )
 from compression_safeguards.safeguards.stencil.abc import StencilSafeguard
-from compression_safeguards.utils._compat import (
-    _ones,
-    _sliding_window_view,
-)
+from compression_safeguards.utils._compat import _ones, _place, _sliding_window_view
 from compression_safeguards.utils.bindings import Bindings, Parameter
 from compression_safeguards.utils.cast import lossless_cast
 from compression_safeguards.utils.error import TypeCheckError, ctx, lookup_enum_or_raise
@@ -240,7 +237,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 axis_ok = axis_ok_
             else:
                 axis_ok = _ones(where_flat.shape, np.dtype(np.bool))
-                np.place(axis_ok, where_flat, axis_ok_)
+                _place(axis_ok, where_flat, axis_ok_)
 
             # the check succeeds for boundary points that were excluded by a
             #  valid boundary
