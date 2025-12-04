@@ -35,6 +35,7 @@ examples = [
     "cdsapi~=0.7.6",
     "earthkit-data~=0.14.0",
     "earthkit-plots~=0.3.1",
+    "humanize~=4.14.0",
     "jupyterlab",
     "matplotlib~=3.10.0",
     "netcdf4~=1.7.2",
