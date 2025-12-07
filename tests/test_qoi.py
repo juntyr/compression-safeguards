@@ -2,7 +2,10 @@ import numpy as np
 import pytest
 
 from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
-from compression_safeguards.safeguards._qois.expr.addsub import ScalarSubtract
+from compression_safeguards.safeguards._qois.expr.addsub import (
+    ScalarAdd,
+    ScalarSubtract,
+)
 from compression_safeguards.safeguards._qois.expr.classification import (
     ScalarIsFinite,
     ScalarIsInf,
@@ -1871,3 +1874,25 @@ def test_fuzzer_found_cosh_equal_isfinite():
 
     assert expr.eval(X_lower, dict()) == np.array(np.float16(0.0))
     assert expr.eval(X_upper, dict()) == np.array(np.float16(0.0))
+
+
+@pytest.mark.xfail(reason="https://github.com/numpy/numpy-user-dtypes/issues/239")
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_foo():
+    X = np.array(_float128("3.362103143112093476804027502198658e-4932"))
+
+    expr = ScalarAdd(
+        ScalarNot(Data.SCALAR),
+        ScalarAdd(ScalarAsinh(Data.SCALAR), ScalarAsinh(Data.SCALAR)),
+    )
+
+    assert expr.eval(X, dict()) == np.array(
+        _float128("6.724206286224186953608055004397316e-4932")
+    )
+
+    # expr_lower = np.array(_float128(0.0))
+    # expr_upper = np.array(_float128("3.362103143112093476804027502198658e-4932"))
+
+    # X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    # assert X_lower == np.array(_float128("3.362103143112093476804027502198658e-4932"))
+    # assert X_upper == np.array(_float128("3.362103143112093476804027502198658e-4932"))
