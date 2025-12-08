@@ -63,7 +63,7 @@ Ci = TypeVar("Ci", bound=Callable)
 # FIXME: actually bound the types to be Expr
 # https://discuss.python.org/t/how-to-use-typevartuple/67502
 Es = TypeVarTuple("Es")
-""" Tuple of [`Expr`][...abc.Expr]s. """
+""" Tuple of [`Expr`][...expr.abc.Expr]s. """
 
 
 def coerce_to_flat(a: np_sndarray[Ps, tuple[()], T]) -> np.ndarray[tuple[Ps], T]:

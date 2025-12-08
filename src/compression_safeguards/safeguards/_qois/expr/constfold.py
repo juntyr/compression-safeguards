@@ -10,7 +10,7 @@ from ..typing import F, Fi, Ns, Ps, np_sndarray
 from .abc import AnyExpr, EmptyExpr, Expr
 
 Ei = TypeVar("Ei", bound=AnyExpr)
-""" Any numpy [`Expr`][..typing.Expr] (invariant). """
+""" Any numpy [`Expr`][...abc.Expr] (invariant). """
 
 
 class ScalarFoldedConstant(EmptyExpr):
