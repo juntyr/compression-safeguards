@@ -131,10 +131,10 @@ class Expr(ABC, Generic[Unpack[Es]]):
 
         Parameters
         ----------
-        Xs : PsNsArray[Ps, Ns, F]
+        Xs : np_sndarray[Ps, Ns, np.dtype[F]]
             The stencil-extended data, in floating-point format, which must be
             of shape [Ps, ...stencil_shape].
-        late_bound : Mapping[Parameter, PsNsArray[Ps, Ns, F]]
+        late_bound : Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]]
             The late-bound constants parameters for this expression, with the
             same shape and floating-point dtype as the stencil-extended data.
 
@@ -258,10 +258,10 @@ class Expr(ABC, Generic[Unpack[Es]]):
 
         Parameters
         ----------
-        Xs : PsNsArray[Ps, Ns, F]
+        Xs : np_sndarray[Ps, Ns, np.dtype[F]]
             The stencil-extended data, in floating-point format, which must be
             of shape [Ps, ...stencil_shape].
-        late_bound : Mapping[Parameter, PsNsArray[Ps, Ns, F]]
+        late_bound : Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]]
             The late-bound constants parameters for this expression, with the
             same shape and floating-point dtype as the stencil-extended data.
 
@@ -303,16 +303,16 @@ class Expr(ABC, Generic[Unpack[Es]]):
             The pointwise lower bound on this expression.
         expr_upper : np.ndarray[tuple[Ps], np.dtype[F]]
             The pointwise upper bound on this expression.
-        Xs : PsNsArray[Ps, Ns, F]
+        Xs : np_sndarray[Ps, Ns, np.dtype[F]]
             The stencil-extended data, in floating-point format, which must be
             of shape [Ps, ...stencil_shape].
-        late_bound : Mapping[Parameter, PsNsArray[Ps, Ns, F]]
+        late_bound : Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]]
             The late-bound constants parameters for this expression, with the
             same shape and floating-point dtype as the stencil-extended data.
 
         Returns
         -------
-        Xs_lower, Xs_upper : tuple[PsNsArray[Ps, Ns, F], PsNsArray[Ps, Ns, F]]
+        Xs_lower, Xs_upper : tuple[np_sndarray[Ps, Ns, np.dtype[F]], np_sndarray[Ps, Ns, np.dtype[F]]]
             The stencil-extended lower and upper bounds on the stencil-extended
             data `Xs`.
 
@@ -347,16 +347,16 @@ class Expr(ABC, Generic[Unpack[Es]]):
             The pointwise lower bound on this expression.
         expr_upper : np.ndarray[tuple[Ps], np.dtype[F]]
             The pointwise upper bound on this expression.
-        Xs : PsNsArray[Ps, Ns, F]
+        Xs : np_sndarray[Ps, Ns, np.dtype[F]]
             The stencil-extended data, in floating-point format, which must be
             of shape [Ps, ...stencil_shape].
-        late_bound : Mapping[Parameter, PsNsArray[Ps, Ns, F]]
+        late_bound : Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]]
             The late-bound constants parameters for this expression, with the
             same shape and floating-point dtype as the stencil-extended data.
 
         Returns
         -------
-        Xs_lower, Xs_upper : tuple[PsNsArray[Ps, Ns, F], PsNsArray[Ps, Ns, F]]
+        Xs_lower, Xs_upper : tuple[np_sndarray[Ps, Ns, np.dtype[F]], np_sndarray[Ps, Ns, np.dtype[F]]]
             The stencil-extended lower and upper bounds on the stencil-extended
             data `Xs`.
 

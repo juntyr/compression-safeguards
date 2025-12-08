@@ -689,6 +689,17 @@ def test_indexing():
     assert f"{safeguard._qoi_expr!r}" == "X[0,0]"
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "sum(abs(X[1::2] - X[:-1:2]))",
+        [dict(axis=0, before=1, after=4, boundary="valid")],
+        "abs",
+        0,
+    )
+    assert (
+        f"{safeguard._qoi_expr!r}"
+        == "(abs(X[1] - X[0]) + abs(X[3] - X[2]) + abs(X[5] - X[4]))"
+    )
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "(X[I[0]-1,I[1]]+X[I[0]+1,I[1]]+X[I[0],I[1]-1]+X[I[0],I[1]+1])/4",
         [
             dict(axis=0, before=1, after=1, boundary="valid"),

@@ -91,7 +91,7 @@ def _nextafter(
     ):
         return np.nextafter(a, b)
 
-    a = _ensure_array(a)
+    a = np.ascontiguousarray(_ensure_array(a))
     b = _ensure_array(b)
 
     _float128_incr_subnormal = np.full(a.shape, _float128_smallest_subnormal)

@@ -443,6 +443,46 @@ def test_where(check):
 
 
 @pytest.mark.parametrize("check", CHECKS)
+def test_comparison(check):
+    check("x <= 1")
+    check("1 <= x")
+    check("sin(x) <= cos(x)")
+
+    check("x < 1")
+    check("1 < x")
+    check("sin(x) < cos(x)")
+
+    check("x == 1")
+    check("1 == x")
+    check("sin(x) == cos(x)")
+
+    check("x != 1")
+    check("1 != x")
+    check("sin(x) != cos(x)")
+
+    check("x > 1")
+    check("1 > x")
+    check("sin(x) > cos(x)")
+
+    check("x >= 1")
+    check("1 >= x")
+    check("sin(x) >= cos(x)")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_combinators(check):
+    check("not(x == 0)")
+
+    check("all([x == 0, x > 1])")
+    check("all([x == 0, 1, x > 1])")
+    check("all([x == 0, 0, x > 1])")
+
+    check("any([x == 0, x > 1])")
+    check("any([x == 0, 1, x > 1])")
+    check("any([x == 0, 0, x > 1])")
+
+
+@pytest.mark.parametrize("check", CHECKS)
 def test_size(check):
     with pytest.raises(SyntaxError, match="scalar non-array expression has no size"):
         check("size(x) + x")

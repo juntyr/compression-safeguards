@@ -5,6 +5,7 @@ Stencil quantity of interest (QoI) error bound safeguard.
 __all__ = ["StencilQuantityOfInterestErrorBoundSafeguard"]
 
 from collections.abc import Sequence, Set
+from functools import reduce
 from typing import ClassVar, Literal
 
 import numpy as np
@@ -1183,6 +1184,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             Only compute the footprint at pointwise checks where the condition
             is [`True`][True].
 
+            Conceptually, `where` is applied to `footprint` at the end.
+
         Returns
         -------
         print : np.ndarray[S, np.dtype[np.bool]]
@@ -1274,6 +1277,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             Only compute the inverse footprint at pointwise checks where the
             condition is [`True`][True].
 
+            Conceptually, `where` is applied to `foot` at the start.
+
         Returns
         -------
         print : np.ndarray[S, np.dtype[np.bool]]
@@ -1286,35 +1291,13 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         window = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
 
         # if the neighbourhood is empty, e.g. because we are in valid mode and
-        #  the neighbourhood shape exceeds the data shape, the footprint is
-        #  empty
+        #  the neighbourhood shape exceeds the data shape, the inverse
+        #  footprint is empty
         for axis, w in zip(self._neighbourhood, window):
             if foot.shape[axis.axis] < w and axis.boundary == BoundaryCondition.valid:
                 return _zeros(foot.shape, dtype=np.dtype(np.bool))
         if foot.size == 0:
             return _zeros(foot.shape, dtype=np.dtype(np.bool))
-
-        foot_boundary: np.ndarray[tuple[int, ...], np.dtype[np.bool]] = foot & where
-        for axis in self._neighbourhood:
-            foot_boundary = _pad_with_boundary(
-                foot_boundary,
-                axis.boundary,
-                axis.before,
-                axis.after,
-                None
-                if axis.constant_boundary is None
-                else _zeros((), np.dtype(np.bool)),
-                axis.axis,
-            )
-
-        foot_windows: np.ndarray[tuple[int, ...], np.dtype[np.bool]] = (
-            _sliding_window_view(
-                foot_boundary,
-                window,
-                axis=tuple(axis.axis for axis in self._neighbourhood),
-                writeable=False,
-            )
-        )
 
         valid_slice = [slice(None)] * foot.ndim
         for axis in self._neighbourhood:
@@ -1338,29 +1321,29 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             True if where is True else where[tuple(valid_slice)].flatten(),
         )
 
-        # flatten the foot and append False, which is indexed if an element did
-        #  not contribute to the maximum number of windows
-        # the foot elements are reduced inside each window and then broadcast
-        #  back to the window to ensure that if one window element has a foot,
-        #  all elements will get the footprint
-        foot_windows_flat = np.full(foot_windows.size + 1, False)
-        foot_windows_flat[:-1] = np.repeat(
-            np.logical_or.reduce(
-                foot_windows.reshape(foot_windows.shape[: foot.ndim] + (-1,)),
-                axis=foot.ndim,
-            ).flatten(),
-            window_used.size,
-        )
+        window_size = reduce(lambda x, y: x * y, window, 1)
+        foot_valid = (foot & where)[tuple(valid_slice)]
+
+        # broadcast the (valid) foot to the window, so that all window elements
+        #  receive the back-contribution from the foot to their inverse
+        #  footprint
+        # flatten the broadcast foot and append False, which is indexed if an
+        #  element did not contribute to the maximum number of windows
+        foot_windows_flat = np.full((foot_valid.size * window_size) + 1, False)
+        foot_windows_flat[:-1] = np.broadcast_to(
+            foot_valid.reshape((*foot_valid.shape, *tuple(1 for _ in window))),
+            (*foot_valid.shape, *window),
+        ).flatten()
 
         # for each data element, reduce over the foot elements that affect it
         # since some data elements may have no foot elements that affect them,
         #  e.g. because of the valid boundary condition, they may have no
-        #  footprint
-        footprint: np.ndarray[S, np.dtype[np.bool]] = np.logical_or.reduce(
+        #  inverse footprint
+        inverse_footprint: np.ndarray[S, np.dtype[np.bool]] = np.logical_or.reduce(
             foot_windows_flat[reverse_indices_windows], axis=1
         ).reshape(foot.shape)
 
-        return footprint
+        return inverse_footprint
 
     def truncate_data_to_qoi_shape(
         self, data: np.ndarray[tuple[int, ...], np.dtype[T]]

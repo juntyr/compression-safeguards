@@ -185,6 +185,8 @@ class StencilSafeguard(Safeguard, ABC):
             Only compute the footprint at pointwise checks where the condition
             is [`True`][True].
 
+            Conceptually, `where` is applied to `footprint` at the end.
+
         Returns
         -------
         print : np.ndarray[S, np.dtype[np.bool]]
@@ -218,6 +220,8 @@ class StencilSafeguard(Safeguard, ABC):
         where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
             Only compute the inverse footprint at pointwise checks where the
             condition is [`True`][True].
+
+            Conceptually, `where` is applied to `foot` at the start.
 
         Returns
         -------

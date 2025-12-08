@@ -21,7 +21,6 @@ from ..bound import checked_data_bounds
 from ..typing import F, Fi, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
-from .literal import Number
 
 
 class ScalarNot(Expr[AnyExpr]):
@@ -134,7 +133,7 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
 
         # any False -> False
         if any(f == 0 for f in fs):
-            return Number.ZERO
+            return dtype.type(0)
 
         # only keep non-const terms, which filters out all True-thy terms
         es = [f for f in fs if isinstance(f, Expr)]
@@ -142,7 +141,7 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
         match es:
             case []:
                 # all True-thy -> True
-                return Number.ONE
+                return dtype.type(1)
             case [e]:
                 # single non-const -> propagate
                 return e
@@ -318,7 +317,7 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
 
         # any True -> True
         if any((not isinstance(f, Expr) and (f != 0)) for f in fs):
-            return Number.ONE
+            return dtype.type(1)
 
         # only keep non-const terms, which filters out all False terms
         es = [f for f in fs if isinstance(f, Expr)]
@@ -326,7 +325,7 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
         match es:
             case []:
                 # all False -> False
-                return Number.ZERO
+                return dtype.type(0)
             case [e]:
                 # single non-const -> propagate
                 return e

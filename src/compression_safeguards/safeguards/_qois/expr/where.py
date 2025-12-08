@@ -54,13 +54,21 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
 
     @override
     def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | AnyExpr:
-        return ScalarFoldedConstant.constant_fold_ternary(
-            self._condition,
-            self._a,
-            self._b,
-            dtype,
-            lambda cond, a, b: _where(cond != 0, a, b),
-            ScalarWhere,
+        cond = self._condition.constant_fold(dtype)
+        a = self._a.constant_fold(dtype)
+        b = self._b.constant_fold(dtype)
+
+        if not isinstance(cond, Expr):
+            if cond != 0 and not isinstance(a, Expr):
+                return a
+
+            if cond == 0 and not isinstance(b, Expr):
+                return b
+
+        return ScalarWhere(
+            ScalarFoldedConstant.from_folded(cond),
+            ScalarFoldedConstant.from_folded(a),
+            ScalarFoldedConstant.from_folded(b),
         )
 
     @override

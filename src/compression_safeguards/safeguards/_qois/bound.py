@@ -138,13 +138,13 @@ def guarantee_data_within_expr_bounds(
 
     Parameters
     ----------
-    expr : Callable[[PsNsArray[Ps, Ns, F]], np.ndarray[tuple[Ps], np.dtype[F]]]
+    expr : Callable[[np_sndarray[Ps, Ns, np.dtype[F]]], np.ndarray[tuple[Ps], np.dtype[F]]]
         Evaluate the expression, given the stencil-extended data `Xs`.
     exprv : np.ndarray[tuple[Ps], np.dtype[F]]
         Evaluation of the expression on the stencil-extended data `Xs`.
-    Xs : PsNsArray[Ps, Ns, F]
+    Xs : np_sndarray[Ps, Ns, np.dtype[F]]
         Stencil-extended data.
-    Xs_bound_guess : PsNsArray[Ps, Ns, F]
+    Xs_bound_guess : np_sndarray[Ps, Ns, np.dtype[F]]
         Provided guess for the bound on the stencil-extended data `Xs`.
     expr_lower : np.ndarray[tuple[Ps], np.dtype[F]]
         Pointwise lower bound on the expression, must be less than or equal to
@@ -158,7 +158,7 @@ def guarantee_data_within_expr_bounds(
 
     Returns
     -------
-    Xs_bound_guess : PsNsArray[Ps, Ns, F]
+    Xs_bound_guess : np_sndarray[Ps, Ns, np.dtype[F]]
         Refined bound that guarantees that
         `expr_lower <= expr(Xs_bound_guess) <= expr_upper` or
         `isnan(exprv) & isnan(expr(Xs_bound_guess))`.

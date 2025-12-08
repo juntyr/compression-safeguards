@@ -77,14 +77,14 @@ class PointwiseQuantityOfInterest:
         ):
             # check if the expression is well-formed and if data bounds can be
             #  computed
-            _canary_data_bounds = ScalarFoldedConstant.constant_fold_expr(
-                expr, np.dtype(np.float64)
-            ).compute_data_bounds(
-                dummy_pointwise,
-                dummy_pointwise,
-                dummy_pointwise,
-                {c: dummy_pointwise for c in late_bound_constants},
-            )
+            _canary_expr = expr.constant_fold(np.dtype(np.float64))
+            if isinstance(_canary_expr, Expr):
+                _canary_data_bounds = _canary_expr.compute_data_bounds(
+                    dummy_pointwise,
+                    dummy_pointwise,
+                    dummy_pointwise,
+                    {c: dummy_pointwise for c in late_bound_constants},
+                )
 
         self._expr = expr
         self._late_bound_constants = late_bound_constants
@@ -160,17 +160,22 @@ class PointwiseQuantityOfInterest:
         qoi_lower = _ensure_array(qoi_lower)
         qoi_upper = _ensure_array(qoi_upper)
         X = _ensure_array(X)
-        expr = ScalarFoldedConstant.constant_fold_expr(self._expr, X.dtype)
-        X_lower_upper: tuple[
-            np_sndarray[Ps, tuple[()], np.dtype[F]],
-            np_sndarray[Ps, tuple[()], np.dtype[F]],
-        ] = expr.compute_data_bounds(qoi_lower, qoi_upper, X, late_bound)
-        X_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
-            coerce_to_flat(X_lower_upper[0])
-        )
-        X_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
-            coerce_to_flat(X_lower_upper[1])
-        )
+        X_lower: np.ndarray[tuple[Ps], np.dtype[F]]
+        X_upper: np.ndarray[tuple[Ps], np.dtype[F]]
+        expr = self._expr.constant_fold(X.dtype)
+        if isinstance(expr, Expr):
+            X_lower_upper: tuple[
+                np_sndarray[Ps, tuple[()], np.dtype[F]],
+                np_sndarray[Ps, tuple[()], np.dtype[F]],
+            ] = expr.compute_data_bounds(qoi_lower, qoi_upper, X, late_bound)
+            X_lower = _ensure_array(coerce_to_flat(X_lower_upper[0]))
+            X_upper = _ensure_array(coerce_to_flat(X_lower_upper[1]))
+        else:
+            # constant fold with combinators can create top-level folded consts
+            X_lower = np.full(X.shape, X.dtype.type(-np.inf))
+            X_lower[np.isnan(X)] = np.nan
+            X_upper = np.full(X.shape, X.dtype.type(np.inf))
+            X_upper[np.isnan(X)] = np.nan
         assert X_lower.dtype == X.dtype
         assert X_upper.dtype == X.dtype
         assert X_lower.shape == X.shape
@@ -266,14 +271,14 @@ class StencilQuantityOfInterest:
         ):
             # check if the expression is well-formed and if data bounds can be
             #  computed
-            _canary_data_bounds = ScalarFoldedConstant.constant_fold_expr(
-                expr, np.dtype(np.float64)
-            ).compute_data_bounds(
-                dummy_pointwise,
-                dummy_pointwise,
-                dummy_stencil,
-                {c: dummy_stencil for c in late_bound_constants},
-            )
+            _canary_expr = expr.constant_fold(np.dtype(np.float64))
+            if isinstance(_canary_expr, Expr):
+                _canary_data_bounds = _canary_expr.compute_data_bounds(
+                    dummy_pointwise,
+                    dummy_pointwise,
+                    dummy_stencil,
+                    {c: dummy_stencil for c in late_bound_constants},
+                )
 
         self._expr = expr
         self._late_bound_constants = late_bound_constants
@@ -306,10 +311,10 @@ class StencilQuantityOfInterest:
 
         Parameters
         ----------
-        Xs : PsNsArray[Ps, Ns, F]
+        Xs : np_sndarray[Ps, Ns, np.dtype[F]]
             The stencil-extended data, in floating-point format, which must be
             of shape [Ps, *stencil_shape].
-        late_bound : Mapping[Parameter, PsNsArray[Ps, Ns, F]]
+        late_bound : Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]]
             The late-bound constants parameters for this QoI, with the same
             shape and floating-point dtype as the stencil-extended data.
 
@@ -348,16 +353,16 @@ class StencilQuantityOfInterest:
             The pointwise lower bound on the QoI.
         qoi_upper : np.ndarray[tuple[Ps], np.dtype[F]]
             The pointwise upper bound on the QoI.
-        Xs : PsNsArray[Ps, Ns, F]
+        Xs : np_sndarray[Ps, Ns, np.dtype[F]]
             The stencil-extended data, in floating-point format, which must be
             of shape [Ps, *stencil_shape].
-        late_bound : Mapping[Parameter, PsNsArray[Ps, Ns, F]]
+        late_bound : Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]]
             The late-bound constants parameters for this QoI, with the same
             shape and floating-point dtype as the stencil-extended data.
 
         Returns
         -------
-        Xs_lower, Xs_upper : tuple[PsNsArray[Ps, Ns, F], PsNsArray[Ps, Ns, F]]
+        Xs_lower, Xs_upper : tuple[np_sndarray[Ps, Ns, np.dtype[F]], np_sndarray[Ps, Ns, np.dtype[F]]]
             The stencil-extended lower and upper bounds on the stencil-extended
             data `Xs`.
 
@@ -370,12 +375,21 @@ class StencilQuantityOfInterest:
         Xs = _ensure_array(Xs)
         assert Xs.shape[:1] == qoi_lower.shape
         assert Xs.shape[1:] == self._stencil_shape
-        expr = ScalarFoldedConstant.constant_fold_expr(self._expr, Xs.dtype)
-        Xs_lower, Xs_upper = expr.compute_data_bounds(
-            qoi_lower, qoi_upper, Xs, late_bound
-        )
-        Xs_lower = _ensure_array(Xs_lower)
-        Xs_upper = _ensure_array(Xs_upper)
+        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]]
+        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]]
+        expr = self._expr.constant_fold(Xs.dtype)
+        if isinstance(expr, Expr):
+            Xs_lower, Xs_upper = expr.compute_data_bounds(
+                qoi_lower, qoi_upper, Xs, late_bound
+            )
+            Xs_lower = _ensure_array(Xs_lower)
+            Xs_upper = _ensure_array(Xs_upper)
+        else:
+            # constant fold with combinators can create top-level folded consts
+            Xs_lower = np.full(Xs.shape, Xs.dtype.type(-np.inf))
+            Xs_lower[np.isnan(Xs)] = np.nan
+            Xs_upper = np.full(Xs.shape, Xs.dtype.type(np.inf))
+            Xs_upper[np.isnan(Xs)] = np.nan
         assert Xs_lower.dtype == Xs.dtype
         assert Xs_upper.dtype == Xs.dtype
         assert Xs_lower.shape == Xs.shape
