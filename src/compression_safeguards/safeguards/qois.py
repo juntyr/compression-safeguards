@@ -51,7 +51,11 @@ expr =
   | late_bound_constant
   | variable
   | array_indexing
-  | functions
+  | arithmetic_functions
+  | classification_functions
+  | logical_combinators
+  | array_functions
+  | finite_difference
 ;
 
 number =
@@ -162,7 +166,7 @@ integer_expr =
     ? symbolic integer-only expression ?
 ;
 
-functions =
+arithmetic_functions =
     "ln", "(", expr, [","], ")"  (* natural logarithm *)
   | "log2", "(", expr, [","], ")"  (* binary logarithm *)
   | "log10", "(", expr, [","], ")"  (* decimal logarithm *)
@@ -191,18 +195,30 @@ functions =
   | "asinh", "(", expr, [","], ")"  (* inverse hyperbolic sine asinh(x) *)
   | "acosh", "(", expr, [","], ")"  (* inverse hyperbolic cosine acosh(x) *)
   | "atanh", "(", expr, [","], ")"  (* inverse hyperbolic tangent atanh(x) *)
-  | "isfinite", "(", expr, [","], ")"  (* 1 if finite, 0 if inf or NaN *)
+;
+
+classification_functions =
+    "isfinite", "(", expr, [","], ")"  (* 1 if finite, 0 if inf or NaN *)
   | "isinf", "(", expr, [","], ")"  (* 1 if inf, 0 if finite or NaN *)
   | "isnan", "(", expr, [","], ")"  (* 1 if NaN, 0 if finite or inf *)
-  | "not", "(", expr, [","], ")"  (* 1 if == 0, 0 if != 0 *)
+;
+
+logical_combinators =
+    "not", "(", expr, [","], ")"  (* 1 if == 0, 0 if != 0 *)
   | "all", "(", expr, [","], ")"  (* 1 if all array elements != 0, 0 if any array element == 0 *)
   | "any", "(", expr, [","], ")"  (* 1 if any array element != 0, 0 if all array elements == 0 *)
   | "where", "(", expr, ",", expr, ",", expr, [","], ")"  (* where(c, x, y) = x if (c != 0) else y *)
-  | "size", "(", expr, [","], ")"  (* array size *)
+;
+
+array_functions =
+    "size", "(", expr, [","], ")"  (* array size *)
   | "shape", "(", expr, [","], ")"  (* array shape as a 1D array *)
   | "sum", "(", expr, [","], ")"  (* array sum *)
   | "matmul", "(", expr, ",", expr, [","], ")"  (* matrix (2d array) multiplication *)
-  | "finite_difference", "("  (* finite difference over an expression, only available in stencil QoIs *)
+;
+
+finite_difference =
+    "finite_difference", "("  (* finite difference over an expression, only available in stencil QoIs *)
       , expr, ","
       , "order", "=", integer, ","  (* order of the derivative *)
       , "accuracy", "=", integer, ","  (* order of accuracy of the approximation *)
