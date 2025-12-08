@@ -547,7 +547,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             )
         )
 
-        if self._compute._unstable_iterative:
+        if self._compute.unstable_iterative:
             correction = _refine_correction_iteratively(
                 self._safeguards, data, decoded, correction, late_bound
             )

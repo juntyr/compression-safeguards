@@ -539,7 +539,7 @@ def check_one_input(data) -> None:
         codec=FuzzCodec(raw, decoded),
         safeguards=safeguards,
         fixed_constants=fixed_constants,
-        compute=dict(_unstable_iterative=True),
+        compute=dict(unstable_iterative=True),
     )
 
     grepr = repr(safeguard)

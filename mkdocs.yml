@@ -85,7 +85,7 @@ plugins:
             docstring_section_style: list
             docstring_style: numpy
             show_if_no_docstring: true
-            filters: ["!^_$", "!^_[^_]", "!^__", "__init__"]
+            filters: ["!^_$", "!^_[^_]", "!^__", "^__init__$"]
             members_order: source
             group_by_category: false
             show_source: false
@@ -103,6 +103,7 @@ plugins:
             backlinks: tree
             show_inheritance_diagram: true
             inheritance_diagram_direction: LR
+            extensions: ["dataclasses"]
           inventories:
             - https://docs.python.org/3.12/objects.inv
             - https://numcodecs.readthedocs.io/en/v0.15.0/objects.inv

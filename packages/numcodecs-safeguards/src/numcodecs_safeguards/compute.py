@@ -33,7 +33,7 @@ class Compute:
     breaking major version bump.
     """
 
-    _unstable_iterative: bool = False
+    unstable_iterative: bool = False
     """
     Unstable option to use an iterative algorithm that can reduce the number of
     corrections that need to be applied, which can improve the compression
@@ -110,7 +110,7 @@ def _refine_correction_iteratively(
 
     for safeguard in safeguards.safeguards:
         if not isinstance(safeguard, PointwiseSafeguard | StencilSafeguard):
-            with ctx.parameter("compute"), ctx.parameter("_unstable_iterative"):
+            with ctx.parameter("compute"), ctx.parameter("unstable_iterative"):
                 raise (
                     ValueError(
                         "only supported for pointwise and stencil safeguards, "
