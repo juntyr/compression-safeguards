@@ -146,7 +146,7 @@ def _refine_correction_iteratively(
             where |= safeguard.compute_footprint(
                 last_correction_change,
                 late_bound=late_bound_resolved,
-                where=True,
+                where=True,  # complete footprint
             )
 
         # check for data points all pointwise checks succeed
@@ -156,11 +156,11 @@ def _refine_correction_iteratively(
                 data,
                 corrected_iterative,
                 late_bound=late_bound_resolved,
-                # a reduced where would only include the inverse footprint of
-                #  the data points that were newly corrected in the last round,
-                # i.e. which points might now have re-evaluate their checks
-                #  since they depend on these point
-                where=True,
+                # minimal where only includes the footprint of the data points
+                #  that were newly corrected in the last round,
+                # i.e. the points that might now have re-evaluate their checks
+                #  since they depend on these newly corrected point
+                where=where,
             )
 
         # all checks succeed, so a reduced correction has been found
@@ -169,7 +169,7 @@ def _refine_correction_iteratively(
                 data,
                 safeguards.apply_correction(prediction, correction_iterative),
                 late_bound=late_bound,
-                where=True,
+                where=True,  # complete check check
             ):
                 raise (
                     SafeguardsSafetyBug(
@@ -183,8 +183,8 @@ def _refine_correction_iteratively(
 
         # find points that failed the check during the previous iteration and
         #  still fail the check
-        # for these sticky failures, expand the failure footprint to correct
-        #  all data points that could have contributed to the failure
+        # for these sticky failures, expand the failure inverse footprint to
+        #  correct all data points that could have contributed to the failure
         sticky_needs_correction_pointwise = (~check_pointwise) & last_needs_correction
         sticky_needs_correction_inverse_footprint = np.zeros_like(
             sticky_needs_correction_pointwise
@@ -194,7 +194,7 @@ def _refine_correction_iteratively(
                 safeguard.compute_inverse_footprint(
                     sticky_needs_correction_pointwise,
                     late_bound=late_bound_resolved,
-                    where=True,
+                    where=True,  # complete inverse footprint
                 )
             )
 
@@ -204,7 +204,7 @@ def _refine_correction_iteratively(
         last_needs_correction[:] = needs_correction
 
         # determine the data points that get a new correction
-        np.equal(corrected_iterative, 0, out=last_correction_change)
+        np.equal(correction_iterative, 0, out=last_correction_change)
         last_correction_change &= needs_correction
 
         # use the pre-computed correction where needed
