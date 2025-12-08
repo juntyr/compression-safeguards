@@ -657,6 +657,18 @@ def test_matmul():
     )
 
 
+@pytest.mark.parametrize("check", CHECKS)
+def test_shape(check):
+    with pytest.raises(SyntaxError, match="scalar non-array expression has no shape"):
+        check("shape(x) + x")
+    check("sum(shape(X)) + x")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_idx(check):
+    check("sum(I[:] + x)")
+
+
 def test_indexing():
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "X[I[0]-1] + X[I[0]+2]",
@@ -687,6 +699,28 @@ def test_indexing():
         0,
     )
     assert f"{safeguard._qoi_expr!r}" == "X[0,0]"
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "X[I]",
+        [
+            dict(axis=0, before=1, after=1, boundary="valid"),
+            dict(axis=1, before=1, after=1, boundary="valid"),
+        ],
+        "abs",
+        0,
+    )
+    assert f"{safeguard._qoi_expr!r}" == "X[1,1]"
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "X[I[0]+1,I[1]-1]",
+        [
+            dict(axis=0, before=1, after=1, boundary="valid"),
+            dict(axis=1, before=1, after=1, boundary="valid"),
+        ],
+        "abs",
+        0,
+    )
+    assert f"{safeguard._qoi_expr!r}" == "X[2,0]"
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "sum(abs(X[1::2] - X[:-1:2]))",

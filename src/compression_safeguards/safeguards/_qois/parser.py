@@ -481,12 +481,14 @@ class QoIParser(Parser):
         )
         return p.expr.as_int()
 
-    @_("IDX")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("IDX LBRACK index_ many_comma_index RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         self.assert_or_error(
             self._I is not None, p, "index `I` is not available in pointwise QoIs"
         )
-        return Array(*tuple(Number.from_symbolic_int(i) for i in self._I))
+        idx = Array(*tuple(Number.from_symbolic_int(i) for i in self._I))
+        with self.with_error_context(p, lambda err: f"{err}", exception=IndexError):
+            return idx.index(tuple([p.index_] + p.many_comma_index))
 
     # functions
 

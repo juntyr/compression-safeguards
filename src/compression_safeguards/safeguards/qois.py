@@ -125,7 +125,6 @@ constant =
 data =
     "x"  (* pointwise data value, x = X[I] *)
   | "X"  (* stencil data neighbourhood, only available in stencil QoIs *)
-  | "I"  (* 1D array over the per-axis stencil neighbourhood centre indices, only available in stencil QoIs *)
 ;
 
 late_bound_constant =
@@ -154,6 +153,7 @@ letter =
 array_indexing =
     expr, "[", "I", "]"  (* stencil neighbourhood centre, only available in stencil QoIs *)
   | expr, "[", index, { ",", index }, [","], "]"  (* array indexing *)
+  | "I", "[", index, { ",", index }, [","], "]"  (* indexed 1D array over the per-axis stencil neighbourhood centre indices, only available in stencil QoIs *)
 ;
 
 index =
