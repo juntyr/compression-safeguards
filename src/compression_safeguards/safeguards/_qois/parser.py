@@ -481,17 +481,12 @@ class QoIParser(Parser):
         )
         return p.expr.as_int()
 
-    @_("IDX LBRACK integer RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    @_("IDX")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         self.assert_or_error(
             self._I is not None, p, "index `I` is not available in pointwise QoIs"
         )
-        self.assert_or_error(
-            (p.integer >= -len(self._I)) and (p.integer < len(self._I)),
-            p,
-            f"axis index {p.integer} is out of bounds for stencil with {len(self._I)} ax{'i' if len(self._I) == 1 else 'e'}s",
-        )
-        return Number.from_symbolic_int(self._I[p.integer])
+        return Array(*tuple(Number.from_symbolic_int(i) for i in self._I))
 
     # functions
 
@@ -682,6 +677,13 @@ class QoIParser(Parser):
             isinstance(p.expr, Array), p, "scalar non-array expression has no size"
         )
         return Number.from_symbolic_int(p.expr.size)
+
+    @_("SHAPE LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        self.assert_or_error(
+            isinstance(p.expr, Array), p, "scalar non-array expression has no shape"
+        )
+        return Array(*tuple(Number.from_symbolic_int(s) for s in p.expr.shape))
 
     @_("SUM LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811

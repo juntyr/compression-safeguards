@@ -490,6 +490,13 @@ def test_size(check):
 
 
 @pytest.mark.parametrize("check", CHECKS)
+def test_shape(check):
+    with pytest.raises(SyntaxError, match="scalar non-array expression has no shape"):
+        check("shape(x) + x")
+    check("sum(shape([[x]])) + x")
+
+
+@pytest.mark.parametrize("check", CHECKS)
 def test_composed(check):
     check("2 / (ln(x) + sqrt(x))")
 

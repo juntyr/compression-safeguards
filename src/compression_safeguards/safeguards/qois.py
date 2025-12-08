@@ -51,7 +51,6 @@ expr =
   | late_bound_constant
   | variable
   | array_indexing
-  | stencil_info
   | functions
 ;
 
@@ -120,8 +119,9 @@ constant =
 ;
 
 data =
-    "x"  (* pointwise data value *)
+    "x"  (* pointwise data value, x = X[I] *)
   | "X"  (* stencil data neighbourhood, only available in stencil QoIs *)
+  | "I"  (* 1D array over the per-axis stencil neighbourhood centre indices, only available in stencil QoIs *)
 ;
 
 late_bound_constant =
@@ -150,10 +150,6 @@ letter =
 array_indexing =
     expr, "[", "I", "]"  (* stencil neighbourhood centre, only available in stencil QoIs *)
   | expr, "[", index, { ",", index }, [","], "]"  (* array indexing *)
-;
-
-stencil_info =
-    "I", "[", integer, "]"  (* stencil neighbourhood centre for an axis, only available in stencil QoIs *)
 ;
 
 index =
@@ -203,6 +199,7 @@ functions =
   | "any", "(", expr, [","], ")"  (* 1 if any array element != 0, 0 if all array elements == 0 *)
   | "where", "(", expr, ",", expr, ",", expr, [","], ")"  (* where(c, x, y) = x if (c != 0) else y *)
   | "size", "(", expr, [","], ")"  (* array size *)
+  | "shape", "(", expr, [","], ")"  (* array shape as a 1D array *)
   | "sum", "(", expr, [","], ")"  (* array sum *)
   | "matmul", "(", expr, ",", expr, [","], ")"  (* matrix (2d array) multiplication *)
   | "finite_difference", "("  (* finite difference over an expression, only available in stencil QoIs *)

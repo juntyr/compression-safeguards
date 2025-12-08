@@ -102,6 +102,7 @@ class QoILexer(Lexer):
         WHERE,  # type: ignore[name-defined]  # noqa: F821
         # array operations
         SIZE,  # type: ignore[name-defined]  # noqa: F821
+        SHAPE,  # type: ignore[name-defined]  # noqa: F821
         SUM,  # type: ignore[name-defined]  # noqa: F821
         MATMUL,  # type: ignore[name-defined]  # noqa: F821
         # finite difference
@@ -259,6 +260,7 @@ class QoILexer(Lexer):
     ID["where"] = WHERE  # type: ignore[index, name-defined]  # noqa: F821
     # array operations
     ID["size"] = SIZE  # type: ignore[index, name-defined]  # noqa: F821
+    ID["shape"] = SHAPE  # type: ignore[index, name-defined]  # noqa: F821
     ID["sum"] = SUM  # type: ignore[index, name-defined]  # noqa: F821
     ID["matmul"] = MATMUL  # type: ignore[index, name-defined]  # noqa: F821
     # finite difference
@@ -409,6 +411,7 @@ class QoILexer(Lexer):
             "WHERE": "`where`",
             # array operations
             "SIZE": "`size`",
+            "SHAPE": "`shape`",
             "SUM": "`sum`",
             "MATMUL": "`matmul`",
             # finite difference
