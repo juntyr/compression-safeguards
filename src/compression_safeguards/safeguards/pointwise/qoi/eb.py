@@ -340,10 +340,10 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                     late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                         self._eb,
                         data.shape,
-                        qoi_data.dtype,
+                        ftype,
                     ).flatten()
                     if isinstance(self._eb, Parameter)
-                    else saturating_finite_float_cast(self._eb, qoi_data.dtype)
+                    else saturating_finite_float_cast(self._eb, ftype)
                 )
                 if isinstance(self._eb, Parameter):
                     _eb: Parameter = self._eb
@@ -463,10 +463,10 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                     late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                         self._eb,
                         data.shape,
-                        data_qoi.dtype,
+                        ftype,
                     ).flatten()
                     if isinstance(self._eb, Parameter)
-                    else saturating_finite_float_cast(self._eb, data_qoi.dtype)
+                    else saturating_finite_float_cast(self._eb, ftype)
                 )
                 if isinstance(self._eb, Parameter):
                     _eb: Parameter = self._eb
