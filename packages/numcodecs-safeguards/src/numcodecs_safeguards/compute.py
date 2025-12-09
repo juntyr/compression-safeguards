@@ -125,10 +125,8 @@ def _refine_correction_iteratively(
     corrected_full = safeguards.apply_correction(prediction, correction_full)
 
     # iterative correction, starting with no correction at all
-    correction_iterative = np.zeros_like(correction)
+    correction_iterative = np.zeros_like(correction_full)
     corrected_iterative = prediction.copy()
-    last_needs_correction = np.zeros(data.shape, dtype=np.bool)
-    last_correction_change = np.ones(data.shape, dtype=np.bool)
 
     # resolve the late-bound bindings using the Safeguards API, since we use
     #  lower-level APIs from now on
@@ -140,52 +138,24 @@ def _refine_correction_iteratively(
         chunked_method_name="check_chunk",
     )
 
-    while True:
-        where = np.zeros(data.shape, dtype=np.bool)
-        for safeguard in safeguards_:
-            where |= safeguard.compute_footprint(
-                last_correction_change,
-                late_bound=late_bound_resolved,
-                where=True,  # complete footprint
-            )
+    # check for which data points all pointwise checks succeed
+    check_pointwise = np.ones(data.shape, dtype=np.bool)
+    for safeguard in safeguards_:
+        check_pointwise &= safeguard.check_pointwise(
+            data,
+            corrected_iterative,
+            late_bound=late_bound_resolved,
+            where=True,  # start with a complete check
+        )
 
-        # check for data points all pointwise checks succeed
-        check_pointwise = np.ones(data.shape, dtype=np.bool)
-        for safeguard in safeguards_:
-            check_pointwise &= safeguard.check_pointwise(
-                data,
-                corrected_iterative,
-                late_bound=late_bound_resolved,
-                # minimal where only includes the footprint of the data points
-                #  that were newly corrected in the last round,
-                # i.e. the points that might now have re-evaluate their checks
-                #  since they depend on these newly corrected point
-                where=where,
-            )
-
-        # all checks succeed, so a reduced correction has been found
-        if np.all(check_pointwise):
-            if not safeguards.check(
-                data,
-                safeguards.apply_correction(prediction, correction_iterative),
-                late_bound=late_bound,
-                where=True,  # complete check check
-            ):
-                raise (
-                    SafeguardsSafetyBug(
-                        "the iteratively refined corrections fail the "
-                        + "safeguards check"
-                    )
-                    | ctx
-                )
-
-            return correction_iterative
-
-        # find points that failed the check during the previous iteration and
-        #  still fail the check
-        # for these sticky failures, expand the failure inverse footprint to
-        #  correct all data points that could have contributed to the failure
-        sticky_needs_correction_pointwise = (~check_pointwise) & last_needs_correction
+    # refine while not all checks succeed
+    while not np.all(check_pointwise):
+        # find points that failed the check but have already been corrected
+        # for these sticky failures, expand to the failure inverse footprint,
+        #  to correct all data points that may have contributed to the failure
+        sticky_needs_correction_pointwise = (~check_pointwise) & (
+            correction_iterative == correction_full
+        )
         sticky_needs_correction_inverse_footprint = np.zeros_like(
             sticky_needs_correction_pointwise
         )
@@ -201,12 +171,56 @@ def _refine_correction_iteratively(
         # determine the data points that need a correction
         needs_correction = sticky_needs_correction_inverse_footprint
         needs_correction |= ~check_pointwise
-        last_needs_correction[:] = needs_correction
 
         # determine the data points that get a new correction
-        np.equal(correction_iterative, 0, out=last_correction_change)
-        last_correction_change &= needs_correction
+        correction_changed = correction_iterative != correction_full
+        correction_changed &= needs_correction
 
         # use the pre-computed correction where needed
         correction_iterative[needs_correction] = correction_full[needs_correction]
         corrected_iterative[needs_correction] = corrected_full[needs_correction]
+
+        # expand the footprint of the changed corrections to find the points
+        #  that need to be rechecked
+        where = np.zeros(data.shape, dtype=np.bool)
+        for safeguard in safeguards_:
+            where |= safeguard.compute_footprint(
+                correction_changed,
+                late_bound=late_bound_resolved,
+                where=True,  # complete footprint
+            )
+
+        # sanity check: we recheck at least where the check previously failed
+        assert not np.any(~check_pointwise & ~where)
+
+        # update for which data points all pointwise checks succeed
+        check_pointwise.fill(True)
+        for safeguard in safeguards_:
+            check_pointwise &= safeguard.check_pointwise(
+                data,
+                corrected_iterative,
+                late_bound=late_bound_resolved,
+                # minimal where only includes the footprint of the data points
+                #  that were newly corrected in the last round,
+                # i.e. the points that might now have re-evaluate their checks
+                #  since they depend on these newly corrected point
+                where=where,
+            )
+
+    # all checks succeeded, so a reduced correction has been found
+
+    # safety check that the refined correction is in fact valid
+    if not safeguards.check(
+        data,
+        safeguards.apply_correction(prediction, correction_iterative),
+        late_bound=late_bound,
+        where=True,  # complete check check
+    ):
+        raise (
+            SafeguardsSafetyBug(
+                "the iteratively refined corrections fail the " + "safeguards check"
+            )
+            | ctx
+        )
+
+    return correction_iterative

@@ -1395,13 +1395,13 @@ def test_late_bound_constant_boundary():
 def test_fuzzer_found_axis_index_out_of_bounds():
     with pytest.raises(
         SyntaxError,
-        match=r"qoi_eb_stencil\.qoi: index 1 is out of bounds for axis 0 with size 1",
+        match=r"qoi_eb_stencil\.qoi: index 1 is out of bounds for axis 0 with size 1 for `I`, the 1D per-axis stencil centre index array",
     ):
         check_all_codecs(np.empty(0), "I[1]", [(0, 0)])
 
     with pytest.raises(
         SyntaxError,
-        match=r"qoi_eb_stencil\.qoi: index -3 is out of bounds for axis 0 with size 2",
+        match=r"qoi_eb_stencil\.qoi: index -3 is out of bounds for axis 0 with size 2 for `I`, the 1D per-axis stencil centre index array",
     ):
         check_all_codecs(np.empty((2, 2)), "I[-3]", [(0, 0), (0, 0)])
 

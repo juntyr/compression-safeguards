@@ -487,7 +487,11 @@ class QoIParser(Parser):
             self._I is not None, p, "index `I` is not available in pointwise QoIs"
         )
         idx = Array(*tuple(Number.from_symbolic_int(i) for i in self._I))
-        with self.with_error_context(p, lambda err: f"{err}", exception=IndexError):
+        with self.with_error_context(
+            p,
+            lambda err: f"{err} for `I`, the 1D per-axis stencil centre index array",
+            exception=IndexError,
+        ):
             return idx.index(tuple([p.index_] + p.many_comma_index))
 
     # functions

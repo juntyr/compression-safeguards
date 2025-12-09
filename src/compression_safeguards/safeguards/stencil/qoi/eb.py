@@ -1311,6 +1311,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         for idxs in self._qoi_expr.data_indices:
             window_used[idxs] = True
 
+        # valid foot, which includes the where condition
+        foot_valid = (foot & where)[tuple(valid_slice)]
+
         # compute the reverse: for each data element, which windows is it in
         # i.e. for each data element, which QoI elements does it contribute to
         #      and thus which foot elements affect it
@@ -1318,29 +1321,21 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             foot.shape,
             self._neighbourhood,
             window_used,
-            True if where is True else where[tuple(valid_slice)].flatten(),
+            # optimization: only compute the reverse indices where the foot is
+            #  True, since the others don't contribute anyways
+            where_flat=foot_valid.flatten(),
         )
 
         window_size = reduce(lambda x, y: x * y, window, 1)
-        foot_valid = (foot & where)[tuple(valid_slice)]
 
-        # broadcast the (valid) foot to the window, so that all window elements
-        #  receive the back-contribution from the foot to their inverse
-        #  footprint
-        # flatten the broadcast foot and append False, which is indexed if an
-        #  element did not contribute to the maximum number of windows
-        foot_windows_flat = np.full((foot_valid.size * window_size) + 1, False)
-        foot_windows_flat[:-1] = np.broadcast_to(
-            foot_valid.reshape((*foot_valid.shape, *tuple(1 for _ in window))),
-            (*foot_valid.shape, *window),
-        ).flatten()
+        # optimization: since we only compute reverse indices where the foot is
+        #  True, we can more efficiently check which elements are part of the
+        #  inverse footprint by checking if they have any valid reverse
+        #  contribution indices
+        valid_reverse_index = reverse_indices_windows != (foot_valid.size * window_size)
 
-        # for each data element, reduce over the foot elements that affect it
-        # since some data elements may have no foot elements that affect them,
-        #  e.g. because of the valid boundary condition, they may have no
-        #  inverse footprint
         inverse_footprint: np.ndarray[S, np.dtype[np.bool]] = np.logical_or.reduce(
-            foot_windows_flat[reverse_indices_windows], axis=1
+            valid_reverse_index, axis=1
         ).reshape(foot.shape)
 
         return inverse_footprint
