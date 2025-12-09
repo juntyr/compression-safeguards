@@ -201,11 +201,14 @@ def _refine_correction_iteratively(
                 corrected_iterative,
                 late_bound=late_bound_resolved,
                 # minimal where only includes the footprint of the data points
-                #  that were newly corrected in the last round,
+                #  that were newly corrected just now,
                 # i.e. the points that might now have re-evaluate their checks
                 #  since they depend on these newly corrected point
                 where=where,
             )
+
+        # continue with the next loop iteration to see if all checks succeeded
+        continue
 
     # all checks succeeded, so a reduced correction has been found
 
