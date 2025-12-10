@@ -130,14 +130,12 @@ This package currently implements the following [safeguards][compression_safegua
 
 The `compression-safeguards` package can be installed from PyPi using pip:
 
-<!--pytest.mark.skip-->
 ```sh
 pip install compression-safeguards
 ```
 
 The integrations can be installed similarly:
 
-<!--pytest.mark.skip-->
 ```sh
 pip install numcodecs-safeguards
 pip install xarray-safeguards
