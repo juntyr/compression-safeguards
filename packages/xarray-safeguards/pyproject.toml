@@ -4,12 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "xarray-safeguards"
-version = "0.1.0"
-description = "Fearless lossy compression using safeguards"
+version = "0.1.0a1"
+description = "Fearless chunked lossy compression in xarray using safeguards"
+license = "MPL-2.0"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "compression-safeguards~=1.0",
+    "compression-safeguards==1.0.0a1",
     "dask>=2024.5.1",
     "numpy~=2.0",
     "typing-extensions~=4.6",
