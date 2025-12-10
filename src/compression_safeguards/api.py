@@ -43,11 +43,10 @@ class Safeguards:
     safeguards : Collection[dict[str, JSON] | Safeguard]
         The safeguards that will be applied. They can either be passed as a
         safeguard configuration [`dict`][dict] or an already initialized
-        [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard].
+        [`Safeguard`][...safeguards.abc.Safeguard].
 
-        Please refer to the
-        [`SafeguardKind`][compression_safeguards.safeguards.SafeguardKind]
-        for an enumeration of all supported safeguards.
+        Please refer to the [`SafeguardKind`][...safeguards.SafeguardKind] for
+        an enumeration of all supported safeguards.
     _version : ...
         The version of the safeguards. Do not provide this parameter explicitly.
 
@@ -161,9 +160,8 @@ class Safeguards:
         - the format of the safeguards corrections (can only be changed in a
           new breaking major release)
 
-        The [`Safeguards`][compression_safeguards.api.Safeguards] can only load
-        configurations for and apply corrections produced by safeguards with a
-        compatible semantic version.
+        The [`Safeguards`][..] can only load configurations for and apply
+        corrections produced by safeguards with a compatible semantic version.
 
         Note that the version of the safeguards may be different from the
         version of the `compression-safeguards` package, which may make changes
@@ -209,15 +207,15 @@ class Safeguards:
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Mapping[str | Parameter, Value] | Bindings = Bindings.EMPTY,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> bool:
         """
         Check if the `prediction` array upholds the properties enforced by the safeguards with respect to the `data` array.
 
         The `data` array must contain the complete data, i.e. not just a chunk
         of data, so that non-pointwise safeguards are correctly applied. Please
-        use the
-        [`check_chunk`][compression_safeguards.api.Safeguards.check_chunk]
-        method instead when working with individual chunks of data.
+        use the [`check_chunk`][..check_chunk] method instead when working with
+        individual chunks of data.
 
         Parameters
         ----------
@@ -233,6 +231,8 @@ class Safeguards:
 
             The safeguards automatically provide the `$x` and `$X` built-in
             constants, which must not be included.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only check at data points where the condition is [`True`][True].
 
         Returns
         -------
@@ -263,7 +263,9 @@ class Safeguards:
         )
 
         for safeguard in self.safeguards:
-            if not safeguard.check(data, prediction, late_bound=late_bound):
+            if not safeguard.check(
+                data, prediction, late_bound=late_bound, where=where
+            ):
                 return False
 
         return True
@@ -274,21 +276,20 @@ class Safeguards:
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Mapping[str | Parameter, Value] | Bindings = Bindings.EMPTY,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[C]]:
         """
         Compute the correction required to make the `prediction` array satisfy the safeguards relative to the `data` array.
 
         The `data` array must contain the complete data, i.e. not just a chunk
         of data, so that non-pointwise safeguards are correctly applied. Please
-        use the
-        [`compute_chunked_correction`][compression_safeguards.api.Safeguards.compute_chunked_correction]
+        use the [`compute_chunked_correction`][..compute_chunked_correction]
         method instead when working with individual chunks of data.
 
         The correction is defined as `as_bits(corrected) - as_bits(prediction)`
         using wrapping unsigned integer arithmetic. It has the corresponding
         binary unsigned integer data type with the same bit size. The
-        correction can be applied using
-        [`apply_correction`][compression_safeguards.api.Safeguards.apply_correction]
+        correction can be applied using [`apply_correction`][..apply_correction]
         to get the corrected `prediction`.
 
         Parameters
@@ -305,6 +306,9 @@ class Safeguards:
 
             The safeguards automatically provide the `$x` and `$X` built-in
             constants, which must not be included.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the correction at data points where the condition
+            is [`True`][True].
 
         Returns
         -------
@@ -337,7 +341,9 @@ class Safeguards:
 
         all_ok = True
         for safeguard in self.safeguards:
-            if not safeguard.check(data, prediction, late_bound=late_bound):
+            if not safeguard.check(
+                data, prediction, late_bound=late_bound, where=where
+            ):
                 all_ok = False
                 break
 
@@ -351,7 +357,9 @@ class Safeguards:
 
         all_intervals: list[IntervalUnion[T, int, int]] = []
         for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
-            intervals = safeguard.compute_safe_intervals(data, late_bound=late_bound)
+            intervals = safeguard.compute_safe_intervals(
+                data, late_bound=late_bound, where=where
+            )
             if not np.all(intervals.contains(data)):
                 raise (
                     SafeguardsSafetyBug(
@@ -376,7 +384,7 @@ class Safeguards:
                     )
                     | ctx
                 )
-            if not safeguard.check(data, corrected, late_bound=late_bound):
+            if not safeguard.check(data, corrected, late_bound=late_bound, where=where):
                 raise (
                     SafeguardsSafetyBug(
                         f"the check for the {safeguard!r} safeguard fails "
@@ -444,7 +452,9 @@ class Safeguards:
         )
 
         if len(late_bound_builtin) > 0:
-            late_bound = late_bound.update(**late_bound_builtin)  # type: ignore
+            late_bound = late_bound.update(
+                **{str(p): v for p, v in late_bound_builtin.items()}
+            )
 
         return late_bound
 
@@ -522,10 +532,9 @@ class Safeguards:
         Compute the shape of the stencil neighbourhood around chunks of the complete data that is required to compute the chunked corrections.
 
         For each data dimension, the stencil might require either a
-        [valid][compression_safeguards.safeguards.stencil.BoundaryCondition.valid]
-        or
-        [wrapping][compression_safeguards.safeguards.stencil.BoundaryCondition.wrap]
-        boundary condition.
+        [valid][....safeguards.stencil.BoundaryCondition.valid] or
+        [wrapping][....safeguards.stencil.BoundaryCondition.wrap] boundary
+        condition.
 
         This method also checks that the data shape is compatible with the
         safeguards.
@@ -692,6 +701,7 @@ class Safeguards:
             ...,
         ],
         late_bound_chunk: Mapping[str | Parameter, Value] | Bindings = Bindings.EMPTY,
+        where_chunk: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> bool:
         """
         Check if the `prediction_chunk` array chunk upholds the properties enforced by the safeguards with respect to the `data_chunk` array chunk.
@@ -700,7 +710,7 @@ class Safeguards:
         the chunk, and the shape of this applied stencil is specified in the
         `chunk_stencil` parameter. This stencil must be compatible with the
         required stencil returned by
-        [`compute_required_stencil_for_chunked_correction(data_shape)`][compression_safeguards.api.Safeguards.compute_required_stencil_for_chunked_correction]:
+        [`compute_required_stencil_for_chunked_correction(data_shape)`][..compute_required_stencil_for_chunked_correction]:
         - a wrapping boundary is always compatible with a valid boundary.
         - a larger stencil is always compatible with a smaller stencil.
         - a smaller stencil is sometimes compatible with a larger stencil, iff
@@ -711,8 +721,7 @@ class Safeguards:
 
         This advanced method should only be used when working with individual
         chunks of data, for non-chunked data please use the simpler and more
-        efficient [`check`][compression_safeguards.api.Safeguards.check] method
-        instead.
+        efficient [`check`][..check] method instead.
 
         Parameters
         ----------
@@ -743,6 +752,8 @@ class Safeguards:
 
             The safeguards automatically provide the `$x` and `$X` built-in
             constants, which must not be included.
+        where_chunk : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only check at data points where the condition is [`True`][True].
 
         Returns
         -------
@@ -770,15 +781,20 @@ class Safeguards:
             if checking a safeguard raises an exception.
         """
 
-        data_chunk_, prediction_chunk_, late_bound_chunk, non_stencil_indices = (
-            self._prepare_stencil_chunked_arrays_and_bindings(
-                data_chunk=data_chunk,
-                prediction_chunk=prediction_chunk,
-                data_shape=data_shape,
-                chunk_offset=chunk_offset,
-                chunk_stencil=chunk_stencil,
-                late_bound_chunk=late_bound_chunk,
-            )
+        (
+            data_chunk_,
+            prediction_chunk_,
+            late_bound_chunk,
+            where_chunk_,
+            non_stencil_indices,
+        ) = self._prepare_stencil_chunked_arrays_and_bindings(
+            data_chunk=data_chunk,
+            prediction_chunk=prediction_chunk,
+            data_shape=data_shape,
+            chunk_offset=chunk_offset,
+            chunk_stencil=chunk_stencil,
+            late_bound_chunk=late_bound_chunk,
+            where_chunk=where_chunk,
         )
 
         # ensure we don't accidentally forget to handle new kinds of safeguards here
@@ -794,7 +810,10 @@ class Safeguards:
         #  non-stencil check results
         for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
             all_ok &= safeguard.check_pointwise(
-                data_chunk_, prediction_chunk_, late_bound=late_bound_chunk
+                data_chunk_,
+                prediction_chunk_,
+                late_bound=late_bound_chunk,
+                where=where_chunk_,
             )[tuple(non_stencil_indices)]
 
             if not np.all(all_ok):
@@ -818,6 +837,7 @@ class Safeguards:
         ],
         any_chunk_check_failed: bool,
         late_bound_chunk: Mapping[str | Parameter, Value] | Bindings = Bindings.EMPTY,
+        where_chunk: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[tuple[int, ...], np.dtype[C]]:
         """
         Compute the correction required to make the `prediction_chunk` array chunk satisfy the safeguards relative to the `data_chunk` array chunk.
@@ -826,7 +846,7 @@ class Safeguards:
         the chunk, and the shape of this applied stencil is specified in the
         `chunk_stencil` parameter. This stencil must be compatible with the
         required stencil returned by
-        [`compute_required_stencil_for_chunked_correction(data_shape)`][compression_safeguards.api.Safeguards.compute_required_stencil_for_chunked_correction]:
+        [`compute_required_stencil_for_chunked_correction(data_shape)`][..compute_required_stencil_for_chunked_correction]:
         - a wrapping boundary is always compatible with a valid boundary.
         - a larger stencil is always compatible with a smaller stencil.
         - a smaller stencil is sometimes compatible with a larger stencil, iff
@@ -837,17 +857,14 @@ class Safeguards:
 
         This advanced method should only be used when working with individual
         chunks of data, for non-chunked data please use the simpler and more
-        efficient
-        [`compute_correction`][compression_safeguards.api.Safeguards.compute_correction]
-        method instead.
+        efficient [`compute_correction`][..compute_correction] method instead.
 
         The (chunked) correction is defined as
         `as_bits(corrected) - as_bits(prediction)` using wrapping unsigned
         integer arithmetic. It has the corresponding binary unsigned integer
         data type with the same bit size. The chunked correction can be applied
-        using
-        [`apply_correction`][compression_safeguards.api.Safeguards.apply_correction]
-        to get the corrected chunked `prediction`.
+        using [`apply_correction`][..apply_correction] to get the corrected
+        chunked `prediction`.
 
         Parameters
         ----------
@@ -877,6 +894,9 @@ class Safeguards:
 
             The safeguards automatically provide the `$x` and `$X` built-in
             constants, which must not be included.
+        where_chunk : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the correction at data points where the condition is
+            [`True`][True].
 
         Returns
         -------
@@ -907,15 +927,20 @@ class Safeguards:
         """
         # explicitly do not document that SafeguardsSafetyBug can be raised
 
-        data_chunk_, prediction_chunk_, late_bound_chunk, non_stencil_indices = (
-            self._prepare_stencil_chunked_arrays_and_bindings(
-                data_chunk=data_chunk,
-                prediction_chunk=prediction_chunk,
-                data_shape=data_shape,
-                chunk_offset=chunk_offset,
-                chunk_stencil=chunk_stencil,
-                late_bound_chunk=late_bound_chunk,
-            )
+        (
+            data_chunk_,
+            prediction_chunk_,
+            late_bound_chunk,
+            where_chunk_,
+            non_stencil_indices,
+        ) = self._prepare_stencil_chunked_arrays_and_bindings(
+            data_chunk=data_chunk,
+            prediction_chunk=prediction_chunk,
+            data_shape=data_shape,
+            chunk_offset=chunk_offset,
+            chunk_stencil=chunk_stencil,
+            late_bound_chunk=late_bound_chunk,
+            where_chunk=where_chunk,
         )
 
         # if no chunk requires a correction, this one doesn't either
@@ -938,7 +963,10 @@ class Safeguards:
             #  non-stencil check results
             for safeguard in self._pointwise_safeguards:
                 all_ok &= safeguard.check_pointwise(
-                    data_chunk_, prediction_chunk_, late_bound=late_bound_chunk
+                    data_chunk_,
+                    prediction_chunk_,
+                    late_bound=late_bound_chunk,
+                    where=where_chunk_,
                 )[tuple(non_stencil_indices)]
 
                 if not np.all(all_ok):
@@ -962,7 +990,7 @@ class Safeguards:
         all_intervals: list[IntervalUnion[T, int, int]] = []
         for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
             intervals = safeguard.compute_safe_intervals(
-                data_chunk_, late_bound=late_bound_chunk
+                data_chunk_, late_bound=late_bound_chunk, where=where_chunk_
             )
             if not np.all(intervals.contains(data_chunk_)):
                 raise (
@@ -989,7 +1017,10 @@ class Safeguards:
                     | ctx
                 )
             if not safeguard.check(
-                data_chunk_, corrected_chunk, late_bound=late_bound_chunk
+                data_chunk_,
+                corrected_chunk,
+                late_bound=late_bound_chunk,
+                where=where_chunk_,
             ):
                 raise (
                     SafeguardsSafetyBug(
@@ -1029,10 +1060,12 @@ class Safeguards:
             ...,
         ],
         late_bound_chunk: Mapping[str | Parameter, Value] | Bindings,
+        where_chunk: Literal[True] | np.ndarray[S, np.dtype[np.bool]],
     ) -> tuple[
         np.ndarray[tuple[int, ...], np.dtype[T]],
         np.ndarray[tuple[int, ...], np.dtype[T]],
         Bindings,
+        Literal[True] | np.ndarray[tuple[int, ...], np.dtype[np.bool]],
         tuple[slice, ...],
     ]:
         TypeSetError.check_dtype_or_raise(data_chunk.dtype, _SUPPORTED_DTYPES)
@@ -1310,12 +1343,25 @@ class Safeguards:
         )
 
         if len(late_bound_builtin) > 0:
-            late_bound_chunk = late_bound_chunk.update(**late_bound_builtin)  # type: ignore
+            late_bound_chunk = late_bound_chunk.update(
+                **{str(p): v for p, v in late_bound_builtin.items()}
+            )
+
+        where_chunk_: Literal[True] | np.ndarray[tuple[int, ...], np.dtype[np.bool]] = (
+            True
+            if where_chunk is True
+            else np.roll(
+                where_chunk[tuple(stencil_indices)],
+                shift=tuple(stencil_roll),
+                axis=tuple(range(where_chunk.ndim)),
+            )
+        )
 
         return (
             data_chunk_,
             prediction_chunk_,
             late_bound_chunk,
+            where_chunk_,
             tuple(non_stencil_indices),
         )
 

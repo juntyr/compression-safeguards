@@ -1,12 +1,16 @@
 from collections.abc import Callable, Mapping
+from typing import TypeVar
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import _broadcast_to
 from ....utils.bindings import Parameter
+from ..typing import F, Fi, Ns, Ps, np_sndarray
 from .abc import AnyExpr, EmptyExpr, Expr
-from .typing import F, Ns, Ps, PsI
+
+Ei = TypeVar("Ei", bound=AnyExpr)
+""" Any numpy [`Expr`][...abc.Expr] (invariant). """
 
 
 class ScalarFoldedConstant(EmptyExpr):
@@ -15,6 +19,10 @@ class ScalarFoldedConstant(EmptyExpr):
 
     def __init__(self, const: np.number) -> None:
         self._const = const[()] if isinstance(const, np.ndarray) else const  # type: ignore
+
+    @staticmethod
+    def from_folded(e: Ei | Fi) -> "Ei | ScalarFoldedConstant":
+        return e if isinstance(e, Expr) else ScalarFoldedConstant(e)
 
     @property
     @override
@@ -33,22 +41,23 @@ class ScalarFoldedConstant(EmptyExpr):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         assert isinstance(self._const, Xs.dtype.type)
-        return _broadcast_to(self._const, x)
+        return _broadcast_to(self._const, Xs.shape[:1])
 
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         assert False, "folded constants have no data bounds"
 
     @staticmethod
@@ -77,48 +86,14 @@ class ScalarFoldedConstant(EmptyExpr):
         if not (isinstance(fleft, Expr) or isinstance(fright, Expr)):
             return m(fleft, fright)
 
-        fleft = fleft if isinstance(fleft, Expr) else ScalarFoldedConstant(fleft)
-        fright = fright if isinstance(fright, Expr) else ScalarFoldedConstant(fright)
+        fleft = ScalarFoldedConstant.from_folded(fleft)
+        fright = ScalarFoldedConstant.from_folded(fright)
 
         return rm(fleft, fright)
 
-    # FIXME: more general constant_fold_ternary is blocked on not being able to
-    #        relate on TypeVarTuple to another, here *Expr to *F, see e.g.
-    #        https://github.com/python/typing/issues/1216
-    @staticmethod
-    def constant_fold_ternary(
-        left: AnyExpr,
-        middle: AnyExpr,
-        right: AnyExpr,
-        dtype: np.dtype[F],
-        m: Callable[[F, F, F], F],
-        rm: Callable[[AnyExpr, AnyExpr, AnyExpr], AnyExpr],
-    ) -> F | AnyExpr:
-        fleft = left.constant_fold(dtype)
-        fmiddle = middle.constant_fold(dtype)
-        fright = right.constant_fold(dtype)
-
-        if not (
-            isinstance(fleft, Expr)
-            or isinstance(fmiddle, Expr)
-            or isinstance(fright, Expr)
-        ):
-            return m(fleft, fmiddle, fright)
-
-        fleft = fleft if isinstance(fleft, Expr) else ScalarFoldedConstant(fleft)
-        fmiddle = (
-            fmiddle if isinstance(fmiddle, Expr) else ScalarFoldedConstant(fmiddle)
-        )
-        fright = fright if isinstance(fright, Expr) else ScalarFoldedConstant(fright)
-
-        return rm(fleft, fmiddle, fright)
-
     @staticmethod
     def constant_fold_expr(expr: AnyExpr, dtype: np.dtype[F]) -> AnyExpr:
-        fexpr = expr.constant_fold(dtype)
-        if isinstance(fexpr, Expr):
-            return fexpr
-        return ScalarFoldedConstant(fexpr)
+        return ScalarFoldedConstant.from_folded(expr.constant_fold(dtype))
 
     @override
     def __repr__(self) -> str:

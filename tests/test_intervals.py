@@ -243,10 +243,10 @@ def test_same_abs():
 
 
 def test_union_no_overlap():
-    z = Interval.empty(np.dtype(int), 1)
+    z = Interval.empty(np.dtype(np.intp), 1)
     Lower(np.array(0)) <= z[:] <= Upper(np.array(0))
 
-    a = Interval.empty(np.dtype(int), 1)
+    a = Interval.empty(np.dtype(np.intp), 1)
     Lower(np.array(53)) <= a[:] <= Upper(np.array(53))
 
     az = a.union(z)
@@ -254,7 +254,7 @@ def test_union_no_overlap():
     np.testing.assert_array_equal(az._lower, np.array([[0], [53]]))
     np.testing.assert_array_equal(az._upper, np.array([[0], [53]]))
 
-    b = Interval.empty(np.dtype(int), 1)
+    b = Interval.empty(np.dtype(np.intp), 1)
     Lower(np.array(0)) <= b[:] <= Upper(np.array(53))
     b = b.into_union()
 
@@ -265,10 +265,10 @@ def test_union_no_overlap():
 
 
 def test_union_adjacent():
-    a = Interval.empty(np.dtype(int), 1)
+    a = Interval.empty(np.dtype(np.intp), 1)
     Lower(np.array(1)) <= a[:] <= Upper(np.array(3))
 
-    b = Interval.empty(np.dtype(int), 1)
+    b = Interval.empty(np.dtype(np.intp), 1)
     Lower(np.array(4)) <= b[:] <= Upper(np.array(5))
 
     ab = a.union(b)

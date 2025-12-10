@@ -14,9 +14,9 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
+from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
-from .typing import F, Ns, Ps, PsI
 
 
 class Logarithm(Enum):
@@ -55,42 +55,43 @@ class ScalarLog(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return (LOGARITHM_UFUNC[self._log])(self._a.eval(x, Xs, late_bound))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return (LOGARITHM_UFUNC[self._log])(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         # evaluate arg and log(arg)
         arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
+        argv = arg.eval(Xs, late_bound)
         exprv = (LOGARITHM_UFUNC[self._log])(argv)
 
-        smallest_subnormal = _floating_smallest_subnormal(X.dtype)
+        smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
 
         # apply the inverse function to get the bounds on arg
         # log(...) is NaN for negative values and can then take any negative
         #  value
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
             _minimum_zero_sign_sensitive(
                 argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_lower)
             )
         )
         arg_lower[np.less(argv, 0)] = -np.inf
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
             _maximum_zero_sign_sensitive(
                 argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_upper)
             )
@@ -99,7 +100,7 @@ class ScalarLog(Expr[AnyExpr]):
 
         # an upper bound of -0.0 must be nudged downwards from 1 to 1-eps
         arg_upper[_is_negative_zero(expr_upper)] = _nextafter(
-            np.array(X.dtype.type(1)), np.array(X.dtype.type(0))
+            np.array(Xs.dtype.type(1)), np.array(Xs.dtype.type(0))
         )
 
         # we need to force argv if expr_lower == expr_upper
@@ -127,7 +128,6 @@ class ScalarLog(Expr[AnyExpr]):
         return arg.compute_data_bounds(
             arg_lower,
             arg_upper,
-            X,
             Xs,
             late_bound,
         )
@@ -138,7 +138,8 @@ class ScalarLog(Expr[AnyExpr]):
 
 
 LOGARITHM_UFUNC: dict[
-    Logarithm, Callable[[np.ndarray[Ps, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]]
+    Logarithm,
+    Callable[[np.ndarray[tuple[Ps], np.dtype[F]]], np.ndarray[tuple[Ps], np.dtype[F]]],
 ] = {
     Logarithm.ln: np.log,
     Logarithm.log2: np.log2,
@@ -182,40 +183,41 @@ class ScalarExp(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return (EXPONENTIAL_UFUNC[self._exp])(self._a.eval(x, Xs, late_bound))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return (EXPONENTIAL_UFUNC[self._exp])(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         # evaluate arg and exp(arg)
         arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
+        argv = arg.eval(Xs, late_bound)
         exprv = (EXPONENTIAL_UFUNC[self._exp])(argv)
 
         # apply the inverse function to get the bounds on arg
         # exp(...) cannot be negative, so ensure the bounds on expr also cannot
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
             _minimum_zero_sign_sensitive(
                 argv,
                 (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(
-                    _maximum_zero_sign_sensitive(X.dtype.type(0), expr_lower)
+                    _maximum_zero_sign_sensitive(Xs.dtype.type(0), expr_lower)
                 ),
             )
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
             _maximum_zero_sign_sensitive(
                 argv, (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(expr_upper)
             )
@@ -246,7 +248,6 @@ class ScalarExp(Expr[AnyExpr]):
         return arg.compute_data_bounds(
             arg_lower,
             arg_upper,
-            X,
             Xs,
             late_bound,
         )
@@ -257,7 +258,8 @@ class ScalarExp(Expr[AnyExpr]):
 
 
 EXPONENTIAL_UFUNC: dict[
-    Exponential, Callable[[np.ndarray[Ps, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]]
+    Exponential,
+    Callable[[np.ndarray[tuple[Ps], np.dtype[F]]], np.ndarray[tuple[Ps], np.dtype[F]]],
 ] = {
     Exponential.exp: np.exp,
     Exponential.exp2: np.exp2,
@@ -265,7 +267,8 @@ EXPONENTIAL_UFUNC: dict[
 }
 
 LOGARITHM_EXPONENTIAL_UFUNC: dict[
-    Logarithm, Callable[[np.ndarray[Ps, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]]
+    Logarithm,
+    Callable[[np.ndarray[tuple[Ps], np.dtype[F]]], np.ndarray[tuple[Ps], np.dtype[F]]],
 ] = {
     Logarithm.ln: EXPONENTIAL_UFUNC[Exponential.exp],
     Logarithm.log2: EXPONENTIAL_UFUNC[Exponential.exp2],
@@ -273,7 +276,8 @@ LOGARITHM_EXPONENTIAL_UFUNC: dict[
 }
 
 EXPONENTIAL_LOGARITHM_UFUNC: dict[
-    Exponential, Callable[[np.ndarray[Ps, np.dtype[F]]], np.ndarray[Ps, np.dtype[F]]]
+    Exponential,
+    Callable[[np.ndarray[tuple[Ps], np.dtype[F]]], np.ndarray[tuple[Ps], np.dtype[F]]],
 ] = {
     Exponential.exp: LOGARITHM_UFUNC[Logarithm.ln],
     Exponential.exp2: LOGARITHM_UFUNC[Logarithm.log2],
@@ -317,10 +321,9 @@ class ScalarLogWithBase(Expr[AnyExpr, AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         from .divmul import ScalarDivide  # noqa: PLC0415
 
         return ScalarDivide(
@@ -332,18 +335,20 @@ class ScalarLogWithBase(Expr[AnyExpr, AnyExpr]):
                 Logarithm.ln,
                 self._b,
             ),
-        ).eval(x, Xs, late_bound)
+        ).eval(Xs, late_bound)
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         from .divmul import ScalarDivide  # noqa: PLC0415
 
         return ScalarDivide(
@@ -355,7 +360,7 @@ class ScalarLogWithBase(Expr[AnyExpr, AnyExpr]):
                 Logarithm.ln,
                 self._b,
             ),
-        ).compute_data_bounds(expr_lower, expr_upper, X, Xs, late_bound)
+        ).compute_data_bounds(expr_lower, expr_upper, Xs, late_bound)
 
     @override
     def __repr__(self) -> str:

@@ -22,7 +22,13 @@ class QoILexer(Lexer):
         POWER,  # type: ignore[name-defined]  # noqa: F821
         TIMES,  # type: ignore[name-defined]  # noqa: F821
         DIVIDE,  # type: ignore[name-defined]  # noqa: F821
+        LESS_EQUAL,  # type: ignore[name-defined]  # noqa: F821
+        LESS,  # type: ignore[name-defined]  # noqa: F821
         EQUAL,  # type: ignore[name-defined]  # noqa: F821
+        NOT_EQUAL,  # type: ignore[name-defined]  # noqa: F821
+        GREATER_EQUAL,  # type: ignore[name-defined]  # noqa: F821
+        GREATER,  # type: ignore[name-defined]  # noqa: F821
+        ASSIGN,  # type: ignore[name-defined]  # noqa: F821
         # array transpose
         TRANSPOSE,  # type: ignore[name-defined]  # noqa: F821
         # groups
@@ -32,6 +38,7 @@ class QoILexer(Lexer):
         RBRACK,  # type: ignore[name-defined]  # noqa: F821
         # separators
         COMMA,  # type: ignore[name-defined]  # noqa: F821
+        COLON,  # type: ignore[name-defined]  # noqa: F821
         SEMI,  # type: ignore[name-defined]  # noqa: F821
         # identifiers
         ID,  # type: ignore[name-defined]  # noqa: F821
@@ -88,16 +95,22 @@ class QoILexer(Lexer):
         ISFINITE,  # type: ignore[name-defined]  # noqa: F821
         ISINF,  # type: ignore[name-defined]  # noqa: F821
         ISNAN,  # type: ignore[name-defined]  # noqa: F821
-        # conditional
+        # combinators
+        NOT,  # type: ignore[name-defined]  # noqa: F821
+        ALL,  # type: ignore[name-defined]  # noqa: F821
+        ANY,  # type: ignore[name-defined]  # noqa: F821
         WHERE,  # type: ignore[name-defined]  # noqa: F821
         # array operations
         SIZE,  # type: ignore[name-defined]  # noqa: F821
+        SHAPE,  # type: ignore[name-defined]  # noqa: F821
         SUM,  # type: ignore[name-defined]  # noqa: F821
         MATMUL,  # type: ignore[name-defined]  # noqa: F821
         # finite difference
         FINITE_DIFFERENCE,  # type: ignore[name-defined]  # noqa: F821
         # keyword arguments
+        #  logarithm
         BASE,  # type: ignore[name-defined]  # noqa: F821
+        #  finite difference
         ORDER,  # type: ignore[name-defined]  # noqa: F821
         ACCURACY,  # type: ignore[name-defined]  # noqa: F821
         TYPE,  # type: ignore[name-defined]  # noqa: F821
@@ -146,10 +159,21 @@ class QoILexer(Lexer):
     # operators
     PLUS = r"\+"
     MINUS = r"-"
-    POWER = r"\*\*"  # comes before TIMES so as to not parse ** as TIMES TIMES
+    # comes before TIMES so as to not parse ** as TIMES TIMES
+    POWER = r"\*\*"
     TIMES = r"\*"
     DIVIDE = r"/"
-    EQUAL = r"="
+    # comes before LESS and ASSIGN so as to not parse <= as LESS ASSIGN
+    LESS_EQUAL = r"<="
+    LESS = r"<"
+    # comes before ASSIGN so as to not parse == as ASSIGN ASSIGN
+    EQUAL = r"=="
+    # comes before ASSIGN so as to not parse != as ! ASSIGN
+    NOT_EQUAL = r"!="
+    # comes before GREATER and ASSIGN so as to not parse >= as GREATER ASSIGN
+    GREATER_EQUAL = r">="
+    GREATER = r">"
+    ASSIGN = r"="
 
     # array transpose
     TRANSPOSE = r"\.T"
@@ -162,6 +186,7 @@ class QoILexer(Lexer):
 
     # separators
     COMMA = r","
+    COLON = r":"
     SEMI = r";"
 
     # identifiers
@@ -228,17 +253,23 @@ class QoILexer(Lexer):
     ID["isfinite"] = ISFINITE  # type: ignore[index, name-defined]  # noqa: F821
     ID["isinf"] = ISINF  # type: ignore[index, name-defined]  # noqa: F821
     ID["isnan"] = ISNAN  # type: ignore[index, name-defined]  # noqa: F821
-    # conditional
+    # combinators
+    ID["not"] = NOT  # type: ignore[index, name-defined]  # noqa: F821
+    ID["all"] = ALL  # type: ignore[index, name-defined]  # noqa: F821
+    ID["any"] = ANY  # type: ignore[index, name-defined]  # noqa: F821
     ID["where"] = WHERE  # type: ignore[index, name-defined]  # noqa: F821
     # array operations
     ID["size"] = SIZE  # type: ignore[index, name-defined]  # noqa: F821
+    ID["shape"] = SHAPE  # type: ignore[index, name-defined]  # noqa: F821
     ID["sum"] = SUM  # type: ignore[index, name-defined]  # noqa: F821
     ID["matmul"] = MATMUL  # type: ignore[index, name-defined]  # noqa: F821
     # finite difference
     ID["finite_difference"] = FINITE_DIFFERENCE  # type: ignore[index, name-defined]  # noqa: F821
 
     # keyword arguments
+    #  logarithm
     ID["base"] = BASE  # type: ignore[index, name-defined]  # noqa: F821
+    #  finite difference
     ID["order"] = ORDER  # type: ignore[index, name-defined]  # noqa: F821
     ID["accuracy"] = ACCURACY  # type: ignore[index, name-defined]  # noqa: F821
     ID["type"] = TYPE  # type: ignore[index, name-defined]  # noqa: F821
@@ -286,11 +317,13 @@ class QoILexer(Lexer):
     @staticmethod
     def token_to_name(token: str) -> str:
         return {
+            # special
+            "$end": "EOF",
             # literals
             "INTEGER": "integer",
             "FLOAT": "floating-point number",
-            "Inf": "`Inf`",
-            "NaN": "`NaN`",
+            "INF": "`Inf`",
+            "NAN": "`NaN`",
             "STRING": "string",
             # operators
             "PLUS": "`+`",
@@ -298,7 +331,13 @@ class QoILexer(Lexer):
             "POWER": "`**`",
             "TIMES": "`*`",
             "DIVIDE": "`/`",
-            "EQUAL": "`=`",
+            "LESS_EQUAL": "`<=`",
+            "LESS": "`<`",
+            "EQUAL": "`==`",
+            "NOT_EQUAL": "`!=`",
+            "GREATER_EQUAL": "`>=`",
+            "GREATER": "`>`",
+            "ASSIGN": "`=`",
             # array transpose
             "TRANSPOSE": "`.T`",
             # groups
@@ -308,6 +347,7 @@ class QoILexer(Lexer):
             "RBRACK": "`]`",
             # separators
             "COMMA": "`,`",
+            "COLON": "`:`",
             "SEMI": "`;`",
             # identifiers
             "ID": "identifier",
@@ -364,16 +404,22 @@ class QoILexer(Lexer):
             "ISFINITE": "`isfinite`",
             "ISINF": "`isinf`",
             "ISNAN": "`isnan`",
-            # conditional
+            # combinators
+            "NOT": "`not`",
+            "ALL": "`all`",
+            "ANY": "`any`",
             "WHERE": "`where`",
             # array operations
             "SIZE": "`size`",
+            "SHAPE": "`shape`",
             "SUM": "`sum`",
             "MATMUL": "`matmul`",
             # finite difference
             "FINITE_DIFFERENCE": "`finite_difference`",
             # keyword arguments
+            #  logarithm
             "BASE": "`base`",
+            #  finite difference
             "ORDER": "`order`",
             "ACCURACY": "`accuracy`",
             "TYPE": "`type`",

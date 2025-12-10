@@ -23,12 +23,11 @@ from typing_extensions import (
     override,  # MSPV 3.12
 )
 
-from compression_safeguards.utils.error import TypeSetError
-
-from ._compat import _ensure_array, _nextafter, _where
+from ._compat import _ensure_array, _nextafter, _reshape, _where, _zeros
 from ._compat import _maximum_zero_sign_sensitive as _np_maximum
 from ._compat import _minimum_zero_sign_sensitive as _np_minimum
 from .cast import as_bits, from_total_order, to_total_order
+from .error import TypeSetError
 from .typing import S, T
 
 N = TypeVar("N", bound=int, covariant=True)
@@ -52,14 +51,10 @@ class Interval(Generic[T, N]):
 
     An interval should only be constructed using
 
-    - [`Interval.empty`][compression_safeguards.utils.intervals.Interval.empty]
-      or
-      [`Interval.empty_like`][compression_safeguards.utils.intervals.Interval.empty_like]
-      for an empty interval that contains no values
-    - [`Interval.full`][compression_safeguards.utils.intervals.Interval.full]
-      or
-      [`Interval.full_like`][compression_safeguards.utils.intervals.Interval.full_like]
-      for a full interval that contains all possible values
+    - [`Interval.empty`][.empty] or [`Interval.empty_like`][.empty_like] for an
+      empty interval that contains no values
+    - [`Interval.full`][.full] or [`Interval.full_like`][.full_like] for a
+      full interval that contains all possible values
 
     ## Overriding lower and upper bounds
 
@@ -87,23 +82,21 @@ class Interval(Generic[T, N]):
 
     The following common lower and upper bounds are provided for ease of use:
 
-    - [`Interval.preserve_inf`][compression_safeguards.utils.intervals.Interval.preserve_inf]
-    - [`Interval.preserve_signed_nan`][compression_safeguards.utils.intervals.Interval.preserve_signed_nan]
-    - [`Interval.preserve_any_nan`][compression_safeguards.utils.intervals.Interval.preserve_any_nan]
-    - [`Interval.preserve_finite`][compression_safeguards.utils.intervals.Interval.preserve_finite]
-    - [`Interval.preserve_non_nan`][compression_safeguards.utils.intervals.Interval.preserve_non_nan]
+    - [`Interval.preserve_inf`][.preserve_inf]
+    - [`Interval.preserve_signed_nan`][.preserve_signed_nan]
+    - [`Interval.preserve_any_nan`][.preserve_any_nan]
+    - [`Interval.preserve_finite`][.preserve_finite]
+    - [`Interval.preserve_non_nan`][.preserve_non_nan]
 
     ## Interval operations
 
     Two intervals can be
 
-    - intersected using
-      [`Interval.intersect`][compression_safeguards.utils.intervals.Interval.intersect]
-    - unioned using
-      [`Interval.union`][compression_safeguards.utils.intervals.Interval.union]
+    - intersected using [`Interval.intersect`][.intersect]
+    - unioned using [`Interval.union`][.union]
 
     or converted into a single-member union of intervals using
-    [`Interval.into_union`][compression_safeguards.utils.intervals.Interval.into_union].
+    [`Interval.into_union`][.into_union].
     """
 
     __slots__: tuple[str, ...] = ("_lower", "_upper")
@@ -134,6 +127,32 @@ class Interval(Generic[T, N]):
         (n,) = self._lower.shape
         return n
 
+    def non_empty_width(self) -> np.ndarray[tuple[N], np.dtype[np.unsignedinteger]]:
+        """
+        Binary width of the interval.
+
+        The interval must not have any empty entries.
+
+        Single-element intervals have width zero, full intervals have maximum
+        width.
+
+        Returns
+        -------
+        widths : np.ndarray[tuple[N], np.dtype[np.unsignedinteger]]
+            The binary widths of the intervals.
+        """
+
+        lt: np.ndarray[tuple[N], np.dtype[np.unsignedinteger]] = to_total_order(
+            self._lower
+        )
+        ut: np.ndarray[tuple[N], np.dtype[np.unsignedinteger]] = to_total_order(
+            self._upper
+        )
+
+        assert np.all(lt <= ut)
+
+        return ut - lt
+
     @staticmethod
     def empty(dtype: np.dtype[T], n: Ni) -> "Interval[T, Ni]":
         """
@@ -152,10 +171,10 @@ class Interval(Generic[T, N]):
             The empty interval
         """
 
-        single = IntervalUnion.empty(dtype, n, 1)
+        single: IntervalUnion[T, Ni, Literal[1]] = IntervalUnion.empty(dtype, n, 1)
         return Interval(
-            _lower=single._lower.reshape(-1),  # type: ignore
-            _upper=single._upper.reshape(-1),  # type: ignore
+            _lower=single._lower[0],
+            _upper=single._upper[0],
         )
 
     @staticmethod
@@ -241,7 +260,7 @@ class Interval(Generic[T, N]):
         Returns
         -------
         self : Self
-            Returns the modified `self`
+            The modified `self`.
         """
 
         if not np.issubdtype(a.dtype, np.floating):
@@ -275,7 +294,7 @@ class Interval(Generic[T, N]):
         Returns
         -------
         self : Self
-            Returns the modified `self`
+            The modified `self`.
         """
 
         if not np.issubdtype(a.dtype, np.floating):
@@ -336,8 +355,8 @@ class Interval(Generic[T, N]):
         Returns
         -------
         union : IntervalUnion[T, N, int]
-            Returns the union of the existing intervals for non-NaN values and
-            the NaN-preserving intervals for NaN values.
+            The union of the existing intervals for non-NaN values and the
+            NaN-preserving intervals for NaN values.
         """
 
         if not np.issubdtype(a.dtype, np.floating):
@@ -388,7 +407,7 @@ class Interval(Generic[T, N]):
         Returns
         -------
         self : Self
-            Returns the modified `self`
+            The modified `self`.
         """
 
         if not np.issubdtype(a.dtype, np.floating):
@@ -424,7 +443,7 @@ class Interval(Generic[T, N]):
         Returns
         -------
         self : Self
-            Returns the modified `self`
+            The modified `self`.
         """
 
         if not np.issubdtype(a.dtype, np.floating):
@@ -449,7 +468,7 @@ class Interval(Generic[T, N]):
         Returns
         -------
         intersection : Interval[T, N]
-            The intersection of `self` and `other`
+            The intersection of `self` and `other`.
         """
 
         (n,) = self._lower.shape
@@ -488,7 +507,7 @@ class Interval(Generic[T, N]):
         Returns
         -------
         intersection : IntervalUnion[T, N, int]
-            The union of `self` and `other`
+            The union of `self` and `other`.
         """
 
         return self.into_union().union(other)
@@ -504,9 +523,37 @@ class Interval(Generic[T, N]):
         """
 
         return IntervalUnion(
-            _lower=self._lower.reshape(1, -1),  # type: ignore
-            _upper=self._upper.reshape(1, -1),  # type: ignore
+            _lower=_reshape(self._lower, (1, self.n)),
+            _upper=_reshape(self._upper, (1, self.n)),
         )
+
+    def preserve_only_where(
+        self, where: Literal[True] | np.ndarray[tuple[N], np.dtype[np.bool]]
+    ) -> Self:
+        """
+        Preserve safe intervals only at the data points where the `where`
+        condition is [`True`][True].
+
+        This method must only be used for pointwise safe intervals.
+
+        Parameters
+        ----------
+        where : Literal[True] | np.ndarray[tuple[N], np.dtype[np.bool]]
+            Only preserve safe intervals at data points where the condition is
+            [`True`][True].
+
+        Returns
+        -------
+        self : Self
+            The modified `self`.
+        """
+
+        if where is True:
+            return self
+
+        # reset all elements where where is False to a full interval
+        Minimum <= self[~where] <= Maximum
+        return self
 
     @override
     def __repr__(self) -> str:
@@ -719,6 +766,48 @@ class IntervalUnion(Generic[T, N, U]):
         u, n = self._lower.shape
         return u
 
+    def non_empty_width(self) -> np.ndarray[tuple[N], np.dtype[np.unsignedinteger]]:
+        """
+        Binary width of the interval union.
+
+        The interval union must not have any empty entries.
+
+        Single-element intervals have width zero, full intervals have maximum
+        width.
+
+        Returns
+        -------
+        widths : np.ndarray[tuple[N], np.dtype[np.unsignedinteger]]
+            The binary widths of the intervals.
+        """
+
+        (u, n) = self._lower.shape
+        interval_width_acc: np.ndarray[tuple[N], np.dtype[np.unsignedinteger]] = _zeros(
+            (n,), dtype=to_total_order(np.array((), dtype=self._lower.dtype)).dtype
+        )
+
+        for i in range(u):
+            lt: np.ndarray[tuple[N], np.dtype[np.unsignedinteger]] = to_total_order(
+                self._lower[i]
+            )
+            ut: np.ndarray[tuple[N], np.dtype[np.unsignedinteger]] = to_total_order(
+                self._upper[i]
+            )
+
+            if i == 0:
+                assert np.all(lt <= ut)
+
+            np.add(
+                interval_width_acc,
+                ut - lt + 1,
+                out=interval_width_acc,
+                where=(ut >= lt),
+            )
+
+        interval_width_acc -= 1
+
+        return interval_width_acc
+
     @staticmethod
     def empty(dtype: np.dtype[T], n: Ni, u: Ui) -> "IntervalUnion[T, Ni, Ui]":
         """
@@ -758,7 +847,7 @@ class IntervalUnion(Generic[T, N, U]):
         Returns
         -------
         intersection : IntervalUnion[T, N, int]
-            The intersection of `self` and `other`
+            The intersection of `self` and `other`.
         """
 
         ((u, n), (v, _)) = self._lower.shape, other._lower.shape
@@ -820,7 +909,7 @@ class IntervalUnion(Generic[T, N, U]):
         Returns
         -------
         union : IntervalUnion[T, N, int]
-            The union of `self` and `other`
+            The union of `self` and `other`.
         """
 
         otheru = other if isinstance(other, IntervalUnion) else other.into_union()
@@ -965,6 +1054,35 @@ class IntervalUnion(Generic[T, N, U]):
 
         return IntervalUnion(_lower=out._lower[:uv], _upper=out._upper[:uv])  # type: ignore
 
+    def preserve_only_where(
+        self, where: Literal[True] | np.ndarray[tuple[N], np.dtype[np.bool]]
+    ) -> "IntervalUnion[T, N, int]":
+        """
+        Preserve safe intervals only at the data points where the `where`
+        condition is [`True`][True].
+
+        This method must only be used for pointwise safe intervals.
+
+        Parameters
+        ----------
+        where : Literal[True] | np.ndarray[tuple[N], np.dtype[np.bool]]
+            Only preserve safe intervals at data points where the condition is
+            [`True`][True].
+
+        Returns
+        -------
+        self : IntervalUnion[T, N, int]
+            The interval union where only safe intervals at data points where
+            the condition is [`True`][True] are preserved.
+        """
+
+        if where is True:
+            return self
+
+        return self.union(
+            Interval.empty(self._lower.dtype, self.n).preserve_only_where(where)
+        )
+
     def contains(
         self, other: np.ndarray[S, np.dtype[T]]
     ) -> np.ndarray[S, np.dtype[np.bool]]:
@@ -995,7 +1113,7 @@ class IntervalUnion(Generic[T, N, U]):
                 other_flat <= to_total_order(self._upper[i])
             )
 
-        return is_contained.reshape(other.shape)  # type: ignore
+        return _reshape(is_contained, other.shape)
 
     def _pick_simple(
         self, prediction: np.ndarray[S, np.dtype[T]]
@@ -1019,8 +1137,18 @@ class IntervalUnion(Generic[T, N, U]):
             return prediction
 
         (u, n) = self._lower.shape
-        interval_size_acc: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
-            np.zeros((n,), dtype=to_total_order(self._lower).dtype)
+        interval_width_acc = self.non_empty_width()
+
+        # use endpoint-inclusive sampling since the single-element width is
+        #  zero and the full-interval width is maximal (so +1 would overflow)
+        pick_indices: np.ndarray[tuple[N], np.dtype[np.unsignedinteger]] = rng.integers(
+            interval_width_acc, dtype=interval_width_acc.dtype, endpoint=True
+        )
+
+        interval_width_acc[:] = 0
+
+        pick_flat: np.ndarray[tuple[N], np.dtype[T]] = np.empty(
+            (n,), dtype=self._lower.dtype
         )
 
         for i in range(u):
@@ -1030,46 +1158,26 @@ class IntervalUnion(Generic[T, N, U]):
             ut: np.ndarray[tuple[N], np.dtype[np.unsignedinteger]] = to_total_order(
                 self._upper[i]
             )
-            np.add(
-                interval_size_acc, ut - lt + 1, out=interval_size_acc, where=(ut >= lt)
-            )
-
-        # if lt = 0 and ut = max, a full interval, (ut - lt + 1) overflows
-        # so we subtract 1 from the accumulated size and use endpoint-inclusive
-        #  sampling to undo any overflow from a full interval
-        pick_indices: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = (
-            rng.integers(
-                interval_size_acc - 1, dtype=interval_size_acc.dtype, endpoint=True
-            )
-        )
-
-        interval_size_acc[:] = 0
-
-        pick_flat: np.ndarray[tuple[N], np.dtype[T]] = np.empty(
-            (n,), dtype=self._lower.dtype
-        )
-
-        for i in range(u):
-            lt = to_total_order(self._lower[i])
-            ut = to_total_order(self._upper[i])
             np.copyto(
                 pick_flat,
                 from_total_order(
-                    lt + (pick_indices - interval_size_acc), dtype=self._lower.dtype
+                    lt + (pick_indices - interval_width_acc), dtype=self._lower.dtype
                 ),
                 where=(
                     (ut >= lt)
-                    & (pick_indices >= interval_size_acc)
-                    & (pick_indices <= (interval_size_acc + (ut - lt)))
+                    & (pick_indices >= interval_width_acc)
+                    & (pick_indices <= (interval_width_acc + (ut - lt)))
                 ),
                 casting="no",
             )
             np.add(
-                interval_size_acc, ut - lt + 1, out=interval_size_acc, where=(ut >= lt)
+                interval_width_acc,
+                ut - lt + 1,
+                out=interval_width_acc,
+                where=(ut >= lt),
             )
 
-        pick: np.ndarray[S, np.dtype[T]] = pick_flat.reshape(prediction.shape)  # type: ignore
-        return pick
+        return _reshape(pick_flat, prediction.shape)
 
     def _pick_more_zeros(
         self, prediction: np.ndarray[S, np.dtype[T]]
@@ -1085,7 +1193,7 @@ class IntervalUnion(Generic[T, N, U]):
         # 1. convert everything to bits in total order
         prediction_bits: np.ndarray[
             tuple[Literal[1], int], np.dtype[np.unsignedinteger]
-        ] = to_total_order(prediction).reshape(1, -1)  # type: ignore
+        ] = _reshape(to_total_order(prediction), (1, -1))
 
         lower: np.ndarray[tuple[U, N], np.dtype[np.unsignedinteger]] = to_total_order(
             self._lower
@@ -1177,9 +1285,9 @@ class IntervalUnion(Generic[T, N, U]):
         np.copyto(pick_bits, prediction_bits, where=contains_prediction, casting="no")
 
         # 13. convert everything back from total-ordered bits to value space
-        pick: np.ndarray[S, np.dtype[T]] = from_total_order(
-            pick_bits, prediction.dtype
-        ).reshape(prediction.shape)  # type: ignore
+        pick: np.ndarray[S, np.dtype[T]] = _reshape(
+            from_total_order(pick_bits, prediction.dtype), prediction.shape
+        )
         assert np.all(self.contains(pick))
 
         return pick
@@ -1232,16 +1340,16 @@ def _count_leading_zeros(
     if nbits <= 16:
         # safe cast from integer type to a larger integer type,
         # then lossless truncation of the number of leading zeros
-        return (nbits - np.frexp(x.astype(np.uint32, casting="safe"))[1]).astype(  # type: ignore
-            np.uint8, casting="unsafe"
-        )
+        return np.subtract(
+            nbits, np.frexp(x.astype(np.uint32, casting="safe"))[1]
+        ).astype(np.uint8, casting="unsafe")
 
     if nbits <= 32:
         # safe cast from integer type to a larger integer type,
         # then lossless truncation of the number of leading zeros
-        return (nbits - np.frexp(x.astype(np.uint64, casting="safe"))[1]).astype(  # type: ignore
-            np.uint8, casting="unsafe"
-        )
+        return np.subtract(
+            nbits, np.frexp(x.astype(np.uint64, casting="safe"))[1]
+        ).astype(np.uint8, casting="unsafe")
 
     # nbits <= 64
     # safe cast from integer type to a larger integer type,
@@ -1251,4 +1359,4 @@ def _count_leading_zeros(
     high_exp += 32
     exp = _ensure_array(low_exp)
     np.copyto(exp, high_exp, where=(high_exp > 32), casting="no")
-    return (nbits - exp).astype(np.uint8, casting="unsafe")  # type: ignore
+    return (nbits - exp).astype(np.uint8, casting="unsafe")

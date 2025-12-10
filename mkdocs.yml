@@ -10,11 +10,14 @@ markdown_extensions:
       noclasses: true
   - pymdownx.arithmatex:
       generic: true
+  - pymdownx.blocks.admonition
+  - pymdownx.blocks.details
 
 extra_javascript:
   - js/katex.js
   - https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/katex.min.js
   - https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/contrib/auto-render.min.js
+  - https://unpkg.com/mermaid@10.9.0/dist/mermaid.min.js
 
 extra_css:
   - https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/katex.min.css
@@ -30,7 +33,6 @@ nav:
       - Special values:
           - NaN values: examples/nan.ipynb
           - Missing values: examples/missing.ipynb
-          - Precipitation extrema: examples/precipitation.ipynb
       - Regions of Interest (RoIs):
           - Latent Heat Flux: examples/latent-heat-flux.ipynb
       - Quantities of Interest (QoIs):
@@ -39,6 +41,9 @@ nav:
           - Higher-order derivatives: examples/derivative.ipynb
           - "Neighbourhood: Vorticity": examples/vorticity.ipynb
           - Bounding the dSSIM metric: examples/dssim.ipynb
+      - Topology:
+          - Precipitation extrema: examples/precipitation.ipynb
+          - Isosurfaces: examples/isosurface.ipynb
       - Error bound distributions:
           - Absolute error bound: examples/error-distribution.ipynb
       - Safeguards on chunked data:
@@ -57,6 +62,7 @@ plugins:
       glob:
         - requirements.txt
         - examples/*.py
+        - examples/data/*/*.md
   - search
   - open-in-new-tab
   - autorefs
@@ -79,13 +85,14 @@ plugins:
             docstring_section_style: list
             docstring_style: numpy
             show_if_no_docstring: true
-            filters: ["!^_$", "!^_[^_]", "!^__", "__init__"]
+            filters: ["!^_$", "!^_[^_]", "!^__", "^__init__$"]
             members_order: source
             group_by_category: false
             show_source: false
             separate_signature: true
             show_signature_annotations: true
             signature_crossrefs: true
+            relative_crossrefs: true
             show_root_toc_entry: false
             merge_init_into_class: true
             summary:
@@ -93,6 +100,10 @@ plugins:
               classes: true
               functions: true
               modules: true
+            backlinks: tree
+            show_inheritance_diagram: true
+            inheritance_diagram_direction: LR
+            extensions: ["dataclasses"]
           inventories:
             - https://docs.python.org/3.12/objects.inv
             - https://numcodecs.readthedocs.io/en/v0.15.0/objects.inv

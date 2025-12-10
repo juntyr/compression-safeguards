@@ -4,30 +4,29 @@
 Lossy compression can be *scary* as valuable information or features of the
 data may be lost.
 
-By using [`Safeguards`][compression_safeguards.Safeguards] to **guarantee**
+By using [`Safeguards`][compression_safeguards.api.Safeguards] to **guarantee**
 your safety requirements, lossy compression can be applied safely and
 *without fear*.
 
 ## Overview
 
 This package provides functionality to use safeguards with (chunked)
-[`xarray.DataArray`][xarray.DataArray]s. Since applying safeguards to chunked
-data by yourself is very difficult and error-prone, this package handles all of
-the complexity for you with a simple and safe API.
+[`xarray.DataArray`][xarray.DataArray]s and cross-chunk boundary conditions.
+Since applying safeguards to chunked data by yourself is very difficult and
+error-prone, this package handles all of the complexity for you with a simple
+and safe API.
 
 In particular, `xarray-safeguards` provides the
-[`produce_data_array_correction`][xarray_safeguards.produce_data_array_correction]
+[`produce_data_array_correction`][.produce_data_array_correction]
 function to produce a correction such that certain properties of the original
 data are preserved after compression, which can be stored in the same or a
 different dataset (or file).
 
 This correction can be applied to the decompressed data using the
-[`apply_data_array_correction`][xarray_safeguards.apply_data_array_correction]
-function or the [`.safeguarded`][xarray_safeguards.DatasetSafeguardedAccessor]
-accessor on datasets.
+[`apply_data_array_correction`][.apply_data_array_correction] function or the
+[`.safeguarded`][.DatasetSafeguardedAccessor] accessor on datasets.
 
-This package also provides the
-[`.safeguards`][xarray_safeguards.DataArraySafeguardsAccessor]
+This package also provides the [`.safeguards`][.DataArraySafeguardsAccessor]
 accessor on correction or corrected data arrays to inspect the safeguards that
 were applied.
 
@@ -79,7 +78,7 @@ np.testing.assert_allclose(ds_safeguarded["da"].values, da.values, rtol=0, atol=
 ```
 
 Please refer to the
-[`compression_safeguards.SafeguardKind`][compression_safeguards.SafeguardKind]
+[`compression_safeguards.SafeguardKind`][compression_safeguards.safeguards.SafeguardKind]
 for an enumeration of all supported safeguards.
 """
 
@@ -362,7 +361,10 @@ def produce_data_array_correction(
         da_correction = (
             data.copy(
                 data=safeguards_.compute_correction(
-                    data.values, prediction.values, late_bound=late_bound_full
+                    data.values,
+                    prediction.values,
+                    late_bound=late_bound_full,
+                    where=True,
                 )
             )
             .rename(correction_name)
@@ -423,7 +425,7 @@ def produce_data_array_correction(
             )
 
             return safeguards.compute_correction(
-                data_chunk, prediction_chunk, late_bound=late_bound_chunk
+                data_chunk, prediction_chunk, late_bound=late_bound_chunk, where=True
             )
 
         da_correction = (
@@ -480,7 +482,7 @@ def produce_data_array_correction(
     def _check_overlapping_stencil_chunk(
         data_chunk: np.ndarray[S, np.dtype[T]],
         prediction_chunk: np.ndarray[S, np.dtype[T]],
-        data_indices_chunk: np.ndarray[S, np.dtype[np.int_]],
+        data_indices_chunk: np.ndarray[S, np.dtype[np.intp]],
         *late_bound_chunks: np.ndarray[S, np.dtype[T]],
         late_bound_names: tuple[str, ...],
         late_bound_global: dict[str, int | float | np.number],
@@ -543,7 +545,7 @@ def produce_data_array_correction(
                 assert_never(boundary_)
 
         # extract the indices of the non-stencil-extended data indices chunk
-        data_indices_chunk_: np.ndarray[tuple[int, ...], np.dtype[np.int_]] = (
+        data_indices_chunk_: np.ndarray[tuple[int, ...], np.dtype[np.intp]] = (
             data_indices_chunk[
                 tuple(
                     slice(a.before, None if a.after == 0 else -a.after)
@@ -573,6 +575,7 @@ def produce_data_array_correction(
             chunk_offset=chunk_offset,
             chunk_stencil=chunk_stencil,
             late_bound_chunk=late_bound_chunk,
+            where_chunk=True,
         )
 
         # broadcast the boolean check scalar to the output chunk shape
@@ -617,7 +620,7 @@ def produce_data_array_correction(
     def _compute_overlapping_stencil_chunk_correction(
         data_chunk: np.ndarray[S, np.dtype[T]],
         prediction_chunk: np.ndarray[S, np.dtype[T]],
-        data_indices_chunk: np.ndarray[S, np.dtype[np.int_]],
+        data_indices_chunk: np.ndarray[S, np.dtype[np.intp]],
         *late_bound_chunks: np.ndarray[S, np.dtype[T]],
         late_bound_names: tuple[str, ...],
         late_bound_global: dict[str, int | float | np.number],
@@ -684,7 +687,7 @@ def produce_data_array_correction(
                 assert_never(boundary_)
 
         # extract the indices of the non-stencil-extended data indices chunk
-        data_indices_chunk_: np.ndarray[tuple[int, ...], np.dtype[np.int_]] = (
+        data_indices_chunk_: np.ndarray[tuple[int, ...], np.dtype[np.intp]] = (
             data_indices_chunk[
                 tuple(
                     slice(a.before, None if a.after == 0 else -a.after)
@@ -718,6 +721,7 @@ def produce_data_array_correction(
                 chunk_stencil=chunk_stencil,
                 any_chunk_check_failed=any_chunk_check_failed,
                 late_bound_chunk=late_bound_chunk,
+                where_chunk=True,
             )
         )
         assert correction.shape == chunk_shape, "invalid correction chunk shape"

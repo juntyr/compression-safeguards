@@ -1,10 +1,8 @@
 """
 Exception and warning types and helpers to raise exceptions with context.
 
-Exceptions raised in this package carry
-[`ErrorContext`][compression_safeguards.utils.error.ErrorContext], which can be
-accessed through the
-[`ErrorContextMixin`][compression_safeguards.utils.error.ErrorContextMixin].
+Exceptions raised in this package carry [`ErrorContext`][.ErrorContext], which
+can be accessed through the [`ErrorContextMixin`][.ErrorContextMixin].
 """
 
 __all__ = [
@@ -197,7 +195,7 @@ class ctx(metaclass=_ctxmeta):
         `safeguard`, to any exception that is raised within.
 
         The added context layer will be a
-        [`SafeguardTypeContextLayer`][compression_safeguards.utils.error.SafeguardTypeContextLayer].
+        [`SafeguardTypeContextLayer`][...SafeguardTypeContextLayer].
 
         Parameters
         ----------
@@ -214,7 +212,7 @@ class ctx(metaclass=_ctxmeta):
         to any exception that is raised within.
 
         The added context layer will be a
-        [`SafeguardTypeContextLayer`][compression_safeguards.utils.error.SafeguardTypeContextLayer].
+        [`SafeguardTypeContextLayer`][...SafeguardTypeContextLayer].
 
         Parameters
         ----------
@@ -231,7 +229,7 @@ class ctx(metaclass=_ctxmeta):
         parameter, to any exception that is raised within.
 
         The added context layer will be a
-        [`ParameterContextLayer`][compression_safeguards.utils.error.ParameterContextLayer].
+        [`ParameterContextLayer`][...ParameterContextLayer].
 
         Parameters
         ----------
@@ -248,7 +246,7 @@ class ctx(metaclass=_ctxmeta):
         late-bound parameter, to any exception that is raised within.
 
         The added context layer will be a
-        [`LateBoundParameterContextLayer`][compression_safeguards.utils.error.LateBoundParameterContextLayer].
+        [`LateBoundParameterContextLayer`][...LateBoundParameterContextLayer].
 
         Parameters
         ----------
@@ -265,7 +263,7 @@ class ctx(metaclass=_ctxmeta):
         exception that is raised within.
 
         The added context layer will be an
-        [`IndexContextLayer`][compression_safeguards.utils.error.IndexContextLayer].
+        [`IndexContextLayer`][...IndexContextLayer].
 
         Parameters
         ----------

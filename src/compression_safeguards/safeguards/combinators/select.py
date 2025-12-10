@@ -6,14 +6,14 @@ __all__ = ["SelectSafeguard"]
 
 from abc import ABC
 from collections.abc import Collection, Set
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
 from ...utils.error import TypeCheckError, ctx
-from ...utils.intervals import IntervalUnion
+from ...utils.intervals import Interval, IntervalUnion
 from ...utils.typing import JSON, S, T
 from ..abc import Safeguard
 from ..pointwise.abc import PointwiseSafeguard
@@ -37,15 +37,13 @@ class SelectSafeguard(Safeguard):
 
     Parameters
     ----------
-    selector : str | Parameter
-        Late-bound parameter name that is used to select between the
-        `safeguards`.
+    selector : int | str | Parameter
+        Literal index or late-bound parameter name that is used to select
+        between the `safeguards`.
     safeguards : Collection[dict[str, JSON] | PointwiseSafeguard | StencilSafeguard]
         At least one safeguard configuration [`dict`][dict]s or already
-        initialized
-        [`PointwiseSafeguard`][compression_safeguards.safeguards.pointwise.abc.PointwiseSafeguard]
-        or
-        [`StencilSafeguard`][compression_safeguards.safeguards.stencil.abc.StencilSafeguard].
+        initialized [`PointwiseSafeguard`][....pointwise.abc.PointwiseSafeguard]
+        or [`StencilSafeguard`][....stencil.abc.StencilSafeguard].
 
     Raises
     ------
@@ -53,6 +51,9 @@ class SelectSafeguard(Safeguard):
         if any parameter has the wrong type.
     ValueError
         if the `safeguards` collection is empty.
+    IndexError
+        if the `selector` is a literal [`int`][int] index that is not within
+        the `0 <= selector < len(safeguards)` bounds.
     ...
         if instantiating a safeguard raises an exception.
     """
@@ -64,7 +65,7 @@ class SelectSafeguard(Safeguard):
     def __init__(
         self,
         *,
-        selector: str | Parameter,
+        selector: int | str | Parameter,
         safeguards: Collection[dict[str, JSON] | PointwiseSafeguard | StencilSafeguard],
     ) -> None:
         pass
@@ -72,16 +73,16 @@ class SelectSafeguard(Safeguard):
     def __new__(  # type: ignore
         cls,
         *,
-        selector: str | Parameter,
+        selector: int | str | Parameter,
         safeguards: Collection[dict[str, JSON] | PointwiseSafeguard | StencilSafeguard],
     ) -> "_SelectPointwiseSafeguard | _SelectStencilSafeguard":
         from ... import SafeguardKind  # noqa: PLC0415
 
         with ctx.safeguardty(cls):
             with ctx.parameter("selector"):
-                TypeCheckError.check_instance_or_raise(selector, str | Parameter)
+                TypeCheckError.check_instance_or_raise(selector, int | str | Parameter)
                 selector = (
-                    selector if isinstance(selector, Parameter) else Parameter(selector)
+                    Parameter(selector) if isinstance(selector, str) else selector
                 )
 
             with ctx.parameter("safeguards"):
@@ -106,15 +107,27 @@ class SelectSafeguard(Safeguard):
                         )
                         safeguards_.append(safeguard)  # type: ignore
 
-        if all(isinstance(safeguard, PointwiseSafeguard) for safeguard in safeguards_):
-            return _SelectPointwiseSafeguard(selector, *safeguards_)  # type: ignore
+            with ctx.parameter("selector"):
+                if isinstance(selector, int) and (
+                    (selector < 0) or (selector >= len(safeguards_))
+                ):
+                    raise IndexError("invalid index") | ctx
+
+        pointwise_safeguards_: list[PointwiseSafeguard] = [
+            safeguard
+            for safeguard in safeguards_
+            if isinstance(safeguard, PointwiseSafeguard)
+        ]
+
+        if len(pointwise_safeguards_) == len(safeguards_):
+            return _SelectPointwiseSafeguard(selector, *pointwise_safeguards_)
         else:
             return _SelectStencilSafeguard(selector, *safeguards_)
 
     @property
-    def selector(self) -> Parameter:  # type: ignore
+    def selector(self) -> int | Parameter:  # type: ignore
         """
-        The late-bound selector parameter.
+        The selector index or late-bound selector parameter.
         """
         ...
 
@@ -149,6 +162,7 @@ class SelectSafeguard(Safeguard):
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> bool:
         """
         Check if, for all elements, the selected safeguard succeed the check.
@@ -161,6 +175,8 @@ class SelectSafeguard(Safeguard):
             Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only check at data points where the condition is [`True`][True].
 
         Returns
         -------
@@ -179,7 +195,7 @@ class SelectSafeguard(Safeguard):
         ValueError
             if not all late-bound `selector` values could be losslessly
             converted to integer indices.
-        ValueError
+        IndexError
             if the late-bound `selector` indices are invalid for the
             selected-over `safeguards`.
         ...
@@ -194,6 +210,7 @@ class SelectSafeguard(Safeguard):
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check for which elements the selected safeguard succeed the check.
@@ -206,6 +223,8 @@ class SelectSafeguard(Safeguard):
             Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only check at data points where the condition is [`True`][True].
 
         Returns
         -------
@@ -224,7 +243,7 @@ class SelectSafeguard(Safeguard):
         ValueError
             if not all late-bound `selector` values could be losslessly
             converted to integer indices.
-        ValueError
+        IndexError
             if the late-bound `selector` indices are invalid for the
             selected-over `safeguards`.
         ...
@@ -238,6 +257,7 @@ class SelectSafeguard(Safeguard):
         data: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the safe intervals for the selected safeguard.
@@ -248,6 +268,9 @@ class SelectSafeguard(Safeguard):
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the safe intervals at pointwise checks where the
+            condition is [`True`][True].
 
         Returns
         -------
@@ -275,6 +298,65 @@ class SelectSafeguard(Safeguard):
 
         ...
 
+    def compute_footprint(  # type: ignore
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the footprint of the `foot` array, e.g. for expanding data
+        points into the pointwise checks that they contribute to.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the inverse footprint at pointwise checks where the
+            condition is [`True`][True].
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The footprint of the `foot` array.
+        """
+
+        ...
+
+    def compute_inverse_footprint(  # type: ignore
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the inverse footprint of the `foot` array, e.g. for expanding
+        pointwise check fails into the points that could have contributed to
+        the failures.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the inverse footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the inverse footprint at pointwise checks where the
+            condition is [`True`][True].
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The inverse footprint of the `foot` array.
+        """
+
+        ...
+
     @override
     def get_config(self) -> dict[str, JSON]:  # type: ignore
         """
@@ -295,7 +377,7 @@ class _SelectSafeguardBase(ABC):
     kind: ClassVar[str] = "select"
 
     @property
-    def selector(self) -> Parameter:
+    def selector(self) -> int | Parameter:
         return self._selector  # type: ignore
 
     @property
@@ -304,9 +386,12 @@ class _SelectSafeguardBase(ABC):
 
     @property
     def late_bound(self) -> Set[Parameter]:
-        return frozenset(
-            [self.selector] + [b for s in self.safeguards for b in s.late_bound]
-        )
+        parameters = frozenset(b for s in self.safeguards for b in s.late_bound)
+
+        if isinstance(self.selector, Parameter):
+            parameters = parameters.union([self.selector])
+
+        return parameters
 
     def check_pointwise(
         self,
@@ -314,17 +399,32 @@ class _SelectSafeguardBase(ABC):
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
-        with ctx.safeguardty(SelectSafeguard), ctx.parameter("selector"):
-            selector = late_bound.resolve_ndarray_with_lossless_cast(
-                self.selector, data.shape, np.dtype(np.int_)
+        # if a single safeguard is selected, just forward to it
+        if isinstance(self.selector, int):
+            return self.safeguards[self.selector].check_pointwise(
+                data, prediction, late_bound=late_bound, where=where
             )
 
+        with ctx.safeguardty(SelectSafeguard), ctx.parameter("selector"):
+            selector = late_bound.resolve_ndarray_with_lossless_cast(
+                self.selector, data.shape, np.dtype(np.intp)
+            )
+
+            with ctx.late_bound_parameter(self.selector):
+                if np.any(selector < 0) or np.any(selector >= len(self.safeguards)):
+                    raise IndexError("invalid indices") | ctx
+
+        # only perform the checks where selected
         oks = [
-            safeguard.check_pointwise(data, prediction, late_bound=late_bound)
-            for safeguard in self.safeguards
+            safeguard.check_pointwise(
+                data, prediction, late_bound=late_bound, where=(selector == i) & where
+            )
+            for i, safeguard in enumerate(self.safeguards)
         ]
 
+        # choose the check result from the selected safeguard
         with (
             ctx.safeguardty(SelectSafeguard),
             ctx.parameter("selector"),
@@ -337,59 +437,121 @@ class _SelectSafeguardBase(ABC):
         data: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> IntervalUnion[T, int, int]:
+        # if a single safeguard is selected, just forward to it
+        if isinstance(self.selector, int):
+            return self.safeguards[self.selector].compute_safe_intervals(
+                data, late_bound=late_bound, where=where
+            )
+
         with ctx.safeguardty(SelectSafeguard), ctx.parameter("selector"):
             selector = late_bound.resolve_ndarray_with_lossless_cast(
-                self.selector, data.shape, np.dtype(np.int_)
+                self.selector, data.shape, np.dtype(np.intp)
             )
 
-        valids = [
-            safeguard.compute_safe_intervals(data, late_bound=late_bound)
-            for safeguard in self.safeguards
-        ]
+            with ctx.late_bound_parameter(self.selector):
+                if np.any(selector < 0) or np.any(selector >= len(self.safeguards)):
+                    raise IndexError("invalid indices") | ctx
 
-        umax = max(valid.u for valid in valids)
+        valid: IntervalUnion[T, int, int] = Interval.full_like(data).into_union()
 
-        for i, v in enumerate(valids):
-            vnew = IntervalUnion.empty(data.dtype, data.size, umax)
-            vnew._lower[: v.u] = v._lower
-            vnew._upper[: v.u] = v._upper
-            valids[i] = vnew
-
-        valid: IntervalUnion[T, int, int] = IntervalUnion.empty(
-            data.dtype, data.size, umax
-        )
-
-        with (
-            ctx.safeguardty(SelectSafeguard),
-            ctx.parameter("selector"),
-            ctx.late_bound_parameter(self.selector),
-        ):
-            valid._lower = (
-                np.take_along_axis(
-                    np.stack([v._lower.T for v in valids], axis=0),
-                    selector.flatten().reshape((1, data.size, 1)),
-                    axis=0,
+        # compute the safe intervals only where needed and then intersect
+        # the `where` condition ensures that we only compute restrictions for
+        #  the data points for which a safeguard was selected (and that other
+        #  points do not impose such requirements)
+        # but that the computed requirements can extend beyond the pointwise
+        for i, safeguard in enumerate(self.safeguards):
+            where_i = (selector == i) & where
+            if np.any(where_i):
+                valid = valid.intersect(
+                    safeguard.compute_safe_intervals(
+                        data, late_bound=late_bound, where=where_i
+                    )
                 )
-                .reshape(data.size, umax)
-                .T
-            )
-            valid._upper = (
-                np.take_along_axis(
-                    np.stack([v._upper.T for v in valids], axis=0),
-                    selector.flatten().reshape((1, data.size, 1)),
-                    axis=0,
-                )
-                .reshape(data.size, umax)
-                .T
-            )
 
         return valid
+
+    def compute_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        # if a single safeguard is selected, just forward to it
+        if isinstance(self.selector, int):
+            return self.safeguards[self.selector].compute_footprint(
+                foot, late_bound=late_bound, where=where
+            )
+
+        with ctx.safeguardty(SelectSafeguard), ctx.parameter("selector"):
+            selector = late_bound.resolve_ndarray_with_lossless_cast(
+                self.selector, foot.shape, np.dtype(np.intp)
+            )
+
+            with ctx.late_bound_parameter(self.selector):
+                if np.any(selector < 0) or np.any(selector >= len(self.safeguards)):
+                    raise IndexError("invalid indices") | ctx
+
+        footprint = np.zeros_like(foot)
+
+        # per point, only the selected safeguard contributes to the combined
+        #  footprint
+        # the union of the footprints is taken since the per-point footprint
+        #  from a stencil safeguard may extend to neighbouring points
+        for i, safeguard in enumerate(self.safeguards):
+            where_i = (selector == i) & where
+            if np.any(where_i):
+                footprint |= safeguard.compute_footprint(
+                    foot, late_bound=late_bound, where=where_i
+                )
+
+        return footprint
+
+    def compute_inverse_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        # if a single safeguard is selected, just forward to it
+        if isinstance(self.selector, int):
+            return self.safeguards[self.selector].compute_inverse_footprint(
+                foot, late_bound=late_bound, where=where
+            )
+
+        with ctx.safeguardty(SelectSafeguard), ctx.parameter("selector"):
+            selector = late_bound.resolve_ndarray_with_lossless_cast(
+                self.selector, foot.shape, np.dtype(np.intp)
+            )
+
+            with ctx.late_bound_parameter(self.selector):
+                if np.any(selector < 0) or np.any(selector >= len(self.safeguards)):
+                    raise IndexError("invalid indices") | ctx
+
+        footprint = np.zeros_like(foot)
+
+        # per point, only the selected safeguard contributes to the combined
+        #  footprint
+        # the union of the footprints is taken since the per-point footprint
+        #  from a stencil safeguard may extend to neighbouring points
+        for i, safeguard in enumerate(self.safeguards):
+            where_i = (selector == i) & where
+            if np.any(where_i):
+                footprint |= safeguard.compute_inverse_footprint(
+                    foot, late_bound=late_bound, where=where_i
+                )
+
+        return footprint
 
     def get_config(self) -> dict[str, JSON]:
         return dict(
             kind=type(self).kind,
-            selector=self.selector,
+            selector=str(self.selector)
+            if isinstance(self.selector, Parameter)
+            else self.selector,
             safeguards=[safeguard.get_config() for safeguard in self.safeguards],
         )
 
@@ -400,10 +562,12 @@ class _SelectSafeguardBase(ABC):
 
 class _SelectPointwiseSafeguard(_SelectSafeguardBase, PointwiseSafeguard):
     __slots__: tuple[str, ...] = ("_selector", "_safeguards")
-    _selector: Parameter
+    _selector: int | Parameter
     _safeguards: tuple[PointwiseSafeguard, ...]
 
-    def __init__(self, selector: Parameter, *safeguards: PointwiseSafeguard) -> None:
+    def __init__(
+        self, selector: int | Parameter, *safeguards: PointwiseSafeguard
+    ) -> None:
         self._selector = selector
 
         for safeguard in safeguards:
@@ -415,11 +579,13 @@ class _SelectPointwiseSafeguard(_SelectSafeguardBase, PointwiseSafeguard):
 
 class _SelectStencilSafeguard(_SelectSafeguardBase, StencilSafeguard):
     __slots__: tuple[str, ...] = ("_selector", "_safeguards")
-    _selector: Parameter
+    _selector: int | Parameter
     _safeguards: tuple[PointwiseSafeguard | StencilSafeguard, ...]
 
     def __init__(
-        self, selector: Parameter, *safeguards: PointwiseSafeguard | StencilSafeguard
+        self,
+        selector: int | Parameter,
+        *safeguards: PointwiseSafeguard | StencilSafeguard,
     ) -> None:
         self._selector = selector
 

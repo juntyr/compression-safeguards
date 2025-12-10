@@ -46,6 +46,31 @@ def test_select():
     )
 
 
+def test_select_literal():
+    safeguard = SelectSafeguard(
+        selector=1,
+        safeguards=[
+            dict(kind="eb", type="abs", eb=100),
+            dict(kind="eb", type="abs", eb=10),
+            dict(kind="eb", type="abs", eb=1),
+        ],
+    )
+
+    data = np.arange(10).reshape(2, 5)
+
+    valid = safeguard.compute_safe_intervals(data, late_bound=Bindings.EMPTY)
+    assert np.all(valid._lower == (data.flatten() - 10))
+    assert np.all(valid._upper == (data.flatten() + 10))
+
+    ok = safeguard.check_pointwise(data, -data, late_bound=Bindings.EMPTY)
+    assert np.all(
+        ok
+        == np.array(
+            [True, True, True, True, True, True, False, False, False, False]
+        ).reshape(2, 5)
+    )
+
+
 def test_inheritance():
     pointwise_config = dict(kind="eb", type="abs", eb=1)
     stencil_config = dict(
@@ -235,4 +260,53 @@ def test_fuzzer_found_select_shape_mismatch():
                 ],
             ),
         ],
+    )
+
+
+def test_fuzzer_found_invalid_literal_index():
+    with pytest.raises(IndexError, match=r"select\.selector: invalid index"):
+        SelectSafeguard(
+            selector=39,
+            safeguards=[
+                dict(kind="same", value=0, exclusive=False),
+                dict(kind="same", value=0, exclusive=False),
+            ],
+        )
+
+
+def test_unsafely_shadowed_stencil_requirements():
+    data = np.array([256, 256], dtype=np.int16)
+    decoded = np.array([0, 0], dtype=np.int16)
+
+    # prior to https://github.com/juntyr/compression-safeguards/pull/48,
+    #  the select safeguard would choose safe intervals per-point and the
+    #  stencil safety could thus be shadowed by neighbouring points
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(
+                kind="select",
+                selector="select",
+                safeguards=[
+                    dict(kind="assume_safe"),
+                    dict(
+                        kind="qoi_eb_stencil",
+                        qoi="sum(X)",
+                        neighbourhood=[
+                            dict(
+                                axis=0,
+                                before=1,
+                                after=1,
+                                boundary="constant",
+                                constant_boundary="$x_max",
+                            ),
+                        ],
+                        type="abs",
+                        eb=1,
+                    ),
+                ],
+            ),
+        ],
+        fixed_constants=dict(select=np.array([0, 1])),
     )

@@ -13,9 +13,9 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
+from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
-from .typing import F, Ns, Ps, PsI
 
 
 class ScalarFloor(Expr[AnyExpr]):
@@ -43,22 +43,23 @@ class ScalarFloor(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.floor(self._a.eval(x, Xs, late_bound))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return np.floor(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         arg = self._a
 
         # compute the rounded result that meets the expr bounds
@@ -75,8 +76,8 @@ class ScalarFloor(Expr[AnyExpr]):
         # if expr_upper is -0.0, floor(-0.0) = -0.0, we need to force arg_upper
         #  to -0.0
         # if expr_upper is +0.0, floor(+0.0) = +0.0, and floor(1-eps) = +0.0
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(expr_lower)
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(expr_lower)
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
             _nextafter(expr_upper + 1, expr_upper)
         )
         arg_upper[_is_negative_zero(expr_upper)] = -0.0
@@ -84,7 +85,6 @@ class ScalarFloor(Expr[AnyExpr]):
         return arg.compute_data_bounds(
             arg_lower,
             arg_upper,
-            X,
             Xs,
             late_bound,
         )
@@ -119,22 +119,23 @@ class ScalarCeil(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.ceil(self._a.eval(x, Xs, late_bound))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return np.ceil(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         arg = self._a
 
         # compute the rounded result that meets the expr bounds
@@ -151,16 +152,15 @@ class ScalarCeil(Expr[AnyExpr]):
         # if expr_upper is -0.0, floor(-0.0) = -0.0, there is nothing above
         #  -0.0 for which ceil(...) = -0.0
         # if expr_upper is +0.0, floor(+0.0) = +0.0, only ceil(+0.0) = +0.0
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
             _nextafter(expr_lower - 1, expr_lower)
         )
         arg_lower[_is_positive_zero(expr_lower)] = +0.0
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(expr_upper)
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(expr_upper)
 
         return arg.compute_data_bounds(
             arg_lower,
             arg_upper,
-            X,
             Xs,
             late_bound,
         )
@@ -195,22 +195,23 @@ class ScalarTrunc(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.trunc(self._a.eval(x, Xs, late_bound))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return np.trunc(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         arg = self._a
 
         # compute the rounded result that meets the expr bounds
@@ -227,7 +228,7 @@ class ScalarTrunc(Expr[AnyExpr]):
         # if expr_upper is -0.0, floor(-0.0) = -0.0, there is nothing above
         #  -0.0 for which trunc(...) = -0.0
         # if expr_upper is +0.0, floor(+0.0) = +0.0, and trunc(1-eps) = +0.0
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
             _nextafter(expr_lower - 1, expr_lower)
         )
         np.copyto(
@@ -236,7 +237,7 @@ class ScalarTrunc(Expr[AnyExpr]):
             where=_is_sign_positive_number(expr_lower),
             casting="no",
         )
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
             _nextafter(expr_upper + 1, expr_upper)
         )
         np.copyto(
@@ -249,7 +250,6 @@ class ScalarTrunc(Expr[AnyExpr]):
         return arg.compute_data_bounds(
             arg_lower,
             arg_upper,
-            X,
             Xs,
             late_bound,
         )
@@ -287,25 +287,26 @@ class ScalarRoundTiesEven(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.rint(self._a.eval(x, Xs, late_bound))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return np.rint(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         # evaluate arg and round_ties_even(arg)
         arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
+        argv = arg.eval(Xs, late_bound)
         exprv = np.rint(argv)
 
         # compute the rounded result that meets the expr bounds
@@ -323,12 +324,12 @@ class ScalarRoundTiesEven(Expr[AnyExpr]):
         # if expr_upper is -0.0, floor(-0.0) = -0.0, we need to force arg_upper
         #  to -0.0
         # if expr_upper is +0.0, floor(+0.0) = +0.0, and rint(+0.5) = +0.0
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
-            np.subtract(expr_lower, X.dtype.type(0.5))
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            np.subtract(expr_lower, Xs.dtype.type(0.5))
         )
         arg_lower[_is_positive_zero(expr_lower)] = +0.0
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
-            np.add(expr_upper, X.dtype.type(0.5))
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            np.add(expr_upper, Xs.dtype.type(0.5))
         )
         arg_upper[_is_negative_zero(expr_upper)] = -0.0
 
@@ -355,7 +356,6 @@ class ScalarRoundTiesEven(Expr[AnyExpr]):
         return arg.compute_data_bounds(
             arg_lower,
             arg_upper,
-            X,
             Xs,
             late_bound,
         )

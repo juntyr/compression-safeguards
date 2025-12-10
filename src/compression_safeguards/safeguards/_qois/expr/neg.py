@@ -6,10 +6,10 @@ from typing_extensions import override  # MSPV 3.12
 
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
+from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
 from .literal import Number
-from .typing import F, Ns, Ps, PsI
 
 
 class ScalarNegate(Expr[AnyExpr]):
@@ -43,23 +43,24 @@ class ScalarNegate(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.negative(self._a.eval(x, Xs, late_bound))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return np.negative(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
-        return self._a.compute_data_bounds(-expr_upper, -expr_lower, X, Xs, late_bound)
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
+        return self._a.compute_data_bounds(-expr_upper, -expr_lower, Xs, late_bound)
 
     @override
     def __repr__(self) -> str:

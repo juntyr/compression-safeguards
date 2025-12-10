@@ -10,15 +10,14 @@ compression can be applied safely and *without fear*.
 ## Overview
 
 This package provides several
-[`Safeguard`][compression_safeguards.safeguards.abc.Safeguard]s (refer to the
-[`SafeguardKind`][compression_safeguards.SafeguardKind] for an enumeration)
-with which you can express *your* requirements for lossy compression to be safe
-to use.
+[`Safeguard`][.safeguards.abc.Safeguard]s (refer to the
+[`SafeguardKind`][.safeguards.SafeguardKind] for an enumeration) with which you
+can express *your* requirements for lossy compression to be safe to use.
 
 The safeguards are then combined in the
-[`Safeguards`][compression_safeguards.Safeguards], which can be used to compute
-and apply the required correction to lossy-compressed data so that it satisfies
-your safety guarantees.
+[`Safeguards`][.api.Safeguards], which can be used to compute and apply the
+required correction to lossy-compressed data so that it satisfies your safety
+guarantees.
 
 This package provides the implementations of the safeguards and the low-level
 `Safeguards` API. Please also refer to the following integrations of the
@@ -28,6 +27,8 @@ safeguards with popular compression APIs:
   [`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec] meta-compressor that
   conveniently applies safeguards to any compressor using the
   [`numcodecs.abc.Codec`][numcodecs.abc.Codec] API.
+- [`xarray-safeguards`][xarray_safeguards]: provides functionality to use
+  safeguards with (chunked) [`xarray.DataArray`][xarray.DataArray]s.
 
 ## Examples
 
@@ -96,7 +97,7 @@ sg = Safeguards(safeguards=[
 ])
 ```
 
-or by using the [`SafeguardKind`][compression_safeguards.SafeguardKind]:
+or by using the [`SafeguardKind`][.safeguards.SafeguardKind]:
 
 ```py
 from compression_safeguards import Safeguards, SafeguardKind

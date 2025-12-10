@@ -138,7 +138,7 @@ class MyLinearQuantizer(MyQuantizer):
         self._eb_abs = eb_abs
 
     def encoded_dtype(self, dtype: np.dtype) -> np.dtype:
-        return np.dtype(int)
+        return np.dtype(np.intp)
 
     def encode(self, x, predict):
         return np.round((x - predict) / (self._eb_abs * 2))

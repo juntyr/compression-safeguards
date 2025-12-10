@@ -2,7 +2,7 @@
 Commonly used type variables.
 """
 
-__all__ = ["C", "F", "Fi", "S", "Si", "T", "Ti", "U", "JSON"]
+__all__ = ["C", "F", "Fi", "S", "Si", "T", "Ti", "TB", "U", "JSON"]
 
 from typing import TypeAlias, TypeVar
 
@@ -28,6 +28,9 @@ T = TypeVar("T", bound=np.number, covariant=True)
 
 Ti = TypeVar("Ti", bound=np.number)
 """ Any numpy [`number`][numpy.number] data type (invariant). """
+
+TB = TypeVar("TB", bound=np.number | np.bool, covariant=True)
+""" Any numpy [`number`][numpy.number] or [`boolean`][numpy.bool] data type (covariant). """
 
 U = TypeVar("U", bound=np.unsignedinteger, covariant=True)
 """ Any numpy [`unsignedinteger`][numpy.unsignedinteger] data type (covariant). """

@@ -2,11 +2,22 @@ import numpy as np
 import pytest
 
 from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
-from compression_safeguards.safeguards._qois.expr.addsub import ScalarSubtract
+from compression_safeguards.safeguards._qois.expr.addsub import (
+    ScalarAdd,
+    ScalarSubtract,
+)
 from compression_safeguards.safeguards._qois.expr.classification import (
     ScalarIsFinite,
     ScalarIsInf,
     ScalarIsNaN,
+)
+from compression_safeguards.safeguards._qois.expr.combinators import (
+    ScalarAny,
+    ScalarNot,
+)
+from compression_safeguards.safeguards._qois.expr.comparison import (
+    ScalarEqual,
+    ScalarLess,
 )
 from compression_safeguards.safeguards._qois.expr.constfold import ScalarFoldedConstant
 from compression_safeguards.safeguards._qois.expr.data import Data
@@ -17,6 +28,7 @@ from compression_safeguards.safeguards._qois.expr.divmul import (
 from compression_safeguards.safeguards._qois.expr.hyperbolic import (
     ScalarAcosh,
     ScalarAsinh,
+    ScalarCosh,
     ScalarTanh,
 )
 from compression_safeguards.safeguards._qois.expr.literal import Euler, Number, Pi
@@ -31,6 +43,7 @@ from compression_safeguards.safeguards._qois.expr.neg import ScalarNegate
 from compression_safeguards.safeguards._qois.expr.power import ScalarPower
 from compression_safeguards.safeguards._qois.expr.reciprocal import ScalarReciprocal
 from compression_safeguards.safeguards._qois.expr.round import (
+    ScalarCeil,
     ScalarRoundTiesEven,
     ScalarTrunc,
 )
@@ -48,7 +61,12 @@ from compression_safeguards.safeguards._qois.expr.where import ScalarWhere
 from compression_safeguards.safeguards._qois.interval import (
     compute_safe_data_lower_upper_interval_union,
 )
-from compression_safeguards.utils._compat import _is_negative_zero, _is_positive_zero
+from compression_safeguards.utils._compat import (
+    _floating_max,
+    _floating_smallest_subnormal,
+    _is_negative_zero,
+    _is_positive_zero,
+)
 from compression_safeguards.utils._float128 import _float128, _float128_dtype
 
 np.set_printoptions(floatmode="unique")
@@ -80,7 +98,6 @@ def test_abs():
         X_lower, X_upper = expr.compute_data_bounds(
             np.abs(X) - 1,
             np.abs(X) + 1,
-            X,
             X,
             dict(),
         )
@@ -168,7 +185,6 @@ def test_sign_same():
         X_lower, X_upper = expr.compute_data_bounds(
             np.sign(X),
             np.sign(X),
-            X,
             X,
             dict(),
         )
@@ -260,7 +276,6 @@ def test_sign_one_off():
             np.sign(X) - 1,
             np.sign(X) + 1,
             X,
-            X,
             dict(),
         )
         valid = compute_safe_data_lower_upper_interval_union(
@@ -349,7 +364,6 @@ def test_sign_any():
         X_lower, X_upper = expr.compute_data_bounds(
             np.sign(X) - 2,
             np.sign(X) + 2,
-            X,
             X,
             dict(),
         )
@@ -440,7 +454,6 @@ def test_square():
             np.square(X) - 1,
             np.square(X) + 1,
             X,
-            X,
             dict(),
         )
         valid = compute_safe_data_lower_upper_interval_union(
@@ -528,7 +541,6 @@ def test_reciprocal():
             np.reciprocal(X) - 1,
             np.reciprocal(X) + 1,
             X,
-            X,
             dict(),
         )
         valid = compute_safe_data_lower_upper_interval_union(
@@ -579,7 +591,6 @@ def test_sin():
         X_lower, X_upper = expr.compute_data_bounds(
             np.sin(X) - 1,
             np.sin(X) + 1,
-            X,
             X,
             dict(),
         )
@@ -670,7 +681,6 @@ def test_asin():
             np.asin(X) - 1,
             np.asin(X) + 1,
             X,
-            X,
             dict(),
         )
         valid = compute_safe_data_lower_upper_interval_union(
@@ -743,17 +753,17 @@ def test_fuzzer_found_bounded_hang():
         ScalarReciprocal(ScalarTanh(Data.SCALAR)),  # coth(x)
     )
 
-    assert expr.eval((), X, dict()) == np.float64(-1.0)
+    assert expr.eval(X, dict()) == np.float64(-1.0)
 
     expr_lower = np.array(-1, dtype=np.float64)
     expr_upper = np.array(0, dtype=np.float64)
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower <= X
     assert X_upper == X
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float64(-1.0))
-    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float64(-1.0))
+    assert expr.eval(np.array(X_lower), dict()) == np.array(np.float64(-1.0))
+    assert expr.eval(np.array(X_upper), dict()) == np.array(np.float64(-1.0))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -762,20 +772,20 @@ def test_fuzzer_found_subtract_inf():
 
     expr = ScalarSubtract(Data.SCALAR, Data.SCALAR)
 
-    assert expr.eval((), X, dict()) == np.array(np.float32(0.0))
+    assert expr.eval(X, dict()) == np.array(np.float32(0.0))
 
     expr_lower = np.array(-np.inf, dtype=np.float32)
     expr_upper = np.array(np.inf, dtype=np.float32)
 
     fmax = np.finfo(X.dtype).max
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     # bad: -inf - -inf = NaN and +inf - +inf = NaN
     assert X_lower == np.array(-fmax, dtype=np.float32)
     assert X_upper == np.array(fmax, dtype=np.float32)
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float32(0.0))
-    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float32(0.0))
+    assert expr.eval(np.array(X_lower), dict()) == np.array(np.float32(0.0))
+    assert expr.eval(np.array(X_upper), dict()) == np.array(np.float32(0.0))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -784,19 +794,19 @@ def test_fuzzer_found_times_zero():
 
     expr = ScalarMultiply(Number("-9.58497987659779e+300"), ScalarAbs(Data.SCALAR))
 
-    assert expr.eval((), X, dict()) == np.array(np.float16(-np.inf))
+    assert expr.eval(X, dict()) == np.array(np.float16(-np.inf))
 
     expr_lower = np.array(-np.inf, dtype=np.float16)
     expr_upper = np.array(np.inf, dtype=np.float16)
 
     smallest_subnormal = np.finfo(X.dtype).smallest_subnormal
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(-np.inf, dtype=np.float16)
     assert X_upper == np.array(-smallest_subnormal, dtype=np.float16)
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(-np.inf))
-    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float16(-np.inf))
+    assert expr.eval(np.array(X_lower), dict()) == np.array(np.float16(-np.inf))
+    assert expr.eval(np.array(X_upper), dict()) == np.array(np.float16(-np.inf))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -809,17 +819,17 @@ def test_fuzzer_found_where():
         ScalarAcosh(ScalarReciprocal(Data.SCALAR)),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float16(np.inf))
+    assert expr.eval(X, dict()) == np.array(np.float16(np.inf))
 
     expr_lower = np.array(0.0, dtype=np.float16)
     expr_upper = np.array(np.inf, dtype=np.float16)
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(0.0, dtype=np.float16) and not np.signbit(X_lower)
     assert X_upper == np.array(0.0, dtype=np.float16) and not np.signbit(X_upper)
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(np.inf))
-    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float16(np.inf))
+    assert expr.eval(np.array(X_lower), dict()) == np.array(np.float16(np.inf))
+    assert expr.eval(np.array(X_upper), dict()) == np.array(np.float16(np.inf))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -832,19 +842,19 @@ def test_fuzzer_found_inconsistent_where():
         ScalarAtan(ScalarReciprocal(Data.SCALAR)),  # acot(x)
     )
 
-    assert expr.eval((), X, dict()) == np.array(
+    assert expr.eval(X, dict()) == np.array(
         _float128("-5.562684646268004075307639094889258e-309")
     )
 
     expr_lower = np.array(_float128("-5.562684646268004075307639094889258e-309"))
     expr_upper = np.array(_float128("0.0e+000"))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(_float128("-inf"))
     assert X_upper == np.array(_float128("-1.797693134862315708145274237317044e+308"))
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(_float128("-0.0e+000"))
-    assert expr.eval((), np.array(X_upper), dict()) == np.array(
+    assert expr.eval(np.array(X_lower), dict()) == np.array(_float128("-0.0e+000"))
+    assert expr.eval(np.array(X_upper), dict()) == np.array(
         _float128("-5.562684646268004075307639094889258e-309")
     )
 
@@ -854,12 +864,12 @@ def test_fuzzer_found_cosine_monotonicity():
 
     expr = ScalarCos(Data.SCALAR)
 
-    assert expr.eval((), X, dict()) == np.array(0.9937, dtype=np.float16)
+    assert expr.eval(X, dict()) == np.array(0.9937, dtype=np.float16)
 
     expr_lower = np.array(7.3e-06, dtype=np.float16)
     expr_upper = np.array(0.9937, dtype=np.float16)
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(0.1133, dtype=np.float16)
     assert X_upper == np.array(1.57, dtype=np.float16)
 
@@ -869,7 +879,7 @@ def test_fuzzer_found_asinh_overflow():
     X = np.array(_float128("-4.237431194812790058760014731131757e+4778"))
 
     expr = ScalarAsinh(Data.SCALAR)
-    assert np.rint(expr.eval((), X, dict())) == np.array(_float128("-11004"))
+    assert np.rint(expr.eval(X, dict())) == np.array(_float128("-11004"))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -878,17 +888,17 @@ def test_fuzzer_found_invalid_divide_rewrite():
 
     expr = ScalarDivide(ScalarIsInf(Data.SCALAR), ScalarAbs(Data.SCALAR))
 
-    assert expr.eval((), X, dict()) == np.array(0.0, dtype=np.float64)
+    assert expr.eval(X, dict()) == np.array(0.0, dtype=np.float64)
 
     expr_lower = np.array(0.0, dtype=np.float64)
     expr_upper = np.array(0.0, dtype=np.float64)
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(2.9e-322, dtype=np.float64)
     assert X_upper == np.array(1.7976931348623157e308, dtype=np.float64)
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(0.0, dtype=np.float64)
-    assert expr.eval((), np.array(X_upper), dict()) == np.array(0.0, dtype=np.float64)
+    assert expr.eval(np.array(X_lower), dict()) == np.array(0.0, dtype=np.float64)
+    assert expr.eval(np.array(X_upper), dict()) == np.array(0.0, dtype=np.float64)
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -897,17 +907,17 @@ def test_fuzzer_found_power_nan_hang():
 
     expr = ScalarPower(ScalarSign(Data.SCALAR), Data.SCALAR)
 
-    assert np.isnan(expr.eval((), X, dict()))
+    assert np.isnan(expr.eval(X, dict()))
 
     expr_lower = np.array(np.nan, dtype=np.float64)
     expr_upper = np.array(np.nan, dtype=np.float64)
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(-1.26836425e-30, dtype=np.float64)
     assert X_upper == np.array(-1.26836425e-30, dtype=np.float64)
 
-    assert np.isnan(expr.eval((), np.array(X_lower), dict()))
-    assert np.isnan(expr.eval((), np.array(X_upper), dict()))
+    assert np.isnan(expr.eval(np.array(X_lower), dict()))
+    assert np.isnan(expr.eval(np.array(X_upper), dict()))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -916,17 +926,17 @@ def test_fuzzer_found_divide_tiny_hang():
 
     expr = ScalarDivide(ScalarMultiply(Data.SCALAR, Data.SCALAR), Data.SCALAR)
 
-    assert expr.eval((), X, dict()) == np.array(0.0, dtype=np.float64)
+    assert expr.eval(X, dict()) == np.array(0.0, dtype=np.float64)
 
     expr_lower = np.array(0.0, dtype=np.float64)
     expr_upper = np.array(0.0, dtype=np.float64)
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(2.81944e-319, dtype=np.float64)
     assert X_upper == np.array(2.81944e-319, dtype=np.float64)
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(0.0, dtype=np.float64)
-    assert expr.eval((), np.array(X_upper), dict()) == np.array(0.0, dtype=np.float64)
+    assert expr.eval(np.array(X_lower), dict()) == np.array(0.0, dtype=np.float64)
+    assert expr.eval(np.array(X_upper), dict()) == np.array(0.0, dtype=np.float64)
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -935,12 +945,12 @@ def test_fuzzer_found_asinh_excessive_nudging():
 
     expr = ScalarDivide(ScalarMultiply(ScalarAsinh(Data.SCALAR), Data.SCALAR), Euler())
 
-    assert expr.eval((), X, dict()) == np.array(_float128(0.0))
+    assert expr.eval(X, dict()) == np.array(_float128(0.0))
 
     expr_lower = np.array(_float128(0.0))
     expr_upper = np.array(_float128(0.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(_float128(0.0))
     assert X_upper == np.array(_float128(0.0))
 
@@ -951,12 +961,12 @@ def test_fuzzer_found_excessive_nudging_log_power():
 
     expr = ScalarPower(ScalarLog(Logarithm.log10, Data.SCALAR), Euler())
 
-    assert expr.eval((), X, dict()) == np.array(np.inf, dtype=np.float16)
+    assert expr.eval(X, dict()) == np.array(np.inf, dtype=np.float16)
 
     expr_lower = np.array(0.0, dtype=np.float16)
     expr_upper = np.array(np.inf, dtype=np.float16)
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(0.0, dtype=np.float16)
     assert X_upper == np.array(0.0, dtype=np.float16)
 
@@ -994,17 +1004,17 @@ def test_fuzzer_found_nan_power_zero():
         ScalarRoundTiesEven(Data.SCALAR),
     )
 
-    assert expr.eval((), X, dict()) == np.array(_float128(1.0))
+    assert expr.eval(X, dict()) == np.array(_float128(1.0))
 
     expr_lower = np.array(_float128(0.0))
     expr_upper = np.array(_float128(1.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
-    assert X_lower == np.array(_float128(0.0))
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(_float128(-0.5))
     assert X_upper == np.array(_float128(0.5))
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(_float128(1.0))
-    assert expr.eval((), np.array(X_upper), dict()) == np.array(_float128(1.0))
+    assert expr.eval(np.array(X_lower), dict()) == np.array(_float128(1.0))
+    assert expr.eval(np.array(X_upper), dict()) == np.array(_float128(1.0))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1019,12 +1029,12 @@ def test_fuzzer_found_addsub_bound_overflow():
         ScalarAtan(Data.SCALAR),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float16(np.inf))
+    assert expr.eval(X, dict()) == np.array(np.float16(np.inf))
 
     expr_lower = np.array(np.float16(-57376.0))
     expr_upper = np.array(np.float16(np.inf))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(6.0e-08))
     assert X_upper == np.array(np.float16(6.0e-08))
 
@@ -1038,17 +1048,17 @@ def test_fuzzer_found_log_upper_bound_negative_zero():
         ScalarTanh(Data.SCALAR),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float32(np.inf))
+    assert expr.eval(X, dict()) == np.array(np.float32(np.inf))
 
     expr_lower = np.array(np.float32(7.47605e-27))
     expr_upper = np.array(np.float32(np.inf))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float32(1.0e-45))
     assert X_upper == np.array(np.float32(8.66434))
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float32(np.inf))
-    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float32(np.inf))
+    assert expr.eval(np.array(X_lower), dict()) == np.array(np.float32(np.inf))
+    assert expr.eval(np.array(X_upper), dict()) == np.array(np.float32(np.inf))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1060,17 +1070,17 @@ def test_fuzzer_found_excessive_nudging_one_power_nan():
         Number("nan"),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float16(1.0))
+    assert expr.eval(X, dict()) == np.array(np.float16(1.0))
 
     expr_lower = np.array(np.float16(0.0))
     expr_upper = np.array(np.float16(1.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(0.0))
     assert X_upper == np.array(np.float16(0.0))
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(1.0))
-    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float16(1.0))
+    assert expr.eval(np.array(X_lower), dict()) == np.array(np.float16(1.0))
+    assert expr.eval(np.array(X_upper), dict()) == np.array(np.float16(1.0))
 
 
 def test_fuzzer_found_excessive_nudging_atan_product():
@@ -1084,19 +1094,19 @@ def test_fuzzer_found_excessive_nudging_atan_product():
         ScalarAtan(Data.SCALAR),
     )
 
-    assert np.round(expr.eval((), X, dict()), 3) == np.array(np.float32(3.876))
+    assert np.round(expr.eval(X, dict()), 3) == np.array(np.float32(3.876))
 
-    expr_lower = expr.eval((), X, dict())
+    expr_lower = expr.eval(X, dict())
     expr_upper = np.array(np.float32(5.0197614e33))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower <= np.array(np.float32(33556004.0))
     assert X_upper == np.array(np.float32(33556004.0))
 
-    assert np.round(expr.eval((), np.array(X_lower), dict()), 3) == np.array(
+    assert np.round(expr.eval(np.array(X_lower), dict()), 3) == np.array(
         np.float32(3.876)
     )
-    assert np.round(expr.eval((), np.array(X_upper), dict()), 3) == np.array(
+    assert np.round(expr.eval(np.array(X_upper), dict()), 3) == np.array(
         np.float32(3.876)
     )
 
@@ -1113,17 +1123,17 @@ def test_fuzzer_found_oh_no_multiplication():
         ),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float64(1.0))
+    assert expr.eval(X, dict()) == np.array(np.float64(1.0))
 
     expr_lower = np.array(np.float64(-1.4568159901474629e144))
     expr_upper = np.array(np.float64(1.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float64(-1.4568159901474651e144))
     assert X_upper == np.array(np.float64(-1.4568159901474651e144))
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float64(1.0))
-    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float64(1.0))
+    assert expr.eval(np.array(X_lower), dict()) == np.array(np.float64(1.0))
+    assert expr.eval(np.array(X_upper), dict()) == np.array(np.float64(1.0))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1138,17 +1148,17 @@ def test_fuzzer_found_excessive_nudging_product():
         ),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float16(65500.0))
+    assert expr.eval(X, dict()) == np.array(np.float16(65500.0))
 
     expr_lower = np.array(np.float16(0.0))
     expr_upper = np.array(np.float16(65504.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(0.0))
     assert X_upper == np.array(np.float16(255.9))
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(0.0))
-    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float16(65500.0))
+    assert expr.eval(np.array(X_lower), dict()) == np.array(np.float16(0.0))
+    assert expr.eval(np.array(X_upper), dict()) == np.array(np.float16(65500.0))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1163,17 +1173,17 @@ def test_fuzzer_found_excessive_nudging_zero_product():
         ),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float32(0.0))
+    assert expr.eval(X, dict()) == np.array(np.float32(0.0))
 
     expr_lower = np.array(np.float32(0.0))
     expr_upper = np.array(np.float32(1.2630801e-38))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float32(0.0))
     assert X_upper == np.array(np.float32(3.8519333e-19))
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float32(0.0))
-    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float32(0.0))
+    assert expr.eval(np.array(X_lower), dict()) == np.array(np.float32(0.0))
+    assert expr.eval(np.array(X_upper), dict()) == np.array(np.float32(0.0))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1188,19 +1198,19 @@ def test_fuzzer_found_excessive_nudging_division():
         ScalarAbs(Data.SCALAR),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float64(338.2034982942516))
+    assert expr.eval(X, dict()) == np.array(np.float64(338.2034982942516))
 
     expr_lower = np.array(np.float64(338.2034982942516))
     expr_upper = np.array(np.float64(3.7921287488073793e146))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float64(3.7921287488073535e146))
     assert X_upper == np.array(np.float64(3.7921287488073535e146))
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(
+    assert expr.eval(np.array(X_lower), dict()) == np.array(
         np.float64(338.2034982942516)
     )
-    assert expr.eval((), np.array(X_upper), dict()) == np.array(
+    assert expr.eval(np.array(X_upper), dict()) == np.array(
         np.float64(338.2034982942516)
     )
 
@@ -1217,17 +1227,17 @@ def test_fuzzer_found_tan_upper_negative_zero():
         Number("255"),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float16(np.inf))
+    assert expr.eval(X, dict()) == np.array(np.float16(np.inf))
 
     expr_lower = np.array(np.float16(-0.841))
     expr_upper = np.array(np.float16(np.inf))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(-1.57))
     assert X_upper == np.array(np.float16(-0.0))
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(7012.0))
-    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float16(np.inf))
+    assert expr.eval(np.array(X_lower), dict()) == np.array(np.float16(7012.0))
+    assert expr.eval(np.array(X_upper), dict()) == np.array(np.float16(np.inf))
 
 
 def test_fuzzer_found_power_excessive_nudging():
@@ -1238,17 +1248,17 @@ def test_fuzzer_found_power_excessive_nudging():
         ScalarAtan(Data.SCALAR),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float32(197957600000000.0))
+    assert expr.eval(X, dict()) == np.array(np.float32(197957600000000.0))
 
     expr_lower = np.array(np.float32(13323083.0))
     expr_upper = np.array(np.float32(1.979576e14))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float32(0.99480957))
     assert X_upper == np.array(np.float32(13323083.0))
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float32(13323083.0))
-    assert expr.eval((), np.array(X_upper), dict()) == np.array(
+    assert expr.eval(np.array(X_lower), dict()) == np.array(np.float32(13323083.0))
+    assert expr.eval(np.array(X_upper), dict()) == np.array(
         np.float32(197957600000000.0)
     )
 
@@ -1265,17 +1275,17 @@ def test_fuzzer_found_sign_negative_zero_bound():
         ScalarSign(Data.SCALAR),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float16(np.inf))
+    assert expr.eval(X, dict()) == np.array(np.float16(np.inf))
 
     expr_lower = np.array(np.float16(-0.0004613))
     expr_upper = np.array(np.float16(np.inf))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(-np.inf))
     assert X_upper == np.array(np.float16(-6.0e-08))
 
-    assert expr.eval((), np.array(X_lower), dict()) == np.array(np.float16(np.inf))
-    assert expr.eval((), np.array(X_upper), dict()) == np.array(np.float16(np.inf))
+    assert expr.eval(np.array(X_lower), dict()) == np.array(np.float16(np.inf))
+    assert expr.eval(np.array(X_upper), dict()) == np.array(np.float16(np.inf))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1446,17 +1456,17 @@ def test_fuzzer_found_power_nan_zero_in_bounds():
         Data.SCALAR,
     )
 
-    assert np.isnan(expr.eval((), X, dict()))
+    assert np.isnan(expr.eval(X, dict()))
 
     expr_lower = np.array(np.float16(np.nan))
     expr_upper = np.array(np.float16(np.nan))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(-np.inf))
     assert X_upper == np.array(np.float16(-6.0e-08))
 
-    assert np.isnan(expr.eval((), np.array(X_lower), dict()))
-    assert np.isnan(expr.eval((), np.array(X_upper), dict()))
+    assert np.isnan(expr.eval(np.array(X_lower), dict()))
+    assert np.isnan(expr.eval(np.array(X_upper), dict()))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1468,17 +1478,17 @@ def test_fuzzer_found_power_nan_excessive_nudging():
         ScalarExp(Exponential.exp, Data.SCALAR),
     )
 
-    assert np.isnan(expr.eval((), X, dict()))
+    assert np.isnan(expr.eval(X, dict()))
 
     expr_lower = np.array(np.float64(np.nan))
     expr_upper = np.array(np.float64(np.nan))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float64(-744.4400719213812))
     assert X_upper == np.array(np.float64(-5.0e-324))
 
-    assert np.isnan(expr.eval((), np.array(X_lower), dict()))
-    assert np.isnan(expr.eval((), np.array(X_upper), dict()))
+    assert np.isnan(expr.eval(np.array(X_lower), dict()))
+    assert np.isnan(expr.eval(np.array(X_upper), dict()))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1490,17 +1500,17 @@ def test_fuzzer_found_asinh_power_excessive_nudging():
         ScalarFoldedConstant(np.float32(3.2749045e-10)),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float32(0.99999994))
+    assert expr.eval(X, dict()) == np.array(np.float32(0.99999994))
 
     expr_lower = np.array(np.float32(0.0))
     expr_upper = np.array(np.float32(0.99999994))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float32(0.0))
     assert X_upper == np.array(np.float32(2.52e-43))
 
-    assert expr.eval((), X_lower, dict()) == np.array(np.float32(0.0))
-    assert expr.eval((), X_upper, dict()) == np.array(np.float32(0.99999994))
+    assert expr.eval(X_lower, dict()) == np.array(np.float32(0.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float32(0.99999994))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1512,17 +1522,17 @@ def test_fuzzer_found_power_const_exponent_excessive_nudging():
         Number("-1.7976931344677203e+308"),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float32(np.inf))
+    assert expr.eval(X, dict()) == np.array(np.float32(np.inf))
 
     expr_lower = np.array(np.float32(0.0))
     expr_upper = np.array(np.float32(np.inf))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float32(-0.99999994))
     assert X_upper == np.array(np.float32(0.99999994))
 
-    assert expr.eval((), X_lower, dict()) == np.array(np.float32(np.inf))
-    assert expr.eval((), X_upper, dict()) == np.array(np.float32(np.inf))
+    assert expr.eval(X_lower, dict()) == np.array(np.float32(np.inf))
+    assert expr.eval(X_upper, dict()) == np.array(np.float32(np.inf))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1534,17 +1544,17 @@ def test_fuzzer_found_power_cos_ln_excessive_nudging():
         ScalarLog(Logarithm.ln, Data.SCALAR),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float32(1.0))
+    assert expr.eval(X, dict()) == np.array(np.float32(1.0))
 
     expr_lower = np.array(np.float32(0.0))
     expr_upper = np.array(np.float32(1.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float32(0.0))
     assert X_upper == np.array(np.float32(0.0))
 
-    assert expr.eval((), X_lower, dict()) == np.array(np.float32(1.0))
-    assert expr.eval((), X_upper, dict()) == np.array(np.float32(1.0))
+    assert expr.eval(X_lower, dict()) == np.array(np.float32(1.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float32(1.0))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1556,17 +1566,17 @@ def test_fuzzer_found_power_ensure_array():
         ScalarReciprocal(Data.SCALAR),
     )
 
-    assert expr.eval((), X, dict()) == np.array(_float128(np.inf))
+    assert expr.eval(X, dict()) == np.array(_float128(np.inf))
 
     expr_lower = np.array(_float128(0.0))
     expr_upper = np.array(_float128(np.inf))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(_float128(0.0))
     assert X_upper == np.array(_float128(0.0))
 
-    assert expr.eval((), X_lower, dict()) == np.array(_float128(np.inf))
-    assert expr.eval((), X_upper, dict()) == np.array(_float128(np.inf))
+    assert expr.eval(X_lower, dict()) == np.array(_float128(np.inf))
+    assert expr.eval(X_upper, dict()) == np.array(_float128(np.inf))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1578,21 +1588,21 @@ def test_fuzzer_found_power_lower_bound_clamp():
         ScalarExp(Exponential.exp10, Data.SCALAR),
     )
 
-    assert expr.eval((), X, dict()) == np.array(
+    assert expr.eval(X, dict()) == np.array(
         _float128("-1.1383000707268022330514359191511894e+004")
     )
 
     expr_lower = np.array(_float128("-1.1383000707268022330514359191511894e+004"))
     expr_upper = np.array(_float128(0.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(_float128("2.6644362440334694804167e-4944"))
     assert X_upper == np.array(_float128("2.6644362440334694804167e-4944"))
 
-    assert expr.eval((), X_lower, dict()) == np.array(
+    assert expr.eval(X_lower, dict()) == np.array(
         _float128("-1.1383000707268022330514359191511894e+004")
     )
-    assert expr.eval((), X_upper, dict()) == np.array(
+    assert expr.eval(X_upper, dict()) == np.array(
         _float128("-1.1383000707268022330514359191511894e+004")
     )
 
@@ -1606,17 +1616,17 @@ def test_fuzzer_found_power_guaranteed_bounds():
         ScalarExp(Exponential.exp, Data.SCALAR),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float16(0.01535))
+    assert expr.eval(X, dict()) == np.array(np.float16(0.01535))
 
     expr_lower = np.array(np.float16(0.01535))
     expr_upper = np.array(np.float16(0.04236))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(0.01643))
     assert X_upper == np.array(np.float16(0.01646))
 
-    assert expr.eval((), X_lower, dict()) == np.array(np.float16(0.01535))
-    assert expr.eval((), X_upper, dict()) == np.array(np.float16(0.01538))
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(0.01535))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.01538))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1628,17 +1638,17 @@ def test_fuzzer_found_power_one_ln():
         ScalarLog(Logarithm.ln, Data.SCALAR),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float16(1.0))
+    assert expr.eval(X, dict()) == np.array(np.float16(1.0))
 
     expr_lower = np.array(np.float16(0.1562))
     expr_upper = np.array(np.float16(1.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(0.0))
     assert X_upper == np.array(np.float16(np.inf))
 
-    assert expr.eval((), X_lower, dict()) == np.array(np.float16(1.0))
-    assert expr.eval((), X_upper, dict()) == np.array(np.float16(1.0))
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(1.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(1.0))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1650,17 +1660,17 @@ def test_fuzzer_found_power_abs_abs_excessive_nudging():
         ScalarAbs(Data.SCALAR),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float64(1.0))
+    assert expr.eval(X, dict()) == np.array(np.float64(1.0))
 
     expr_lower = np.array(np.float64(1.0))
     expr_upper = np.array(np.float64(4.4417230418076605e291))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float64(-1.2682853192147052e-30))
     assert X_upper == np.array(np.float64(-1.2682853192147052e-30))
 
-    assert expr.eval((), X_lower, dict()) == np.array(np.float64(1.0))
-    assert expr.eval((), X_upper, dict()) == np.array(np.float64(1.0))
+    assert expr.eval(X_lower, dict()) == np.array(np.float64(1.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float64(1.0))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1672,17 +1682,17 @@ def test_fuzzer_found_power_trunc_sign():
         ScalarSign(Data.SCALAR),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float16(-np.inf))
+    assert expr.eval(X, dict()) == np.array(np.float16(-np.inf))
 
     expr_lower = np.array(np.float16(-np.inf))
     expr_upper = np.array(np.float16(-0.841))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(-0.9995))
     assert X_upper == np.array(np.float16(-6.0e-08))
 
-    assert expr.eval((), X_lower, dict()) == np.array(np.float16(-np.inf))
-    assert expr.eval((), X_upper, dict()) == np.array(np.float16(-np.inf))
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(-np.inf))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(-np.inf))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1694,14 +1704,195 @@ def test_fuzzer_found_power_tanh_acos_excessive_nudging():
         ScalarAcos(Data.SCALAR),
     )
 
-    assert expr.eval((), X, dict()) == np.array(np.float32(0.0))
+    assert expr.eval(X, dict()) == np.array(np.float32(0.0))
 
     expr_lower = np.array(np.float32(-2.430206e09))
     expr_upper = np.array(np.float32(1.9024737e-38))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, X, dict())
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float32(0.0))
     assert X_upper == np.array(np.float32(1.2555627e-32))
 
-    assert expr.eval((), X_lower, dict()) == np.array(np.float32(0.0))
-    assert expr.eval((), X_upper, dict()) == np.array(np.float32(0.0))
+    assert expr.eval(X_lower, dict()) == np.array(np.float32(0.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float32(0.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_sum_upper_bound_negative_zero():
+    X = np.array([np.float16(131.0), np.float16(187.0)])
+
+    expr = ScalarAcosh(
+        ScalarReciprocal(
+            ScalarSubtract(
+                ScalarSqrt(Number.from_symbolic_int(2632)),
+                Data.SCALAR,
+            )
+        ),
+    )
+
+    assert np.all(np.isnan(expr.eval(X, dict())))
+
+    expr_lower = np.array([np.float16(np.nan), np.float16(np.nan)])
+    expr_upper = np.array([np.float16(np.nan), np.float16(np.nan)])
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    assert np.all(X_lower == np.array([np.float16(51.34), np.float16(51.34)]))
+    assert np.all(X_upper == np.array([np.float16(np.inf), np.float16(np.inf)]))
+
+    assert np.all(np.isnan(expr.eval(X_lower, dict())))
+    assert np.all(np.isnan(expr.eval(X_upper, dict())))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_negative_zero_excessive_nudging():
+    X = np.array(_float128(0.0))
+
+    expr = ScalarDivide(ScalarMultiply(ScalarCeil(Data.SCALAR), Number.ZERO), Euler())
+
+    assert expr.eval(X, dict()) == np.array(_float128(0.0))
+
+    expr_lower = np.array(_float128(0.0))
+    expr_upper = np.array(_float128(0.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(_float128(0.0))
+    assert X_upper == np.array(_floating_max(_float128_dtype))
+
+    assert expr.eval(X_lower, dict()) == np.array(_float128(0.0))
+    assert expr.eval(X_upper, dict()) == np.array(_float128(0.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_upper_data_bounds_below():
+    X = np.array(np.float16(1.09e-05))
+
+    expr = ScalarSubtract(ScalarTrunc(Data.SCALAR), ScalarTrunc(Data.SCALAR))
+
+    assert expr.eval(X, dict()) == np.array(np.float16(0.0))
+
+    expr_lower = np.array(np.float16(0.0))
+    expr_upper = np.array(np.float16(0.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(np.float16(0.0))
+    assert X_upper == np.array(np.float16(0.9995))
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(0.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.0))
+
+
+def test_fuzzer_found_not_data_bound():
+    X = np.array(np.float64(3.1e-322))
+
+    expr = ScalarNot(Data.SCALAR)
+
+    assert expr.eval(X, dict()) == np.array(np.float64(0.0))
+
+    expr_lower = np.array(np.float64(0.0))
+    expr_upper = np.array(np.float64(0.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(
+        np.float64(_floating_smallest_subnormal(np.dtype(np.float64)))
+    )
+    assert X_upper == np.array(np.float64(np.inf))
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float64(0.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float64(0.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_asinh_less_asinh():
+    X = np.array(_float128("1.65e-4963"))
+
+    expr = ScalarLess(ScalarAsinh(Data.SCALAR), ScalarAsinh(Data.SCALAR))
+
+    assert expr.eval(X, dict()) == np.array(_float128(0.0))
+
+    expr_lower = np.array(_float128(0.0))
+    expr_upper = np.array(_float128(0.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(_float128("1.65e-4963"))
+    assert X_upper == np.array(_float128("1.65e-4963"))
+
+    assert expr.eval(X_lower, dict()) == np.array(_float128(0.0))
+    assert expr.eval(X_upper, dict()) == np.array(_float128(0.0))
+
+
+def test_fuzzer_found_negx_less_x():
+    X = np.array(0.0, dtype=np.float16)
+
+    expr = ScalarLess(ScalarNegate(Data.SCALAR), Data.SCALAR)
+
+    assert expr.eval(X, dict()) == np.array(np.float16(0.0))
+
+    expr_lower = np.array(np.float16(0.0))
+    expr_upper = np.array(np.float16(0.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(np.float16(-np.inf))
+    assert X_upper == np.array(np.float16(0.0))
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(0.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.0))
+
+
+def test_fuzzer_found_any_zero_singularity():
+    X = np.array(np.float32(-2.2334841e18))
+
+    expr = ScalarAny(Data.SCALAR, ScalarIsNaN(Data.SCALAR), Data.SCALAR)
+
+    assert expr.eval(X, dict()) == np.array(np.float32(1.0))
+
+    expr_lower = np.array(np.float32(8.8e-44))
+    expr_upper = np.array(np.float32(1.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(np.float32(-np.inf))
+    assert X_upper == np.array(
+        np.float32(-_floating_smallest_subnormal(np.dtype(np.float32)))
+    )
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float32(1.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float32(1.0))
+
+
+def test_fuzzer_found_cosh_equal_isfinite():
+    X = np.array(0.04678, dtype=np.float16)
+
+    expr = ScalarEqual(ScalarCosh(Data.SCALAR), ScalarIsFinite(Data.SCALAR))
+
+    assert expr.eval(X, dict()) == np.array(np.float16(0.0))
+
+    expr_lower = np.array(np.float16(0.0))
+    expr_upper = np.array(np.float16(0.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(np.float16(0.0442))
+    assert X_upper == np.array(np.float16(np.inf))
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(0.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.0))
+
+
+@pytest.mark.xfail(reason="https://github.com/numpy/numpy-user-dtypes/issues/239")
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_foo():
+    X = np.array(_float128("3.362103143112093476804027502198658e-4932"))
+
+    expr = ScalarAdd(
+        ScalarNot(Data.SCALAR),
+        ScalarAdd(ScalarAsinh(Data.SCALAR), ScalarAsinh(Data.SCALAR)),
+    )
+
+    assert expr.eval(X, dict()) == np.array(
+        _float128("6.724206286224186953608055004397316e-4932")
+    )
+
+    # expr_lower = np.array(_float128(0.0))
+    # expr_upper = np.array(_float128("3.362103143112093476804027502198658e-4932"))
+
+    # X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    # assert X_lower == np.array(_float128("3.362103143112093476804027502198658e-4932"))
+    # assert X_upper == np.array(_float128("3.362103143112093476804027502198658e-4932"))

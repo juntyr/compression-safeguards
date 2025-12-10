@@ -5,12 +5,12 @@ Pointwise quantity of interest (QoI) error bound safeguard.
 __all__ = ["PointwiseQuantityOfInterestErrorBoundSafeguard"]
 
 from collections.abc import Set
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import _ensure_array
+from ....utils._compat import _ensure_array, _logical_and, _ones, _place, _reshape
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import ToFloatMode, saturating_finite_float_cast, to_float
 from ....utils.error import TypeCheckError, ctx, lookup_enum_or_raise
@@ -48,11 +48,10 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
     The error bound can be verified by evaluating the QoI in the floating-point
     data type selected by `qoi_dtype` parameter using the
-    [`evaluate_qoi`][compression_safeguards.safeguards.pointwise.qoi.eb.PointwiseQuantityOfInterestErrorBoundSafeguard.evaluate_qoi]
-    method.
+    [`evaluate_qoi`][.evaluate_qoi] method.
 
     Please refer to the
-    [`PointwiseQuantityOfInterestExpression`][compression_safeguards.safeguards.qois.PointwiseQuantityOfInterestExpression]
+    [`PointwiseQuantityOfInterestExpression`][.....qois.PointwiseQuantityOfInterestExpression]
     for the EBNF grammar that specifies the language in which the quantities of
     interest are written.
 
@@ -219,22 +218,28 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                 ftype: np.dtype[F] = self._qoi_dtype.floating_point_dtype_for(
                     data.dtype
                 )  # type: ignore
-                data_float: np.ndarray[S, np.dtype[F]] = to_float(data, ftype=ftype)
+                data_float: np.ndarray[tuple[int], np.dtype[F]] = to_float(
+                    data, ftype=ftype
+                ).flatten()
 
-            late_bound_constants: dict[Parameter, np.ndarray[S, np.dtype[F]]] = dict()
+            late_bound_constants: dict[
+                Parameter, np.ndarray[tuple[int], np.dtype[F]]
+            ] = dict()
             with ctx.parameter("qoi"):
                 for c in self._qoi_expr.late_bound_constants:
                     with ctx.parameter(c):
                         late_bound_constants[c] = (
                             late_bound.resolve_ndarray_with_lossless_cast(
-                                c, data.shape, data_float.dtype
-                            )
+                                c, data.shape, ftype
+                            ).flatten()
                         )
 
-        return self._qoi_expr.eval(
+        qoi_: np.ndarray[tuple[int], np.dtype[F]] = self._qoi_expr.eval(
             data_float,
             late_bound_constants,
         )
+        qoi: np.ndarray[S, np.dtype[F]] = _reshape(qoi_, data.shape)
+        return qoi
 
     @override
     def check_pointwise(
@@ -243,6 +248,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `prediction` array satisfy the error bound
@@ -256,6 +262,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only check at data points where the condition is [`True`][True].
 
         Returns
         -------
@@ -293,50 +301,74 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                 ftype: np.dtype[np.floating] = self._qoi_dtype.floating_point_dtype_for(
                     data.dtype
                 )
-                data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(
+                data_float: np.ndarray[tuple[int], np.dtype[np.floating]] = to_float(
                     data, ftype=ftype
+                ).flatten()
+                prediction_float: np.ndarray[tuple[int], np.dtype[np.floating]] = (
+                    to_float(prediction, ftype=ftype).flatten()
                 )
 
             late_bound_constants: dict[
-                Parameter, np.ndarray[S, np.dtype[np.floating]]
+                Parameter, np.ndarray[tuple[int], np.dtype[np.floating]]
             ] = dict()
             with ctx.parameter("qoi"):
                 for c in self._qoi_expr.late_bound_constants:
                     with ctx.parameter(c):
                         late_bound_constants[c] = (
                             late_bound.resolve_ndarray_with_lossless_cast(
-                                c, data.shape, data_float.dtype
-                            )
+                                c, data.shape, ftype
+                            ).flatten()
                         )
 
-            qoi_data = self._qoi_expr.eval(data_float, late_bound_constants)
-            qoi_prediction = self._qoi_expr.eval(
-                to_float(prediction, ftype=ftype), late_bound_constants
+            # optimization: only evaluate the QoI where necessary
+            if where is not True:
+                data_float = np.extract(where, data_float)
+                prediction_float = np.extract(where, prediction_float)
+                late_bound_constants = {
+                    c: np.extract(where, cv) for (c, cv) in late_bound_constants.items()
+                }
+
+            qoi_data: np.ndarray[tuple[int], np.dtype[np.floating]] = (
+                self._qoi_expr.eval(data_float, late_bound_constants)
+            )
+            qoi_prediction: np.ndarray[tuple[int], np.dtype[np.floating]] = (
+                self._qoi_expr.eval(prediction_float, late_bound_constants)
             )
 
             with ctx.parameter("eb"):
-                eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
+                eb: np.ndarray[tuple[()] | tuple[int], np.dtype[np.floating]] = (
                     late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                         self._eb,
-                        qoi_data.shape,
-                        qoi_data.dtype,
-                    )
+                        data.shape,
+                        ftype,
+                    ).flatten()
                     if isinstance(self._eb, Parameter)
-                    else saturating_finite_float_cast(self._eb, qoi_data.dtype)
+                    else saturating_finite_float_cast(self._eb, ftype)
                 )
                 if isinstance(self._eb, Parameter):
                     _eb: Parameter = self._eb
                     with ctx.late_bound_parameter(_eb):
                         _check_error_bound(self._type, eb)
 
-        finite_ok: np.ndarray[S, np.dtype[np.bool]] = np.less_equal(
+        if where is not True and eb.shape != ():
+            eb = np.extract(where, eb)
+
+        finite_ok: np.ndarray[tuple[int], np.dtype[np.bool]] = np.less_equal(
             _compute_finite_absolute_error(self._type, qoi_data, qoi_prediction),
             _compute_finite_absolute_error_bound(self._type, eb, qoi_data),
         )
 
-        ok: np.ndarray[S, np.dtype[np.bool]] = _ensure_array(finite_ok)
-        np.equal(qoi_data, qoi_prediction, out=ok, where=np.isinf(qoi_data))
-        np.isnan(qoi_prediction, out=ok, where=np.isnan(qoi_data))
+        ok_: np.ndarray[tuple[int], np.dtype[np.bool]] = _ensure_array(finite_ok)
+        np.equal(qoi_data, qoi_prediction, out=ok_, where=np.isinf(qoi_data))
+        np.isnan(qoi_prediction, out=ok_, where=np.isnan(qoi_data))
+
+        # the check succeeds where `where` is False
+        ok: np.ndarray[S, np.dtype[np.bool]]
+        if where is True:
+            ok = _reshape(ok_, data.shape)
+        else:
+            ok = _ones(data.shape, np.dtype(np.bool))
+            _place(ok, where, ok_)
 
         return ok
 
@@ -346,6 +378,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         data: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the error bound is upheld with
@@ -357,6 +390,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the safe intervals at pointwise checks where the
+            condition is [`True`][True].
 
         Returns
         -------
@@ -394,59 +430,149 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                 ftype: np.dtype[np.floating] = self._qoi_dtype.floating_point_dtype_for(
                     data.dtype
                 )
-                data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(
+                data_float: np.ndarray[tuple[int], np.dtype[np.floating]] = to_float(
                     data, ftype=ftype
-                )
+                ).flatten()
 
             late_bound_constants: dict[
-                Parameter, np.ndarray[S, np.dtype[np.floating]]
+                Parameter, np.ndarray[tuple[int], np.dtype[np.floating]]
             ] = dict()
             with ctx.parameter("qoi"):
                 for c in self._qoi_expr.late_bound_constants:
                     with ctx.parameter(c):
                         late_bound_constants[c] = (
                             late_bound.resolve_ndarray_with_lossless_cast(
-                                c, data.shape, data_float.dtype
-                            )
+                                c, data.shape, ftype
+                            ).flatten()
                         )
 
-            data_qoi = self._qoi_expr.eval(data_float, late_bound_constants)
+            # optimization: only evaluate the QoI and compute data bounds where
+            #  necessary
+            if where is not True:
+                data_float = np.extract(where, data_float)
+                late_bound_constants = {
+                    c: np.extract(where, cv) for (c, cv) in late_bound_constants.items()
+                }
+
+            data_qoi: np.ndarray[tuple[int], np.dtype[np.floating]] = (
+                self._qoi_expr.eval(data_float, late_bound_constants)
+            )
 
             with ctx.parameter("eb"):
-                eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
+                eb: np.ndarray[tuple[()] | tuple[int], np.dtype[np.floating]] = (
                     late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                         self._eb,
-                        data_qoi.shape,
-                        data_qoi.dtype,
-                    )
+                        data.shape,
+                        ftype,
+                    ).flatten()
                     if isinstance(self._eb, Parameter)
-                    else saturating_finite_float_cast(self._eb, data_qoi.dtype)
+                    else saturating_finite_float_cast(self._eb, ftype)
                 )
                 if isinstance(self._eb, Parameter):
                     _eb: Parameter = self._eb
                     with ctx.late_bound_parameter(_eb):
                         _check_error_bound(self._type, eb)
 
-        qoi_lower_upper: tuple[
-            np.ndarray[S, np.dtype[np.floating]], np.ndarray[S, np.dtype[np.floating]]
-        ] = _apply_finite_qoi_error_bound(
-            self._type,
-            eb,
-            data_qoi,
-        )
-        qoi_lower, qoi_upper = qoi_lower_upper
+            if where is not True and eb.shape != ():
+                eb = np.extract(where, eb)
+
+        qoi_lower, qoi_upper = _apply_finite_qoi_error_bound(self._type, eb, data_qoi)
 
         # compute the bounds in data space
-        data_float_lower, data_float_upper = self._qoi_expr.compute_data_bounds(
+        data_float_lower_, data_float_upper_ = self._qoi_expr.compute_data_bounds(
             qoi_lower,
             qoi_upper,
             data_float,
             late_bound_constants,
         )
 
+        # the data bounds can be arbitrary where `where` is False since they
+        #  are later overridden by preserve_only_where
+        data_float_lower: np.ndarray[S, np.dtype[np.floating]]
+        data_float_upper: np.ndarray[S, np.dtype[np.floating]]
+        if where is True:
+            data_float_lower = _reshape(data_float_lower_, data.shape)
+            data_float_upper = _reshape(data_float_upper_, data.shape)
+        else:
+            # FIXME: https://github.com/numpy/numpy-user-dtypes/issues/163
+            with np.errstate(invalid="ignore"):
+                data_float_lower = np.full(data.shape, -np.inf, ftype)
+                data_float_upper = np.full(data.shape, np.inf, ftype)
+            _place(data_float_lower, where, data_float_lower_)
+            _place(data_float_upper, where, data_float_upper_)
+
+        wheref: Literal[True] | np.ndarray[tuple[int], np.dtype[np.bool]] = (
+            True if where is True else where.flatten()
+        )
+
         return compute_safe_data_lower_upper_interval_union(
             data, data_float_lower, data_float_upper
-        )
+        ).preserve_only_where(wheref)
+
+    @override
+    def compute_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the footprint of the `foot` array, e.g. for expanding data
+        points into the pointwise checks that they contribute to.
+
+        The footprint is equivalent to `foot & where`.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the footprint at pointwise checks where the condition
+            is [`True`][True].
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The footprint of the `foot` array.
+        """
+
+        return _logical_and(foot, where)
+
+    @override
+    def compute_inverse_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the inverse footprint of the `foot` array, e.g. for expanding
+        pointwise check fails into the points that could have contributed to
+        the failures.
+
+        The inverse footprint is equivalent to `foot & where`.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the inverse footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the inverse footprint at pointwise checks where the
+            condition is [`True`][True].
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The inverse footprint of the `foot` array.
+        """
+
+        return _logical_and(foot, where)
 
     @override
     def get_config(self) -> dict[str, JSON]:

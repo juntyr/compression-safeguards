@@ -1,11 +1,19 @@
+from collections.abc import Set
+from typing import ClassVar, Literal
+
 import numpy as np
+from typing_extensions import override  # MSPV 3.12
 
 from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.pointwise.abc import PointwiseSafeguard
 from compression_safeguards.safeguards.stencil.abc import StencilSafeguard
+from compression_safeguards.utils.bindings import Bindings, Parameter
+from compression_safeguards.utils.intervals import Interval, IntervalUnion
+from compression_safeguards.utils.typing import JSON, S, T
 
 from .codecs import (
     encode_decode_identity,
+    encode_decode_mock,
     encode_decode_neg,
     encode_decode_noise,
     encode_decode_zero,
@@ -168,3 +176,207 @@ def test_inheritance():
         assert len(safeguards.safeguards) == 1
         assert not isinstance(safeguards.safeguards[0], PointwiseSafeguard)
         assert isinstance(safeguards.safeguards[0], StencilSafeguard)
+
+
+def test_fuzzer_found_any_selector_shape():
+    data = np.array(
+        [
+            [-1.849731611000141e095, np.nan, np.nan],
+            [np.nan, np.nan, 5.915260930833873e-270],
+            [5.686073566141173e-270, 5.686073566141173e-270, 5.686073566141173e-270],
+        ],
+        dtype=np.float64,
+    )
+    decoded = np.array(
+        [
+            [5.686073566141173e-270, 5.686073566141173e-270, 5.686073566141173e-270],
+            [5.686073566141173e-270, 5.686073566141173e-270, np.nan],
+            [np.nan, np.nan, np.nan],
+        ],
+        dtype=np.float64,
+    )
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[dict(kind="sign", offset=43)]
+        + [
+            dict(
+                kind="qoi_eb_stencil",
+                qoi="""
+                    all([
+                        # weakly decreasing & not constant sequences stay weakly decreasing
+                        any([all(X[1:] <= X[:-1]), not(all([
+                            all(C["$X"][1:] <= C["$X"][:-1]),
+                            not(all(C["$X"][1:] == C["$X"][:-1])),
+                        ]))]),
+                        # weakly increasing & not constant sequences stay weakly increasing
+                        any([all(X[1:] >= X[:-1]), not(all([
+                            all(C["$X"][1:] >= C["$X"][:-1]),
+                            not(all(C["$X"][1:] == C["$X"][:-1])),
+                        ]))]),
+                    ])
+                """,
+                neighbourhood=[dict(axis=axis, before=1, after=1, boundary="valid")],
+                type="abs",
+                eb=0,
+            )
+            for axis in range(data.ndim)
+        ],
+    )
+
+
+def test_all_stencil_requirements():
+    data = np.array([256, 256], dtype=np.int16)
+    decoded = np.array([0, 0], dtype=np.int16)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(
+                kind="all",
+                safeguards=[
+                    dict(kind="assume_safe"),
+                    dict(
+                        kind="qoi_eb_stencil",
+                        qoi="sum(X)",
+                        neighbourhood=[
+                            dict(
+                                axis=0,
+                                before=1,
+                                after=1,
+                                boundary="constant",
+                                constant_boundary="$x_max",
+                            ),
+                        ],
+                        type="abs",
+                        eb=1,
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
+def test_any_unsafely_shadowed_stencil_requirements():
+    data = np.array([256, 256], dtype=np.int16)
+    decoded = np.array([0, 0], dtype=np.int16)
+
+    # prior to https://github.com/juntyr/compression-safeguards/pull/48,
+    #  the any safeguard would union safe intervals per-point and the
+    #  stencil safety could thus be shadowed by neighbouring points
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(
+                kind="any",
+                safeguards=[
+                    SometimesSafeguard(is_safe="is_safe"),
+                    dict(
+                        kind="qoi_eb_stencil",
+                        qoi="sum(X)",
+                        neighbourhood=[
+                            dict(
+                                axis=0,
+                                before=1,
+                                after=1,
+                                boundary="constant",
+                                constant_boundary="$x_max",
+                            ),
+                        ],
+                        type="abs",
+                        eb=1,
+                    ),
+                ],
+            ),
+        ],
+        fixed_constants=dict(is_safe=np.array([True, False])),
+    )
+
+
+# a safeguard that sometimes reports always safe and sometimes always unsafe
+# this is just for testing since we require that a safeguard must always have a
+#  non-empty safe interval
+class SometimesSafeguard(PointwiseSafeguard):
+    __slots__: tuple[str, ...] = ("_is_safe",)
+    _is_safe: Parameter
+
+    kind: ClassVar[str] = "sometimes_safe"
+
+    def __init__(self, *, is_safe: str | Parameter) -> None:
+        self._is_safe = (
+            is_safe if isinstance(is_safe, Parameter) else Parameter(is_safe)
+        )
+
+    @property
+    @override
+    def late_bound(self) -> Set[Parameter]:
+        return frozenset([self._is_safe])
+
+    @override
+    def check_pointwise(
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        prediction: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        is_safe = late_bound.resolve_ndarray_with_lossless_cast(
+            self._is_safe, data.shape, np.dtype(np.intp)
+        )
+
+        return (is_safe != 0) | where
+
+    @override
+    def compute_safe_intervals(
+        self,
+        data: np.ndarray[S, np.dtype[T]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> IntervalUnion[T, int, int]:
+        is_safe = late_bound.resolve_ndarray_with_lossless_cast(
+            self._is_safe, data.shape, np.dtype(np.intp)
+        )
+
+        return (
+            Interval.empty_like(data)
+            .preserve_only_where(is_safe == 0)
+            .preserve_only_where(True if where is True else where.flatten())
+            .into_union()
+        )
+
+    @override
+    def compute_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        is_safe = late_bound.resolve_ndarray_with_lossless_cast(
+            self._is_safe, foot.shape, np.dtype(np.intp)
+        )
+
+        return (is_safe == 0) & where
+
+    @override
+    def compute_inverse_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        is_safe = late_bound.resolve_ndarray_with_lossless_cast(
+            self._is_safe, foot.shape, np.dtype(np.intp)
+        )
+
+        return (is_safe == 0) & where
+
+    @override
+    def get_config(self) -> dict[str, JSON]:
+        return dict(kind=type(self).kind, is_safe=str(self._is_safe))

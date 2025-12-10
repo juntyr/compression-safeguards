@@ -28,9 +28,9 @@ class ErrorBound(Enum):
     Different types of error bounds that can be guaranteed by various
     safeguards, including:
 
-    - [`ErrorBoundSafeguard`][compression_safeguards.safeguards.pointwise.eb.ErrorBoundSafeguard]
-    - [`PointwiseQuantityOfInterestErrorBoundSafeguard`][compression_safeguards.safeguards.pointwise.qoi.eb.PointwiseQuantityOfInterestErrorBoundSafeguard]
-    - [`StencilQuantityOfInterestErrorBoundSafeguard`][compression_safeguards.safeguards.stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard]
+    - [`ErrorBoundSafeguard`][...pointwise.eb.ErrorBoundSafeguard]
+    - [`PointwiseQuantityOfInterestErrorBoundSafeguard`][...pointwise.qoi.eb.PointwiseQuantityOfInterestErrorBoundSafeguard]
+    - [`StencilQuantityOfInterestErrorBoundSafeguard`][...stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard]
     """
 
     abs = auto()
@@ -451,6 +451,10 @@ def _apply_finite_qoi_error_bound(
                 upper: np.ndarray[S, np.dtype[F]] = _ensure_array(
                     np.add(qoi_float, eb_abs)
                 )
+
+            # optimistically allow both -0.0 and +0.0
+            lower[lower == 0] = -0.0
+            upper[upper == 0] = +0.0
 
             # correct rounding errors in the lower and upper bound
             with np.errstate(

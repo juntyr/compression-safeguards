@@ -20,17 +20,17 @@ warnings.filterwarnings("error")
 
 def generate_interval_union(
     data: atheris.FuzzedDataProvider, n: int, imin: int, imax: int
-) -> tuple[IntervalUnion[np.int_, int, int], set[int]]:
+) -> tuple[IntervalUnion[np.intp, int, int], set[int]]:
     n = data.ConsumeIntInRange(1, n)
 
     pivots = sorted(data.ConsumeIntInRange(imin, imax) for _ in range(n * 2))
 
-    intervals = IntervalUnion.empty(np.dtype(np.int_), 1, 1)
+    intervals = IntervalUnion.empty(np.dtype(np.intp), 1, 1)
     elems: set[int] = set()
 
     for i in range(n):
         low, high = pivots[i * 2], pivots[i * 2 + 1]
-        interval = Interval.empty(np.dtype(np.int_), 1)
+        interval = Interval.empty(np.dtype(np.intp), 1)
         Lower(np.array(low)) <= interval[:] <= Upper(np.array(high))
         intervals = intervals.union(interval.into_union())
         elems = elems.union(range(low, high + 1))
@@ -46,7 +46,7 @@ def check_one_input(data) -> None:
     info: list[Any] = []
 
     try:
-        intervals = IntervalUnion.empty(np.dtype(np.int_), 1, 1)
+        intervals = IntervalUnion.empty(np.dtype(np.intp), 1, 1)
         elems: set[int] = set()
 
         # generate #m interval unions with 1-#n intervals each

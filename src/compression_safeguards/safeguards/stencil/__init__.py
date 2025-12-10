@@ -5,6 +5,8 @@ Implementations for the provided [`StencilSafeguard`][compression_safeguards.saf
 __all__ = ["BoundaryCondition", "NeighbourhoodAxis", "NeighbourhoodBoundaryAxis"]
 
 from enum import Enum, auto
+from functools import reduce
+from typing import Literal
 
 import numpy as np
 from typing_extensions import (
@@ -13,17 +15,16 @@ from typing_extensions import (
     override,  # MSPV 3.12
 )
 
-from compression_safeguards.utils.error import TypeCheckError, ctx, lookup_enum_or_raise
-
+from ...utils._compat import _sliding_window_view
 from ...utils.bindings import Parameter
-from ...utils.typing import JSON, S, T
+from ...utils.error import TypeCheckError, ctx, lookup_enum_or_raise
+from ...utils.typing import JSON, TB, S
 
 
 class BoundaryCondition(Enum):
     """
     Different types of boundary conditions that can be applied to the data
-    array domain boundaries for
-    [`StencilSafeguard`][compression_safeguards.safeguards.stencil.abc.StencilSafeguard]s.
+    array domain boundaries for [`StencilSafeguard`][..abc.StencilSafeguard]s.
 
     Since stencil safeguards operate over small neighbourhoods of data points,
     points at the boundary, where part of the neighbourhood may not exist, need
@@ -338,20 +339,20 @@ class NeighbourhoodBoundaryAxis:
 
 
 def _pad_with_boundary(
-    a: np.ndarray[S, np.dtype[T]],
+    a: np.ndarray[S, np.dtype[TB]],
     boundary: BoundaryCondition,
     pad_before: int,
     pad_after: int,
-    constant: None | np.ndarray[tuple[()], np.dtype[T]],
+    constant: None | np.ndarray[tuple[()], np.dtype[TB]],
     axis: int,
-) -> np.ndarray[tuple[int, ...], np.dtype[T]]:
+) -> np.ndarray[tuple[int, ...], np.dtype[TB]]:
     if (axis >= a.ndim) or (axis < -a.ndim):
         return a
 
     pad_width = [(0, 0)] * a.ndim
     pad_width[axis] = (pad_before, pad_after)
 
-    kwargs = dict()
+    kwargs: dict[str, None | str | np.ndarray[tuple[()], np.dtype[TB]]] = dict()
     match boundary:
         case BoundaryCondition.valid:
             return a
@@ -362,13 +363,83 @@ def _pad_with_boundary(
             mode = "edge"
         case BoundaryCondition.reflect:
             mode = "reflect"
-            kwargs["reflect_type"] = "even"  # type: ignore
+            kwargs["reflect_type"] = "even"
         case BoundaryCondition.symmetric:
             mode = "symmetric"
-            kwargs["reflect_type"] = "even"  # type: ignore
+            kwargs["reflect_type"] = "even"
         case BoundaryCondition.wrap:
             mode = "wrap"
         case _:
             assert_never(boundary)
 
     return np.pad(a, pad_width, mode, **kwargs)  # type: ignore
+
+
+def _reverse_neighbourhood_indices(
+    data_shape: tuple[int, ...],
+    neighbourhood: tuple[NeighbourhoodBoundaryAxis, ...],
+    window_used: np.ndarray[tuple[int, ...], np.dtype[np.bool]],
+    where_flat: Literal[True] | np.ndarray[tuple[int], np.dtype[np.bool]],
+) -> np.ndarray[tuple[int, int], np.dtype[np.intp]]:
+    data_size = reduce(lambda x, y: x * y, data_shape, 1)
+
+    window = tuple(axis.before + 1 + axis.after for axis in neighbourhood)
+    window_size = reduce(lambda x, y: x * y, window, 1)
+
+    # compute how the data indices are distributed into windows
+    # i.e. for each derived element, which data does it depend on
+    indices_boundary = np.arange(data_size).reshape(data_shape)
+    for axis in neighbourhood:
+        indices_boundary = _pad_with_boundary(
+            indices_boundary,
+            axis.boundary,
+            axis.before,
+            axis.after,
+            None if axis.constant_boundary is None else np.full((), data_size),
+            axis.axis,
+        )
+    indices_windows = _sliding_window_view(
+        indices_boundary,
+        window,
+        axis=tuple(axis.axis for axis in neighbourhood),
+        writeable=False,
+    ).reshape((-1, window_size))
+
+    # compute the reverse: for each data element, which windows is it in
+    # i.e. for each data element, which derived elements does it contribute to
+    #      and thus which data bounds affect it
+    reverse_indices_windows = np.full(
+        (data_size, np.sum(window_used.astype(int))), indices_windows.size
+    )
+    reverse_indices_counter = np.zeros(data_size, dtype=np.intp)
+    for i, u in enumerate(window_used.flat):
+        # skip window indices that are not used
+        if not u:
+            continue
+        # manual loop to account for potential aliasing:
+        # with a wrapping boundary, more than one j for the same window
+        #  position j could refer back to the same data element
+        for j in range(indices_windows.shape[0]):
+            # skip back-contributions from data elements where the safety
+            #  requirements are disabled
+            if (where_flat is not True) and (not where_flat[j]):
+                continue
+            idx = indices_windows[j, i]
+            if idx != data_size:
+                # lazily allocate more to account for all possible edge cases
+                if reverse_indices_counter[idx] >= reverse_indices_windows.shape[1]:
+                    new_reverse_indices_windows = np.full(
+                        (data_size, reverse_indices_windows.shape[1] * 2),
+                        indices_windows.size,
+                    )
+                    new_reverse_indices_windows[
+                        :, : reverse_indices_windows.shape[1]
+                    ] = reverse_indices_windows
+                    reverse_indices_windows = new_reverse_indices_windows
+                # update the reverse mapping
+                reverse_indices_windows[idx][reverse_indices_counter[idx]] = (
+                    j * window_used.size
+                ) + i
+                reverse_indices_counter[idx] += 1
+
+    return reverse_indices_windows

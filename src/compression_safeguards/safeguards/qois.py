@@ -8,12 +8,11 @@ safeguard not just properties on the data but also on these derived quantities
 of interest (QoIs).
 
 The `compression-safeguards` package provides the
-[`PointwiseQuantityOfInterestErrorBoundSafeguard`][compression_safeguards.safeguards.pointwise.qoi.eb.PointwiseQuantityOfInterestErrorBoundSafeguard]
+[`PointwiseQuantityOfInterestErrorBoundSafeguard`][..pointwise.qoi.eb.PointwiseQuantityOfInterestErrorBoundSafeguard]
 and
-[`StencilQuantityOfInterestErrorBoundSafeguard`][compression_safeguards.safeguards.stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard]
-safeguards to preserve various
-[`ErrorBound`][compression_safeguards.safeguards.eb.ErrorBound]s on
-pointwise[^1] and stencil[^2] quantities of interest, respectively.
+[`StencilQuantityOfInterestErrorBoundSafeguard`][..stencil.qoi.eb.StencilQuantityOfInterestErrorBoundSafeguard]
+safeguards to preserve various [`ErrorBound`][..eb.ErrorBound]s on pointwise[^1]
+and stencil[^2] quantities of interest, respectively.
 
 [^1]: A pointwise QoI is computed independently for each data point, taking
     only the value of this data point as input.
@@ -44,6 +43,7 @@ expr =
   | array
   | unary_operator
   | binary_operator
+  | binary_comparison
   | array_transpose
   | subexpression
   | constant
@@ -51,7 +51,11 @@ expr =
   | late_bound_constant
   | variable
   | array_indexing
-  | functions
+  | arithmetic_functions
+  | classification_functions
+  | logical_combinators
+  | array_functions
+  | finite_difference
 ;
 
 number =
@@ -96,6 +100,15 @@ binary_operator =
   | expr, "**", expr  (* exponentiation / power *)
 ;
 
+binary_comparison =
+    expr, "<", expr  (* 1 if a less than b, 0 otherwise (e.g. with NaN) *)
+  | expr, "<=", expr  (* 1 if a less than or equal to b, 0 otherwise (e.g. with NaN) *)
+  | expr, "==", expr  (* 1 if a equal to b, 0 otherwise (e.g. with NaN) *)
+  | expr, "!=", expr  (* 1 if a not equal to b, 0 otherwise; 1 for NaN != NaN *)
+  | expr, ">=", expr  (* 1 if a greater than or equal to b, 0 otherwise (e.g. with NaN) *)
+  | expr, ">", expr  (* 1 if a greater than b, 0 otherwise (e.g. with NaN) *)
+;
+
 array_transpose =
     expr, ".T"
 ;
@@ -110,7 +123,7 @@ constant =
 ;
 
 data =
-    "x"  (* pointwise data value *)
+    "x"  (* pointwise data value, x = X[I] *)
   | "X"  (* stencil data neighbourhood, only available in stencil QoIs *)
 ;
 
@@ -140,14 +153,20 @@ letter =
 array_indexing =
     expr, "[", "I", "]"  (* stencil neighbourhood centre, only available in stencil QoIs *)
   | expr, "[", index, { ",", index }, [","], "]"  (* array indexing *)
+  | "I", "[", index, { ",", index }, [","], "]"  (* indexed 1D array over the per-axis stencil neighbourhood centre indices, only available in stencil QoIs *)
 ;
 
 index =
-    expr  (* symbolic integer-only expression *)
-  | "I", "[", integer, "]"  (* stencil neighbourhood centre, only available in stencil QoIs *)
+    integer_expr  (* single index *)
+  | [ integer_expr ], ":", [ integer_expr ]  (* slice index from (inclusive) to (exclusive) *)
+  | [ integer_expr ], ":", [ integer_expr ], ":", [ integer_expr ]  (* slice index with step *)
 ;
 
-functions =
+integer_expr =
+    ? symbolic integer-only expression ?
+;
+
+arithmetic_functions =
     "ln", "(", expr, [","], ")"  (* natural logarithm *)
   | "log2", "(", expr, [","], ")"  (* binary logarithm *)
   | "log10", "(", expr, [","], ")"  (* decimal logarithm *)
@@ -176,14 +195,30 @@ functions =
   | "asinh", "(", expr, [","], ")"  (* inverse hyperbolic sine asinh(x) *)
   | "acosh", "(", expr, [","], ")"  (* inverse hyperbolic cosine acosh(x) *)
   | "atanh", "(", expr, [","], ")"  (* inverse hyperbolic tangent atanh(x) *)
-  | "isfinite", "(", expr, [","], ")"  (* 1 if finite, 0 if inf or NaN *)
+;
+
+classification_functions =
+    "isfinite", "(", expr, [","], ")"  (* 1 if finite, 0 if inf or NaN *)
   | "isinf", "(", expr, [","], ")"  (* 1 if inf, 0 if finite or NaN *)
   | "isnan", "(", expr, [","], ")"  (* 1 if NaN, 0 if finite or inf *)
+;
+
+logical_combinators =
+    "not", "(", expr, [","], ")"  (* 1 if == 0, 0 if != 0 *)
+  | "all", "(", expr, [","], ")"  (* 1 if all array elements != 0, 0 if any array element == 0 *)
+  | "any", "(", expr, [","], ")"  (* 1 if any array element != 0, 0 if all array elements == 0 *)
   | "where", "(", expr, ",", expr, ",", expr, [","], ")"  (* where(c, x, y) = x if (c != 0) else y *)
-  | "size", "(", expr, [","], ")"  (* array size *)
+;
+
+array_functions =
+    "size", "(", expr, [","], ")"  (* array size *)
+  | "shape", "(", expr, [","], ")"  (* array shape as a 1D array *)
   | "sum", "(", expr, [","], ")"  (* array sum *)
   | "matmul", "(", expr, ",", expr, [","], ")"  (* matrix (2d array) multiplication *)
-  | "finite_difference", "("  (* finite difference over an expression, only available in stencil QoIs *)
+;
+
+finite_difference =
+    "finite_difference", "("  (* finite difference over an expression, only available in stencil QoIs *)
       , expr, ","
       , "order", "=", integer, ","  (* order of the derivative *)
       , "accuracy", "=", integer, ","  (* order of accuracy of the approximation *)
@@ -209,7 +244,7 @@ newline `\\n`) and single-line inline comments starting with a hash `#`.
 ### Floating-point data type
 
 QoIs can be evaluated on any data type supported by the safeguards (see
-[`Safeguards.supported_dtypes`][compression_safeguards.api.Safeguards.supported_dtypes]).
+[`Safeguards.supported_dtypes`][...api.Safeguards.supported_dtypes]).
 Since the QoIs support many functions with floating-point outputs, they
 are evaluated using floating-point arithmetic.
 
@@ -226,8 +261,7 @@ larger bit width (e.g. at least [`np.float64`][numpy.float64] for
 [`np.int32`][numpy.int32] or [`np.uint32`][numpy.uint32] data).
 
 The specific floating-point data type in which the quantities of interest are
-evaluated is configured using the
-[`ToFloatMode`][compression_safeguards.utils.cast.ToFloatMode]
+evaluated is configured using the [`ToFloatMode`][...utils.cast.ToFloatMode]
 enum, please refer to its documentation for further information.
 
 ### Literals

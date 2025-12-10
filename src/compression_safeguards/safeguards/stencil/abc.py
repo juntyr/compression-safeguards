@@ -5,7 +5,7 @@ Abstract base class for the stencil safeguards.
 __all__ = ["StencilSafeguard"]
 
 from abc import ABC, abstractmethod
-from typing import final
+from typing import Literal, final
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
@@ -64,6 +64,7 @@ class StencilSafeguard(Safeguard, ABC):
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> bool:
         """
         Check if the `prediction` array upholds the property enforced by this
@@ -77,6 +78,8 @@ class StencilSafeguard(Safeguard, ABC):
             Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only check at data points where the condition is [`True`][True].
 
         Returns
         -------
@@ -85,7 +88,11 @@ class StencilSafeguard(Safeguard, ABC):
         """
 
         return bool(
-            np.all(self.check_pointwise(data, prediction, late_bound=late_bound))
+            np.all(
+                self.check_pointwise(
+                    data, prediction, late_bound=late_bound, where=where
+                )
+            )
         )
 
     @abstractmethod
@@ -95,6 +102,7 @@ class StencilSafeguard(Safeguard, ABC):
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `prediction` array uphold the neighbourhood
@@ -108,6 +116,8 @@ class StencilSafeguard(Safeguard, ABC):
             Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only check at data points where the condition is [`True`][True].
 
         Returns
         -------
@@ -123,6 +133,7 @@ class StencilSafeguard(Safeguard, ABC):
         data: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the safeguard's guarantees with respect
@@ -137,11 +148,85 @@ class StencilSafeguard(Safeguard, ABC):
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the safe intervals at pointwise checks where the
+            condition is [`True`][True].
 
         Returns
         -------
         intervals : IntervalUnion[T, int, int]
             Union of intervals in which the safeguard's guarantees are upheld.
+        """
+
+        pass
+
+    @abstractmethod
+    def compute_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the footprint of the `foot` array, e.g. for expanding data
+        points into the pointwise checks that they contribute to.
+
+        For stencil safeguards, the footprint usually extends beyond
+        `foot & where`.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the footprint at pointwise checks where the condition
+            is [`True`][True].
+
+            Conceptually, `where` is applied to `footprint` at the end.
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The footprint of the `foot` array.
+        """
+
+        pass
+
+    @abstractmethod
+    def compute_inverse_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the inverse footprint of the `foot` array, e.g. for expanding
+        pointwise check fails into the points that could have contributed to
+        the failures.
+
+        For stencil safeguards, the inverse footprint usually extends beyond
+        `foot & where`.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the inverse footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the inverse footprint at pointwise checks where the
+            condition is [`True`][True].
+
+            Conceptually, `where` is applied to `foot` at the start.
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The inverse footprint of the `foot` array.
         """
 
         pass

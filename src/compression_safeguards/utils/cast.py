@@ -60,7 +60,7 @@ class ToFloatMode(Enum):
         Select the floating-point dtype for the input `dtype`.
 
         Only data type supported by the safeguards (see
-        [`Safeguards.supported_dtypes`][compression_safeguards.api.Safeguards.supported_dtypes])
+        [`Safeguards.supported_dtypes`][.....api.Safeguards.supported_dtypes])
         are supported by this method.
 
         On platforms where the [`np.float128`][numpy.float128] type does *not*
@@ -183,7 +183,7 @@ def to_float(
     or [`np.uint32`][numpy.uint32] data).
 
     The
-    [`ToFloatMode.floating_point_dtype_for`][compression_safeguards.utils.cast.ToFloatMode.floating_point_dtype_for]
+    [`ToFloatMode.floating_point_dtype_for`][..ToFloatMode.floating_point_dtype_for]
     method can be used to select a floating-point data type that fits the above
     criteria.
 
@@ -222,9 +222,8 @@ def from_float(
     x: np.ndarray[S, np.dtype[F]], dtype: np.dtype[T]
 ) -> np.ndarray[S, np.dtype[T]]:
     """
-    Reverses the conversion of the array `x`, using the
-    [`to_float`][compression_safeguards.utils.cast.to_float], back to the
-    original `dtype`.
+    Reverses the conversion of the array `x`, converted using the
+    [`to_float`][..to_float], back to the original `dtype`.
 
     If the original `dtype` was floating-point with lower precision, the
     conversion is lossy.
@@ -236,7 +235,7 @@ def from_float(
     ----------
     x : np.ndarray[S, np.dtype[F]]
         The floating-point array to re-convert.
-    dtype : np.dtype
+    dtype : np.dtype[T]
         The original dtype.
 
     Returns

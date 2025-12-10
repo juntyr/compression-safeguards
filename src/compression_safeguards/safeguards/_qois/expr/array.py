@@ -10,13 +10,13 @@ from typing_extensions import (
 
 from ....utils.bindings import Parameter
 from ....utils.error import ctx
+from ..typing import Es, F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .addsub import ScalarLeftAssociativeSum
 from .constfold import ScalarFoldedConstant
 from .data import Data
 from .divmul import ScalarMultiply
 from .group import Group
-from .typing import Es, F, Ns, Ps, PsI
 
 
 class Array(Expr[AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
@@ -41,7 +41,7 @@ class Array(Expr[AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
             for e in els:
                 if isinstance(e, Array):
                     raise ValueError("elements must all be scalar") | ctx
-            self._array = np.array((el,) + els, copy=None)
+            self._array = np.array((el, *els), copy=None)
 
     @staticmethod
     def from_data_shape(shape: tuple[int, ...]) -> "Array":
@@ -58,7 +58,7 @@ class Array(Expr[AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
     def args(self) -> tuple[AnyExpr, Unpack[tuple[AnyExpr, ...]]]:
         if self._array.ndim == 1:
             return tuple(self._array)
-        return tuple(a for a in self._array)
+        return tuple(Array(*a) for a in self._array)  # type: ignore
 
     @override
     def with_args(self, el: AnyExpr, *els: AnyExpr) -> Self:
@@ -74,21 +74,22 @@ class Array(Expr[AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         assert False, "cannot evaluate an array expression"
 
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         assert False, "cannot derive data bounds over an array expression"
 
     @property
@@ -150,6 +151,9 @@ class Array(Expr[AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
         # we can return a group here since sum_ is not an array
         assert not isinstance(sum_, Array)
         return Group(sum_)
+
+    def flatlist(self) -> list[AnyExpr]:
+        return list(self._array.flat)
 
     @staticmethod
     def matmul(

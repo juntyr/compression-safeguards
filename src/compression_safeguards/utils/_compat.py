@@ -6,14 +6,21 @@ equivalent behaviour for all supported dtypes, e.g. numpy_quaddtype.
 __all__ = [
     "_nan_to_zero_inf_to_finite",
     "_nextafter",
+    "_place",
+    "_logical_not",
+    "_as_logical",
     "_symmetric_modulo",
     "_minimum_zero_sign_sensitive",
     "_maximum_zero_sign_sensitive",
     "_where",
+    "_reshape",
     "_broadcast_to",
+    "_stack",
     "_ensure_array",
     "_ones",
     "_zeros",
+    "_logical_and",
+    "_sliding_window_view",
     "_is_sign_negative_number",
     "_is_negative_zero",
     "_is_sign_positive_number",
@@ -26,9 +33,11 @@ __all__ = [
     "_e",
 ]
 
-from typing import TypeGuard, overload
+from collections.abc import Sequence
+from typing import Literal, TypeGuard, TypeVar, overload
 
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
 
 from ._float128 import (
     _float128,
@@ -41,11 +50,15 @@ from ._float128 import (
     _float128_smallest_subnormal,
     _float128_type,
 )
-from .typing import F, Fi, S, Si, T, Ti
+from .typing import TB, F, Fi, S, Si, T, Ti
+
+N = TypeVar("N", bound=int, covariant=True)
+""" Any [`int`][int] (covariant). """
 
 
 # reimplementation of np.nan_to_num that also works for numpy_quaddtype and
 #  makes all values finite
+# FIXME: https://github.com/numpy/numpy-user-dtypes/issues/163
 @np.errstate(invalid="ignore")
 def _nan_to_zero_inf_to_finite(
     a: np.ndarray[S, np.dtype[T]],
@@ -68,6 +81,7 @@ def _nan_to_zero_inf_to_finite(
 
 # wrapper around np.nextafter that also works for numpy_quaddtype
 # Implementation is variant 2 from https://stackoverflow.com/a/70512834
+# FIXME: https://github.com/numpy/numpy-user-dtypes/issues/163
 @np.errstate(invalid="ignore")
 def _nextafter(
     a: np.ndarray[S, np.dtype[F]], b: np.ndarray[S, np.dtype[F]]
@@ -77,7 +91,7 @@ def _nextafter(
     ):
         return np.nextafter(a, b)
 
-    a = _ensure_array(a)
+    a = np.ascontiguousarray(_ensure_array(a))
     b = _ensure_array(b)
 
     _float128_incr_subnormal = np.full(a.shape, _float128_smallest_subnormal)
@@ -140,6 +154,49 @@ def _nextafter(
     np.add(out, b, out=out, where=(np.isnan(a) | np.isnan(b)))
 
     return out
+
+
+# wrapper around np.place that also works for numpy_quaddtype
+# FIXME: https://github.com/numpy/numpy-user-dtypes/issues/236
+def _place(
+    a: np.ndarray[S, np.dtype[TB]],
+    mask: np.ndarray[S, np.dtype[np.bool]],
+    vals: np.ndarray[tuple[int], np.dtype[TB]],
+) -> None:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
+        return np.place(a, mask, vals)
+
+    return np.put(a, np.flatnonzero(mask), vals)
+
+
+# wrapper around np.logical_not that also works for numpy_quaddtype
+@overload
+def _logical_not(a: Ti) -> bool: ...
+
+
+@overload
+def _logical_not(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[np.bool]]: ...
+
+
+def _logical_not(a):
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
+        return np.logical_not(a)
+
+    return a == 0
+
+
+# helper for around np.any and np.all that also works for numpy_quaddtype
+def _as_logical(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T | np.bool]]:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
+        return a
+
+    return a != 0
 
 
 # wrapper around np.mod(p, q) that guarantees that the result is in [-q/2, q/2]
@@ -259,17 +316,9 @@ def _maximum_zero_sign_sensitive(a, b):
 @overload
 def _where(
     cond: np.ndarray[S, np.dtype[np.bool]],
-    a: np.ndarray[S, np.dtype[T]],
-    b: np.ndarray[S, np.dtype[T]],
-) -> np.ndarray[S, np.dtype[T]]: ...
-
-
-@overload
-def _where(
-    cond: np.ndarray[S, np.dtype[np.bool]],
-    a: np.ndarray[S, np.dtype[np.bool]],
-    b: np.ndarray[S, np.dtype[np.bool]],
-) -> np.ndarray[S, np.dtype[np.bool]]: ...
+    a: np.ndarray[S, np.dtype[TB]],
+    b: np.ndarray[S, np.dtype[TB]],
+) -> np.ndarray[S, np.dtype[TB]]: ...
 
 
 @overload
@@ -280,17 +329,18 @@ def _where(cond, a, b):
     return np.where(cond, a, b)
 
 
+# wrapper around np.reshape but with better type hints
+def _reshape(
+    a: np.ndarray[tuple[int, ...], np.dtype[TB]], shape: Si
+) -> np.ndarray[Si, np.dtype[TB]]:
+    return np.reshape(a, shape)
+
+
 # wrapper around np.broadcast_to but with better type hints
 @overload
 def _broadcast_to(
-    a: np.ndarray[tuple[int, ...], np.dtype[T]], shape: Si
-) -> np.ndarray[Si, np.dtype[T]]: ...
-
-
-@overload
-def _broadcast_to(
-    a: np.ndarray[tuple[int, ...], np.dtype[np.bool]], shape: Si
-) -> np.ndarray[Si, np.dtype[np.bool]]: ...
+    a: np.ndarray[tuple[int, ...], np.dtype[TB]], shape: Si
+) -> np.ndarray[Si, np.dtype[TB]]: ...
 
 
 @overload
@@ -301,49 +351,63 @@ def _broadcast_to(a, shape):
     return np.broadcast_to(a, shape)
 
 
+# wrapper around np.stack but with better type hints
+@overload
+def _stack(
+    arrays: tuple[np.ndarray[tuple[N], np.dtype[T]]],
+) -> np.ndarray[tuple[Literal[2], N], np.dtype[T]]: ...
+
+
+@overload
+def _stack(
+    arrays: Sequence[np.ndarray[tuple[N], np.dtype[T]]],
+) -> np.ndarray[tuple[int, N], np.dtype[T]]: ...
+
+
+def _stack(arrays):
+    return np.stack(arrays)
+
+
 # wrapper around np.array(a, copy=(copy=None)) but with better type hints
-@overload
 def _ensure_array(
-    a: np.ndarray[S, np.dtype[T]], copy: None | bool = None
-) -> np.ndarray[S, np.dtype[T]]: ...
-
-
-@overload
-def _ensure_array(
-    a: np.ndarray[S, np.dtype[np.bool]], copy: None | bool = None
-) -> np.ndarray[S, np.dtype[np.bool]]: ...
-
-
-def _ensure_array(a, copy=None):
-    return np.array(a, copy=copy)  # type: ignore
+    a: np.ndarray[S, np.dtype[TB]], copy: None | bool = None
+) -> np.ndarray[S, np.dtype[TB]]:
+    return np.array(a, copy=copy)
 
 
 # wrapper around np.ones but with better type hints
-@overload
-def _ones(shape: Si, dtype: np.dtype[T]) -> np.ndarray[Si, np.dtype[T]]: ...
-
-
-@overload
-def _ones(shape: Si, dtype: np.dtype[np.bool]) -> np.ndarray[Si, np.dtype[np.bool]]: ...
-
-
-def _ones(shape, dtype):
+def _ones(shape: Si, dtype: np.dtype[TB]) -> np.ndarray[Si, np.dtype[TB]]:
     return np.ones(shape, dtype=dtype)
 
 
 # wrapper around np.zeros but with better type hints
-@overload
-def _zeros(shape: Si, dtype: np.dtype[T]) -> np.ndarray[Si, np.dtype[T]]: ...
-
-
-@overload
-def _zeros(
-    shape: Si, dtype: np.dtype[np.bool]
-) -> np.ndarray[Si, np.dtype[np.bool]]: ...
-
-
-def _zeros(shape, dtype):
+def _zeros(shape: Si, dtype: np.dtype[TB]) -> np.ndarray[Si, np.dtype[TB]]:
     return np.zeros(shape, dtype=dtype)
+
+
+# wrapper around np.logical_and with better type hints
+def _logical_and(
+    a: np.ndarray[S, np.dtype[np.bool]],
+    b: Literal[True] | np.ndarray[S, np.dtype[np.bool]],
+) -> np.ndarray[S, np.dtype[np.bool]]:
+    return a & b  # type: ignore
+
+
+# wrapper around np.lib.stride_tricks.sliding_window_view with better type hints
+def _sliding_window_view(
+    a: np.ndarray[tuple[int, ...], np.dtype[TB]],
+    window_shape: int | tuple[int, ...],
+    *,
+    axis: int | tuple[int, ...],
+    writeable: Literal[False],
+) -> np.ndarray[tuple[int, ...], np.dtype[TB]]:
+    return sliding_window_view(
+        a,
+        window_shape,
+        # the docs say that tuple[int, ...] is allowed here
+        axis=axis,  # type: ignore
+        writeable=writeable,
+    )
 
 
 # wrapper around a < 0 that also works for -0.0 (is negative) but excludes NaNs

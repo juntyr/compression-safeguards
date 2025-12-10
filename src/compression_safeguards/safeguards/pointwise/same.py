@@ -5,12 +5,12 @@ Same value safeguard.
 __all__ = ["SameValueSafeguard"]
 
 from collections.abc import Set
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ...utils._compat import _ensure_array
+from ...utils._compat import _ensure_array, _logical_and
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import as_bits, from_total_order, lossless_cast, to_total_order
 from ...utils.error import TypeCheckError, ctx
@@ -108,6 +108,7 @@ class SameValueSafeguard(PointwiseSafeguard):
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements preserve the special `value` from the `data` to
@@ -121,6 +122,8 @@ class SameValueSafeguard(PointwiseSafeguard):
             Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only check at data points where the condition is [`True`][True].
 
         Returns
         -------
@@ -161,12 +164,18 @@ class SameValueSafeguard(PointwiseSafeguard):
             prediction
         )
 
+        ok: np.ndarray[S, np.dtype[np.bool]]
         if self._exclusive:
             # value if and only if where value
-            return (data_bits == value_bits) == (prediction_bits == value_bits)
+            ok = (data_bits == value_bits) == (prediction_bits == value_bits)
+        else:
+            # value must stay value, everything else can be arbitrary
+            ok = (data_bits != value_bits) | (prediction_bits == value_bits)
+        ok = _ensure_array(ok)
+        if where is not True:
+            ok[~where] = True
 
-        # value must stay value, everything else can be arbitrary
-        return (data_bits != value_bits) | (prediction_bits == value_bits)
+        return ok
 
     @override
     def compute_safe_intervals(
@@ -174,6 +183,7 @@ class SameValueSafeguard(PointwiseSafeguard):
         data: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the same value guarantee is upheld with
@@ -185,6 +195,9 @@ class SameValueSafeguard(PointwiseSafeguard):
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the safe intervals at pointwise checks where the
+            condition is [`True`][True].
 
         Returns
         -------
@@ -225,13 +238,17 @@ class SameValueSafeguard(PointwiseSafeguard):
             dataf
         )
 
+        wheref: Literal[True] | np.ndarray[tuple[int], np.dtype[np.bool]] = (
+            True if where is True else where.flatten()
+        )
+
         valid = Interval.empty_like(dataf)
 
         if not self._exclusive:
             # preserve value elements exactly, do not constrain other elements
             valid = Interval.full_like(dataf)
             Lower(valuef) <= valid[dataf_bits == valuef_bits] <= Upper(valuef)
-            return valid.into_union()
+            return valid.preserve_only_where(wheref).into_union()
 
         valuef_total: np.ndarray[
             tuple[()] | tuple[int], np.dtype[np.unsignedinteger]
@@ -259,7 +276,72 @@ class SameValueSafeguard(PointwiseSafeguard):
             (dataf_bits != valuef_bits) & (valuef_total < total_max)
         ] <= Maximum
 
-        return valid_below.union(valid_above)
+        return valid_below.union(valid_above).preserve_only_where(wheref)
+
+    @override
+    def compute_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the footprint of the `foot` array, e.g. for expanding data
+        points into the pointwise checks that they contribute to.
+
+        The footprint is equivalent to `foot & where`.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the footprint at pointwise checks where the condition
+            is [`True`][True].
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The footprint of the `foot` array.
+        """
+
+        return _logical_and(foot, where)
+
+    @override
+    def compute_inverse_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the inverse footprint of the `foot` array, e.g. for expanding
+        pointwise check fails into the points that could have contributed to
+        the failures.
+
+        The inverse footprint is equivalent to `foot & where`.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the inverse footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the inverse footprint at pointwise checks where the
+            condition is [`True`][True].
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The inverse footprint of the `foot` array.
+        """
+
+        return _logical_and(foot, where)
 
     @override
     def get_config(self) -> dict[str, JSON]:

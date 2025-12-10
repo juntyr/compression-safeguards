@@ -258,27 +258,27 @@ def test_polynomial(check):
     # x * 0
     check("x * 0")
 
-    # x + (inf / -inf, NaN)
+    # x + (inf, -inf, NaN)
     check("x + (1/0)")
     check("x + (-1/0)")
     check("x + (0/0)")
 
-    # x * (inf / -inf, NaN)
+    # x * (inf, -inf, NaN)
     check("x * (1/0)")
     check("x * (-1/0)")
     check("x * (0/0)")
 
-    # x / (inf / -inf, NaN)
+    # x / (inf, -inf, NaN)
     check("x / (1/0)")
     check("x / (-1/0)")
     check("x / (0/0)")
 
-    # (inf / -inf, NaN) / x
+    # (inf, -inf, NaN) / x
     check("(1/0) / x")
     check("(-1/0) / x")
     check("(0/0) / x")
 
-    # sum(x * (inf / -inf, NaN), 0)
+    # sum(x * (inf, -inf, NaN) + 0)
     check("x * (1/0) + 0")
     check("x * (-1/0) + 0")
     check("x * (0/0) + 0")
@@ -443,10 +443,57 @@ def test_where(check):
 
 
 @pytest.mark.parametrize("check", CHECKS)
+def test_comparison(check):
+    check("x <= 1")
+    check("1 <= x")
+    check("sin(x) <= cos(x)")
+
+    check("x < 1")
+    check("1 < x")
+    check("sin(x) < cos(x)")
+
+    check("x == 1")
+    check("1 == x")
+    check("sin(x) == cos(x)")
+
+    check("x != 1")
+    check("1 != x")
+    check("sin(x) != cos(x)")
+
+    check("x > 1")
+    check("1 > x")
+    check("sin(x) > cos(x)")
+
+    check("x >= 1")
+    check("1 >= x")
+    check("sin(x) >= cos(x)")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_combinators(check):
+    check("not(x == 0)")
+
+    check("all([x == 0, x > 1])")
+    check("all([x == 0, 1, x > 1])")
+    check("all([x == 0, 0, x > 1])")
+
+    check("any([x == 0, x > 1])")
+    check("any([x == 0, 1, x > 1])")
+    check("any([x == 0, 0, x > 1])")
+
+
+@pytest.mark.parametrize("check", CHECKS)
 def test_size(check):
     with pytest.raises(SyntaxError, match="scalar non-array expression has no size"):
         check("size(x) + x")
     check("size([x]) + x")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_shape(check):
+    with pytest.raises(SyntaxError, match="scalar non-array expression has no shape"):
+        check("shape(x) + x")
+    check("sum(shape([[x]])) + x")
 
 
 @pytest.mark.parametrize("check", CHECKS)
@@ -484,7 +531,7 @@ def test_evaluate_expr_with_dtype():
 
     assert f"{expr!r}" == "x + pi + e"
 
-    assert expr.eval((), np.float16("4.2"), dict()) == np.float16("4.2") + np.float16(
+    assert expr.eval(np.float16("4.2"), dict()) == np.float16("4.2") + np.float16(
         np.e
     ) + np.float16(np.pi)
 
@@ -620,17 +667,17 @@ def test_constant_fold():
         Number.from_symbolic_int(100), Number.from_symbolic_int(10)
     )
     assert f"{expr!r}" == "log(100, base=10)"
-    assert expr.eval((), np.empty(0, dtype=np.float64), {}) == 2
+    assert expr.eval(np.array(0, dtype=np.float64), {}).squeeze()[()] == 2
 
     assert expr.constant_fold(np.dtype(np.float64)) == 2
 
     expr = ScalarLogWithBase(Data.SCALAR, Number.from_symbolic_int(10))
     assert f"{expr!r}" == "log(x, base=10)"
-    assert expr.eval((), np.array(100, dtype=np.float64), {}) == 2
+    assert expr.eval(np.array(100, dtype=np.float64), {}).squeeze()[()] == 2
 
     expr = expr.constant_fold(np.dtype(np.float64))
     assert f"{expr!r}" == f"ln(x) / ({np.log(np.float64(10))!r})"
-    assert expr.eval((), np.array(100, dtype=np.float64), {}) == 2
+    assert expr.eval(np.array(100, dtype=np.float64), {}).squeeze()[()] == 2
 
 
 def test_fuzzer_found_sign_constant_fold():
@@ -842,3 +889,98 @@ def test_fuzzer_found_float_upper_negative_zero_rounding():
     )
 
     codec.decode(codec.encode(data))
+
+
+def test_fuzzer_found_where_invalid_cast():
+    data = np.array(
+        [
+            [0],
+            [0],
+            [33],
+            [33],
+            [10],
+            [81],
+            [126],
+            [16],
+            [-27],
+            [-113],
+            [-38],
+            [33],
+            [33],
+            [33],
+            [33],
+            [33],
+            [33],
+            [33],
+        ],
+        dtype=np.int8,
+    )
+    decoded = np.array(
+        [
+            [39],
+            [-39],
+            [-31],
+            [39],
+            [39],
+            [39],
+            [39],
+            [39],
+            [39],
+            [64],
+            [64],
+            [64],
+            [64],
+            [64],
+            [64],
+            [1],
+            [33],
+            [0],
+        ],
+        dtype=np.int8,
+    )
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(
+                kind="select",
+                selector="__where__",
+                safeguards=[
+                    dict(kind="any", safeguards=[dict(kind="sign", offset=0)]),
+                    dict(
+                        kind="qoi_eb_pw",
+                        qoi="acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(reciprocal(reciprocal(reciprocal(reciprocal(reciprocal(log2(reciprocal(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(trunc(trunc(trunc(trunc(trunc(atanh(exp10(x))))))))))))))))))))))))))))))))))))))))))))))))) ** e)",
+                        type="abs",
+                        eb=0,
+                        qoi_dtype="float128",
+                    ),
+                    dict(kind="assume_safe"),
+                ],
+            )
+        ],
+        fixed_constants=dict(
+            __where__=np.array(
+                [
+                    [0],
+                    [0],
+                    [0],
+                    [0],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [0],
+                    [0],
+                    [0],
+                ]
+            )
+        ),
+    )

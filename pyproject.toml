@@ -24,7 +24,7 @@ bench = [
     "mpl-ascii~=0.10.0",
     "netcdf4~=1.7.2",
     "numcodecs-wasm~=0.2.1",
-    "numcodecs-wasm-sz3~=0.7.0",
+    "numcodecs-wasm-sz3~=0.8.1",
     "numcodecs-wasm-zfp~=0.6.0",
     "numcodecs-wasm-zstd~=0.4.0",
     "tqdm~=4.0",
@@ -35,15 +35,18 @@ examples = [
     "cdsapi~=0.7.6",
     "earthkit-data~=0.14.0",
     "earthkit-plots~=0.3.1",
+    "humanize~=4.14.0",
     "jupyterlab",
     "matplotlib~=3.10.0",
     "netcdf4~=1.7.2",
     "numcodecs-wasm~=0.2.1",
     "numcodecs-wasm-sperr~=0.2.0",
-    "numcodecs-wasm-sz3~=0.7.0",
+    "numcodecs-wasm-sz3~=0.8.1",
     "numcodecs-wasm-zfp~=0.6.0",
+    "numcodecs-zero~=0.1.0",
     # FIXME: https://github.com/dask/dask/issues/12072
     "pyarrow~=21.0.0",
+    "scikit-image~=0.25.0",
     "xarray~=2025.1",
 ]
 fuzz = ["atheris~=2.3", "setuptools~=80.0", "timeoutcontext~=1.2"]

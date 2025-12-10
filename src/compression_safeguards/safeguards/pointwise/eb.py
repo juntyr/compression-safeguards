@@ -5,12 +5,12 @@ Error bound safeguard.
 __all__ = ["ErrorBoundSafeguard"]
 
 from collections.abc import Set
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ...utils._compat import _ensure_array
+from ...utils._compat import _ensure_array, _logical_and
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import ToFloatMode, as_bits, saturating_finite_float_cast, to_float
 from ...utils.error import TypeCheckError, ctx, lookup_enum_or_raise
@@ -38,8 +38,8 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
 
     The error bound can be verified by casting the data and error bound to a
     sufficiently large floating-point type, selected by
-    [`ToFloatMode.lossless.floating_point_dtype_for`][compression_safeguards.utils.cast.ToFloatMode.floating_point_dtype_for],
-    using [`to_float`][compression_safeguards.utils.cast.to_float].
+    [`ToFloatMode.lossless.floating_point_dtype_for`][.....utils.cast.ToFloatMode.floating_point_dtype_for],
+    using [`to_float`][.....utils.cast.to_float].
 
     Parameters
     ----------
@@ -125,6 +125,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements in the `prediction` array satisfy the error bound.
@@ -137,6 +138,8 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only check at data points where the condition is [`True`][True].
 
         Returns
         -------
@@ -167,11 +170,11 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
                 late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                     self._eb,
-                    data_float.shape,
-                    data_float.dtype,
+                    data.shape,
+                    ftype,
                 )
                 if isinstance(self._eb, Parameter)
-                else saturating_finite_float_cast(self._eb, data_float.dtype)
+                else saturating_finite_float_cast(self._eb, ftype)
             )
             if isinstance(self._eb, Parameter):
                 _eb: Parameter = self._eb
@@ -191,7 +194,8 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         np.copyto(ok, same_bits, where=~np.isfinite(data), casting="no")
         if self._equal_nan:
             np.copyto(ok, both_nan, where=np.isnan(data), casting="no")
-
+        if where is not True:
+            ok[~where] = True
         return ok
 
     @override
@@ -200,6 +204,7 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
         data: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intervals in which the error bound is upheld with respect
@@ -211,6 +216,9 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the safe intervals at pointwise checks where the
+            condition is [`True`][True].
 
         Returns
         -------
@@ -229,24 +237,19 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             invalid error bound value for the error bound `type`.
         """
 
-        dataf = data.flatten()
-
-        valid = Interval.empty_like(dataf).preserve_inf(dataf)
-
         ftype: np.dtype[np.floating] = ToFloatMode.lossless.floating_point_dtype_for(
             data.dtype
         )
-        data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
 
         with ctx.safeguard(self), ctx.parameter("eb"):
             eb: np.ndarray[tuple[()] | S, np.dtype[np.floating]] = (
                 late_bound.resolve_ndarray_with_saturating_finite_float_cast(
                     self._eb,
-                    data_float.shape,
-                    data_float.dtype,
+                    data.shape,
+                    ftype,
                 )
                 if isinstance(self._eb, Parameter)
-                else saturating_finite_float_cast(self._eb, data_float.dtype)
+                else saturating_finite_float_cast(self._eb, ftype)
             )
             if isinstance(self._eb, Parameter):
                 _eb: Parameter = self._eb
@@ -257,9 +260,83 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             self._type, eb, data, to_float(data, ftype=ftype)
         )
 
+        dataf: np.ndarray[tuple[int], np.dtype[T]] = data.flatten()
+        valid = Interval.empty_like(dataf).preserve_inf(dataf)
+
         Lower(lower.flatten()) <= valid[np.isfinite(dataf)] <= Upper(upper.flatten())
 
-        return valid.preserve_any_nan(dataf, equal_nan=self._equal_nan)
+        wheref: Literal[True] | np.ndarray[tuple[int], np.dtype[np.bool]] = (
+            True if where is True else where.flatten()
+        )
+
+        return valid.preserve_any_nan(
+            dataf, equal_nan=self._equal_nan
+        ).preserve_only_where(wheref)
+
+    @override
+    def compute_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the footprint of the `foot` array, e.g. for expanding data
+        points into the pointwise checks that they contribute to.
+
+        The footprint is equivalent to `foot & where`.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the footprint at pointwise checks where the condition
+            is [`True`][True].
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The footprint of the `foot` array.
+        """
+
+        return _logical_and(foot, where)
+
+    @override
+    def compute_inverse_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the inverse footprint of the `foot` array, e.g. for expanding
+        pointwise check fails into the points that could have contributed to
+        the failures.
+
+        The inverse footprint is equivalent to `foot & where`.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the inverse footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the inverse footprint at pointwise checks where the
+            condition is [`True`][True].
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The inverse footprint of the `foot` array.
+        """
+
+        return _logical_and(foot, where)
 
     @override
     def get_config(self) -> dict[str, JSON]:

@@ -4,12 +4,12 @@ from warnings import warn
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import _broadcast_to, _is_of_shape, _ones
+from ....utils._compat import _broadcast_to, _ensure_array, _is_of_shape, _ones
 from ....utils.bindings import Parameter
 from ....utils.error import QuantityOfInterestRuntimeWarning
 from ..bound import DataBounds, data_bounds
+from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, EmptyExpr
-from .typing import F, Ns, Ps, PsI
 
 
 class Data(EmptyExpr):
@@ -42,11 +42,17 @@ class Data(EmptyExpr):
     @override  # type: ignore
     def eval_has_data(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[np.bool]]:
-        return _ones(x, dtype=np.dtype(np.bool))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[np.bool]]:
+        # we could just return all True here, since all data is ... data
+        # but we also currently guarantee that NaN data values stay NaN,
+        #  i.e. that the values are constant, so not really data dependent
+        # therefore, we say that only non-NaN data is actually data
+        data = self.eval(Xs, late_bound)
+        data_is_not_nan = _ensure_array(np.isnan(data))
+        np.logical_not(data_is_not_nan, out=data_is_not_nan)
+        return data_is_not_nan
 
     @property  # type: ignore
     @override
@@ -70,24 +76,25 @@ class Data(EmptyExpr):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         out: np.ndarray[tuple[int, ...], np.dtype[F]] = Xs[(...,) + self._index]
-        assert _is_of_shape(out, x)
+        assert _is_of_shape(out, Xs.shape[:1])
         return out
 
     @data_bounds(DataBounds.infallible)
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         exprv = Xs[(...,) + self._index]
 
         if not np.all((expr_lower <= exprv) | np.isnan(exprv)):
@@ -101,11 +108,15 @@ class Data(EmptyExpr):
                 category=QuantityOfInterestRuntimeWarning,
             )
 
-        Xs_lower: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(-np.inf))
+        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(-np.inf)
+        )
         Xs_lower[np.isnan(Xs)] = np.nan
         Xs_lower[(...,) + self._index] = expr_lower
 
-        Xs_upper: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(np.inf))
+        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(np.inf)
+        )
         Xs_upper[np.isnan(Xs)] = np.nan
         Xs_upper[(...,) + self._index] = expr_upper
 
@@ -148,7 +159,7 @@ class LateBoundConstant(EmptyExpr):
         return ()
 
     @override
-    def with_args(self) -> "LateBoundConstant":  # type: ignore
+    def with_args(self) -> "LateBoundConstant":
         return LateBoundConstant(self._name, self._index)
 
     @override  # type: ignore
@@ -173,25 +184,26 @@ class LateBoundConstant(EmptyExpr):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         out: np.ndarray[tuple[int, ...], np.dtype[F]] = late_bound[self.name][
             (...,) + self._index
         ]
-        assert _is_of_shape(out, x)
+        assert _is_of_shape(out, Xs.shape[:1])
         return out
 
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         assert False, "late-bound constants have no data bounds"
 
     @override
@@ -227,11 +239,10 @@ class ScalarAnyDataConstant(EmptyExpr):
     @override  # type: ignore
     def eval_has_data(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[np.bool]]:
-        return _ones(x, dtype=np.dtype(np.bool))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[np.bool]]:
+        return _ones(Xs.shape[:1], dtype=np.dtype(np.bool))
 
     @property  # type: ignore
     @override
@@ -245,23 +256,24 @@ class ScalarAnyDataConstant(EmptyExpr):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         assert isinstance(self._const, Xs.dtype.type)
-        return _broadcast_to(self._const, x)
+        return _broadcast_to(self._const, Xs.shape[:1])
 
     @override
     @data_bounds(DataBounds.infallible)
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         assert isinstance(self._const, Xs.dtype.type)
 
         if not np.all((expr_lower <= self._const) | np.isnan(self._const)):
@@ -275,10 +287,14 @@ class ScalarAnyDataConstant(EmptyExpr):
                 category=QuantityOfInterestRuntimeWarning,
             )
 
-        Xs_lower: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(-np.inf))
+        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(-np.inf)
+        )
         Xs_lower[np.isnan(Xs)] = np.nan
 
-        Xs_upper: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(np.inf))
+        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(np.inf)
+        )
         Xs_upper[np.isnan(Xs)] = np.nan
 
         return Xs_lower, Xs_upper

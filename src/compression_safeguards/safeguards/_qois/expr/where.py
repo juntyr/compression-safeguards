@@ -13,9 +13,9 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
+from ..typing import F, Fi, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
-from .typing import F, Fi, Ns, Ps, PsI
 
 
 class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
@@ -41,83 +41,95 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
     @override  # type: ignore
     def eval_has_data(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[np.bool]]:
-        has_data = self._condition.eval_has_data(x, Xs, late_bound)
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[np.bool]]:
+        has_data = self._condition.eval_has_data(Xs, late_bound)
         has_data |= _where(
-            self._condition.eval(x, Xs, late_bound) != 0,
-            self._a.eval_has_data(x, Xs, late_bound),
-            self._b.eval_has_data(x, Xs, late_bound),
+            self._condition.eval(Xs, late_bound) != 0,
+            self._a.eval_has_data(Xs, late_bound),
+            self._b.eval_has_data(Xs, late_bound),
         )
         return has_data
 
     @override
     def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | AnyExpr:
-        return ScalarFoldedConstant.constant_fold_ternary(
-            self._condition,
-            self._a,
-            self._b,
-            dtype,
-            lambda cond, a, b: _where(cond != 0, a, b),
-            ScalarWhere,
+        cond = self._condition.constant_fold(dtype)
+        a = self._a.constant_fold(dtype)
+        b = self._b.constant_fold(dtype)
+
+        if not isinstance(cond, Expr):
+            if cond != 0 and not isinstance(a, Expr):
+                return a
+
+            if cond == 0 and not isinstance(b, Expr):
+                return b
+
+        return ScalarWhere(
+            ScalarFoldedConstant.from_folded(cond),
+            ScalarFoldedConstant.from_folded(a),
+            ScalarFoldedConstant.from_folded(b),
         )
 
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         return _where(
-            self._condition.eval(x, Xs, late_bound) != 0,
-            self._a.eval(x, Xs, late_bound),
-            self._b.eval(x, Xs, late_bound),
+            self._condition.eval(Xs, late_bound) != 0,
+            self._a.eval(Xs, late_bound),
+            self._b.eval(Xs, late_bound),
         )
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         # evaluate the condition, a, and b
         cond, a, b = self._condition, self._a, self._b
-        condv: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
-            cond.eval(X.shape, Xs, late_bound)
+        condv: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            cond.eval(Xs, late_bound)
         )
-        condvb_Ps: np.ndarray[Ps, np.dtype[np.bool]] = condv != 0
-        condvb_Ns: np.ndarray[Ns, np.dtype[np.bool]] = _broadcast_to(
-            _ensure_array(condvb_Ps).reshape(X.shape + (1,) * (Xs.ndim - X.ndim)),
+        condvb_Ps: np.ndarray[tuple[Ps], np.dtype[np.bool]] = condv != 0
+        condvb_Ns: np_sndarray[Ps, Ns, np.dtype[np.bool]] = _broadcast_to(
+            _ensure_array(condvb_Ps).reshape(Xs.shape[:1] + (1,) * (Xs.ndim - 1)),
             Xs.shape,
         )
-        av = a.eval(X.shape, Xs, late_bound)
-        bv = b.eval(X.shape, Xs, late_bound)
+        av = a.eval(Xs, late_bound)
+        bv = b.eval(Xs, late_bound)
 
-        Xs_lower: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(-np.inf))
-        Xs_upper: np.ndarray[Ns, np.dtype[F]] = np.full(Xs.shape, X.dtype.type(np.inf))
+        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(-np.inf)
+        )
+        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(np.inf)
+        )
 
         if cond.has_data:
             # for simplicity, we assume that the condition must always evaluate
             #  to the same boolean when compared to 0
-            cond_lower: np.ndarray[Ps, np.dtype[F]] = np.full(
-                condv.shape, X.dtype.type(-np.inf)
+            cond_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
+                condv.shape, Xs.dtype.type(-np.inf)
             )
-            cond_upper: np.ndarray[Ps, np.dtype[F]] = np.full(
-                condv.shape, X.dtype.type(np.inf)
+            cond_upper: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
+                condv.shape, Xs.dtype.type(np.inf)
             )
 
             # zero condition values must remain zero
             cond_lower[condv == 0] = -0.0
             cond_upper[condv == 0] = +0.0
 
-            smallest_subnormal = _floating_smallest_subnormal(X.dtype)
+            smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
 
             # non-zero condition values must remain non-zero
             # TODO: an interval union could represent that the two disjoint
@@ -125,7 +137,7 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
             cond_lower[condv > 0] = smallest_subnormal
             cond_upper[condv < 0] = -smallest_subnormal
 
-            cl, cu = cond.compute_data_bounds(cond_lower, cond_upper, X, Xs, late_bound)
+            cl, cu = cond.compute_data_bounds(cond_lower, cond_upper, Xs, late_bound)
             Xs_lower = _maximum_zero_sign_sensitive(Xs_lower, cl)
             Xs_upper = _minimum_zero_sign_sensitive(Xs_upper, cu)
 
@@ -135,7 +147,6 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
             al, au = a.compute_data_bounds(
                 _where(condvb_Ps, expr_lower, av),
                 _where(condvb_Ps, expr_upper, av),
-                X,
                 Xs,
                 late_bound,
             )
@@ -160,7 +171,6 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
             bl, bu = b.compute_data_bounds(
                 _where(condvb_Ps, bv, expr_lower),
                 _where(condvb_Ps, bv, expr_upper),
-                X,
                 Xs,
                 late_bound,
             )

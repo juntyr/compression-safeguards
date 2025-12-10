@@ -22,11 +22,11 @@ def _default_lossless_for_safeguards() -> Codec:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Lossless:
     """
     Configuration for the lossless encoding used by the
-    [`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec] to encode the
+    [`SafeguardsCodec`][...SafeguardsCodec] to encode the
     wrapped codec's encoded data and any safeguards-computed corrections.
     """
 
@@ -34,7 +34,7 @@ class Lossless:
     """
     Lossless codec (configuration) that is applied to wrapped codec's encoding.
     
-    By default, no further lossless encoding is applied.
+    By default, no further lossless compression is applied.
     """
 
     for_safeguards: dict[str, JSON] | Codec = field(

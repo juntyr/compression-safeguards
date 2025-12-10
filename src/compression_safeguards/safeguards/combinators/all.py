@@ -6,7 +6,7 @@ __all__ = ["AllSafeguards"]
 
 from abc import ABC
 from collections.abc import Collection, Set
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
@@ -34,10 +34,8 @@ class AllSafeguards(Safeguard):
     ----------
     safeguards : Collection[dict[str, JSON] | PointwiseSafeguard | StencilSafeguard]
         At least one safeguard configuration [`dict`][dict]s or already
-        initialized
-        [`PointwiseSafeguard`][compression_safeguards.safeguards.pointwise.abc.PointwiseSafeguard]
-        or
-        [`StencilSafeguard`][compression_safeguards.safeguards.stencil.abc.StencilSafeguard].
+        initialized [`PointwiseSafeguard`][....pointwise.abc.PointwiseSafeguard]
+        or [`StencilSafeguard`][....stencil.abc.StencilSafeguard].
 
     Raises
     ------
@@ -90,8 +88,14 @@ class AllSafeguards(Safeguard):
                         )
                         safeguards_.append(safeguard)  # type: ignore
 
-        if all(isinstance(safeguard, PointwiseSafeguard) for safeguard in safeguards_):
-            return _AllPointwiseSafeguards(*safeguards_)  # type: ignore
+        pointwise_safeguards_: list[PointwiseSafeguard] = [
+            safeguard
+            for safeguard in safeguards_
+            if isinstance(safeguard, PointwiseSafeguard)
+        ]
+
+        if len(pointwise_safeguards_) == len(safeguards_):
+            return _AllPointwiseSafeguards(*pointwise_safeguards_)
         else:
             return _AllStencilSafeguards(*safeguards_)
 
@@ -127,6 +131,7 @@ class AllSafeguards(Safeguard):
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> bool:
         """
         Check if, for all elements, all of the combined safeguards succeed the
@@ -140,6 +145,8 @@ class AllSafeguards(Safeguard):
             Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only check at data points where the condition is [`True`][True].
 
         Returns
         -------
@@ -160,6 +167,7 @@ class AllSafeguards(Safeguard):
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check for which elements all of the combined safeguards succeed the
@@ -173,6 +181,8 @@ class AllSafeguards(Safeguard):
             Prediction for the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only check at data points where the condition is [`True`][True].
 
         Returns
         -------
@@ -192,6 +202,7 @@ class AllSafeguards(Safeguard):
         data: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> IntervalUnion[T, int, int]:
         """
         Compute the intersection of the safe intervals of the combined
@@ -203,6 +214,9 @@ class AllSafeguards(Safeguard):
             Data for which the safe intervals should be computed.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the safe intervals at pointwise checks where the
+            condition is [`True`][True].
 
         Returns
         -------
@@ -213,6 +227,65 @@ class AllSafeguards(Safeguard):
         ------
         ...
             if computing the safe intervals for a safeguard raises an exception.
+        """
+
+        ...
+
+    def compute_footprint(  # type: ignore
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the footprint of the `foot` array, e.g. for expanding data
+        points into the pointwise checks that they contribute to.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the inverse footprint at pointwise checks where the
+            condition is [`True`][True].
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The footprint of the `foot` array.
+        """
+
+        ...
+
+    def compute_inverse_footprint(  # type: ignore
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        """
+        Compute the inverse footprint of the `foot` array, e.g. for expanding
+        pointwise check fails into the points that could have contributed to
+        the failures.
+
+        Parameters
+        ----------
+        foot : np.ndarray[S, np.dtype[np.bool]]
+            Array for which the inverse footprint is computed.
+        late_bound : Bindings
+            Bindings for late-bound parameters, including for this safeguard.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only compute the inverse footprint at pointwise checks where the
+            condition is [`True`][True].
+
+        Returns
+        -------
+        print : np.ndarray[S, np.dtype[np.bool]]
+            The inverse footprint of the `foot` array.
         """
 
         ...
@@ -250,13 +323,17 @@ class _AllSafeguardsBase(ABC):
         prediction: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         front, *tail = self.safeguards
 
-        ok = front.check_pointwise(data, prediction, late_bound=late_bound)
+        # pointwise check succeeds if all safeguards' pointwise check succeeds
+        ok = front.check_pointwise(data, prediction, late_bound=late_bound, where=where)
 
         for safeguard in tail:
-            ok &= safeguard.check_pointwise(data, prediction, late_bound=late_bound)
+            ok &= safeguard.check_pointwise(
+                data, prediction, late_bound=late_bound, where=where
+            )
 
         return ok
 
@@ -265,17 +342,63 @@ class _AllSafeguardsBase(ABC):
         data: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> IntervalUnion[T, int, int]:
         front, *tail = self.safeguards
 
-        valid = front.compute_safe_intervals(data, late_bound=late_bound)
+        # only the intersection of all safeguards' safe intervals is safe
+        valid = front.compute_safe_intervals(data, late_bound=late_bound, where=where)
 
         for safeguard in tail:
             valid = valid.intersect(
-                safeguard.compute_safe_intervals(data, late_bound=late_bound)
+                safeguard.compute_safe_intervals(
+                    data, late_bound=late_bound, where=where
+                )
             )
 
         return valid
+
+    def compute_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        front, *tail = self.safeguards
+
+        # since all safeguards can contribute to the footprint, the union of
+        #  their footprints forms the combined footprint
+        footprint = front.compute_footprint(foot, late_bound=late_bound, where=where)
+
+        for safeguard in tail:
+            footprint |= safeguard.compute_footprint(
+                foot, late_bound=late_bound, where=where
+            )
+
+        return footprint
+
+    def compute_inverse_footprint(
+        self,
+        foot: np.ndarray[S, np.dtype[np.bool]],
+        *,
+        late_bound: Bindings,
+        where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
+    ) -> np.ndarray[S, np.dtype[np.bool]]:
+        front, *tail = self.safeguards
+
+        # since all safeguards can contribute to the footprint, the union of
+        #  their footprints forms the combined footprint
+        footprint = front.compute_inverse_footprint(
+            foot, late_bound=late_bound, where=where
+        )
+
+        for safeguard in tail:
+            footprint |= safeguard.compute_inverse_footprint(
+                foot, late_bound=late_bound, where=where
+            )
+
+        return footprint
 
     def get_config(self) -> dict[str, JSON]:
         return dict(

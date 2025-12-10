@@ -657,6 +657,18 @@ def test_matmul():
     )
 
 
+@pytest.mark.parametrize("check", CHECKS)
+def test_shape(check):
+    with pytest.raises(SyntaxError, match="scalar non-array expression has no shape"):
+        check("shape(x) + x")
+    check("sum(shape(X)) + x")
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_idx(check):
+    check("sum(I[:] + x)")
+
+
 def test_indexing():
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "X[I[0]-1] + X[I[0]+2]",
@@ -687,6 +699,39 @@ def test_indexing():
         0,
     )
     assert f"{safeguard._qoi_expr!r}" == "X[0,0]"
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "X[I]",
+        [
+            dict(axis=0, before=1, after=1, boundary="valid"),
+            dict(axis=1, before=1, after=1, boundary="valid"),
+        ],
+        "abs",
+        0,
+    )
+    assert f"{safeguard._qoi_expr!r}" == "X[1,1]"
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "X[I[0]+1,I[1]-1]",
+        [
+            dict(axis=0, before=1, after=1, boundary="valid"),
+            dict(axis=1, before=1, after=1, boundary="valid"),
+        ],
+        "abs",
+        0,
+    )
+    assert f"{safeguard._qoi_expr!r}" == "X[2,0]"
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        "sum(abs(X[1::2] - X[:-1:2]))",
+        [dict(axis=0, before=1, after=4, boundary="valid")],
+        "abs",
+        0,
+    )
+    assert (
+        f"{safeguard._qoi_expr!r}"
+        == "(abs(X[1] - X[0]) + abs(X[3] - X[2]) + abs(X[5] - X[4]))"
+    )
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         "(X[I[0]-1,I[1]]+X[I[0]+1,I[1]]+X[I[0],I[1]-1]+X[I[0],I[1]+1])/4",
@@ -1350,13 +1395,13 @@ def test_late_bound_constant_boundary():
 def test_fuzzer_found_axis_index_out_of_bounds():
     with pytest.raises(
         SyntaxError,
-        match=r"qoi_eb_stencil\.qoi: axis index 1 is out of bounds for stencil with 1 axis",
+        match=r"qoi_eb_stencil\.qoi: index 1 is out of bounds for axis 0 with size 1 for `I`, the 1D per-axis stencil centre index array",
     ):
         check_all_codecs(np.empty(0), "I[1]", [(0, 0)])
 
     with pytest.raises(
         SyntaxError,
-        match=r"qoi_eb_stencil\.qoi: axis index -3 is out of bounds for stencil with 2 axes",
+        match=r"qoi_eb_stencil\.qoi: index -3 is out of bounds for axis 0 with size 2 for `I`, the 1D per-axis stencil centre index array",
     ):
         check_all_codecs(np.empty((2, 2)), "I[-3]", [(0, 0), (0, 0)])
 
@@ -1371,4 +1416,119 @@ def test_fuzzer_found_has_data_recursion_error():
         type="abs",
         eb=0,
         qoi_dtype="lossless",
+    )
+
+
+def test_fuzzer_found_has_data_2d_array():
+    with pytest.raises(
+        SyntaxError,
+        match=r"qoi_eb_stencil\.qoi: `finite_difference` expr must be a scalar array element expression, e.g. the centre value, not an array",
+    ):
+        StencilQuantityOfInterestErrorBoundSafeguard(
+            qoi="sqrt(reciprocal(sum(finite_difference(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(sin(X, ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), ), order=3, accuracy=4, type=1, axis=0, grid_spacing=-1.6989962450678104e+308) + X, ), ), ) / e / e / 1",
+            neighbourhood=[
+                dict(axis=42, before=101, after=97, boundary="valid"),
+                dict(axis=0, before=0, after=0, boundary="valid"),
+            ],
+            type="abs",
+            eb=0,
+            qoi_dtype="lossless",
+        )
+
+
+def test_fuzzer_found_where_invalid_cast():
+    data = np.array(
+        [
+            [0],
+            [0],
+            [33],
+            [33],
+            [10],
+            [81],
+            [126],
+            [16],
+            [-27],
+            [-113],
+            [-38],
+            [33],
+            [33],
+            [33],
+            [33],
+            [33],
+            [33],
+            [33],
+        ],
+        dtype=np.int8,
+    )
+    decoded = np.array(
+        [
+            [39],
+            [-39],
+            [-31],
+            [39],
+            [39],
+            [39],
+            [39],
+            [39],
+            [39],
+            [64],
+            [64],
+            [64],
+            [64],
+            [64],
+            [64],
+            [1],
+            [33],
+            [0],
+        ],
+        dtype=np.int8,
+    )
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(
+                kind="select",
+                selector="__where__",
+                safeguards=[
+                    dict(kind="any", safeguards=[dict(kind="sign", offset=0)]),
+                    dict(
+                        kind="qoi_eb_stencil",
+                        qoi="acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(reciprocal(reciprocal(reciprocal(reciprocal(reciprocal(log2(reciprocal(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(acosh(trunc(trunc(trunc(trunc(trunc(atanh(exp10(x))))))))))))))))))))))))))))))))))))))))))))))))) ** e)",
+                        neighbourhood=[
+                            dict(axis=0, before=0, after=0, boundary="valid")
+                        ],
+                        type="abs",
+                        eb=0,
+                        qoi_dtype="float128",
+                    ),
+                    dict(kind="assume_safe"),
+                ],
+            )
+        ],
+        fixed_constants=dict(
+            __where__=np.array(
+                [
+                    [0],
+                    [0],
+                    [0],
+                    [0],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [1],
+                    [0],
+                    [0],
+                    [0],
+                ]
+            )
+        ),
     )

@@ -12,9 +12,9 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
+from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
-from .typing import F, Ns, Ps, PsI
 
 
 class ScalarSqrt(Expr[AnyExpr]):
@@ -42,37 +42,40 @@ class ScalarSqrt(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.sqrt(self._a.eval(x, Xs, late_bound))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return np.sqrt(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         # for sqrt(-0.0), we should return -0.0 as the inverse
         # this ensures that 1/sqrt(-0.0) doesn't become 1/sqrt(0.0)
-        def _sqrt_inv(x: np.ndarray[Ps, np.dtype[F]]) -> np.ndarray[Ps, np.dtype[F]]:
-            out: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
-                np.square(_maximum_zero_sign_sensitive(X.dtype.type(0), x))
+        def _sqrt_inv(
+            x: np.ndarray[tuple[Ps], np.dtype[F]],
+        ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+            out: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+                np.square(_maximum_zero_sign_sensitive(Xs.dtype.type(0), x))
             )
             np.copyto(out, x, where=(x == 0), casting="no")
             return out
 
         # evaluate arg and sqrt(arg)
         arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
+        argv = arg.eval(Xs, late_bound)
         exprv = np.sqrt(argv)
 
-        smallest_subnormal = _floating_smallest_subnormal(X.dtype)
+        smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
 
         # apply the inverse function to get the bounds on arg
         # sqrt(-0.0) = -0.0 and sqrt(+0.0) = +0.0
@@ -81,12 +84,12 @@ class ScalarSqrt(Expr[AnyExpr]):
         # otherwise ensure that the bounds on sqrt(...) are non-negative
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
             _minimum_zero_sign_sensitive(argv, _sqrt_inv(expr_lower))
         )
         arg_lower[np.less(argv, 0)] = -np.inf
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
             _maximum_zero_sign_sensitive(argv, _sqrt_inv(expr_upper))
         )
         arg_upper[np.less(argv, 0)] = -smallest_subnormal
@@ -116,7 +119,6 @@ class ScalarSqrt(Expr[AnyExpr]):
         return arg.compute_data_bounds(
             arg_lower,
             arg_upper,
-            X,
             Xs,
             late_bound,
         )
@@ -151,29 +153,30 @@ class ScalarSquare(Expr[AnyExpr]):
     @override
     def eval(
         self,
-        x: PsI,
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> np.ndarray[PsI, np.dtype[F]]:
-        return np.square(self._a.eval(x, Xs, late_bound))
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        return np.square(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
     def compute_data_bounds_unchecked(
         self,
-        expr_lower: np.ndarray[Ps, np.dtype[F]],
-        expr_upper: np.ndarray[Ps, np.dtype[F]],
-        X: np.ndarray[Ps, np.dtype[F]],
-        Xs: np.ndarray[Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np.ndarray[Ns, np.dtype[F]]],
-    ) -> tuple[np.ndarray[Ns, np.dtype[F]], np.ndarray[Ns, np.dtype[F]]]:
+        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+    ) -> tuple[
+        np_sndarray[Ps, Ns, np.dtype[F]],
+        np_sndarray[Ps, Ns, np.dtype[F]],
+    ]:
         # evaluate arg and square(arg)
         arg = self._a
-        argv = arg.eval(X.shape, Xs, late_bound)
+        argv = arg.eval(Xs, late_bound)
         exprv = np.square(argv)
 
         # apply the inverse function to get the bounds on arg
-        al = np.sqrt(_maximum_zero_sign_sensitive(expr_lower, X.dtype.type(0)))
+        al = np.sqrt(_maximum_zero_sign_sensitive(expr_lower, Xs.dtype.type(0)))
         au = np.sqrt(expr_upper)
 
         # flip and swap the expr bounds to get the bounds on arg
@@ -183,7 +186,7 @@ class ScalarSquare(Expr[AnyExpr]):
         #  - el <= 0 -> al = -eu, au = eu
         # TODO: an interval union could represent that the two sometimes-
         #       disjoint intervals in the future
-        arg_lower: np.ndarray[Ps, np.dtype[F]] = _ensure_array(al, copy=True)
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(al, copy=True)
         np.negative(
             au,
             out=arg_lower,
@@ -191,7 +194,7 @@ class ScalarSquare(Expr[AnyExpr]):
         )
         arg_lower = _ensure_array(_minimum_zero_sign_sensitive(argv, arg_lower))
 
-        arg_upper: np.ndarray[Ps, np.dtype[F]] = _ensure_array(au, copy=True)
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(au, copy=True)
         np.negative(
             al,
             out=arg_upper,
@@ -224,7 +227,6 @@ class ScalarSquare(Expr[AnyExpr]):
         return arg.compute_data_bounds(
             arg_lower,
             arg_upper,
-            X,
             Xs,
             late_bound,
         )

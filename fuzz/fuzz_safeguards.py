@@ -200,6 +200,13 @@ def generate_parameter(
             "*": 2,
             "/": 2,
             "**": 2,
+            # binary comparison operators
+            "<=": 2,
+            "<": 2,
+            "==": 2,
+            "!=": 2,
+            ">=": 2,
+            ">": 2,
             # logarithms and exponentials
             "ln": 1,
             "log2": 1,
@@ -238,7 +245,10 @@ def generate_parameter(
             "isfinite": 1,
             "isinf": 1,
             "isnan": 1,
-            # conditional
+            # combinators
+            "not": 1,
+            "all": 2,
+            "any": 2,
             "where": 3,
         }
 
@@ -255,6 +265,7 @@ def generate_parameter(
                 "indexI": 1,
                 "index1": 2,
                 "index2": 3,
+                "indexFTS": 4,
                 # array transpose
                 "transpose": 1,
                 # array operations
@@ -304,6 +315,10 @@ def generate_parameter(
                 atoms.append(f"({atom1})[{atomn[0]}]")
             elif op == "index2":
                 atoms.append(f"({atom1})[{atomn[0]}, {atomn[1]}]")
+            elif op == "indexFTS":
+                atoms.append(
+                    f"({atom1})[{atomn[0] if data.ConsumeBool() else ''}:{atomn[1] if data.ConsumeBool() else ''}:{atomn[2] if data.ConsumeBool() else ''}]"
+                )
             elif op == "transpose":
                 atoms.append(f"({atom1}).T")
             elif op == "finite_difference":
@@ -375,17 +390,22 @@ def check_one_input(data) -> None:
 
     fixed_constants = dict()
     for p in late_bound:
-        c = data.ConsumeIntInRange(0, 4)
+        c = data.ConsumeIntInRange(0, 5)
         if c == 0:
             fixed_constants[p] = data.ConsumeInt(1)
         elif c == 1:
             fixed_constants[p] = data.ConsumeFloat()
         elif c == 2:
-            b = data.ConsumeBytes(size * np.dtype(int).itemsize)
-            if len(b) != size * np.dtype(int).itemsize:
-                return
-            fixed_constants[p] = np.frombuffer(b, dtype=int).reshape(raw.shape)
+            # small integers that likely work as select.selector indices
+            fixed_constants[p] = np.array(
+                [data.ConsumeIntInRange(0, 3) for _ in range(raw.size)], dtype=np.intp
+            ).reshape(raw.shape)
         elif c == 3:
+            b = data.ConsumeBytes(size * np.dtype(np.intp).itemsize)
+            if len(b) != size * np.dtype(np.intp).itemsize:
+                return
+            fixed_constants[p] = np.frombuffer(b, dtype=np.intp).reshape(raw.shape)
+        elif c == 4:
             b = data.ConsumeBytes(size * np.dtype(float).itemsize)
             if len(b) != size * np.dtype(float).itemsize:
                 return
@@ -403,7 +423,7 @@ def check_one_input(data) -> None:
                 safeguards=safeguards,
                 fixed_constants=fixed_constants,
             )
-    except (ValueError, TypeError, SyntaxError, TimeoutError):
+    except (IndexError, ValueError, TypeError, SyntaxError, TimeoutError):
         return
     except RuntimeWarning as err:
         # skip expressions that try to perform a**b with excessive digits
@@ -477,17 +497,10 @@ def check_one_input(data) -> None:
                     ParameterContextLayer("selector"),
                     LateBoundParameterContextLayer(_),
                 ) if (
-                    isinstance(err, ValueError)
-                    and ("invalid entry in choice array" in str(err))
+                    isinstance(err, IndexError)
+                    and ("invalid indices" in str(err))
                     and safeguard is SelectSafeguard
                 ):
-                    return
-                case (
-                    *_,
-                    SafeguardTypeContextLayer(safeguard),
-                    ParameterContextLayer("selector"),
-                    LateBoundParameterContextLayer(_),
-                ) if isinstance(err, IndexError) and safeguard is SelectSafeguard:
                     return
                 case (
                     *_,
@@ -521,6 +534,27 @@ def check_one_input(data) -> None:
         print(f"\n===\n\ncodec = {grepr}\n\n===\n")  # noqa: T201
         raise
 
+    # test using iterative corrections
+    safeguard = SafeguardsCodec(
+        codec=FuzzCodec(raw, decoded),
+        safeguards=safeguards,
+        fixed_constants=fixed_constants,
+        compute=dict(unstable_iterative=True),
+    )
+
+    grepr = repr(safeguard)
+    gconfig = safeguard.get_config()
+
+    safeguard = numcodecs.registry.get_codec(gconfig)
+    assert safeguard.get_config() == gconfig
+
+    try:
+        encoded = safeguard.encode(raw)
+        safeguard.decode(encoded, out=np.empty_like(raw))
+    except Exception:
+        print(f"\n===\n\ncodec = {grepr}\n\n===\n")  # noqa: T201
+        raise
+
     # test using the safeguards with the zero codec
     safeguard = SafeguardsCodec(
         codec=dict(id="zero"),
@@ -539,6 +573,38 @@ def check_one_input(data) -> None:
         safeguard.decode(encoded, out=np.empty_like(raw))
     except Exception:
         print(f"\n===\n\ncodec = {grepr}\n\ndata = {raw!r}\n\n===\n")  # noqa: T201
+        raise
+
+    # test where using top-level select
+    safeguard = SafeguardsCodec(
+        codec=FuzzCodec(raw, decoded),
+        safeguards=[
+            dict(
+                kind="select",
+                selector="__where__",
+                safeguards=safeguards + [dict(kind="assume_safe")],
+            )
+        ],
+        fixed_constants={
+            **fixed_constants,
+            "__where__": np.array(
+                [data.ConsumeIntInRange(0, len(safeguards)) for _ in range(raw.size)],
+                dtype=np.intp,
+            ).reshape(raw.shape),
+        },
+    )
+
+    grepr = repr(safeguard)
+    gconfig = safeguard.get_config()
+
+    safeguard = numcodecs.registry.get_codec(gconfig)
+    assert safeguard.get_config() == gconfig
+
+    try:
+        encoded = safeguard.encode(raw)
+        safeguard.decode(encoded, out=np.empty_like(raw))
+    except Exception:
+        print(f"\n===\n\ncodec = {grepr}\n\n===\n")  # noqa: T201
         raise
 
 
