@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "compression-safeguards"
 version = "1.0.0a1"
 description = "Fearless lossy compression using safeguards"
+authors = [{ name = "Juniper Tyree", email = "juniper.tyree@helsinki.fi" }]
 license = "MPL-2.0"
 readme = "README.md"
 requires-python = ">=3.10"

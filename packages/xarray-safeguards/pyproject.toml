@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "xarray-safeguards"
 version = "0.1.0a1"
 description = "Fearless chunked lossy compression in xarray using safeguards"
+authors = [{ name = "Juniper Tyree", email = "juniper.tyree@helsinki.fi" }]
 license = "MPL-2.0"
 readme = "README.md"
 requires-python = ">=3.10"

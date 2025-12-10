@@ -13,14 +13,36 @@ authors:
     email: juniper.tyree@helsinki.fi
     affiliation: University of Helsinki
     orcid: 'https://orcid.org/0000-0002-7923-9609'
+  - given-names: Daniel
+    family-names: Köhler
+    affiliation: University of Helsinki
+    orcid: 'https://orcid.org/0009-0008-5470-6996'
+  - given-names: Robert
+    family-names: Underwood
+    affiliation: 'Argonne National Laboratory, University of Chicago'
+    orcid: 'https://orcid.org/0000-0002-1464-729X'
+  - given-names: Clément
+    family-names: Bouvier
+    affiliation: University of Helsinki
+    orcid: 'https://orcid.org/0000-0003-2920-7585'
+  - given-names: Heikki Johannes
+    family-names: Järvinen
+    affiliation: University of Helsinki
+    orcid: 'https://orcid.org/0000-0003-1879-6804'
+  - given-names: Milan
+    family-names: Klöwer
+    affiliation: University of Oxford
+    orcid: 'https://orcid.org/0000-0002-3920-4356'
 repository-code: 'https://github.com/juntyr/compression-safeguards'
 url: 'https://compression-safeguards.readthedocs.io/en/stable/'
 repository-artifact: 'https://pypi.org/project/compression-safeguards/'
-abstract: Safe and Fearless lossy compression using safeguards
+abstract: >-
+  Compression Safeguards - Towards Safe and Fearless Lossy
+  Compression
 keywords:
+  - safeguards
   - compression
   - lossy-compression
-  - fearless
-  - safeguards
   - safe
+  - fearless
 license: MPL-2.0

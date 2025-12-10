@@ -388,7 +388,7 @@ SZ3's error compression can provide higher compression ratios if most data eleme
 
 Please cite this work as follows:
 
-> Tyree, J. (2025). `compression-safeguards` &ndash; Safe and Fearless lossy compression using safeguards. Available from: <https://github.com/juntyr/compression-safeguards>
+> Tyree, J., Köhler, D., Underwood, R., Bouvier, C., Järvinen, H. J., and Klöwer, M. (2026). Compression Safeguards &ndash; Towards Safe and Fearless Lossy Compression. Available from: <https://github.com/juntyr/compression-safeguards>
 
 Please also refer to the [CITATION.cff](CITATION.cff) file and refer to <https://citation-file-format.github.io> to extract the citation in a format of your choice.
 
