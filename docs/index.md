@@ -1,7 +1,7 @@
 [![image](https://img.shields.io/github/actions/workflow/status/juntyr/compression-safeguards/ci.yml?branch=main)](https://github.com/juntyr/compression-safeguards/actions/workflows/ci.yml?query=branch%3Amain)
 [![image](https://img.shields.io/pypi/v/compression-safeguards.svg)](https://pypi.python.org/pypi/compression-safeguards)
 [![image](https://img.shields.io/pypi/l/compression-safeguards.svg)](https://github.com/juntyr/compression-safeguards/blob/main/LICENSE)
-[![image](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2Fjuntyr%2Fcompression-safeguards%2Frefs%2Fheads%2Fmain%2Fpyproject.toml%3Ftoken%3DGHSAT0AAAAAADHXACHARJOLLKENMEJTCN3K2JZZWAA
+[![image](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2Fjuntyr%2Fcompression-safeguards%2Frefs%2Fheads%2Fmain%2Fpyproject.toml
 )](https://pypi.python.org/pypi/compression-safeguards)
 [![image](https://readthedocs.org/projects/compression-safeguards/badge/?version=latest)](https://compression-safeguards.readthedocs.io/en/latest/?badge=latest)
 
@@ -358,13 +358,80 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
 ## Related Projects
 
-### SZ3 error compression
+### Error-bounded Compression
 
-[SZ3](https://github.com/szcompressor/SZ3) >=3.2.0 provides the `CmprAlgo=ALGO_NOPRED` option, with which the compression error $error = decompressed - data$ of another lossy compressor can itself be lossy-compressed with e.g. an absolute error bound. Using this option, any compressor can be transformed into an error bounded compressor.
+#### SZ3 error compression
+
+The [SZ3](https://github.com/szcompressor/SZ3) compressor version >=3.2.0 provides the `CmprAlgo=ALGO_NOPRED` option, with which the compression error $\hat{x} - x$ of another lossy compressor can itself be lossy-compressed with e.g. an absolute error bound. Using this option, any compressor can be transformed into an error bounded compressor.
 
 SZ3's error compression can provide higher compression ratios if most data elements are expected to violate the error bound, e.g. when wrapping a lossy compressor that does *not* bound its errors. However, SZ3 has a higher byte overhead than `numcodecs-safeguards` if all elements already satisfy the bound.
 
-**TLDR:** You can use SZ3 to transform a *known* *unbounded* lossy compressor into an (absolute) error-bound compressor. Use `compression-safeguards` to guarantee a variety of safety requirements for *any* compressor (unbounded, best-effort bounded, or strictly bounded).
+**TLDR:** You can use SZ3 to transform a *known* *unbounded* lossy compressor into an (absolute) error-bound compressor. Use `compression-safeguards` to guarantee a variety of safety requirements for *any* compressor (unbounded, best-effort bounded, or strictly bounded), including SZ3.
+
+> Liu, J., Di, S., Zhao, K., Liang, X., Jin, S., Jian, Z., Huang, J., Wu, S., Chen, Z., & Cappello, F. (2024). High-performance Effective Scientific Error-bounded Lossy Compression with Auto-tuned Multi-component Interpolation. *Proceedings of the ACM on Management of Data*, 2(1), 1–27. Available from: [doi:10.1145/3639259](https://doi.org/10.1145/3639259).
+
+> Zhao, K., Di, S., Dmitriev, M., Tonellot, T. D., Chen, Z., & Cappello, F. (2021). Optimizing Error-Bounded Lossy Compression for Scientific Data by Dynamic Spline Interpolation. *2021 IEEE 37th International Conference on Data Engineering (ICDE)*, 1643–1654. Available from: [doi:10.1109/icde51399.2021.00145](https://doi.org/10.1109/icde51399.2021.00145).
+
+> Liang, X., Zhao, K., Di, S., Li, S., Underwood, R., Gok, A. M., Tian, J., Deng, J., Calhoun, J. C., Tao, D., Chen, Z., & Cappello, F. (2022). SZ3: A modular framework for composing Prediction-Based Error-Bounded lossy compressors. *IEEE Transactions on Big Data*, 9(2), 485–498. Available from: [doi:10.1109/tbdata.2022.3201176](https://doi.org/10.1109/tbdata.2022.3201176).
+
+You can easily try out SZ3 using the [`numcodecs-wasm-sz3`](https://numcodecs-wasm.readthedocs.io/en/latest/api/numcodecs_wasm_sz3/) Python package.
+
+
+#### SPERR outlier correction
+
+The [SPERR](https://github.com/NCAR/SPERR) compressor bounds the pointwise absolute error of its wavelet-based lossy compression by correcting any outlier points that exceed the error bound. For each outlier, where the error bound is violated, a lossy integer correction, which represents a multiple of the absolute error bound, is stored. With this correction, outliers are corrected back within the error bounds. The SPERR compressor is tuned to produce around 2% outliers, which minimises the combined cost of compression and correction.
+
+Note that SPERR is known to [^5] sometimes violate its pointwise absolute error bound even after the corrections have been applied. We thus recommend using SPERR with safeguards to guarantee that the error bound is never violated.
+
+[^5]: Fallin, A., & Burtscher, M. (2024). Lessons learned on the path to guaranteeing the error bound in lossy quantizers. *arXiv*. Available from: [doi:10.48550/arxiv.2407.15037](https://doi.org/10.48550/arxiv.2407.15037).
+
+**TLDR:** You can use SPERR to (mostly) bound a (globally constant) pointwise absolute error, for which SPERR uses an efficient outlier encoding. Use `compression-safeguards` to guarantee a variety of safety requirements, including locally varying pointwise absolute errors, for *any* compressor, including SPERR.
+
+> Li, S., Lindstrom, P., & Clyne, J. (2023). Lossy Scientific Data Compression With SPERR. *2023 IEEE International Parallel and Distributed Processing Symposium (IPDPS)*, 1007–1017. Available from: [doi:10.1109/ipdps54959.2023.00104](https://doi.org/10.1109/ipdps54959.2023.00104).
+
+You can easily try out SPERR using the [`numcodecs-wasm-sperr`](https://numcodecs-wasm.readthedocs.io/en/latest/api/numcodecs_wasm_sperr/) Python package.
+
+
+#### EBCC residual compression
+
+The [EBCC](https://github.com/spcl/EBCC) (Error Bounded Climate-data) compressor bounds the pointwise absolute or range-relative error of its JPEG2000-based lossy compression by encoding the residual using a discrete wavelet transform. The wavelet coefficients are encoded into a hierarchical bitstream that is truncated once the global error bound is met. The EBCC compressor is tuned to minimise the combined cost of compression and the sparse residual encoding.
+
+**TLDR:** You can use EBCC to bound a (globally constant) pointwise absolute or range-relative error, for which EBCC uses efficient residual compression. Use `compression-safeguards` to guarantee a variety of safety requirements, for *any* compressor, including EBCC.
+
+> Huang, L., Fusco, L., Scheidl, F., Zibell, J., Sprenger, M. A., Schemm, S., & Hoefler, T. (2025). Error bounded compression for weather and climate applications. *arXiv*. Available from: [doi:10.48550/arxiv.2510.22265](https://doi.org/10.48550/arxiv.2510.22265).
+
+
+#### LC
+
+[LC](https://github.com/burtscher/LC-framework) is a framework for building custom lossless and lossy error-bounded compressors from an extensive collection of components. LC takes particular care with handling all edge cases of floating point lossy compression correctly and reproducibly across both CPU and GPU implementations. The framework is written in C and C++ with Python scripts that search for an optimal compressor pipeline, either exhaustively or using a genetic algorithm.
+
+LC implements lossy error-bounded compression by providing specific quantizers for absolute / relative / pointwise normalised error bounds. During decompression, these quantizers can optionally decorrelate the resulting compression error by randomising the decompressed values within their quantisation bins.
+
+**TLDR:** You can use LC to build a custom compressor with guaranteed error bounds across different CPUs and GPUs. Use `compression-safeguards` to guarantee a variety of safety requirements, including arbitrary combinations of different error bounds, for *any* compressor, including those created with LC.
+
+> Fallin, A., & Burtscher, M. (2024). Lessons learned on the path to guaranteeing the error bound in lossy quantizers. *arXiv*. Available from: [doi:10.48550/arxiv.2407.15037](https://doi.org/10.48550/arxiv.2407.15037).
+
+
+### Preserving Quantities of Interest
+
+#### QoI-SZ3
+
+The [QoI-SZ3](https://github.com/jpcoding/SZ3/tree/vldb_test_version) compressor extends the SZ3 compressor by analytically deriving per-point absolute data error bounds that bound the absolute error over a derived quantity of interest. QoI-SZ3 supports quantities of interests that contain polynomials, logarithms, square roots, or regional averages, as well as isosurfaces. QoI-SZ3 quantizes and stores the analytically derived per-point absolute error bound and then uses it to quantize the prediction error from SZ3.
+
+**TLDR:** You can use QoI-SZ3 to preserve an absolute error bound over simple quantities of interest for which an error bound can be derived analytically. Use `compression-safeguards` to guarantee a greater variety of safety requirements, for *any* compressor, including SZ3.
+
+> Jiao, P., Di, S., Guo, H., Zhao, K., Tian, J., Tao, D., Liang, X., & Cappello, F. (2022). Toward Quantity-of-Interest preserving lossy compression for scientific data. *Proceedings of the VLDB Endowment*, 16(4), 697–710. Available from: [doi:10.14778/3574245.3574255](https://doi.org/10.14778/3574245.3574255).
+
+
+#### QPET
+
+The [QPET](https://github.com/JLiu-1/QPET-Artifact) compressor is the successor to QoI-SZ3 and bounds the absolute or range-relative error over a derived quantity of interest by deriving approximate per-point absolute data error bounds based on the symbolic derivative over the quantity of interest. QPET supports pointwise and blockwise quantities of interest that contain addition, multiplication, exponentiation, logarithm, (non-inverse) trigonometric and hyperbolic functions, sign, or the absolute value, as well as isosurfaces. QPET can be adapted for existing compressors, e.g. as [QPET-SZ](https://github.com/JLiu-1/QPET-Artifact/tree/szfamily_qpet_revision) and [QPET-SPERR](https://github.com/JLiu-1/QPET-Artifact/tree/sperr_qpet_revision). QPET auto-tunes a new global error bound based on the per-point error bounds to (a) use fewer distinct error bounds for compressors that support per-point error bounds, e.g. in QPET-SZ (where per-point error bounds are stored as in QoI-SZ3), or (b) produce a new global error bound, e.g. in QPET-SPERR. QPET losslessly encodes outlier data points for which the approximate data error bounds result in a violation of the error bound over the quantity of interest.
+
+**TLDR:** You can use QPET to preserve an absolute or range-relative error bound over a variety of differentiable quantities of interest. QPET's approximate data error bounds and outlier correction result in high compression ratios. QPET can be combined with the `compression-safeguards` to guarantee an even greater variety of safety requirements.
+
+> Liu, J., Jiao, P., Zhao, K., Liang, X., Di, S., & Cappello, F. (2025). QPET: a versatile and portable Quantity-of-Interest-Preservation Framework for Error-Bounded Lossy Compression. *Proceedings of the VLDB Endowment*, 18(8), 2440–2453. Available from: [doi:10.14778/3742728.3742739](https://doi.org/10.14778/3742728.3742739).
+
+You can easily try out QPET-SPERR using the [`numcodecs-wasm-qpet-sperr`](https://numcodecs-wasm.readthedocs.io/en/latest/api/numcodecs_wasm_qpet_sperr/) Python package.
 
 
 ## Citation
