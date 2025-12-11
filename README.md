@@ -201,7 +201,7 @@ assert np.all(np.abs(data - decoded) <= np.abs(data) * 0.01)
 assert np.all(np.sign(data) == np.sign(decoded))
 ```
 
-Please refer to the [`numcodecs-safeguards` documentation](https://juntyr.github.io/compression-safeguards/_ref/numcodecs_safeguards/) for further information.
+Please refer to the [`numcodecs-safeguards` documentation](https://compression-safeguards.readthedocs.io/en/latest/_ref/numcodecs_safeguards/) for further information.
 
 #### `xarray-safeguards`
 
@@ -244,7 +244,7 @@ ds_safeguarded: xr.Dataset = ds.safeguarded
 np.testing.assert_allclose(ds_safeguarded["da"].values, da.values, rtol=0, atol=0.1)
 ```
 
-Please also refer to the [`xarray-safeguards` documentation](https://juntyr.github.io/compression-safeguards/_ref/xarray_safeguards/) and the [`chunked.ipynb`](examples/chunked.ipynb) example for further information.
+Please also refer to the [`xarray-safeguards` documentation](https://compression-safeguards.readthedocs.io/en/latest/_ref/xarray_safeguards/) and the [`chunked.ipynb`](examples/chunked.ipynb) example for further information.
 
 #### `compression-safeguards`
 
@@ -296,7 +296,7 @@ decompressed = sg.apply_correction(decompressed, correction)
 assert np.all(np.abs(data - decompressed) <= 0.1)
 ```
 
-Please refer to the [`compression-safeguards` documentation](https://juntyr.github.io/compression-safeguards/_ref/compression_safeguards/) for further examples.
+Please refer to the [`compression-safeguards` documentation](https://compression-safeguards.readthedocs.io/en/latest/_ref/compression_safeguards/) for further examples.
 
 ### (b) Safeguards for developers of lossy compressors
 
