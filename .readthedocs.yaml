@@ -6,9 +6,9 @@ build:
     python: "3.10"
   jobs:
     pre_build:
-      - cat src/compression_safeguards/__init__.py
+      - grep "__all__" src/compression_safeguards/__init__.py
       - sed -i "s/__all__ = \["\""Safeguards"\"", "\""SafeguardKind"\""\]/__all__ = \[\]/g" src/compression_safeguards/__init__.py
-      - cat src/compression_safeguards/__init__.py
+      - grep "__all__" src/compression_safeguards/__init__.py
 
 mkdocs:
   configuration: mkdocs.yml
