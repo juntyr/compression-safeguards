@@ -29,6 +29,8 @@ theme:
 
 nav:
   - Home: index.md
+  - API Reference:
+      - Overview: api.md
   - Examples:
       - Special values:
           - NaN values: examples/nan.ipynb
