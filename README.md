@@ -467,4 +467,10 @@ Licensed under the Mozilla Public License, Version 2.0 ([LICENSE](LICENSE) or ht
 
 The `compression-safeguards`, `numcodecs-safeguards`, and `xarray-safeguards` packages have been developed as part of [ESiWACE3](https://www.esiwace.eu), the third phase of the Centre of Excellence in Simulation of Weather and Climate in Europe.
 
-Funded by the European Union. This work has received funding from the European High Performance Computing Joint Undertaking (JU) under grant agreement No 101093054.
+Juniper Tyree and Heikki J. Järvinen are funded by the ESiWACE3 Centre of Excellence. Funded by the European Union. This work has received funding from the European High Performance Computing Joint Undertaking (JU) under grant agreement No 101093054.
+
+Daniel Köhler is funded by the University of Helsinki Doctoral School.
+
+Robert Underwood is funded by the National Science Foundation (NSF) CSSI "FZ" project with Grant #2311875.
+
+Milan Klöwer acknowledges funding from Schmidt Sciences.
