@@ -18,16 +18,13 @@ from numcodecs_huffman import HuffmanCodec
 
 
 def _default_lossless_for_safeguards() -> Codec:
+    return CodecStack(HuffmanCodec(), numcodecs.zstd.Zstd(level=3))
     # return PickBestCodec(
-    #     CodecStack(HuffmanCodec(), numcodecs.zstd.Zstd(level=3)),
-    #     CodecStack(RemapCodec(), Shuffle(), numcodecs.zstd.Zstd(level=3)),
+    #     CodecStack(
+    #         RemapCodec(), PackZeroCodec(), Shuffle(), numcodecs.zstd.Zstd(level=3)
+    #     ),
+    #     CodecStack(PackZeroCodec(), Shuffle(), numcodecs.zstd.Zstd(level=3)),
     # )
-    return PickBestCodec(
-        CodecStack(
-            RemapCodec(), PackZeroCodec(), Shuffle(), numcodecs.zstd.Zstd(level=3)
-        ),
-        CodecStack(PackZeroCodec(), Shuffle(), numcodecs.zstd.Zstd(level=3)),
-    )
     # return CodecStack(Shuffle(), numcodecs.zstd.Zstd(level=3))
 
 
