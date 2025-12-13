@@ -22,9 +22,13 @@ def _default_lossless_for_safeguards() -> Codec:
     #     CodecStack(HuffmanCodec(), numcodecs.zstd.Zstd(level=3)),
     #     CodecStack(RemapCodec(), Shuffle(), numcodecs.zstd.Zstd(level=3)),
     # )
-    return CodecStack(
-        RemapCodec(), Shuffle(), numcodecs.zstd.Zstd(level=3)
+    return PickBestCodec(
+        CodecStack(
+            RemapCodec(), PackZeroCodec(), Shuffle(), numcodecs.zstd.Zstd(level=3)
+        ),
+        CodecStack(PackZeroCodec(), Shuffle(), numcodecs.zstd.Zstd(level=3)),
     )
+    # return CodecStack(Shuffle(), numcodecs.zstd.Zstd(level=3))
 
 
 @dataclass(kw_only=True)
