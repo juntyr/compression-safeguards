@@ -6,37 +6,40 @@ __all__ = ["Lossless"]
 
 from dataclasses import dataclass, field
 from functools import reduce
+from io import BytesIO
+from sys import byteorder
+from typing import Any, TypeVar
 
 import numcodecs
+import numcodecs.compat
+import numpy as np
+import varint
 from compression_safeguards.utils.typing import JSON
 from numcodecs.abc import Codec
-from numcodecs.compat import ensure_contiguous_ndarray, ndarray_copy
+from numcodecs.compat import ensure_contiguous_ndarray
 from numcodecs_combinators.best import PickBestCodec
+from numcodecs_combinators.framed import FramedCodecStack
 from numcodecs_combinators.stack import CodecStack
 from numcodecs_delta import BinaryDeltaCodec
-from numcodecs_huffman import HuffmanCodec
+from typing_extensions import Buffer  # MSPV 3.12
 
 
 def _default_lossless_for_safeguards() -> Codec:
     return PickBestCodec(
         CodecStack(
-            PackZeroCodec(), RemapCodec(), Shuffle(), numcodecs.zstd.Zstd(level=3)
+            RemapCodec(),
+            PackZeroCodec(),
+            DtypeShuffle(),
+            FramedCodecStack(numcodecs.zstd.Zstd(level=3)),
         ),
         CodecStack(
             BinaryDeltaCodec(),
-            PackZeroCodec(),
             RemapCodec(),
-            Shuffle(),
-            numcodecs.zstd.Zstd(level=3),
+            PackZeroCodec(),
+            DtypeShuffle(),
+            FramedCodecStack(numcodecs.zstd.Zstd(level=3)),
         ),
     )
-    # return PickBestCodec(
-    #     CodecStack(
-    #         RemapCodec(), PackZeroCodec(), Shuffle(), numcodecs.zstd.Zstd(level=3)
-    #     ),
-    #     CodecStack(PackZeroCodec(), Shuffle(), numcodecs.zstd.Zstd(level=3)),
-    # )
-    # return CodecStack(Shuffle(), numcodecs.zstd.Zstd(level=3))
 
 
 @dataclass(kw_only=True)
@@ -65,30 +68,30 @@ class Lossless:
     """
 
 
-class Shuffle(Codec):
-    codec_id = "shuffle"
+class DtypeShuffle(Codec):
+    codec_id = "dtype-shuffle"
 
     def encode(self, buf):
         buf = ensure_contiguous_ndarray(buf)
-
-        self.itemsize = buf.dtype.itemsize
-
-        return numcodecs.Shuffle(elementsize=self.itemsize).encode(buf)
+        return (
+            numcodecs.Shuffle(elementsize=buf.dtype.itemsize)
+            .encode(buf)
+            .view(buf.dtype)
+            .reshape(buf.shape)
+        )
 
     def decode(self, buf, out=None):
-        # FIXME: hack
-        return numcodecs.Shuffle(elementsize=self.itemsize).decode(buf, out=out)
+        buf = ensure_contiguous_ndarray(buf)
+        if out is not None:
+            out = ensure_contiguous_ndarray(out)
+            assert out.dtype == buf.dtype
+        return (
+            numcodecs.Shuffle(elementsize=buf.dtype.itemsize)
+            .decode(buf, out=out)
+            .view(buf.dtype)
+            .reshape(buf.shape)
+        )
 
-
-from io import BytesIO
-from sys import byteorder
-from typing import Any, TypeVar
-
-import numcodecs.compat
-import numpy as np
-import varint
-from numcodecs.abc import Codec
-from typing_extensions import Buffer  # MSPV 3.12
 
 S = TypeVar("S", bound=tuple[int, ...])
 """ Any array shape. """
@@ -140,7 +143,6 @@ class RemapCodec(Codec):
         if table_keys_byteorder != "<":
             encoded = encoded.byteswap()
         message.append(encoded.tobytes())
-        # message.append(numcodecs.Shuffle(dtype.itemsize).encode(encoded).tobytes())
 
         message = b"".join(message)
         return np.frombuffer(
@@ -179,8 +181,6 @@ class RemapCodec(Codec):
         if dtype_bits_byteorder != "<":
             table_keys = table_keys.byteswap()
 
-        # encoded = np.empty(shape, dtype=_dtype_bits(dtype).newbyteorder("<"))
-        # numcodecs.Shuffle(dtype.itemsize).decode(b_io.read(), out=encoded)
         encoded = np.frombuffer(
             b_io.read(),
             dtype=_dtype_bits(dtype).newbyteorder("<"),
@@ -192,43 +192,6 @@ class RemapCodec(Codec):
         decoded = table_keys[encoded].view(dtype).reshape(shape)
 
         return numcodecs.compat.ndarray_copy(decoded, out)
-
-
-def _as_bits(a: np.ndarray[S, np.dtype[Any]], /) -> np.ndarray[S, np.dtype[Any]]:
-    """
-    Reinterprets the array `a` to its binary (unsigned integer) representation.
-
-    Parameters
-    ----------
-    a : np.ndarray[S, np.dtype[Any]]
-        The array to reinterpret as binary.
-
-    Returns
-    -------
-    binary : np.ndarray[S, np.dtype[Any]]
-        The binary representation of the array `a`.
-    """
-
-    return a.view(_dtype_bits(a.dtype))  # type: ignore
-
-
-def _dtype_bits(dtype: np.dtype) -> np.dtype:
-    """
-    Converts the `dtype` to its binary (unsigned integer) representation.
-
-    Parameters
-    ----------
-    dtype : np.dtype
-        The dtype to convert.
-
-    Returns
-    -------
-    binary : np.dtype
-        The binary dtype with equivalent size and alignment but unsigned
-        integer kind.
-    """
-
-    return np.dtype(dtype.str.replace("f", "u").replace("i", "u"))
 
 
 class PackZeroCodec(Codec):
@@ -320,3 +283,40 @@ class PackZeroCodec(Codec):
         decoded = decoded.view(dtype).reshape(shape)
 
         return numcodecs.compat.ndarray_copy(decoded, out)
+
+
+def _as_bits(a: np.ndarray[S, np.dtype[Any]], /) -> np.ndarray[S, np.dtype[Any]]:
+    """
+    Reinterprets the array `a` to its binary (unsigned integer) representation.
+
+    Parameters
+    ----------
+    a : np.ndarray[S, np.dtype[Any]]
+        The array to reinterpret as binary.
+
+    Returns
+    -------
+    binary : np.ndarray[S, np.dtype[Any]]
+        The binary representation of the array `a`.
+    """
+
+    return a.view(_dtype_bits(a.dtype))  # type: ignore
+
+
+def _dtype_bits(dtype: np.dtype) -> np.dtype:
+    """
+    Converts the `dtype` to its binary (unsigned integer) representation.
+
+    Parameters
+    ----------
+    dtype : np.dtype
+        The dtype to convert.
+
+    Returns
+    -------
+    binary : np.dtype
+        The binary dtype with equivalent size and alignment but unsigned
+        integer kind.
+    """
+
+    return np.dtype(dtype.str.replace("f", "u").replace("i", "u"))
