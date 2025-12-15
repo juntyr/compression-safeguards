@@ -29,14 +29,14 @@ def _default_lossless_for_safeguards() -> Codec:
         CodecStack(
             RemapCodec(),
             TypedByteShuffleCodec(),
-            PackZeroCodec(),
+            # PackZeroCodec(),
             FramedCodecStack(numcodecs.zstd.Zstd(level=3)),
         ),
         CodecStack(
             BinaryDeltaCodec(),
             RemapCodec(),
             TypedByteShuffleCodec(),
-            PackZeroCodec(),
+            # PackZeroCodec(),
             FramedCodecStack(numcodecs.zstd.Zstd(level=3)),
         ),
     )
@@ -97,9 +97,20 @@ class RemapCodec(Codec):
 
         message.append(varint.encode(unique.size))
 
+        if unique.size <= 2**8:
+            utype = np.dtype(np.uint8)
+        elif unique.size <= 2**16:
+            utype = np.dtype(np.uint16)
+        elif unique.size <= 2**32:
+            utype = np.dtype(np.uint32)
+        elif unique.size <= 2**64:
+            utype = np.dtype(np.uint64)
+        else:
+            utype = a.dtype
+
         # insert padding to align with itemsize
         message.append(
-            b"\0" * (dtype.itemsize - (sum(len(m) for m in message) % dtype.itemsize))
+            b"\0" * (utype.itemsize - (sum(len(m) for m in message) % utype.itemsize))
         )
 
         # ensure that the table keys are encoded in little endian binary
@@ -114,15 +125,13 @@ class RemapCodec(Codec):
             table_keys_array = table_keys_array.byteswap()
         message.append(table_keys_array.tobytes())
 
-        encoded = argsortinv[inverse].astype(a.dtype)
+        encoded = argsortinv[inverse].astype(utype)
         if table_keys_byteorder != "<":
             encoded = encoded.byteswap()
         message.append(encoded.tobytes())
 
         message = b"".join(message)
-        return np.frombuffer(
-            message, dtype=table_keys_array.dtype, count=len(message) // dtype.itemsize
-        )
+        return np.frombuffer(message, dtype=utype, count=len(message) // utype.itemsize)
 
     def decode(self, buf: Buffer, out: None | Buffer = None) -> Buffer:
         b = numcodecs.compat.ensure_bytes(buf)
@@ -137,8 +146,19 @@ class RemapCodec(Codec):
 
         table_len = varint.decode_stream(b_io)
 
+        if table_len <= 2**8:
+            utype = np.dtype(np.uint8)
+        elif table_len <= 2**16:
+            utype = np.dtype(np.uint16)
+        elif table_len <= 2**32:
+            utype = np.dtype(np.uint32)
+        elif table_len <= 2**64:
+            utype = np.dtype(np.uint64)
+        else:
+            utype = _dtype_bits(dtype)
+
         # remove padding to align with itemsize
-        b_io.read(dtype.itemsize - (b_io.tell() % dtype.itemsize))
+        b_io.read(utype.itemsize - (b_io.tell() % utype.itemsize))
 
         # decode the table keys from little endian binary
         # change them back to dtype_bits byte order
@@ -158,7 +178,7 @@ class RemapCodec(Codec):
 
         encoded = np.frombuffer(
             b_io.read(),
-            dtype=_dtype_bits(dtype).newbyteorder("<"),
+            dtype=utype.newbyteorder("<"),
             count=np.prod(shape, dtype=np.uintp),
         )
         if dtype_bits_byteorder != "<":
