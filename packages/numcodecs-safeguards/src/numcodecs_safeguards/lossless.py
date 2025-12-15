@@ -28,6 +28,7 @@ def _default_lossless_for_safeguards() -> Codec:
     return PickBestCodec(
         CodecStack(
             RemapCodec(),
+            PackZeroCodec(),
             TypedByteShuffleCodec(),
             # PackZeroCodec(),
             FramedCodecStack(numcodecs.zstd.Zstd(level=3)),
@@ -35,6 +36,7 @@ def _default_lossless_for_safeguards() -> Codec:
         CodecStack(
             BinaryDeltaCodec(),
             RemapCodec(),
+            PackZeroCodec(),
             TypedByteShuffleCodec(),
             # PackZeroCodec(),
             FramedCodecStack(numcodecs.zstd.Zstd(level=3)),
