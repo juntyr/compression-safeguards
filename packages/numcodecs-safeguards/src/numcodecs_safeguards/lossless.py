@@ -30,7 +30,6 @@ def _default_lossless_for_safeguards() -> Codec:
             RemapCodec(),
             PackZeroCodec(),
             TypedByteShuffleCodec(),
-            PackZeroCodec(),
             FramedCodecStack(numcodecs.zstd.Zstd(level=3)),
         ),
         CodecStack(
@@ -38,7 +37,6 @@ def _default_lossless_for_safeguards() -> Codec:
             RemapCodec(),
             PackZeroCodec(),
             TypedByteShuffleCodec(),
-            PackZeroCodec(),
             FramedCodecStack(numcodecs.zstd.Zstd(level=3)),
         ),
     )
