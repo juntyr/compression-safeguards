@@ -16,11 +16,11 @@ import numpy as np
 import varint
 from compression_safeguards.utils.typing import JSON
 from numcodecs.abc import Codec
-from numcodecs.compat import ensure_contiguous_ndarray
 from numcodecs_combinators.best import PickBestCodec
 from numcodecs_combinators.framed import FramedCodecStack
 from numcodecs_combinators.stack import CodecStack
 from numcodecs_delta import BinaryDeltaCodec
+from numcodecs_shuffle import TypedByteShuffleCodec
 from typing_extensions import Buffer  # MSPV 3.12
 
 
@@ -29,14 +29,14 @@ def _default_lossless_for_safeguards() -> Codec:
         CodecStack(
             RemapCodec(),
             PackZeroCodec(),
-            DtypeShuffle(),
+            TypedByteShuffleCodec(),
             FramedCodecStack(numcodecs.zstd.Zstd(level=3)),
         ),
         CodecStack(
             BinaryDeltaCodec(),
             RemapCodec(),
             PackZeroCodec(),
-            DtypeShuffle(),
+            TypedByteShuffleCodec(),
             FramedCodecStack(numcodecs.zstd.Zstd(level=3)),
         ),
     )
@@ -66,31 +66,6 @@ class Lossless:
 
     The default is considered an implementation detail.
     """
-
-
-class DtypeShuffle(Codec):
-    codec_id = "dtype-shuffle"
-
-    def encode(self, buf):
-        buf = ensure_contiguous_ndarray(buf)
-        return (
-            numcodecs.Shuffle(elementsize=buf.dtype.itemsize)
-            .encode(buf)
-            .view(buf.dtype)
-            .reshape(buf.shape)
-        )
-
-    def decode(self, buf, out=None):
-        buf = ensure_contiguous_ndarray(buf)
-        if out is not None:
-            out = ensure_contiguous_ndarray(out)
-            assert out.dtype == buf.dtype
-        return (
-            numcodecs.Shuffle(elementsize=buf.dtype.itemsize)
-            .decode(buf, out=out)
-            .view(buf.dtype)
-            .reshape(buf.shape)
-        )
 
 
 S = TypeVar("S", bound=tuple[int, ...])
