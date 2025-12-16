@@ -452,4 +452,6 @@ Daniel Köhler is funded by the University of Helsinki Doctoral School.
 
 Robert Underwood is funded by the National Science Foundation (NSF) CSSI "FZ" project with Grant #2311875.
 
+Clément Bouvier was funded by the European Union's Destination Earth Initiative and the Research Council of Finland (grant nos. 338615 and 337549).
+
 Milan Klöwer acknowledges funding from Schmidt Sciences.
