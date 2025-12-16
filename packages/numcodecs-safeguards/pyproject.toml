@@ -16,6 +16,7 @@ dependencies = [
     "numcodecs-combinators~=0.2.10",
     "numcodecs-delta~=0.1.0",
     "numcodecs-shuffle~=0.1.0",
+    "numcodecs-tokenize~=0.1.0",
     "numcodecs-zero~=0.1.0",
     "numpy~=2.0",
     "semver~=3.0",

@@ -21,20 +21,21 @@ from numcodecs_combinators.framed import FramedCodecStack
 from numcodecs_combinators.stack import CodecStack
 from numcodecs_delta import BinaryDeltaCodec
 from numcodecs_shuffle import TypedByteShuffleCodec
+from numcodecs_tokenize import TokenizeCodec
 from typing_extensions import Buffer  # MSPV 3.12
 
 
 def _default_lossless_for_safeguards() -> Codec:
     return PickBestCodec(
         CodecStack(
-            RemapCodec(),
+            TokenizeCodec(),
             PackZeroCodec(),
             TypedByteShuffleCodec(),
             FramedCodecStack(numcodecs.zstd.Zstd(level=3)),
         ),
         CodecStack(
             BinaryDeltaCodec(),
-            RemapCodec(),
+            TokenizeCodec(),
             PackZeroCodec(),
             TypedByteShuffleCodec(),
             FramedCodecStack(numcodecs.zstd.Zstd(level=3)),
@@ -70,123 +71,6 @@ class Lossless:
 
 S = TypeVar("S", bound=tuple[int, ...])
 """ Any array shape. """
-
-
-class RemapCodec(Codec):
-    codec_id = "remap"
-
-    def encode(self, buf: Buffer) -> bytes:
-        a = numcodecs.compat.ensure_ndarray(buf)
-        dtype, shape = a.dtype, a.shape
-        a = _as_bits(a.flatten())
-
-        # FIXME: MPSV 3.11 numpy 2.3: sorted=True
-        unique, inverse, counts = np.unique(a, return_inverse=True, return_counts=True)
-        argsort = np.argsort(-counts, stable=True)  # sort with decreasing order
-        argsortinv = np.argsort(argsort, stable=True)
-
-        # message: dtype shape table encoded
-        message = []
-
-        message.append(varint.encode(len(dtype.str)))
-        message.append(dtype.str.encode("ascii"))
-
-        message.append(varint.encode(len(shape)))
-        for s in shape:
-            message.append(varint.encode(s))
-
-        message.append(varint.encode(unique.size))
-
-        if unique.size <= 2**8:
-            utype = np.dtype(np.uint8)
-        elif unique.size <= 2**16:
-            utype = np.dtype(np.uint16)
-        elif unique.size <= 2**32:
-            utype = np.dtype(np.uint32)
-        elif unique.size <= 2**64:
-            utype = np.dtype(np.uint64)
-        else:
-            utype = a.dtype
-
-        # insert padding to align with itemsize
-        message.append(
-            b"\0" * (utype.itemsize - (sum(len(m) for m in message) % utype.itemsize))
-        )
-
-        # ensure that the table keys are encoded in little endian binary
-        table_keys_array = unique[argsort]
-        table_keys_byteorder = table_keys_array.dtype.byteorder
-        table_keys_byteorder = (
-            table_keys_byteorder
-            if table_keys_byteorder in ("<", ">")
-            else ("<" if (byteorder == "little") else ">")
-        )
-        if table_keys_byteorder != "<":
-            table_keys_array = table_keys_array.byteswap()
-        message.append(table_keys_array.tobytes())
-
-        encoded = argsortinv[inverse].astype(utype)
-        if table_keys_byteorder != "<":
-            encoded = encoded.byteswap()
-        message.append(encoded.tobytes())
-
-        message = b"".join(message)
-        return np.frombuffer(message, dtype=utype, count=len(message) // utype.itemsize)
-
-    def decode(self, buf: Buffer, out: None | Buffer = None) -> Buffer:
-        b = numcodecs.compat.ensure_bytes(buf)
-
-        b_io = BytesIO(b)
-
-        dtype = np.dtype(b_io.read(varint.decode_stream(b_io)).decode("ascii"))
-
-        shape = tuple(
-            varint.decode_stream(b_io) for _ in range(varint.decode_stream(b_io))
-        )
-
-        table_len = varint.decode_stream(b_io)
-
-        if table_len <= 2**8:
-            utype = np.dtype(np.uint8)
-        elif table_len <= 2**16:
-            utype = np.dtype(np.uint16)
-        elif table_len <= 2**32:
-            utype = np.dtype(np.uint32)
-        elif table_len <= 2**64:
-            utype = np.dtype(np.uint64)
-        else:
-            utype = _dtype_bits(dtype)
-
-        # remove padding to align with itemsize
-        b_io.read(utype.itemsize - (b_io.tell() % utype.itemsize))
-
-        # decode the table keys from little endian binary
-        # change them back to dtype_bits byte order
-        table_keys = np.frombuffer(
-            b_io.read(table_len * dtype.itemsize),
-            dtype=_dtype_bits(dtype).newbyteorder("<"),
-            count=table_len,
-        )
-        dtype_bits_byteorder = _dtype_bits(dtype).byteorder
-        dtype_bits_byteorder = (
-            dtype_bits_byteorder
-            if dtype_bits_byteorder in ("<", ">")
-            else ("<" if (byteorder == "little") else ">")
-        )
-        if dtype_bits_byteorder != "<":
-            table_keys = table_keys.byteswap()
-
-        encoded = np.frombuffer(
-            b_io.read(),
-            dtype=utype.newbyteorder("<"),
-            count=np.prod(shape, dtype=np.uintp),
-        )
-        if dtype_bits_byteorder != "<":
-            encoded = encoded.byteswap()
-
-        decoded = table_keys[encoded].view(dtype).reshape(shape)
-
-        return numcodecs.compat.ndarray_copy(decoded, out)
 
 
 class PackZeroCodec(Codec):
