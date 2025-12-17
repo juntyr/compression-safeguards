@@ -81,11 +81,20 @@ class PackZeroCodec(Codec):
         dtype, shape = a.dtype, a.shape
         a = _as_bits(a.flatten())
 
-        is_zero = a == 0
-        packed_is_zero = np.packbits(is_zero, axis=None, bitorder="big")
-        a_non_zero = np.extract(~is_zero, a)
+        # FIXME: MPSV 3.11 numpy 2.3: sorted=True
+        unique, counts = np.unique(a, return_counts=True)
+        argsort = np.argsort(-counts, stable=True)  # sort with decreasing order
+        unique = unique[argsort]
+        counts = counts[argsort]
 
-        # message: dtype shape table encoded
+        bitsavings = counts * (dtype.itemsize * 8 - 1)
+        bitcosts = a.size - np.cumsum(counts) + dtype.itemsize * 8
+
+        factor = 2
+
+        num_bitmaps = np.argmax((bitcosts * factor) >= bitsavings)
+
+        # message: dtype shape is-zero [padding] non-zero
         message = []
 
         message.append(varint.encode(len(dtype.str)))
@@ -95,7 +104,26 @@ class PackZeroCodec(Codec):
         for s in shape:
             message.append(varint.encode(s))
 
-        message.append(packed_is_zero.tobytes())
+        message.append(varint.encode(num_bitmaps))
+
+        a_byteorder = a.dtype.byteorder
+        a_byteorder = (
+            a_byteorder
+            if a_byteorder in ("<", ">")
+            else ("<" if (byteorder == "little") else ">")
+        )
+
+        for u in unique[:num_bitmaps]:
+            ule = u
+            if a_byteorder != "<":
+                ule = ule.byteswap()
+            message.append(ule.tobytes())
+
+            is_u = a == u
+            packed_is_u = np.packbits(is_u, axis=None, bitorder="big")
+            a = np.extract(~is_u, a)
+
+            message.append(packed_is_u.tobytes())
 
         # insert padding to align with itemsize
         message.append(
@@ -110,17 +138,21 @@ class PackZeroCodec(Codec):
             else ("<" if (byteorder == "little") else ">")
         )
         if a_byteorder != "<":
-            a_non_zero = a_non_zero.byteswap()
-        message.append(a_non_zero.tobytes())
+            a = a.byteswap()
+        message.append(a.tobytes())
 
-        message = b"".join(message)
-        return np.frombuffer(
-            message, dtype=a_non_zero.dtype, count=len(message) // dtype.itemsize
+        encoded_bytes = b"".join(message)
+
+        encoded: np.ndarray[tuple[int], np.dtype[np.unsignedinteger]] = np.frombuffer(
+            encoded_bytes,
+            dtype=a.dtype,
+            count=len(encoded_bytes) // dtype.itemsize,
         )
+
+        return encoded  # type: ignore
 
     def decode(self, buf: Buffer, out: None | Buffer = None) -> Buffer:
         b = numcodecs.compat.ensure_bytes(buf)
-
         b_io = BytesIO(b)
 
         dtype = np.dtype(b_io.read(varint.decode_stream(b_io)).decode("ascii"))
@@ -130,23 +162,47 @@ class PackZeroCodec(Codec):
         )
         size = reduce(lambda a, b: a * b, shape, 1)
 
-        packed_is_zero = np.frombuffer(
-            b_io.read((size + 7) // 8),
-            dtype=np.uint8,
-            count=(size + 7) // 8,
+        num_bitmaps = varint.decode_stream(b_io)
+
+        indices = np.arange(size)
+
+        dtype_bits_byteorder = _dtype_bits(dtype).byteorder
+        dtype_bits_byteorder = (
+            dtype_bits_byteorder
+            if dtype_bits_byteorder in ("<", ">")
+            else ("<" if (byteorder == "little") else ">")
         )
-        is_zero = np.unpackbits(
-            packed_is_zero, axis=None, count=size, bitorder="big"
-        ).astype(np.bool)
-        num_non_zero = is_zero.size - np.sum(is_zero)
+
+        decoded = np.zeros(size, _dtype_bits(dtype))
+
+        for i in range(num_bitmaps):
+            u = np.frombuffer(
+                b_io.read(dtype.itemsize),
+                dtype=_dtype_bits(dtype).newbyteorder("<"),
+                count=1,
+            )
+            if dtype_bits_byteorder != "<":
+                u = u.byteswap()
+
+            packed_is_u = np.frombuffer(
+                b_io.read((indices.size + 7) // 8),
+                dtype=np.uint8,
+                count=(indices.size + 7) // 8,
+            )
+            is_u = np.unpackbits(
+                packed_is_u, axis=None, count=indices.size, bitorder="big"
+            ).astype(np.bool)
+
+            decoded[indices[is_u]] = u
+            indices = np.extract(~is_u, indices)
 
         # remove padding to align with itemsize
         b_io.read(dtype.itemsize - (b_io.tell() % dtype.itemsize))
 
-        compressed = np.frombuffer(
-            b_io.read(num_non_zero * dtype.itemsize),
+        leftover: np.ndarray = np.frombuffer(
+            b_io.read(indices.size * dtype.itemsize),
             dtype=_dtype_bits(dtype).newbyteorder("<"),
-            count=num_non_zero,
+            count=indices.size,
         )
         dtype_bits_byteorder = _dtype_bits(dtype).byteorder
         dtype_bits_byteorder = (
@@ -155,13 +211,13 @@ class PackZeroCodec(Codec):
             else ("<" if (byteorder == "little") else ">")
         )
         if dtype_bits_byteorder != "<":
-            compressed = compressed.byteswap()
+            leftover = leftover.byteswap()
 
-        decoded = np.zeros(size, compressed.dtype)
-        np.place(decoded, ~is_zero, compressed)
+        decoded[indices] = leftover
+
         decoded = decoded.view(dtype).reshape(shape)
 
-        return numcodecs.compat.ndarray_copy(decoded, out)
+        return numcodecs.compat.ndarray_copy(decoded, out)  # type: ignore
 
 
 def _as_bits(a: np.ndarray[S, np.dtype[Any]], /) -> np.ndarray[S, np.dtype[Any]]:
