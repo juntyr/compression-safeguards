@@ -84,7 +84,13 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Setup the Python venv with the safeguards
-        run: uv sync --all-packages --group test --resolution ${{ matrix.resolution }}
+        run: |
+          uv sync --all-packages \
+            --group test \
+            --resolution ${{ matrix.resolution }} \
+            --no-build \
+            --no-binary-package compression-safeguards \
+            --no-binary-package varint
 
       - name: Run tests
         run: uv run pytest -v -W error -m "${{ matrix.markers }}"
@@ -109,7 +115,13 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Setup the Python venv with the safeguards
-        run: uv sync --all-packages --group typing --resolution ${{ matrix.resolution }}
+        run: |
+          uv sync --all-packages \
+            --group typing \
+            --resolution ${{ matrix.resolution }} \
+            --no-build \
+            --no-binary-package compression-safeguards \
+            --no-binary-package varint
 
       - name: Typecheck compression-safeguards
         run: uv run mypy -p compression_safeguards
@@ -148,7 +160,13 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Setup the Python venv with the safeguards
-        run: uv sync --all-packages --group fuzz --resolution ${{ matrix.resolution }}
+        run: |
+          uv sync --all-packages \
+            --group fuzz \
+            --resolution ${{ matrix.resolution }} \
+            --no-build \
+            --no-binary-package compression-safeguards \
+            --no-binary-package varint
 
       - name: Restore the fuzzer corpus
         id: fuzzer-corpus-restore
@@ -197,7 +215,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Setup the Python venv with the safeguards
-        run: uv sync --all-packages --resolution highest
+        run: |
+          uv sync --all-packages \
+            --resolution highest \
+            --no-build \
+            --no-binary-package compression-safeguards \
+            --no-binary-package varint
 
       - name: Install mkdocs dependencies
         run: uv pip install -r docs/requirements.txt
@@ -229,7 +252,13 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Setup the Python venv with the safeguards
-        run: uv sync --all-packages --group doctest --resolution ${{ matrix.resolution }}
+        run: |
+          uv sync --all-packages \
+            --group doctest \
+            --resolution ${{ matrix.resolution }} \
+            --no-build \
+            --no-binary-package compression-safeguards \
+            --no-binary-package varint
 
       - name: Compile all docs
         run: |
