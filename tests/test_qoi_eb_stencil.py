@@ -243,6 +243,7 @@ def test_invalid_array():
         check_all_codecs(np.empty(0), "[]", [(0, 0)])
 
 
+@pytest.mark.slow
 def test_mean():
     # arithmetic mean
     check_all_codecs(
@@ -266,6 +267,7 @@ def test_mean():
     )
 
 
+@pytest.mark.slow
 def test_finite_difference():
     data = np.arange(81, dtype=float).reshape(9, 9)
     valid_5x5_neighbourhood = [
@@ -842,6 +844,7 @@ def test_fuzzer_finite_difference_int_iter():
         )
 
 
+@pytest.mark.veryslow
 def test_fuzzer_finite_difference_fraction_overflow():
     data = np.array([7], dtype=np.int8)
     decoded = np.array([0], dtype=np.int8)
@@ -872,6 +875,7 @@ def test_fuzzer_finite_difference_fraction_overflow():
         )
 
 
+@pytest.mark.veryslow
 def test_fuzzer_finite_difference_fraction_compare():
     data = np.array([1978047305655558])
 
@@ -1320,6 +1324,7 @@ def test_late_bound_constant():
     assert np.all(ok == np.array([True, True, True, True, True, False]).reshape(2, 3))
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("check", CHECKS)
 def test_pointwise_normalised_absolute_error(check):
     # pointwise normalised / range-relative absolute error bound

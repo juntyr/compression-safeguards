@@ -192,10 +192,12 @@ def check_all_codecs(data: np.ndarray, constant_boundary=4.2):
         assert sanity_safeguards.check(data, corrected)
 
 
+@pytest.mark.slow
 def test_empty():
     check_all_codecs(np.empty(0))
 
 
+@pytest.mark.slow
 def test_dimensions():
     check_all_codecs(np.array(42.0))
     check_all_codecs(np.array(42, dtype=np.int64), constant_boundary=42)
@@ -204,14 +206,17 @@ def test_dimensions():
     check_all_codecs(np.array([[[42.0]]]))
 
 
+@pytest.mark.slow
 def test_arange():
     check_all_codecs(np.arange(100, dtype=float))
 
 
+@pytest.mark.slow
 def test_linspace():
     check_all_codecs(np.linspace(-1024, 1024, 2831))
 
 
+@pytest.mark.slow
 def test_edge_cases():
     check_all_codecs(
         np.array(
@@ -233,6 +238,7 @@ def test_edge_cases():
     )
 
 
+@pytest.mark.slow
 def test_rounded_cos():
     x = np.linspace(0.0, np.pi * 4.0, 100)
     data = np.round(np.cos(x) / 0.1) * 0.1
@@ -240,6 +246,7 @@ def test_rounded_cos():
     check_all_codecs(data)
 
 
+@pytest.mark.veryslow
 def test_cos_sin():
     x = np.linspace(0.0, np.pi * 4.0, 100)
     x, y = np.meshgrid(x, x)
@@ -248,6 +255,7 @@ def test_cos_sin():
     check_all_codecs(data)
 
 
+@pytest.mark.veryslow
 def test_cos_sin_cos():
     x = np.linspace(0.0, np.pi * 2.0, 10)
     x, y, z = np.meshgrid(x, x, x)

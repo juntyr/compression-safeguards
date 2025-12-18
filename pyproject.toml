@@ -38,7 +38,7 @@ examples = [
     "earthkit-data~=0.14.0",
     "earthkit-plots~=0.3.1",
     "humanize~=4.14.0",
-    "jupyterlab",
+    "jupyterlab~=4.3",
     "matplotlib~=3.10.0",
     "netcdf4~=1.7.2",
     "numcodecs-wasm~=0.2.2",
@@ -46,23 +46,26 @@ examples = [
     "numcodecs-wasm-sperr~=0.2.0",
     "numcodecs-wasm-sz3~=0.8.1",
     "numcodecs-wasm-zfp~=0.6.0",
-    "numcodecs-zero~=0.1.0",
-    # FIXME: https://github.com/dask/dask/issues/12072
-    "pyarrow~=21.0.0",
+    "numcodecs-zero~=0.1.1",
     "scikit-image~=0.25.0",
     "xarray~=2025.1",
 ]
-fuzz = ["atheris~=2.3", "setuptools~=80.0", "timeoutcontext~=1.2"]
+fuzz = [
+    "atheris~=2.3; python_version <= '3.10'",
+    "atheris~=3.0; python_version >= '3.11'",
+    "setuptools~=80.0",
+    "timeoutcontext~=2.0",
+]
 test = [
     "dask~=2025.4",
-    "numcodecs-combinators~=0.2.10",
-    "pytest~=8.4",
+    "numcodecs-combinators~=0.2.12",
+    "pytest~=9.0",
     "xarray~=2025.4",
     "zarr~=3.0; python_version >= '3.11'",
     "zarr-any-numcodecs~=0.1.2; python_version >= '3.11'",
 ]
-doctest = ["griffe2md~=1.1", "pytest~=8.3", "pytest-codeblocks~=0.17.0"]
-typing = ["mypy~=1.18"]
+doctest = ["griffe2md~=1.1", "pytest~=9.0", "pytest-codeblocks~=0.17.0"]
+typing = ["mypy~=1.19"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -79,8 +82,12 @@ ignore = ["PLC0105"]
 "examples/*" = ["T20", "PLC"]
 
 [tool.pytest.ini_options]
-addopts = ["--import-mode=importlib"]
+addopts = ["--import-mode=importlib", "--strict-markers"]
 xfail_strict = true
+markers = [
+    "slow: marks tests as slow [10-30s] (deselect with '-m \"not slow\"')",
+    "veryslow: marks tests as very slow [>30s] (deselect with '-m \"not veryslow\"')",
+]
 
 [[tool.mypy.overrides]]
 module = ["numpy_quaddtype.*", "sly.*"]
