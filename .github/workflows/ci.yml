@@ -82,7 +82,7 @@ jobs:
         run: uv sync --all-packages --group test
 
       - name: Run tests
-        run: uv run pytest -v -W error
+        run: uv run pytest -v -W error -m ${{ matrix.markers }}
 
   mypy:
     name: Typecheck
