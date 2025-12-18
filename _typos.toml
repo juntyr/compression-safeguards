@@ -2,7 +2,7 @@
 extend-exclude = ["*.bin"]
 
 [default]
-extend-ignore-identifiers-re = ["arange"]
+extend-ignore-identifiers-re = ["arange", "_VOR$", "_VOR_", "^vor_"]
 
 [default.extend-identifiers]
 check_arange = "check_arange"
