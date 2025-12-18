@@ -6,15 +6,11 @@ __all__ = ["Safeguards"]
 
 import functools
 from collections.abc import Collection, Mapping, Set
-from typing import Final, Literal
+from typing import Final, Literal, Self, assert_never
 
 import numpy as np
 from semver import Version
-from typing_extensions import (
-    Self,  # MSPV 3.11
-    assert_never,  # MSPV 3.11
-    override,  # MSPV 3.12
-)
+from typing_extensions import override  # MSPV 3.12
 
 from .safeguards import SafeguardKind
 from .safeguards.abc import Safeguard

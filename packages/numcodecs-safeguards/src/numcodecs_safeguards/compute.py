@@ -7,6 +7,7 @@ __all__ = ["Compute"]
 import dataclasses
 import warnings
 from dataclasses import dataclass
+from typing import Self
 
 import numpy as np
 from compression_safeguards.api import Safeguards
@@ -15,7 +16,6 @@ from compression_safeguards.safeguards.stencil.abc import StencilSafeguard
 from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.error import SafeguardsSafetyBug, ctx
 from compression_safeguards.utils.typing import JSON, C, S, T
-from typing_extensions import Self  # MSPV 3.11
 
 
 @dataclass(kw_only=True)

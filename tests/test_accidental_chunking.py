@@ -1,8 +1,7 @@
-import sys
-
 import numpy as np
 import pytest
 import xarray as xr
+import zarr
 from numcodecs_combinators.stack import CodecStack
 
 
@@ -83,12 +82,7 @@ def test_codec_stack_stencil():
         ).compute()
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 11), reason="zarr v3 requires >= Python 3.11"
-)
 def test_zarr_pointwise():
-    import zarr  # noqa: PLC0415
-
     data = np.arange(100, dtype=float)
 
     store = zarr.storage.MemoryStore()
@@ -119,12 +113,7 @@ def test_zarr_pointwise():
     assert np.all(np.abs(np.asarray(a) - data) <= 0.5)
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 11), reason="zarr v3 requires >= Python 3.11"
-)
 def test_zarr_stencil():
-    import zarr  # noqa: PLC0415
-
     data = np.arange(100, dtype=float)
 
     store = zarr.storage.MemoryStore()

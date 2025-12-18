@@ -9,9 +9,9 @@ description = "Fearless lossy compression using safeguards"
 authors = [{ name = "Juniper Tyree", email = "juniper.tyree@helsinki.fi" }]
 license = "MPL-2.0"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
-    "numpy~=2.0,<2.4",
+    "numpy==2.4.0rc1",
     "numpy-quaddtype~=0.2.0; sys_platform != 'emscripten'",
     "semver~=3.0",
     "sly~=0.5.0",
@@ -32,7 +32,7 @@ bench = [
     "tqdm~=4.0",
     "xarray~=2025.4",
 ]
-dev = ["ruff~=0.9"]
+dev = ["ruff~=0.14"]
 examples = [
     "cdsapi~=0.7.6",
     "earthkit-data~=0.14.0",
@@ -51,8 +51,7 @@ examples = [
     "xarray~=2025.1",
 ]
 fuzz = [
-    "atheris~=2.3; python_version <= '3.10'",
-    "atheris~=3.0; python_version >= '3.11'",
+    "atheris~=3.0",
     "setuptools~=80.0",
     "timeoutcontext~=2.0",
 ]
@@ -61,8 +60,8 @@ test = [
     "numcodecs-combinators~=0.2.12",
     "pytest~=9.0",
     "xarray~=2025.4",
-    "zarr~=3.0; python_version >= '3.11'",
-    "zarr-any-numcodecs~=0.1.2; python_version >= '3.11'",
+    "zarr~=3.0",
+    "zarr-any-numcodecs~=0.1.2",
 ]
 doctest = ["griffe2md~=1.1", "pytest~=9.0", "pytest-codeblocks~=0.17.0"]
 typing = ["mypy~=1.19"]

@@ -77,7 +77,7 @@ __all__ = ["SafeguardsCodec"]
 
 from collections.abc import Callable, Collection, Mapping, Set
 from io import BytesIO
-from typing import ClassVar
+from typing import ClassVar, Self
 
 import numcodecs
 import numcodecs.compat
@@ -100,7 +100,6 @@ from numcodecs_combinators.abc import CodecCombinatorMixin
 from semver import Version
 from typing_extensions import (
     Buffer,  # MSPV 3.12
-    Self,  # MSPV 3.11
     override,  # MSPV 3.12
 )
 
@@ -465,20 +464,14 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             with ctx.parameter("codec"):
                 decoded = self._codec.decode(np.copy(encoded), out=None)
         except Exception as err:
-            note = (
+            err.add_note(
                 "decoding with `out=None` failed\n\n"
                 "consider using wrapping the codec in the "
                 "`numcodecs_combinators.framed.FramedCodecStack(codec)` "
                 "combinator if the codec requires knowing the output data "
                 "type and shape for decoding"
             )
-
-            # MSPV 3.11
-            if getattr(err, "add_note", None) is not None:
-                err.add_note(note)  # type: ignore
-                raise
-            else:
-                raise (RuntimeError(note) | ctx) from err
+            raise
         decoded = numcodecs.compat.ensure_ndarray(decoded)
 
         if self._lossless_for_codec is not None:
@@ -502,19 +495,13 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 if decoded.shape != data.shape:
                     raise RuntimeError("codec must decode to the data's shape") | ctx
         except RuntimeError as err:
-            note = (
+            err.add_note(
                 "consider using wrapping the codec in the "
                 "`numcodecs_combinators.framed.FramedCodecStack(codec)` "
                 "combinator to encode to bytes and preserve the data dtype and"
                 "shape"
             )
-
-            # MSPV 3.11
-            if getattr(err, "add_note", None) is not None:
-                err.add_note(note)  # type: ignore
-                raise
-            else:
-                raise (RuntimeError(note) | ctx) from err
+            raise
 
         late_bound = self._late_bound
         late_bound_reqs = self._safeguards.late_bound

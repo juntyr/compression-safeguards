@@ -2,10 +2,7 @@ from collections.abc import Callable, Mapping
 from typing import overload
 
 import numpy as np
-from typing_extensions import (
-    Unpack,  # MSPV 3.11
-    override,  # MSPV 3.12
-)
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _as_logical,
@@ -106,7 +103,7 @@ class ScalarNot(Expr[AnyExpr]):
         return f"not({self._a!r})"
 
 
-class ScalarAll(Expr[AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
+class ScalarAll(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
     __slots__: tuple[str, ...] = ("_a", "_b", "_cs")
     _a: AnyExpr
     _b: AnyExpr
@@ -119,7 +116,7 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
 
     @property
     @override
-    def args(self) -> tuple[AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]:
+    def args(self) -> tuple[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]:
         return (self._a, self._b, *self._cs)
 
     @override
@@ -290,7 +287,7 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
         return f"all({abc})"
 
 
-class ScalarAny(Expr[AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
+class ScalarAny(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
     __slots__: tuple[str, ...] = ("_a", "_b", "_cs")
     _a: AnyExpr
     _b: AnyExpr
@@ -303,7 +300,7 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
 
     @property
     @override
-    def args(self) -> tuple[AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]:
+    def args(self) -> tuple[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]:
         return (self._a, self._b, *self._cs)
 
     @override

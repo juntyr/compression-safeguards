@@ -65,13 +65,15 @@ def _nan_to_zero_inf_to_finite(
 ) -> np.ndarray[S, np.dtype[T]]:
     out: np.ndarray[S, np.dtype[T]] = _ensure_array(a, copy=True)
 
+    fmin: T
+    fmax: T
     if out.dtype == _float128_dtype:
-        fmin, fmax = _float128_min, _float128_max
+        fmin, fmax = _float128_min, _float128_max  # type: ignore
     elif not np.issubdtype(out.dtype, np.floating):
         return out
     else:
         finfo = np.finfo(out.dtype)  # type: ignore
-        fmin, fmax = finfo.min, finfo.max
+        fmin, fmax = finfo.min, finfo.max  # type: ignore
 
     out[np.isnan(a)] = 0
     out[a == -np.inf] = fmin

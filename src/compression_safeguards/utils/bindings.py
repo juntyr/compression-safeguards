@@ -8,13 +8,10 @@ from base64 import standard_b64decode, standard_b64encode
 from collections.abc import Set
 from io import BytesIO
 from types import MappingProxyType
-from typing import TypeAlias
+from typing import Self, TypeAlias
 
 import numpy as np
-from typing_extensions import (
-    Self,  # MSPV 3.11
-    override,  # MSPV 3.12
-)
+from typing_extensions import override  # MSPV 3.12
 
 from ._compat import _broadcast_to
 from .cast import lossless_cast, saturating_finite_float_cast

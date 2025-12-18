@@ -1,12 +1,9 @@
 import itertools
 from collections.abc import Callable, Iterator, Mapping
+from typing import Self
 
 import numpy as np
-from typing_extensions import (
-    Self,  # MSPV 3.11
-    Unpack,  # MSPV 3.11
-    override,  # MSPV 3.12
-)
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils.bindings import Parameter
 from ....utils.error import ctx
@@ -19,7 +16,7 @@ from .divmul import ScalarMultiply
 from .group import Group
 
 
-class Array(Expr[AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
+class Array(Expr[AnyExpr, *tuple[AnyExpr, ...]]):
     __slots__: tuple[str, ...] = ("_array",)
     _array: np.ndarray
 
@@ -55,7 +52,7 @@ class Array(Expr[AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
 
     @property
     @override
-    def args(self) -> tuple[AnyExpr, Unpack[tuple[AnyExpr, ...]]]:
+    def args(self) -> tuple[AnyExpr, *tuple[AnyExpr, ...]]:
         if self._array.ndim == 1:
             return tuple(self._array)
         return tuple(Array(*a) for a in self._array)  # type: ignore
@@ -101,7 +98,7 @@ class Array(Expr[AnyExpr, Unpack[tuple[AnyExpr, ...]]]):
         return self._array.size
 
     @staticmethod
-    def map(map: Callable[[Unpack[Es]], AnyExpr], *exprs: Unpack[Es]) -> AnyExpr:
+    def map(map: Callable[[*Es], AnyExpr], *exprs: *Es) -> AnyExpr:
         if not any(isinstance(e, Array) for e in exprs):
             return map(*exprs)
 

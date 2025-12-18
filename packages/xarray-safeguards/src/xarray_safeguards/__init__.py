@@ -94,7 +94,7 @@ import json
 import warnings
 from collections.abc import Collection, Mapping
 from types import MappingProxyType
-from typing import Literal, TypeAlias
+from typing import Literal, TypeAlias, assert_never
 
 import dask
 import dask.array
@@ -114,7 +114,6 @@ from compression_safeguards.utils.error import (
     ctx,
 )
 from compression_safeguards.utils.typing import JSON, S, T
-from typing_extensions import assert_never  # MSPV 3.11
 
 DataValue: TypeAlias = int | float | np.number | xr.DataArray
 """

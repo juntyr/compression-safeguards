@@ -2,10 +2,7 @@ import operator
 from collections.abc import Mapping
 
 import numpy as np
-from typing_extensions import (
-    Unpack,  # MSPV 3.11
-    override,  # MSPV 3.12
-)
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _broadcast_to,
@@ -151,9 +148,7 @@ class ScalarSubtract(Expr[AnyExpr, AnyExpr]):
 #  - two terms: binary sum
 # this class avoids the deep nesting that's required to represent a
 #  left-associative sum with ScalarAdd's
-class ScalarLeftAssociativeSum(
-    Expr[AnyExpr, AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]
-):
+class ScalarLeftAssociativeSum(Expr[AnyExpr, AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
     __slots__: tuple[str, ...] = ("_a", "_b", "_c", "_ds")
     _a: AnyExpr
     _b: AnyExpr
@@ -194,7 +189,7 @@ class ScalarLeftAssociativeSum(
 
     @property
     @override
-    def args(self) -> tuple[AnyExpr, AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]:
+    def args(self) -> tuple[AnyExpr, AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]:
         return (self._a, self._b, self._c, *self._ds)
 
     @override

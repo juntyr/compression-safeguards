@@ -9,7 +9,7 @@ description = "Fearless lossy compression in numcodecs using safeguards"
 authors = [{ name = "Juniper Tyree", email = "juniper.tyree@helsinki.fi" }]
 license = "MPL-2.0"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "compression-safeguards==1.0.0a1",
     "numcodecs>=0.13.0,<0.17",
@@ -19,7 +19,7 @@ dependencies = [
     "numcodecs-shuffle~=0.1.0",
     "numcodecs-tokenize~=0.1.2",
     "numcodecs-zero~=0.1.1",
-    "numpy~=2.0,<2.4",
+    "numpy==2.4.0rc1",
     "semver~=3.0",
     "typing-extensions~=4.6",
     "varint~=1.0.2",

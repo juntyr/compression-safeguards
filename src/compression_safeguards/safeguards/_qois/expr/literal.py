@@ -36,20 +36,13 @@ class Number(EmptyExpr):
             category=RuntimeWarning,
         )
 
-        int_max_str_digits = None
-
-        if (
-            getattr(sys, "get_int_max_str_digits", None) is not None
-            and getattr(sys, "set_int_max_str_digits", None) is not None
-        ):  # MSPV 3.11
-            int_max_str_digits = sys.get_int_max_str_digits()
-            sys.set_int_max_str_digits(0)
+        int_max_str_digits = sys.get_int_max_str_digits()
+        sys.set_int_max_str_digits(0)
 
         try:
             return Number(f"{n}")
         finally:
-            if int_max_str_digits is not None:
-                sys.set_int_max_str_digits(int_max_str_digits)
+            sys.set_int_max_str_digits(int_max_str_digits)
 
     @staticmethod
     def from_symbolic_int_as_float(n: int, force_negative: bool = False) -> "Number":
@@ -114,20 +107,13 @@ class Number(EmptyExpr):
             category=RuntimeWarning,
         )
 
-        int_max_str_digits = None
-
-        if (
-            getattr(sys, "get_int_max_str_digits", None) is not None
-            and getattr(sys, "set_int_max_str_digits", None) is not None
-        ):  # MSPV 3.11
-            int_max_str_digits = sys.get_int_max_str_digits()
-            sys.set_int_max_str_digits(0)
+        int_max_str_digits = sys.get_int_max_str_digits()
+        sys.set_int_max_str_digits(0)
 
         try:
             return int(self._n)
         finally:
-            if int_max_str_digits is not None:
-                sys.set_int_max_str_digits(int_max_str_digits)
+            sys.set_int_max_str_digits(int_max_str_digits)
 
     @override
     def __repr__(self) -> str:

@@ -60,12 +60,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        python: ["3.11", "3.12", "3.13", "3.14"]
         resolution: ["highest", "lowest-direct"]
         markers: ["not slow and not veryslow", "slow", "veryslow"]
         exclude:
-          - python: "3.10"
-            markers: "veryslow"
           - python: "3.11"
             markers: "veryslow"
             resolution: "highest"
@@ -99,7 +97,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        python: ["3.11", "3.12", "3.13", "3.14"]
         resolution: ["highest", "lowest-direct"]
     steps:
       - name: Checkout the Repository
@@ -132,15 +130,13 @@ jobs:
       fail-fast: false
       max-parallel: 1
       matrix:
-        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        python: ["3.11", "3.12", "3.13", "3.14"]
         resolution: ["highest", "lowest-direct"]
         exclude:
-          - python: "3.10"
-            resolution: "highest"
           - python: "3.12"
-            resolution: "highest"
+            resolution: "lowest-direct"
           - python: "3.13"
-            resolution: "highest"
+            resolution: "lowest-direct"
           - python: "3.14"
     steps:
       - name: Checkout the Repository
@@ -221,7 +217,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        python: ["3.11", "3.12", "3.13", "3.14"]
         resolution: ["highest", "lowest-direct"]
     steps:
       - name: Checkout the Repository

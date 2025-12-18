@@ -15,13 +15,10 @@ __all__ = [
     "Ui",
 ]
 
-from typing import Any, Generic, Literal, TypeVar
+from typing import Any, Generic, Literal, Self, TypeVar
 
 import numpy as np
-from typing_extensions import (
-    Self,  # MSPV 3.11
-    override,  # MSPV 3.12
-)
+from typing_extensions import override  # MSPV 3.12
 
 from ._compat import _ensure_array, _nextafter, _reshape, _where, _zeros
 from ._compat import _maximum_zero_sign_sensitive as _np_maximum
@@ -1340,14 +1337,14 @@ def _count_leading_zeros(
     if nbits <= 16:
         # safe cast from integer type to a larger integer type,
         # then lossless truncation of the number of leading zeros
-        return np.subtract(
+        return np.subtract(  # type: ignore
             nbits, np.frexp(x.astype(np.uint32, casting="safe"))[1]
         ).astype(np.uint8, casting="unsafe")
 
     if nbits <= 32:
         # safe cast from integer type to a larger integer type,
         # then lossless truncation of the number of leading zeros
-        return np.subtract(
+        return np.subtract(  # type: ignore
             nbits, np.frexp(x.astype(np.uint64, casting="safe"))[1]
         ).astype(np.uint8, casting="unsafe")
 

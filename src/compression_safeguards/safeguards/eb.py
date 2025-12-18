@@ -5,12 +5,9 @@ Error bounds that can be guaranteed by various safeguards.
 __all__ = ["ErrorBound"]
 
 from enum import Enum, auto
+from typing import Never, assert_never
 
 import numpy as np
-from typing_extensions import (
-    Never,  # MSPV 3.11
-    assert_never,  # MSPV 3.11
-)
 
 from ..utils._compat import (
     _ensure_array,

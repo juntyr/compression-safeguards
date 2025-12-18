@@ -7,13 +7,10 @@ __all__ = ["Monotonicity", "MonotonicityPreservingSafeguard"]
 from collections.abc import Set
 from enum import Enum
 from operator import ge, gt, le, lt
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, assert_never
 
 import numpy as np
-from typing_extensions import (
-    assert_never,  # MSPV 3.11
-    override,  # MSPV 3.12
-)
+from typing_extensions import override  # MSPV 3.12
 
 from compression_safeguards.safeguards.stencil import (
     BoundaryCondition,

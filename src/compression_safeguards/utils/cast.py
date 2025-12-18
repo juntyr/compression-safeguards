@@ -14,9 +14,9 @@ __all__ = [
 ]
 
 from enum import Enum, auto
+from typing import assert_never
 
 import numpy as np
-from typing_extensions import assert_never  # MSPV 3.11
 
 from ._compat import _ensure_array, _is_of_dtype, _nan_to_zero_inf_to_finite
 from ._float128 import _float128_dtype

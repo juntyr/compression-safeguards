@@ -14,13 +14,9 @@ __all__ = [
 ]
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, TypeAlias, TypeVar, TypeVarTuple
 
 import numpy as np
-from typing_extensions import (
-    TypeVarTuple,  # MSPV 3.11
-    Unpack,  # MSPV 3.11
-)
 
 T = TypeVar("T", bound=np.dtype[np.generic], covariant=True)
 """ Any numpy [`dtype`][numpy.dtype] (covariant). """
@@ -44,17 +40,17 @@ Ns = TypeVar("Ns", bound=tuple[int, ...], covariant=True)
 """ Any stencil neighbourhood array shape [*S.shape] (covariant). """
 
 if TYPE_CHECKING:
-    np_sndarray: TypeAlias = np.ndarray[tuple[Ps, Unpack[Ns]], T]  # type: ignore
-    """ Any stencil-extended [`np.ndarray[tuple[Ps, Unpack[Ns]], T]`][numpy.ndarray]. """
+    np_sndarray: TypeAlias = np.ndarray[tuple[Ps, *Ns], T]  # type: ignore
+    """ Any stencil-extended [`np.ndarray[tuple[Ps, *Ns], T]`][numpy.ndarray]. """
 else:
-    # Unpack[TypeVar(bound=tuple)] is not yet supported
+    # *TypeVar(bound=tuple) is not yet supported
     np_sndarray: TypeAlias = np.ndarray[tuple[Ps, Ns], T]  # type: ignore
 
 if TYPE_CHECKING:
-    np_sndarray2: TypeAlias = np.ndarray[tuple[Unpack[Ps2], Unpack[Ns]], T]  # type: ignore
-    """ Any stencil-extended [`np.ndarray[tuple[Unpack[Ps2], Unpack[Ns]], T]`][numpy.ndarray]. """
+    np_sndarray2: TypeAlias = np.ndarray[tuple[*Ps2, *Ns], T]  # type: ignore
+    """ Any stencil-extended [`np.ndarray[tuple[*Ps2, *Ns], T]`][numpy.ndarray]. """
 else:
-    # Unpack[TypeVar(bound=tuple)] is not yet supported
+    # *TypeVar(bound=tuple), *TypeVar(bound=tuple) is not supported
     np_sndarray2: TypeAlias = np.ndarray[tuple[Ps2, Ns], T]  # type: ignore
 
 Ci = TypeVar("Ci", bound=Callable)
