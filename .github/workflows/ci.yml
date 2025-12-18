@@ -53,7 +53,7 @@ jobs:
       fail-fast: false
       matrix:
         python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
-        resolution: ["highest", "lowest"]
+        resolution: ["highest", "lowest-direct"]
         markers: ["not slow and not veryslow", "slow", "veryslow"]
         exclude:
           - python: "3.10"
@@ -67,7 +67,7 @@ jobs:
             markers: "veryslow"
           - python: "3.14"
             markers: "veryslow"
-            resolution: "lowest"
+            resolution: "lowest-direct"
     steps:
       - name: Checkout the Repository
         uses: actions/checkout@v6
@@ -76,10 +76,9 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
-          resolution-strategy: ${{ matrix.resolution }}
 
       - name: Setup the Python venv with the safeguards
-        run: uv sync --all-packages --group test
+        run: uv sync --all-packages --group test --resolution ${{ matrix.resolution }}
 
       - name: Run tests
         run: uv run pytest -v -W error -m "${{ matrix.markers }}"
@@ -91,7 +90,7 @@ jobs:
       fail-fast: false
       matrix:
         python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
-        resolution: ["highest", "lowest"]
+        resolution: ["highest", "lowest-direct"]
     steps:
       - name: Checkout the Repository
         uses: actions/checkout@v6
@@ -100,10 +99,9 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
-          resolution-strategy: ${{ matrix.resolution }}
 
       - name: Setup the Python venv with the safeguards
-        run: uv sync --all-packages --group typing
+        run: uv sync --all-packages --group typing --resolution ${{ matrix.resolution }}
 
       - name: Typecheck compression-safeguards
         run: uv run mypy -p compression_safeguards
@@ -122,7 +120,7 @@ jobs:
       max-parallel: 1
       matrix:
         python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
-        resolution: ["highest", "lowest"]
+        resolution: ["highest", "lowest-direct"]
         exclude:
           - python: "3.10"
             resolution: "highest"
@@ -142,10 +140,9 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
-          resolution-strategy: ${{ matrix.resolution }}
 
       - name: Setup the Python venv with the safeguards
-        run: uv sync --all-packages --group fuzz
+        run: uv sync --all-packages --group fuzz --resolution ${{ matrix.resolution }}
 
       - name: Restore the fuzzer corpus
         id: fuzzer-corpus-restore
@@ -192,7 +189,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Setup the Python venv with the safeguards
-        run: uv sync --all-packages
+        run: uv sync --all-packages --resolution highest
 
       - name: Install mkdocs dependencies
         run: uv pip install -r docs/requirements.txt
@@ -211,7 +208,7 @@ jobs:
       fail-fast: false
       matrix:
         python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
-        resolution: ["highest", "lowest"]
+        resolution: ["highest", "lowest-direct"]
     steps:
       - name: Checkout the Repository
         uses: actions/checkout@v6
@@ -220,10 +217,9 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
-          resolution-strategy: ${{ matrix.resolution }}
 
       - name: Setup the Python venv with the safeguards
-        run: uv sync --all-packages --group doctest
+        run: uv sync --all-packages --group doctest --resolution ${{ matrix.resolution }}
 
       - name: Compile all docs
         run: |
