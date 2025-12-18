@@ -1,6 +1,7 @@
 from itertools import product
 
 import numpy as np
+import pytest
 import xarray as xr
 from xarray_safeguards import apply_data_array_correction, produce_data_array_correction
 
@@ -68,6 +69,7 @@ def test_empty():
     check_all_boundaries(np.empty(0), 1)
 
 
+@pytest.mark.slow
 def test_dimensions():
     check_all_boundaries(np.array([42.0]), 1)
     check_all_boundaries(np.array([42], dtype=np.int64), 1, constant_boundary=24)
@@ -75,6 +77,7 @@ def test_dimensions():
     check_all_boundaries(np.array([[[42.0]]]), 1)
 
 
+@pytest.mark.slow
 def test_unit():
     data = np.linspace(-1.0, 1.0, 100, dtype=np.float16)
     check_all_boundaries(data[::10], 1, constant_boundary=2.5)
@@ -82,6 +85,7 @@ def test_unit():
     check_all_boundaries(data, 17, constant_boundary=2.5)
 
 
+@pytest.mark.slow
 def test_circle():
     data = np.linspace(-np.pi * 2, np.pi * 2, 100, dtype=np.int64)
     check_all_boundaries(data[::10], 1, constant_boundary=42)
@@ -89,6 +93,7 @@ def test_circle():
     check_all_boundaries(data, 17, constant_boundary=42)
 
 
+@pytest.mark.slow
 def test_arange():
     data = np.arange(100, dtype=float)
     check_all_boundaries(data[::10], 1)
@@ -96,6 +101,7 @@ def test_arange():
     check_all_boundaries(data, 17)
 
 
+@pytest.mark.slow
 def test_linspace():
     data = np.linspace(-1024, 1024, 2831, dtype=np.float32)
     check_all_boundaries(data[::283], 1, constant_boundary=2.5)
@@ -103,6 +109,7 @@ def test_linspace():
     check_all_boundaries(data, 1738, constant_boundary=2.5)
 
 
+@pytest.mark.slow
 def test_edge_cases():
     data = np.array(
         [

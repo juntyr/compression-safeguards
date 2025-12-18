@@ -248,6 +248,7 @@ def test_abs(check):
     check("abs(abs(x))")
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("check", CHECKS)
 def test_polynomial(check):
     # identities
@@ -442,6 +443,7 @@ def test_where(check):
     check("where(x, x*2, x/2)")
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("check", CHECKS)
 def test_comparison(check):
     check("x <= 1")
@@ -509,6 +511,7 @@ def test_dtypes(dtype):
     check_all_codecs(np.array([[1]], dtype=dtype), "x/sqrt(pi)")
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("check", CHECKS)
 def test_fuzzer_found(check):
     with pytest.warns(RuntimeWarning, match="symbolic integer evaluation"):
