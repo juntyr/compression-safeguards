@@ -90,6 +90,8 @@ jobs:
             --resolution ${{ matrix.resolution }} \
             --no-build \
             --no-binary-package compression-safeguards \
+            --no-binary-package numcodecs-safeguards \
+            --no-binary-package xarray-safeguards \
             --no-binary-package varint
 
       - name: Run tests
@@ -121,6 +123,8 @@ jobs:
             --resolution ${{ matrix.resolution }} \
             --no-build \
             --no-binary-package compression-safeguards \
+            --no-binary-package numcodecs-safeguards \
+            --no-binary-package xarray-safeguards \
             --no-binary-package varint
 
       - name: Typecheck compression-safeguards
@@ -166,6 +170,8 @@ jobs:
             --resolution ${{ matrix.resolution }} \
             --no-build \
             --no-binary-package compression-safeguards \
+            --no-binary-package numcodecs-safeguards \
+            --no-binary-package xarray-safeguards \
             --no-binary-package varint
 
       - name: Restore the fuzzer corpus
@@ -220,6 +226,8 @@ jobs:
             --resolution highest \
             --no-build \
             --no-binary-package compression-safeguards \
+            --no-binary-package numcodecs-safeguards \
+            --no-binary-package xarray-safeguards \
             --no-binary-package varint
 
       - name: Install mkdocs dependencies
@@ -258,6 +266,8 @@ jobs:
             --resolution ${{ matrix.resolution }} \
             --no-build \
             --no-binary-package compression-safeguards \
+            --no-binary-package numcodecs-safeguards \
+            --no-binary-package xarray-safeguards \
             --no-binary-package varint
 
       - name: Compile all docs
