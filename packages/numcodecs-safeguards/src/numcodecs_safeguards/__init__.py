@@ -197,8 +197,8 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
           applied.
         - [`Lossless.for_safeguards`][..lossless.Lossless.for_safeguards]
           specifies the lossless encoding that is applied to the corrections
-          that the safeguards produce. By default, Huffman coding followed by
-          Zstandard compression is applied.
+          that the safeguards produce. By default, Zstandard compression is
+          applied after entropy coding.
 
         The lossless encoding must encode to a 1D buffer of bytes.
     compute : None | dict[str, JSON] | Compute, optional

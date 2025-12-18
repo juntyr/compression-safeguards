@@ -38,7 +38,7 @@ examples = [
     "earthkit-data~=0.14.0",
     "earthkit-plots~=0.3.1",
     "humanize~=4.14.0",
-    "jupyterlab",
+    "jupyterlab~=4.3",
     "matplotlib~=3.10.0",
     "netcdf4~=1.7.2",
     "numcodecs-wasm~=0.2.2",
@@ -46,7 +46,7 @@ examples = [
     "numcodecs-wasm-sperr~=0.2.0",
     "numcodecs-wasm-sz3~=0.8.1",
     "numcodecs-wasm-zfp~=0.6.0",
-    "numcodecs-zero~=0.1.0",
+    "numcodecs-zero~=0.1.1",
     "scikit-image~=0.25.0",
     "xarray~=2025.1",
 ]
@@ -58,7 +58,7 @@ fuzz = [
 ]
 test = [
     "dask~=2025.4",
-    "numcodecs-combinators~=0.2.11",
+    "numcodecs-combinators~=0.2.12",
     "pytest~=9.0",
     "xarray~=2025.4",
     "zarr~=3.0; python_version >= '3.11'",
