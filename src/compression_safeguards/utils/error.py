@@ -119,7 +119,9 @@ class ErrorContext:
         other_with_context.__context__ = other.__context__
         other_with_context.__suppress_context__ = other.__suppress_context__
         other_with_context.__traceback__ = other.__traceback__
-        other_with_context.__notes__ = other.__notes__
+        if hasattr(other, "__notes__"):
+            # only present after add_note() is called
+            other_with_context.__notes__ = other.__notes__
         return other_with_context
 
     @override

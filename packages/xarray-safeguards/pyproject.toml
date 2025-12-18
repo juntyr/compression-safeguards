@@ -13,7 +13,7 @@ requires-python = ">=3.11"
 dependencies = [
     "compression-safeguards==1.0.0a1",
     "dask>=2024.5.1",
-    "numpy==2.4.0rc1",
+    "numpy~=2.3",
     "typing-extensions~=4.6",
     "xarray>=2024.7.0",
 ]
