@@ -22,7 +22,7 @@ dependencies = [
     "numpy~=2.0",
     "semver~=3.0",
     "typing-extensions~=4.6",
-    "varint~=1.0",
+    "varint~=1.0.2",
 ]
 
 [project.entry-points."numcodecs.codecs"]
