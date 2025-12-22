@@ -15,6 +15,8 @@ jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout the Repository
         uses: actions/checkout@v6
@@ -27,6 +29,8 @@ jobs:
   spelling:
     name: Spellcheck
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout the Repository
         uses: actions/checkout@v6
@@ -37,6 +41,8 @@ jobs:
   fmt:
     name: Formatting
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout the Repository
         uses: actions/checkout@v6
@@ -49,6 +55,8 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -86,6 +94,8 @@ jobs:
   mypy:
     name: Typecheck
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -115,6 +125,9 @@ jobs:
   fuzz:
     name: Fuzz
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
     strategy:
       fail-fast: false
       max-parallel: 1
@@ -129,9 +142,6 @@ jobs:
           - python: "3.13"
             resolution: "highest"
           - python: "3.14"
-    permissions:
-      actions: write
-      contents: read
     steps:
       - name: Checkout the Repository
         uses: actions/checkout@v6
@@ -181,6 +191,8 @@ jobs:
   docs:
     name: Docs
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout the Repository
         uses: actions/checkout@v6
@@ -204,6 +216,8 @@ jobs:
   doctest:
     name: Doctest
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
