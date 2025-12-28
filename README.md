@@ -335,7 +335,11 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
 - ... isolines / isosurfaces?
 
-    > Isolines or isosurfaces can be preserved by using a `sign` safeguard with a matching `offset` for each surface value that should be kept. These `sign` safeguards should generally be combined with an error-bounding safeguard, unless *any* values that preserve the isosurfaces are acceptable.
+    > Isolines or isosurfaces can be preserved by using a `sign` safeguard with a matching `offset` for each surface value that should be kept. These `sign` safeguards should generally be combined with an error-bounding safeguard, unless *any* values that preserve the isosurfaces are acceptable. To preserve isosurfaces over a quantity of interest, comparison operators such as `log(x) > 3` can be used in the quantity of interest safeguards.
+
+- ... critical points?
+
+    Critical points, i.e. points where the derivative over the data or a quantity of interest is zero, can be preserved using the following `qoi_eb_stencil` safeguard: `'finite_difference(x, ...) == 0'`, where the finite difference keyword parameters have been excluded for brevity. To preserve critical points over a quantity of interest, the finite difference over `x` can be replaced with the finite difference over the quantity of interest. Points where the derivative is NaN can be preserved using `'isnan(finite_difference(x, ...))'`.
 
 - ... the monotonicity of a sequence?
 
