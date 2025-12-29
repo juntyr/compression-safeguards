@@ -11,7 +11,7 @@ license = "MPL-2.0"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "numpy~=2.3",
+    "numpy~=2.3.0",
     "numpy-quaddtype~=0.2.0; sys_platform != 'emscripten'",
     "semver~=3.0",
     "sly~=0.5.0",
