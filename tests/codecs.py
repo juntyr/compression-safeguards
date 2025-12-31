@@ -94,8 +94,8 @@ def encode_decode_identity(data: np.ndarray, **kwargs) -> np.ndarray:
     assert isinstance(just_data, bytes)
 
     # Ensure that codecs that already satisfy the properties only have a
-    #  single-byte overhead
-    assert len(encoded) == (1 + len(just_data))
+    #  three-byte overhead
+    assert len(encoded) == (3 + len(just_data))
 
     decoded = codec.decode(encoded)
 

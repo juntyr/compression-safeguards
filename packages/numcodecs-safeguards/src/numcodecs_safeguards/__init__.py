@@ -18,8 +18,8 @@ properties of the original data are preserved by compression.
 The `SafeguardsCodec` treats the wrapped inner codec as a blackbox. To
 guarantee the user's safety requirements, it post-processes the decompressed
 data, if necessary. If no correction is needed, the `SafeguardsCodec` only has
-a one-byte overhead for the compressed data and a computational overhead at
-compression time.
+a three-byte overhead for the compressed data and a computational overhead at
+compression time (at decompression time, only the checksum is verified).
 
 By using the `SafeguardsCodec` adapter, badly behaving lossy codecs become safe
 to use, at the cost of potentially less efficient compression, and lossy
@@ -103,6 +103,7 @@ from typing_extensions import (
     override,  # MSPV 3.12
 )
 
+from .checksum import checksum
 from .compute import Compute, _refine_correction_iteratively
 from .lossless import Lossless
 
@@ -126,7 +127,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         The codec must be deterministic during decoding (but can be
         non-deterministic during encoding) such that decoding the same bytes
-        always produces the same binary equivalent decoded result.
+        always produces the same bitwise equivalent decoded result.
 
         It is desirable to perform lossless compression after applying the
         safeguards (rather than before), e.g. by customising the
@@ -402,12 +403,13 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
     @override
     def encode(self, buf: Buffer) -> bytes:
-        """Encode the data in `buf`.
+        """
+        Encode the data in `buf` while safeguarding the compression.
 
         The encoded data is defined by the following *stable* format:
 
         ```
-        ULEB128(len(correction_bytes)), encoded_bytes, correction_bytes
+        ULEB128(len(correction_bytes)), checksum, encoded_bytes, correction_bytes
         ```
 
         where
@@ -416,6 +418,10 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
           [unsigned LEB128](https://en.wikipedia.org/wiki/LEB128#Unsigned_LEB128)
           (little endian base 128) variable length encoding for unsigned
           integers
+        - `checksum` refers to the
+          [RFC 1071](https://datatracker.ietf.org/doc/html/rfc1071)
+          "Internet Checksum" over the little-endian C-order bytes of the
+          corrected data, stored as two bytes in big-endian order
         - `encoded_bytes` refers to the encoded bytes produced by the codec and
           its optional lossless encoding
         - `correction_bytes` refers to the encoded correction bytes produced by
@@ -423,7 +429,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         - the above bytestrings are concatenated into a single bytestring
 
         If no correction is required, `correction_bytes` is empty and there is
-        only a single-byte overhead from using the safeguards.
+        only a three-byte overhead from using the safeguards.
 
         The `buf`fer must contain the complete data, i.e. not just a chunk of
         data, so that non-pointwise safeguards are correctly applied. Please
@@ -544,6 +550,9 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 self._safeguards, data, decoded, correction, late_bound
             )
 
+        corrected = self._safeguards.apply_correction(decoded, correction)
+        corrected_checksum = checksum(corrected)
+
         if np.all(correction == 0):
             correction_bytes = b""
         else:
@@ -553,11 +562,12 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         correction_len = varint.encode(len(correction_bytes))
 
-        return correction_len + encoded_bytes + correction_bytes
+        return correction_len + corrected_checksum + encoded_bytes + correction_bytes
 
     @override
     def decode(self, buf: Buffer, out: None | Buffer = None) -> Buffer:
-        """Decode the data in `buf`.
+        """
+        Decode the data in `buf` and apply the safeguards corrections.
 
         Parameters
         ----------
@@ -594,6 +604,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
             buf_io = BytesIO(buf_bytes)
             correction_len = varint.decode_stream(buf_io)
+            corrected_checksum = buf_io.read(2)
             if correction_len < 0:
                 raise (
                     ValueError("cannot decode from corrupt buf with invalid header")
@@ -628,6 +639,25 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             corrected = self._safeguards.apply_correction(decoded, correction)
         else:
             corrected = decoded
+
+        newly_corrected_checksum = checksum(corrected)
+
+        if newly_corrected_checksum != corrected_checksum:
+            err = ValueError("mismatch in the checksum for the corrected data")
+            err.add_note(
+                "The checksum of the corrected ensures that the safeguards "
+                "correction is applied to the bitwise equivalent decompressed "
+                "data as when the correction was computed, i.e. that the "
+                "corrected meets all safety requirements."
+            )
+            err.add_note(
+                "A mismatch in the checksum likely comes from a wrapped "
+                "`codec` that produces non-deterministic decompressed output. "
+                "However, the safeguards can only be used with a determinstic "
+                "decompressor."
+            )
+
+            raise (err | ctx)
 
         return numcodecs.compat.ndarray_copy(corrected, out)  # type: ignore
 
