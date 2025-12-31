@@ -462,6 +462,9 @@ class Safeguards:
         """
         Apply the `correction` to the `prediction` to satisfy the safeguards for which the `correction` was computed.
 
+        The `prediction` must be bitwise equivalent to the `prediction` that
+        was used to compute the `correction`.
+
         This method is guaranteed to work for chunked data as well, i.e.
         applying a chunk of the `correction` to the corresponding chunk of the
         `prediction` produces the correct result.

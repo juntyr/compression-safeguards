@@ -124,6 +124,10 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         [`numcodecs_combinators.stack.CodecStack`][numcodecs_combinators.stack.CodecStack]
         combinator.
 
+        The codec must be deterministic during decoding (but can be
+        non-deterministic during encoding) such that decoding the same bytes
+        always produces the same binary equivalent decoded result.
+
         It is desirable to perform lossless compression after applying the
         safeguards (rather than before), e.g. by customising the
         [`Lossless.for_codec`][..lossless.Lossless.for_codec] field of the
@@ -416,6 +420,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
           its optional lossless encoding
         - `correction_bytes` refers to the encoded correction bytes produced by
           the safeguards and their lossless encoding
+        - the above bytestrings are concatenated into a single bytestring
 
         If no correction is required, `correction_bytes` is empty and there is
         only a single-byte overhead from using the safeguards.
