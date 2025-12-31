@@ -455,7 +455,11 @@ def lossless_cast(
 
     lossless_same = xa == xa_back
     lossless_same |= np.isnan(xa) & np.isnan(xa_back)
-    lossless_same &= np.signbit(xa) == np.signbit(xa_back)
+
+    if isinstance(x, int):
+        lossless_same &= (x < 0) == np.signbit(xa_back)
+    else:
+        lossless_same &= np.signbit(xa) == np.signbit(xa_back)
 
     if not np.all(lossless_same):
         raise (
@@ -517,6 +521,9 @@ def saturating_finite_float_cast(
         xa_to = _ensure_array(xa).astype(dtype, casting="unsafe")
 
     # the above checks guarantee that there are no NaNs in xa
-    assert np.all(np.signbit(xa) == np.signbit(xa_to))
+    if isinstance(x, int):
+        assert (x < 0) == np.signbit(xa_to)
+    else:
+        assert np.all(np.signbit(xa) == np.signbit(xa_to))
 
     return _nan_to_zero_inf_to_finite(xa_to)

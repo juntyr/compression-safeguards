@@ -32,12 +32,12 @@ def checksum(data: np.ndarray[S, np.dtype[T]]) -> bytes:
         bytes_le += b"\0"
 
     # reinterpret the bytes as little endian unsigned 16bit integers
-    halfs: np.ndarray[tuple[int]] = np.frombuffer(
+    u16sle: np.ndarray[tuple[int]] = np.frombuffer(
         bytes_le, dtype=np.dtype("<u2"), count=len(bytes_le) // 2
     )
 
     # sum up using unsigned 32bit integer wrapping arithmetic
-    acc32: np.uint32 = np.sum(halfs.astype(np.uint32))
+    acc32: np.uint32 = np.sum(u16sle.astype(np.uint32))
 
     # fold into unsigned 16bit integer: add the carrier
     while (acc32 >> 16) > 0:

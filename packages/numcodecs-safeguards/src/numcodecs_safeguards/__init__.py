@@ -653,8 +653,8 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             err.add_note(
                 "A mismatch in the checksum likely comes from a wrapped "
                 "`codec` that produces non-deterministic decompressed output. "
-                "However, the safeguards can only be used with a determinstic "
-                "decompressor."
+                "However, the safeguards can only be used with a "
+                "deterministic decompressor."
             )
 
             raise (err | ctx)
