@@ -40,7 +40,7 @@ def test_rfc_1071():
 
 
 # adapted from https://docs.rs/crate/internet-checksum/0.2.1/source/src/lib.rs#768-784
-def test_checksums():
+def test_ipv4_checksums():
     # fmt: off
     IPV4_HEADERS = [
         [
