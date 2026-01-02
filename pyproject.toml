@@ -5,11 +5,6 @@ build-backend = "hatchling.build"
 [project]
 name = "compression-safeguards"
 version = "1.0.0a1"
-description = "Fearless lossy compression using safeguards"
-authors = [{ name = "Juniper Tyree", email = "juniper.tyree@helsinki.fi" }]
-license = "MPL-2.0"
-readme = "README.md"
-requires-python = ">=3.11"
 dependencies = [
     "numpy~=2.3.0",
     "numpy-quaddtype~=0.2.0; sys_platform != 'emscripten'",
@@ -17,6 +12,31 @@ dependencies = [
     "sly~=0.5.0",
     "typing-extensions~=4.6",
 ]
+requires-python = ">=3.11"
+authors = [{ name = "Juniper Tyree", email = "juniper.tyree@helsinki.fi" }]
+maintainers = [{ name = "Juniper Tyree", email = "juniper.tyree@helsinki.fi" }]
+description = "Fearless lossy compression using safeguards"
+readme = "README.md"
+license = "MPL-2.0"
+keywords = ["safeguards", "compression", "lossy-compression", "safe", "fearless"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+    "Topic :: System :: Archiving :: Compression",
+    "Typing :: Typed",
+]
+
 
 [dependency-groups]
 bench = [
