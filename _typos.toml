@@ -5,6 +5,7 @@ extend-exclude = ["*.bin"]
 extend-ignore-identifiers-re = ["arange", "_VOR$", "_VOR_", "^vor_"]
 
 [default.extend-identifiers]
+Apon = "Apon"
 check_arange = "check_arange"
 dout = "dout"
 Hel = "Hel"
