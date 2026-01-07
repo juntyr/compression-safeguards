@@ -280,3 +280,71 @@ jobs:
 
       - name: Run doctests
         run: uv run pytest -v -W error --codeblocks docs/
+
+  pyodide-test:
+    name: Test Pyodide
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout the Repository
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: 3.13.2
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 4.0.9
+          actions-cache-folder: emsdk-cache
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pyodide-build
+        run: python -m pip install pyodide-build
+
+      - name: Install the Pyodide build env
+        run: pyodide xbuildenv install 0.29.0
+
+      - name: Build the safeguards packages for Pyodide
+        run: |
+          pyodide build .
+          pyodide build packages/numcodecs-safeguards
+          pyodide build packages/xarray-safeguards
+
+      - name: Build numpy 2.3.5 for Pyodide
+        run: pyodide build https://files.pythonhosted.org/packages/source/n/numpy/numpy-2.3.5.tar.gz
+
+      - name: Build varint for Pyodide
+        run: pyodide build https://files.pythonhosted.org/packages/source/v/varint/varint-1.0.2.tar.gz
+
+      - name: Create the Pyodide venv
+        run: |
+          # Set up Pyodide venv
+          pyodide venv .venv-pyodide
+          source .venv-pyodide/bin/activate
+          # Install pre-built packages
+          pip install $(ls dist/*.whl)
+          # Install test dependencies
+          pip install --group test
+
+      - name: Run the fast tests for Pyodide
+        run: |
+          source .venv-pyodide/bin/activate
+          python -m pytest -v -W error -m "not slow and not veryslow"
+
+      - name: Run the slow tests for Pyodide
+        run: |
+          source .venv-pyodide/bin/activate
+          python -m pytest -v -W error -m slow
+
+      - name: Run the very slow tests for Pyodide
+        run: |
+          source .venv-pyodide/bin/activate
+          python -m pytest -v -W error -m veryslow
