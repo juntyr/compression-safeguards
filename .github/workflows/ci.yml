@@ -318,8 +318,16 @@ jobs:
           pyodide build packages/numcodecs-safeguards
           pyodide build packages/xarray-safeguards
 
+      - name: Checkout the numpy repository
+        uses: actions/checkout@v6
+        with:
+          repository: numpy/numpy
+          ref: v2.3.5
+          path: numpy
+          submodules: recursive
+
       - name: Build numpy 2.3.5 for Pyodide
-        run: pyodide build https://files.pythonhosted.org/packages/source/n/numpy/numpy-2.3.5.tar.gz
+        run: pyodide build ./numpy
 
       - name: Build varint for Pyodide
         run: pyodide build https://files.pythonhosted.org/packages/source/v/varint/varint-1.0.2.tar.gz
