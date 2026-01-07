@@ -79,6 +79,7 @@ test = [
     "dask~=2025.4",
     "numcodecs-combinators~=0.2.12",
     "pytest~=9.0",
+    "pytest-asyncio~=1.3",
     "xarray~=2025.4",
     "zarr~=3.0",
     "zarr-any-numcodecs~=0.1.2",

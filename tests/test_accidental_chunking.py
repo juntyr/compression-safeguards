@@ -2,6 +2,8 @@ import numpy as np
 import pytest
 import xarray as xr
 import zarr
+import zarr.api.asynchronous
+import zarr.storage
 from numcodecs_combinators.stack import CodecStack
 
 
@@ -82,12 +84,13 @@ def test_codec_stack_stencil():
         ).compute()
 
 
-def test_zarr_pointwise():
+@pytest.mark.asyncio
+async def test_zarr_pointwise():
     data = np.arange(100, dtype=float)
 
     store = zarr.storage.MemoryStore()
 
-    zarr.save_array(
+    await zarr.api.asynchronous.save_array(
         store,
         data,
         codecs=[
@@ -113,13 +116,14 @@ def test_zarr_pointwise():
     assert np.all(np.abs(np.asarray(a) - data) <= 0.5)
 
 
-def test_zarr_stencil():
+@pytest.mark.asyncio
+async def test_zarr_stencil():
     data = np.arange(100, dtype=float)
 
     store = zarr.storage.MemoryStore()
 
     with pytest.raises(RuntimeError, match="chunked array"):
-        zarr.save_array(
+        await zarr.api.asynchronous.save_array(
             store,
             data,
             codecs=[
