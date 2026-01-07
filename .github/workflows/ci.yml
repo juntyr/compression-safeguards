@@ -331,6 +331,7 @@ jobs:
             -Csetup-args="--cross-file=$PWD/numpy/tools/ci/emscripten/emscripten.meson.cross" \
             -Csetup-args="-Dblas=none" \
             -Csetup-args="-Dlapack=none"
+          rm -rf numpy
 
       - name: Checkout the numcodecs repository
         uses: actions/checkout@v6
@@ -340,14 +341,17 @@ jobs:
           path: numcodecs
           submodules: recursive
 
-      - name: Patch numcodecs for Pyodide
+      - name: Build numcodecs v0.15.1 for Pyodide
         run: |
+          # patch numcodecs
           cd numcodecs
           patch -p1 < ../tools/ci/pyodide/numcodecs/patches/fixblosc.patch
           patch -p1 < ../tools/ci/pyodide/numcodecs/patches/fixzlib.patch
-
-      - name: Build numcodecs v0.15.1 for Pyodide
-        run: pyodide build ./numcodecs
+          cd ..
+          # build numcodecs
+          pyodide build ./numcodecs
+          # clean up
+          rm -rf numcodecs
         env:
           DISABLE_NUMCODECS_AVX2: 1
           DISABLE_NUMCODECS_SSE2: 1
