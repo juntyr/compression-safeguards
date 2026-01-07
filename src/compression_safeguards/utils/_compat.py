@@ -107,7 +107,8 @@ def _nextafter(
         .view(a.dtype)
         .reshape(a.shape)
     )
-    _float128_incr_normal = abs_a_zero_mantissa / (_float128(2) ** 112)
+    # FIXME: https://github.com/numpy/numpy-user-dtypes/issues/249
+    _float128_incr_normal = abs_a_zero_mantissa / (np.power(_float128(2), 112))
 
     # zero, subnormal, or smallest normal
     out_subnormal = _ensure_array(np.subtract(a, _float128_incr_subnormal))
