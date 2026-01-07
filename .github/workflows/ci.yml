@@ -319,6 +319,7 @@ jobs:
 
       - name: Build compiled dependencies for Pyodide
         run: |
+          source "${EMSDK}/emsdk_env.sh"
           pyodide build-recipes \
             --recipe-dir tools/ci/pyodide-recipes/packages \
             --install \
