@@ -118,3 +118,10 @@ include = ["/src", "/CITATION.cff", "/LICENSE", "/pyproject.toml", "/README.md"]
 
 [tool.uv.workspace]
 members = ["packages/numcodecs-safeguards", "packages/xarray-safeguards"]
+
+# FIXME: https://github.com/astral-sh/uv/issues/15125
+[tool.uv]
+constraint-dependencies = [
+    "numcodecs ~= 0.16.4; python_version == '3.14'",
+    "numpy ~= 2.3.2; python_version == '3.14'",
+]

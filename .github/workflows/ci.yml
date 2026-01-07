@@ -83,15 +83,6 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      # FIXME: workaround for https://github.com/astral-sh/uv/issues/15125
-      - name: Install numpy
-        run: |
-          uv venv
-          uv pip install \
-            "$(grep 'numpy~=' ./pyproject.toml | cut -c6- | rev | cut -c3- | rev)" \
-            --resolution ${{ matrix.resolution }} \
-            --no-build
-
       - name: Setup the Python venv with the safeguards
         run: |
           uv sync --all-packages \
@@ -124,15 +115,6 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
-
-      # FIXME: workaround for https://github.com/astral-sh/uv/issues/15125
-      - name: Install numpy
-        run: |
-          uv venv
-          uv pip install \
-            "$(grep 'numpy~=' ./pyproject.toml | cut -c6- | rev | cut -c3- | rev)" \
-            --resolution ${{ matrix.resolution }} \
-            --no-build
 
       - name: Setup the Python venv with the safeguards
         run: |
@@ -180,15 +162,6 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
-
-      # FIXME: workaround for https://github.com/astral-sh/uv/issues/15125
-      - name: Install numpy
-        run: |
-          uv venv
-          uv pip install \
-            "$(grep 'numpy~=' ./pyproject.toml | cut -c6- | rev | cut -c3- | rev)" \
-            --resolution ${{ matrix.resolution }} \
-            --no-build
 
       - name: Setup the Python venv with the safeguards
         run: |
@@ -247,15 +220,6 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
 
-      # FIXME: workaround for https://github.com/astral-sh/uv/issues/15125
-      - name: Install numpy
-        run: |
-          uv venv
-          uv pip install \
-            "$(grep 'numpy~=' ./pyproject.toml | cut -c6- | rev | cut -c3- | rev)" \
-            --resolution ${{ matrix.resolution }} \
-            --no-build
-
       - name: Setup the Python venv with the safeguards
         run: |
           uv sync --all-packages \
@@ -294,15 +258,6 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
-
-      # FIXME: workaround for https://github.com/astral-sh/uv/issues/15125
-      - name: Install numpy
-        run: |
-          uv venv
-          uv pip install \
-            "$(grep 'numpy~=' ./pyproject.toml | cut -c6- | rev | cut -c3- | rev)" \
-            --resolution ${{ matrix.resolution }} \
-            --no-build
 
       - name: Setup the Python venv with the safeguards
         run: |
