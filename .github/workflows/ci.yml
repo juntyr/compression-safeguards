@@ -321,7 +321,8 @@ jobs:
         run: |
           pyodide build-recipes \
             --recipe-dir tools/ci/pyodide-recipes/packages \
-            --install
+            --install \
+            google-crc32c numcodecs numpy numpy-quaddtype varint
 
       - name: Create the Pyodide venv
         run: |

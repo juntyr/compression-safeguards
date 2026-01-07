@@ -1,5 +1,5 @@
 package:
-  name: numpy_quaddtype
+  name: numpy-quaddtype
   version: 0.2.2
   top-level:
     - numpy_quaddtype
