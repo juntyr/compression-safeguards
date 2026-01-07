@@ -83,6 +83,14 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
+      # workaround for https://github.com/astral-sh/uv/issues/15125
+      - name: Install numpy
+        run: |
+          uv pip install \
+            "$(grep 'numpy~=' ./pyproject.toml | cut -c6- | rev | cut -c3- | rev)" \
+            --resolution ${{ matrix.resolution }} \
+            --no-build
+
       - name: Setup the Python venv with the safeguards
         run: |
           uv sync --all-packages \
@@ -115,6 +123,14 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
+
+      # workaround for https://github.com/astral-sh/uv/issues/15125
+      - name: Install numpy
+        run: |
+          uv pip install \
+            "$(grep 'numpy~=' ./pyproject.toml | cut -c6- | rev | cut -c3- | rev)" \
+            --resolution ${{ matrix.resolution }} \
+            --no-build
 
       - name: Setup the Python venv with the safeguards
         run: |
@@ -162,6 +178,14 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
+
+      # workaround for https://github.com/astral-sh/uv/issues/15125
+      - name: Install numpy
+        run: |
+          uv pip install \
+            "$(grep 'numpy~=' ./pyproject.toml | cut -c6- | rev | cut -c3- | rev)" \
+            --resolution ${{ matrix.resolution }} \
+            --no-build
 
       - name: Setup the Python venv with the safeguards
         run: |
@@ -220,6 +244,14 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
 
+      # workaround for https://github.com/astral-sh/uv/issues/15125
+      - name: Install numpy
+        run: |
+          uv pip install \
+            "$(grep 'numpy~=' ./pyproject.toml | cut -c6- | rev | cut -c3- | rev)" \
+            --resolution ${{ matrix.resolution }} \
+            --no-build
+
       - name: Setup the Python venv with the safeguards
         run: |
           uv sync --all-packages \
@@ -258,6 +290,14 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
+
+      # workaround for https://github.com/astral-sh/uv/issues/15125
+      - name: Install numpy
+        run: |
+          uv pip install \
+            "$(grep 'numpy~=' ./pyproject.toml | cut -c6- | rev | cut -c3- | rev)" \
+            --resolution ${{ matrix.resolution }} \
+            --no-build
 
       - name: Setup the Python venv with the safeguards
         run: |
@@ -323,6 +363,12 @@ jobs:
             --recipe-dir tools/ci/pyodide-recipes/packages \
             --install \
             numcodecs numpy numpy-quaddtype varint zarr
+
+      - name: Upload the WASM codec artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyodide-dist
+          path: dist
 
       - name: Create the Pyodide venv
         run: |
