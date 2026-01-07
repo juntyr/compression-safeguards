@@ -281,8 +281,8 @@ jobs:
       - name: Run doctests
         run: uv run pytest -v -W error --codeblocks docs/
 
-  pyodide-test:
-    name: Test Pyodide
+  pyodide-build:
+    name: Build for Pyodide
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -324,8 +324,43 @@ jobs:
             --install \
             numcodecs numpy numpy-quaddtype varint zarr
 
+      - name: Clean the Pyodide dist
+        run: find dist/ ! -name '*.whl' -delete
+
       - name: Upload the WASM codec artifacts
         uses: actions/upload-artifact@v4
+        with:
+          name: pyodide-dist
+          path: dist
+          retention-days: 1
+
+  pyodide-test:
+    name: Build for Pyodide
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    needs: pyodide-build
+    strategy:
+      fail-fast: false
+      matrix:
+        markers: ["not slow and not veryslow", "slow", "veryslow"]
+    steps:
+      - name: Checkout the Repository
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: 3.13.2
+
+      - name: Install pyodide-build
+        run: python -m pip install pyodide-build
+
+      - name: Install the Pyodide build env
+        run: pyodide xbuildenv install 0.29.0
+
+      - name: Download the pyodide-lock.json artifact
+        uses: actions/download-artifact@v4
         with:
           name: pyodide-dist
           path: dist
@@ -340,17 +375,7 @@ jobs:
           # Install test dependencies
           pip install --group test
 
-      - name: Run the fast tests for Pyodide
+      - name: Run tests
         run: |
           source .venv-pyodide/bin/activate
-          python -m pytest -v -W error -m "not slow and not veryslow"
-
-      - name: Run the slow tests for Pyodide
-        run: |
-          source .venv-pyodide/bin/activate
-          python -m pytest -v -W error -m slow
-
-      - name: Run the very slow tests for Pyodide
-        run: |
-          source .venv-pyodide/bin/activate
-          python -m pytest -v -W error -m veryslow
+          python -m pytest -v -W error -m "${{ matrix.markers }}"
