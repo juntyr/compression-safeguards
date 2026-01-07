@@ -63,10 +63,8 @@ class ToFloatMode(Enum):
         [`Safeguards.supported_dtypes`][.....api.Safeguards.supported_dtypes])
         are supported by this method.
 
-        On platforms where the [`np.float128`][numpy.float128] type does *not*
-        refer to a floating-point type with true 128 bits of precision, the
-        [`numpy_quaddtype`](https://pypi.org/project/numpy-quaddtype/) package
-        is used to provide a true 128 bit floating-point data type.
+        The [`numpy_quaddtype`](https://pypi.org/project/numpy-quaddtype/)
+        package is used to provide a true 128 bit floating-point data type.
 
         Parameters
         ----------
