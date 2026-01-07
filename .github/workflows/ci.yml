@@ -319,11 +319,10 @@ jobs:
 
       - name: Build compiled dependencies for Pyodide
         run: |
-          source "${EMSDK}/emsdk_env.sh"
           pyodide build-recipes \
             --recipe-dir tools/ci/pyodide-recipes/packages \
             --install \
-            google-crc32c numcodecs numpy numpy-quaddtype varint
+            numcodecs numpy numpy-quaddtype varint zarr
 
       - name: Create the Pyodide venv
         run: |
