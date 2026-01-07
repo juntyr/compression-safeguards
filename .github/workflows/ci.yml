@@ -299,7 +299,6 @@ jobs:
         uses: mymindstorm/setup-emsdk@v14
         with:
           version: 4.0.9
-          actions-cache-folder: emsdk-cache
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -327,7 +326,11 @@ jobs:
           submodules: recursive
 
       - name: Build numpy 2.3.5 for Pyodide
-        run: pyodide build ./numpy
+        run: |
+          pyodide build ./numpy \
+            -Csetup-args="--cross-file=$PWD/numpy/tools/ci/emscripten/emscripten.meson.cross" \
+            -Csetup-args="-Dblas=none" \
+            -Csetup-args="-Dlapack=none"
 
       - name: Build varint for Pyodide
         run: pyodide build https://files.pythonhosted.org/packages/source/v/varint/varint-1.0.2.tar.gz
