@@ -1,3 +1,4 @@
+import contextlib
 import re
 from itertools import cycle, permutations, product
 
@@ -1092,9 +1093,13 @@ def test_late_bound_lossless_cast():
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.int32).max - 1)
         )
-    with pytest.raises(
-        ValueError,
-        match=rf"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from {np.array(np.iinfo(np.int32).max).dtype.name} to float32",
+    with (
+        contextlib.nullcontext()
+        if np.intp is np.int32
+        else pytest.raises(
+            ValueError,
+            match=rf"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from {np.array(np.iinfo(np.int32).max).dtype.name} to float32",
+        )
     ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.int32).max)
@@ -1120,9 +1125,23 @@ def test_late_bound_lossless_cast():
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.int64).max - 1)
         )
-    safeguard.compute_safe_intervals(
-        data, late_bound=Bindings(c=np.iinfo(np.int64).max)
-    )
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        same_value_int64_max = np.array(np.iinfo(np.int64).max).astype(
+            np.float32
+        ).astype(np.array(np.iinfo(np.int64).max).dtype) == np.array(
+            np.iinfo(np.int64).max
+        )
+    with (
+        contextlib.nullcontext()
+        if same_value_int64_max
+        else pytest.raises(
+            ValueError,
+            match=rf"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from {np.array(np.iinfo(np.int64).max).dtype.name} to float32",
+        )
+    ):
+        safeguard.compute_safe_intervals(
+            data, late_bound=Bindings(c=np.iinfo(np.int64).max)
+        )
     with pytest.raises(
         ValueError,
         match=r"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from uint64 to float32",
