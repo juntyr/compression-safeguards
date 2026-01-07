@@ -1,0 +1,25 @@
+diff --git a/c-blosc/blosc/blosc.c b/c-blosc/blosc/blosc.c
+index a3d137d..73dea7a 100644
+--- a/c-blosc/blosc/blosc.c
++++ b/c-blosc/blosc/blosc.c
+@@ -1309,6 +1309,7 @@ int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
+   int result;
+   char* envvar;
+ 
++  g_initlib = 1;
+   /* Check if should initialize */
+   if (!g_initlib) blosc_init();
+ 
+diff --git a/c-blosc/blosc/blosc.h b/c-blosc/blosc/blosc.h
+index c9dc8ed..c57ef91 100644
+--- a/c-blosc/blosc/blosc.h
++++ b/c-blosc/blosc/blosc.h
+@@ -48,7 +48,7 @@ extern "C" {
+   ((INT_MAX - BLOSC_MAX_TYPESIZE * sizeof(int32_t)) / 3)
+ 
+ /* The maximum number of threads (for some static arrays) */
+-#define BLOSC_MAX_THREADS 256
++#define BLOSC_MAX_THREADS 1
+ 
+ /* Codes for shuffling (see blosc_compress) */
+ #define BLOSC_NOSHUFFLE   0  /* no shuffle */
