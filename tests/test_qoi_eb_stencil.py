@@ -1087,34 +1087,42 @@ def test_late_bound_lossless_cast():
 
     with pytest.raises(
         ValueError,
-        match=r"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from int64 to float32",
+        match=rf"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from {np.array(np.iinfo(np.int32).max - 1).dtype.name} to float32",
     ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.int32).max - 1)
         )
+    with pytest.raises(
+        ValueError,
+        match=rf"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from {np.array(np.iinfo(np.int32).max).dtype.name} to float32",
+    ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.int32).max)
         )
     with pytest.raises(
         ValueError,
-        match=r"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from int64 to float32",
+        match=rf"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from {np.array(np.iinfo(np.uint32).max - 1).dtype.name} to float32",
     ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.uint32).max - 1)
         )
+    with pytest.raises(
+        ValueError,
+        match=rf"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from {np.array(np.iinfo(np.uint32).max).dtype.name} to float32",
+    ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.uint32).max)
         )
     with pytest.raises(
         ValueError,
-        match=r"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from int64 to float32",
+        match=rf"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from {np.array(np.iinfo(np.int64).max - 1).dtype.name} to float32",
     ):
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.int64).max - 1)
         )
-        safeguard.compute_safe_intervals(
-            data, late_bound=Bindings(c=np.iinfo(np.int64).max)
-        )
+    safeguard.compute_safe_intervals(
+        data, late_bound=Bindings(c=np.iinfo(np.int64).max)
+    )
     with pytest.raises(
         ValueError,
         match=r"qoi_eb_stencil\.qoi\.c=c: cannot losslessly cast \(some\) values from uint64 to float32",
@@ -1122,9 +1130,9 @@ def test_late_bound_lossless_cast():
         safeguard.compute_safe_intervals(
             data, late_bound=Bindings(c=np.iinfo(np.uint64).max - 1)
         )
-        safeguard.compute_safe_intervals(
-            data, late_bound=Bindings(c=np.iinfo(np.uint64).max)
-        )
+    safeguard.compute_safe_intervals(
+        data, late_bound=Bindings(c=np.iinfo(np.uint64).max)
+    )
 
     safeguard.compute_safe_intervals(
         data, late_bound=Bindings(c=np.finfo(np.float16).smallest_subnormal)
@@ -1390,7 +1398,7 @@ def test_late_bound_constant_boundary():
 
     with pytest.raises(
         ValueError,
-        match=r"qoi_eb_stencil\.neighbourhood\[1\]\.constant_boundary=const2: cannot losslessly cast \(some\) values from int64 to uint8",
+        match=rf"qoi_eb_stencil\.neighbourhood\[1\]\.constant_boundary=const2: cannot losslessly cast \(some\) values from {np.array(256).dtype.name} to uint8",
     ):
         safeguard.compute_safe_intervals(data, late_bound=Bindings(const=1, const2=256))
 
