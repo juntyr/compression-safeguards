@@ -325,7 +325,7 @@ jobs:
             numcodecs numpy numpy-quaddtype varint zarr
 
       - name: Clean the Pyodide dist
-        run: find dist/ ! -name '*.whl' -delete
+        run: find dist/ -type f ! -name '*.whl' -delete
 
       - name: Upload the WASM codec artifacts
         uses: actions/upload-artifact@v4
@@ -335,7 +335,7 @@ jobs:
           retention-days: 1
 
   pyodide-test:
-    name: Build for Pyodide
+    name: Test on Pyodide
     runs-on: ubuntu-latest
     permissions:
       contents: read
