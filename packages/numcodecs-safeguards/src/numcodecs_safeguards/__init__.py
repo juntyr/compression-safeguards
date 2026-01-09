@@ -562,7 +562,9 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         correction_len = leb128.u.encode(len(correction_bytes))
 
-        return correction_len + corrected_checksum + encoded_bytes + correction_bytes
+        return b"".join(
+            [correction_len, corrected_checksum, encoded_bytes, correction_bytes]
+        )
 
     @override
     def decode(self, buf: Buffer, out: None | Buffer = None) -> Buffer:
