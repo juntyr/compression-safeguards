@@ -288,12 +288,7 @@ def as_bits(
         The binary unsigned integer representation of the array `a`.
     """
 
-    return a.view(
-        a.dtype.str.replace("f", "u")
-        .replace("i", "u")
-        # numpy_quaddtype currently does not set its kind properly
-        .replace(_float128_dtype.kind, "u")
-    )
+    return a.view(a.dtype.str.replace("f", "u").replace("i", "u"))
 
 
 def to_total_order(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[U]]:

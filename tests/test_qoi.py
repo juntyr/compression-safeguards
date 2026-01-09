@@ -1878,7 +1878,7 @@ def test_fuzzer_found_cosh_equal_isfinite():
 
 @pytest.mark.xfail(reason="https://github.com/numpy/numpy-user-dtypes/issues/239")
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_foo():
+def test_fuzzer_found_numpy_quaddtype_tiny_add():
     X = np.array(_float128("3.362103143112093476804027502198658e-4932"))
 
     expr = ScalarAdd(
@@ -1896,3 +1896,47 @@ def test_fuzzer_found_foo():
     # X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     # assert X_lower == np.array(_float128("3.362103143112093476804027502198658e-4932"))
     # assert X_upper == np.array(_float128("3.362103143112093476804027502198658e-4932"))
+
+
+@pytest.mark.xfail(reason="https://github.com/numpy/numpy-user-dtypes/issues/239")
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_numpy_quaddtype_tiny_add2():
+    X = np.array(_float128("3.362103143112093506262677806464369e-4932"))
+
+    expr = ScalarAdd(
+        ScalarNot(Data.SCALAR),
+        ScalarAdd(ScalarAsinh(Data.SCALAR), ScalarAsinh(Data.SCALAR)),
+    )
+
+    assert expr.eval(X, dict()) == np.array(
+        _float128("6.7242062862241870125253556129287371e-4932")
+    )
+
+    # expr_lower = np.array(_float128(0.0))
+    # expr_upper = np.array(_float128("3.362103143112093506262677806464369e-4932"))
+
+    # X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    # assert X_lower == np.array(_float128("3.362103143112093506262677806464369e-4932"))
+    # assert X_upper == np.array(_float128("3.362103143112093506262677806464369e-4932"))
+
+
+@pytest.mark.xfail(reason="https://github.com/numpy/numpy-user-dtypes/issues/239")
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_numpy_quaddtype_tiny_add3():
+    X = np.array(_float128("2.456859624266849837562439886883052e-4884"))
+
+    expr = ScalarAdd(
+        ScalarNot(Data.SCALAR),
+        ScalarAdd(ScalarTan(Data.SCALAR), ScalarNot(Data.SCALAR)),
+    )
+
+    assert expr.eval(X, dict()) == np.array(
+        _float128("2.456859624266849837562439886883052e-4884")
+    )
+
+    # expr_lower = np.array(_float128(0.0))
+    # expr_upper = np.array(_float128("1.228429812133424918781219943441526e-4884"))
+
+    # X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    # assert X_lower == np.array(_float128("1.228429812133424918781219943441526e-4884"))
+    # assert X_upper == np.array(_float128("1.228429812133424918781219943441526e-4884"))
