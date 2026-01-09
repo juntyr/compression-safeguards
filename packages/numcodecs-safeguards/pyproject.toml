@@ -7,17 +7,17 @@ name = "numcodecs-safeguards"
 version = "0.1.0a1"
 dependencies = [
     "compression-safeguards==1.0.0a1",
+    "leb128~=1.0.8",
     "numcodecs>=0.13.0,<0.17",
-    "numcodecs-bitmap-index~=0.1.1",
-    "numcodecs-combinators~=0.2.12",
+    "numcodecs-bitmap-index~=0.1.2",
+    "numcodecs-combinators~=0.2.13",
     "numcodecs-delta~=0.1.0",
     "numcodecs-shuffle~=0.1.0",
-    "numcodecs-tokenize~=0.1.2",
-    "numcodecs-zero~=0.1.1",
-    "numpy~=2.3.0",
+    "numcodecs-tokenize~=0.1.3",
+    "numcodecs-zero~=0.1.2",
+    "numpy~=2.0",
     "semver~=3.0",
     "typing-extensions~=4.6",
-    "varint~=1.0.2",
 ]
 requires-python = ">=3.11"
 authors = [{ name = "Juniper Tyree", email = "juniper.tyree@helsinki.fi" }]
@@ -61,10 +61,7 @@ addopts = ["--import-mode=importlib"]
 xfail_strict = true
 
 [[tool.mypy.overrides]]
-module = [
-    "numcodecs.*",
-    "varint.*",
-]
+module = ["leb128.*", "numcodecs.*"]
 follow_untyped_imports = true
 
 [tool.hatch.build.targets.sdist]

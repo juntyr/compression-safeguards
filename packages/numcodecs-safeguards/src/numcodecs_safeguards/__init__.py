@@ -79,12 +79,12 @@ from collections.abc import Callable, Collection, Mapping, Set
 from io import BytesIO
 from typing import ClassVar, Self
 
+import leb128
 import numcodecs
 import numcodecs.compat
 import numcodecs.registry
 import numcodecs_combinators
 import numpy as np
-import varint
 from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.abc import Safeguard
 from compression_safeguards.utils.bindings import Bindings, Parameter, Value
@@ -560,7 +560,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 self._lossless_for_safeguards.encode(correction)
             )
 
-        correction_len = varint.encode(len(correction_bytes))
+        correction_len = leb128.u.encode(len(correction_bytes))
 
         return correction_len + corrected_checksum + encoded_bytes + correction_bytes
 
@@ -603,7 +603,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             buf_bytes = numcodecs.compat.ensure_bytes(buf)
 
             buf_io = BytesIO(buf_bytes)
-            correction_len = varint.decode_stream(buf_io)
+            correction_len, _ = leb128.u.decode_reader(buf_io)
             corrected_checksum = buf_io.read(2)
             if correction_len < 0:
                 raise (

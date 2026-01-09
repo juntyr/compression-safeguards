@@ -91,8 +91,7 @@ jobs:
             --no-build \
             --no-binary-package compression-safeguards \
             --no-binary-package numcodecs-safeguards \
-            --no-binary-package xarray-safeguards \
-            --no-binary-package varint
+            --no-binary-package xarray-safeguards
 
       - name: Run tests
         run: uv run pytest -v -W error -m "${{ matrix.markers }}"
@@ -124,8 +123,7 @@ jobs:
             --no-build \
             --no-binary-package compression-safeguards \
             --no-binary-package numcodecs-safeguards \
-            --no-binary-package xarray-safeguards \
-            --no-binary-package varint
+            --no-binary-package xarray-safeguards
 
       - name: Typecheck compression-safeguards
         run: uv run mypy -p compression_safeguards
@@ -171,8 +169,7 @@ jobs:
             --no-build \
             --no-binary-package compression-safeguards \
             --no-binary-package numcodecs-safeguards \
-            --no-binary-package xarray-safeguards \
-            --no-binary-package varint
+            --no-binary-package xarray-safeguards
 
       - name: Restore the fuzzer corpus
         id: fuzzer-corpus-restore
@@ -227,8 +224,7 @@ jobs:
             --no-build \
             --no-binary-package compression-safeguards \
             --no-binary-package numcodecs-safeguards \
-            --no-binary-package xarray-safeguards \
-            --no-binary-package varint
+            --no-binary-package xarray-safeguards
 
       - name: Install mkdocs dependencies
         run: uv pip install -r docs/requirements.txt
@@ -267,8 +263,7 @@ jobs:
             --no-build \
             --no-binary-package compression-safeguards \
             --no-binary-package numcodecs-safeguards \
-            --no-binary-package xarray-safeguards \
-            --no-binary-package varint
+            --no-binary-package xarray-safeguards
 
       - name: Compile all docs
         run: |
@@ -322,7 +317,7 @@ jobs:
           pyodide build-recipes \
             --recipe-dir tools/ci/pyodide-recipes/packages \
             --install \
-            numcodecs numpy numpy-quaddtype varint zarr
+            numcodecs numpy numpy-quaddtype zarr
 
       - name: Clean the Pyodide dist
         run: find dist/ -type f ! -name '*.whl' -delete
