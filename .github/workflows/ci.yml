@@ -317,7 +317,7 @@ jobs:
           pyodide build-recipes \
             --recipe-dir tools/ci/pyodide-recipes/packages \
             --install \
-            numcodecs numpy numpy-quaddtype zarr
+            google-crc32c numcodecs numpy numpy-quaddtype
 
       - name: Clean the Pyodide dist
         run: find dist/ -type f ! -name '*.whl' -delete
