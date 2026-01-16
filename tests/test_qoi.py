@@ -62,8 +62,6 @@ from compression_safeguards.safeguards._qois.interval import (
     compute_safe_data_lower_upper_interval_union,
 )
 from compression_safeguards.utils._compat import (
-    _floating_max,
-    _floating_smallest_subnormal,
     _is_negative_zero,
     _is_positive_zero,
 )
@@ -1756,7 +1754,7 @@ def test_fuzzer_found_negative_zero_excessive_nudging():
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(_float128(0.0))
-    assert X_upper == np.array(_floating_max(_float128_dtype))
+    assert X_upper == np.array(np.finfo(_float128_dtype).max)
 
     assert expr.eval(X_lower, dict()) == np.array(_float128(0.0))
     assert expr.eval(X_upper, dict()) == np.array(_float128(0.0))
@@ -1792,9 +1790,7 @@ def test_fuzzer_found_not_data_bound():
     expr_upper = np.array(np.float64(0.0))
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
-    assert X_lower == np.array(
-        np.float64(_floating_smallest_subnormal(np.dtype(np.float64)))
-    )
+    assert X_lower == np.array(np.finfo(np.float64).smallest_subnormal)
     assert X_upper == np.array(np.float64(np.inf))
 
     assert expr.eval(X_lower, dict()) == np.array(np.float64(0.0))
@@ -1850,9 +1846,7 @@ def test_fuzzer_found_any_zero_singularity():
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float32(-np.inf))
-    assert X_upper == np.array(
-        np.float32(-_floating_smallest_subnormal(np.dtype(np.float32)))
-    )
+    assert X_upper == np.array(-np.finfo(np.float32).smallest_subnormal)
 
     assert expr.eval(X_lower, dict()) == np.array(np.float32(1.0))
     assert expr.eval(X_upper, dict()) == np.array(np.float32(1.0))
@@ -1876,7 +1870,6 @@ def test_fuzzer_found_cosh_equal_isfinite():
     assert expr.eval(X_upper, dict()) == np.array(np.float16(0.0))
 
 
-@pytest.mark.xfail(reason="https://github.com/numpy/numpy-user-dtypes/issues/239")
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 def test_fuzzer_found_numpy_quaddtype_tiny_add():
     X = np.array(_float128("3.362103143112093476804027502198658e-4932"))
@@ -1890,15 +1883,14 @@ def test_fuzzer_found_numpy_quaddtype_tiny_add():
         _float128("6.724206286224186953608055004397316e-4932")
     )
 
-    # expr_lower = np.array(_float128(0.0))
-    # expr_upper = np.array(_float128("3.362103143112093476804027502198658e-4932"))
+    expr_lower = np.array(_float128(0.0))
+    expr_upper = np.array(_float128("6.724206286224186953608055004397316e-4932"))
 
-    # X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
-    # assert X_lower == np.array(_float128("3.362103143112093476804027502198658e-4932"))
-    # assert X_upper == np.array(_float128("3.362103143112093476804027502198658e-4932"))
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(_float128("6.724206286224186953608055004397316e-4932"))
+    assert X_upper == np.array(_float128("6.724206286224186953608055004397316e-4932"))
 
 
-@pytest.mark.xfail(reason="https://github.com/numpy/numpy-user-dtypes/issues/239")
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 def test_fuzzer_found_numpy_quaddtype_tiny_add2():
     X = np.array(_float128("3.362103143112093506262677806464369e-4932"))
@@ -1912,15 +1904,14 @@ def test_fuzzer_found_numpy_quaddtype_tiny_add2():
         _float128("6.7242062862241870125253556129287371e-4932")
     )
 
-    # expr_lower = np.array(_float128(0.0))
-    # expr_upper = np.array(_float128("3.362103143112093506262677806464369e-4932"))
+    expr_lower = np.array(_float128(0.0))
+    expr_upper = np.array(_float128("6.7242062862241870125253556129287371e-4932"))
 
-    # X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
-    # assert X_lower == np.array(_float128("3.362103143112093506262677806464369e-4932"))
-    # assert X_upper == np.array(_float128("3.362103143112093506262677806464369e-4932"))
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(_float128("6.7242062862241870125253556129287371e-4932"))
+    assert X_upper == np.array(_float128("6.7242062862241870125253556129287371e-4932"))
 
 
-@pytest.mark.xfail(reason="https://github.com/numpy/numpy-user-dtypes/issues/239")
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 def test_fuzzer_found_numpy_quaddtype_tiny_add3():
     X = np.array(_float128("2.456859624266849837562439886883052e-4884"))
@@ -1934,9 +1925,9 @@ def test_fuzzer_found_numpy_quaddtype_tiny_add3():
         _float128("2.456859624266849837562439886883052e-4884")
     )
 
-    # expr_lower = np.array(_float128(0.0))
-    # expr_upper = np.array(_float128("1.228429812133424918781219943441526e-4884"))
+    expr_lower = np.array(_float128(0.0))
+    expr_upper = np.array(_float128("2.456859624266849837562439886883052e-4884"))
 
-    # X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
-    # assert X_lower == np.array(_float128("1.228429812133424918781219943441526e-4884"))
-    # assert X_upper == np.array(_float128("1.228429812133424918781219943441526e-4884"))
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(_float128("2.456859624266849837562439886883052e-4884"))
+    assert X_upper == np.array(_float128("2.456859624266849837562439886883052e-4884"))

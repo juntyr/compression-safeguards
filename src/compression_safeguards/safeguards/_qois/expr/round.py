@@ -9,7 +9,6 @@ from ....utils._compat import (
     _is_positive_zero,
     _is_sign_negative_number,
     _is_sign_positive_number,
-    _nextafter,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
@@ -78,7 +77,7 @@ class ScalarFloor(Expr[AnyExpr]):
         # if expr_upper is +0.0, floor(+0.0) = +0.0, and floor(1-eps) = +0.0
         arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(expr_lower)
         arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
-            _nextafter(expr_upper + 1, expr_upper)
+            np.nextafter(expr_upper + 1, expr_upper)
         )
         arg_upper[_is_negative_zero(expr_upper)] = -0.0
 
@@ -153,7 +152,7 @@ class ScalarCeil(Expr[AnyExpr]):
         #  -0.0 for which ceil(...) = -0.0
         # if expr_upper is +0.0, floor(+0.0) = +0.0, only ceil(+0.0) = +0.0
         arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
-            _nextafter(expr_lower - 1, expr_lower)
+            np.nextafter(expr_lower - 1, expr_lower)
         )
         arg_lower[_is_positive_zero(expr_lower)] = +0.0
         arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(expr_upper)
@@ -229,7 +228,7 @@ class ScalarTrunc(Expr[AnyExpr]):
         #  -0.0 for which trunc(...) = -0.0
         # if expr_upper is +0.0, floor(+0.0) = +0.0, and trunc(1-eps) = +0.0
         arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
-            _nextafter(expr_lower - 1, expr_lower)
+            np.nextafter(expr_lower - 1, expr_lower)
         )
         np.copyto(
             arg_lower,
@@ -238,7 +237,7 @@ class ScalarTrunc(Expr[AnyExpr]):
             casting="no",
         )
         arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
-            _nextafter(expr_upper + 1, expr_upper)
+            np.nextafter(expr_upper + 1, expr_upper)
         )
         np.copyto(
             arg_upper,

@@ -1,14 +1,9 @@
 """
 Private compatibility functions, mostly wrappers around numpy, that ensure
-equivalent behaviour for all supported dtypes, e.g. numpy_quaddtype.
+equivalent behaviour for all supported dtypes and provide good type hints.
 """
 
 __all__ = [
-    "_nan_to_zero_inf_to_finite",
-    "_nextafter",
-    "_place",
-    "_logical_not",
-    "_as_logical",
     "_symmetric_modulo",
     "_minimum_zero_sign_sensitive",
     "_maximum_zero_sign_sensitive",
@@ -27,10 +22,8 @@ __all__ = [
     "_is_positive_zero",
     "_is_of_dtype",
     "_is_of_shape",
-    "_floating_max",
-    "_floating_smallest_subnormal",
-    "_pi",
-    "_e",
+    "_floating_pi",
+    "_floating_e",
 ]
 
 from collections.abc import Sequence
@@ -39,167 +32,11 @@ from typing import Literal, TypeGuard, TypeVar, overload
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
-from ._float128 import (
-    _float128,
-    _float128_dtype,
-    _float128_e,
-    _float128_max,
-    _float128_min,
-    _float128_pi,
-    _float128_smallest_normal,
-    _float128_smallest_subnormal,
-    _float128_type,
-)
+from ._float128 import _float128_e, _float128_pi
 from .typing import TB, F, Fi, S, Si, T, Ti
 
 N = TypeVar("N", bound=int, covariant=True)
 """ Any [`int`][int] (covariant). """
-
-
-# reimplementation of np.nan_to_num that also works for numpy_quaddtype and
-#  makes all values finite
-# FIXME: https://github.com/numpy/numpy-user-dtypes/issues/163
-@np.errstate(invalid="ignore")
-def _nan_to_zero_inf_to_finite(
-    a: np.ndarray[S, np.dtype[T]],
-) -> np.ndarray[S, np.dtype[T]]:
-    out: np.ndarray[S, np.dtype[T]] = _ensure_array(a, copy=True)
-
-    fmin: T
-    fmax: T
-    if out.dtype == _float128_dtype:
-        fmin, fmax = _float128_min, _float128_max  # type: ignore
-    elif not np.issubdtype(out.dtype, np.floating):
-        return out
-    else:
-        finfo = np.finfo(out.dtype)  # type: ignore
-        fmin, fmax = finfo.min, finfo.max  # type: ignore
-
-    out[np.isnan(a)] = 0
-    out[a == -np.inf] = fmin
-    out[a == np.inf] = fmax
-    return out
-
-
-# wrapper around np.nextafter that also works for numpy_quaddtype
-# Implementation is variant 2 from https://stackoverflow.com/a/70512834
-# FIXME: https://github.com/numpy/numpy-user-dtypes/issues/163
-@np.errstate(invalid="ignore")
-def _nextafter(
-    a: np.ndarray[S, np.dtype[F]], b: np.ndarray[S, np.dtype[F]]
-) -> np.ndarray[S, np.dtype[F]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.nextafter(a, b)
-
-    a = np.ascontiguousarray(_ensure_array(a))
-    b = _ensure_array(b)
-
-    _float128_incr_subnormal = np.full(a.shape, _float128_smallest_subnormal)
-    np.negative(_float128_incr_subnormal, out=_float128_incr_subnormal, where=(a < 0))
-
-    abs_a_zero_mantissa = (
-        (
-            np.atleast_1d(a).view(np.uint8)
-            & np.atleast_1d(np.full_like(a, np.inf)).view(np.uint8)
-        )
-        .view(a.dtype)
-        .reshape(a.shape)
-    )
-    # FIXME: https://github.com/numpy/numpy-user-dtypes/issues/249
-    _float128_incr_normal = abs_a_zero_mantissa / (np.power(_float128(2), 112))
-
-    # zero, subnormal, or smallest normal
-    out_subnormal = _ensure_array(np.subtract(a, _float128_incr_subnormal))
-    out_subnormal[a == (-_float128_smallest_subnormal)] = -0.0
-    np.add(a, _float128_incr_subnormal, out=out_subnormal, where=((a < b) == (a >= 0)))
-
-    out: np.ndarray[S, np.dtype[F]] = _ensure_array(a, copy=True)
-    # normal
-    # note: implementation deviates here since numpy_quaddtype
-    #       divides/multiplies with error
-    #       based on https://stackoverflow.com/a/70512041
-    np.add(
-        out,
-        _float128_incr_normal / 2,
-        out=out,
-        where=((a < b) & (a == -abs_a_zero_mantissa)),
-    )
-    np.add(
-        out,
-        _float128_incr_normal,
-        out=out,
-        where=((a < b) & (a != -abs_a_zero_mantissa)),
-    )
-    np.subtract(
-        out,
-        _float128_incr_normal / 2,
-        out=out,
-        where=((a >= b) & (a == abs_a_zero_mantissa)),
-    )
-    np.subtract(
-        out,
-        _float128_incr_normal,
-        out=out,
-        where=((a >= b) & (a != abs_a_zero_mantissa)),
-    )
-    # zero, subnormal, or smallest normal
-    np.copyto(
-        out, out_subnormal, where=(np.abs(a) <= _float128_smallest_normal), casting="no"
-    )
-    # infinity
-    out[np.isinf(a)] = _float128_max
-    out[np.isinf(a) & (a < 0)] = _float128_min
-    # equal
-    np.copyto(out, b, where=(a == b), casting="no")
-    # unordered, at least one is NaN
-    np.add(out, b, out=out, where=(np.isnan(a) | np.isnan(b)))
-
-    return out
-
-
-# wrapper around np.place that also works for numpy_quaddtype
-# FIXME: https://github.com/numpy/numpy-user-dtypes/issues/236
-def _place(
-    a: np.ndarray[S, np.dtype[TB]],
-    mask: np.ndarray[S, np.dtype[np.bool]],
-    vals: np.ndarray[tuple[int], np.dtype[TB]],
-) -> None:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.place(a, mask, vals)
-
-    return np.put(a, np.flatnonzero(mask), vals)
-
-
-# wrapper around np.logical_not that also works for numpy_quaddtype
-@overload
-def _logical_not(a: Ti) -> bool: ...
-
-
-@overload
-def _logical_not(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[np.bool]]: ...
-
-
-def _logical_not(a):
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return np.logical_not(a)
-
-    return a == 0
-
-
-# helper for around np.any and np.all that also works for numpy_quaddtype
-def _as_logical(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T | np.bool]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return a
-
-    return a != 0
 
 
 # wrapper around np.mod(p, q) that guarantees that the result is in [-q/2, q/2]
@@ -458,30 +295,15 @@ def _is_of_shape(
     return x.shape == shape
 
 
-# wrapper around np.finfo(dtype).max that also works for numpy_quaddtype
-def _floating_max(dtype: np.dtype[F]) -> F:
-    if isinstance(_float128_max, dtype.type):
-        return _float128_max
-    return dtype.type(np.finfo(dtype).max)
-
-
-# wrapper around np.finfo(dtype).smallest_subnormal that also works for
-#  numpy_quaddtype
-def _floating_smallest_subnormal(dtype: np.dtype[F]) -> F:
-    if isinstance(_float128_smallest_subnormal, dtype.type):
-        return _float128_smallest_subnormal
-    return dtype.type(np.finfo(dtype).smallest_subnormal)
-
-
 # wrapper around np.pi, of the dtype, that also works for numpy_quaddtype
-def _pi(dtype: np.dtype[F]) -> F:
+def _floating_pi(dtype: np.dtype[F]) -> F:
     if isinstance(_float128_pi, dtype.type):
         return _float128_pi
     return dtype.type(np.pi)
 
 
 # wrapper around np.e, of the dtype, that also works for numpy_quaddtype
-def _e(dtype: np.dtype[F]) -> F:
+def _floating_e(dtype: np.dtype[F]) -> F:
     if isinstance(_float128_e, dtype.type):
         return _float128_e
     return dtype.type(np.e)

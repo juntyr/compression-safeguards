@@ -4,7 +4,7 @@ from typing import overload
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import _ensure_array, _floating_max
+from ....utils._compat import _ensure_array
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from ..typing import F, Fi, Ns, Ps, np_sndarray
@@ -61,7 +61,7 @@ class ScalarIsFinite(Expr[AnyExpr]):
         arg = self._a
         argv = arg.eval(Xs, late_bound)
 
-        fmax = _floating_max(Xs.dtype)
+        fmax = np.finfo(Xs.dtype).max
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, isfinite(arg) = True, so arg must be finite
@@ -136,7 +136,7 @@ class ScalarIsInf(Expr[AnyExpr]):
         arg = self._a
         argv = arg.eval(Xs, late_bound)
 
-        fmax = _floating_max(Xs.dtype)
+        fmax = np.finfo(Xs.dtype).max
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, isinf(arg) = True, so arg must stay infinite

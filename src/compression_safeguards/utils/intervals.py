@@ -20,7 +20,7 @@ from typing import Any, Generic, Literal, Self, TypeVar
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ._compat import _ensure_array, _nextafter, _reshape, _where, _zeros
+from ._compat import _ensure_array, _reshape, _where, _zeros
 from ._compat import _maximum_zero_sign_sensitive as _np_maximum
 from ._compat import _minimum_zero_sign_sensitive as _np_minimum
 from .cast import as_bits, from_total_order, to_total_order
@@ -415,11 +415,15 @@ class Interval(Generic[T, N]):
         #  values
         Lower(
             np.array(
-                _nextafter(np.array(-np.inf, dtype=a.dtype), np.array(0, dtype=a.dtype))
+                np.nextafter(
+                    np.array(-np.inf, dtype=a.dtype), np.array(0, dtype=a.dtype)
+                )
             )
         ) <= self[np.isfinite(a)] <= Upper(
             np.array(
-                _nextafter(np.array(np.inf, dtype=a.dtype), np.array(0, dtype=a.dtype))
+                np.nextafter(
+                    np.array(np.inf, dtype=a.dtype), np.array(0, dtype=a.dtype)
+                )
             )
         )
 

@@ -9,8 +9,6 @@ from ...utils._compat import (
     _ensure_array,
     _is_sign_negative_number,
     _is_sign_positive_number,
-    _nan_to_zero_inf_to_finite,
-    _nextafter,
 )
 from ...utils.error import QuantityOfInterestRuntimeWarning
 from .typing import Ci, F, J, Ns, Ps, Ps2, np_sndarray, np_sndarray2
@@ -242,15 +240,9 @@ def _guarantee_data_within_expr_bounds_inner(
             )
 
         # nudge the guess towards the data by 1 ULP
-        # TODO: np.nextafter(out=...) once possible
-        np.copyto(
-            Xs_bound_guess,
-            _nextafter(Xs_bound_guess, Xs),
-            where=bounds_exceeded,
-            casting="no",
-        )
+        np.nextafter(Xs_bound_guess, Xs, out=Xs_bound_guess, where=bounds_exceeded)
 
-    Xs_diff = _ensure_array(_nan_to_zero_inf_to_finite(Xs_bound_guess - Xs))
+    Xs_diff = _ensure_array(np.nan_to_num(Xs_bound_guess - Xs))
 
     # exponential backoff for the distance
     backoff = Xs.dtype.type(0.5)

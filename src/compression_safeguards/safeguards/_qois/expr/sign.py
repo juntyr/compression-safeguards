@@ -3,7 +3,7 @@ from collections.abc import Mapping
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import _floating_smallest_subnormal, _is_positive_zero
+from ....utils._compat import _is_positive_zero
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from ..typing import F, Ns, Ps, np_sndarray
@@ -65,7 +65,7 @@ class ScalarSign(Expr[AnyExpr]):
         expr_lower = np.ceil(expr_lower)
         expr_upper = np.floor(expr_upper)
 
-        smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
+        smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
 
         # compute the lower and upper arg bounds that produce the sign bounds
         # sign(-0.0) = +0.0 and sign(+0.0) = +0.0

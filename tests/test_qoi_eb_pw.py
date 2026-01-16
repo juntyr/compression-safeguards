@@ -88,7 +88,7 @@ def check_linspace(qoi: str):
     check_all_codecs(np.linspace(-1024, 1024, 2831, dtype=np.float32), qoi)
 
 
-# FIXME: could we also test the float128 edge cases, somehow?
+# TODO: could we also test the float128 edge cases, somehow?
 def check_edge_cases(qoi: str):
     check_all_codecs(
         np.array(

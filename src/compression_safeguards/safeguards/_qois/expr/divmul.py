@@ -8,8 +8,6 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import (
     _broadcast_to,
     _ensure_array,
-    _floating_max,
-    _floating_smallest_subnormal,
     _is_negative_zero,
     _is_positive_zero,
     _is_sign_negative_number,
@@ -94,8 +92,8 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
         if a_const or b_const:
             term, termv, constv = (b, bv, av) if a_const else (a, av, bv)
 
-            fmax = _floating_max(Xs.dtype)
-            smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
+            fmax = np.finfo(Xs.dtype).max
+            smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
 
             # for x*0, we can allow any finite x, unless the output +-0.0 sign
             #  is restricted, then we need to restrict the sign of x:
@@ -233,8 +231,8 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
         bv_abs = np.abs(bv)
         exprv_abs = _ensure_array(np.abs(exprv))
 
-        fmax = _floating_max(Xs.dtype)
-        smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
+        fmax = np.finfo(Xs.dtype).max
+        smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
 
         # we are given l <= e <= u, which we translate into e/lf <= e <= e*uf
         # - if the factor is infinite, we limit it to fmax
@@ -491,8 +489,8 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
         bv = b.eval(Xs, late_bound)
         exprv = np.divide(av, bv)
 
-        fmax = _floating_max(Xs.dtype)
-        smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
+        fmax = np.finfo(Xs.dtype).max
+        smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
 
         term_lower: np.ndarray[tuple[Ps], np.dtype[F]]
         term_upper: np.ndarray[tuple[Ps], np.dtype[F]]
@@ -737,8 +735,8 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
         bv_abs = np.abs(bv)
         exprv_abs = _ensure_array(np.abs(exprv))
 
-        fmax = _floating_max(Xs.dtype)
-        smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
+        fmax = np.finfo(Xs.dtype).max
+        smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
 
         # we are given l <= e <= u, which we translate into e/lf <= e <= e*uf
         # - if the factor is infinite, we limit it to fmax

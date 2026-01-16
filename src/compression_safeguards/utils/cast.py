@@ -18,7 +18,7 @@ from typing import assert_never
 
 import numpy as np
 
-from ._compat import _ensure_array, _is_of_dtype, _nan_to_zero_inf_to_finite
+from ._compat import _ensure_array, _is_of_dtype
 from ._float128 import _float128_dtype
 from .error import TypeSetError, ctx
 from .typing import F, S, T, U
@@ -199,21 +199,19 @@ def to_float(
         The converted array with the chosen floating-point data type.
     """
 
-    assert np.issubdtype(ftype, np.floating) or (ftype == _float128_dtype)
+    assert np.issubdtype(ftype, np.floating)
 
     if np.issubdtype(x.dtype, np.floating):
         assert ftype.itemsize >= x.dtype.itemsize
-    elif ftype != _float128_dtype:
+    else:
         assert np.finfo(ftype).nmant >= x.dtype.itemsize
 
     if _is_of_dtype(x, ftype):
         return x
 
-    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        # lossless cast to floating-point data type with a sufficiently large
-        #  mantissa
-        # FIXME: numpy_quaddtype raises warnings even though no overflow occurs
-        return x.astype(ftype, casting="safe")
+    # lossless cast to floating-point data type with a sufficiently large
+    #  mantissa
+    return x.astype(ftype, casting="safe")
 
 
 def from_float(
@@ -244,7 +242,7 @@ def from_float(
 
     x = _ensure_array(x)
 
-    assert np.issubdtype(x.dtype, np.floating) or (x.dtype == _float128_dtype)
+    assert np.issubdtype(x.dtype, np.floating)
 
     if _is_of_dtype(x, dtype):
         return x
@@ -493,7 +491,7 @@ def saturating_finite_float_cast(
         if any values are non-finite, i.e. infinite or NaN.
     """
 
-    assert np.issubdtype(dtype, np.floating) or (dtype == _float128_dtype)
+    assert np.issubdtype(dtype, np.floating)
 
     xa = np.array(x, copy=None)
 
@@ -519,4 +517,4 @@ def saturating_finite_float_cast(
     else:
         assert np.all(np.signbit(xa) == np.signbit(xa_to))
 
-    return _nan_to_zero_inf_to_finite(xa_to)
+    return np.nan_to_num(xa_to)

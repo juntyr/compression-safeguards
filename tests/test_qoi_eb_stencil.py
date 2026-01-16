@@ -10,7 +10,7 @@ from compression_safeguards.safeguards.stencil import BoundaryCondition
 from compression_safeguards.safeguards.stencil.qoi.eb import (
     StencilQuantityOfInterestErrorBoundSafeguard,
 )
-from compression_safeguards.utils._float128 import _float128_dtype
+from compression_safeguards.utils._compat import _symmetric_modulo
 from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.cast import ToFloatMode, to_float
 
@@ -604,13 +604,7 @@ def test_finite_difference_periodic_grid():
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 def test_periodic_delta_transform(dtype):
     def delta_transform(x, period):
-        p, q = x, period
-        q2 = q / 2
-
-        if x.dtype == _float128_dtype:
-            return np.mod(np.mod(p + q2, q) + q, q) - q2
-        else:
-            return np.mod(p + q2, q) - q2
+        return _symmetric_modulo(x, period)
 
     dtype = np.dtype(dtype)
 

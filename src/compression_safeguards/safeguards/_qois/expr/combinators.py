@@ -5,10 +5,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
-    _as_logical,
     _ensure_array,
-    _floating_smallest_subnormal,
-    _logical_not,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
     _stack,
@@ -41,7 +38,7 @@ class ScalarNot(Expr[AnyExpr]):
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
-            lambda x: combine_to_dtype(_logical_not, x, dtype),
+            lambda x: combine_to_dtype(np.logical_not, x, dtype),
             ScalarNot,
         )
 
@@ -51,7 +48,7 @@ class ScalarNot(Expr[AnyExpr]):
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
-        return combine_to_dtype(_logical_not, self._a.eval(Xs, late_bound), Xs.dtype)
+        return combine_to_dtype(np.logical_not, self._a.eval(Xs, late_bound), Xs.dtype)
 
     @override
     @checked_data_bounds
@@ -69,7 +66,7 @@ class ScalarNot(Expr[AnyExpr]):
         arg = self._a
         argv = arg.eval(Xs, late_bound)
 
-        smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
+        smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, not(arg) = True, so arg must stay False, i.e zero
@@ -154,7 +151,7 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         return reduce_combine_to_dtype(
-            lambda a: np.all(_as_logical(a), axis=0),
+            lambda a: np.all(a, axis=0),
             _stack(
                 [self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound)]
                 + [c.eval(Xs, late_bound) for c in self._cs]
@@ -190,7 +187,7 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
         bv = b.eval(Xs, late_bound)
         cvs = [c.eval(Xs, late_bound) for c in cs]
 
-        smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
+        smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
 
         a_const_zero = (av == 0) & (
             True if a_const else ~a.eval_has_data(Xs, late_bound)
@@ -338,7 +335,7 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         return reduce_combine_to_dtype(
-            lambda a: np.any(_as_logical(a), axis=0),
+            lambda a: np.any(a, axis=0),
             _stack(
                 [self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound)]
                 + [c.eval(Xs, late_bound) for c in self._cs]
@@ -374,7 +371,7 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
         bv = b.eval(Xs, late_bound)
         cvs = [c.eval(Xs, late_bound) for c in cs]
 
-        smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
+        smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
 
         a_const_non_zero = (av != 0) & (
             True if a_const else ~a.eval_has_data(Xs, late_bound)

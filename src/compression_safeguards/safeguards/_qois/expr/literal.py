@@ -5,7 +5,7 @@ from warnings import warn
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import _broadcast_to, _e, _pi
+from ....utils._compat import _broadcast_to, _floating_e, _floating_pi
 from ....utils.bindings import Parameter
 from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, EmptyExpr
@@ -160,7 +160,7 @@ class Pi(EmptyExpr):
 
     @override
     def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
-        return _pi(dtype)
+        return _floating_pi(dtype)
 
     @override
     def eval(
@@ -168,7 +168,7 @@ class Pi(EmptyExpr):
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
-        pi: F = _pi(Xs.dtype)
+        pi: F = _floating_pi(Xs.dtype)
         return _broadcast_to(pi, Xs.shape[:1])
 
     @override
@@ -203,7 +203,7 @@ class Euler(EmptyExpr):
 
     @override
     def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
-        return _e(dtype)
+        return _floating_e(dtype)
 
     @override
     def eval(
@@ -211,7 +211,7 @@ class Euler(EmptyExpr):
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
-        e: F = _e(Xs.dtype)
+        e: F = _floating_e(Xs.dtype)
         return _broadcast_to(e, Xs.shape[:1])
 
     @override

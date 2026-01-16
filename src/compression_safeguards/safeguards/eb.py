@@ -9,12 +9,7 @@ from typing import Never, assert_never
 
 import numpy as np
 
-from ..utils._compat import (
-    _ensure_array,
-    _nan_to_zero_inf_to_finite,
-    _nextafter,
-    _where,
-)
+from ..utils._compat import _ensure_array, _where
 from ..utils.cast import from_float, from_total_order, to_float, to_total_order
 from ..utils.error import ctx
 from ..utils.typing import F, S, T
@@ -202,7 +197,7 @@ def _compute_finite_absolute_error_bound(
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
-                eb_rel_as_abs = _nan_to_zero_inf_to_finite(np.abs(data_float) * eb)
+                eb_rel_as_abs = np.nan_to_num(np.abs(data_float) * eb)
             assert np.all((eb_rel_as_abs >= 0) & np.isfinite(eb_rel_as_abs))
             return eb_rel_as_abs
         case ErrorBound.ratio:
@@ -465,17 +460,17 @@ def _apply_finite_qoi_error_bound(
                 )
 
             # we can nudge with nextafter since the QoIs are floating-point
-            np.copyto(
+            np.nextafter(
                 lower,
-                _nextafter(lower, qoi_float),
+                qoi_float,
+                out=lower,
                 where=(lower_outside_eb & np.isfinite(qoi_float)),
-                casting="no",
             )
-            np.copyto(
+            np.nextafter(
                 upper,
-                _nextafter(upper, qoi_float),
+                qoi_float,
+                out=upper,
                 where=(upper_outside_eb & np.isfinite(qoi_float)),
-                casting="no",
             )
 
             # a zero-error bound must preserve exactly, e.g. even for -0.0
@@ -519,17 +514,17 @@ def _apply_finite_qoi_error_bound(
                 )
 
             # we can nudge with nextafter since the QoIs are floating-point
-            np.copyto(
+            np.nextafter(
                 lower,
-                _nextafter(lower, qoi_float),
+                qoi_float,
+                out=lower,
                 where=(lower_outside_eb & np.isfinite(qoi_float)),
-                casting="no",
             )
-            np.copyto(
+            np.nextafter(
                 upper,
-                _nextafter(upper, qoi_float),
+                qoi_float,
+                out=upper,
                 where=(upper_outside_eb & np.isfinite(qoi_float)),
-                casting="no",
             )
 
             # a ratio of 1 bound must preserve exactly, e.g. even for -0.0

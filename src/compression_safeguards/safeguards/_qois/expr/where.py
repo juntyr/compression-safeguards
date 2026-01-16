@@ -6,7 +6,6 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import (
     _broadcast_to,
     _ensure_array,
-    _floating_smallest_subnormal,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
     _where,
@@ -129,7 +128,7 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
             cond_lower[condv == 0] = -0.0
             cond_upper[condv == 0] = +0.0
 
-            smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
+            smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
 
             # non-zero condition values must remain non-zero
             # TODO: an interval union could represent that the two disjoint

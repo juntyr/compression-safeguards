@@ -6,15 +6,12 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import (
     _broadcast_to,
     _ensure_array,
-    _floating_max,
-    _floating_smallest_subnormal,
     _is_negative_zero,
     _is_positive_zero,
     _is_sign_negative_number,
     _is_sign_positive_number,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
-    _nextafter,
     _stack,
     _where,
 )
@@ -122,7 +119,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             np.copyto(b_lower, bv, where=(expr_lower == expr_upper), casting="no")
             np.copyto(b_upper, bv, where=(expr_lower == expr_upper), casting="no")
 
-            smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
+            smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
 
             # handle 0 ** bv
             # - +-0 ** +-0 = 1 -> discontinuous, force bv = +-0
@@ -226,10 +223,10 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             a_lower[(bv == 0)] = -np.inf
             a_upper[(bv == 0)] = np.inf
 
-            one_plus_eps = _nextafter(
+            one_plus_eps = np.nextafter(
                 np.array(1, dtype=Xs.dtype), np.array(2, dtype=Xs.dtype)
             )
-            one_minus_eps = _nextafter(
+            one_minus_eps = np.nextafter(
                 np.array(1, dtype=Xs.dtype), np.array(0, dtype=Xs.dtype)
             )
 
@@ -288,10 +285,10 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
                 late_bound,
             )
 
-        one_plus_eps = _nextafter(
+        one_plus_eps = np.nextafter(
             np.array(1, dtype=Xs.dtype), np.array(2, dtype=Xs.dtype)
         )
-        one_minus_eps = _nextafter(
+        one_minus_eps = np.nextafter(
             np.array(1, dtype=Xs.dtype), np.array(0, dtype=Xs.dtype)
         )
 
@@ -351,8 +348,8 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         #  former can work with finite logarithm results
         exprv_log_abs = np.multiply(av_log_abs, bv_abs)
 
-        fmax = _floating_max(Xs.dtype)
-        smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
+        fmax = np.finfo(Xs.dtype).max
+        smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
 
         # we are given l <= e <= u, which we translate into e/lf <= e <= e*uf
         # - if the factor is infinite, we limit it to fmax

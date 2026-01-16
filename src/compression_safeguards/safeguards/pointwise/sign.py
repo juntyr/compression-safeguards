@@ -10,7 +10,7 @@ from typing import ClassVar, Literal
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ...utils._compat import _ensure_array, _floating_smallest_subnormal, _logical_and
+from ...utils._compat import _ensure_array, _logical_and
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import from_total_order, lossless_cast, to_total_order
 from ...utils.error import TypeCheckError, ctx
@@ -244,7 +244,7 @@ class SignPreservingSafeguard(PointwiseSafeguard):
             if np.issubdtype(data.dtype, np.floating):
                 # special case for floating-point -0.0 / +0.0 which both have
                 #  zero sign and thus have weird below / above intervals
-                smallest_subnormal = _floating_smallest_subnormal(data.dtype)  # type: ignore
+                smallest_subnormal = np.finfo(data.dtype).smallest_subnormal  # type: ignore
                 below_upper = _ensure_array(
                     from_total_order(offsetf_total - 1, data.dtype)
                 )

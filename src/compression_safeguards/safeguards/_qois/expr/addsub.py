@@ -7,7 +7,6 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import (
     _broadcast_to,
     _ensure_array,
-    _floating_max,
     _is_negative_zero,
     _is_positive_zero,
     _maximum_zero_sign_sensitive,
@@ -351,7 +350,7 @@ def compute_left_associate_sum_data_bounds(
         np.divide(expr_upper_diff, total_abs_factor)
     )
 
-    fmax = _floating_max(Xs.dtype)
+    fmax = np.finfo(Xs.dtype).max
 
     # ensure that the bounds never contain both -inf and +inf since that would
     #  allow NaN to sneak in
