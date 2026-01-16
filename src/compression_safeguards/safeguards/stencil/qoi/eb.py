@@ -14,6 +14,7 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import (
     _ensure_array,
     _ones,
+    _place,
     _reshape,
     _sliding_window_view,
     _zeros,
@@ -810,7 +811,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             windows_ok = windows_ok_
         else:
             windows_ok = _ones(where_flat.shape, np.dtype(np.bool))
-            np.place(windows_ok, where_flat, windows_ok_)
+            _place(windows_ok, where_flat, windows_ok_)
 
         # the check succeeds for boundary points that were excluded by a valid
         #  boundary

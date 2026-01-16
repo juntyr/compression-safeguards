@@ -1887,8 +1887,8 @@ def test_fuzzer_found_numpy_quaddtype_tiny_add():
     expr_upper = np.array(_float128("6.724206286224186953608055004397316e-4932"))
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
-    assert X_lower == np.array(_float128("6.724206286224186953608055004397316e-4932"))
-    assert X_upper == np.array(_float128("6.724206286224186953608055004397316e-4932"))
+    assert X_lower == np.array(_float128("1.681051571556046738402013751099329e-4932"))
+    assert X_upper == np.array(_float128("3.362103143112093476804027502198658e-4932"))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1908,8 +1908,8 @@ def test_fuzzer_found_numpy_quaddtype_tiny_add2():
     expr_upper = np.array(_float128("6.7242062862241870125253556129287371e-4932"))
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
-    assert X_lower == np.array(_float128("6.7242062862241870125253556129287371e-4932"))
-    assert X_upper == np.array(_float128("6.7242062862241870125253556129287371e-4932"))
+    assert X_lower == np.array(_float128("1.6810515715560467531313389032321847e-4932"))
+    assert X_upper == np.array(_float128("3.362103143112093506262677806464369e-4932"))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1929,5 +1929,5 @@ def test_fuzzer_found_numpy_quaddtype_tiny_add3():
     expr_upper = np.array(_float128("2.456859624266849837562439886883052e-4884"))
 
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
-    assert X_lower == np.array(_float128("2.456859624266849837562439886883052e-4884"))
+    assert X_lower == np.array(_float128("1.842644718200137378171829915162289e-4884"))
     assert X_upper == np.array(_float128("2.456859624266849837562439886883052e-4884"))

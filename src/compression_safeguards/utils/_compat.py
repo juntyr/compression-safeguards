@@ -4,6 +4,7 @@ equivalent behaviour for all supported dtypes and provide good type hints.
 """
 
 __all__ = [
+    "_place",
     "_symmetric_modulo",
     "_minimum_zero_sign_sensitive",
     "_maximum_zero_sign_sensitive",
@@ -32,11 +33,26 @@ from typing import Literal, TypeGuard, TypeVar, overload
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
-from ._float128 import _float128_e, _float128_pi
+from ._float128 import _float128_dtype, _float128_e, _float128_pi, _float128_type
 from .typing import TB, F, Fi, S, Si, T, Ti
 
 N = TypeVar("N", bound=int, covariant=True)
 """ Any [`int`][int] (covariant). """
+
+
+# wrapper around np.place that also works for numpy_quaddtype
+# FIXME: https://github.com/numpy/numpy-user-dtypes/issues/236
+def _place(
+    a: np.ndarray[S, np.dtype[TB]],
+    mask: np.ndarray[S, np.dtype[np.bool]],
+    vals: np.ndarray[tuple[int], np.dtype[TB]],
+) -> None:
+    if (type(a) is not _float128_type) and (
+        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
+    ):
+        return np.place(a, mask, vals)
+
+    return np.put(a, np.flatnonzero(mask), vals)
 
 
 # wrapper around np.mod(p, q) that guarantees that the result is in [-q/2, q/2]
