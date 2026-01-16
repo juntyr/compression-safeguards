@@ -987,3 +987,30 @@ def test_fuzzer_found_where_invalid_cast():
             )
         ),
     )
+
+
+def test_fuzzer_found_place_crash():
+    data = np.array([[0, 0, 50175]], dtype=np.uint16)
+    decoded = np.array([[33958, 56962, 65535]], dtype=np.uint16)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(
+                kind="select",
+                selector="__where__",
+                safeguards=[
+                    dict(
+                        kind="qoi_eb_pw",
+                        qoi="ceil(where(sqrt(sqrt(trunc(sqrt(exp2(pi))))), x, 1))",
+                        type="ratio",
+                        eb=1,
+                        qoi_dtype="float128",
+                    ),
+                    dict(kind="assume_safe"),
+                ],
+            ),
+        ],
+        fixed_constants=dict(__where__=np.array([[1, 0, 1]])),
+    )
