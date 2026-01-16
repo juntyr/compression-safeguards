@@ -5,6 +5,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
+    _as_logical,
     _ensure_array,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
@@ -151,7 +152,7 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         return reduce_combine_to_dtype(
-            lambda a: np.all(a, axis=0),
+            lambda a: np.all(_as_logical(a), axis=0),
             _stack(
                 [self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound)]
                 + [c.eval(Xs, late_bound) for c in self._cs]
@@ -335,7 +336,7 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         return reduce_combine_to_dtype(
-            lambda a: np.any(a, axis=0),
+            lambda a: np.any(_as_logical(a), axis=0),
             _stack(
                 [self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound)]
                 + [c.eval(Xs, late_bound) for c in self._cs]

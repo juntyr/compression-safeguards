@@ -12,6 +12,7 @@ from compression_safeguards.safeguards._qois.expr.classification import (
     ScalarIsNaN,
 )
 from compression_safeguards.safeguards._qois.expr.combinators import (
+    ScalarAll,
     ScalarAny,
     ScalarNot,
 )
@@ -1931,3 +1932,29 @@ def test_fuzzer_found_numpy_quaddtype_tiny_add3():
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(_float128("1.842644718200137378171829915162289e-4884"))
     assert X_upper == np.array(_float128("2.456859624266849837562439886883052e-4884"))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_all_false():
+    X = np.array(
+        np.frombuffer(
+            b"\xfa\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+            dtype=_float128_dtype,
+            count=1,
+        )[0]
+    )
+
+    expr = ScalarAll(
+        ScalarAsin(Data.SCALAR),
+        ScalarAsin(Data.SCALAR),
+        ScalarAsin(Data.SCALAR),
+    )
+
+    assert expr.eval(X, dict()) == np.array(_float128(1.0))
+
+    expr_lower = np.array(_float128(1.0))
+    expr_upper = np.array(_float128(1.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(np.finfo(_float128_dtype).smallest_subnormal)
+    assert X_upper == np.array(_float128(1.0))

@@ -209,9 +209,11 @@ def to_float(
     if _is_of_dtype(x, ftype):
         return x
 
-    # lossless cast to floating-point data type with a sufficiently large
-    #  mantissa
-    return x.astype(ftype, casting="safe")
+    # FIXME: https://github.com/numpy/numpy-user-dtypes/issues/163
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        # lossless cast to floating-point data type with a sufficiently large
+        #  mantissa
+        return x.astype(ftype, casting="safe")
 
 
 def from_float(
