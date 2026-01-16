@@ -1,12 +1,12 @@
 package:
   name: libsleef
-  version: "3.8"
+  version: 4.0.0
   tag:
     - library
     - static_library
 source:
-  sha256: a12ccd50f57083c530e1c76f10d52865defbd19fc9e2c85b483493065709874a
-  url: https://github.com/shibatch/sleef/archive/refs/tags/3.8.tar.gz
+  sha256: 545c80b55e24c2a75dbca2af35e3fe3ffe5d0d447d28d63ac63c6697a5c0f896
+  url: https://github.com/shibatch/sleef/archive/43a0252ba9331adc7fb10755021f802863678c38.tar.gz
   patches:
     - patches/0001-no-x86intrin.patch
     - patches/0002-no-mfpmatch.patch
@@ -24,14 +24,20 @@ build:
     unset CMAKE_TOOLCHAIN_FILE
 
     cmake \
+      -DCMAKE_INSTALL_PREFIX=$(pwd)/my-install \
       -DCMAKE_BUILD_TYPE=Release \
       -DSLEEF_BUILD_QUAD=ON \
       -DSLEEF_BUILD_SHARED_LIBS=OFF \
       -DSLEEF_BUILD_TESTS=OFF \
       -DSLEEF_BUILD_INLINE_HEADERS=OFF \
+      -DSLEEF_ENABLE_TESTER4=OFF \
+      -DSLEEF_ENABLE_FFTW=OFF \
+      -DSLEEF_ENABLE_MPFR=OFF \
+      -DSLEEF_ENABLE_SSL=OFF \
+      -DSLEEF_ENABLE_OPENMP=OFF \
       -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
       ../
-
+    
     make -j ${PYODIDE_JOBS:-3}
 
     export CMAKE_TOOLCHAIN_FILE=${BACKUP_TOOLCHAIN}
@@ -40,22 +46,29 @@ build:
     mkdir build
     cd build
 
+    mkdir my-install
+
     emcmake cmake \
+      -DCMAKE_INSTALL_PREFIX=${WASM_LIBRARY_DIR} \
       -DCMAKE_BUILD_TYPE=Release \
       -DSLEEF_BUILD_QUAD=ON \
       -DSLEEF_BUILD_SHARED_LIBS=OFF \
       -DSLEEF_BUILD_TESTS=OFF \
       -DSLEEF_BUILD_INLINE_HEADERS=OFF \
+      -DSLEEF_ENABLE_TESTER4=OFF \
+      -DSLEEF_ENABLE_FFTW=OFF \
+      -DSLEEF_ENABLE_MPFR=OFF \
+      -DSLEEF_ENABLE_SSL=OFF \
+      -DSLEEF_ENABLE_OPENMP=OFF \
+      -DSLEEF_ENABLE_SSE2=ON \
+      -DSLEEF_ENABLE_AVX2=OFF \
+      -DSLEEF_ENABLE_AVX512F=OFF \
       -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
       -DCMAKE_INSTALL_PREFIX=${WASM_LIBRARY_DIR} \
       -DNATIVE_BUILD_DIR=${NATIVE_BUILD_DIR} \
       -DCMAKE_C_FLAGS="-msimd128 -msse2" \
       -DCMAKE_CXX_FLAGS="-msimd128 -msse2" \
-      -DSLEEF_DISABLE_FLOAT128=ON \
       ../
-
-    # -DSLEEF_ENABLE_SSE2=ON \
-    # -DSLEEF_ENABLE_AVX2=OFF \
 
     emmake make -j ${PYODIDE_JOBS:-3}
     emmake make install

@@ -1,8 +1,8 @@
 diff --git a/Configure.cmake b/Configure.cmake
-index 7c64ce9..dcd4d96 100644
+index f3551fa..fda5677 100644
 --- a/Configure.cmake
 +++ b/Configure.cmake
-@@ -113,7 +113,7 @@ endif()
+@@ -189,7 +189,7 @@ endif()
  if(SLEEF_TARGET_PROCESSOR MATCHES "(x86|AMD64|amd64|^i.86$)")
    set(SLEEF_ARCH_X86 ON CACHE INTERNAL "True for x86 architecture.")
  
