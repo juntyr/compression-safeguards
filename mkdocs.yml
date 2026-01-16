@@ -107,13 +107,13 @@ plugins:
             inheritance_diagram_direction: LR
             extensions: ["dataclasses"]
           inventories:
-            - https://docs.python.org/3.12/objects.inv
-            - https://numcodecs.readthedocs.io/en/v0.15.0/objects.inv
-            - https://numcodecs-combinators.readthedocs.io/en/v0.2.10/objects.inv
-            - https://numcodecs-zero.readthedocs.io/en/v0.1.0/objects.inv
-            - https://numpy.org/doc/2.2/objects.inv
+            - https://docs.python.org/3.11/objects.inv
+            - https://numcodecs.readthedocs.io/en/v0.16.5/objects.inv
+            - https://numcodecs-combinators.readthedocs.io/en/v0.2.13/objects.inv
+            - https://numcodecs-zero.readthedocs.io/en/v0.1.2/objects.inv
+            - https://numpy.org/doc/2.4/objects.inv
             - https://python-semver.readthedocs.io/en/3.0.0/objects.inv
-            - https://docs.xarray.dev/en/v2025.01.0/objects.inv
+            - https://docs.xarray.dev/en/v2025.04.0/objects.inv
 
 watch:
   - src
