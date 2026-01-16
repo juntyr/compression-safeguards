@@ -48,6 +48,9 @@ build:
     mkdir build
     cd build
 
+    export CFLAGS="${CFLAGS} -fno-exceptions"
+    export CXXFLAGS="${CXXFLAGS} -fno-exceptions"
+
     emcmake cmake \
       -DCMAKE_INSTALL_PREFIX=${WASM_LIBRARY_DIR} \
       -DCMAKE_BUILD_TYPE=Release \
@@ -65,8 +68,8 @@ build:
       -DSLEEF_ENABLE_AVX512F=OFF \
       -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
       -DNATIVE_BUILD_DIR=${NATIVE_BUILD_DIR} \
-      -DCMAKE_C_FLAGS="-msimd128 -msse2 -fno-exceptions" \
-      -DCMAKE_CXX_FLAGS="-msimd128 -msse2 -fno-exceptions" \
+      -DCMAKE_C_FLAGS="-msimd128 -msse2" \
+      -DCMAKE_CXX_FLAGS="-msimd128 -msse2" \
       ../
 
     emmake make -j ${PYODIDE_JOBS:-3}
