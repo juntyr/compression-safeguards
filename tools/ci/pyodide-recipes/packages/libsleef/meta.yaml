@@ -18,6 +18,8 @@ build:
     mkdir build-native
     cd build-native
 
+    mkdir my-install
+
     export NATIVE_BUILD_DIR=`pwd`
 
     BACKUP_TOOLCHAIN=${CMAKE_TOOLCHAIN_FILE}
@@ -37,7 +39,7 @@ build:
       -DSLEEF_ENABLE_OPENMP=OFF \
       -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
       ../
-    
+
     make -j ${PYODIDE_JOBS:-3}
 
     export CMAKE_TOOLCHAIN_FILE=${BACKUP_TOOLCHAIN}
@@ -45,8 +47,6 @@ build:
     cd ..
     mkdir build
     cd build
-
-    mkdir my-install
 
     emcmake cmake \
       -DCMAKE_INSTALL_PREFIX=${WASM_LIBRARY_DIR} \
@@ -64,10 +64,9 @@ build:
       -DSLEEF_ENABLE_AVX2=OFF \
       -DSLEEF_ENABLE_AVX512F=OFF \
       -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-      -DCMAKE_INSTALL_PREFIX=${WASM_LIBRARY_DIR} \
       -DNATIVE_BUILD_DIR=${NATIVE_BUILD_DIR} \
-      -DCMAKE_C_FLAGS="-msimd128 -msse2" \
-      -DCMAKE_CXX_FLAGS="-msimd128 -msse2" \
+      -DCMAKE_C_FLAGS="-msimd128 -msse2 -sRELOCATABLE=1" \
+      -DCMAKE_CXX_FLAGS="-msimd128 -msse2 -sRELOCATABLE=1" \
       ../
 
     emmake make -j ${PYODIDE_JOBS:-3}
