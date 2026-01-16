@@ -7,7 +7,7 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import (
     _ensure_array,
     _maximum_zero_sign_sensitive,
-    _minimum_zero_sign_sensitive
+    _minimum_zero_sign_sensitive,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
