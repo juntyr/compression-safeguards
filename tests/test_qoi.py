@@ -18,6 +18,7 @@ from compression_safeguards.safeguards._qois.expr.combinators import (
 )
 from compression_safeguards.safeguards._qois.expr.comparison import (
     ScalarEqual,
+    ScalarGreater,
     ScalarLess,
 )
 from compression_safeguards.safeguards._qois.expr.constfold import ScalarFoldedConstant
@@ -1891,6 +1892,13 @@ def test_fuzzer_found_numpy_quaddtype_tiny_add():
     assert X_lower == np.array(_float128("1.681051571556046738402013751099329e-4932"))
     assert X_upper == np.array(_float128("3.362103143112093476804027502198658e-4932"))
 
+    assert expr.eval(X_lower, dict()) == np.array(
+        _float128("3.3621031431120934768040275021986586e-4932")
+    )
+    assert expr.eval(X_upper, dict()) == np.array(
+        _float128("6.724206286224186953608055004397316e-4932")
+    )
+
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 def test_fuzzer_found_numpy_quaddtype_tiny_add2():
@@ -1911,6 +1919,13 @@ def test_fuzzer_found_numpy_quaddtype_tiny_add2():
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(_float128("1.6810515715560467531313389032321847e-4932"))
     assert X_upper == np.array(_float128("3.362103143112093506262677806464369e-4932"))
+
+    assert expr.eval(X_lower, dict()) == np.array(
+        _float128("3.3621031431120935062626778064643693e-4932")
+    )
+    assert expr.eval(X_upper, dict()) == np.array(
+        _float128("6.7242062862241870125253556129287371e-4932")
+    )
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1933,9 +1948,16 @@ def test_fuzzer_found_numpy_quaddtype_tiny_add3():
     assert X_lower == np.array(_float128("1.842644718200137378171829915162289e-4884"))
     assert X_upper == np.array(_float128("2.456859624266849837562439886883052e-4884"))
 
+    assert expr.eval(X_lower, dict()) == np.array(
+        _float128("1.842644718200137378171829915162289e-4884")
+    )
+    assert expr.eval(X_upper, dict()) == np.array(
+        _float128("2.456859624266849837562439886883052e-4884")
+    )
+
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_all_false():
+def test_fuzzer_found_all_tiny_true():
     X = np.array(
         np.frombuffer(
             b"\xfa\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
@@ -1958,3 +1980,25 @@ def test_fuzzer_found_all_false():
     X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.finfo(_float128_dtype).smallest_subnormal)
     assert X_upper == np.array(_float128(1.0))
+
+    assert expr.eval(X_lower, dict()) == np.array(_float128(1.0))
+    assert expr.eval(X_upper, dict()) == np.array(_float128(1.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_atan_greater_atan():
+    X = np.array(3.3554988e07, dtype=np.float32)
+
+    expr = ScalarGreater(ScalarAtan(Data.SCALAR), ScalarAtan(Data.SCALAR))
+
+    assert expr.eval(X, dict()) == np.array(np.float32(0.0))
+
+    expr_lower = np.array(np.float32(0.0))
+    expr_upper = np.array(np.float32(0.0))
+
+    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(np.float32(1.3245402e07))  # atan still the same
+    assert X_upper == np.array(np.float32(3.3554988e07))
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float32(0.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float32(0.0))
