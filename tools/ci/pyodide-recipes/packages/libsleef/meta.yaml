@@ -48,9 +48,7 @@ build:
     mkdir build
     cd build
 
-    export CFLAGS="${CFLAGS} -fwasm-exceptions -sSUPPORT_LONGJMP='wasm'"
-    export CXXFLAGS="${CXXFLAGS} -fwasm-exceptions -sSUPPORT_LONGJMP='wasm'"
-    export LDFLAGS="${LDFLAGS} -fwasm-exceptions -sSUPPORT_LONGJMP='wasm'"
+    sed -i 's/-fno-exceptions//g' ../submodules/tlfloat/CMakeLists.txt
 
     emcmake cmake \
       -DCMAKE_INSTALL_PREFIX=${WASM_LIBRARY_DIR} \
@@ -69,9 +67,8 @@ build:
       -DSLEEF_ENABLE_AVX512F=OFF \
       -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
       -DNATIVE_BUILD_DIR=${NATIVE_BUILD_DIR} \
-      -DCMAKE_C_FLAGS="-msimd128 -msse2 -fwasm-exceptions -sSUPPORT_LONGJMP='wasm'" \
-      -DCMAKE_CXX_FLAGS="-msimd128 -msse2 -fwasm-exceptions -sSUPPORT_LONGJMP='wasm'" \
-      -DCMAKE_STATIC_LINKER_FLAGS="-fwasm-exceptions -sSUPPORT_LONGJMP='wasm'" \
+      -DCMAKE_C_FLAGS="-msimd128 -msse2" \
+      -DCMAKE_CXX_FLAGS="-msimd128 -msse2" \
       ../
 
     emmake make -j ${PYODIDE_JOBS:-3}
