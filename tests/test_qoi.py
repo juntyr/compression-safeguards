@@ -1987,6 +1987,7 @@ def test_fuzzer_found_all_tiny_true():
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 def test_fuzzer_found_atan_greater_atan():
+    # fixme for 3.3554432e+07
     X = np.array(3.3554988e07, dtype=np.float32)
 
     expr = ScalarGreater(ScalarAtan(Data.SCALAR), ScalarAtan(Data.SCALAR))

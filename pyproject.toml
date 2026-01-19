@@ -86,7 +86,7 @@ test = [
     "zarr-any-numcodecs~=0.1.2",
 ]
 doctest = ["griffe2md~=1.1", "pytest~=9.0", "pytest-codeblocks~=0.17.0"]
-typing = ["mypy~=1.19"]
+typecheck = ["mypy~=1.19"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
