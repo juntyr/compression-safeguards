@@ -108,8 +108,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           sparse-checkout: |
-            /pyproject.toml
-            /tests/
+            pyproject.toml
+            tests/
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -153,7 +153,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           sparse-checkout: |
-            /pyproject.toml
+            pyproject.toml
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -211,8 +211,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           sparse-checkout: |
-            /fuzz/
-            /pyproject.toml
+            fuzz/
+            pyproject.toml
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -352,7 +352,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           sparse-checkout: |
-            /tools/
+            tools/
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -407,8 +407,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           sparse-checkout: |
-            /pyproject.toml
-            /tests/
+            pyproject.toml
+            tests/
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
