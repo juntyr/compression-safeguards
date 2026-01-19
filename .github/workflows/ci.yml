@@ -310,7 +310,7 @@ jobs:
 
       # https://github.com/mkdocstrings/python/issues/167
       - name: Reduce docs duplication
-        run: sed -i 's/__all__ = \["Safeguards", "SafeguardKind"\]/__all__ = \[\]/g' src/compression_safeguards/__init__.py
+        run: sed -i 's/__all__ = \["Safeguards", "SafeguardKind"\]/__all__ = \[\]/g' .venv/lib/python*/site-packages/compression_safeguards/__init__.py
 
       - name: Check docs build
         run: uv run --no-sync mkdocs build
@@ -377,13 +377,10 @@ jobs:
           sparse-checkout: |
             tools/
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
+      - name: Setup Python
+        uses: actions/setup-python@v6
         with:
           python-version: 3.13.2
-
-      - name: Create a virtual environment
-        run: uv venv
 
       - name: Setup Emscripten
         uses: mymindstorm/setup-emsdk@v14
@@ -396,14 +393,14 @@ jobs:
           node-version: 22
 
       - name: Install pyodide-build
-        run: uv pip install pyodide-build
+        run: python -m pip install pyodide-build
 
       - name: Install the Pyodide build env
-        run: uv run --no-sync pyodide xbuildenv install 0.29.0
+        run: pyodide xbuildenv install 0.29.0
 
       - name: Build compiled dependencies for Pyodide
         run: |
-          uv run --no-sync pyodide build-recipes \
+          pyodide build-recipes \
             --recipe-dir tools/ci/pyodide-recipes/packages \
             --install \
             google-crc32c numcodecs numpy numpy-quaddtype
