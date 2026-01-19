@@ -116,24 +116,22 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      - name: Create a virtual environment
-        run: uv venv
-
       - name: Download the dist artifact
         uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist
 
-      - name: Install the safeguards packages
+      - name: Install the test dependencies
         run: |
-          uv pip install dist/*.whl \
+          uv sync --no-install-workspace \
+            --group test \
             --resolution ${{ matrix.resolution }} \
             --no-build
 
-      - name: Install the test dependencies
+      - name: Install the safeguards packages
         run: |
-          uv sync --only-group test \
+          uv pip install dist/*.whl \
             --resolution ${{ matrix.resolution }} \
             --no-build
 
