@@ -54,6 +54,17 @@ bench = [
     "xarray~=2025.4",
 ]
 dev = ["ruff~=0.14"]
+docs = [
+    "mkdocs~=1.6",
+    "mkdocstrings[python]~=1.0",
+    "mkdocstrings-python-generator==1.0.0rc1",
+    "mkdocs-exclude~=1.0",
+    "mkdocs-jupyter~=0.25",
+    "mkdocs-open-in-new-tab~=1.0",
+    "Pygments~=2.19",
+    "ruff~=0.14",
+]
+doctest = ["griffe2md~=1.1", "pytest~=9.0", "pytest-codeblocks~=0.17.0"]
 examples = [
     "cdsapi~=0.7.6",
     "earthkit-data~=0.14.0",
@@ -85,7 +96,6 @@ test = [
     "zarr~=3.0",
     "zarr-any-numcodecs~=0.1.2",
 ]
-doctest = ["griffe2md~=1.1", "pytest~=9.0", "pytest-codeblocks~=0.17.0"]
 typecheck = ["mypy~=1.19"]
 
 [tool.setuptools.packages.find]

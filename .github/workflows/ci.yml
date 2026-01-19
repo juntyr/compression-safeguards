@@ -116,6 +116,9 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
+      - name: Create a virtual environment
+        run: uv venv
+
       - name: Download the dist artifact
         uses: actions/download-artifact@v4
         with:
@@ -159,6 +162,9 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
+
+      - name: Create a virtual environment
+        run: uv venv
 
       - name: Download the dist artifact
         uses: actions/download-artifact@v4
@@ -218,6 +224,9 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
+
+      - name: Create a virtual environment
+        run: uv venv
 
       - name: Download the dist artifact
         uses: actions/download-artifact@v4
@@ -286,14 +295,12 @@ jobs:
       - name: Setup the Python venv with the safeguards
         run: |
           uv sync --all-packages \
+            --group docs \
             --resolution highest \
             --no-build \
             --no-binary-package compression-safeguards \
             --no-binary-package numcodecs-safeguards \
             --no-binary-package xarray-safeguards
-
-      - name: Install the mkdocs dependencies
-        run: uv pip install -r docs/requirements.txt
 
       # https://github.com/mkdocstrings/python/issues/167
       - name: Reduce docs duplication
@@ -358,6 +365,9 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           python-version: 3.13.2
+
+      - name: Create a virtual environment
+        run: uv venv
 
       - name: Setup Emscripten
         uses: mymindstorm/setup-emsdk@v14
