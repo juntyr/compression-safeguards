@@ -128,7 +128,6 @@ jobs:
             --group test \
             --resolution ${{ matrix.resolution }} \
             --no-build
-          rm pyproject.toml
 
       - name: Install the safeguards packages
         run: |
@@ -137,7 +136,7 @@ jobs:
             --no-build
 
       - name: Run tests
-        run: uv run pytest -v -W error -m "${{ matrix.markers }}"
+        run: uv run --no-sync pytest -v -W error -m "${{ matrix.markers }}"
 
   typing:
     name: Typecheck
