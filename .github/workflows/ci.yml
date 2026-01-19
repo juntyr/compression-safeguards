@@ -154,7 +154,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           sparse-checkout: |
-            packages/*/pyproject.toml
+            packages/numcodecs-safeguards/pyproject.toml
+            packages/xarray-safeguards/pyproject.toml
             pyproject.toml
 
       - name: Install uv
@@ -378,11 +379,11 @@ jobs:
         run: uv pip install pyodide-build
 
       - name: Install the Pyodide build env
-        run: uv run pyodide xbuildenv install 0.29.0
+        run: uv run --no-sync pyodide xbuildenv install 0.29.0
 
       - name: Build compiled dependencies for Pyodide
         run: |
-          uv run pyodide build-recipes \
+          uv run --no-sync pyodide build-recipes \
             --recipe-dir tools/ci/pyodide-recipes/packages \
             --install \
             google-crc32c numcodecs numpy numpy-quaddtype
@@ -424,7 +425,7 @@ jobs:
         run: uv pip install pyodide-build
 
       - name: Install the Pyodide build env
-        run: uv run pyodide xbuildenv install 0.29.0
+        run: uv run --no-sync pyodide xbuildenv install 0.29.0
 
       - name: Download the dist artifact
         uses: actions/download-artifact@v4
@@ -441,7 +442,7 @@ jobs:
       - name: Create the Pyodide venv
         run: |
           # Set up Pyodide venv
-          uv run pyodide venv .venv-pyodide
+          uv run --no-sync pyodide venv .venv-pyodide
           source .venv-pyodide/bin/activate
           # Install pre-built packages
           python -m pip install $(ls dist/*.whl)
