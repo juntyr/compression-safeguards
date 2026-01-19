@@ -281,6 +281,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    needs: build
     steps:
       - name: Checkout the Repository
         uses: actions/checkout@v6
@@ -288,28 +289,38 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
 
-      - name: Setup the Python venv with the safeguards
+      - name: Download the dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Install the docs dependencies
         run: |
-          uv sync --all-packages \
+          uv sync --no-install-workspace \
             --group docs \
             --resolution highest \
-            --no-build \
-            --no-binary-package compression-safeguards \
-            --no-binary-package numcodecs-safeguards \
-            --no-binary-package xarray-safeguards
+            --no-build
+
+      - name: Install the safeguards packages
+        run: |
+          uv pip install dist/*.whl \
+            --resolution highest \
+            --no-build
 
       # https://github.com/mkdocstrings/python/issues/167
       - name: Reduce docs duplication
         run: sed -i 's/__all__ = \["Safeguards", "SafeguardKind"\]/__all__ = \[\]/g' src/compression_safeguards/__init__.py
 
       - name: Check docs build
-        run: uv run mkdocs build
+        run: uv run --no-sync mkdocs build
 
   doctest:
     name: Doctest
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    needs: build
     strategy:
       fail-fast: false
       matrix:
@@ -324,26 +335,35 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      - name: Setup the Python venv with the safeguards
+      - name: Download the dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Install the doctest dependencies
         run: |
-          uv sync --all-packages \
+          uv sync --no-install-workspace \
             --group doctest \
-            --resolution ${{ matrix.resolution }} \
-            --no-build \
-            --no-binary-package compression-safeguards \
-            --no-binary-package numcodecs-safeguards \
-            --no-binary-package xarray-safeguards
+            --resolution highest \
+            --no-build
+
+      - name: Install the safeguards packages
+        run: |
+          uv pip install dist/*.whl \
+            --resolution highest \
+            --no-build
 
       - name: Compile all docs
         run: |
           cp README.md docs/
-          uv run griffe2md src/compression_safeguards/ -o docs/compression_safeguards.md
-          uv run griffe2md packages/numcodecs-safeguards/src/numcodecs_safeguards/ -o docs/numcodecs_safeguards.md
-          uv run griffe2md packages/xarray-safeguards/src/xarray_safeguards/ -o docs/xarray_safeguards.md
+          uv run --no-sync griffe2md src/compression_safeguards/ -o docs/compression_safeguards.md
+          uv run --no-sync griffe2md packages/numcodecs-safeguards/src/numcodecs_safeguards/ -o docs/numcodecs_safeguards.md
+          uv run --no-sync griffe2md packages/xarray-safeguards/src/xarray_safeguards/ -o docs/xarray_safeguards.md
           find docs -type f -name "*.md" | xargs sed -i -e 's/```py/```python/g'
 
       - name: Run doctests
-        run: uv run pytest -v -W error --codeblocks docs/
+        run: uv run --no-sync pytest -v -W error --codeblocks docs/
 
   pyodide-build:
     name: Build for Pyodide
