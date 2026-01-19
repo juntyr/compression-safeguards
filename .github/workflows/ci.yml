@@ -161,14 +161,18 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      - name: Create a virtual environment
-        run: uv venv
-
       - name: Download the dist artifact
         uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist
+
+      - name: Install the typecheck dependencies
+        run: |
+          uv sync --no-install-workspace \
+            --group typecheck \
+            --resolution ${{ matrix.resolution }} \
+            --no-build
 
       - name: Install the safeguards packages
         run: |
@@ -176,20 +180,14 @@ jobs:
             --resolution ${{ matrix.resolution }} \
             --no-build
 
-      - name: Install the typecheck dependencies
-        run: |
-          uv sync --only-group typecheck \
-            --resolution ${{ matrix.resolution }} \
-            --no-build
-
       - name: Typecheck compression-safeguards
-        run: uv run mypy -p compression_safeguards
+        run: uv run --no-sync mypy -p compression_safeguards
 
       - name: Typecheck numcodecs-safeguards
-        run: uv run mypy -p numcodecs_safeguards
+        run: uv run --no-sync mypy -p numcodecs_safeguards
 
       - name: Typecheck xarray-safeguards
-        run: uv run mypy -p xarray_safeguards
+        run: uv run --no-sync mypy -p xarray_safeguards
 
   fuzz:
     name: Fuzz
