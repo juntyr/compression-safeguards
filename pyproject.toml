@@ -10,7 +10,7 @@ dependencies = [
     "numpy-quaddtype~=1.0",
     "semver~=3.0",
     "sly~=0.5.0",
-    "typing-extensions~=4.6",
+    "typing-extensions~=4.12",
 ]
 # FIXME: remove hacks once numpy-quaddtype 1.0 is actually released
 requires-python = ">=3.11, <3.15"
@@ -89,6 +89,7 @@ fuzz = [
 ]
 test = [
     "dask~=2025.4",
+    "google_crc32c~=1.8",
     "numcodecs-combinators~=0.2.13",
     "pytest~=9.0",
     "pytest-asyncio~=1.3",
