@@ -461,9 +461,11 @@ jobs:
           # Set up Pyodide venv
           pyodide venv .venv-pyodide
           source .venv-pyodide/bin/activate
+          # Install pre-built packages (for dependencies)
+          python -m pip install $(ls dist/*.whl)
           # Install test dependencies
           python -m pip install --group test
-          # Install pre-built packages
+          # Install pre-built packages (to override)
           python -m pip install $(ls dist/*.whl)
 
       - name: Run tests
