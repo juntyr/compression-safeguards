@@ -647,15 +647,16 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         if newly_corrected_checksum != corrected_checksum:
             err = ValueError("mismatch in the checksum for the corrected data")
             err.add_note(
-                "The checksum of the corrected ensures that the safeguards "
-                "correction is applied to the bitwise equivalent decompressed "
-                "data as when the correction was computed, i.e. that the "
-                "corrected meets all safety requirements."
+                "The checksum of the corrected data is checked to ensure that "
+                "the safeguards correction is applied to the bitwise "
+                "equivalent decompressed data as when the correction was "
+                "computed, i.e. that the corrected data meets all safety "
+                "requirements."
             )
             err.add_note(
                 "A mismatch in the checksum likely comes from a wrapped "
                 "`codec` that produces non-deterministic decompressed output. "
-                "However, the safeguards can only be used with a "
+                "Note that the safeguards can only be used with a "
                 "deterministic decompressor."
             )
 

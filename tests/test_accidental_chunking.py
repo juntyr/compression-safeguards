@@ -87,7 +87,7 @@ def test_codec_stack_stencil():
 
 
 @pytest.mark.skipif(
-    sys.platform == "emscripten", reason="pytest-asyncio broken is in Pyodide"
+    sys.platform == "emscripten", reason="pytest-asyncio is broken in Pyodide"
 )
 @pytest.mark.asyncio
 async def test_zarr_pointwise():
@@ -122,7 +122,7 @@ async def test_zarr_pointwise():
 
 
 @pytest.mark.skipif(
-    sys.platform == "emscripten", reason="pytest-asyncio broken is in Pyodide"
+    sys.platform == "emscripten", reason="pytest-asyncio is broken in Pyodide"
 )
 @pytest.mark.asyncio
 async def test_zarr_stencil():

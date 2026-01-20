@@ -18,11 +18,9 @@ import numpy_quaddtype
 from numpy._typing import _128Bit
 
 if TYPE_CHECKING:
-    from numpy._typing import _128Bit
-
     _float128_type: TypeAlias = np.floating[_128Bit]
 else:
-    _float128_type = numpy_quaddtype.QuadPrecision
+    _float128_type: type[np.floating[_128Bit]] = numpy_quaddtype.QuadPrecision
 
 _float128: Callable[[int | float | str], _float128_type] = (
     numpy_quaddtype.SleefQuadPrecision
