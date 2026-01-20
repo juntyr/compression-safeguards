@@ -416,13 +416,15 @@ class Interval(Generic[T, N]):
         Lower(
             np.array(
                 np.nextafter(
-                    np.array(-np.inf, dtype=a.dtype), np.array(0, dtype=a.dtype)
+                    a.dtype.type(-np.inf),  # type: ignore
+                    a.dtype.type(0),
                 )
             )
         ) <= self[np.isfinite(a)] <= Upper(
             np.array(
                 np.nextafter(
-                    np.array(np.inf, dtype=a.dtype), np.array(0, dtype=a.dtype)
+                    a.dtype.type(np.inf),  # type: ignore
+                    a.dtype.type(0),
                 )
             )
         )

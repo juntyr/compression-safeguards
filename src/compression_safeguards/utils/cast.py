@@ -326,7 +326,7 @@ def to_total_order(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[U]]:
     if np.issubdtype(a.dtype, np.unsignedinteger):
         return a  # type: ignore
 
-    utype = a.dtype.str.replace("i", "u").replace("f", "u")
+    utype = np.dtype(a.dtype.str.replace("i", "u").replace("f", "u"))
 
     if np.issubdtype(a.dtype, np.signedinteger):
         shift = np.iinfo(a.dtype).max  # type: ignore
@@ -334,16 +334,14 @@ def to_total_order(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[U]]:
             over="ignore",
             under="ignore",
         ):
-            return (
-                a.view(utype) + np.array(shift, dtype=utype) + np.array(1, dtype=utype)
-            )
+            return a.view(utype) + utype.type(shift) + utype.type(1)
 
     itype = a.dtype.str.replace("f", "i")
     bits = np.iinfo(utype).bits
 
     mask = (-((a.view(dtype=utype) >> (bits - 1)).view(dtype=itype))).view(
         dtype=utype
-    ) | (np.array(1, dtype=utype) << (bits - 1))
+    ) | (utype.type(1) << (bits - 1))
 
     return a.view(dtype=utype) ^ mask
 
@@ -392,12 +390,12 @@ def from_total_order(
         ):
             return a.view(dtype) + shift + dtype.type(1)
 
-    utype = dtype.str.replace("f", "u")
+    utype = np.dtype(dtype.str.replace("f", "u"))
     itype = dtype.str.replace("f", "i")
     bits = np.iinfo(utype).bits
 
     mask = ((a >> (bits - 1)).view(dtype=itype) - 1).view(dtype=utype) | (
-        np.array(1, dtype=utype) << (bits - 1)
+        utype.type(1) << (bits - 1)
     )
 
     return (a ^ mask).view(dtype=dtype)

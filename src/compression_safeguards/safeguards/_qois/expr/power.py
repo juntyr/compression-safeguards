@@ -223,12 +223,8 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             a_lower[(bv == 0)] = -np.inf
             a_upper[(bv == 0)] = np.inf
 
-            one_plus_eps = np.nextafter(
-                np.array(1, dtype=Xs.dtype), np.array(2, dtype=Xs.dtype)
-            )
-            one_minus_eps = np.nextafter(
-                np.array(1, dtype=Xs.dtype), np.array(0, dtype=Xs.dtype)
-            )
+            one_plus_eps = np.nextafter(Xs.dtype.type(1), Xs.dtype.type(2))
+            one_minus_eps = np.nextafter(Xs.dtype.type(1), Xs.dtype.type(0))
 
             # handle av ** +-inf
             # - 1 ** +-inf = 1 -> discontinuous, force av = 1
@@ -285,12 +281,8 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
                 late_bound,
             )
 
-        one_plus_eps = np.nextafter(
-            np.array(1, dtype=Xs.dtype), np.array(2, dtype=Xs.dtype)
-        )
-        one_minus_eps = np.nextafter(
-            np.array(1, dtype=Xs.dtype), np.array(0, dtype=Xs.dtype)
-        )
+        one_plus_eps = np.nextafter(Xs.dtype.type(1), Xs.dtype.type(2))
+        one_minus_eps = np.nextafter(Xs.dtype.type(1), Xs.dtype.type(0))
 
         expr_upper = _ensure_array(expr_upper, copy=True)
 

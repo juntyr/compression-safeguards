@@ -466,7 +466,7 @@ class ScalarAcosh(Expr[AnyExpr]):
         argv = arg.eval(Xs, late_bound)
         exprv = np.acosh(argv)
 
-        eps_one = np.nextafter(np.array(1, dtype=Xs.dtype), np.array(0, dtype=Xs.dtype))
+        eps_one = np.nextafter(Xs.dtype.type(1), Xs.dtype.type(0))
 
         # apply the inverse function to get the bounds on arg
         # acosh(...) is NaN for values smaller than 1 and can then take any
@@ -568,7 +568,7 @@ class ScalarAtanh(Expr[AnyExpr]):
         argv = arg.eval(Xs, late_bound)
         exprv = np.atanh(argv)
 
-        one_eps = np.nextafter(np.array(1, dtype=Xs.dtype), np.array(2, dtype=Xs.dtype))
+        one_eps = np.nextafter(Xs.dtype.type(1), Xs.dtype.type(2))
 
         # apply the inverse function to get the bounds on arg
         # atanh(...) is NaN when abs(...) > 1 and can then take any value > 1
