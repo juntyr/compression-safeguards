@@ -6,13 +6,10 @@ __all__ = ["Safeguard"]
 
 from abc import ABC, abstractmethod
 from collections.abc import Set
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, Self
 
 import numpy as np
-from typing_extensions import (
-    Self,  # MSPV 3.11
-    override,  # MSPV 3.12
-)
+from typing_extensions import override  # MSPV 3.12
 
 from ..utils.bindings import Bindings, Parameter
 from ..utils.typing import JSON, S, T

@@ -1,0 +1,81 @@
+package:
+  name: libsleef
+  version: 4.0.0
+  tag:
+    - library
+    - static_library
+source:
+  sha256: 545c80b55e24c2a75dbca2af35e3fe3ffe5d0d447d28d63ac63c6697a5c0f896
+  url: https://github.com/shibatch/sleef/archive/43a0252ba9331adc7fb10755021f802863678c38.tar.gz
+  patches:
+    - patches/0001-no-x86intrin.patch
+    - patches/0002-no-mfpmatch.patch
+    - patches/0003-no-mfma.patch
+    - patches/0004-no-cpuid.patch
+build:
+  type: static_library
+  script: |
+    mkdir build-native
+    cd build-native
+
+    mkdir my-install
+
+    export NATIVE_BUILD_DIR=`pwd`
+
+    BACKUP_TOOLCHAIN=${CMAKE_TOOLCHAIN_FILE}
+    unset CMAKE_TOOLCHAIN_FILE
+
+    cmake \
+      -DCMAKE_INSTALL_PREFIX=$(pwd)/my-install \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DSLEEF_BUILD_QUAD=ON \
+      -DSLEEF_BUILD_SHARED_LIBS=OFF \
+      -DSLEEF_BUILD_TESTS=OFF \
+      -DSLEEF_BUILD_INLINE_HEADERS=OFF \
+      -DSLEEF_ENABLE_TESTER4=OFF \
+      -DSLEEF_ENABLE_FFTW=OFF \
+      -DSLEEF_ENABLE_MPFR=OFF \
+      -DSLEEF_ENABLE_SSL=OFF \
+      -DSLEEF_ENABLE_OPENMP=OFF \
+      -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+      ../
+
+    make -j ${PYODIDE_JOBS:-3}
+
+    export CMAKE_TOOLCHAIN_FILE=${BACKUP_TOOLCHAIN}
+
+    cd ..
+    mkdir build
+    cd build
+
+    sed -i 's/-fno-exceptions//g' ../submodules/tlfloat/CMakeLists.txt
+
+    emcmake cmake \
+      -DCMAKE_INSTALL_PREFIX=${WASM_LIBRARY_DIR} \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DSLEEF_BUILD_QUAD=ON \
+      -DSLEEF_BUILD_SHARED_LIBS=OFF \
+      -DSLEEF_BUILD_TESTS=OFF \
+      -DSLEEF_BUILD_INLINE_HEADERS=OFF \
+      -DSLEEF_ENABLE_TESTER4=OFF \
+      -DSLEEF_ENABLE_FFTW=OFF \
+      -DSLEEF_ENABLE_MPFR=OFF \
+      -DSLEEF_ENABLE_SSL=OFF \
+      -DSLEEF_ENABLE_OPENMP=OFF \
+      -DSLEEF_ENABLE_SSE2=ON \
+      -DSLEEF_ENABLE_AVX2=OFF \
+      -DSLEEF_ENABLE_AVX512F=OFF \
+      -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+      -DNATIVE_BUILD_DIR=${NATIVE_BUILD_DIR} \
+      -DCMAKE_C_FLAGS="-msimd128 -msse2" \
+      -DCMAKE_CXX_FLAGS="-msimd128 -msse2" \
+      ../
+
+    emmake make -j ${PYODIDE_JOBS:-3}
+    emmake make install
+
+    mkdir -p dist
+    cp ${WASM_LIBRARY_DIR}/lib/libsleef* dist/
+about:
+  home: https://github.com/shibatch/sleef
+  license: Boost Software License - Version 1.0

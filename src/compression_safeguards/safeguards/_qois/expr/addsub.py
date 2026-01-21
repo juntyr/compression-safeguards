@@ -2,15 +2,11 @@ import operator
 from collections.abc import Mapping
 
 import numpy as np
-from typing_extensions import (
-    Unpack,  # MSPV 3.11
-    override,  # MSPV 3.12
-)
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _broadcast_to,
     _ensure_array,
-    _floating_max,
     _is_negative_zero,
     _is_positive_zero,
     _maximum_zero_sign_sensitive,
@@ -151,9 +147,7 @@ class ScalarSubtract(Expr[AnyExpr, AnyExpr]):
 #  - two terms: binary sum
 # this class avoids the deep nesting that's required to represent a
 #  left-associative sum with ScalarAdd's
-class ScalarLeftAssociativeSum(
-    Expr[AnyExpr, AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]
-):
+class ScalarLeftAssociativeSum(Expr[AnyExpr, AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
     __slots__: tuple[str, ...] = ("_a", "_b", "_c", "_ds")
     _a: AnyExpr
     _b: AnyExpr
@@ -194,7 +188,7 @@ class ScalarLeftAssociativeSum(
 
     @property
     @override
-    def args(self) -> tuple[AnyExpr, AnyExpr, AnyExpr, Unpack[tuple[AnyExpr, ...]]]:
+    def args(self) -> tuple[AnyExpr, AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]:
         return (self._a, self._b, self._c, *self._ds)
 
     @override
@@ -356,7 +350,7 @@ def compute_left_associate_sum_data_bounds(
         np.divide(expr_upper_diff, total_abs_factor)
     )
 
-    fmax = _floating_max(Xs.dtype)
+    fmax = np.finfo(Xs.dtype).max
 
     # ensure that the bounds never contain both -inf and +inf since that would
     #  allow NaN to sneak in

@@ -494,10 +494,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             data_float_lower = _reshape(data_float_lower_, data.shape)
             data_float_upper = _reshape(data_float_upper_, data.shape)
         else:
-            # FIXME: https://github.com/numpy/numpy-user-dtypes/issues/163
-            with np.errstate(invalid="ignore"):
-                data_float_lower = np.full(data.shape, -np.inf, ftype)
-                data_float_upper = np.full(data.shape, np.inf, ftype)
+            data_float_lower = np.full(data.shape, -np.inf, ftype)
+            data_float_upper = np.full(data.shape, np.inf, ftype)
             _place(data_float_lower, where, data_float_lower_)
             _place(data_float_upper, where, data_float_upper_)
 

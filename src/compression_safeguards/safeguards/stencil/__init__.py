@@ -6,14 +6,10 @@ __all__ = ["BoundaryCondition", "NeighbourhoodAxis", "NeighbourhoodBoundaryAxis"
 
 from enum import Enum, auto
 from functools import reduce
-from typing import Literal
+from typing import Literal, Self, assert_never
 
 import numpy as np
-from typing_extensions import (
-    Self,  # MSPV 3.11
-    assert_never,  # MSPV 3.11
-    override,  # MSPV 3.12
-)
+from typing_extensions import override  # MSPV 3.12
 
 from ...utils._compat import _sliding_window_view
 from ...utils.bindings import Parameter

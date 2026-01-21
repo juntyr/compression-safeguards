@@ -18,8 +18,8 @@ properties of the original data are preserved by compression.
 The `SafeguardsCodec` treats the wrapped inner codec as a blackbox. To
 guarantee the user's safety requirements, it post-processes the decompressed
 data, if necessary. If no correction is needed, the `SafeguardsCodec` only has
-a one-byte overhead for the compressed data and a computational overhead at
-compression time.
+a three-byte overhead for the compressed data and a computational overhead at
+compression time (at decompression time, only the checksum is verified).
 
 By using the `SafeguardsCodec` adapter, badly behaving lossy codecs become safe
 to use, at the cost of potentially less efficient compression, and lossy
@@ -77,14 +77,14 @@ __all__ = ["SafeguardsCodec"]
 
 from collections.abc import Callable, Collection, Mapping, Set
 from io import BytesIO
-from typing import ClassVar
+from typing import ClassVar, Self
 
+import leb128
 import numcodecs
 import numcodecs.compat
 import numcodecs.registry
 import numcodecs_combinators
 import numpy as np
-import varint
 from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.abc import Safeguard
 from compression_safeguards.utils.bindings import Bindings, Parameter, Value
@@ -100,10 +100,10 @@ from numcodecs_combinators.abc import CodecCombinatorMixin
 from semver import Version
 from typing_extensions import (
     Buffer,  # MSPV 3.12
-    Self,  # MSPV 3.11
     override,  # MSPV 3.12
 )
 
+from .checksum import checksum
 from .compute import Compute, _refine_correction_iteratively
 from .lossless import Lossless
 
@@ -124,6 +124,10 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         wrap a sequence or stack of codecs, you can use the
         [`numcodecs_combinators.stack.CodecStack`][numcodecs_combinators.stack.CodecStack]
         combinator.
+
+        The codec must be deterministic during decoding (but can be
+        non-deterministic during encoding) such that decoding the same bytes
+        always produces the same bitwise equivalent decoded result.
 
         It is desirable to perform lossless compression after applying the
         safeguards (rather than before), e.g. by customising the
@@ -399,12 +403,13 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
     @override
     def encode(self, buf: Buffer) -> bytes:
-        """Encode the data in `buf`.
+        """
+        Encode the data in `buf` while safeguarding the compression.
 
         The encoded data is defined by the following *stable* format:
 
         ```
-        ULEB128(len(correction_bytes)), encoded_bytes, correction_bytes
+        ULEB128(len(correction_bytes)), checksum, encoded_bytes, correction_bytes
         ```
 
         where
@@ -413,13 +418,18 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
           [unsigned LEB128](https://en.wikipedia.org/wiki/LEB128#Unsigned_LEB128)
           (little endian base 128) variable length encoding for unsigned
           integers
+        - `checksum` refers to the
+          [RFC 1071](https://datatracker.ietf.org/doc/html/rfc1071)
+          "Internet Checksum" over the little-endian C-order bytes of the
+          corrected data, stored as two bytes in big-endian order
         - `encoded_bytes` refers to the encoded bytes produced by the codec and
           its optional lossless encoding
         - `correction_bytes` refers to the encoded correction bytes produced by
           the safeguards and their lossless encoding
+        - the above bytestrings are concatenated into a single bytestring
 
         If no correction is required, `correction_bytes` is empty and there is
-        only a single-byte overhead from using the safeguards.
+        only a three-byte overhead from using the safeguards.
 
         The `buf`fer must contain the complete data, i.e. not just a chunk of
         data, so that non-pointwise safeguards are correctly applied. Please
@@ -465,20 +475,14 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             with ctx.parameter("codec"):
                 decoded = self._codec.decode(np.copy(encoded), out=None)
         except Exception as err:
-            note = (
+            err.add_note(
                 "decoding with `out=None` failed\n\n"
                 "consider using wrapping the codec in the "
                 "`numcodecs_combinators.framed.FramedCodecStack(codec)` "
                 "combinator if the codec requires knowing the output data "
                 "type and shape for decoding"
             )
-
-            # MSPV 3.11
-            if getattr(err, "add_note", None) is not None:
-                err.add_note(note)  # type: ignore
-                raise
-            else:
-                raise (RuntimeError(note) | ctx) from err
+            raise
         decoded = numcodecs.compat.ensure_ndarray(decoded)
 
         if self._lossless_for_codec is not None:
@@ -502,19 +506,13 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 if decoded.shape != data.shape:
                     raise RuntimeError("codec must decode to the data's shape") | ctx
         except RuntimeError as err:
-            note = (
+            err.add_note(
                 "consider using wrapping the codec in the "
                 "`numcodecs_combinators.framed.FramedCodecStack(codec)` "
                 "combinator to encode to bytes and preserve the data dtype and"
                 "shape"
             )
-
-            # MSPV 3.11
-            if getattr(err, "add_note", None) is not None:
-                err.add_note(note)  # type: ignore
-                raise
-            else:
-                raise (RuntimeError(note) | ctx) from err
+            raise
 
         late_bound = self._late_bound
         late_bound_reqs = self._safeguards.late_bound
@@ -552,6 +550,9 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 self._safeguards, data, decoded, correction, late_bound
             )
 
+        corrected = self._safeguards.apply_correction(decoded, correction)
+        corrected_checksum = checksum(corrected)
+
         if np.all(correction == 0):
             correction_bytes = b""
         else:
@@ -559,13 +560,16 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
                 self._lossless_for_safeguards.encode(correction)
             )
 
-        correction_len = varint.encode(len(correction_bytes))
+        correction_len = leb128.u.encode(len(correction_bytes))
 
-        return correction_len + encoded_bytes + correction_bytes
+        return b"".join(
+            [correction_len, corrected_checksum, encoded_bytes, correction_bytes]
+        )
 
     @override
     def decode(self, buf: Buffer, out: None | Buffer = None) -> Buffer:
-        """Decode the data in `buf`.
+        """
+        Decode the data in `buf` and apply the safeguards corrections.
 
         Parameters
         ----------
@@ -601,7 +605,8 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             buf_bytes = numcodecs.compat.ensure_bytes(buf)
 
             buf_io = BytesIO(buf_bytes)
-            correction_len = varint.decode_stream(buf_io)
+            correction_len, _ = leb128.u.decode_reader(buf_io)
+            corrected_checksum = buf_io.read(2)
             if correction_len < 0:
                 raise (
                     ValueError("cannot decode from corrupt buf with invalid header")
@@ -636,6 +641,26 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             corrected = self._safeguards.apply_correction(decoded, correction)
         else:
             corrected = decoded
+
+        newly_corrected_checksum = checksum(corrected)
+
+        if newly_corrected_checksum != corrected_checksum:
+            err = ValueError("mismatch in the checksum for the corrected data")
+            err.add_note(
+                "The checksum of the corrected data is checked to ensure that "
+                "the safeguards correction is applied to the bitwise "
+                "equivalent decompressed data as when the correction was "
+                "computed, i.e. that the corrected data meets all safety "
+                "requirements."
+            )
+            err.add_note(
+                "A mismatch in the checksum likely comes from a wrapped "
+                "`codec` that produces non-deterministic decompressed output. "
+                "Note that the safeguards can only be used with a "
+                "deterministic decompressor."
+            )
+
+            raise (err | ctx)
 
         return numcodecs.compat.ndarray_copy(corrected, out)  # type: ignore
 

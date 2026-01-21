@@ -1,16 +1,11 @@
 import sys
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Generic, TypeAlias, final
+from typing import TYPE_CHECKING, Generic, Self, TypeAlias, assert_never, final
 from warnings import warn
 
 import numpy as np
-from typing_extensions import (
-    Self,  # MSPV 3.11
-    Unpack,  # MSPV 3.11
-    assert_never,  # MSPV 3.11
-    override,  # MSPV 3.12
-)
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _maximum_zero_sign_sensitive,
@@ -26,7 +21,7 @@ if TYPE_CHECKING:
     from .literal import Number
 
 
-class Expr(ABC, Generic[Unpack[Es]]):
+class Expr(ABC, Generic[*Es]):
     """
     Abstract base class for the quantity of interest expression abstract syntax
     tree.
@@ -36,19 +31,19 @@ class Expr(ABC, Generic[Unpack[Es]]):
 
     @property
     @abstractmethod
-    def args(self) -> tuple[Unpack[Es]]:
+    def args(self) -> tuple[*Es]:
         """
         The sub-expression arguments of this expression.
         """
 
     @abstractmethod
-    def with_args(self, *args: Unpack[Es]) -> "Self | Number":
+    def with_args(self, *args: *Es) -> "Self | Number":
         """
         Reconstruct this expression with different sub-expression arguments.
 
         Parameters
         ----------
-        *args : Unpack[Es]
+        *args : *Es
             The modified sub-expression arguments, derived from
             [`self.args`][..args].
 
@@ -440,7 +435,7 @@ class Expr(ABC, Generic[Unpack[Es]]):
         pass
 
 
-AnyExpr: TypeAlias = Expr[Unpack[tuple["AnyExpr", ...]]]
+AnyExpr: TypeAlias = Expr[*tuple["AnyExpr", ...]]
 """ Expression with sub-expression arguments """
 
 if sys.version_info >= (3, 11) or TYPE_CHECKING:

@@ -319,7 +319,11 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
 - ... isolines / isosurfaces?
 
-    > Isolines or isosurfaces can be preserved by using a `sign` safeguard with a matching `offset` for each surface value that should be kept. These `sign` safeguards should generally be combined with an error-bounding safeguard, unless *any* values that preserve the isosurfaces are acceptable.
+    > Isolines or isosurfaces can be preserved by using a `sign` safeguard with a matching `offset` for each surface value that should be kept. These `sign` safeguards should generally be combined with an error-bounding safeguard, unless *any* values that preserve the isosurfaces are acceptable. To preserve isosurfaces over a quantity of interest, comparison operators such as `log(x) > 3` can be used in the quantity of interest safeguards.
+
+- ... critical points?
+
+    Critical points, i.e. points where the derivative over the data or a quantity of interest is zero, can be preserved using the following `qoi_eb_stencil` safeguard: `'finite_difference(x, ...) == 0'`, where the finite difference keyword parameters have been excluded for brevity. To preserve critical points over a quantity of interest, the finite difference over `x` can be replaced with the finite difference over the quantity of interest. Points where the derivative is NaN can be preserved using `'isnan(finite_difference(x, ...))'`.
 
 - ... the monotonicity of a sequence?
 
@@ -358,6 +362,23 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 ## Related Projects
 
 ### Error-bounded Compression
+
+#### ZFP
+
+[ZFP](https://github.com/llnl/zfp) is a transform-based error-bounded lossy compressor that compresses n-dimensional data in $4 \times \ldots \times 4$ blocks. All values in the block are decorrelated using a near-orthogonal transform, the coefficients are reordered so that larger magnitudes usually come first, transformed to the negabinary representation, the bitplanes of which are concatenated into a bitstream that is losslessly compressed. The resulting per-chunk bitstream can be truncated to satisfy a user-provided compression target, e.g. a fixed number of bits, a bitplane precision, or an absolute error tolerance. ZFP can compress floating point numbers and integers and supports lossless compression. Since ZFP produces ULP-order-biased errors, Hammerling et al. (2019) have proposed the ZFP-ROUND variant which eliminates the bias by rounding instead of truncating the coefficients. ZFP can only lossy-compress finite floating-point values, though Lindstrom (2025) has recently outlined several approaches for how ZFP could support encoding special values such as NaN or infinity.
+
+**TLDR:** You can use ZFP to bound a pointwise absolute error or target a specific compression ratio with high throughput. Use `compression-safeguards` to guarantee a variety of safety requirements, including locally varying pointwise absolute errors, for *any* compressor, including ZFP.
+
+> Lindstrom, P. (2025). *Supporting special values in ZFP*. Available from: [doi:10.2172/2998448](https://doi.org/10.2172/2998448).
+
+> Hammerling, D. M., Baker, A. H., Pinard, A., & Lindstrom, P. (2019). A Collaborative Effort to Improve Lossy Compression Methods for Climate Data. *2019 IEEE/ACM 5th International Workshop on Data Analysis and Reduction for Big Scientific Data (DRBSD-5)*, 16–22. Available from: [doi:10.1109/drbsd-549595.2019.00008](https://doi.org/10.1109/drbsd-549595.2019.00008).
+
+> Diffenderfer, J., Fox, A., Hittinger, J., Sanders, G., & Lindstrom, P. (2019). Error analysis of ZFP compression for Floating-Point data. *SIAM Journal on Scientific Computing*, 41(3), A1867–A1898. Available from: [doi:10.1137/18m1168832](https://doi.org/10.1137/18m1168832).
+
+> Lindstrom, P. (2014). Fixed-Rate Compressed Floating-Point arrays. *IEEE Transactions on Visualization and Computer Graphics*, 20(12), 2674–2683. Available from: [doi:10.1109/tvcg.2014.2346458](https://doi.org/10.1109/tvcg.2014.2346458).
+
+You can easily try out ZFP using the [`numcodecs-wasm-zfp`](https://numcodecs-wasm.readthedocs.io/en/latest/api/numcodecs_wasm_zfp/) (for ZFP-ROUND) and [`numcodecs-wasm-zfp-classic`](https://numcodecs-wasm.readthedocs.io/en/latest/api/numcodecs_wasm_zfp/) (for ZFP) Python packages.
+
 
 #### SZ3 error compression
 
@@ -431,6 +452,36 @@ The [QPET](https://github.com/JLiu-1/QPET-Artifact) compressor is the successor 
 > Liu, J., Jiao, P., Zhao, K., Liang, X., Di, S., & Cappello, F. (2025). QPET: a versatile and portable Quantity-of-Interest-Preservation Framework for Error-Bounded Lossy Compression. *Proceedings of the VLDB Endowment*, 18(8), 2440–2453. Available from: [doi:10.14778/3742728.3742739](https://doi.org/10.14778/3742728.3742739).
 
 You can easily try out QPET-SPERR using the [`numcodecs-wasm-qpet-sperr`](https://numcodecs-wasm.readthedocs.io/en/latest/api/numcodecs_wasm_qpet_sperr/) Python package.
+
+
+#### MGARD
+
+[MGARD](https://github.com/CODARcode/MGARD) (MultiGrid Adaptive Reduction of Data) is a lossy compression framework that works with data on a structured grid. It decomposes this grid recursively, using piecewise linear interpolation to approximate the residual from the previous coarser level, stopping when the current decomposition level is able to compress the data within the user chosen error bound. MGARD stands out for supporting arbitrary error norms in addition to $L_{\infty}$ and $L_2$. MGARD has several variants, e.g. to support execution on both CPUs and GPUs, and for additional features such as preserving regions of interest. The MGARD-QoI variant can bound errors over those quantities of interest that can be expressed as bounded linear functionals, e.g. the arithmetic mean over the data but not a non-linear function such as $\sin(x)$ or the percentage of points exceeding an error threshold. MGARD-QoI analytically derives an error norm over the data which then bounds the error over the quantity of interest. Wu et al. (2024) have extended MGARD to support progressive retrieval while bounding quantities of interest that can contain polynomials, square roots, radicals, addition, multiplication, and division. The experimental MGARD-Lambda variant also supports preserving those non-linear quantities of interest that can be converted into linear constraints under simplifying assumptions. Banerjee et al. (2025) have generalised this approach into a hybrid compression method that combines machine learning and compression while preserving quantities of interest.
+
+**TLDR:** You can use MGARD-QoI to preserve an arbitrary error norm over a variety of linear quantities of interest for data on an structured or unstructured grid. Newer extensions for MGARD support more varied QoIs and are integrated with machine learning predictors. MGARD can be combined with the `compression-safeguards` to guarantee an even greater variety of safety requirements.
+
+> Banerjee, T., Choi, J., Lee, J., Gong, Q., Chen, J., Klasky, S., Rangarajan, A., & Ranka, S. (2025). Scalable hybrid learning techniques for scientific data compression. *IEEE Transactions on Parallel and Distributed Systems*, 37(1), 29–44. Available from: [doi:10.1109/tpds.2025.3623935](https://doi.org/10.1109/tpds.2025.3623935).
+
+> Wu, X., Gong, Q., Chen, J., Liu, Q., Podhorszki, N., Liang, X., & Klasky, S. (2024). Error-controlled Progressive Retrieval of Scientific Data under Derivable Quantities of Interest. *SC24: International Conference for High Performance Computing, Networking, Storage and Analysis*, 1–16. Available from: [doi:10.1109/sc41406.2024.00092](https://doi.org/10.1109/sc41406.2024.00092).
+
+> Banerjee, T., Choi, J., Lee, J., Gong, Q., Wang, R., Klasky, S., Rangarajan, A., & Ranka, S. (2022). An Algorithmic and Software Pipeline for Very Large Scale Scientific Data Compression with Error Guarantees. *2022 IEEE 29th International Conference on High Performance Computing, Data, and Analytics (HiPC)*, 226–235. Available from: [doi:10.1109/hipc56025.2022.00039](https://doi.org/10.1109/hipc56025.2022.00039).
+
+> Gong, Q., Liang, X., Whitney, B., Choi, J. Y., Chen, J., Wan, L., Ethier, S., Ku, S., Churchill, R. M., Chang, C.-., Ainsworth, M., Tugluk, O., Munson, T., Pugmire, D., Archibald, R., & Klasky, S. (2022). Maintaining trust in reduction: preserving the accuracy of quantities of interest for lossy compression. In *Communications in computer and information science* (pp. 22–39). Available from: [doi:10.1007/978-3-030-96498-6_2](https://doi.org/10.1007/978-3-030-96498-6_2).
+
+> Gong, Q., Whitney, B., Zhang, C., Liang, X., Rangarajan, A., Chen, J., Wan, L., Ullrich, P., Liu, Q., Jacob, R., Ranka, S., & Klasky, S. (2022). Region-adaptive, Error-controlled Scientific Data Compression using Multilevel Decomposition. *SSDBM '22: Proceedings of the 34th International Conference on Scientific and Statistical Database Management*, 1–12. Available from: [doi:10.1145/3538712.3538717](https://doi.org/10.1145/3538712.3538717).
+
+> Liang, X., Whitney, B., Chen, J., Wan, L., Liu, Q., Tao, D., Kress, J., Pugmire, D., Wolf, M., Podhorszki, N., & Klasky, S. (2021). MGARD+: Optimizing Multilevel Methods for Error-Bounded Scientific Data Reduction. *IEEE Transactions on Computers*, 71(7), 1522–1536. Available from: [doi:10.1109/tc.2021.3092201](https://doi.org/10.1109/tc.2021.3092201).
+
+> Ainsworth, M., Tugluk, O., Whitney, B., & Klasky, S. A. (2019). Multilevel Techniques for compression and reduction of Scientific Data-Quantitative Control of Accuracy in derived quantities. *SIAM Journal on Scientific Computing*, 41(4), A2146–A2171. Available from: [doi:10.1137/18m1208885](https://doi.org/10.1137/18m1208885).
+
+
+#### OptZConfig
+
+[OptZConfig](https://github.com/robertu94/libpressio_opt) is a framework for optimising the configuration of lossy compressors to target or preserve any user-defined metric, e.g. a specific compression ratio, the peak signal-to-noise ratio (PSNR), Pearson's coefficient, or any quantity of interest. OptZConfig is implemented as a meta-compressor for the libpressio framework and uses black-box optimisation to tune any compressor that can be exposed through libpressio. OptZConfig can optimise for any user-defined metric, implemented as a C++ shared library or R script or in any other language that can communicate via HTTP, using a variety of efficiently parallelised search functions. OptZConfig excels at optimising e.g. global data error bounds that preserve an error bound over a quantity of interest, and may often and more quickly find a bound that provides better compression than methods based on analytical derivation. However, problems such as finding an absolute error bound that preserves the sign of the data can lead OptZConfig to revert to lossless compression.
+
+**TLDR:** You can use OptZConfig to optimise the configuration of any compressor to maximise compression ratio while preserving arbitrary data properties. Combine OptZConfig with the `compression-safeguards` to optimize the combined compression ratio of the safeguarded compressor and the safeguards corrections.
+
+> Underwood, R., Calhoun, J. C., Di, S., Apon, A., & Cappello, F. (2022). OptZConfig: Efficient parallel optimization of lossy compression configuration. *IEEE Transactions on Parallel and Distributed Systems*, 33(12), 3505–3519. Available from: [doi:10.1109/tpds.2022.3154096](https://doi.org/10.1109/tpds.2022.3154096).
 
 
 ## Citation

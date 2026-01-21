@@ -94,7 +94,7 @@ import json
 import warnings
 from collections.abc import Collection, Mapping
 from types import MappingProxyType
-from typing import Literal, TypeAlias
+from typing import Literal, TypeAlias, assert_never
 
 import dask
 import dask.array
@@ -114,7 +114,6 @@ from compression_safeguards.utils.error import (
     ctx,
 )
 from compression_safeguards.utils.typing import JSON, S, T
-from typing_extensions import assert_never  # MSPV 3.11
 
 DataValue: TypeAlias = int | float | np.number | xr.DataArray
 """
@@ -772,6 +771,9 @@ def apply_data_array_correction(
     """
     Apply the `correction` to the `prediction` array to satisfy the safeguards for which the `correction` was produced.
 
+    The `prediction` must be bitwise equivalent to the `prediction` that
+    was used to produce the `correction`.
+
     The `prediction` array may be chunked[^2] and the `correction` array must
     use the same chunking, though this chunking may differ from the one that
     was used to produce the `correction`.
@@ -863,6 +865,9 @@ class DatasetSafeguardedAccessor:
     An extension for an [`xarray.Dataset`][xarray.Dataset] that provides the
     `.safeguarded` property that applies safeguards corrections in the dataset
     to their respective variables.
+
+    The safeguarded variables must be bitwise equivalent to the variables
+    for which their corrections were originally produced.
 
     For instance, for a dataset `ds` that contains both a variable `ds.foo` and
     its correction, you can access the corrected variable using

@@ -713,9 +713,9 @@ def test_fuzzer_found_wrapping_constant_boundary_clash():
         np.ones_like(da.values), name="da", dims=["a", "b"]
     ).chunk(chunks)
 
-    # FIXME: wrapping boundary in case (b), only one overlap with the global
-    #        boundary, needs to roll the wrapped values around to the other
-    #        side so that other boundary conditions still see a global boundary
+    # NOTE: wrapping boundary in case (b), only one overlap with the global
+    #       boundary, needs to roll the wrapped values around to the other
+    #       side so that other boundary conditions still see a global boundary
 
     safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
         qoi="x",

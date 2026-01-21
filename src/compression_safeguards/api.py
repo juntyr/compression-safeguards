@@ -6,15 +6,11 @@ __all__ = ["Safeguards"]
 
 import functools
 from collections.abc import Collection, Mapping, Set
-from typing import Final, Literal
+from typing import Final, Literal, Self, assert_never
 
 import numpy as np
 from semver import Version
-from typing_extensions import (
-    Self,  # MSPV 3.11
-    assert_never,  # MSPV 3.11
-    override,  # MSPV 3.12
-)
+from typing_extensions import override  # MSPV 3.12
 
 from .safeguards import SafeguardKind
 from .safeguards.abc import Safeguard
@@ -465,6 +461,9 @@ class Safeguards:
     ) -> np.ndarray[S, np.dtype[T]]:
         """
         Apply the `correction` to the `prediction` to satisfy the safeguards for which the `correction` was computed.
+
+        The `prediction` must be bitwise equivalent to the `prediction` that
+        was used to compute the `correction`.
 
         This method is guaranteed to work for chunked data as well, i.e.
         applying a chunk of the `correction` to the corresponding chunk of the

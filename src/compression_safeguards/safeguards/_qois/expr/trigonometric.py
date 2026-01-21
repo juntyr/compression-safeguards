@@ -5,12 +5,10 @@ from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _ensure_array,
-    _floating_max,
+    _floating_pi,
     _is_negative_zero,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
-    _nextafter,
-    _pi,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
@@ -92,7 +90,7 @@ class ScalarSin(Expr[AnyExpr]):
             expr_lower, -1
         ) & np.greater_equal(expr_upper, 1)
 
-        fmax = _floating_max(Xs.dtype)
+        fmax = np.finfo(Xs.dtype).max
 
         # sin(+-inf) = NaN, so force infinite argv to have exact bounds
         # sin(finite) in [-1, +1] so allow any finite argv if the all of
@@ -229,7 +227,7 @@ class ScalarCos(Expr[AnyExpr]):
             expr_lower, -1
         ) & np.greater_equal(expr_upper, 1)
 
-        fmax = _floating_max(Xs.dtype)
+        fmax = np.finfo(Xs.dtype).max
 
         # cps(+-inf) = NaN, so force infinite argv to have exact bounds
         # cos(finite) in [-1, +1] so allow any finite argv if the all of
@@ -350,7 +348,7 @@ class ScalarTan(Expr[AnyExpr]):
             expr_lower == Xs.dtype.type(-np.inf)
         ) & (expr_upper == Xs.dtype.type(np.inf))
 
-        fmax = _floating_max(Xs.dtype)
+        fmax = np.finfo(Xs.dtype).max
 
         # tan(+-inf) = NaN, so force infinite argv to have exact bounds
         # tan(finite) in [-inf, +inf] so allow any finite argv if the all of
@@ -455,9 +453,9 @@ class ScalarAsin(Expr[AnyExpr]):
         argv = arg.eval(Xs, late_bound)
         exprv = np.asin(argv)
 
-        pi = _pi(Xs.dtype)
+        pi = _floating_pi(Xs.dtype)
         pi_2: F = np.divide(pi, 2)
-        one_eps = _nextafter(np.array(1, dtype=Xs.dtype), np.array(2, dtype=Xs.dtype))
+        one_eps = np.nextafter(Xs.dtype.type(1), Xs.dtype.type(2))
 
         # apply the inverse function to get the bounds on arg
         # asin(...) is NaN when abs(...) > 1 and can then take any value > 1
@@ -569,8 +567,8 @@ class ScalarAcos(Expr[AnyExpr]):
         argv = arg.eval(Xs, late_bound)
         exprv = np.acos(argv)
 
-        pi = _pi(Xs.dtype)
-        one_eps = _nextafter(np.array(1, dtype=Xs.dtype), np.array(2, dtype=Xs.dtype))
+        pi = _floating_pi(Xs.dtype)
+        one_eps = np.nextafter(Xs.dtype.type(1), Xs.dtype.type(2))
 
         # apply the inverse function to get the bounds on arg
         # acos(...) is NaN when abs(...) > 1 and can then take any value > 1
@@ -688,9 +686,7 @@ class ScalarAtan(Expr[AnyExpr]):
         #  tan(pi/2) >> 0
         atan_max: F = np.atan(Xs.dtype.type(np.inf))
         if np.tan(atan_max) < 0:
-            atan_max = Xs.dtype.type(
-                _nextafter(np.array(atan_max), np.array(Xs.dtype.type(0)))
-            )
+            atan_max = Xs.dtype.type(np.nextafter(atan_max, Xs.dtype.type(0)))
         assert np.tan(atan_max) > 0
 
         # apply the inverse function to get the bounds on arg
@@ -698,18 +694,18 @@ class ScalarAtan(Expr[AnyExpr]):
         #  arg_lower is also -0.0, same for arg_upper
         # ensure that the bounds on atan(...) are in [-pi/2, +pi/2]
         # since tan is discontinuous at +-pi/2, we need to be extra careful
-        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.tan(
-            _minimum_zero_sign_sensitive(
-                _maximum_zero_sign_sensitive(-atan_max, expr_lower), atan_max
-            )
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            np.tan(expr_lower)
         )
+        arg_lower[expr_lower < -atan_max] = -np.inf
+        arg_lower[expr_lower > atan_max] = np.inf
         arg_lower = _ensure_array(_minimum_zero_sign_sensitive(argv, arg_lower))
 
-        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = np.tan(
-            _minimum_zero_sign_sensitive(
-                _maximum_zero_sign_sensitive(-atan_max, expr_upper), atan_max
-            )
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            np.tan(expr_upper)
         )
+        arg_upper[expr_upper < -atan_max] = -np.inf
+        arg_upper[expr_upper > atan_max] = np.inf
         arg_upper = _ensure_array(_maximum_zero_sign_sensitive(argv, arg_upper))
 
         # we need to force argv if expr_lower == expr_upper

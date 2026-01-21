@@ -5,7 +5,6 @@ from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _ensure_array,
-    _floating_smallest_subnormal,
     _is_sign_negative_number,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
@@ -75,7 +74,7 @@ class ScalarSqrt(Expr[AnyExpr]):
         argv = arg.eval(Xs, late_bound)
         exprv = np.sqrt(argv)
 
-        smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
+        smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
 
         # apply the inverse function to get the bounds on arg
         # sqrt(-0.0) = -0.0 and sqrt(+0.0) = +0.0

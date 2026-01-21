@@ -28,14 +28,10 @@ from collections.abc import Set
 from contextlib import AbstractContextManager, contextmanager
 from enum import Enum
 from types import UnionType
-from typing import TYPE_CHECKING, TypeVar, final
+from typing import TYPE_CHECKING, Never, Self, TypeVar, final
 
 import numpy as np
-from typing_extensions import (
-    Never,  # MSPV 3.11
-    Self,  # MSPV 3.11
-    override,  # MSPV 3.12
-)
+from typing_extensions import override  # MSPV 3.12
 
 if TYPE_CHECKING:
     from ..safeguards.abc import Safeguard
@@ -123,8 +119,9 @@ class ErrorContext:
         other_with_context.__context__ = other.__context__
         other_with_context.__suppress_context__ = other.__suppress_context__
         other_with_context.__traceback__ = other.__traceback__
-        if hasattr(other, "__notes__"):  # MSPV 3.11
-            other_with_context.__notes__ = other.__notes__  # type: ignore
+        if hasattr(other, "__notes__"):
+            # only present after add_note() is called
+            other_with_context.__notes__ = other.__notes__
         return other_with_context
 
     @override
@@ -758,22 +755,13 @@ class SafeguardsSafetyBug(RuntimeError):
     __slots__: tuple[str, ...] = ()
 
     def __init__(self, message: str) -> None:
-        note = (
+        super().__init__(message)
+
+        self.add_note(
             "This is a fatal bug in the implementation of the "
             + "`compression-safeguards`. Please report it at "
             + "<https://github.com/juntyr/compression-safeguards/issues>."
         )
-
-        if not hasattr(self, "add_note"):
-            if note not in message:
-                message = f"{message}\n\n{note}"
-
-        super().__init__(message)
-
-        # MSPV 3.11
-        if hasattr(self, "add_note"):
-            if note not in getattr(self, "__notes__", []):
-                self.add_note(note)  # type: ignore
 
 
 class QuantityOfInterestRuntimeWarning(RuntimeWarning):
@@ -797,22 +785,13 @@ class QuantityOfInterestRuntimeWarning(RuntimeWarning):
     __slots__: tuple[str, ...] = ()
 
     def __init__(self, message: str) -> None:
-        note = (
+        super().__init__(message)
+
+        self.add_note(
             "This is a non-fatal bug in the implementation of the "
             + "`compression-safeguards`. Please report it at "
             + "<https://github.com/juntyr/compression-safeguards/issues>."
         )
-
-        if not hasattr(self, "add_note"):
-            if note not in message:
-                message = f"{message}\n\n{note}"
-
-        super().__init__(message)
-
-        # MSPV 3.11
-        if hasattr(self, "add_note"):
-            if note not in getattr(self, "__notes__", []):
-                self.add_note(note)  # type: ignore
 
 
 def lookup_enum_or_raise(

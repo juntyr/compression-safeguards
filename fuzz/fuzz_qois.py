@@ -97,13 +97,10 @@ def as_bits(
 ) -> np.ndarray[S, np.dtype[U]]:
     a = np.array(a, copy=None)
 
-    kind = "V" if a.dtype == _float128_dtype else "u"
+    if a.dtype == _float128_dtype:
+        return a.view("|V16")
 
-    return a.view(
-        a.dtype.str.replace("f", kind)
-        # numpy_quaddtype currently does not set its kind properly
-        .replace(_float128_dtype.kind, kind)
-    )
+    return a.view(a.dtype.str.replace("f", "u"))
 
 
 def ConsumeDtypeElement(data, dtype: np.dtype[T]) -> T:

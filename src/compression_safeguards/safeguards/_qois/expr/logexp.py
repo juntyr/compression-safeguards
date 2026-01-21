@@ -6,11 +6,9 @@ from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _ensure_array,
-    _floating_smallest_subnormal,
     _is_negative_zero,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
-    _nextafter,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
@@ -77,7 +75,7 @@ class ScalarLog(Expr[AnyExpr]):
         argv = arg.eval(Xs, late_bound)
         exprv = (LOGARITHM_UFUNC[self._log])(argv)
 
-        smallest_subnormal = _floating_smallest_subnormal(Xs.dtype)
+        smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
 
         # apply the inverse function to get the bounds on arg
         # log(...) is NaN for negative values and can then take any negative
@@ -99,7 +97,7 @@ class ScalarLog(Expr[AnyExpr]):
         arg_upper[np.less(argv, 0)] = -smallest_subnormal
 
         # an upper bound of -0.0 must be nudged downwards from 1 to 1-eps
-        arg_upper[_is_negative_zero(expr_upper)] = _nextafter(
+        arg_upper[_is_negative_zero(expr_upper)] = np.nextafter(
             np.array(Xs.dtype.type(1)), np.array(Xs.dtype.type(0))
         )
 

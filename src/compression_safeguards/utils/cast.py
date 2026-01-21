@@ -14,11 +14,11 @@ __all__ = [
 ]
 
 from enum import Enum, auto
+from typing import assert_never
 
 import numpy as np
-from typing_extensions import assert_never  # MSPV 3.11
 
-from ._compat import _ensure_array, _is_of_dtype, _nan_to_zero_inf_to_finite
+from ._compat import _ensure_array, _is_of_dtype
 from ._float128 import _float128_dtype
 from .error import TypeSetError, ctx
 from .typing import F, S, T, U
@@ -63,10 +63,8 @@ class ToFloatMode(Enum):
         [`Safeguards.supported_dtypes`][.....api.Safeguards.supported_dtypes])
         are supported by this method.
 
-        On platforms where the [`np.float128`][numpy.float128] type does *not*
-        refer to a floating-point type with true 128 bits of precision, the
-        [`numpy_quaddtype`](https://pypi.org/project/numpy-quaddtype/) package
-        is used to provide a true 128 bit floating-point data type.
+        The [`numpy_quaddtype`](https://pypi.org/project/numpy-quaddtype/)
+        package is used to provide a true 128 bit floating-point data type.
 
         Parameters
         ----------
@@ -201,20 +199,20 @@ def to_float(
         The converted array with the chosen floating-point data type.
     """
 
-    assert np.issubdtype(ftype, np.floating) or (ftype == _float128_dtype)
+    assert np.issubdtype(ftype, np.floating)
 
     if np.issubdtype(x.dtype, np.floating):
         assert ftype.itemsize >= x.dtype.itemsize
-    elif ftype != _float128_dtype:
+    else:
         assert np.finfo(ftype).nmant >= x.dtype.itemsize
 
     if _is_of_dtype(x, ftype):
         return x
 
+    # FIXME: https://github.com/numpy/numpy-user-dtypes/issues/163
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         # lossless cast to floating-point data type with a sufficiently large
         #  mantissa
-        # FIXME: numpy_quaddtype raises warnings even though no overflow occurs
         return x.astype(ftype, casting="safe")
 
 
@@ -246,7 +244,7 @@ def from_float(
 
     x = _ensure_array(x)
 
-    assert np.issubdtype(x.dtype, np.floating) or (x.dtype == _float128_dtype)
+    assert np.issubdtype(x.dtype, np.floating)
 
     if _is_of_dtype(x, dtype):
         return x
@@ -290,12 +288,7 @@ def as_bits(
         The binary unsigned integer representation of the array `a`.
     """
 
-    return a.view(
-        a.dtype.str.replace("f", "u")
-        .replace("i", "u")
-        # numpy_quaddtype currently does not set its kind properly
-        .replace(_float128_dtype.kind, "u")
-    )
+    return a.view(a.dtype.str.replace("f", "u").replace("i", "u"))
 
 
 def to_total_order(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[U]]:
@@ -333,7 +326,7 @@ def to_total_order(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[U]]:
     if np.issubdtype(a.dtype, np.unsignedinteger):
         return a  # type: ignore
 
-    utype = a.dtype.str.replace("i", "u").replace("f", "u")
+    utype = np.dtype(a.dtype.str.replace("i", "u").replace("f", "u"))
 
     if np.issubdtype(a.dtype, np.signedinteger):
         shift = np.iinfo(a.dtype).max  # type: ignore
@@ -341,16 +334,14 @@ def to_total_order(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[U]]:
             over="ignore",
             under="ignore",
         ):
-            return (
-                a.view(utype) + np.array(shift, dtype=utype) + np.array(1, dtype=utype)
-            )
+            return a.view(utype) + utype.type(shift) + utype.type(1)
 
     itype = a.dtype.str.replace("f", "i")
     bits = np.iinfo(utype).bits
 
     mask = (-((a.view(dtype=utype) >> (bits - 1)).view(dtype=itype))).view(
         dtype=utype
-    ) | (np.array(1, dtype=utype) << (bits - 1))
+    ) | (utype.type(1) << (bits - 1))
 
     return a.view(dtype=utype) ^ mask
 
@@ -399,12 +390,12 @@ def from_total_order(
         ):
             return a.view(dtype) + shift + dtype.type(1)
 
-    utype = dtype.str.replace("f", "u")
+    utype = np.dtype(dtype.str.replace("f", "u"))
     itype = dtype.str.replace("f", "i")
     bits = np.iinfo(utype).bits
 
     mask = ((a >> (bits - 1)).view(dtype=itype) - 1).view(dtype=utype) | (
-        np.array(1, dtype=utype) << (bits - 1)
+        utype.type(1) << (bits - 1)
     )
 
     return (a ^ mask).view(dtype=dtype)
@@ -453,7 +444,13 @@ def lossless_cast(
         xa_to = _ensure_array(xa).astype(dtype, casting="unsafe")
         xa_back = xa_to.astype(dtype_from, casting="unsafe")
 
-    lossless_same = (xa == xa_back) | (np.isnan(xa) & np.isnan(xa_back))
+    lossless_same = xa == xa_back
+    lossless_same |= np.isnan(xa) & np.isnan(xa_back)
+
+    if isinstance(x, int):
+        lossless_same &= (x < 0) == np.signbit(xa_back)
+    else:
+        lossless_same &= np.signbit(xa) == np.signbit(xa_back)
 
     if not np.all(lossless_same):
         raise (
@@ -494,7 +491,7 @@ def saturating_finite_float_cast(
         if any values are non-finite, i.e. infinite or NaN.
     """
 
-    assert np.issubdtype(dtype, np.floating) or (dtype == _float128_dtype)
+    assert np.issubdtype(dtype, np.floating)
 
     xa = np.array(x, copy=None)
 
@@ -514,4 +511,10 @@ def saturating_finite_float_cast(
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         xa_to = _ensure_array(xa).astype(dtype, casting="unsafe")
 
-    return _nan_to_zero_inf_to_finite(xa_to)
+    # the above checks guarantee that there are no NaNs in xa
+    if isinstance(x, int):
+        assert (x < 0) == np.signbit(xa_to)
+    else:
+        assert np.all(np.signbit(xa) == np.signbit(xa_to))
+
+    return np.nan_to_num(xa_to)

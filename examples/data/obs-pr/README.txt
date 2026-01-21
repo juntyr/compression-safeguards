@@ -19,7 +19,7 @@ Junninen, H., Lauri, A., Keronen, P., Aalto, P., Hiltunen, V., Hari, P., Kulmala
 
 ### belem.csv ###
 
-Contains the hourly precipitation (PR) in mm and the date and time (DateTime) in UTC from the 2024-04-02 00:00:00 to 2024-04-04 23:00:00 for Belem, Brazil.
+Contains the hourly precipitation (PR) in mm and the date and time (DateTime) in UTC from the 2024-04-02 00:00:00 to 2024-04-04 23:00:00 for Belém, Brazil.
 
 Source: https://tempo.inmet.gov.br/TabelaEstacoes/A201
 Request: 

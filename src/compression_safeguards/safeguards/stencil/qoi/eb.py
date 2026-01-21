@@ -9,10 +9,7 @@ from functools import reduce
 from typing import ClassVar, Literal
 
 import numpy as np
-from typing_extensions import (
-    Unpack,  # MSPV 3.11
-    override,  # MSPV 3.12
-)
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
     _ensure_array,
@@ -498,11 +495,11 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
             qoi_shape: tuple[int, ...] = data_windows_float_.shape[: -len(window)]
             data_windows_float: np.ndarray[
-                tuple[int, Unpack[tuple[int, ...]]], np.dtype[F]
+                tuple[int, *tuple[int, ...]], np.dtype[F]
             ] = _reshape(data_windows_float_, (-1, *window))
 
             late_bound_constants: dict[
-                Parameter, np.ndarray[tuple[int, Unpack[tuple[int, ...]]], np.dtype[F]]
+                Parameter, np.ndarray[tuple[int, *tuple[int, ...]], np.dtype[F]]
             ] = dict()
             with ctx.parameter("qoi"):
                 for c in self._qoi_expr.late_bound_constants:
@@ -535,7 +532,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                         )
                     )
                     late_windows_float: np.ndarray[
-                        tuple[int, Unpack[tuple[int, ...]]], np.dtype[F]
+                        tuple[int, *tuple[int, ...]], np.dtype[F]
                     ] = _reshape(late_windows_float_, (-1, *window))
                     late_bound_constants[c] = late_windows_float
 
@@ -698,15 +695,15 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
 
             data_windows_float: np.ndarray[
-                tuple[int, Unpack[tuple[int, ...]]], np.dtype[np.floating]
+                tuple[int, *tuple[int, ...]], np.dtype[np.floating]
             ] = _reshape(data_windows_float_, (-1, *window))
             prediction_windows_float: np.ndarray[
-                tuple[int, Unpack[tuple[int, ...]]], np.dtype[np.floating]
+                tuple[int, *tuple[int, ...]], np.dtype[np.floating]
             ] = _reshape(prediction_windows_float_, (-1, *window))
 
             late_bound_constants: dict[
                 Parameter,
-                np.ndarray[tuple[int, Unpack[tuple[int, ...]]], np.dtype[np.floating]],
+                np.ndarray[tuple[int, *tuple[int, ...]], np.dtype[np.floating]],
             ] = dict()
             with ctx.parameter("qoi"):
                 for c in self._qoi_expr.late_bound_constants:
@@ -739,7 +736,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                         ftype=ftype,
                     )
                     late_windows_float: np.ndarray[
-                        tuple[int, Unpack[tuple[int, ...]]], np.dtype[np.floating]
+                        tuple[int, *tuple[int, ...]], np.dtype[np.floating]
                     ] = _reshape(late_windows_float_, (-1, *window))
                     late_bound_constants[c] = late_windows_float
 
@@ -954,12 +951,12 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             )
             qoi_stencil_shape: tuple[int, ...] = data_windows_float_.shape
             data_windows_float: np.ndarray[
-                tuple[int, Unpack[tuple[int, ...]]], np.dtype[np.floating]
+                tuple[int, *tuple[int, ...]], np.dtype[np.floating]
             ] = _reshape(data_windows_float_, (-1, *window))
 
             late_bound_constants: dict[
                 Parameter,
-                np.ndarray[tuple[int, Unpack[tuple[int, ...]]], np.dtype[np.floating]],
+                np.ndarray[tuple[int, *tuple[int, ...]], np.dtype[np.floating]],
             ] = dict()
             with ctx.parameter("qoi"):
                 for c in self._qoi_expr.late_bound_constants:
@@ -992,7 +989,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                         ftype=ftype,
                     )
                     late_windows_float: np.ndarray[
-                        tuple[int, Unpack[tuple[int, ...]]], np.dtype[np.floating]
+                        tuple[int, *tuple[int, ...]], np.dtype[np.floating]
                     ] = _reshape(late_windows_float_, (-1, *window))
                     late_bound_constants[c] = late_windows_float
 
@@ -1078,14 +1075,12 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             where_indices = np.nonzero(where_flat)[0].reshape(
                 (-1, *tuple(1 for _ in window))
             )
-            # FIXME: https://github.com/numpy/numpy-user-dtypes/issues/163
-            with np.errstate(invalid="ignore"):
-                data_windows_float_lower = np.full(
-                    qoi_stencil_shape, -np.inf, dtype=ftype
-                ).reshape(-1, *window)
-                data_windows_float_upper = np.full(
-                    qoi_stencil_shape, np.inf, dtype=ftype
-                ).reshape(-1, *window)
+            data_windows_float_lower = np.full(
+                qoi_stencil_shape, -np.inf, dtype=ftype
+            ).reshape(-1, *window)
+            data_windows_float_upper = np.full(
+                qoi_stencil_shape, np.inf, dtype=ftype
+            ).reshape(-1, *window)
             np.put_along_axis(
                 data_windows_float_lower,
                 where_indices,
@@ -1123,14 +1118,12 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         # flatten the QoI data bounds and append an infinite value,
         #  which is indexed if an element did not contribute to the maximum
         #  number of windows
-        # FIXME: https://github.com/numpy/numpy-user-dtypes/issues/163
-        with np.errstate(invalid="ignore"):
-            data_windows_float_lower_flat = np.full(
-                data_windows_float_lower.size + 1, -np.inf, dtype=ftype
-            )
-            data_windows_float_upper_flat = np.full(
-                data_windows_float_upper.size + 1, np.inf, dtype=ftype
-            )
+        data_windows_float_lower_flat = np.full(
+            data_windows_float_lower.size + 1, -np.inf, dtype=ftype
+        )
+        data_windows_float_upper_flat = np.full(
+            data_windows_float_upper.size + 1, np.inf, dtype=ftype
+        )
         data_windows_float_lower_flat[:-1] = data_windows_float_lower.flatten()
         data_windows_float_upper_flat[:-1] = data_windows_float_upper.flatten()
 

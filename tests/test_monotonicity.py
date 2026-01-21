@@ -687,7 +687,7 @@ def test_late_bound_constant_boundary():
 
     with pytest.raises(
         ValueError,
-        match=r"qoi_eb_stencil\.neighbourhood\[0\]\.constant_boundary=const: cannot losslessly cast \(some\) values from int64 to uint8",
+        match=rf"qoi_eb_stencil\.neighbourhood\[0\]\.constant_boundary=const: cannot losslessly cast \(some\) values from {np.array(-1).dtype.name} to uint8",
     ):
         correction = safeguards.compute_correction(
             data, decoded, late_bound=Bindings(const=-1)

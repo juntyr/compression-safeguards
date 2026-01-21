@@ -8,8 +8,6 @@ from ....utils._compat import (
     _ensure_array,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
-    _nan_to_zero_inf_to_finite,
-    _nextafter,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
@@ -82,14 +80,14 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
         av = a.eval(Xs, late_bound)
         bv = b.eval(Xs, late_bound)
 
-        bv_nxt_av = _ensure_array(_nextafter(bv, av))
+        bv_nxt_av = _ensure_array(np.nextafter(bv, av))
 
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
         #  - since we use finite values, mid(-Inf, +Inf) = 0
         av_mid_bv: np.ndarray[tuple[Ps], np.dtype[F]] = np.add(  # type: ignore
-            np.divide(_nan_to_zero_inf_to_finite(av), Xs.dtype.type(2)),
-            np.divide(_nan_to_zero_inf_to_finite(bv), Xs.dtype.type(2)),
+            np.divide(np.nan_to_num(av), Xs.dtype.type(2)),
+            np.divide(np.nan_to_num(bv), Xs.dtype.type(2)),
         )
         # the midpoint must be in range [av, bv), unless av == bv, since we
         #  later want to be able to step from the midpoint closer towards bv
@@ -124,7 +122,7 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
                 where=a.eval_has_data(Xs, late_bound),
                 casting="no",
             )
-        av_nxt_bv = _nextafter(av_nxt_bv, bv)
+        av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
         xl: np_sndarray[Ps, Ns, np.dtype[F]]
         xu: np_sndarray[Ps, Ns, np.dtype[F]]
@@ -304,14 +302,14 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
         av = a.eval(Xs, late_bound)
         bv = b.eval(Xs, late_bound)
 
-        bv_nxt_av = _ensure_array(_nextafter(bv, av))
+        bv_nxt_av = _ensure_array(np.nextafter(bv, av))
 
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
         #  - since we use finite values, mid(-Inf, +Inf) = 0
         av_mid_bv: np.ndarray[tuple[Ps], np.dtype[F]] = np.add(  # type: ignore
-            np.divide(_nan_to_zero_inf_to_finite(av), Xs.dtype.type(2)),
-            np.divide(_nan_to_zero_inf_to_finite(bv), Xs.dtype.type(2)),
+            np.divide(np.nan_to_num(av), Xs.dtype.type(2)),
+            np.divide(np.nan_to_num(bv), Xs.dtype.type(2)),
         )
         # the midpoint must be in range [av, bv), unless av == bv, since we
         #  later want to be able to step from the midpoint closer towards bv
@@ -346,7 +344,7 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
                 where=a.eval_has_data(Xs, late_bound),
                 casting="no",
             )
-        av_nxt_bv = _nextafter(av_nxt_bv, bv)
+        av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
         xl: np_sndarray[Ps, Ns, np.dtype[F]]
         xu: np_sndarray[Ps, Ns, np.dtype[F]]
@@ -526,14 +524,14 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
         av = a.eval(Xs, late_bound)
         bv = b.eval(Xs, late_bound)
 
-        bv_nxt_av = _ensure_array(_nextafter(bv, av))
+        bv_nxt_av = _ensure_array(np.nextafter(bv, av))
 
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
         #  - since we use finite values, mid(-Inf, +Inf) = 0
         av_mid_bv: np.ndarray[tuple[Ps], np.dtype[F]] = np.add(  # type: ignore
-            np.divide(_nan_to_zero_inf_to_finite(av), Xs.dtype.type(2)),
-            np.divide(_nan_to_zero_inf_to_finite(bv), Xs.dtype.type(2)),
+            np.divide(np.nan_to_num(av), Xs.dtype.type(2)),
+            np.divide(np.nan_to_num(bv), Xs.dtype.type(2)),
         )
         # the midpoint must be in range [av, bv), unless av == bv, since we
         #  later want to be able to step from the midpoint closer towards bv
@@ -568,7 +566,7 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
                 where=a.eval_has_data(Xs, late_bound),
                 casting="no",
             )
-        av_nxt_bv = _nextafter(av_nxt_bv, bv)
+        av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
         xl: np_sndarray[Ps, Ns, np.dtype[F]]
         xu: np_sndarray[Ps, Ns, np.dtype[F]]
@@ -742,14 +740,14 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
         av = a.eval(Xs, late_bound)
         bv = b.eval(Xs, late_bound)
 
-        bv_nxt_av = _ensure_array(_nextafter(bv, av))
+        bv_nxt_av = _ensure_array(np.nextafter(bv, av))
 
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
         #  - since we use finite values, mid(-Inf, +Inf) = 0
         av_mid_bv: np.ndarray[tuple[Ps], np.dtype[F]] = np.add(  # type: ignore
-            np.divide(_nan_to_zero_inf_to_finite(av), Xs.dtype.type(2)),
-            np.divide(_nan_to_zero_inf_to_finite(bv), Xs.dtype.type(2)),
+            np.divide(np.nan_to_num(av), Xs.dtype.type(2)),
+            np.divide(np.nan_to_num(bv), Xs.dtype.type(2)),
         )
         # the midpoint must be in range [av, bv), unless av == bv, since we
         #  later want to be able to step from the midpoint closer towards bv
@@ -784,7 +782,7 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
                 where=a.eval_has_data(Xs, late_bound),
                 casting="no",
             )
-        av_nxt_bv = _nextafter(av_nxt_bv, bv)
+        av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
         xl: np_sndarray[Ps, Ns, np.dtype[F]]
         xu: np_sndarray[Ps, Ns, np.dtype[F]]
@@ -958,14 +956,14 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
         av = a.eval(Xs, late_bound)
         bv = b.eval(Xs, late_bound)
 
-        av_nxt_bv = _ensure_array(_nextafter(av, bv))
+        av_nxt_bv = _ensure_array(np.nextafter(av, bv))
 
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
         #  - since we use finite values, mid(-Inf, +Inf) = 0
         av_mid_bv: np.ndarray[tuple[Ps], np.dtype[F]] = np.add(  # type: ignore
-            np.divide(_nan_to_zero_inf_to_finite(av), Xs.dtype.type(2)),
-            np.divide(_nan_to_zero_inf_to_finite(bv), Xs.dtype.type(2)),
+            np.divide(np.nan_to_num(av), Xs.dtype.type(2)),
+            np.divide(np.nan_to_num(bv), Xs.dtype.type(2)),
         )
         # the midpoint must be in range (av, bv], unless av == bv, since we
         #  later want to be able to step from the midpoint closer towards av
@@ -988,7 +986,7 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
                 where=b.eval_has_data(Xs, late_bound),
                 casting="no",
             )
-        bv_nxt_av = _nextafter(bv_nxt_av, av)
+        bv_nxt_av = np.nextafter(bv_nxt_av, av)
 
         # compute the next value from a towards b that can be part of b's
         #  safe interval
@@ -1174,14 +1172,14 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
         av = a.eval(Xs, late_bound)
         bv = b.eval(Xs, late_bound)
 
-        av_nxt_bv = _ensure_array(_nextafter(av, bv))
+        av_nxt_bv = _ensure_array(np.nextafter(av, bv))
 
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
         #  - since we use finite values, mid(-Inf, +Inf) = 0
         av_mid_bv: np.ndarray[tuple[Ps], np.dtype[F]] = np.add(  # type: ignore
-            np.divide(_nan_to_zero_inf_to_finite(av), Xs.dtype.type(2)),
-            np.divide(_nan_to_zero_inf_to_finite(bv), Xs.dtype.type(2)),
+            np.divide(np.nan_to_num(av), Xs.dtype.type(2)),
+            np.divide(np.nan_to_num(bv), Xs.dtype.type(2)),
         )
         # the midpoint must be in range (av, bv], unless av == bv, since we
         #  later want to be able to step from the midpoint closer towards av
@@ -1204,7 +1202,7 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
                 where=b.eval_has_data(Xs, late_bound),
                 casting="no",
             )
-        bv_nxt_av = _nextafter(bv_nxt_av, av)
+        bv_nxt_av = np.nextafter(bv_nxt_av, av)
 
         # compute the next value from a towards b that can be part of b's
         #  safe interval

@@ -237,13 +237,13 @@ def check_one_input(data) -> None:
         late_bound["$x_min"] = (
             np.nanmin(da)
             if da.size > 0 and not np.all(np.isnan(da))
-            else np.array(0, dtype=da.dtype)
+            else da.dtype.type(0)
         )
     if "$x_max" in safeguard.late_bound:
         late_bound["$x_max"] = (
             np.nanmax(da)
             if da.size > 0 and not np.all(np.isnan(da))
-            else np.array(0, dtype=da.dtype)
+            else da.dtype.type(0)
         )
 
     if chunks is not None:

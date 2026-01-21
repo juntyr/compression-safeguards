@@ -1,11 +1,9 @@
 from collections.abc import Callable, Mapping
 from enum import Enum, auto
+from typing import assert_never
 
 import numpy as np
-from typing_extensions import (
-    assert_never,  # MSPV 3.11
-    override,  # MSPV 3.11
-)
+from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import _symmetric_modulo
 from ....utils.bindings import Parameter
