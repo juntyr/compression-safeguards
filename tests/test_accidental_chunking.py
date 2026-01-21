@@ -86,9 +86,6 @@ def test_codec_stack_stencil():
         ).compute()
 
 
-@pytest.mark.skipif(
-    sys.platform == "emscripten", reason="pytest-asyncio is broken in Pyodide"
-)
 @pytest.mark.asyncio
 async def test_zarr_pointwise():
     data = np.arange(100, dtype=float)
@@ -121,9 +118,6 @@ async def test_zarr_pointwise():
     assert np.all(np.abs(np.asarray(a) - data) <= 0.5)
 
 
-@pytest.mark.skipif(
-    sys.platform == "emscripten", reason="pytest-asyncio is broken in Pyodide"
-)
 @pytest.mark.asyncio
 async def test_zarr_stencil():
     data = np.arange(100, dtype=float)
