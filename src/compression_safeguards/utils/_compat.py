@@ -5,7 +5,6 @@ equivalent behaviour for all supported dtypes and provide good type hints.
 
 __all__ = [
     "_place",
-    "_as_logical",
     "_symmetric_modulo",
     "_minimum_zero_sign_sensitive",
     "_maximum_zero_sign_sensitive",
@@ -54,17 +53,6 @@ def _place(
         return np.place(a, mask, vals)
 
     return np.put(a, np.flatnonzero(mask), vals)
-
-
-# helper for np.any and np.all that also works for numpy_quaddtype
-# FIXME: https://github.com/numpy/numpy-user-dtypes/issues/258
-def _as_logical(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T | np.bool]]:
-    if (type(a) is not _float128_type) and (
-        not isinstance(a, np.ndarray) or a.dtype != _float128_dtype
-    ):
-        return a
-
-    return a != 0
 
 
 # wrapper around np.mod(p, q) that guarantees that the result is in [-q/2, q/2]
