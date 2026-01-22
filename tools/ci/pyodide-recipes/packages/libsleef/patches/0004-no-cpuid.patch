@@ -1,82 +1,8 @@
-diff --git a/src/arch/helperavx2.h b/src/arch/helperavx2.h
-index 33889f2..820d8eb 100644
---- a/src/arch/helperavx2.h
-+++ b/src/arch/helperavx2.h
-@@ -74,15 +74,11 @@ void Sleef_x86CpuID(int32_t out[4], uint32_t eax, uint32_t ecx);
- #endif
- 
- static INLINE int cpuSupportsAVX2() {
--    int32_t reg[4];
--    Sleef_x86CpuID(reg, 7, 0);
--    return (reg[1] & (1 << 5)) != 0;
-+    return 0;
- }
- 
- static INLINE int cpuSupportsFMA() {
--    int32_t reg[4];
--    Sleef_x86CpuID(reg, 1, 0);
--    return (reg[2] & (1 << 12)) != 0;
-+    return 0;
- }
- 
- #if CONFIG == 1 && defined(__AVX2__)
-diff --git a/src/arch/helperavx2_128.h b/src/arch/helperavx2_128.h
-index 2dda209..32505bd 100644
---- a/src/arch/helperavx2_128.h
-+++ b/src/arch/helperavx2_128.h
-@@ -74,15 +74,11 @@ void Sleef_x86CpuID(int32_t out[4], uint32_t eax, uint32_t ecx);
- #endif
- 
- static INLINE int cpuSupportsAVX2() {
--    int32_t reg[4];
--    Sleef_x86CpuID(reg, 7, 0);
--    return (reg[1] & (1 << 5)) != 0;
-+    return 0;
- }
- 
- static INLINE int cpuSupportsFMA() {
--    int32_t reg[4];
--    Sleef_x86CpuID(reg, 1, 0);
--    return (reg[2] & (1 << 12)) != 0;
-+    return 0;
- }
- 
- #if CONFIG == 1 && defined(__AVX2__)
-diff --git a/src/arch/helperavx512f.h b/src/arch/helperavx512f.h
-index fa75e2a..ff6602f 100644
---- a/src/arch/helperavx512f.h
-+++ b/src/arch/helperavx512f.h
-@@ -77,9 +77,7 @@ void Sleef_x86CpuID(int32_t out[4], uint32_t eax, uint32_t ecx);
- #endif
- 
- static INLINE int cpuSupportsAVX512F() {
--    int32_t reg[4];
--    Sleef_x86CpuID(reg, 7, 0);
--    return (reg[1] & (1 << 16)) != 0;
-+    return 0;
- }
- 
- #if CONFIG == 1 && defined(__AVX512F__)
-diff --git a/src/arch/helpersse2.h b/src/arch/helpersse2.h
-index e13095d..3e6f22b 100644
---- a/src/arch/helpersse2.h
-+++ b/src/arch/helpersse2.h
-@@ -74,9 +74,7 @@ void Sleef_x86CpuID(int32_t out[4], uint32_t eax, uint32_t ecx);
- #endif
- 
- static INLINE int cpuSupportsSSE2() {
--    int32_t reg[4];
--    Sleef_x86CpuID(reg, 1, 0);
--    return (reg[3] & (1 << 26)) != 0;
-+    return 0;
- }
- 
- #if defined(__SSE2__)
 diff --git a/src/libm/dispavx.c.org b/src/libm/dispavx.c.org
-index 12b6972..65019ae 100644
+index 86a0148..e309af7 100644
 --- a/src/libm/dispavx.c.org
 +++ b/src/libm/dispavx.c.org
-@@ -14,23 +14,11 @@
+@@ -14,33 +14,15 @@
  #include "sleef.h"
  
  static int cpuSupportsAVX2() {
@@ -101,13 +27,35 @@ index 12b6972..65019ae 100644
 +  return 0;
  }
  
- #ifdef ENABLE_AVX2
+ static int cpuSupportsFMA4() {
+-  static int ret = -1;
+-  if (ret == -1) {
+-    int32_t reg[4];
+-    Sleef_x86CpuID(reg, 0x80000001, 0);
+-    ret = (reg[2] & (1 << 16)) != 0;
+-  }
+-  return ret;
++  return 0;
+ }
+ 
+ #ifdef ENABLE_FMA4
 diff --git a/src/libm/dispsse.c.org b/src/libm/dispsse.c.org
-index 985c1d3..9876a9b 100644
+index 4e0d09b..1e9a875 100644
 --- a/src/libm/dispsse.c.org
 +++ b/src/libm/dispsse.c.org
-@@ -14,23 +14,11 @@
+@@ -14,33 +14,15 @@
  #include "sleef.h"
+ 
+ static int cpuSupportsSSE4_1() {
+-  static int ret = -1;
+-  if (ret == -1) {
+-    int32_t reg[4];
+-    Sleef_x86CpuID(reg, 1, 0);
+-    ret = (reg[2] & (1 << 19)) != 0;
+-  }
+-  return ret;
++  return 0;
+ }
  
  static int cpuSupportsAVX2() {
 -  static int ret = -1;
@@ -131,4 +79,4 @@ index 985c1d3..9876a9b 100644
 +  return 0;
  }
  
- #ifdef ENABLE_AVX2
+ #define SUBST_IF_EXT1(funcsse4) if (cpuSupportsSSE4_1()) p = funcsse4;
