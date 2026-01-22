@@ -503,7 +503,7 @@ You can easily try out QPET-SPERR using the [`numcodecs-wasm-qpet-sperr`](https:
 
 Please cite this work as follows:
 
-> Tyree, J., Köhler, D., Underwood, R., Bouvier, C., Järvinen, H. J., and Klöwer, M. (2026). Compression Safeguards &ndash; Towards Safe and Fearless Lossy Compression. Available from: <https://github.com/juntyr/compression-safeguards>
+> Tyree, J., Köhler, D., Underwood, R., Bouvier, C., Reichelt, T., Järvinen, H. J., and Klöwer, M. (2026). Compression Safeguards &ndash; Towards Safe and Fearless Lossy Compression. Available from: <https://github.com/juntyr/compression-safeguards>
 
 Please also refer to the [CITATION.cff](CITATION.cff) file and refer to <https://citation-file-format.github.io> to extract the citation in a format of your choice.
 
@@ -525,4 +525,6 @@ Robert Underwood is funded by the National Science Foundation (NSF) CSSI "FZ" pr
 
 Clément Bouvier was funded by the European Union's Destination Earth Initiative and the Research Council of Finland (grant nos. 338615 and 337549).
 
-Milan Klöwer acknowledges funding from Schmidt Sciences.
+Tim Reichelt acknowledges funding from the EU's Horizon Europe program under grant agreement number 10113184 and also acknowledges funding from UK Research and Innovation (UKRI). Tim Reichelt also received funding from ARIA and DSIT and Pillar VC under the Encode: AI for Science Fellowship.
+
+Milan Klöwer acknowledges funding from the Natural Environment Research Council under grant number UKRI191.

@@ -4,9 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "numcodecs-safeguards"
-version = "0.1.0a1"
+version = "0.1.0b1"
 dependencies = [
-    "compression-safeguards==1.0.0a1",
+    "compression-safeguards==1.0.0b1",
     "leb128~=1.0.9",
     "numcodecs>=0.13.0,<0.17",
     "numcodecs-bitmap-index~=0.1.2",
@@ -27,7 +27,7 @@ readme = "README.md"
 license = "MPL-2.0"
 keywords = ["numcodecs", "safeguards", "compression", "lossy-compression", "safe", "fearless"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Intended Audience :: End Users/Desktop",
     "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
