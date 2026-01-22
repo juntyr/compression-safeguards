@@ -117,7 +117,7 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Download the dist artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: dist
           path: dist
@@ -164,7 +164,7 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Download the dist artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: dist
           path: dist
@@ -224,7 +224,7 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Download the dist artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: dist
           path: dist
@@ -290,7 +290,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Download the dist artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: dist
           path: dist
@@ -336,7 +336,7 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Download the dist artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: dist
           path: dist
@@ -445,13 +445,13 @@ jobs:
         run: pyodide xbuildenv install 0.29.2
 
       - name: Download the dist artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: dist
           path: dist
 
       - name: Download the pyodide-dist artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: pyodide-dist
           path: dist
