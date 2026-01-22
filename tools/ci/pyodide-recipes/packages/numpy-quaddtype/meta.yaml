@@ -4,10 +4,8 @@ package:
   top-level:
     - numpy_quaddtype
 source:
-  url: https://gist.github.com/juntyr/640783e4e92953e182f3d20b83fbb9ed/raw/eb260509fc779fa29681ddd8175ffc8e6052da36/numpy_quaddtype-1.0.0.tar.gz
-  sha256: 523519367bbf7d0a58af6170a237db3f0779678de6cb5b802c77e41af8dd87f6
-  patches:
-    - patches/0001-no-sleef-check.patch
+  url: https://gist.github.com/juntyr/640783e4e92953e182f3d20b83fbb9ed/raw/49b0b80a326d475b8e97133a63f2989d76e09afb/numpy_quaddtype-1.0.0.tar.gz
+  sha256: abddd894dc4e2157c27697bd41ee7c1fe2b0831773dab26890efc4e13d0bf991
 requirements:
   host:
     - numpy

@@ -1,16 +1,16 @@
 package:
   name: libsleef
-  version: 4.0.0
+  version: 3.9.0
   tag:
     - library
     - static_library
 source:
-  sha256: 545c80b55e24c2a75dbca2af35e3fe3ffe5d0d447d28d63ac63c6697a5c0f896
-  url: https://github.com/shibatch/sleef/archive/43a0252ba9331adc7fb10755021f802863678c38.tar.gz
+  sha256: af60856abac08a3b5e72a8d156dd71fec1f7ac23de8ee67793f45f9edcdf0908
+  url: https://github.com/shibatch/sleef/archive/refs/tags/3.9.0.tar.gz
   patches:
     - patches/0001-no-x86intrin.patch
     - patches/0002-no-mfpmatch.patch
-    - patches/0003-no-mfma.patch
+    - patches/0003-fix-purecfma-scalar-x86.patch
     - patches/0004-no-cpuid.patch
 build:
   type: static_library
@@ -32,11 +32,13 @@ build:
       -DSLEEF_BUILD_SHARED_LIBS=OFF \
       -DSLEEF_BUILD_TESTS=OFF \
       -DSLEEF_BUILD_INLINE_HEADERS=OFF \
+      -DSLEEF_BUILD_GNUABI_LIBS=OFF \
+      -DSLEEF_ENABLE_TLFLOAT=OFF \
       -DSLEEF_ENABLE_TESTER4=OFF \
-      -DSLEEF_ENABLE_FFTW=OFF \
-      -DSLEEF_ENABLE_MPFR=OFF \
-      -DSLEEF_ENABLE_SSL=OFF \
-      -DSLEEF_ENABLE_OPENMP=OFF \
+      -DSLEEF_DISABLE_FFTW=ON \
+      -DSLEEF_DISABLE_MPFR=ON \
+      -DSLEEF_DISABLE_SSL=ON \
+      -DSLEEF_DISABLE_OPENMP=ON \
       -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
       ../
 
@@ -48,8 +50,6 @@ build:
     mkdir build
     cd build
 
-    sed -i 's/-fno-exceptions//g' ../submodules/tlfloat/CMakeLists.txt
-
     emcmake cmake \
       -DCMAKE_INSTALL_PREFIX=${WASM_LIBRARY_DIR} \
       -DCMAKE_BUILD_TYPE=Release \
@@ -57,14 +57,17 @@ build:
       -DSLEEF_BUILD_SHARED_LIBS=OFF \
       -DSLEEF_BUILD_TESTS=OFF \
       -DSLEEF_BUILD_INLINE_HEADERS=OFF \
+      -DSLEEF_BUILD_GNUABI_LIBS=OFF \
+      -DSLEEF_ENABLE_TLFLOAT=OFF \
       -DSLEEF_ENABLE_TESTER4=OFF \
-      -DSLEEF_ENABLE_FFTW=OFF \
-      -DSLEEF_ENABLE_MPFR=OFF \
-      -DSLEEF_ENABLE_SSL=OFF \
-      -DSLEEF_ENABLE_OPENMP=OFF \
-      -DSLEEF_ENABLE_SSE2=ON \
-      -DSLEEF_ENABLE_AVX2=OFF \
-      -DSLEEF_ENABLE_AVX512F=OFF \
+      -DSLEEF_DISABLE_FFTW=ON \
+      -DSLEEF_DISABLE_MPFR=ON \
+      -DSLEEF_DISABLE_SSL=ON \
+      -DSLEEF_DISABLE_OPENMP=ON \
+      -DSLEEF_DISABLE_SSE2=OFF \
+      -DSLEEF_DISABLE_AVX2=ON \
+      -DSLEEF_DISABLE_AVX512F=ON \
+      -DSLEEF_DISABLE_PURECFMA_SCALAR=ON \
       -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
       -DNATIVE_BUILD_DIR=${NATIVE_BUILD_DIR} \
       -DCMAKE_C_FLAGS="-msimd128 -msse2" \
