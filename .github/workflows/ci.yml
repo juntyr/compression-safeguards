@@ -479,11 +479,11 @@ jobs:
   publish:
     name: Publish to PyPi
     runs-on: ubuntu-latest
-    # environment: pypi
+    environment: pypi
     permissions:
       contents: read
-      # id-token: write
-    # if: ${{ github.event_name == 'release' }}
+      id-token: write
+    if: ${{ github.event_name == 'release' }}
     needs:
       # require all jobs to succeed
       - check
@@ -507,7 +507,7 @@ jobs:
       - name: List the built dist files
         run: ls -lh dist/
 
-      # - name: Publish the packages
-      #   uses: pypa/gh-action-pypi-publish@release/v1
-      #   with:
-      #     skip-existing: true
+      - name: Publish the packages
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
