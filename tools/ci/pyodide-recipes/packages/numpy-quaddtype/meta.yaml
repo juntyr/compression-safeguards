@@ -4,8 +4,8 @@ package:
   top-level:
     - numpy_quaddtype
 source:
-  url: https://gist.github.com/juntyr/640783e4e92953e182f3d20b83fbb9ed/raw/49b0b80a326d475b8e97133a63f2989d76e09afb/numpy_quaddtype-1.0.0.tar.gz
-  sha256: abddd894dc4e2157c27697bd41ee7c1fe2b0831773dab26890efc4e13d0bf991
+  url: https://files.pythonhosted.org/packages/e0/8b/7a88882808ac17a6f8d73253b785a969ea7acec34a2fd14425e4947bfae4/numpy_quaddtype-1.0.0.tar.gz
+  sha256: e2844e879dd6f4b44971e318d17cf2c5fa1f9fd2f04d0a50fe8813139e6dcf29
 requirements:
   host:
     - numpy

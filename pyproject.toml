@@ -12,8 +12,7 @@ dependencies = [
     "sly~=0.5.0",
     "typing-extensions~=4.12",
 ]
-# FIXME: remove hacks once numpy-quaddtype 1.0 is actually released
-requires-python = ">=3.11, <3.15"
+requires-python = ">=3.11"
 authors = [{ name = "Juniper Tyree", email = "juniper.tyree@helsinki.fi" }]
 maintainers = [{ name = "Juniper Tyree", email = "juniper.tyree@helsinki.fi" }]
 description = "Fearless lossy compression using safeguards"
@@ -135,19 +134,4 @@ members = ["packages/numcodecs-safeguards", "packages/xarray-safeguards"]
 [tool.uv]
 constraint-dependencies = [
     "numcodecs ~= 0.16.5; python_version == '3.14'",
-]
-
-# FIXME: remove hacks once numpy-quaddtype 1.0 is actually released
-[tool.uv.sources]
-numpy-quaddtype = [
-    { url = "https://gist.github.com/juntyr/640783e4e92953e182f3d20b83fbb9ed/raw/49b0b80a326d475b8e97133a63f2989d76e09afb/numpy_quaddtype-1.0.0-cp311-cp311-macosx_15_0_arm64.whl", marker = "sys_platform == 'darwin' and python_version == '3.11'" },
-    { url = "https://gist.github.com/juntyr/640783e4e92953e182f3d20b83fbb9ed/raw/49b0b80a326d475b8e97133a63f2989d76e09afb/numpy_quaddtype-1.0.0-cp312-cp312-macosx_15_0_arm64.whl", marker = "sys_platform == 'darwin' and python_version == '3.12'" },
-    { url = "https://gist.github.com/juntyr/640783e4e92953e182f3d20b83fbb9ed/raw/49b0b80a326d475b8e97133a63f2989d76e09afb/numpy_quaddtype-1.0.0-cp313-cp313-macosx_15_0_arm64.whl", marker = "sys_platform == 'darwin' and python_version == '3.13'" },
-    { url = "https://gist.github.com/juntyr/640783e4e92953e182f3d20b83fbb9ed/raw/49b0b80a326d475b8e97133a63f2989d76e09afb/numpy_quaddtype-1.0.0-cp314-cp314-macosx_15_0_arm64.whl", marker = "sys_platform == 'darwin' and python_version == '3.14'" },
-    { url = "https://gist.github.com/juntyr/640783e4e92953e182f3d20b83fbb9ed/raw/49b0b80a326d475b8e97133a63f2989d76e09afb/numpy_quaddtype-1.0.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", marker = "sys_platform == 'linux' and python_version == '3.11'" },
-    { url = "https://gist.github.com/juntyr/640783e4e92953e182f3d20b83fbb9ed/raw/49b0b80a326d475b8e97133a63f2989d76e09afb/numpy_quaddtype-1.0.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", marker = "sys_platform == 'linux' and python_version == '3.12'" },
-    { url = "https://gist.github.com/juntyr/640783e4e92953e182f3d20b83fbb9ed/raw/49b0b80a326d475b8e97133a63f2989d76e09afb/numpy_quaddtype-1.0.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", marker = "sys_platform == 'linux' and python_version == '3.13'" },
-    { url = "https://gist.github.com/juntyr/640783e4e92953e182f3d20b83fbb9ed/raw/49b0b80a326d475b8e97133a63f2989d76e09afb/numpy_quaddtype-1.0.0-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", marker = "sys_platform == 'linux' and python_version == '3.14'" },
-    { url = "https://gist.github.com/juntyr/640783e4e92953e182f3d20b83fbb9ed/raw/49b0b80a326d475b8e97133a63f2989d76e09afb/numpy_quaddtype-1.0.0-cp311-cp311-macosx_15_0_arm64.whl", marker = "sys_platform == 'darwin' and python_version == '3.11'" },
-    { url = "https://gist.github.com/juntyr/640783e4e92953e182f3d20b83fbb9ed/raw/49b0b80a326d475b8e97133a63f2989d76e09afb/numpy_quaddtype-1.0.0.tar.gz", marker = "sys_platform != 'darwin' and sys_platform != 'linux'" }
 ]
