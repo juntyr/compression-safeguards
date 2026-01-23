@@ -7,6 +7,9 @@ on:
   pull_request:
     branches:
       - "*"
+  release:
+    branch: main
+    types: [released]
 
 env:
   CLICOLOR: 1
@@ -472,3 +475,39 @@ jobs:
         run: |
           source .venv-pyodide/bin/activate
           python -m pytest -v -W error -m "${{ matrix.markers }}"
+
+  publish:
+    name: Publish to PyPi
+    runs-on: ubuntu-latest
+    # environment: pypi
+    permissions:
+      contents: read
+      # id-token: write
+    # if: ${{ github.event_name == 'release' }}
+    needs:
+      # require all jobs to succeed
+      - check
+      - spelling
+      - fmt
+      - build # includes the dist artifact
+      - test
+      - typing
+      - fuzz
+      - docs
+      - doctest
+      - pyodide-build
+      - pyodide-test
+    steps:
+      - name: Download the dist artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: dist
+          path: dist
+
+      - name: List the built dist files
+        run: ls -lh dist/
+
+      # - name: Publish the packages
+      #   uses: pypa/gh-action-pypi-publish@release/v1
+      #   with:
+      #     skip-existing: true
