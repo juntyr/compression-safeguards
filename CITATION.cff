@@ -37,6 +37,10 @@ authors:
     family-names: Klöwer
     affiliation: University of Oxford
     orcid: 'https://orcid.org/0000-0002-3920-4356'
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.18355539
+    description: Zenodo
 repository-code: 'https://github.com/juntyr/compression-safeguards'
 url: 'https://compression-safeguards.readthedocs.io/en/latest/'
 repository-artifact: 'https://pypi.org/project/compression-safeguards/'

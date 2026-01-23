@@ -3,6 +3,7 @@
 [![image](https://img.shields.io/pypi/l/compression-safeguards.svg)](https://github.com/juntyr/compression-safeguards/blob/main/LICENSE)
 [![image](https://img.shields.io/pypi/pyversions/compression-safeguards.svg)](https://pypi.python.org/pypi/compression-safeguards)
 [![image](https://readthedocs.org/projects/compression-safeguards/badge/?version=latest)](https://compression-safeguards.readthedocs.io/en/latest/?badge=latest)
+[![image](https://zenodo.org/badge/DOI/10.5281/zenodo.18355539.svg)](https://doi.org/10.5281/zenodo.18355539)
 
 # Safe and Fearless lossy compression with `compression-safeguards`
 
