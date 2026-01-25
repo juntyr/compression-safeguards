@@ -66,7 +66,8 @@ examples = [
     "numcodecs-wasm-zfp~=0.6.0",
     "numcodecs-zero~=0.1.2",
     "scikit-image~=0.25.0",
-    "xarray~=2025.1",
+    "tqdm~=4.0",
+    "xarray~=2025.4",
 ]
 fuzz = [
     "atheris~=3.0",
