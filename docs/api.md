@@ -1,3 +1,7 @@
+---
+edit_uri: docs/api.md
+---
+
 # API Reference Overview
 
 - [`compression-safeguards`][compression_safeguards]: provides the core [`Safeguards`][compression_safeguards.api.Safeguards] API as well as several [`Safeguard`][compression_safeguards.safeguards.abc.Safeguard]s with which you can express *your* safety requirements.
