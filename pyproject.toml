@@ -45,6 +45,7 @@ docs = [
     "mkdocstrings[python]~=1.0",
     "mkdocstrings-python-generator==1.0.0rc1",
     "mkdocs-exclude~=1.0",
+    "mkdocs-simple-hooks~=0.1.5",
     "mkdocs-jupyter~=0.25",
     "mkdocs-open-in-new-tab~=1.0",
     "Pygments~=2.19",

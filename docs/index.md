@@ -1,3 +1,7 @@
+---
+edit_uri: docs/index.md
+---
+
 [![image](https://img.shields.io/github/actions/workflow/status/juntyr/compression-safeguards/ci.yml?branch=main)](https://github.com/juntyr/compression-safeguards/actions/workflows/ci.yml?query=branch%3Amain)
 [![image](https://img.shields.io/pypi/v/compression-safeguards.svg)](https://pypi.python.org/pypi/compression-safeguards)
 [![image](https://img.shields.io/pypi/l/compression-safeguards.svg)](https://github.com/juntyr/compression-safeguards/blob/main/LICENSE)

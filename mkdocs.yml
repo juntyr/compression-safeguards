@@ -1,7 +1,7 @@
 site_name: compression-safeguards
 site_author: Juniper Tyree
-repo_url: https://github.com/juntyr/compression-safeguards
-edit_uri: edit/main/docs/
+repo_url: https://github.com/juntyr/compression-safeguards/
+edit_uri: edit/main/
 
 strict: true
 
@@ -66,9 +66,9 @@ nav:
 plugins:
   - exclude:
       glob:
-        - requirements.txt
         - examples/*.py
         - examples/data/*/*.md
+        - hooks/*
   - search
   - open-in-new-tab
   - autorefs
@@ -86,6 +86,9 @@ plugins:
           edit_uri: edit/main/packages/xarray-safeguards/src/
   - mkdocs-jupyter:
       ignore_h1_titles: True
+  - mkdocs-simple-hooks:
+      hooks:
+        on_page_context: "docs.hooks.edit_uri:on_page_context"
   - mkdocstrings:
       enable_inventory: true
       handlers:
@@ -123,5 +126,7 @@ plugins:
             - https://docs.xarray.dev/en/v2025.04.0/objects.inv
 
 watch:
-  - src
+  - docs
+  - examples
   - packages
+  - src
