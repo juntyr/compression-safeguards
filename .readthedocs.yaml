@@ -8,8 +8,11 @@ build:
     post_checkout:
       - grep "__all__" src/compression_safeguards/__init__.py
       - sed -i "s/__all__ = \["\""Safeguards"\"", "\""SafeguardKind"\""\]/__all__ = \[\]/g" src/compression_safeguards/__init__.py
+      - grep "__all__" src/compression_safeguards/__init__.py
       - git update-index --assume-unchanged src/compression_safeguards/__init__.py
-      - sed -i "s/main/$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match)/g" mkdocs.yml
+      - grep "main" mkdocs.yml
+      - sed -i "s/main/${READTHEDOCS_GIT_IDENTIFIER}/g" mkdocs.yml
+      - grep "main" mkdocs.yml
       - git update-index --assume-unchanged mkdocs.yml
     pre_create_environment:
       - asdf plugin add uv
