@@ -1,4 +1,7 @@
 site_name: compression-safeguards
+site_author: Juniper Tyree
+repo_url: https://github.com/juntyr/compression-safeguards
+edit_uri: edit/main/docs/
 
 strict: true
 
@@ -32,6 +35,7 @@ nav:
   - API Reference:
       - Overview: api.md
   - Examples:
+      - Datasets: https://github.com/juntyr/compression-safeguards/tree/main/examples/data
       - Special values:
           - NaN values: examples/nan.ipynb
           - Missing values: examples/missing.ipynb
@@ -72,11 +76,14 @@ plugins:
       source_dirs:
         - nav_heading: [API Reference]
           base: src
+          edit_uri: edit/main/src/
           ignore: ["_compat.py", "_float128.py", "_qois"]
         - nav_heading: [API Reference]
           base: packages/numcodecs-safeguards/src
+          edit_uri: edit/main/packages/numcodecs-safeguards/src/
         - nav_heading: [API Reference]
           base: packages/xarray-safeguards/src
+          edit_uri: edit/main/packages/xarray-safeguards/src/
   - mkdocs-jupyter:
       ignore_h1_titles: True
   - mkdocstrings:
