@@ -12,7 +12,7 @@ build:
       - git update-index --assume-unchanged src/compression_safeguards/__init__.py
       - grep "main" mkdocs.yml
       - sed -i "s/main/${READTHEDOCS_GIT_IDENTIFIER}/g" mkdocs.yml
-      - grep "main" mkdocs.yml
+      - grep "edit_uri" mkdocs.yml
       - git update-index --assume-unchanged mkdocs.yml
     pre_create_environment:
       - asdf plugin add uv
