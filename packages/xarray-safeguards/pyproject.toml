@@ -37,6 +37,11 @@ classifiers = [
     "Typing :: Typed",
 ]
 
+[project.urls]
+Documentation = "https://compression-safeguards.readthedocs.io"
+Repository = "https://github.com/juntyr/compression-safeguards.git"
+Issues = "https://github.com/juntyr/compression-safeguards/issues"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
