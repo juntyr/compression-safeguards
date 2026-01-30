@@ -1,5 +1,5 @@
 """
-Helper classes for lossless encoding for the codec with safeguards.
+Helper classes for lossless encoding for the [`SafeguardedCodec`][numcodecs_safeguards.SafeguardedCodec].
 """
 
 __all__ = ["Lossless"]
@@ -40,7 +40,7 @@ def _default_lossless_for_safeguards() -> Codec:
 class Lossless:
     """
     Configuration for the lossless encoding used by the
-    [`SafeguardsCodec`][...SafeguardsCodec] to encode the
+    [`SafeguardedCodec`][...SafeguardedCodec] to encode the
     wrapped codec's encoded data and any safeguards-computed corrections.
     """
 

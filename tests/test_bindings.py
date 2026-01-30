@@ -3,7 +3,7 @@ import json
 import numcodecs.registry
 import numpy as np
 import pytest
-from numcodecs_safeguards import SafeguardsCodec
+from numcodecs_safeguards import SafeguardedCodec
 
 from compression_safeguards import Safeguards
 from compression_safeguards.utils.bindings import Bindings
@@ -40,7 +40,7 @@ def test_missing_extraneous_bindings():
 def test_numcodecs_missing_extraneous_bindings():
     data = np.array([1.0, 2.0, 3.0])
 
-    codec = SafeguardsCodec(
+    codec = SafeguardedCodec(
         codec=dict(id="zero"),
         safeguards=[
             dict(
@@ -67,7 +67,7 @@ def test_numcodecs_missing_extraneous_bindings():
     ],
 )
 def test_numcodecs_config(eb):
-    codec = SafeguardsCodec(
+    codec = SafeguardedCodec(
         codec=dict(id="zero"),
         safeguards=[
             dict(
@@ -85,7 +85,7 @@ def test_numcodecs_config(eb):
 
     codec2 = numcodecs.registry.get_codec(config)
 
-    assert isinstance(codec2, SafeguardsCodec)
+    assert isinstance(codec2, SafeguardedCodec)
     assert codec2.late_bound == codec.late_bound
     np.testing.assert_array_equal(codec2._late_bound._bindings["eb"], eb)
 

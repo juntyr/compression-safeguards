@@ -10,22 +10,22 @@ your safety requirements, lossy compression can be applied safely and
 
 ## Overview
 
-This package provides the [`SafeguardsCodec`][.SafeguardsCodec] adapter /
+This package provides the [`SafeguardedCodec`][.SafeguardedCodec] adapter /
 meta-compressor that can be wrapped around *any* existing (lossy)
 [`numcodecs.abc.Codec`][numcodecs.abc.Codec] to *guarantee* that certain
 properties of the original data are preserved by compression.
 
-The `SafeguardsCodec` treats the wrapped inner codec as a blackbox. To
+The `SafeguardedCodec` treats the wrapped inner codec as a blackbox. To
 guarantee the user's safety requirements, it post-processes the decompressed
-data, if necessary. If no correction is needed, the `SafeguardsCodec` only has
+data, if necessary. If no correction is needed, the `SafeguardedCodec` only has
 a three-byte overhead for the compressed data and a computational overhead at
 compression time (at decompression time, only the checksum is verified).
 
-By using the `SafeguardsCodec` adapter, badly behaving lossy codecs become safe
+By using the `SafeguardedCodec` adapter, badly behaving lossy codecs become safe
 to use, at the cost of potentially less efficient compression, and lossy
 compression can be applied *without fear*.
 
-The `SafeguardsCodec` must only be used to encode the complete data, i.e. not
+The `SafeguardedCodec` must only be used to encode the complete data, i.e. not
 just a chunk of data, so that non-pointwise safeguards are correctly applied.
 Please refer to the [`xarray-safeguards`][xarray_safeguards] frontend for
 applying safeguards to chunked data.
@@ -38,7 +38,7 @@ $eb_{rel} = 1\%$ and preserve data signs as follows:
 ```py
 import numpy as np
 from numcodecs.fixedscaleoffset import FixedScaleOffset
-from numcodecs_safeguards import SafeguardsCodec
+from numcodecs_safeguards import SafeguardedCodec
 
 # use any numcodecs-compatible codec
 # here we quantize data >= -10 with one decimal digit
@@ -46,8 +46,8 @@ lossy_codec = FixedScaleOffset(
     offset=-10, scale=10, dtype="float64", astype="uint8",
 )
 
-# wrap the codec in the `SafeguardsCodec` and specify the safeguards to apply
-sg_codec = SafeguardsCodec(codec=lossy_codec, safeguards=[
+# wrap the codec in the `SafeguardedCodec` and specify the safeguards to apply
+sg_codec = SafeguardedCodec(codec=lossy_codec, safeguards=[
     # guarantee a relative error bound of 1%:
     #   |x - x'| <= |x| * 0.01
     dict(kind="eb", type="rel", eb=0.01),
@@ -73,7 +73,7 @@ Please refer to the
 for an enumeration of all supported safeguards.
 """
 
-__all__ = ["SafeguardsCodec"]
+__all__ = ["SafeguardedCodec"]
 
 from collections.abc import Callable, Collection, Mapping, Set
 from io import BytesIO
@@ -108,7 +108,7 @@ from .compute import Compute, _refine_correction_iteratively
 from .lossless import Lossless
 
 
-class SafeguardsCodec(Codec, CodecCombinatorMixin):
+class SafeguardedCodec(Codec, CodecCombinatorMixin):
     """
     An adaptor codec that uses
     [`Safeguards`][compression_safeguards.api.Safeguards] to guarantee certain
@@ -117,8 +117,8 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
     Parameters
     ----------
     codec : dict[str, JSON] | Codec
-        The codec to wrap with safeguards. It can either be passed as a codec
-        configuration [`dict`][dict], which is passed to
+        The codec that will be wrapped with safeguards. It can either be passed
+        as a codec configuration [`dict`][dict], which is passed to
         [`numcodecs.registry.get_codec(config)`][numcodecs.registry.get_codec],
         or an already initialized [`Codec`][numcodecs.abc.Codec]. If you want to
         wrap a sequence or stack of codecs, you can use the
@@ -163,7 +163,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         [`SafeguardKind`][compression_safeguards.safeguards.SafeguardKind]
         for an enumeration of all supported safeguards.
 
-        The `SafeguardsCodec` supports safeguards with late-bound parameters,
+        The `SafeguardedCodec` supports safeguards with late-bound parameters,
         e.g. the
         [`SelectSafeguard`][compression_safeguards.safeguards.combinators.select.SelectSafeguard],
         but they must be provided as `fixed_constants` that are *fixed* and
@@ -218,7 +218,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
     Raises
     ------
     ValueError
-        if `codec` wraps another `SafeguardsCodec`, which may create a printer
+        if `codec` wraps another `SafeguardedCodec`, which may create a printer
         problem.
     LateBoundParameterResolutionError
         if `fixed_constants` does not resolve all late-bound parameters of the
@@ -258,7 +258,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         def check_for_safeguards_codec(codec: Codec) -> Codec:
             nonlocal wraps_safeguards_codec
-            wraps_safeguards_codec |= isinstance(codec, SafeguardsCodec)
+            wraps_safeguards_codec |= isinstance(codec, SafeguardedCodec)
             return codec
 
         self._codec = (
@@ -271,10 +271,10 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             with ctx.parameter("codec"):
                 raise (
                     ValueError(
-                        "`SafeguardsCodec` should not wrap a codec containing "
-                        + "another `SafeguardsCodec` since the safeguards of one "
+                        "`SafeguardedCodec` should not wrap a codec containing "
+                        + "another `SafeguardedCodec` since the safeguards of one "
                         + "might not be upheld by the other (printer problem); "
-                        + "merge them into one combined `SafeguardsCodec` instead"
+                        + "merge them into one combined `SafeguardedCodec` instead"
                     )
                     | ctx
                 )
@@ -325,7 +325,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
     @property
     def codec(self) -> Codec:
         """
-        The codec that is wrapped with safeguards.
+        The inner (unsafeguarded) codec.
         """
 
         return self._codec
@@ -362,10 +362,10 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
             [Parameter("$x_min"), Parameter("$x_max")]
         )
 
-    def update_fixed_constants(self, **kwargs: Value) -> "SafeguardsCodec":
+    def update_fixed_constants(self, **kwargs: Value) -> "SafeguardedCodec":
         """
-        Create a new codec with safeguards, where the old fixed constants have
-        been overridden by new ones from `**kwargs`.
+        Create a new safeguarded codec, where the old fixed constants have been
+        overridden by new ones from `**kwargs`.
 
         Only existing late-bound constants may be overridden and no new ones
         may be added.
@@ -384,11 +384,11 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
 
         Returns
         -------
-        safeguards : SafeguardsCodec
-            The codec with safeguards, with the updated fixed constants.
+        safeguards : SafeguardedCodec
+            The safeguarded codec, with the updated fixed constants.
         """
 
-        return SafeguardsCodec(
+        return SafeguardedCodec(
             codec=self._codec,
             safeguards=self._safeguards.safeguards,
             fixed_constants=self._late_bound.update(**kwargs),
@@ -667,7 +667,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
     @override
     def get_config(self) -> dict[str, JSON]:
         """
-        Returns the configuration of the codec with safeguards.
+        Returns the configuration of this safeguarded codec.
 
         [`numcodecs.registry.get_codec(config)`][numcodecs.registry.get_codec]
         can be used to reconstruct this adapter from the returned config.
@@ -675,7 +675,7 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         Returns
         -------
         config : dict[str, JSON]
-            Configuration of the codec with safeguards.
+            Configuration of this safeguarded codec.
         """
 
         return dict(
@@ -699,17 +699,17 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
     @override
     def from_config(cls, config: dict[str, JSON]) -> Self:
         """
-        Instantiate the codec with safeguards from a configuration [`dict`][dict].
+        Instantiate the safeguarded codec from a configuration [`dict`][dict].
 
         Parameters
         ----------
         config : dict[str, JSON]
-            Configuration of the codec with safeguards.
+            Configuration of the safeguarded codec.
 
         Returns
         -------
         safeguards : Self
-            Instantiated codec with safeguards.
+            Instantiated safeguarded codec.
         """
 
         # Bindings.from_config handles the encoding and decoding of late-bound
@@ -726,11 +726,11 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         return f"{type(self).__name__}(codec={self._codec!r}, safeguards={list(self._safeguards.safeguards)!r}, fixed_constants={dict(**self._late_bound._bindings)!r}, lossless={Lossless(for_codec=self._lossless_for_codec, for_safeguards=self._lossless_for_safeguards)!r})"
 
     @override
-    def map(self, mapper: Callable[[Codec], Codec]) -> "SafeguardsCodec":
+    def map(self, mapper: Callable[[Codec], Codec]) -> "SafeguardedCodec":
         """
-        Apply the `mapper` to this codec with safeguards.
+        Apply the `mapper` to this safeguarded codec.
 
-        In the returned [`SafeguardsCodec`][..], the codec is
+        In the returned [`SafeguardedCodec`][..], the codec is
         replaced by its mapped codec.
 
         The `mapper` should recursively apply itself to any inner codecs that
@@ -748,16 +748,16 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         Parameters
         ----------
         mapper : Callable[[Codec], Codec]
-            The callable that should be applied to this codec to map over this
-            codec with safeguards.
+            The callable that should be applied to the inner (unsafeguarded)
+            codec to map over this safeguarded codec.
 
         Returns
         -------
-        mapped : SafeguardsCodec
-            The mapped codec with safeguards.
+        mapped : SafeguardedCodec
+            The mapped safeguarded codec.
         """
 
-        return SafeguardsCodec(
+        return SafeguardedCodec(
             codec=mapper(self._codec),
             safeguards=self._safeguards.safeguards,
             fixed_constants=self._late_bound,
@@ -771,4 +771,4 @@ class SafeguardsCodec(Codec, CodecCombinatorMixin):
         )
 
 
-numcodecs.registry.register_codec(SafeguardsCodec)
+numcodecs.registry.register_codec(SafeguardedCodec)

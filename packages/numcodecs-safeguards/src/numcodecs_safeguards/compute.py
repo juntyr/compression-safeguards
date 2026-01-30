@@ -1,5 +1,5 @@
 """
-Helper classes for configuring the compute behaviour of the codec with safeguards.
+Helper classes for configuring the compute behaviour of the [`SafeguardedCodec`][numcodecs_safeguards.SafeguardedCodec].
 """
 
 __all__ = ["Compute"]

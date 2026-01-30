@@ -16,7 +16,7 @@ with atheris.instrument_imports():
     import numcodecs.registry
     import numpy as np
     from numcodecs.abc import Codec
-    from numcodecs_safeguards import SafeguardsCodec
+    from numcodecs_safeguards import SafeguardedCodec
     from typing_extensions import override  # MSPV 3.12
 
     from compression_safeguards import SafeguardKind, Safeguards
@@ -418,7 +418,7 @@ def check_one_input(data) -> None:
 
     try:
         with timeout(1):
-            safeguard = SafeguardsCodec(
+            safeguard = SafeguardedCodec(
                 codec=FuzzCodec(raw, decoded),
                 safeguards=safeguards,
                 fixed_constants=fixed_constants,
@@ -535,7 +535,7 @@ def check_one_input(data) -> None:
         raise
 
     # test using iterative corrections
-    safeguard = SafeguardsCodec(
+    safeguard = SafeguardedCodec(
         codec=FuzzCodec(raw, decoded),
         safeguards=safeguards,
         fixed_constants=fixed_constants,
@@ -556,7 +556,7 @@ def check_one_input(data) -> None:
         raise
 
     # test using the safeguards with the zero codec
-    safeguard = SafeguardsCodec(
+    safeguard = SafeguardedCodec(
         codec=dict(id="zero"),
         safeguards=safeguards,
         fixed_constants=fixed_constants,
@@ -576,7 +576,7 @@ def check_one_input(data) -> None:
         raise
 
     # test where using top-level select
-    safeguard = SafeguardsCodec(
+    safeguard = SafeguardedCodec(
         codec=FuzzCodec(raw, decoded),
         safeguards=[
             dict(
