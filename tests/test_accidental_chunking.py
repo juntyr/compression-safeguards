@@ -86,9 +86,8 @@ def test_codec_stack_stencil():
         ).compute()
 
 
-def test_codec_stack_minmax():
+def test_numcodecs_chunked_global_minmax():
     stack = CodecStack(
-        dict(id="fixedscaleoffset", offset=0.0, scale=1.0, dtype=float),
         dict(
             id="safeguards",
             codec=dict(id="zero"),

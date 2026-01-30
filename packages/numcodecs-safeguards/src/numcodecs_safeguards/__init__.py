@@ -526,8 +526,8 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
                         "encoding an individual chunk in a chunked array is "
                         "unsafe when using the $x_min or $x_max late-bound "
                         "constants for the cross-chunk global minimum / "
-                        "maximum; use the xarray-safeguards frontend or pass "
-                        "the entire (not chunked) data array instead"
+                        "maximum; instead use the xarray-safeguards frontend "
+                        "or pass the entire (not chunked) data array"
                     )
                     | ctx
                 )
