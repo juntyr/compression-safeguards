@@ -1,27 +1,27 @@
 import numpy as np
 import pytest
 import xarray as xr
-from numcodecs_safeguards import SafeguardsCodec
+from numcodecs_safeguards import SafeguardedCodec
 from xarray_safeguards import apply_data_array_correction, produce_data_array_correction
 
 
 def test_direct_wrap():
-    SafeguardsCodec(codec=dict(id="zero"), safeguards=[])
+    SafeguardedCodec(codec=dict(id="zero"), safeguards=[])
 
     with pytest.raises(ValueError, match="printer problem"):
-        SafeguardsCodec(
-            codec=SafeguardsCodec(codec=dict(id="zero"), safeguards=[]), safeguards=[]
+        SafeguardedCodec(
+            codec=SafeguardedCodec(codec=dict(id="zero"), safeguards=[]), safeguards=[]
         )
 
 
 def test_codec_stack_wrap():
     with pytest.raises(ValueError, match="printer problem"):
-        SafeguardsCodec(
+        SafeguardedCodec(
             codec=dict(
                 id="combinators.stack",
                 codecs=[
                     dict(id="bitround", keepbits=10),
-                    SafeguardsCodec(codec=dict(id="zero"), safeguards=[]),
+                    SafeguardedCodec(codec=dict(id="zero"), safeguards=[]),
                 ],
             ),
             safeguards=[],

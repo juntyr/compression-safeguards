@@ -24,7 +24,7 @@ This package provides the implementations of the safeguards and the low-level
 safeguards with popular compression APIs:
 
 - [`numcodecs-safeguards`][numcodecs_safeguards]: provides the
-  [`SafeguardsCodec`][numcodecs_safeguards.SafeguardsCodec] meta-compressor that
+  [`SafeguardedCodec`][numcodecs_safeguards.SafeguardedCodec] meta-compressor that
   conveniently applies safeguards to any compressor using the
   [`numcodecs.abc.Codec`][numcodecs.abc.Codec] API.
 - [`xarray-safeguards`][xarray_safeguards]: provides functionality to use

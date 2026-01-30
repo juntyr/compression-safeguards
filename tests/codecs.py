@@ -4,7 +4,7 @@ import numcodecs.compat
 import numpy as np
 from numcodecs.abc import Codec
 from numcodecs_combinators.framed import FramedCodecStack
-from numcodecs_safeguards import SafeguardsCodec
+from numcodecs_safeguards import SafeguardedCodec
 from numcodecs_zero import ZeroCodec
 
 
@@ -67,7 +67,7 @@ class MockCodec(Codec):
 
 
 def encode_decode_zero(data: np.ndarray, **kwargs) -> np.ndarray:
-    codec = SafeguardsCodec(codec=ZeroCodec(), **kwargs)
+    codec = SafeguardedCodec(codec=ZeroCodec(), **kwargs)
 
     encoded = codec.encode(data)
     decoded = codec.decode(encoded)
@@ -76,7 +76,7 @@ def encode_decode_zero(data: np.ndarray, **kwargs) -> np.ndarray:
 
 
 def encode_decode_neg(data: np.ndarray, **kwargs) -> np.ndarray:
-    codec = SafeguardsCodec(codec=FramedCodecStack(NegCodec()), **kwargs)
+    codec = SafeguardedCodec(codec=FramedCodecStack(NegCodec()), **kwargs)
 
     encoded = codec.encode(data)
     decoded = codec.decode(encoded)
@@ -85,7 +85,7 @@ def encode_decode_neg(data: np.ndarray, **kwargs) -> np.ndarray:
 
 
 def encode_decode_identity(data: np.ndarray, **kwargs) -> np.ndarray:
-    codec = SafeguardsCodec(codec=FramedCodecStack(IdentityCodec()), **kwargs)
+    codec = SafeguardedCodec(codec=FramedCodecStack(IdentityCodec()), **kwargs)
 
     encoded = codec.encode(data)
     assert isinstance(encoded, bytes)
@@ -105,7 +105,7 @@ def encode_decode_identity(data: np.ndarray, **kwargs) -> np.ndarray:
 def encode_decode_noise(data: np.ndarray, **kwargs) -> np.ndarray:
     seed = np.random.randint(2**31)  # noqa: NPY002
     print(f"noise seed = {seed}")  # noqa: T201
-    codec = SafeguardsCodec(codec=FramedCodecStack(NoiseCodec(seed=seed)), **kwargs)
+    codec = SafeguardedCodec(codec=FramedCodecStack(NoiseCodec(seed=seed)), **kwargs)
 
     encoded = codec.encode(data)
     decoded = codec.decode(encoded)
@@ -114,7 +114,7 @@ def encode_decode_noise(data: np.ndarray, **kwargs) -> np.ndarray:
 
 
 def encode_decode_mock(data: np.ndarray, decoded: np.ndarray, **kwargs) -> np.ndarray:
-    codec = SafeguardsCodec(codec=MockCodec(data, decoded), **kwargs)
+    codec = SafeguardedCodec(codec=MockCodec(data, decoded), **kwargs)
 
     encoded = codec.encode(data)
     decoded = codec.decode(encoded)

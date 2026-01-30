@@ -48,7 +48,7 @@ The `compression-safeguards` package provides several `Safeguard`s with which yo
 
 We also provide the following integrations of the safeguards with popular compression APIs:
 
-- `numcodecs-safeguards`: provides the `SafeguardsCodec` meta-compressor that conveniently applies safeguards to any compressor using the `numcodecs.abc.Codec` API.
+- `numcodecs-safeguards`: provides the `SafeguardedCodec` meta-compressor that conveniently applies safeguards to any compressor using the `numcodecs.abc.Codec` API.
 - `xarray-safeguards`: provides functionality to use safeguards with (chunked) `xarray.DataArray`s and cross-chunk boundary conditions.
 
 The safeguards can be adopted easily:
@@ -73,7 +73,7 @@ The safeguards can be adopted easily:
 
 - *parameter*: A configuration option for a safeguard that is provided when declaring the safeguard and cannot be changed
 
-- *late-bound parameter*: A configuration option for a safeguard that is not constant but depends on the data being compressed. At declaration time, a late-bound parameter is only given a name but not a value. When the safeguards are later applied to data, all late-bound parameters must be resolved by providing their values. The `compression-safeguards`, `numcodecs-safeguards`, and `xarray-safeguards` frontends also provide a few built-in late-bound constants automatically, including `$x` to refer to the data as a constant. When configuring a `numcodecs_safeguards.SafeguardsCodec`, late-bound parameters are provided as *fixed constants* that must be compatible with any data that is encoded by the codec.
+- *late-bound parameter*: A configuration option for a safeguard that is not constant but depends on the data being compressed. At declaration time, a late-bound parameter is only given a name but not a value. When the safeguards are later applied to data, all late-bound parameters must be resolved by providing their values. The `compression-safeguards`, `numcodecs-safeguards`, and `xarray-safeguards` frontends also provide a few built-in late-bound constants automatically, including `$x` to refer to the data as a constant. When configuring a `numcodecs_safeguards.SafeguardedCodec`, late-bound parameters are provided as *fixed constants* that must be compatible with any data that is encoded by the codec.
 
 - *quantity of interest* (*QoI*): We are often not just interested in data itself, but also in quantities derived from it. For instance, we might later plot the data logarithm, compute a derivative, or apply a smoothing kernel. In these cases, we often want to safeguard not just properties on the data but also on these derived quantities of interest.
 
@@ -166,12 +166,12 @@ We provide the lower-level `compression-safeguards` package and the user-facing 
 
 #### `numcodecs-safeguards`
 
-You can get started quickly with the `numcodecs`-compatible `SafeguardsCodec` meta-compressor for non-chunked arrays:
+You can get started quickly with the `numcodecs`-compatible `SafeguardedCodec` meta-compressor for non-chunked arrays:
 
 ```py
 import numpy as np
 from numcodecs.fixedscaleoffset import FixedScaleOffset
-from numcodecs_safeguards import SafeguardsCodec
+from numcodecs_safeguards import SafeguardedCodec
 
 # use any numcodecs-compatible codec
 # here we quantize data >= -10 with one decimal digit
@@ -179,8 +179,8 @@ lossy_codec = FixedScaleOffset(
     offset=-10, scale=10, dtype="float64", astype="uint8",
 )
 
-# wrap the codec in the `SafeguardsCodec` and specify the safeguards to apply
-sg_codec = SafeguardsCodec(codec=lossy_codec, safeguards=[
+# wrap the codec in the `SafeguardedCodec` and specify the safeguards to apply
+sg_codec = SafeguardedCodec(codec=lossy_codec, safeguards=[
     # guarantee a relative error bound of 1%:
     #   |x - x'| <= |x| * 0.01
     dict(kind="eb", type="rel", eb=0.01),
@@ -355,13 +355,13 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
 ## Limitations
 
-- *printer problem*: The `compression-safeguards` need to know about all safety requirements that they should uphold. If the data is first safeguarded with an absolute error bound, and then later the safeguards-corrected data is safeguarded with a relative error bound, the second safeguard may violate the guarantees provided by the first. Even applying the same safeguard twice in a row can violate the guarantees. This is also known as the printer problem: every time a document is copied (safeguarded) from a previously copied and printed (safeguarded) document, new artifacts are added and accumulate over time. Several safeguards should instead be combined into one using the (logical) combinator safeguards provided by the `compression-safeguards` package. Furthermore, the safeguards should always be given the original, uncompressed and unsafeguarded, reference data in relation to which the safety requirements must be upheld. The `numcodecs-safeguards` and `xarray-safeguards` frontends catch some trivial cases of the printer problem, e.g. wrapping a `SafeguardsCodec` inside a `SafeguardsCodec` or applying safeguards to an already safeguards-corrected `DataArray`. In the future, a community standard for marking lossy-compressed (and safeguarded) data with metadata could help with preventing accidental compression error accumulation.
+- *printer problem*: The `compression-safeguards` need to know about all safety requirements that they should uphold. If the data is first safeguarded with an absolute error bound, and then later the safeguards-corrected data is safeguarded with a relative error bound, the second safeguard may violate the guarantees provided by the first. Even applying the same safeguard twice in a row can violate the guarantees. This is also known as the printer problem: every time a document is copied (safeguarded) from a previously copied and printed (safeguarded) document, new artifacts are added and accumulate over time. Several safeguards should instead be combined into one using the (logical) combinator safeguards provided by the `compression-safeguards` package. Furthermore, the safeguards should always be given the original, uncompressed and unsafeguarded, reference data in relation to which the safety requirements must be upheld. The `numcodecs-safeguards` and `xarray-safeguards` frontends catch some trivial cases of the printer problem, e.g. wrapping a `SafeguardedCodec` inside a `SafeguardedCodec` or applying safeguards to an already safeguards-corrected `DataArray`. In the future, a community standard for marking lossy-compressed (and safeguarded) data with metadata could help with preventing accidental compression error accumulation.
 
 - *biased corrections*: The `compression-safeguards` do not currently provide a safeguard to guarantee that the compression errors after safeguarding are unbiased. For instance, if a compressor, which produces biased decompressed values that are within the safeguarded error bound, is safeguarded, the biased values are not corrected by the safeguards. Furthermore, the safeguard corrections themselves may introduce bias in the compression error. Please refer to [`error-distribution.ipynb`](examples/error-distribution.ipynb) for some examples. We are working on a bias safeguard that would optionally provide these guarantees.
 
 - *platform-dependent quantities of interest*: The quantity of interest expressions supported by the `compression-safeguards` include functions, e.g. $\tan^{-1}(x)$, for which `numpy` (via `libc`) and `numpy-quaddtype` (via `SLEEF` [^3]) do not guarantee 0 ULP correctly rounded results. Quantities of interests using those expressions may thus evaluate to slightly different values across different machines. Therefore, the `compression-safeguards` can only guarantee that such quantities of interest are preserved in the same computational environment as the corrections were computed in. In the future, the `compression-safeguards` could use a different numerical evaluation backend that guarantees that all functions are evaluated without rounding errors.
 
-- *suboptimal one-shot corrections*: The `compression-safeguards` sometimes cannot provide optimal and easily compressible corrections. For instance, using a stencil safeguard that spans a local neighbourhood requires the safeguard to conservatively assume that the worst cases from each individual element could accumulate. Since the `compression-safeguards` compute the corrections for all elements simultaneously (instead of incrementally or by testing an initial correction that is repeatedly adjusted if it leads to a violation elsewhere), even a single violation can require conservative corrections for many data elements. In the future, the `compression-safeguards` API could support computing corrections incrementally such that stencil safeguards could make use of earlier[^4] already-corrected data elements and restrictions imposed by pointwise safeguards to provide better corrections for later elements. If you would like a peek at how safeguards could be applied incrementally, you can have a look at the [`incremental.ipynb`](examples/incremental.ipynb) example. A minimal form of iterative corrections can be activated with the unstable `compute=dict(unstable_iterative=True)` configuration of the `SafeguardsCodec`.
+- *suboptimal one-shot corrections*: The `compression-safeguards` sometimes cannot provide optimal and easily compressible corrections. For instance, using a stencil safeguard that spans a local neighbourhood requires the safeguard to conservatively assume that the worst cases from each individual element could accumulate. Since the `compression-safeguards` compute the corrections for all elements simultaneously (instead of incrementally or by testing an initial correction that is repeatedly adjusted if it leads to a violation elsewhere), even a single violation can require conservative corrections for many data elements. In the future, the `compression-safeguards` API could support computing corrections incrementally such that stencil safeguards could make use of earlier[^4] already-corrected data elements and restrictions imposed by pointwise safeguards to provide better corrections for later elements. If you would like a peek at how safeguards could be applied incrementally, you can have a look at the [`incremental.ipynb`](examples/incremental.ipynb) example. A minimal form of iterative corrections can be activated with the unstable `compute=dict(unstable_iterative=True)` configuration of the `SafeguardedCodec`.
 
 - *no global safeguards*: The `compression-safeguards` implementation do not currently support global safeguards, such as preserving mean errors or global data distributions. In many cases, it is possible to preserve these properties using stricter pointwise safeguards, at the cost of achieving lower compression ratios. Please refer to the [How to safeguard](#how-to-safeguard) section above for further details and examples.
 

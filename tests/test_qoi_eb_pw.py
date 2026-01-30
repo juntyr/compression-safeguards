@@ -3,7 +3,7 @@ from contextlib import nullcontext as does_not_raise
 import numpy as np
 import pytest
 from numcodecs_combinators.framed import FramedCodecStack
-from numcodecs_safeguards import SafeguardsCodec
+from numcodecs_safeguards import SafeguardedCodec
 
 from compression_safeguards import Safeguards
 from compression_safeguards.safeguards._qois.expr.addsub import ScalarAdd
@@ -701,7 +701,7 @@ def test_fuzzer_found_sign_constant_fold():
 def test_fuzzer_found_logarithm_noise():
     data = np.linspace(-1.0, 1.0, 100, dtype=np.float16)
 
-    codec = SafeguardsCodec(
+    codec = SafeguardedCodec(
         codec=FramedCodecStack(NoiseCodec(seed=258957826)),
         safeguards=[
             PointwiseQuantityOfInterestErrorBoundSafeguard(
@@ -879,7 +879,7 @@ def test_fuzzer_found_to_float_overflow():
 def test_fuzzer_found_float_upper_negative_zero_rounding():
     data = np.array([[-5568], [2577], [16448]], dtype=np.int16)
 
-    codec = SafeguardsCodec(
+    codec = SafeguardedCodec(
         codec=dict(id="zero"),
         safeguards=[
             PointwiseQuantityOfInterestErrorBoundSafeguard(

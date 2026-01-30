@@ -50,7 +50,7 @@ Repository = "https://github.com/juntyr/compression-safeguards.git"
 Issues = "https://github.com/juntyr/compression-safeguards/issues"
 
 [project.entry-points."numcodecs.codecs"]
-"safeguards" = "numcodecs_safeguards:SafeguardsCodec"
+"safeguards" = "numcodecs_safeguards:SafeguardedCodec"
 
 [tool.setuptools.packages.find]
 where = ["src"]
