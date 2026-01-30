@@ -117,8 +117,8 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
     Parameters
     ----------
     codec : dict[str, JSON] | Codec
-        The codec to wrap with safeguards. It can either be passed as a codec
-        configuration [`dict`][dict], which is passed to
+        The codec that will be wrapped with safeguards. It can either be passed
+        as a codec configuration [`dict`][dict], which is passed to
         [`numcodecs.registry.get_codec(config)`][numcodecs.registry.get_codec],
         or an already initialized [`Codec`][numcodecs.abc.Codec]. If you want to
         wrap a sequence or stack of codecs, you can use the
@@ -325,7 +325,7 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
     @property
     def codec(self) -> Codec:
         """
-        The codec that is wrapped with safeguards.
+        The inner (unsafeguarded) codec.
         """
 
         return self._codec
@@ -364,8 +364,8 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
 
     def update_fixed_constants(self, **kwargs: Value) -> "SafeguardedCodec":
         """
-        Create a new codec with safeguards, where the old fixed constants have
-        been overridden by new ones from `**kwargs`.
+        Create a new safeguarded codec, where the old fixed constants have been
+        overridden by new ones from `**kwargs`.
 
         Only existing late-bound constants may be overridden and no new ones
         may be added.
@@ -385,7 +385,7 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
         Returns
         -------
         safeguards : SafeguardedCodec
-            The codec with safeguards, with the updated fixed constants.
+            The safeguarded codec, with the updated fixed constants.
         """
 
         return SafeguardedCodec(
@@ -667,7 +667,7 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
     @override
     def get_config(self) -> dict[str, JSON]:
         """
-        Returns the configuration of the codec with safeguards.
+        Returns the configuration of this safeguarded codec.
 
         [`numcodecs.registry.get_codec(config)`][numcodecs.registry.get_codec]
         can be used to reconstruct this adapter from the returned config.
@@ -675,7 +675,7 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
         Returns
         -------
         config : dict[str, JSON]
-            Configuration of the codec with safeguards.
+            Configuration of this safeguarded codec.
         """
 
         return dict(
@@ -699,17 +699,17 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
     @override
     def from_config(cls, config: dict[str, JSON]) -> Self:
         """
-        Instantiate the codec with safeguards from a configuration [`dict`][dict].
+        Instantiate the safeguarded codec from a configuration [`dict`][dict].
 
         Parameters
         ----------
         config : dict[str, JSON]
-            Configuration of the codec with safeguards.
+            Configuration of the safeguarded codec.
 
         Returns
         -------
         safeguards : Self
-            Instantiated codec with safeguards.
+            Instantiated safeguarded codec.
         """
 
         # Bindings.from_config handles the encoding and decoding of late-bound
@@ -728,7 +728,7 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
     @override
     def map(self, mapper: Callable[[Codec], Codec]) -> "SafeguardedCodec":
         """
-        Apply the `mapper` to this codec with safeguards.
+        Apply the `mapper` to this safeguarded codec.
 
         In the returned [`SafeguardedCodec`][..], the codec is
         replaced by its mapped codec.
@@ -748,13 +748,13 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
         Parameters
         ----------
         mapper : Callable[[Codec], Codec]
-            The callable that should be applied to this codec to map over this
-            codec with safeguards.
+            The callable that should be applied to the inner (unsafeguarded)
+            codec to map over this safeguarded codec.
 
         Returns
         -------
         mapped : SafeguardedCodec
-            The mapped codec with safeguards.
+            The mapped safeguarded codec.
         """
 
         return SafeguardedCodec(

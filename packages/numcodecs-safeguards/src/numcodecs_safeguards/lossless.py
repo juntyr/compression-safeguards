@@ -1,5 +1,5 @@
 """
-Helper classes for lossless encoding for the codec with safeguards.
+Helper classes for lossless encoding for the [`SafeguardedCodec`][numcodecs_safeguards.SafeguardedCodec].
 """
 
 __all__ = ["Lossless"]
