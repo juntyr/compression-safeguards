@@ -517,6 +517,21 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
         late_bound = self._late_bound
         late_bound_reqs = self._safeguards.late_bound
 
+        if getattr(data, "chunked", False) and not late_bound_reqs.isdisjoint(
+            ("$x_min", "$x_max")
+        ):
+            with ctx.parameter("data"):
+                raise (
+                    RuntimeError(
+                        "encoding an individual chunk in a chunked array is "
+                        "unsafe when using the $x_min or $x_max late-bound "
+                        "constants for the cross-chunk global minimum / "
+                        "maximum; use the xarray-safeguards frontend or pass "
+                        "the entire (not chunked) data array instead"
+                    )
+                    | ctx
+                )
+
         if "$x_min" in late_bound_reqs:
             late_bound = late_bound.update(
                 **{
