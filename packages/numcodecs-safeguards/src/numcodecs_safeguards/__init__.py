@@ -635,14 +635,12 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
             encoded = buf_bytes[buf_io.tell() :]
             correction_bytes = b""
 
-        if self._lossless_for_codec is not None:
-            encoded = numcodecs.compat.ensure_bytes(
-                self._lossless_for_codec.decode(encoded)
-            )
+        encoded = np.frombuffer(encoded, dtype="uint8", count=len(encoded))
 
-        decoded = self._codec.decode(
-            np.frombuffer(encoded, dtype="uint8", count=len(encoded)), out=out
-        )
+        if self._lossless_for_codec is not None:
+            encoded = self._lossless_for_codec.decode(encoded)
+
+        decoded = self._codec.decode(encoded, out=out)
 
         if correction_len > 0:
             correction = (
