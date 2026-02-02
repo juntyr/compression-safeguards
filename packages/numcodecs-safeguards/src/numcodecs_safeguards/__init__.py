@@ -432,9 +432,10 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
         only a three-byte overhead from using the safeguards.
 
         The `buf`fer must contain the complete data, i.e. not just a chunk of
-        data, so that non-pointwise safeguards are correctly applied. Please
-        refer to the [`xarray-safeguards`][xarray_safeguards] frontend for
-        applying safeguards to chunked data.
+        data, so that non-pointwise safeguards are correctly applied and the
+        global minimum `$x_min` and global maximum `$x_max` can be correctly
+        provided. Please refer to the [`xarray-safeguards`][xarray_safeguards]
+        frontend for applying safeguards to chunked data.
 
         Parameters
         ----------
@@ -453,9 +454,13 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
             if the `buf`fer uses an unsupported data type.
         RuntimeError
             if decoding with the `codec` with `out=None` fails.
-        RuntimError
+        RuntimeError
             if `codec` and `lossless` do not encode to 1D bytes or do not
             recreate the data's dtype and shape during decoding.
+        RuntimeError
+            if the `buf`fer is chunked but the safeguards use the built-in
+            late-bound parameter `$x_min` or `$x_max` for the cross-chunk
+            global minimum / maximum.
         ...
             if checking a safeguard or computing the correction for a safeguard
             raises an exception.
