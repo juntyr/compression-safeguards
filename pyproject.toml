@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "compression-safeguards"
-version = "1.0.0b1"
+version = "1.0.0b2"
 dependencies = [
     "numpy~=2.4",
     "numpy-quaddtype~=1.0",
