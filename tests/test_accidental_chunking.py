@@ -86,6 +86,44 @@ def test_codec_stack_stencil():
         ).compute()
 
 
+def test_numcodecs_chunked_global_minmax():
+    stack = CodecStack(
+        dict(
+            id="safeguards",
+            codec=dict(id="zero"),
+            safeguards=[
+                dict(
+                    kind="qoi_eb_pw",
+                    qoi="""
+                    round_ties_even(
+                        10 * (x - c["$x_min"]) / (c["$x_max"] - c["$x_min"])
+                    )
+                    """,
+                    type="abs",
+                    eb=0,
+                )
+            ],
+        ),
+    )
+
+    data = np.arange(100, dtype=float)
+
+    encoded = stack.encode(data)
+    decoded = stack.decode(encoded)
+    assert np.all(np.rint(10 * decoded / 99) == np.rint(10 * data / 99))
+
+    encoded_decoded = stack.encode_decode(data)
+    assert np.all(encoded_decoded == decoded)
+
+    encoded_decoded_da = stack.encode_decode_data_array(xr.DataArray(data, name="da"))
+    assert np.all(encoded_decoded_da.values == decoded)
+
+    with pytest.raises(RuntimeError, match="chunked array"):
+        encoded_decoded_da = stack.encode_decode_data_array(
+            xr.DataArray(data, name="da").chunk(10)
+        ).compute()
+
+
 @pytest.mark.skipif(
     sys.platform == "emscripten", reason="pytest-asyncio is broken in Pyodide"
 )
