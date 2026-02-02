@@ -466,19 +466,22 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
             raises an exception.
         """
 
-        data = (
+        data: np.ndarray = (
             buf if isinstance(buf, np.ndarray) else numcodecs.compat.ensure_ndarray(buf)
         )
 
         TypeSetError.check_dtype_or_raise(data.dtype, Safeguards.supported_dtypes())
 
-        encoded = self._codec.encode(np.copy(data))
-        encoded = numcodecs.compat.ensure_ndarray(encoded)
+        encoded: np.ndarray = numcodecs.compat.ensure_ndarray(
+            self._codec.encode(np.copy(data))
+        )
 
         # check that decoding with `out=None` works
         try:
             with ctx.parameter("codec"):
-                decoded = self._codec.decode(np.copy(encoded), out=None)
+                decoded: np.ndarray = numcodecs.compat.ensure_ndarray(
+                    self._codec.decode(np.copy(encoded), out=None)
+                )
         except Exception as err:
             err.add_note(
                 "decoding with `out=None` failed\n\n"
@@ -488,10 +491,11 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
                 "type and shape for decoding"
             )
             raise
-        decoded = numcodecs.compat.ensure_ndarray(decoded)
 
         if self._lossless_for_codec is not None:
-            encoded = self._lossless_for_codec.encode(encoded)
+            encoded = numcodecs.compat.ensure_ndarray(
+                self._lossless_for_codec.encode(encoded)
+            )
 
         try:
             with ctx.parameter(
@@ -503,7 +507,7 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
                     raise (
                         RuntimeError("codec and lossless must encode to 1D bytes") | ctx
                     )
-                encoded_bytes = numcodecs.compat.ensure_bytes(encoded)
+                encoded_bytes: bytes = numcodecs.compat.ensure_bytes(encoded)
 
             with ctx.parameter("codec"):
                 if decoded.dtype != data.dtype:
@@ -571,8 +575,9 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
             )
 
         corrected = self._safeguards.apply_correction(decoded, correction)
-        corrected_checksum = checksum(corrected)
+        corrected_checksum: bytes = checksum(corrected)
 
+        correction_bytes: bytes
         if np.all(correction == 0):
             correction_bytes = b""
         else:
@@ -580,7 +585,7 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
                 self._lossless_for_safeguards.encode(correction)
             )
 
-        correction_len = leb128.u.encode(len(correction_bytes))
+        correction_len: bytearray = leb128.u.encode(len(correction_bytes))
 
         return b"".join(
             [correction_len, corrected_checksum, encoded_bytes, correction_bytes]
@@ -617,12 +622,12 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
         """
 
         with ctx.parameter("buf"):
-            buf_array = numcodecs.compat.ensure_ndarray(buf)
+            buf_array: np.ndarray = numcodecs.compat.ensure_ndarray(buf)
             if buf_array.dtype != np.dtype(np.uint8):
                 raise ValueError("can only decode from bytes") | ctx
             if buf_array.ndim != 1:
                 raise ValueError("can only decode from 1D bytes") | ctx
-            buf_bytes = numcodecs.compat.ensure_bytes(buf)
+            buf_bytes: bytes = numcodecs.compat.ensure_bytes(buf)
 
             buf_io = BytesIO(buf_bytes)
             correction_len, _ = leb128.u.decode_reader(buf_io)
@@ -633,22 +638,31 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
                     | ctx
                 )
 
+        encoded_bytes: bytes
+        correction_bytes: bytes
         if correction_len > 0:
-            encoded = buf_bytes[buf_io.tell() : -correction_len]
+            encoded_bytes = buf_bytes[buf_io.tell() : -correction_len]
             correction_bytes = buf_bytes[-correction_len:]
         else:
-            encoded = buf_bytes[buf_io.tell() :]
+            encoded_bytes = buf_bytes[buf_io.tell() :]
             correction_bytes = b""
 
-        encoded = np.frombuffer(encoded, dtype="uint8", count=len(encoded))
+        encoded: np.ndarray = np.frombuffer(
+            encoded_bytes, dtype="uint8", count=len(encoded_bytes)
+        )
 
         if self._lossless_for_codec is not None:
-            encoded = self._lossless_for_codec.decode(encoded)
+            encoded = numcodecs.compat.ensure_ndarray(
+                self._lossless_for_codec.decode(encoded)
+            )
 
-        decoded = self._codec.decode(encoded, out=out)
+        decoded: np.ndarray = numcodecs.compat.ensure_ndarray(
+            self._codec.decode(encoded, out=out)
+        )
 
+        corrected: np.ndarray
         if correction_len > 0:
-            correction = (
+            correction: np.ndarray = (
                 numcodecs.compat.ensure_ndarray(
                     self._lossless_for_safeguards.decode(correction_bytes)
                 )
