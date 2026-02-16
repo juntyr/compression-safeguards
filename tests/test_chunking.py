@@ -761,3 +761,67 @@ def test_fuzzer_found_wrapping_constant_boundary_clash():
             late_bound=late_bound,
         )
         np.testing.assert_array_equal(chunked_hash.values, global_hash)
+
+
+def test_fuzzer_found_nan_magic():
+    # casting from float64 to uint32 has different behaviour for NaNs
+    # - for a scalar value, NaN casts to 0
+    # - in this particular case, the NaN in an array casts to a huge value,
+    #   but only on Linux (e.g. in CI)
+    # this bug is triggered since the hashing expression can produce binary
+    #  hashes that interpret as NaN but are then cast back to the data dtype
+    # normal code should not trigger this code path
+    chunks = dict(a=1)
+    da = xr.DataArray(
+        np.array(
+            [
+                [184484319],
+                [1431655935],
+                [1056899039],
+                [876494398],
+                [2874539776],
+                [14090239],
+            ],
+            dtype=np.uint32,
+        ),
+        name="da",
+        dims=["a", "b"],
+    ).chunk(chunks)
+    da_prediction = xr.DataArray(
+        np.ones_like(da.values), name="da", dims=["a", "b"]
+    ).chunk(chunks)
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi="x",
+        neighbourhood=[
+            dict(
+                axis=-1, before=85, after=85, boundary="constant", constant_boundary=85
+            )
+        ],
+        type="abs",
+        eb=85,
+        qoi_dtype="lossless",
+    )
+    safeguard._qoi_expr._expr = HashingExpr.from_data_shape(
+        data_shape=safeguard._qoi_expr._stencil_shape,
+        late_bound_constants=frozenset(["foo"]),
+    )
+    safeguard._qoi_expr._late_bound_constants = (
+        safeguard._qoi_expr._expr.late_bound_constants
+    )
+
+    late_bound = dict(foo=109)
+
+    with _patch_for_hashing_qoi_dev_only():
+        global_hash = Safeguards(safeguards=[safeguard]).compute_correction(
+            data=da.values,
+            prediction=da_prediction.values,
+            late_bound=late_bound,
+        )
+        chunked_hash = produce_data_array_correction(
+            data=da,
+            prediction=da_prediction,
+            safeguards=[safeguard],
+            late_bound=late_bound,
+        )
+        np.testing.assert_array_equal(chunked_hash.values, global_hash)
