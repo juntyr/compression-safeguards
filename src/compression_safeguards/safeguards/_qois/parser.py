@@ -112,7 +112,9 @@ class QoIParser(Parser):
         self.assert_or_error(
             not isinstance(p.expr, Array),
             p,
-            lambda: f"expression must be a scalar but is an array expression of shape {p.expr.shape}",
+            lambda: (
+                f"expression must be a scalar but is an array expression of shape {p.expr.shape}"
+            ),
         )
         self.assert_or_error(p.expr.has_data, p, "expression must not be constant")
         return p.expr
@@ -126,7 +128,9 @@ class QoIParser(Parser):
         self.assert_or_error(
             not isinstance(p.expr, Array),
             p,
-            lambda: f"return expression must be a scalar but is an array expression of shape {p.expr.shape}",
+            lambda: (
+                f"return expression must be a scalar but is an array expression of shape {p.expr.shape}"
+            ),
         )
         self.assert_or_error(
             p.expr.has_data, p, "return expression must not be constant"
