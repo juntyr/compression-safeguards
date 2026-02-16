@@ -227,7 +227,8 @@ def from_float(
     conversion is lossy.
 
     If the original `dtype` was integer, the rounding conversion is lossy.
-    Infinite values are clamped to the minimum/maximum integer values.
+    Infinite values are clamped to the minimum/maximum integer values. NaN
+    values are converted to integer zero.
 
     Parameters
     ----------
@@ -267,6 +268,7 @@ def from_float(
         )
         converted[np.greater(x, imax.astype(x.dtype, casting="safe"))] = imax
         converted[np.less(x, imin.astype(x.dtype, casting="safe"))] = imin
+        converted[np.isnan(x)] = 0
 
     return converted
 
