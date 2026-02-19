@@ -64,6 +64,7 @@ examples = [
     "jupyterlab~=4.3",
     "matplotlib~=3.10.0",
     "netcdf4~=1.7.2",
+    "numcodecs-pw-ratio==0.1.0",
     "numcodecs-replace==0.1.0",
     "numcodecs-wasm==0.2.2",
     "numcodecs-wasm-qpet-sperr==0.2.0",
