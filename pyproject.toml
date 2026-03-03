@@ -67,6 +67,7 @@ examples = [
     "numcodecs-pw-ratio==0.2.0",
     "numcodecs-replace==0.1.0",
     "numcodecs-wasm==0.2.2",
+    "numcodecs-wasm-ebcc==0.1.1",
     "numcodecs-wasm-qpet-sperr==0.2.0",
     "numcodecs-wasm-sperr==0.2.0",
     "numcodecs-wasm-sz3==0.8.1",
