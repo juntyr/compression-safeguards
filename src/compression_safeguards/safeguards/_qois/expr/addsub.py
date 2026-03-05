@@ -504,14 +504,17 @@ def compute_left_associate_sum_data_bounds(
     Xs_lower_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
     Xs_upper_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
     i = 0
-    for term, abs_factorv in zip(left_associative_sum, abs_factorvs):
+    for term, termv, abs_factorv in zip(left_associative_sum, termvs, abs_factorvs):
         if abs_factorv is None:
             continue
 
         # recurse into the terms with a weighted bound
         xl, xu = term.compute_data_bounds(
-            tl_stack[i],
-            tu_stack[i],
+            # termv might be +-0.0, but tl or tu might have been nudged
+            #  such that tl > termv or tu < termv
+            # so guarantee once again that tl <= termv <= tu
+            _minimum_zero_sign_sensitive(termv, tl_stack[i]),
+            _maximum_zero_sign_sensitive(termv, tu_stack[i]),
             Xs,
             late_bound,
         )
