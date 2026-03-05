@@ -77,7 +77,7 @@ jobs:
         run: ls -lh dist/
 
       - name: Upload the package sdist and wheels
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist
@@ -120,7 +120,7 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Download the dist artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist
@@ -167,7 +167,7 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Download the dist artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist
@@ -227,7 +227,7 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Download the dist artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist
@@ -293,7 +293,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Download the dist artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist
@@ -339,7 +339,7 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Download the dist artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist
@@ -412,7 +412,7 @@ jobs:
         run: find dist/ -type f ! -name '*.whl' -delete
 
       - name: Upload the Pyodide wheels
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: pyodide-dist
           path: dist
@@ -448,13 +448,13 @@ jobs:
         run: pyodide xbuildenv install 0.29.2
 
       - name: Download the dist artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist
 
       - name: Download the pyodide-dist artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: pyodide-dist
           path: dist
@@ -499,7 +499,7 @@ jobs:
       - pyodide-test
     steps:
       - name: Download the dist artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist
