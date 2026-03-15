@@ -1,0 +1,53 @@
+# Try the `compression-safeguards` using JupyterLite
+
+<iframe id="try-jupyterlite" width="100%" height="750px"></iframe>
+
+<script>
+  window.addEventListener("load", () => {
+    document.getElementById("try-jupyterlite").src = "https://lab.climet.eu/main/repl/index.html?kernel=python&toolbar=1&code=" + encodeURIComponent(`\
+import numpy as np
+from matplotlib import pyplot as plt
+from numcodecs import Quantize
+from numcodecs_combinators.framed import FramedCodecStack
+from numcodecs_safeguards import SafeguardedCodec
+
+# input data
+x = np.linspace(-np.pi, np.pi)
+
+# lossy compression, here linear quantization
+codec = Quantize(digits=0, dtype=np.float64)
+enc = codec.encode(x)
+dec = codec.decode(enc)
+
+# safeguard an absolute error over a quantity of interest,
+#  here sin(x),
+# with an absolute error bound s.t.
+#  abs( sin(x') - sin(x) ) <= 0.1
+sg = SafeguardedCodec(
+    codec=FramedCodecStack(codec),
+    safeguards=[
+        dict(kind="qoi_eb_pw", qoi="sin(x)", type="abs", eb=0.1),
+    ]
+)
+enc_sg = sg.encode(x)
+dec_sg = sg.decode(enc_sg)
+
+# visually compare the lossy compressed and safeguarded data
+fig, (ax1, ax2) = plt.subplots(2)
+ax1.plot(x, np.sin(x))
+ax1.plot(x, np.sin(dec))
+ax1.plot(x, np.sin(dec_sg))
+ax1.legend([], title=r"$\\sin$(...)", ncols=3, loc="upper left")
+ax2.axhline(0.1, c="k", ls=":")
+ax2.axhline(-0.1, c="k", ls=":")
+ax2.plot(x, np.sin(x)-np.sin(x), label="original")
+ax2.plot(x, np.sin(dec)-np.sin(x), label="compressed")
+ax2.plot(x, np.sin(dec_sg)-np.sin(x), label="safeguarded")
+plt.legend(
+    title=r"$\\sin(\\hat{x}) - \\sin(x)$",
+    ncols=3, loc="lower center",
+)
+plt.show()\
+`);
+  });
+</script>
