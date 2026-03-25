@@ -68,7 +68,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Replace symlinks with file copies
-        run: find ./ -type l -exec sh -c 'for i in "$@"; do cp -r --preserve --remove-destination "$(readlink -f "$i")" "$i"; done' sh {} +
+        run: find ./ -type l ! -wholename ./docs/examples -exec sh -c 'for i in "$@"; do cp --preserve --remove-destination "$(readlink -f "$i")" "$i"; done' sh {} +
 
       - name: Build all packages
         run: uv build --all-packages
