@@ -48,6 +48,31 @@ plt.legend(
     ncols=3, loc="lower center",
 )
 plt.show()\
-`);
+`) + "&pyodideKernelPackages=" + encodeURIComponent(JSON.stringify([
+  // standard kernel packages
+  "comm",
+  "packaging",
+  "ipython",
+  "micropip",
+  "pyodide-http",
+  "widgetsnbextension",
+  // example packages
+  "matplotlib",
+  "numcodecs",
+  "numcodecs-bitmap-index",
+  "numcodecs-combinators",
+  "numcodecs-delta",
+  "numcodecs-shuffle",
+  "numcodecs-tokenize",
+  "numcodecs-zero",
+  "numpy",
+  "numpy-quaddtype",
+  "semver",
+  "sly",
+  "typing-extensions",
+  // example package lazy dependencies
+  "crc32c",
+  "msgpack",
+]));
   });
 </script>
