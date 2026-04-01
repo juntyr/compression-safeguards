@@ -68,7 +68,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Replace symlinks with file copies
-        run: find ./ -type l ! -wholename ./docs/examples -exec sh -c 'for i in "$@"; do cp --preserve --remove-destination "$(readlink -f "$i")" "$i"; done' sh {} +
+        run: find ./ -type l ! -wholename ./docs/examples ! -wholename ./docs/branding -exec sh -c 'for i in "$@"; do cp --preserve --remove-destination "$(readlink -f "$i")" "$i"; done' sh {} +
 
       - name: Build all packages
         run: uv build --all-packages
@@ -396,7 +396,7 @@ jobs:
           node-version: 22
 
       - name: Install pyodide-build
-        run: python -m pip install pyodide-build
+        run: python -m pip install pyodide-build==0.33.0
 
       - name: Install the Pyodide build env
         run: pyodide xbuildenv install 0.29.2

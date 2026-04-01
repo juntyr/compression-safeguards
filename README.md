@@ -1,11 +1,14 @@
+<h1>
+    <img align="left" src="https://raw.githubusercontent.com/juntyr/compression-safeguards/main/branding/logo/compression-safeguards-logo-filled.svg" height="80">
+    Safe, Trusted, and Fearless lossy compression with Compression Safeguards
+</h1><br>
+
 [![image](https://img.shields.io/github/actions/workflow/status/juntyr/compression-safeguards/ci.yml?branch=main)](https://github.com/juntyr/compression-safeguards/actions/workflows/ci.yml?query=branch%3Amain)
 [![image](https://img.shields.io/pypi/v/compression-safeguards.svg)](https://pypi.python.org/pypi/compression-safeguards)
 [![image](https://img.shields.io/pypi/l/compression-safeguards.svg)](https://github.com/juntyr/compression-safeguards/blob/main/LICENSE)
 [![image](https://img.shields.io/pypi/pyversions/compression-safeguards.svg)](https://pypi.python.org/pypi/compression-safeguards)
 [![image](https://readthedocs.org/projects/compression-safeguards/badge/?version=latest)](https://compression-safeguards.readthedocs.io/en/latest/?badge=latest)
 [![image](https://zenodo.org/badge/DOI/10.5281/zenodo.18355539.svg)](https://doi.org/10.5281/zenodo.18355539)
-
-# Safe and Fearless lossy compression with `compression-safeguards`
 
 Lossy[^1] compression can be *scary* as valuable information or features of the data may be lost.
 
