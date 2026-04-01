@@ -1,5 +1,5 @@
 <h1>
-    <img align="left" src="https://raw.githubusercontent.com/juntyr/compression-safeguards/logo/branding/logo/compression-safeguards-logo.svg" height="80">
+    <img align="left" src="https://raw.githubusercontent.com/juntyr/compression-safeguards/main/branding/logo/compression-safeguards-logo-filled.svg" height="80">
     Safe, Trusted, and Fearless lossy compression with Compression Safeguards
 </h1><br>
 

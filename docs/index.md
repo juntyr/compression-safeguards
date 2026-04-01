@@ -3,7 +3,7 @@ edit_uri: docs/index.md
 ---
 
 <h1>
-    <img align="left" src="./branding/logo/compression-safeguards-logo.svg" id="compression-safeguards-logo">
+    <img align="left" src="./branding/logo/compression-safeguards-logo-filled.svg" id="compression-safeguards-logo">
     Safe, Trusted, and Fearless lossy compression with Compression Safeguards
 </h1>
 
