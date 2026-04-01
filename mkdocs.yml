@@ -23,6 +23,7 @@ extra_javascript:
   - https://unpkg.com/mermaid@10.9.0/dist/mermaid.min.js
 
 extra_css:
+  - css/logo.css
   - https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/katex.min.css
 
 theme:
