@@ -108,6 +108,10 @@ This package currently implements the following [safeguards][compression_safegua
 
 ### Pointwise properties
 
+- [`lossless`][compression_safeguards.safeguards.pointwise.lossless.LosslessSafeguard] (bitwise exact reconstruction):
+
+    All elements are reconstructed exactly, i.e. losslessly. This safeguard is an alternative to using a zero error bound. It can be used with the [`select`][compression_safeguards.safeguards.combinators.select.SelectSafeguard] combinator to express regions that are of extra special interest and must be kept exactly the same.
+
 - [`same`][compression_safeguards.safeguards.pointwise.same.SameValueSafeguard] (value preserving):
 
     If an element has a special value in the input, that element is guaranteed to also have bitwise the same value in the decompressed output. This safeguard can be used for preserving e.g. zero values, missing values, pre-computed extreme values, or any other value of importance. By default, elements that do *not* have the special value in the input may still have the value in the output. It is also possible to enforce that an element in the output only has the special value if and only if it also has the value in the input, e.g. to ensure that only missing values in the input have the missing value bitpattern in the output. Beware that +0.0 and -0.0 are semantically equivalent in floating-point but have different bitwise patterns. To preserve both, two same value safeguards are needed, one for each bitpattern.

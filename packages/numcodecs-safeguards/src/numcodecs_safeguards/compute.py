@@ -40,6 +40,15 @@ class Compute:
     ratio at the cost of requiring additional time to compute the corrections.
     """
 
+    unstable_lossless_corrections: bool = False
+    """
+    Unstable option to compute lossless corrections that reproduce the original
+    data exactly.
+
+    If lossless corrections are used without iterative corrections, all data
+    elements will be corrected (whether or not they need corrections).
+    """
+
     def get_config(self) -> dict[str, JSON]:
         """
         Returns the compute configuration.

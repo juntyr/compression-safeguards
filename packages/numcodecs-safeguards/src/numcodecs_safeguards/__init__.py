@@ -87,6 +87,7 @@ import numcodecs_combinators
 import numpy as np
 from compression_safeguards.api import Safeguards
 from compression_safeguards.safeguards.abc import Safeguard
+from compression_safeguards.safeguards.pointwise.lossless import LosslessSafeguard
 from compression_safeguards.utils.bindings import Bindings, Parameter, Value
 from compression_safeguards.utils.cast import as_bits
 from compression_safeguards.utils.error import (
@@ -560,14 +561,24 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
 
         # the codec always compresses the complete data ... at least chunking
         #  is not our concern
-        correction: np.ndarray[tuple[int, ...], np.dtype[np.unsignedinteger]] = (
-            self._safeguards.compute_correction(
+        correction: np.ndarray[tuple[int, ...], np.dtype[np.unsignedinteger]]
+        if self._compute.unstable_lossless_corrections:
+            correction = Safeguards(
+                safeguards=[LosslessSafeguard()],
+                _version=self._safeguards.version,
+            ).compute_correction(
                 data,
                 decoded,
                 late_bound=late_bound,
                 where=True,
             )
-        )
+        else:
+            correction = self._safeguards.compute_correction(
+                data,
+                decoded,
+                late_bound=late_bound,
+                where=True,
+            )
 
         if self._compute.unstable_iterative:
             correction = _refine_correction_iteratively(
@@ -602,7 +613,7 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
             Encoded data. Must be an object representing a bytestring, e.g.
             [`bytes`][bytes] or a 1D array of [`np.uint8`][numpy.uint8]s etc.
         out : None | Buffer
-            Writeable buffer to store decoded data. N.B. if provided, this buffer must
+            Writable buffer to store decoded data. N.B. if provided, this buffer must
             be exactly the right size to store the decoded data.
 
         Returns
