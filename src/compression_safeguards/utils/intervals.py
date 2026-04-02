@@ -197,7 +197,7 @@ class Interval(Generic[T, N]):
     @staticmethod
     def singleton(a: np.ndarray[tuple[int, ...], np.dtype[T]]) -> "Interval[T, int]":
         """
-        Create a singleton interval that has the same dtype and size as `a` contains, for each element in `a`, only this singular value.
+        Create a singleton interval that has the same dtype and size as `a` and contains, for each element in `a`, only this singular value.
 
         Parameters
         ----------

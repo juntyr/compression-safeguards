@@ -26,8 +26,9 @@ class LosslessSafeguard(PointwiseSafeguard):
     This safeguard is an alternative to using a zero error bound safeguard.
 
     This safeguards can be used with the
-    [`SelectSafeguard`][...select.SelectSafeguard] to express regions that are
-    of extra special interest and must be kept exactly the same.
+    [`SelectSafeguard`][....combinators.select.SelectSafeguard] to express
+    regions that are of extra special interest and must be kept exactly the
+    same.
     """
 
     __slots__: tuple[str, ...] = ()

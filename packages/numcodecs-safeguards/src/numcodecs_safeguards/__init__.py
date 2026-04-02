@@ -613,7 +613,7 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
             Encoded data. Must be an object representing a bytestring, e.g.
             [`bytes`][bytes] or a 1D array of [`np.uint8`][numpy.uint8]s etc.
         out : None | Buffer
-            Writeable buffer to store decoded data. N.B. if provided, this buffer must
+            Writable buffer to store decoded data. N.B. if provided, this buffer must
             be exactly the right size to store the decoded data.
 
         Returns
