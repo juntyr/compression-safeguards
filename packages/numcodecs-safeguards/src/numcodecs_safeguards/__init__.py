@@ -569,7 +569,7 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
             ).compute_correction(
                 data,
                 decoded,
-                late_bound=late_bound,
+                late_bound=Bindings.EMPTY,
                 where=True,
             )
         else:
