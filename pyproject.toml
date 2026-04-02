@@ -71,6 +71,7 @@ examples = [
     "numcodecs-wasm-sperr==0.2.0",
     "numcodecs-wasm-sz3==0.8.1",
     "numcodecs-wasm-zfp==0.6.0",
+    "numcodecs-wasm-zstd==0.4.0",
     "numcodecs-zero==0.1.2",
     "scikit-image~=0.25.0",
     "tqdm~=4.0",
