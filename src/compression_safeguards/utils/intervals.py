@@ -50,6 +50,8 @@ class Interval(Generic[T, N]):
 
     - [`Interval.empty`][.empty] or [`Interval.empty_like`][.empty_like] for an
       empty interval that contains no values
+    - [`Interval.singleton`][.singleton] for a singleton interval that only
+      contains one array of values
     - [`Interval.full`][.full] or [`Interval.full_like`][.full_like] for a
       full interval that contains all possible values
 
@@ -191,6 +193,27 @@ class Interval(Generic[T, N]):
         """
 
         return Interval.empty(a.dtype, a.size)
+
+    @staticmethod
+    def singleton(a: np.ndarray[tuple[int, ...], np.dtype[T]]) -> "Interval[T, int]":
+        """
+        Create a singleton interval that has the same dtype and size as `a` contains, for each element in `a`, only this singular value.
+
+        Parameters
+        ----------
+        a : np.ndarray[tuple[int, ...], np.dtype[T]]
+            An array whose values, dtype, and size the interval gets.
+
+        Returns
+        -------
+        singleton : Interval[T, int]
+            The singleton interval
+        """
+
+        return Interval(
+            _lower=a.copy().flatten(),
+            _upper=a.copy().flatten(),
+        )
 
     @staticmethod
     def full(dtype: np.dtype[T], n: Ni) -> "Interval[T, Ni]":

@@ -14,6 +14,7 @@ from .combinators.any import AnySafeguard
 from .combinators.assume_safe import AssumeAlwaysSafeguard
 from .combinators.select import SelectSafeguard
 from .pointwise.eb import ErrorBoundSafeguard
+from .pointwise.lossless import LosslessSafeguard
 from .pointwise.qoi.eb import PointwiseQuantityOfInterestErrorBoundSafeguard
 from .pointwise.same import SameValueSafeguard
 from .pointwise.sign import SignPreservingSafeguard
@@ -24,6 +25,10 @@ class SafeguardKind(Enum):
     """
     Enumeration of all supported safeguards:
     """
+
+    # lossless
+    lossless = LosslessSafeguard
+    """All elements must be reconstructed exactly, i.e. losslessly."""
 
     # same value
     same = SameValueSafeguard
