@@ -124,9 +124,10 @@ Parameter value type that includes scalar numbers and data arrays thereof.
 def produce_data_array_correction(
     data: xr.DataArray,
     prediction: xr.DataArray,
+    *,
     safeguards: Collection[dict[str, JSON] | Safeguard],
     late_bound: Mapping[str, DataValue] = MappingProxyType(dict()),
-    *,
+    check_chunks_first: bool = True,
     allow_unsafe_safeguards_override: bool = False,
 ) -> xr.DataArray:
     """
@@ -179,6 +180,12 @@ def produce_data_array_correction(
         - `$x` and `$X`: the original `data` as a constant
         - `$x_min` and `$x_max`: the global minimum/maximum of the data
         - `$d_DIM` for each dimension `DIM` of the `data` array
+    check_chunks_first : bool
+        If [`True`][True], all chunks are first checked to determine if no
+        corrections are required, which requires eagerly computing the check
+        result across all chunks. If [`False`][False], the check is skipped and
+        corrections for all chunks are produced, even if no corrections are
+        required.
     allow_unsafe_safeguards_override : bool
         **WARNING:** This option is *unsafe* and must only be passed if
         instructed. Do *not* pass this option otherwise.
@@ -586,8 +593,9 @@ def produce_data_array_correction(
     # for stencil safeguards, one chunk failing requires all to be corrected
     #  (since incremental corrections could spread)
     # if no chunk check failed, the chunked correction can take a fast path
-    any_chunk_check_failed = (
-        not dask.array.map_overlap(
+    all_chunk_checks_succeeded = (
+        check_chunks_first
+        and dask.array.map_overlap(
             _check_overlapping_stencil_chunk,
             data.data,
             prediction.data,
@@ -615,6 +623,7 @@ def produce_data_array_correction(
         .all()
         .compute()
     )
+    any_chunk_check_failed = not all_chunk_checks_succeeded
 
     def _compute_overlapping_stencil_chunk_correction(
         data_chunk: np.ndarray[S, np.dtype[T]],
