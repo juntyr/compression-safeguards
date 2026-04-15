@@ -882,6 +882,11 @@ class Safeguards:
         chunk_stencil : tuple[tuple[Literal[BoundaryCondition.valid, BoundaryCondition.wrap], NeighbourhoodAxis], ...]
             The shape of the stencil neighbourhood that was applied around the
             chunk in `data_chunk` and `prediction_chunk`.
+        any_chunk_check_failed : bool
+            If any chunk failed its check, this chunk requires corrections; if
+            no chunk failed its check, this chunk does not require corrections.
+            If no check across all chunks was performed, this option must be
+            set to [`True`][True].
         late_bound_chunk : Mapping[str | Parameter, Value] | Bindings
             The bindings for all late-bound parameters of the safeguards.
 
@@ -949,6 +954,11 @@ class Safeguards:
                 self.correction_dtype_for_data(data_chunk_.dtype),
             )
 
+        # ensure we don't accidentally forget to handle new kinds of safeguards here
+        assert len(self.safeguards) == len(self._pointwise_safeguards) + len(
+            self._stencil_safeguards
+        )
+
         safeguard: Safeguard
 
         # if only pointwise safeguards are used, check if we need to correct
@@ -980,11 +990,6 @@ class Safeguards:
         # otherwise, correct the chunk
         # if stencil safeguards are used, then any chunk needing a correction
         #  requires all chunks to be corrected
-
-        # ensure we don't accidentally forget to handle new kinds of safeguards here
-        assert len(self.safeguards) == len(self._pointwise_safeguards) + len(
-            self._stencil_safeguards
-        )
 
         all_intervals: list[IntervalUnion[T, int, int]] = []
         for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
