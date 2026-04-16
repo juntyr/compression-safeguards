@@ -166,6 +166,41 @@ def check_all_codecs(data: np.ndarray, constant_boundary=4.2):
             for axis in range(data.ndim)
         ]
 
+        # preserve the order of all points in a local neighbourhood
+        # inspired by https://doi.org/10.48550/arXiv.2603.26968
+        order_safeguards = [
+            dict(
+                kind="qoi_eb_stencil",
+                qoi="""
+                # compute the order of X[0] and X[1]
+                where(
+                    # (a) less than
+                    X[0] < X[1], -1, where(
+                    # (b) greater than
+                    X[0] > X[1], +1, where(
+                    # (c) equal to
+                    X[0] == X[1], 0,
+                    # (d) at least one is NaN
+                    NaN,
+                )))
+                """,
+                neighbourhood=[
+                    dict(
+                        axis=axis,
+                        before=0,
+                        after=1,
+                        boundary=boundary,
+                        constant_boundary=constant_boundary
+                        if boundary == BoundaryCondition.constant
+                        else None,
+                    )
+                ],
+                type="abs",
+                eb=0,
+            )
+            for axis in range(data.ndim)
+        ]
+
         sanity_safeguards = Safeguards(
             safeguards=[
                 MonotonicityPreservingSafeguard(
@@ -179,6 +214,7 @@ def check_all_codecs(data: np.ndarray, constant_boundary=4.2):
             ]
         )
 
+        # monotonicity QoI safeguards
         corrected = encode_decode_zero(data, safeguards=safeguards)
         assert sanity_safeguards.check(data, corrected)
 
@@ -189,6 +225,19 @@ def check_all_codecs(data: np.ndarray, constant_boundary=4.2):
         assert sanity_safeguards.check(data, corrected)
 
         corrected = encode_decode_noise(data, safeguards=safeguards)
+        assert sanity_safeguards.check(data, corrected)
+
+        # local neighbourhood order QoI safeguards
+        corrected = encode_decode_zero(data, safeguards=order_safeguards)
+        assert sanity_safeguards.check(data, corrected)
+
+        corrected = encode_decode_neg(data, safeguards=order_safeguards)
+        assert sanity_safeguards.check(data, corrected)
+
+        corrected = encode_decode_identity(data, safeguards=order_safeguards)
+        assert sanity_safeguards.check(data, corrected)
+
+        corrected = encode_decode_noise(data, safeguards=order_safeguards)
         assert sanity_safeguards.check(data, corrected)
 
 
