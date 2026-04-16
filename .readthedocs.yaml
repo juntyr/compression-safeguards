@@ -22,6 +22,6 @@ build:
       - uv venv "${READTHEDOCS_VIRTUALENV_PATH}"
     install:
       - UV_PROJECT_ENVIRONMENT="${READTHEDOCS_VIRTUALENV_PATH}" uv sync --all-packages --group docs --link-mode=copy
-
-mkdocs:
-  configuration: mkdocs.yml
+    build:
+      html:
+        - python -m properdocs build --clean --site-dir $READTHEDOCS_OUTPUT/html

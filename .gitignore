@@ -4,6 +4,7 @@
 /.ruff_cache
 /uv.lock
 
+/.cache
 /build
 /site
 

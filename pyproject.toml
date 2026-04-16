@@ -45,13 +45,15 @@ Issues = "https://github.com/juntyr/compression-safeguards/issues"
 [dependency-groups]
 dev = ["ruff~=0.14"]
 docs = [
-    "mkdocs~=1.6",
     "mkdocstrings[python]~=1.0",
     "mkdocstrings-python-generator==1.0.0rc1",
     "mkdocs-exclude~=1.0",
+    "mkdocs-section-index~=0.3.11",
     "mkdocs-simple-hooks~=0.1.5",
     "mkdocs-jupyter~=0.25",
     "mkdocs-open-in-new-tab~=1.0",
+    "properdocs~=1.6.5",
+    "properdocs-theme-readthedocs~=1.6.5",
     "Pygments~=2.19",
     "ruff~=0.14",
 ]
