@@ -4,8 +4,7 @@ site_url: !ENV READTHEDOCS_CANONICAL_URL
 repo_url: https://github.com/juntyr/compression-safeguards/
 edit_uri: blob/main/
 
-# FIXME: https://github.com/oprypin/mkdocs-section-index/issues/28
-# strict: true
+strict: true
 
 markdown_extensions:
   - footnotes
