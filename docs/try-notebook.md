@@ -7,6 +7,11 @@ edit_uri: docs/try-notebook.md
     Try the <a id="try-notebook-name"></a> example using JupyterLite
 </h1>
 
+/// details | **Warning:** JupyterLite may not work in every web browser
+    type: warning
+<img src="https://baseline.js.org/features/wasm-multi-memory/responsive-adaptive.svg" alt="Baseline Status: Multi-memory (WebAssembly)" style="width: 100%; height: auto;" />
+///
+
 <iframe id="try-notebook-jupyterlite" width="100%" height="750px" referrerpolicy="no-referrer"></iframe>
 
 <script>

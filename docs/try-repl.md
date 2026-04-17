@@ -4,6 +4,11 @@ edit_uri: docs/try-repl.md
 
 # Try the `compression-safeguards` using JupyterLite
 
+/// details | **Warning:** JupyterLite may not work in every web browser
+    type: warning
+<img src="https://baseline.js.org/features/wasm-multi-memory/responsive-adaptive.svg" alt="Baseline Status: Multi-memory (WebAssembly)" style="width: 100%; height: auto;" />
+///
+
 <iframe id="try-repl-jupyterlite" width="100%" height="750px" referrerpolicy="no-referrer"></iframe>
 
 <script>
