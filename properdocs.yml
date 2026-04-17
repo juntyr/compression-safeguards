@@ -94,8 +94,7 @@ plugins:
           edit_uri: blob/main/packages/xarray-safeguards/src/
   - mkdocs-jupyter:
       ignore_h1_titles: True
-      # FIXME: https://github.com/danielfrg/mkdocs-jupyter/pull/272
-      # no_prompt: True
+      no_prompt: True
   - mkdocs-simple-hooks:
       hooks:
         on_nav: "docs.hooks.section_index:on_nav"
