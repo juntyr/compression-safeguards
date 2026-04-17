@@ -22,16 +22,16 @@ edit_uri: docs/try-notebook.md
     if (url === null) {
       return;
     }
-    
-    // https://github.com/USER/REPO/blob/BRANCH/PATH ->
-    // https://raw.githubusercontent.com/USER/REPO/refs/heads/BRANCH/PATH
+
+    // https://github.com/USER/REPO/blob/BRANCH/...PATH/NAME ->
+    // https://raw.githubusercontent.com/USER/REPO/refs/heads/BRANCH/...PATH/NAME
     const rawUrl = new URL(url);
     rawUrl.hostname = "raw.githubusercontent.com";
     rawUrl.pathname = rawUrl.pathname.split("/").toSpliced(3, 1, "refs", "heads").join("/");
 
-    const parts = rawUrl.pathname.split("/").slice(6);
-    const name = parts[parts.length - 1];
-    const backlink = ["..", ...parts.slice(0, -1), name.split(".")[0]].join("/");
+    const [, user, repo, , , branch, ...path] = rawUrl.pathname.split("/");
+    const name = path.pop();
+    const backlink = ["..", ...path, name.split(".")[0]].join("/");
 
     document.getElementById("try-notebook-name").innerText = name;
     document.getElementById("try-notebook-name").href = backlink;
@@ -40,15 +40,23 @@ edit_uri: docs/try-notebook.md
       "EARTHKIT_DATA_CACHE_POLICY": "off",
       "EARTHKIT_REGRID_CACHE_POLICY": "off",
       "CLIMET_LAB_BOOTSTRAP_CODE": `\
-import urllib.request
-code = urllib.request.urlopen(
-    "https://gist.githubusercontent.com/juntyr/f76ca0af41328439bcb40f758d418b7a/raw/5415a603bef6a006d7c889c9f3c226de2f5e04c5/mount-data.py"
-).read()
-print(code)
-try:
-    exec(code, globals=dict(), locals=dict())
-except Exception as err:
-    print(err)
+import pyodide_fs_mount_http
+from pathlib import Path
+for folder, files in {
+    "cems-ercnfdr": ["data.grib"],
+    "era5-lh": ["data.nc"],
+    "era5-pr": ["data.nc"],
+    "era5-q": ["data.nc"],
+    "era5-uv": ["data.nc"],
+    "hoaps-c.r30.h06.wvpa.2020-08": ["data.nc"],
+    "isabel": ["Pf48.bin", "Uf48.bin"],
+    "obs-pr": ["belem.csv", "helsinki.csv"],
+    "output": [],
+}.items():
+    pyodide_fs_mount_http.mount_http_files(Path("data") / folder, {
+        name: f"https://media.githubusercontent.com/media/${user}/${repo}/refs/heads/${branch}/examples/data/{folder}/{name}"
+        for name in files
+    })
 `,
     }));
   });
