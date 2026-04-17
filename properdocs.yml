@@ -29,12 +29,13 @@ extra_css:
 
 theme:
   name: readthedocs
+  custom_dir: docs/overrides
   highlightjs: false
   navigation_depth: 99
 
 nav:
   - Home: index.md
-  - Try the safeguards: try.md
+  - Try the safeguards: try-repl.md
   - API Reference:
       - Overview: api.md
   - Examples:
@@ -66,12 +67,16 @@ nav:
           - numcodecs-safeguards: https://pypi.org/project/numcodecs-safeguards/
           - xarray-safeguards: https://pypi.org/project/xarray-safeguards/
 
+not_in_nav: |
+  try-notebook.md
+
 plugins:
   - exclude:
       glob:
         - examples/*.py
         - examples/data/*/*.md
         - hooks/*
+        - overrides/*
   - search
   - open-in-new-tab
   - autorefs

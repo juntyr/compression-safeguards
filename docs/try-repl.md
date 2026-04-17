@@ -1,10 +1,14 @@
+---
+edit_uri: docs/try-repl.md
+---
+
 # Try the `compression-safeguards` using JupyterLite
 
-<iframe id="try-jupyterlite" width="100%" height="750px"></iframe>
+<iframe id="try-repl-jupyterlite" width="100%" height="750px" referrerpolicy="no-referrer"></iframe>
 
 <script>
   window.addEventListener("load", () => {
-    document.getElementById("try-jupyterlite").src = "https://lab.climet.eu/main/repl/index.html?kernel=python&toolbar=1&code=" + encodeURIComponent(`\
+    document.getElementById("try-repl-jupyterlite").src = "https://lab.climet.eu/main/repl/index.html?kernel=python&toolbar=1&code=" + encodeURIComponent(`\
 import numpy as np
 from matplotlib import pyplot as plt
 from numcodecs import Quantize
