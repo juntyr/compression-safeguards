@@ -3,7 +3,7 @@
 # Allows overriding the edit_url from the yaml frontmatter
 
 
-def on_page_context(context, page, config, **kwargs):
+def on_page_context(context, page, config, nav):
     if "edit_uri" in page.meta:
         page.edit_url = config["repo_url"] + config["edit_uri"] + page.meta["edit_uri"]
     return context

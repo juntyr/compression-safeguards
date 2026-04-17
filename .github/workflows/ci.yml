@@ -316,7 +316,7 @@ jobs:
         run: sed -i 's/__all__ = \["Safeguards", "SafeguardKind"\]/__all__ = \[\]/g' .venv/lib/python*/site-packages/compression_safeguards/__init__.py
 
       - name: Check docs build
-        run: uv run --no-sync mkdocs build
+        run: uv run --no-sync properdocs build
 
   doctest:
     name: Doctest

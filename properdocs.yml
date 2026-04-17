@@ -1,7 +1,8 @@
 site_name: compression-safeguards
 site_author: Juniper Tyree
+site_url: !ENV READTHEDOCS_CANONICAL_URL
 repo_url: https://github.com/juntyr/compression-safeguards/
-edit_uri: edit/main/
+edit_uri: blob/main/
 
 strict: true
 
@@ -28,12 +29,13 @@ extra_css:
 
 theme:
   name: readthedocs
+  custom_dir: docs/overrides
   highlightjs: false
   navigation_depth: 99
 
 nav:
   - Home: index.md
-  - Try the safeguards: try.md
+  - Try the safeguards: try-repl.md
   - API Reference:
       - Overview: api.md
   - Examples:
@@ -65,12 +67,16 @@ nav:
           - numcodecs-safeguards: https://pypi.org/project/numcodecs-safeguards/
           - xarray-safeguards: https://pypi.org/project/xarray-safeguards/
 
+not_in_nav: |
+  try-notebook.md
+
 plugins:
   - exclude:
       glob:
         - examples/*.py
         - examples/data/*/*.md
         - hooks/*
+        - overrides/*
   - search
   - open-in-new-tab
   - autorefs
@@ -78,19 +84,22 @@ plugins:
       source_dirs:
         - nav_heading: [API Reference]
           base: src
-          edit_uri: edit/main/src/
+          edit_uri: blob/main/src/
           ignore: ["_compat.py", "_float128.py", "_qois"]
         - nav_heading: [API Reference]
           base: packages/numcodecs-safeguards/src
-          edit_uri: edit/main/packages/numcodecs-safeguards/src/
+          edit_uri: blob/main/packages/numcodecs-safeguards/src/
         - nav_heading: [API Reference]
           base: packages/xarray-safeguards/src
-          edit_uri: edit/main/packages/xarray-safeguards/src/
+          edit_uri: blob/main/packages/xarray-safeguards/src/
   - mkdocs-jupyter:
       ignore_h1_titles: True
+      no_prompt: True
   - mkdocs-simple-hooks:
       hooks:
+        on_nav: "docs.hooks.section_index:on_nav"
         on_page_context: "docs.hooks.edit_uri:on_page_context"
+  - section-index
   - mkdocstrings:
       enable_inventory: true
       handlers:
