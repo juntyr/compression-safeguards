@@ -65,6 +65,9 @@ for folder, files in {
         name: f"https://media.githubusercontent.com/media/${user}/${repo}/refs/heads/${branch}/examples/data/{folder}/{name}"
         for name in files
     })
+
+for folder in ["observations", "plots", "tables"]:
+    Path(folder).mkdir(parents=True, exist_ok=True)
 `,
     }));
   });

@@ -3,7 +3,7 @@ import json
 from collections import defaultdict
 from collections.abc import Generator, Mapping
 from contextlib import AbstractContextManager, contextmanager
-from typing import Any
+from typing import Any, cast
 
 import numcodecs_observers
 from numcodecs.abc import Codec
@@ -62,8 +62,7 @@ def _observe(codec: Codec, observations: list[dict]) -> Generator[Codec]:
                 for observer in codec_._observers
             ]
 
-            encoded = codec_class.encode(codec_._codec, buf)
-            assert isinstance(encoded, Buffer)
+            encoded = cast("Buffer", codec_class.encode(codec_._codec, buf))
 
             for observer in reversed(observers):
                 observer(encoded)
@@ -76,8 +75,7 @@ def _observe(codec: Codec, observations: list[dict]) -> Generator[Codec]:
                 for observer in codec_._observers
             ]
 
-            decoded = codec_class.decode(codec_._codec, buf, out=out)
-            assert isinstance(decoded, Buffer)
+            decoded = cast("Buffer", codec_class.decode(codec_._codec, buf, out=out))
 
             for observer in reversed(observers):
                 observer(decoded)
