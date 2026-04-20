@@ -68,7 +68,7 @@ examples = [
     "netcdf4~=1.7.2",
     "numcodecs-observers==0.1.3",
     "numcodecs-pw-ratio==0.2.0",
-    "numcodecs-replace==0.1.0",
+    "numcodecs-replace==0.1.1",
     "numcodecs-wasm==0.2.2",
     "numcodecs-wasm-qpet-sperr==0.2.0",
     "numcodecs-wasm-sperr==0.2.0",
