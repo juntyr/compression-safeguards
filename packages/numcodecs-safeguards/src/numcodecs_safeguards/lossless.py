@@ -18,7 +18,7 @@ from numcodecs_shuffle import TypedByteShuffleCodec
 from numcodecs_tokenize import TokenizeCodec
 
 
-def _default_lossless_for_safeguards() -> Codec:
+def _default_lossless_for_corrections() -> Codec:
     return PickBestCodec(
         CodecStack(
             TokenizeCodec(),
@@ -51,11 +51,11 @@ class Lossless:
     By default, no further lossless compression is applied.
     """
 
-    for_safeguards: dict[str, JSON] | Codec = field(
-        default_factory=_default_lossless_for_safeguards,
+    for_corrections: dict[str, JSON] | Codec = field(
+        default_factory=_default_lossless_for_corrections,
     )
     """
-    Lossless codec (configuration) that is applied to the safeguard-computed
+    Lossless codec (configuration) that is applied to the safeguards-computed
     corrections.
 
     The default is considered an implementation detail.

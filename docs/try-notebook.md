@@ -40,8 +40,16 @@ edit_uri: docs/try-notebook.md
       "EARTHKIT_DATA_CACHE_POLICY": "off",
       "EARTHKIT_REGRID_CACHE_POLICY": "off",
       "CLIMET_LAB_BOOTSTRAP_CODE": `\
-import pyodide_fs_mount_http
+import shutil
 from pathlib import Path
+from urllib.request import urlopen
+
+import pyodide_fs_mount_http
+
+with urlopen(f"https://cors.climet.eu/https://raw.githubusercontent.com/${user}/${repo}/refs/heads/${branch}/examples/observe.py") as response:
+    with open("observe.py", "wb") as file:
+        shutil.copyfileobj(response, file)
+
 for folder, files in {
     "cems-ercnfdr": ["data.grib"],
     "era5-lh": ["data.nc"],
@@ -57,6 +65,9 @@ for folder, files in {
         name: f"https://media.githubusercontent.com/media/${user}/${repo}/refs/heads/${branch}/examples/data/{folder}/{name}"
         for name in files
     })
+
+for folder in ["observations", "plots", "tables"]:
+    Path(folder).mkdir(parents=True, exist_ok=True)
 `,
     }));
   });

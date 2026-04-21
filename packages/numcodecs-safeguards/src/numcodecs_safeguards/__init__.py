@@ -200,7 +200,7 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
           lossless encoding that is applied to the encoded output of the
           wrapped `codec`. By default, no additional lossless encoding is
           applied.
-        - [`Lossless.for_safeguards`][..lossless.Lossless.for_safeguards]
+        - [`Lossless.for_corrections`][..lossless.Lossless.for_corrections]
           specifies the lossless encoding that is applied to the corrections
           that the safeguards produce. By default, Zstandard compression is
           applied after entropy coding.
@@ -233,14 +233,14 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
         "_safeguards",
         "_late_bound",
         "_lossless_for_codec",
-        "_lossless_for_safeguards",
+        "_lossless_for_corrections",
         "_compute",
     )
     _codec: Codec
     _safeguards: Safeguards
     _late_bound: Bindings
     _lossless_for_codec: None | Codec
-    _lossless_for_safeguards: Codec
+    _lossless_for_corrections: Codec
     _compute: Compute
 
     codec_id: ClassVar[str] = "safeguards"  # type: ignore
@@ -309,10 +309,10 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
             if lossless.for_codec is not None
             else None
         )
-        self._lossless_for_safeguards = (
-            lossless.for_safeguards
-            if isinstance(lossless.for_safeguards, Codec)
-            else numcodecs.registry.get_codec(lossless.for_safeguards)
+        self._lossless_for_corrections = (
+            lossless.for_corrections
+            if isinstance(lossless.for_corrections, Codec)
+            else numcodecs.registry.get_codec(lossless.for_corrections)
         )
 
         self._compute = (
@@ -397,7 +397,7 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
                 for_codec=None
                 if self._lossless_for_codec is None
                 else self._lossless_for_codec,
-                for_safeguards=self._lossless_for_safeguards,
+                for_corrections=self._lossless_for_corrections,
             ),
             _version=self._safeguards.version,
         )
@@ -593,7 +593,7 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
             correction_bytes = b""
         else:
             correction_bytes = numcodecs.compat.ensure_bytes(
-                self._lossless_for_safeguards.encode(correction)
+                self._lossless_for_corrections.encode(correction)
             )
 
         correction_len: bytearray = leb128.u.encode(len(correction_bytes))
@@ -675,7 +675,7 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
         if correction_len > 0:
             correction: np.ndarray = (
                 numcodecs.compat.ensure_ndarray(
-                    self._lossless_for_safeguards.decode(correction_bytes)
+                    self._lossless_for_corrections.decode(correction_bytes)
                 )
                 .view(as_bits(np.array((), dtype=decoded.dtype)).dtype)
                 .reshape(decoded.shape)
@@ -732,7 +732,7 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
                 for_codec=None
                 if self._lossless_for_codec is None
                 else self._lossless_for_codec.get_config(),
-                for_safeguards=self._lossless_for_safeguards.get_config(),
+                for_corrections=self._lossless_for_corrections.get_config(),
             ),
             compute=self._compute.get_config(),
             _version=str(self._safeguards.version),
@@ -766,7 +766,7 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
 
     @override
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(codec={self._codec!r}, safeguards={list(self._safeguards.safeguards)!r}, fixed_constants={dict(**self._late_bound._bindings)!r}, lossless={Lossless(for_codec=self._lossless_for_codec, for_safeguards=self._lossless_for_safeguards)!r})"
+        return f"{type(self).__name__}(codec={self._codec!r}, safeguards={list(self._safeguards.safeguards)!r}, fixed_constants={dict(**self._late_bound._bindings)!r}, lossless={Lossless(for_codec=self._lossless_for_codec, for_corrections=self._lossless_for_corrections)!r}, compute={self._compute!r})"
 
     @override
     def map(self, mapper: Callable[[Codec], Codec]) -> "SafeguardedCodec":
@@ -808,8 +808,9 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
                 for_codec=None
                 if self._lossless_for_codec is None
                 else mapper(self._lossless_for_codec),
-                for_safeguards=mapper(self._lossless_for_safeguards),
+                for_corrections=mapper(self._lossless_for_corrections),
             ),
+            compute=self._compute.get_config(),
             _version=self._safeguards.version,
         )
 
