@@ -49,7 +49,7 @@ nav:
           - "Pointwise: Log-scale Specific Humidity": examples/log-scale.ipynb
           - "Semi-Pointwise: Kinetic energy": examples/kinetic-energy.ipynb
           - Higher-order derivatives: examples/derivative.ipynb
-          - "Neighbourhood: Vorticity": examples/vorticity.ipynb
+          - "Neighbourhood: Relative Vorticity": examples/vorticity.ipynb
           - Bounding the dSSIM metric: examples/dssim.ipynb
       - Topology:
           - Precipitation extrema: examples/precipitation.ipynb
