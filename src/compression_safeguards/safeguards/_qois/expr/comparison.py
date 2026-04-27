@@ -1,4 +1,5 @@
 from collections.abc import Callable, Mapping
+from functools import partial
 from typing import overload
 
 import numpy as np
@@ -12,7 +13,7 @@ from ....utils._compat import (
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from ..typing import F, Fi, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Expr
+from .abc import AnyExpr, Callback, Context, Expr
 from .constfold import ScalarFoldedConstant
 
 
@@ -29,6 +30,11 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarEqual":
@@ -57,18 +63,17 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             Xs.dtype,
         )
 
-    @override
     @checked_data_bounds
-    def compute_data_bounds_unchecked(
+    @override
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         a = self._a
         b = self._b
 
@@ -124,10 +129,44 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        xl: np_sndarray[Ps, Ns, np.dtype[F]]
-        xu: np_sndarray[Ps, Ns, np.dtype[F]]
-        Xs_lower_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
-        Xs_upper_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
+        Xs_lower_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+        Xs_upper_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+
+        term_callbacks_done = [False, False]
+        callback_done = [False]
+
+        def callback_wrapper(
+            Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
+            Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
+            *,
+            j: int,
+        ) -> None:
+            # combine the inner data bounds
+            if Xs_lower_[0] is None:
+                Xs_lower_[0] = Xs_lower
+            else:
+                Xs_lower_[0] = _maximum_zero_sign_sensitive(Xs_lower_[0], Xs_lower)
+            if Xs_upper_[0] is None:
+                Xs_upper_[0] = Xs_upper
+            else:
+                Xs_upper_[0] = _minimum_zero_sign_sensitive(Xs_upper_[0], Xs_upper)
+
+            term_callbacks_done[j] = True
+
+            if all(term_callbacks_done) and not callback_done[0]:
+                callback_done[0] = True
+
+                assert Xs_lower_[0] is not None
+                assert Xs_upper_[0] is not None
+
+                Xs_lower = Xs_lower_[0]
+                Xs_upper = Xs_upper_[0]
+
+                # ensure that the bounds on Xs include Xs
+                Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
+                Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+
+                return callback(Xs_lower, Xs_upper)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a == b) = True, then
@@ -168,11 +207,13 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
 
             # recurse into arg a
-            Xs_lower_, Xs_upper_ = a.compute_data_bounds(
+            a.deferred_compute_data_bounds(
                 a_lower,
                 a_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(callback_wrapper, j=0),
             )
 
         # cont. with b as outlined above
@@ -206,32 +247,29 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
 
             # recurse into arg b
-            xl, xu = b.compute_data_bounds(
+            b.deferred_compute_data_bounds(
                 b_lower,
                 b_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(callback_wrapper, j=1),
             )
 
-            # combine the inner data bounds
-            if Xs_lower_ is None:
-                Xs_lower_ = xl
-            else:
-                Xs_lower_ = _maximum_zero_sign_sensitive(Xs_lower_, xl)
-            if Xs_upper_ is None:
-                Xs_upper_ = xu
-            else:
-                Xs_upper_ = _minimum_zero_sign_sensitive(Xs_upper_, xu)
+        if all(term_callbacks_done) and not callback_done[0]:
+            callback_done[0] = True
 
-        assert Xs_lower_ is not None
-        assert Xs_upper_ is not None
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_lower_
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_upper_
+            assert Xs_lower_[0] is not None
+            assert Xs_upper_[0] is not None
 
-        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+            Xs_lower = Xs_lower_[0]
+            Xs_upper = Xs_upper_[0]
 
-        return Xs_lower, Xs_upper
+            # ensure that the bounds on Xs include Xs
+            Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
+            Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+
+            return callback(Xs_lower, Xs_upper)
 
     @override
     def __repr__(self) -> str:
@@ -251,6 +289,11 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarNotEqual":
@@ -279,18 +322,17 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             Xs.dtype,
         )
 
-    @override
     @checked_data_bounds
-    def compute_data_bounds_unchecked(
+    @override
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         a = self._a
         b = self._b
 
@@ -346,10 +388,44 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        xl: np_sndarray[Ps, Ns, np.dtype[F]]
-        xu: np_sndarray[Ps, Ns, np.dtype[F]]
-        Xs_lower_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
-        Xs_upper_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
+        Xs_lower_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+        Xs_upper_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+
+        term_callbacks_done = [False, False]
+        callback_done = [False]
+
+        def callback_wrapper(
+            Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
+            Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
+            *,
+            j: int,
+        ) -> None:
+            # combine the inner data bounds
+            if Xs_lower_[0] is None:
+                Xs_lower_[0] = Xs_lower
+            else:
+                Xs_lower_[0] = _maximum_zero_sign_sensitive(Xs_lower_[0], Xs_lower)
+            if Xs_upper_[0] is None:
+                Xs_upper_[0] = Xs_upper
+            else:
+                Xs_upper_[0] = _minimum_zero_sign_sensitive(Xs_upper_[0], Xs_upper)
+
+            term_callbacks_done[j] = True
+
+            if all(term_callbacks_done) and not callback_done[0]:
+                callback_done[0] = True
+
+                assert Xs_lower_[0] is not None
+                assert Xs_upper_[0] is not None
+
+                Xs_lower = Xs_lower_[0]
+                Xs_upper = Xs_upper_[0]
+
+                # ensure that the bounds on Xs include Xs
+                Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
+                Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+
+                return callback(Xs_lower, Xs_upper)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a != b) = True, then
@@ -390,11 +466,13 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
 
             # recurse into arg a
-            Xs_lower_, Xs_upper_ = a.compute_data_bounds(
+            a.deferred_compute_data_bounds(
                 a_lower,
                 a_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(callback_wrapper, j=0),
             )
 
         # cont. with b as outlined above
@@ -428,32 +506,29 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
 
             # recurse into arg b
-            xl, xu = b.compute_data_bounds(
+            b.deferred_compute_data_bounds(
                 b_lower,
                 b_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(callback_wrapper, j=1),
             )
 
-            # combine the inner data bounds
-            if Xs_lower_ is None:
-                Xs_lower_ = xl
-            else:
-                Xs_lower_ = _maximum_zero_sign_sensitive(Xs_lower_, xl)
-            if Xs_upper_ is None:
-                Xs_upper_ = xu
-            else:
-                Xs_upper_ = _minimum_zero_sign_sensitive(Xs_upper_, xu)
+        if all(term_callbacks_done) and not callback_done[0]:
+            callback_done[0] = True
 
-        assert Xs_lower_ is not None
-        assert Xs_upper_ is not None
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_lower_
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_upper_
+            assert Xs_lower_[0] is not None
+            assert Xs_upper_[0] is not None
 
-        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+            Xs_lower = Xs_lower_[0]
+            Xs_upper = Xs_upper_[0]
 
-        return Xs_lower, Xs_upper
+            # ensure that the bounds on Xs include Xs
+            Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
+            Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+
+            return callback(Xs_lower, Xs_upper)
 
     @override
     def __repr__(self) -> str:
@@ -473,6 +548,11 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarLess":
@@ -501,18 +581,17 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             Xs.dtype,
         )
 
-    @override
     @checked_data_bounds
-    def compute_data_bounds_unchecked(
+    @override
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         a = self._a
         b = self._b
 
@@ -568,10 +647,44 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        xl: np_sndarray[Ps, Ns, np.dtype[F]]
-        xu: np_sndarray[Ps, Ns, np.dtype[F]]
-        Xs_lower_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
-        Xs_upper_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
+        Xs_lower_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+        Xs_upper_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+
+        term_callbacks_done = [False, False]
+        callback_done = [False]
+
+        def callback_wrapper(
+            Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
+            Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
+            *,
+            j: int,
+        ) -> None:
+            # combine the inner data bounds
+            if Xs_lower_[0] is None:
+                Xs_lower_[0] = Xs_lower
+            else:
+                Xs_lower_[0] = _maximum_zero_sign_sensitive(Xs_lower_[0], Xs_lower)
+            if Xs_upper_[0] is None:
+                Xs_upper_[0] = Xs_upper
+            else:
+                Xs_upper_[0] = _minimum_zero_sign_sensitive(Xs_upper_[0], Xs_upper)
+
+            term_callbacks_done[j] = True
+
+            if all(term_callbacks_done) and not callback_done[0]:
+                callback_done[0] = True
+
+                assert Xs_lower_[0] is not None
+                assert Xs_upper_[0] is not None
+
+                Xs_lower = Xs_lower_[0]
+                Xs_upper = Xs_upper_[0]
+
+                # ensure that the bounds on Xs include Xs
+                Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
+                Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+
+                return callback(Xs_lower, Xs_upper)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a < b) = True, then
@@ -608,11 +721,13 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
 
             # recurse into arg a
-            Xs_lower_, Xs_upper_ = a.compute_data_bounds(
+            a.deferred_compute_data_bounds(
                 a_lower,
                 a_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(callback_wrapper, j=0),
             )
 
         # cont. with b as outlined above
@@ -644,32 +759,29 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
 
             # recurse into arg b
-            xl, xu = b.compute_data_bounds(
+            b.deferred_compute_data_bounds(
                 b_lower,
                 b_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(callback_wrapper, j=1),
             )
 
-            # combine the inner data bounds
-            if Xs_lower_ is None:
-                Xs_lower_ = xl
-            else:
-                Xs_lower_ = _maximum_zero_sign_sensitive(Xs_lower_, xl)
-            if Xs_upper_ is None:
-                Xs_upper_ = xu
-            else:
-                Xs_upper_ = _minimum_zero_sign_sensitive(Xs_upper_, xu)
+        if all(term_callbacks_done) and not callback_done[0]:
+            callback_done[0] = True
 
-        assert Xs_lower_ is not None
-        assert Xs_upper_ is not None
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_lower_
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_upper_
+            assert Xs_lower_[0] is not None
+            assert Xs_upper_[0] is not None
 
-        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+            Xs_lower = Xs_lower_[0]
+            Xs_upper = Xs_upper_[0]
 
-        return Xs_lower, Xs_upper
+            # ensure that the bounds on Xs include Xs
+            Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
+            Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+
+            return callback(Xs_lower, Xs_upper)
 
     @override
     def __repr__(self) -> str:
@@ -689,6 +801,11 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarGreaterEqual":
@@ -717,18 +834,17 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             Xs.dtype,
         )
 
-    @override
     @checked_data_bounds
-    def compute_data_bounds_unchecked(
+    @override
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         a = self._a
         b = self._b
 
@@ -784,10 +900,44 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        xl: np_sndarray[Ps, Ns, np.dtype[F]]
-        xu: np_sndarray[Ps, Ns, np.dtype[F]]
-        Xs_lower_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
-        Xs_upper_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
+        Xs_lower_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+        Xs_upper_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+
+        term_callbacks_done = [False, False]
+        callback_done = [False]
+
+        def callback_wrapper(
+            Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
+            Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
+            *,
+            j: int,
+        ) -> None:
+            # combine the inner data bounds
+            if Xs_lower_[0] is None:
+                Xs_lower_[0] = Xs_lower
+            else:
+                Xs_lower_[0] = _maximum_zero_sign_sensitive(Xs_lower_[0], Xs_lower)
+            if Xs_upper_[0] is None:
+                Xs_upper_[0] = Xs_upper
+            else:
+                Xs_upper_[0] = _minimum_zero_sign_sensitive(Xs_upper_[0], Xs_upper)
+
+            term_callbacks_done[j] = True
+
+            if all(term_callbacks_done) and not callback_done[0]:
+                callback_done[0] = True
+
+                assert Xs_lower_[0] is not None
+                assert Xs_upper_[0] is not None
+
+                Xs_lower = Xs_lower_[0]
+                Xs_upper = Xs_upper_[0]
+
+                # ensure that the bounds on Xs include Xs
+                Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
+                Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+
+                return callback(Xs_lower, Xs_upper)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a >= b) = True, then
@@ -824,11 +974,13 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
 
             # recurse into arg a
-            Xs_lower_, Xs_upper_ = a.compute_data_bounds(
+            a.deferred_compute_data_bounds(
                 a_lower,
                 a_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(callback_wrapper, j=0),
             )
 
         # cont. with b as outlined above
@@ -860,32 +1012,29 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
 
             # recurse into arg b
-            xl, xu = b.compute_data_bounds(
+            b.deferred_compute_data_bounds(
                 b_lower,
                 b_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(callback_wrapper, j=1),
             )
 
-            # combine the inner data bounds
-            if Xs_lower_ is None:
-                Xs_lower_ = xl
-            else:
-                Xs_lower_ = _maximum_zero_sign_sensitive(Xs_lower_, xl)
-            if Xs_upper_ is None:
-                Xs_upper_ = xu
-            else:
-                Xs_upper_ = _minimum_zero_sign_sensitive(Xs_upper_, xu)
+        if all(term_callbacks_done) and not callback_done[0]:
+            callback_done[0] = True
 
-        assert Xs_lower_ is not None
-        assert Xs_upper_ is not None
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_lower_
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_upper_
+            assert Xs_lower_[0] is not None
+            assert Xs_upper_[0] is not None
 
-        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+            Xs_lower = Xs_lower_[0]
+            Xs_upper = Xs_upper_[0]
 
-        return Xs_lower, Xs_upper
+            # ensure that the bounds on Xs include Xs
+            Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
+            Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+
+            return callback(Xs_lower, Xs_upper)
 
     @override
     def __repr__(self) -> str:
@@ -905,6 +1054,11 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarLessEqual":
@@ -933,18 +1087,17 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
             Xs.dtype,
         )
 
-    @override
     @checked_data_bounds
-    def compute_data_bounds_unchecked(
+    @override
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         a = self._a
         b = self._b
 
@@ -1000,10 +1153,44 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-        xl: np_sndarray[Ps, Ns, np.dtype[F]]
-        xu: np_sndarray[Ps, Ns, np.dtype[F]]
-        Xs_lower_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
-        Xs_upper_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
+        Xs_lower_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+        Xs_upper_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+
+        term_callbacks_done = [False, False]
+        callback_done = [False]
+
+        def callback_wrapper(
+            Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
+            Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
+            *,
+            j: int,
+        ) -> None:
+            # combine the inner data bounds
+            if Xs_lower_[0] is None:
+                Xs_lower_[0] = Xs_lower
+            else:
+                Xs_lower_[0] = _maximum_zero_sign_sensitive(Xs_lower_[0], Xs_lower)
+            if Xs_upper_[0] is None:
+                Xs_upper_[0] = Xs_upper
+            else:
+                Xs_upper_[0] = _minimum_zero_sign_sensitive(Xs_upper_[0], Xs_upper)
+
+            term_callbacks_done[j] = True
+
+            if all(term_callbacks_done) and not callback_done[0]:
+                callback_done[0] = True
+
+                assert Xs_lower_[0] is not None
+                assert Xs_upper_[0] is not None
+
+                Xs_lower = Xs_lower_[0]
+                Xs_upper = Xs_upper_[0]
+
+                # ensure that the bounds on Xs include Xs
+                Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
+                Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+
+                return callback(Xs_lower, Xs_upper)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a <= b) = True, then
@@ -1040,11 +1227,13 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
             a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
 
             # recurse into arg a
-            Xs_lower_, Xs_upper_ = a.compute_data_bounds(
+            a.deferred_compute_data_bounds(
                 a_lower,
                 a_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(callback_wrapper, j=0),
             )
 
         # cont. with b as outlined above
@@ -1076,32 +1265,29 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
             #       intervals in the future
 
             # recurse into arg b
-            xl, xu = b.compute_data_bounds(
+            b.deferred_compute_data_bounds(
                 b_lower,
                 b_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(callback_wrapper, j=1),
             )
 
-            # combine the inner data bounds
-            if Xs_lower_ is None:
-                Xs_lower_ = xl
-            else:
-                Xs_lower_ = _maximum_zero_sign_sensitive(Xs_lower_, xl)
-            if Xs_upper_ is None:
-                Xs_upper_ = xu
-            else:
-                Xs_upper_ = _minimum_zero_sign_sensitive(Xs_upper_, xu)
+        if all(term_callbacks_done) and not callback_done[0]:
+            callback_done[0] = True
 
-        assert Xs_lower_ is not None
-        assert Xs_upper_ is not None
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_lower_
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_upper_
+            assert Xs_lower_[0] is not None
+            assert Xs_upper_[0] is not None
 
-        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+            Xs_lower = Xs_lower_[0]
+            Xs_upper = Xs_upper_[0]
 
-        return Xs_lower, Xs_upper
+            # ensure that the bounds on Xs include Xs
+            Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
+            Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+
+            return callback(Xs_lower, Xs_upper)
 
     @override
     def __repr__(self) -> str:
@@ -1121,6 +1307,11 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarGreater":
@@ -1149,18 +1340,17 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
             Xs.dtype,
         )
 
-    @override
     @checked_data_bounds
-    def compute_data_bounds_unchecked(
+    @override
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         a = self._a
         b = self._b
 
@@ -1216,10 +1406,44 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-        xl: np_sndarray[Ps, Ns, np.dtype[F]]
-        xu: np_sndarray[Ps, Ns, np.dtype[F]]
-        Xs_lower_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
-        Xs_upper_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
+        Xs_lower_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+        Xs_upper_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+
+        term_callbacks_done = [False, False]
+        callback_done = [False]
+
+        def callback_wrapper(
+            Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
+            Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
+            *,
+            j: int,
+        ) -> None:
+            # combine the inner data bounds
+            if Xs_lower_[0] is None:
+                Xs_lower_[0] = Xs_lower
+            else:
+                Xs_lower_[0] = _maximum_zero_sign_sensitive(Xs_lower_[0], Xs_lower)
+            if Xs_upper_[0] is None:
+                Xs_upper_[0] = Xs_upper
+            else:
+                Xs_upper_[0] = _minimum_zero_sign_sensitive(Xs_upper_[0], Xs_upper)
+
+            term_callbacks_done[j] = True
+
+            if all(term_callbacks_done) and not callback_done[0]:
+                callback_done[0] = True
+
+                assert Xs_lower_[0] is not None
+                assert Xs_upper_[0] is not None
+
+                Xs_lower = Xs_lower_[0]
+                Xs_upper = Xs_upper_[0]
+
+                # ensure that the bounds on Xs include Xs
+                Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
+                Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+
+                return callback(Xs_lower, Xs_upper)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a > b) = True, then
@@ -1256,11 +1480,13 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
             a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
 
             # recurse into arg a
-            Xs_lower_, Xs_upper_ = a.compute_data_bounds(
+            a.deferred_compute_data_bounds(
                 a_lower,
                 a_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(callback_wrapper, j=0),
             )
 
         # cont. with b as outlined above
@@ -1292,32 +1518,29 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
             b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
 
             # recurse into arg b
-            xl, xu = b.compute_data_bounds(
+            b.deferred_compute_data_bounds(
                 b_lower,
                 b_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(callback_wrapper, j=1),
             )
 
-            # combine the inner data bounds
-            if Xs_lower_ is None:
-                Xs_lower_ = xl
-            else:
-                Xs_lower_ = _maximum_zero_sign_sensitive(Xs_lower_, xl)
-            if Xs_upper_ is None:
-                Xs_upper_ = xu
-            else:
-                Xs_upper_ = _minimum_zero_sign_sensitive(Xs_upper_, xu)
+        if all(term_callbacks_done) and not callback_done[0]:
+            callback_done[0] = True
 
-        assert Xs_lower_ is not None
-        assert Xs_upper_ is not None
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_lower_
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_upper_
+            assert Xs_lower_[0] is not None
+            assert Xs_upper_[0] is not None
 
-        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+            Xs_lower = Xs_lower_[0]
+            Xs_upper = Xs_upper_[0]
 
-        return Xs_lower, Xs_upper
+            # ensure that the bounds on Xs include Xs
+            Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
+            Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+
+            return callback(Xs_lower, Xs_upper)
 
     @override
     def __repr__(self) -> str:

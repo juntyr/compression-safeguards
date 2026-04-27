@@ -29,14 +29,14 @@ with atheris.instrument_imports():
     #     ScalarAny,
     #     ScalarNot,
     # )
-    # from compression_safeguards.safeguards._qois.expr.comparison import (
-    #     ScalarEqual,
-    #     ScalarGreater,
-    #     ScalarGreaterEqual,
-    #     ScalarLess,
-    #     ScalarLessEqual,
-    #     ScalarNotEqual,
-    # )
+    from compression_safeguards.safeguards._qois.expr.comparison import (
+        ScalarEqual,
+        ScalarGreater,
+        ScalarGreaterEqual,
+        ScalarLess,
+        ScalarLessEqual,
+        ScalarNotEqual,
+    )
     from compression_safeguards.safeguards._qois.expr.constfold import (
         ScalarFoldedConstant,
     )
@@ -173,12 +173,12 @@ BINARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr], AnyExpr]] = [
     ScalarMultiply,
     ScalarLogWithBase,
     ScalarPower,
-    # ScalarLessEqual,
-    # ScalarLess,
-    # ScalarEqual,
-    # ScalarNotEqual,
-    # ScalarGreaterEqual,
-    # ScalarGreater,
+    ScalarLessEqual,
+    ScalarLess,
+    ScalarEqual,
+    ScalarNotEqual,
+    ScalarGreaterEqual,
+    ScalarGreater,
 ]
 TERNARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr, AnyExpr], AnyExpr]] = [
     ScalarWhere,

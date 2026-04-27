@@ -18,11 +18,11 @@ from compression_safeguards.safeguards._qois.expr.classification import (
 #     ScalarAny,
 #     ScalarNot,
 # )
-# from compression_safeguards.safeguards._qois.expr.comparison import (
-#     ScalarEqual,
-#     ScalarGreater,
-#     ScalarLess,
-# )
+from compression_safeguards.safeguards._qois.expr.comparison import (
+    ScalarEqual,
+    ScalarGreater,
+    ScalarLess,
+)
 from compression_safeguards.safeguards._qois.expr.constfold import ScalarFoldedConstant
 from compression_safeguards.safeguards._qois.expr.data import Data
 from compression_safeguards.safeguards._qois.expr.divmul import (
@@ -32,7 +32,7 @@ from compression_safeguards.safeguards._qois.expr.divmul import (
 from compression_safeguards.safeguards._qois.expr.hyperbolic import (
     ScalarAcosh,
     ScalarAsinh,
-    # ScalarCosh,
+    ScalarCosh,
     ScalarTanh,
 )
 from compression_safeguards.safeguards._qois.expr.literal import Euler, Number, Pi
@@ -1809,41 +1809,41 @@ def test_fuzzer_found_upper_data_bounds_below():
 #     assert expr.eval(X_upper, dict()) == np.array(np.float64(0.0))
 
 
-# @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-# def test_fuzzer_found_asinh_less_asinh():
-#     X = np.array(_float128("1.65e-4963"))
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_asinh_less_asinh():
+    X = np.array(_float128("1.65e-4963"))
 
-#     expr = ScalarLess(ScalarAsinh(Data.SCALAR), ScalarAsinh(Data.SCALAR))
+    expr = ScalarLess(ScalarAsinh(Data.SCALAR), ScalarAsinh(Data.SCALAR))
 
-#     assert expr.eval(X, dict()) == np.array(_float128(0.0))
+    assert expr.eval(X, dict()) == np.array(_float128(0.0))
 
-#     expr_lower = np.array(_float128(0.0))
-#     expr_upper = np.array(_float128(0.0))
+    expr_lower = np.array(_float128(0.0))
+    expr_upper = np.array(_float128(0.0))
 
-#     X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
-#     assert X_lower == np.array(_float128("1.65e-4963"))
-#     assert X_upper == np.array(_float128("1.65e-4963"))
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(_float128("1.65e-4963"))
+    assert X_upper == np.array(_float128("1.65e-4963"))
 
-#     assert expr.eval(X_lower, dict()) == np.array(_float128(0.0))
-#     assert expr.eval(X_upper, dict()) == np.array(_float128(0.0))
+    assert expr.eval(X_lower, dict()) == np.array(_float128(0.0))
+    assert expr.eval(X_upper, dict()) == np.array(_float128(0.0))
 
 
-# def test_fuzzer_found_negx_less_x():
-#     X = np.array(0.0, dtype=np.float16)
+def test_fuzzer_found_negx_less_x():
+    X = np.array(0.0, dtype=np.float16)
 
-#     expr = ScalarLess(ScalarNegate(Data.SCALAR), Data.SCALAR)
+    expr = ScalarLess(ScalarNegate(Data.SCALAR), Data.SCALAR)
 
-#     assert expr.eval(X, dict()) == np.array(np.float16(0.0))
+    assert expr.eval(X, dict()) == np.array(np.float16(0.0))
 
-#     expr_lower = np.array(np.float16(0.0))
-#     expr_upper = np.array(np.float16(0.0))
+    expr_lower = np.array(np.float16(0.0))
+    expr_upper = np.array(np.float16(0.0))
 
-#     X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
-#     assert X_lower == np.array(np.float16(-np.inf))
-#     assert X_upper == np.array(np.float16(0.0))
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(np.float16(-np.inf))
+    assert X_upper == np.array(np.float16(0.0))
 
-#     assert expr.eval(X_lower, dict()) == np.array(np.float16(0.0))
-#     assert expr.eval(X_upper, dict()) == np.array(np.float16(0.0))
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(0.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.0))
 
 
 # def test_fuzzer_found_any_zero_singularity():
@@ -1864,22 +1864,22 @@ def test_fuzzer_found_upper_data_bounds_below():
 #     assert expr.eval(X_upper, dict()) == np.array(np.float32(1.0))
 
 
-# def test_fuzzer_found_cosh_equal_isfinite():
-#     X = np.array(0.04678, dtype=np.float16)
+def test_fuzzer_found_cosh_equal_isfinite():
+    X = np.array(0.04678, dtype=np.float16)
 
-#     expr = ScalarEqual(ScalarCosh(Data.SCALAR), ScalarIsFinite(Data.SCALAR))
+    expr = ScalarEqual(ScalarCosh(Data.SCALAR), ScalarIsFinite(Data.SCALAR))
 
-#     assert expr.eval(X, dict()) == np.array(np.float16(0.0))
+    assert expr.eval(X, dict()) == np.array(np.float16(0.0))
 
-#     expr_lower = np.array(np.float16(0.0))
-#     expr_upper = np.array(np.float16(0.0))
+    expr_lower = np.array(np.float16(0.0))
+    expr_upper = np.array(np.float16(0.0))
 
-#     X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
-#     assert X_lower == np.array(np.float16(0.0442))
-#     assert X_upper == np.array(np.float16(np.inf))
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(np.float16(0.0442))
+    assert X_upper == np.array(np.float16(np.inf))
 
-#     assert expr.eval(X_lower, dict()) == np.array(np.float16(0.0))
-#     assert expr.eval(X_upper, dict()) == np.array(np.float16(0.0))
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(0.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.0))
 
 
 # @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1995,39 +1995,39 @@ def test_fuzzer_found_upper_data_bounds_below():
 #     assert expr.eval(X_upper, dict()) == np.array(_float128(1.0))
 
 
-# @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-# def test_fuzzer_found_atan_greater_atan():
-#     X = np.array(3.3554988e07, dtype=np.float32)
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_atan_greater_atan():
+    X = np.array(3.3554988e07, dtype=np.float32)
 
-#     expr = ScalarGreater(ScalarAtan(Data.SCALAR), ScalarAtan(Data.SCALAR))
+    expr = ScalarGreater(ScalarAtan(Data.SCALAR), ScalarAtan(Data.SCALAR))
 
-#     assert expr.eval(X, dict()) == np.array(np.float32(0.0))
+    assert expr.eval(X, dict()) == np.array(np.float32(0.0))
 
-#     expr_lower = np.array(np.float32(0.0))
-#     expr_upper = np.array(np.float32(0.0))
+    expr_lower = np.array(np.float32(0.0))
+    expr_upper = np.array(np.float32(0.0))
 
-#     X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
-#     assert X_lower <= X
-#     assert X_upper >= X
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+    assert X_lower <= X
+    assert X_upper >= X
 
-#     assert expr.eval(X_lower, dict()) == np.array(np.float32(0.0))
-#     assert expr.eval(X_upper, dict()) == np.array(np.float32(0.0))
+    assert expr.eval(X_lower, dict()) == np.array(np.float32(0.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float32(0.0))
 
 
-# @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-# def test_fuzzer_found_atan_greater_atan2():
-#     X = np.array(3.3554432e07, dtype=np.float32)
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_atan_greater_atan2():
+    X = np.array(3.3554432e07, dtype=np.float32)
 
-#     expr = ScalarGreater(ScalarAtan(Data.SCALAR), ScalarAtan(Data.SCALAR))
+    expr = ScalarGreater(ScalarAtan(Data.SCALAR), ScalarAtan(Data.SCALAR))
 
-#     assert expr.eval(X, dict()) == np.array(np.float32(0.0))
+    assert expr.eval(X, dict()) == np.array(np.float32(0.0))
 
-#     expr_lower = np.array(np.float32(0.0))
-#     expr_upper = np.array(np.float32(0.0))
+    expr_lower = np.array(np.float32(0.0))
+    expr_upper = np.array(np.float32(0.0))
 
-#     X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
-#     assert X_lower <= X
-#     assert X_upper >= X
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+    assert X_lower <= X
+    assert X_upper >= X
 
-#     assert expr.eval(X_lower, dict()) == np.array(np.float32(0.0))
-#     assert expr.eval(X_upper, dict()) == np.array(np.float32(0.0))
+    assert expr.eval(X_lower, dict()) == np.array(np.float32(0.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float32(0.0))
