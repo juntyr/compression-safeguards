@@ -7,7 +7,7 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils.bindings import Parameter
 from ..bound import DataBounds, data_bounds
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Expr
+from .abc import AnyExpr, Callback, Context, Expr
 from .literal import Number
 
 
@@ -77,6 +77,11 @@ class ReportingExpr(Expr[AnyExpr]):
     def args(self) -> tuple[AnyExpr]:
         return (self._expr,)
 
+    @property
+    @override
+    def extra(self) -> tuple[Reporter]:
+        return (self._reporter,)
+
     @override
     def with_args(self, expr: AnyExpr) -> "ReportingExpr | Number":
         return ReportingExpr(expr, self._reporter)
@@ -123,20 +128,27 @@ class ReportingExpr(Expr[AnyExpr]):
 
     @data_bounds(DataBounds.infallible)
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         self._reporter.enter(self._expr)
+
+        def wrapped_callback(
+            Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
+            Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
+        ) -> None:
+            self._reporter.exit(self._expr)
+            return callback(Xs_lower, Xs_upper)
+
         try:
-            return self._expr.compute_data_bounds(
-                expr_lower, expr_upper, Xs, late_bound
+            return self._expr.deferred_compute_data_bounds(
+                expr_lower, expr_upper, Xs, late_bound, ctx, wrapped_callback
             )
         finally:
             self._reporter.exit(self._expr)

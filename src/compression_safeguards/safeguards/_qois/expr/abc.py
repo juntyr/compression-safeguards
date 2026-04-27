@@ -1,7 +1,15 @@
-import sys
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Generic, Self, TypeAlias, assert_never, final
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    Protocol,
+    Self,
+    TypeAlias,
+    assert_never,
+    final,
+)
 from warnings import warn
 
 import numpy as np
@@ -21,6 +29,27 @@ if TYPE_CHECKING:
     from .literal import Number
 
 
+class Callback(Protocol, Generic[Ps, Ns, F]):  # type: ignore
+    def __call__(
+        self,
+        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
+        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
+    ) -> None: ...
+
+
+class ExprContext(Generic[Ps, Ns, F]):
+    users: int
+    callbacks: list[Callback[Ps, Ns, F]]
+    expr_bounds: (
+        None
+        | tuple[np.ndarray[tuple[Ps], np.dtype[F]], np.ndarray[tuple[Ps], np.dtype[F]]]
+    )
+
+
+class Context(Generic[Ps, Ns, F]):
+    context: dict["AnyExpr", ExprContext[Ps, Ns, F]]
+
+
 class Expr(ABC, Generic[*Es]):
     """
     Abstract base class for the quantity of interest expression abstract syntax
@@ -35,6 +64,11 @@ class Expr(ABC, Generic[*Es]):
         """
         The sub-expression arguments of this expression.
         """
+
+    @property
+    @abstractmethod
+    def extra(self) -> tuple[Any, ...]:
+        pass
 
     @abstractmethod
     def with_args(self, *args: *Es) -> "Self | Number":
@@ -52,6 +86,14 @@ class Expr(ABC, Generic[*Es]):
         expr : Self
             The modified expression.
         """
+
+    @final
+    def visit_expr(self, v: Callable[["AnyExpr"], None]) -> None:
+        args: tuple[AnyExpr, ...] = self.args  # type: ignore
+        for a in args:
+            a.visit_expr(v)
+        this: AnyExpr = self  # type: ignore
+        return v(this)
 
     @final
     def map_expr(self, m: "Callable[[AnyExpr], AnyExpr]") -> "AnyExpr":
@@ -76,6 +118,33 @@ class Expr(ABC, Generic[*Es]):
         mapped_args: tuple[AnyExpr, ...] = tuple(a.map_expr(m) for a in args)
         mapped_self: AnyExpr = self.with_args(*mapped_args)  # type: ignore
         return m(mapped_self)
+
+    @final
+    def deduplicate_expr(
+        self,
+        cache: dict[
+            tuple[type["AnyExpr"], tuple["AnyExpr", ...], tuple[Any, ...]], "AnyExpr"
+        ],
+    ) -> "AnyExpr":
+        ty: type[AnyExpr] = type(self)  # type: ignore
+
+        args: tuple[AnyExpr, ...] = self.args  # type: ignore
+        deduplicated_args: tuple[AnyExpr, ...] = tuple(
+            a.deduplicate_expr(cache) for a in args
+        )
+
+        key = (ty, deduplicated_args, self.extra)
+
+        cached = cache.get(key, None)
+
+        if cached is not None:
+            return cached
+
+        deduplicated_self: AnyExpr = self.with_args(*deduplicated_args)  # type: ignore
+
+        cache[key] = deduplicated_self
+
+        return deduplicated_self
 
     @final
     @property
@@ -267,100 +336,47 @@ class Expr(ABC, Generic[*Es]):
         """
 
     @abstractmethod
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
-        """
-        Compute the lower-upper bounds on the stencil-extended data `Xs` that
-        that satisfy the lower-upper bounds `expr_lower` and `expr_lower` on
-        this expression.
-
-        This method should *not* be called manually.
-
-        This method is allowed to return slightly wrongly-rounded results
-        that are then corrected by
-        [`compute_data_bounds`][..compute_data_bounds].
-
-        If this method is known to have no rounding errors and always return
-        the correct data bounds, it can be decorated with
-        [`@data_bounds(DataBounds.infallible)`][.....bound.data_bounds].
-
-        Parameters
-        ----------
-        expr_lower : np.ndarray[tuple[Ps], np.dtype[F]]
-            The pointwise lower bound on this expression.
-        expr_upper : np.ndarray[tuple[Ps], np.dtype[F]]
-            The pointwise upper bound on this expression.
-        Xs : np_sndarray[Ps, Ns, np.dtype[F]]
-            The stencil-extended data, in floating-point format, which must be
-            of shape [Ps, ...stencil_shape].
-        late_bound : Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]]
-            The late-bound constants parameters for this expression, with the
-            same shape and floating-point dtype as the stencil-extended data.
-
-        Returns
-        -------
-        Xs_lower, Xs_upper : tuple[np_sndarray[Ps, Ns, np.dtype[F]], np_sndarray[Ps, Ns, np.dtype[F]]]
-            The stencil-extended lower and upper bounds on the stencil-extended
-            data `Xs`.
-
-            The bounds have not yet been combined across neighbouring points
-            that contribute to the same QoI points.
-        """
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
+        pass
 
     @final
-    def compute_data_bounds(
+    def deferred_compute_data_bounds(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
-        """
-        Compute the lower-upper bounds on the stencil-extended data `Xs` that
-        that satisfy the lower-upper bounds `expr_lower` and `expr_lower` on
-        this expression.
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
+        my_ctx = ctx.context[self]  # type: ignore
 
-        This method, by default, calls into
-        [`compute_data_bounds_unchecked`][..compute_data_bounds_unchecked]
-        and then applies extensive rounding checks to ensure that the returned
-        bounds satisfy the bounds on this expression.
+        if my_ctx.expr_bounds is None:
+            my_ctx.expr_bounds = (expr_lower, expr_upper)
+        else:
+            my_ctx.expr_bounds = (
+                _maximum_zero_sign_sensitive(my_ctx.expr_bounds[0], expr_lower),
+                _minimum_zero_sign_sensitive(my_ctx.expr_bounds[1], expr_upper),
+            )
+        my_ctx.callbacks.append(callback)
+        assert len(my_ctx.callbacks) <= my_ctx.users
 
-        Parameters
-        ----------
-        expr_lower : np.ndarray[tuple[Ps], np.dtype[F]]
-            The pointwise lower bound on this expression.
-        expr_upper : np.ndarray[tuple[Ps], np.dtype[F]]
-            The pointwise upper bound on this expression.
-        Xs : np_sndarray[Ps, Ns, np.dtype[F]]
-            The stencil-extended data, in floating-point format, which must be
-            of shape [Ps, ...stencil_shape].
-        late_bound : Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]]
-            The late-bound constants parameters for this expression, with the
-            same shape and floating-point dtype as the stencil-extended data.
+        if len(my_ctx.callbacks) < my_ctx.users:
+            return None
+        ctx.context.pop(self)  # type: ignore
 
-        Returns
-        -------
-        Xs_lower, Xs_upper : tuple[np_sndarray[Ps, Ns, np.dtype[F]], np_sndarray[Ps, Ns, np.dtype[F]]]
-            The stencil-extended lower and upper bounds on the stencil-extended
-            data `Xs`.
-
-            The bounds have not yet been combined across neighbouring points
-            that contribute to the same QoI points.
-        """
+        expr_lower, expr_upper = my_ctx.expr_bounds
 
         if (
-            data_bounds_checks(self.compute_data_bounds_unchecked)
+            data_bounds_checks(self.deferred_compute_data_bounds_unchecked)
             != DataBounds.infallible
         ):
             exprv: np.ndarray[tuple[Ps], np.dtype[F]] = self.eval(Xs, late_bound)
@@ -377,57 +393,68 @@ class Expr(ABC, Generic[*Es]):
         else:
             exprv = None  # type: ignore
 
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]]
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]]
-        Xs_lower, Xs_upper = self.compute_data_bounds_unchecked(
-            expr_lower, expr_upper, Xs, late_bound
-        )
+        def wrapped_callback(
+            Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
+            Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
+        ) -> None:
+            warn_on_bounds_exceeded: bool
 
-        warn_on_bounds_exceeded: bool
+            match data_bounds_checked := data_bounds_checks(
+                self.deferred_compute_data_bounds_unchecked
+            ):
+                case DataBounds.infallible:
+                    for callback in my_ctx.callbacks:
+                        callback(Xs_lower, Xs_upper)
+                    return
+                case DataBounds.unchecked:
+                    warn_on_bounds_exceeded = False
+                case DataBounds.checked:
+                    warn_on_bounds_exceeded = True
+                case _:
+                    assert_never(data_bounds_checked)
 
-        match data_bounds_checked := data_bounds_checks(
-            self.compute_data_bounds_unchecked
-        ):
-            case DataBounds.infallible:
-                return Xs_lower, Xs_upper
-            case DataBounds.unchecked:
-                warn_on_bounds_exceeded = False
-            case DataBounds.checked:
-                warn_on_bounds_exceeded = True
-            case _:
-                assert_never(data_bounds_checked)
+            # ensure that the original data values are within the data bounds
+            Xs_lower = _minimum_zero_sign_sensitive(Xs, Xs_lower)
+            Xs_upper = _maximum_zero_sign_sensitive(Xs, Xs_upper)
 
-        # ensure that the original data values are within the data bounds
-        Xs_lower = _minimum_zero_sign_sensitive(Xs, Xs_lower)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs, Xs_upper)
-
-        # handle rounding errors in the lower bound computation
-        Xs_lower = guarantee_data_within_expr_bounds(
-            lambda Xs_lower: self.eval(
+            # handle rounding errors in the lower bound computation
+            Xs_lower = guarantee_data_within_expr_bounds(
+                lambda Xs_lower: self.eval(
+                    Xs_lower,
+                    late_bound,
+                ),
+                exprv,
+                Xs,
                 Xs_lower,
-                late_bound,
-            ),
-            exprv,
-            Xs,
-            Xs_lower,
-            expr_lower,
-            expr_upper,
-            warn_on_bounds_exceeded=warn_on_bounds_exceeded,
-        )
-        Xs_upper = guarantee_data_within_expr_bounds(
-            lambda Xs_upper: self.eval(
+                expr_lower,
+                expr_upper,
+                warn_on_bounds_exceeded=warn_on_bounds_exceeded,
+            )
+            Xs_upper = guarantee_data_within_expr_bounds(
+                lambda Xs_upper: self.eval(
+                    Xs_upper,
+                    late_bound,
+                ),
+                exprv,
+                Xs,
                 Xs_upper,
-                late_bound,
-            ),
-            exprv,
-            Xs,
-            Xs_upper,
+                expr_lower,
+                expr_upper,
+                warn_on_bounds_exceeded=warn_on_bounds_exceeded,
+            )
+
+            for callback in my_ctx.callbacks:
+                callback(Xs_lower, Xs_upper)
+            return
+
+        return self.deferred_compute_data_bounds_unchecked(
             expr_lower,
             expr_upper,
-            warn_on_bounds_exceeded=warn_on_bounds_exceeded,
+            Xs,
+            late_bound,
+            ctx,
+            wrapped_callback,
         )
-
-        return Xs_lower, Xs_upper
 
     @abstractmethod
     @override
@@ -438,8 +465,60 @@ class Expr(ABC, Generic[*Es]):
 AnyExpr: TypeAlias = Expr[*tuple["AnyExpr", ...]]
 """ Expression with sub-expression arguments """
 
-if sys.version_info >= (3, 11) or TYPE_CHECKING:
-    EmptyExpr: TypeAlias = Expr[()]
-    """ Expression with zero arguments """
-else:
-    EmptyExpr: TypeAlias = Expr
+EmptyExpr: TypeAlias = Expr[()]
+""" Expression with zero arguments """
+
+
+def create_context(expr: AnyExpr) -> Context:
+    context = dict()
+
+    def visit(e: AnyExpr) -> None:
+        if e in context:
+            return
+
+        ctx: ExprContext = ExprContext()
+        ctx.users = 0
+        ctx.callbacks = []
+        ctx.expr_bounds = None
+        context[e] = ctx
+
+        for a in e.args:
+            visit(a)
+            context[a].users += 1
+
+    visit(expr)
+    context[expr].users += 1
+
+    ctx: Context = Context()
+    ctx.context = context
+
+    return ctx
+
+
+def compute_expr_data_bounds(
+    expr: AnyExpr,
+    expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
+    expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
+    Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+    late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
+) -> tuple[np_sndarray[Ps, Ns, np.dtype[F]], np_sndarray[Ps, Ns, np.dtype[F]]]:
+    expr = expr.deduplicate_expr({})
+
+    Xs_lower_out: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+    Xs_upper_out: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+
+    def callback(
+        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
+        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
+    ) -> None:
+        Xs_lower_out[0] = Xs_lower
+        Xs_upper_out[0] = Xs_upper
+
+    expr.deferred_compute_data_bounds(
+        expr_lower, expr_upper, Xs, late_bound, create_context(expr), callback
+    )
+
+    assert Xs_lower_out[0] is not None
+    assert Xs_upper_out[0] is not None
+
+    return Xs_lower_out[0], Xs_upper_out[0]

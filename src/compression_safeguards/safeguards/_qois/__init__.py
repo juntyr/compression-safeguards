@@ -12,7 +12,7 @@ from ..qois import (
     PointwiseQuantityOfInterestExpression,
     StencilQuantityOfInterestExpression,
 )
-from .expr.abc import AnyExpr, Expr
+from .expr.abc import AnyExpr, Expr, compute_expr_data_bounds
 from .expr.array import Array
 from .expr.constfold import ScalarFoldedConstant
 from .expr.data import Data
@@ -79,7 +79,8 @@ class PointwiseQuantityOfInterest:
             #  computed
             _canary_expr = expr.constant_fold(np.dtype(np.float64))
             if isinstance(_canary_expr, Expr):
-                _canary_data_bounds = _canary_expr.compute_data_bounds(
+                _canary_data_bounds = compute_expr_data_bounds(
+                    _canary_expr,
                     dummy_pointwise,
                     dummy_pointwise,
                     dummy_pointwise,
@@ -167,7 +168,7 @@ class PointwiseQuantityOfInterest:
             X_lower_upper: tuple[
                 np_sndarray[Ps, tuple[()], np.dtype[F]],
                 np_sndarray[Ps, tuple[()], np.dtype[F]],
-            ] = expr.compute_data_bounds(qoi_lower, qoi_upper, X, late_bound)
+            ] = compute_expr_data_bounds(expr, qoi_lower, qoi_upper, X, late_bound)
             X_lower = _ensure_array(coerce_to_flat(X_lower_upper[0]))
             X_upper = _ensure_array(coerce_to_flat(X_lower_upper[1]))
         else:
@@ -273,7 +274,8 @@ class StencilQuantityOfInterest:
             #  computed
             _canary_expr = expr.constant_fold(np.dtype(np.float64))
             if isinstance(_canary_expr, Expr):
-                _canary_data_bounds = _canary_expr.compute_data_bounds(
+                _canary_data_bounds = compute_expr_data_bounds(
+                    _canary_expr,
                     dummy_pointwise,
                     dummy_pointwise,
                     dummy_stencil,
@@ -379,8 +381,8 @@ class StencilQuantityOfInterest:
         Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]]
         expr = self._expr.constant_fold(Xs.dtype)
         if isinstance(expr, Expr):
-            Xs_lower, Xs_upper = expr.compute_data_bounds(
-                qoi_lower, qoi_upper, Xs, late_bound
+            Xs_lower, Xs_upper = compute_expr_data_bounds(
+                expr, qoi_lower, qoi_upper, Xs, late_bound
             )
             Xs_lower = _ensure_array(Xs_lower)
             Xs_upper = _ensure_array(Xs_upper)

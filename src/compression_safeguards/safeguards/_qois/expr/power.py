@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from functools import partial
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
@@ -22,7 +23,7 @@ from ..bound import (
     guarantee_stacked_arg_within_expr_bounds,
 )
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Expr
+from .abc import AnyExpr, Callback, Context, Expr
 from .constfold import ScalarFoldedConstant
 from .literal import Number
 
@@ -51,6 +52,11 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
 
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
+
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarPower | Number":
         return ScalarPower(a, b)
@@ -69,18 +75,17 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         return np.power(self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound))
 
-    @override
     @checked_data_bounds
-    def compute_data_bounds_unchecked(
+    @override
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         a_const = not self._a.has_data
         b_const = not self._b.has_data
         assert not (a_const and b_const), "constant power has no data bounds"
@@ -185,11 +190,13 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
                 expr_upper,
             )
 
-            return b.compute_data_bounds(
+            return b.deferred_compute_data_bounds(
                 b_lower,
                 b_upper,
                 Xs,
                 late_bound,
+                ctx,
+                callback,
             )
 
         a_lower: np.ndarray[tuple[Ps], np.dtype[F]]
@@ -274,11 +281,13 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
                 expr_upper,
             )
 
-            return a.compute_data_bounds(
+            return a.deferred_compute_data_bounds(
                 a_lower,
                 a_upper,
                 Xs,
                 late_bound,
+                ctx,
+                callback,
             )
 
         one_plus_eps = np.nextafter(Xs.dtype.type(1), Xs.dtype.type(2))
@@ -541,29 +550,83 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             _where(np.less(av, 1), tl_stack[1], tu_stack[1]),
         )
 
+        Xs_lower_out: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+        Xs_upper_out: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+
+        term_callbacks_done = [False, False]
+        callback_done = [False]
+
+        def callback_wrapper(
+            Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
+            Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
+            *,
+            j: int,
+        ) -> None:
+            # combine the inner data bounds
+            if Xs_lower_out[0] is None:
+                Xs_lower_out[0] = Xs_lower
+            else:
+                Xs_lower_out[0] = _maximum_zero_sign_sensitive(
+                    Xs_lower_out[0], Xs_lower
+                )
+            if Xs_upper_out[0] is None:
+                Xs_upper_out[0] = Xs_upper
+            else:
+                Xs_upper_out[0] = _minimum_zero_sign_sensitive(
+                    Xs_upper_out[0], Xs_upper
+                )
+
+            term_callbacks_done[j] = True
+
+            if all(term_callbacks_done) and not callback_done[0]:
+                callback_done[0] = True
+
+                assert Xs_lower_out[0] is not None
+                assert Xs_upper_out[0] is not None
+
+                Xs_lower = Xs_lower_out[0]
+                Xs_upper = Xs_upper_out[0]
+
+                # ensure that the bounds on Xs include Xs
+                Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
+                Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+
+                return callback(Xs_lower, Xs_upper)
+
         # recurse into a and b to propagate their bounds, then combine their
         #  bounds on Xs
-        Xs_lower, Xs_upper = a.compute_data_bounds(
+        a.deferred_compute_data_bounds(
             a_lower,
             a_upper,
             Xs,
             late_bound,
+            ctx,
+            partial(callback_wrapper, j=0),
         )
 
-        bl, bu = b.compute_data_bounds(
+        b.deferred_compute_data_bounds(
             b_lower,
             b_upper,
             Xs,
             late_bound,
+            ctx,
+            partial(callback_wrapper, j=1),
         )
-        Xs_lower = _maximum_zero_sign_sensitive(Xs_lower, bl)
-        Xs_upper = _minimum_zero_sign_sensitive(Xs_upper, bu)
 
-        # ensure that the bounds on Xs include Xs
-        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+        if all(term_callbacks_done) and not callback_done[0]:
+            callback_done[0] = True
 
-        return Xs_lower, Xs_upper
+            assert Xs_lower_out[0] is not None
+            assert Xs_upper_out[0] is not None
+
+            Xs_lower = Xs_lower_out[0]
+            Xs_upper = Xs_upper_out[0]
+
+            # ensure that the bounds on Xs include Xs
+            Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
+            Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+
+            return callback(Xs_lower, Xs_upper)
 
     @override
     def __repr__(self) -> str:

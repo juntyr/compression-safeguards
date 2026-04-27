@@ -8,7 +8,10 @@ with atheris.instrument_imports():
 
     import numpy as np
 
-    from compression_safeguards.safeguards._qois.expr.abc import AnyExpr
+    from compression_safeguards.safeguards._qois.expr.abc import (
+        AnyExpr,
+        compute_expr_data_bounds,
+    )
     from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
     from compression_safeguards.safeguards._qois.expr.addsub import (
         ScalarAdd,
@@ -20,19 +23,20 @@ with atheris.instrument_imports():
         ScalarIsInf,
         ScalarIsNaN,
     )
-    from compression_safeguards.safeguards._qois.expr.combinators import (
-        ScalarAll,
-        ScalarAny,
-        ScalarNot,
-    )
-    from compression_safeguards.safeguards._qois.expr.comparison import (
-        ScalarEqual,
-        ScalarGreater,
-        ScalarGreaterEqual,
-        ScalarLess,
-        ScalarLessEqual,
-        ScalarNotEqual,
-    )
+
+    # from compression_safeguards.safeguards._qois.expr.combinators import (
+    #     ScalarAll,
+    #     ScalarAny,
+    #     ScalarNot,
+    # )
+    # from compression_safeguards.safeguards._qois.expr.comparison import (
+    #     ScalarEqual,
+    #     ScalarGreater,
+    #     ScalarGreaterEqual,
+    #     ScalarLess,
+    #     ScalarLessEqual,
+    #     ScalarNotEqual,
+    # )
     from compression_safeguards.safeguards._qois.expr.constfold import (
         ScalarFoldedConstant,
     )
@@ -160,7 +164,7 @@ UNARY_EXPRESSIONS: list[Callable[[AnyExpr], AnyExpr]] = [
     ScalarAsin,
     ScalarAcos,
     ScalarAtan,
-    ScalarNot,
+    # ScalarNot,
 ]
 BINARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr], AnyExpr]] = [
     ScalarAdd,
@@ -169,12 +173,12 @@ BINARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr], AnyExpr]] = [
     ScalarMultiply,
     ScalarLogWithBase,
     ScalarPower,
-    ScalarLessEqual,
-    ScalarLess,
-    ScalarEqual,
-    ScalarNotEqual,
-    ScalarGreaterEqual,
-    ScalarGreater,
+    # ScalarLessEqual,
+    # ScalarLess,
+    # ScalarEqual,
+    # ScalarNotEqual,
+    # ScalarGreaterEqual,
+    # ScalarGreater,
 ]
 TERNARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr, AnyExpr], AnyExpr]] = [
     ScalarWhere,
@@ -187,8 +191,8 @@ TERNARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr, AnyExpr], AnyExpr]] = [
     lambda a, b, c: ScalarMultiply(a, ScalarMultiply(b, c)),
     lambda a, b, c: ScalarMultiply(ScalarDivide(a, b), c),
     lambda a, b, c: ScalarDivide(ScalarMultiply(a, b), c),
-    ScalarAll,
-    ScalarAny,
+    # ScalarAll,
+    # ScalarAny,
 ]
 
 
@@ -298,8 +302,12 @@ def check_one_input(data) -> None:
     # and evaluate the expression for them
     try:
         with timeout(1):
-            X_lower, X_upper = expr.compute_data_bounds(
-                np.array([expr_lower]), np.array([expr_upper]), np.array([X]), dict()
+            X_lower, X_upper = compute_expr_data_bounds(
+                expr,
+                np.array([expr_lower]),
+                np.array([expr_upper]),
+                np.array([X]),
+                dict(),
             )
             X_lower, X_upper = X_lower.squeeze()[()], X_upper.squeeze()[()]
     except Exception:

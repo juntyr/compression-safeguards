@@ -15,7 +15,7 @@ from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import S, T
 from ..bound import DataBounds, data_bounds
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, EmptyExpr
+from .abc import AnyExpr, Callback, Context, EmptyExpr
 
 
 class HashingExpr(EmptyExpr):
@@ -45,6 +45,11 @@ class HashingExpr(EmptyExpr):
     @override
     def args(self) -> tuple[()]:
         return ()
+
+    @property
+    @override
+    def extra(self) -> tuple[frozenset[tuple[int, ...]], frozenset[Parameter]]:
+        return (self._data_indices, self._late_bound_constants)
 
     @override
     def with_args(self) -> "HashingExpr":
@@ -124,21 +129,22 @@ class HashingExpr(EmptyExpr):
 
     @data_bounds(DataBounds.infallible)
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         X_hash: np.ndarray[tuple[Ps], np.dtype[F]] = self.eval(Xs, late_bound)
         Xs_hash: np_sndarray[Ps, Ns, np.dtype[F]] = _broadcast_to(
             X_hash.reshape(Xs.shape[:1] + (1,) * (Xs.ndim - 1)), Xs.shape
         )
-        return _ensure_array(Xs_hash, copy=True), _ensure_array(Xs_hash, copy=True)
+        return callback(
+            _ensure_array(Xs_hash, copy=True), _ensure_array(Xs_hash, copy=True)
+        )
 
     @override
     def __repr__(self) -> str:

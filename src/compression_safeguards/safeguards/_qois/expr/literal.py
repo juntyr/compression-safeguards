@@ -8,7 +8,7 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import _broadcast_to, _floating_e, _floating_pi
 from ....utils.bindings import Parameter
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, EmptyExpr
+from .abc import AnyExpr, Callback, Context, EmptyExpr
 
 
 class Number(EmptyExpr):
@@ -57,6 +57,11 @@ class Number(EmptyExpr):
     def args(self) -> tuple[()]:
         return ()
 
+    @property
+    @override
+    def extra(self) -> tuple[str]:
+        return (self._n,)
+
     @override
     def with_args(self) -> "Number":
         return Number(self._n)
@@ -75,16 +80,15 @@ class Number(EmptyExpr):
         return _broadcast_to(n, Xs.shape[:1])
 
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         assert False, "number literals have no data bounds"
 
     def as_int(self) -> None | int:
@@ -154,6 +158,11 @@ class Pi(EmptyExpr):
     def args(self) -> tuple[()]:
         return ()
 
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
+
     @override
     def with_args(self) -> "Pi":
         return Pi()
@@ -172,16 +181,15 @@ class Pi(EmptyExpr):
         return _broadcast_to(pi, Xs.shape[:1])
 
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         assert False, "pi has no data bounds"
 
     @override
@@ -195,6 +203,11 @@ class Euler(EmptyExpr):
     @property
     @override
     def args(self) -> tuple[()]:
+        return ()
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
         return ()
 
     @override
@@ -215,16 +228,15 @@ class Euler(EmptyExpr):
         return _broadcast_to(e, Xs.shape[:1])
 
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         assert False, "Euler's e has no data bounds"
 
     @override

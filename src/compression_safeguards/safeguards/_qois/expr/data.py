@@ -9,7 +9,7 @@ from ....utils.bindings import Parameter
 from ....utils.error import QuantityOfInterestRuntimeWarning
 from ..bound import DataBounds, data_bounds
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, EmptyExpr
+from .abc import AnyExpr, Callback, Context, EmptyExpr
 
 
 class Data(EmptyExpr):
@@ -29,6 +29,11 @@ class Data(EmptyExpr):
     @override
     def args(self) -> tuple[()]:
         return ()
+
+    @property
+    @override
+    def extra(self) -> tuple[tuple[int, ...]]:
+        return (self._index,)
 
     @override
     def with_args(self) -> "Data":
@@ -85,16 +90,15 @@ class Data(EmptyExpr):
 
     @data_bounds(DataBounds.infallible)
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         exprv = Xs[(...,) + self._index]
 
         if not np.all((expr_lower <= exprv) | np.isnan(exprv)):
@@ -120,7 +124,7 @@ class Data(EmptyExpr):
         Xs_upper[np.isnan(Xs)] = np.nan
         Xs_upper[(...,) + self._index] = expr_upper
 
-        return Xs_lower, Xs_upper
+        return callback(Xs_lower, Xs_upper)
 
     @override
     def __repr__(self) -> str:
@@ -158,6 +162,11 @@ class LateBoundConstant(EmptyExpr):
     def args(self) -> tuple[()]:
         return ()
 
+    @property
+    @override
+    def extra(self) -> tuple[str, tuple[int, ...]]:
+        return (self.name, self._index)
+
     @override
     def with_args(self) -> "LateBoundConstant":
         return LateBoundConstant(self._name, self._index)
@@ -194,16 +203,15 @@ class LateBoundConstant(EmptyExpr):
         return out
 
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         assert False, "late-bound constants have no data bounds"
 
     @override
@@ -226,6 +234,11 @@ class ScalarAnyDataConstant(EmptyExpr):
     @override
     def args(self) -> tuple[()]:
         return ()
+
+    @property
+    @override
+    def extra(self) -> tuple[np.number]:
+        return (self._const,)
 
     @override
     def with_args(self) -> "ScalarAnyDataConstant":
@@ -262,18 +275,17 @@ class ScalarAnyDataConstant(EmptyExpr):
         assert isinstance(self._const, Xs.dtype.type)
         return _broadcast_to(self._const, Xs.shape[:1])
 
-    @override
     @data_bounds(DataBounds.infallible)
-    def compute_data_bounds_unchecked(
+    @override
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         assert isinstance(self._const, Xs.dtype.type)
 
         if not np.all((expr_lower <= self._const) | np.isnan(self._const)):
@@ -297,7 +309,7 @@ class ScalarAnyDataConstant(EmptyExpr):
         )
         Xs_upper[np.isnan(Xs)] = np.nan
 
-        return Xs_lower, Xs_upper
+        return callback(Xs_lower, Xs_upper)
 
     @override
     def __repr__(self) -> str:

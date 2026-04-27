@@ -8,7 +8,7 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils.bindings import Parameter
 from ....utils.error import ctx
 from ..typing import Es, F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Expr
+from .abc import AnyExpr, Callback, Context, Expr
 from .addsub import ScalarLeftAssociativeSum
 from .constfold import ScalarFoldedConstant
 from .data import Data
@@ -57,6 +57,11 @@ class Array(Expr[AnyExpr, *tuple[AnyExpr, ...]]):
             return tuple(self._array)
         return tuple(Array(*a) for a in self._array)  # type: ignore
 
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
+
     @override
     def with_args(self, el: AnyExpr, *els: AnyExpr) -> Self:
         return type(self)(el, *els)
@@ -77,16 +82,15 @@ class Array(Expr[AnyExpr, *tuple[AnyExpr, ...]]):
         assert False, "cannot evaluate an array expression"
 
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         assert False, "cannot derive data bounds over an array expression"
 
     @property

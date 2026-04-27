@@ -13,7 +13,7 @@ from ....utils._compat import (
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Expr
+from .abc import AnyExpr, Callback, Context, Expr
 from .constfold import ScalarFoldedConstant
 
 
@@ -36,6 +36,11 @@ class ScalarLog(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[Logarithm]:
+        return (self._log,)
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarLog":
@@ -60,16 +65,15 @@ class ScalarLog(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg and log(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -123,11 +127,13 @@ class ScalarLog(Expr[AnyExpr]):
             expr_upper,
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -165,6 +171,11 @@ class ScalarExp(Expr[AnyExpr]):
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
+    @property
+    @override
+    def extra(self) -> tuple[Exponential]:
+        return (self._exp,)
+
     @override
     def with_args(self, a: AnyExpr) -> "ScalarExp":
         return ScalarExp(self._exp, a)
@@ -188,16 +199,15 @@ class ScalarExp(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg and exp(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -243,11 +253,13 @@ class ScalarExp(Expr[AnyExpr]):
             expr_upper,
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -297,6 +309,11 @@ class ScalarLogWithBase(Expr[AnyExpr, AnyExpr]):
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
 
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
+
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarLogWithBase":
         return ScalarLogWithBase(a, b)
@@ -337,16 +354,15 @@ class ScalarLogWithBase(Expr[AnyExpr, AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         from .divmul import ScalarDivide  # noqa: PLC0415
 
         return ScalarDivide(
@@ -358,7 +374,9 @@ class ScalarLogWithBase(Expr[AnyExpr, AnyExpr]):
                 Logarithm.ln,
                 self._b,
             ),
-        ).compute_data_bounds(expr_lower, expr_upper, Xs, late_bound)
+        ).deferred_compute_data_bounds(
+            expr_lower, expr_upper, Xs, late_bound, ctx, callback
+        )
 
     @override
     def __repr__(self) -> str:

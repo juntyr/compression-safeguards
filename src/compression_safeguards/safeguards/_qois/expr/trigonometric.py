@@ -13,7 +13,7 @@ from ....utils._compat import (
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Expr
+from .abc import AnyExpr, Callback, Context, Expr
 from .constfold import ScalarFoldedConstant
 
 
@@ -28,6 +28,11 @@ class ScalarSin(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarSin":
@@ -49,16 +54,15 @@ class ScalarSin(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg and sin(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -142,11 +146,13 @@ class ScalarSin(Expr[AnyExpr]):
             expr_upper,
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -165,6 +171,11 @@ class ScalarCos(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarCos":
@@ -186,16 +197,15 @@ class ScalarCos(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg and cos(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -274,11 +284,13 @@ class ScalarCos(Expr[AnyExpr]):
             expr_upper,
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -297,6 +309,11 @@ class ScalarTan(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarTan":
@@ -318,16 +335,15 @@ class ScalarTan(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg and tan(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -394,11 +410,13 @@ class ScalarTan(Expr[AnyExpr]):
             expr_upper,
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -417,6 +435,11 @@ class ScalarAsin(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarAsin":
@@ -438,16 +461,15 @@ class ScalarAsin(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg and asin(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -508,11 +530,13 @@ class ScalarAsin(Expr[AnyExpr]):
             expr_upper,
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -531,6 +555,11 @@ class ScalarAcos(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarAcos":
@@ -552,16 +581,15 @@ class ScalarAcos(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg and acos(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -623,11 +651,13 @@ class ScalarAcos(Expr[AnyExpr]):
             expr_upper,
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -646,6 +676,11 @@ class ScalarAtan(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarAtan":
@@ -667,16 +702,15 @@ class ScalarAtan(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg and atan(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -730,11 +764,13 @@ class ScalarAtan(Expr[AnyExpr]):
             expr_upper,
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override

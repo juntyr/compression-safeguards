@@ -7,7 +7,7 @@ from ....utils._compat import _is_positive_zero
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Expr
+from .abc import AnyExpr, Callback, Context, Expr
 from .constfold import ScalarFoldedConstant
 
 
@@ -22,6 +22,11 @@ class ScalarSign(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarSign":
@@ -46,16 +51,15 @@ class ScalarSign(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg and sign(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -87,11 +91,13 @@ class ScalarSign(Expr[AnyExpr]):
         arg_upper[_is_positive_zero(expr_upper)] = +0.0
         np.copyto(arg_upper, exprv, where=np.isnan(exprv), casting="no")
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override

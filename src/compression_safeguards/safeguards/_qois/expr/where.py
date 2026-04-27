@@ -13,7 +13,7 @@ from ....utils._compat import (
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from ..typing import F, Fi, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Expr
+from .abc import AnyExpr, Callback, Context, Expr
 from .constfold import ScalarFoldedConstant
 
 
@@ -32,6 +32,11 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr, AnyExpr]:
         return (self._condition, self._a, self._b)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, condition: AnyExpr, a: AnyExpr, b: AnyExpr) -> "ScalarWhere":
@@ -84,16 +89,15 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate the condition, a, and b
         cond, a, b = self._condition, self._a, self._b
         condv: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
@@ -107,12 +111,20 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
         av = a.eval(Xs, late_bound)
         bv = b.eval(Xs, late_bound)
 
+        cond_callback_done = [False]
+        a_callback_done = [False]
+        b_callback_done = [False]
+        callback_done = [False]
+
         Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
             Xs.shape, Xs.dtype.type(-np.inf)
         )
         Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
             Xs.shape, Xs.dtype.type(np.inf)
         )
+
+        Xs_lower_out = [Xs_lower]
+        Xs_upper_out = [Xs_upper]
 
         if cond.has_data:
             # for simplicity, we assume that the condition must always evaluate
@@ -136,59 +148,124 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
             cond_lower[condv > 0] = smallest_subnormal
             cond_upper[condv < 0] = -smallest_subnormal
 
-            cl, cu = cond.compute_data_bounds(cond_lower, cond_upper, Xs, late_bound)
-            Xs_lower = _maximum_zero_sign_sensitive(Xs_lower, cl)
-            Xs_upper = _minimum_zero_sign_sensitive(Xs_upper, cu)
+            def wrapped_cond_callback(
+                Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
+                Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
+            ) -> None:
+                Xs_lower_out[0] = _maximum_zero_sign_sensitive(
+                    Xs_lower_out[0], Xs_lower
+                )
+                Xs_upper_out[0] = _minimum_zero_sign_sensitive(
+                    Xs_upper_out[0], Xs_upper
+                )
+                cond_callback_done[0] = True
+                if (
+                    cond_callback_done[0]
+                    and a_callback_done[0]
+                    and b_callback_done[0]
+                    and not callback_done[0]
+                ):
+                    callback_done[0] = True
+                    return callback(Xs_lower_out[0], Xs_upper_out[0])
+
+            cond.deferred_compute_data_bounds(
+                cond_lower, cond_upper, Xs, late_bound, ctx, wrapped_cond_callback
+            )
+        else:
+            cond_callback_done[0] = True
 
         if np.any(condvb_Ps) and a.has_data:
+
+            def wrapped_a_callback(
+                Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
+                Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
+            ) -> None:
+                # combine the data bounds
+                np.copyto(
+                    Xs_lower_out[0],
+                    _maximum_zero_sign_sensitive(Xs_lower_out[0], Xs_lower),
+                    where=condvb_Ns,
+                    casting="no",
+                )
+                np.copyto(
+                    Xs_upper_out[0],
+                    _minimum_zero_sign_sensitive(Xs_upper_out[0], Xs_upper),
+                    where=condvb_Ns,
+                    casting="no",
+                )
+                a_callback_done[0] = True
+                if (
+                    cond_callback_done[0]
+                    and a_callback_done[0]
+                    and b_callback_done[0]
+                    and not callback_done[0]
+                ):
+                    callback_done[0] = True
+                    return callback(Xs_lower_out[0], Xs_upper_out[0])
+
             # pass on the data bounds to a but only use its bounds on Xs if
             #  chosen by the condition
-            al, au = a.compute_data_bounds(
+            a.deferred_compute_data_bounds(
                 _where(condvb_Ps, expr_lower, av),
                 _where(condvb_Ps, expr_upper, av),
                 Xs,
                 late_bound,
+                ctx,
+                wrapped_a_callback,
             )
-
-            # combine the data bounds
-            np.copyto(
-                Xs_lower,
-                _maximum_zero_sign_sensitive(Xs_lower, al),
-                where=condvb_Ns,
-                casting="no",
-            )
-            np.copyto(
-                Xs_upper,
-                _minimum_zero_sign_sensitive(Xs_upper, au),
-                where=condvb_Ns,
-                casting="no",
-            )
+        else:
+            a_callback_done[0] = True
 
         if (not np.all(condvb_Ps)) and b.has_data:
+
+            def wrapped_b_callback(
+                Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
+                Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
+            ) -> None:
+                # combine the data bounds
+                np.copyto(
+                    Xs_lower_out[0],
+                    _maximum_zero_sign_sensitive(Xs_lower_out[0], Xs_lower),
+                    where=~condvb_Ns,
+                    casting="no",
+                )
+                np.copyto(
+                    Xs_upper_out[0],
+                    _minimum_zero_sign_sensitive(Xs_upper_out[0], Xs_upper),
+                    where=~condvb_Ns,
+                    casting="no",
+                )
+                b_callback_done[0] = True
+                if (
+                    cond_callback_done[0]
+                    and a_callback_done[0]
+                    and b_callback_done[0]
+                    and not callback_done[0]
+                ):
+                    callback_done[0] = True
+                    return callback(Xs_lower_out[0], Xs_upper_out[0])
+
             # pass on the data bounds to b but only use its bounds on Xs if
             #  chosen by the condition
-            bl, bu = b.compute_data_bounds(
+            b.deferred_compute_data_bounds(
                 _where(condvb_Ps, bv, expr_lower),
                 _where(condvb_Ps, bv, expr_upper),
                 Xs,
                 late_bound,
+                ctx,
+                wrapped_b_callback,
             )
+        else:
+            b_callback_done[0] = True
 
-            # combine the data bounds
-            np.copyto(
-                Xs_lower,
-                _maximum_zero_sign_sensitive(Xs_lower, bl),
-                where=~condvb_Ns,
-                casting="no",
-            )
-            np.copyto(
-                Xs_upper,
-                _minimum_zero_sign_sensitive(Xs_upper, bu),
-                where=~condvb_Ns,
-                casting="no",
-            )
-
-        return Xs_lower, Xs_upper
+        if (
+            cond_callback_done[0]
+            and a_callback_done[0]
+            and b_callback_done[0]
+            and not callback_done[0]
+        ):
+            callback_done[0] = True
+            return callback(Xs_lower_out[0], Xs_upper_out[0])
 
     @override
     def __repr__(self) -> str:

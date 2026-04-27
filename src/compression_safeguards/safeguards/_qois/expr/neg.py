@@ -7,7 +7,7 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Expr
+from .abc import AnyExpr, Callback, Context, Expr
 from .constfold import ScalarFoldedConstant
 from .literal import Number
 
@@ -30,6 +30,11 @@ class ScalarNegate(Expr[AnyExpr]):
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
+
     @override
     def with_args(self, a: AnyExpr) -> "ScalarNegate | Number":
         return ScalarNegate(a)
@@ -50,17 +55,18 @@ class ScalarNegate(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
-        return self._a.compute_data_bounds(-expr_upper, -expr_lower, Xs, late_bound)
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
+        return self._a.deferred_compute_data_bounds(
+            -expr_upper, -expr_lower, Xs, late_bound, ctx, callback
+        )
 
     @override
     def __repr__(self) -> str:

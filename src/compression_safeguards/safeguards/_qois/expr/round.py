@@ -13,7 +13,7 @@ from ....utils._compat import (
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Expr
+from .abc import AnyExpr, Callback, Context, Expr
 from .constfold import ScalarFoldedConstant
 
 
@@ -28,6 +28,11 @@ class ScalarFloor(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarFloor":
@@ -49,16 +54,15 @@ class ScalarFloor(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         arg = self._a
 
         # compute the rounded result that meets the expr bounds
@@ -81,11 +85,13 @@ class ScalarFloor(Expr[AnyExpr]):
         )
         arg_upper[_is_negative_zero(expr_upper)] = -0.0
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -104,6 +110,11 @@ class ScalarCeil(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarCeil":
@@ -125,16 +136,15 @@ class ScalarCeil(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         arg = self._a
 
         # compute the rounded result that meets the expr bounds
@@ -157,11 +167,13 @@ class ScalarCeil(Expr[AnyExpr]):
         arg_lower[_is_positive_zero(expr_lower)] = +0.0
         arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(expr_upper)
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -180,6 +192,11 @@ class ScalarTrunc(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarTrunc":
@@ -201,16 +218,15 @@ class ScalarTrunc(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         arg = self._a
 
         # compute the rounded result that meets the expr bounds
@@ -246,11 +262,13 @@ class ScalarTrunc(Expr[AnyExpr]):
             casting="no",
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -269,6 +287,11 @@ class ScalarRoundTiesEven(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarRoundTiesEven":
@@ -293,16 +316,15 @@ class ScalarRoundTiesEven(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg and round_ties_even(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -352,11 +374,13 @@ class ScalarRoundTiesEven(Expr[AnyExpr]):
             expr_upper,
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override

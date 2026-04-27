@@ -7,7 +7,7 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import _broadcast_to
 from ....utils.bindings import Parameter
 from ..typing import F, Fi, Ns, Ps, np_sndarray
-from .abc import AnyExpr, EmptyExpr, Expr
+from .abc import AnyExpr, Callback, Context, EmptyExpr, Expr
 
 Ei = TypeVar("Ei", bound=AnyExpr)
 """ Any numpy [`Expr`][...abc.Expr] (invariant). """
@@ -29,6 +29,11 @@ class ScalarFoldedConstant(EmptyExpr):
     def args(self) -> tuple[()]:
         return ()
 
+    @property
+    @override
+    def extra(self) -> tuple[np.number]:
+        return (self._const,)
+
     @override
     def with_args(self) -> "ScalarFoldedConstant":
         return ScalarFoldedConstant(self._const)
@@ -48,16 +53,15 @@ class ScalarFoldedConstant(EmptyExpr):
         return _broadcast_to(self._const, Xs.shape[:1])
 
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context,
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         assert False, "folded constants have no data bounds"
 
     @staticmethod
