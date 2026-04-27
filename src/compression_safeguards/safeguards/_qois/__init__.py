@@ -68,7 +68,7 @@ class PointwiseQuantityOfInterest:
 
         late_bound_constants = expr.late_bound_constants
 
-        dummy_pointwise: np.ndarray[tuple[int], np.dtype[np.float64]] = _zeros(
+        canary_pointwise: np.ndarray[tuple[int], np.dtype[np.float64]] = _zeros(
             (0,), np.dtype(np.float64)
         )
 
@@ -77,14 +77,14 @@ class PointwiseQuantityOfInterest:
         ):
             # check if the expression is well-formed and if data bounds can be
             #  computed
-            _canary_expr = expr.constant_fold(np.dtype(np.float64))
-            if isinstance(_canary_expr, Expr):
+            canary_expr = expr.constant_fold(np.dtype(np.float64))
+            if isinstance(canary_expr, Expr):
                 _canary_data_bounds = compute_expr_data_bounds(
-                    _canary_expr,
-                    dummy_pointwise,
-                    dummy_pointwise,
-                    dummy_pointwise,
-                    {c: dummy_pointwise for c in late_bound_constants},
+                    canary_expr,
+                    canary_pointwise,
+                    canary_pointwise,
+                    canary_pointwise,
+                    {c: canary_pointwise for c in late_bound_constants},
                 )
 
         self._expr = expr
@@ -260,11 +260,11 @@ class StencilQuantityOfInterest:
 
         late_bound_constants = expr.late_bound_constants
 
-        dummy_pointwise: np.ndarray[tuple[int], np.dtype[np.float64]] = _zeros(
+        canary_pointwise: np.ndarray[tuple[int], np.dtype[np.float64]] = _zeros(
             (0,), np.dtype(np.float64)
         )
-        dummy_stencil: np_sndarray[int, tuple[int, ...], np.dtype[np.float64]] = _zeros(
-            (0, *stencil_shape), np.dtype(np.float64)
+        canary_stencil: np_sndarray[int, tuple[int, ...], np.dtype[np.float64]] = (
+            _zeros((0, *stencil_shape), np.dtype(np.float64))
         )
 
         with np.errstate(
@@ -272,14 +272,14 @@ class StencilQuantityOfInterest:
         ):
             # check if the expression is well-formed and if data bounds can be
             #  computed
-            _canary_expr = expr.constant_fold(np.dtype(np.float64))
-            if isinstance(_canary_expr, Expr):
+            canary_expr = expr.constant_fold(np.dtype(np.float64))
+            if isinstance(canary_expr, Expr):
                 _canary_data_bounds = compute_expr_data_bounds(
-                    _canary_expr,
-                    dummy_pointwise,
-                    dummy_pointwise,
-                    dummy_stencil,
-                    {c: dummy_stencil for c in late_bound_constants},
+                    canary_expr,
+                    canary_pointwise,
+                    canary_pointwise,
+                    canary_stencil,
+                    {c: canary_stencil for c in late_bound_constants},
                 )
 
         self._expr = expr

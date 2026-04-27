@@ -123,6 +123,7 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
             Xs.shape, Xs.dtype.type(np.inf)
         )
 
+        # FIXME: could this be done in a less hacky way?
         def prune_pre_visit(e: AnyExpr) -> None:
             ctx._context[e]._dependents -= 1
             if ctx._context[e]._dependents > 0:
