@@ -129,8 +129,12 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        Xs_lower_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
-        Xs_upper_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+        Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(-np.inf)
+        )
+        Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(np.inf)
+        )
 
         term_callbacks_done = [False, False]
         callback_done = [False]
@@ -142,31 +146,35 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            if Xs_lower_[0] is None:
-                Xs_lower_[0] = Xs_lower
-            else:
-                Xs_lower_[0] = _maximum_zero_sign_sensitive(Xs_lower_[0], Xs_lower)
-            if Xs_upper_[0] is None:
-                Xs_upper_[0] = Xs_upper
-            else:
-                Xs_upper_[0] = _minimum_zero_sign_sensitive(Xs_upper_[0], Xs_upper)
+            np.copyto(
+                Xs_lower_out,
+                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
+                casting="no",
+            )
+            np.copyto(
+                Xs_upper_out,
+                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
+                casting="no",
+            )
 
             term_callbacks_done[j] = True
 
             if all(term_callbacks_done) and not callback_done[0]:
                 callback_done[0] = True
 
-                assert Xs_lower_[0] is not None
-                assert Xs_upper_[0] is not None
-
-                Xs_lower = Xs_lower_[0]
-                Xs_upper = Xs_upper_[0]
-
                 # ensure that the bounds on Xs include Xs
-                Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-                Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+                np.copyto(
+                    Xs_lower_out,
+                    _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
+                    casting="no",
+                )
+                np.copyto(
+                    Xs_upper_out,
+                    _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
+                    casting="no",
+                )
 
-                return callback(Xs_lower, Xs_upper)
+                return callback(Xs_lower_out, Xs_upper_out)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a == b) = True, then
@@ -263,17 +271,19 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
         if all(term_callbacks_done) and not callback_done[0]:
             callback_done[0] = True
 
-            assert Xs_lower_[0] is not None
-            assert Xs_upper_[0] is not None
-
-            Xs_lower = Xs_lower_[0]
-            Xs_upper = Xs_upper_[0]
-
             # ensure that the bounds on Xs include Xs
-            Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-            Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+            np.copyto(
+                Xs_lower_out,
+                _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
+                casting="no",
+            )
+            np.copyto(
+                Xs_upper_out,
+                _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
+                casting="no",
+            )
 
-            return callback(Xs_lower, Xs_upper)
+            return callback(Xs_lower_out, Xs_upper_out)
 
     @override
     def __repr__(self) -> str:
@@ -392,8 +402,12 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        Xs_lower_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
-        Xs_upper_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+        Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(-np.inf)
+        )
+        Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(np.inf)
+        )
 
         term_callbacks_done = [False, False]
         callback_done = [False]
@@ -405,31 +419,35 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            if Xs_lower_[0] is None:
-                Xs_lower_[0] = Xs_lower
-            else:
-                Xs_lower_[0] = _maximum_zero_sign_sensitive(Xs_lower_[0], Xs_lower)
-            if Xs_upper_[0] is None:
-                Xs_upper_[0] = Xs_upper
-            else:
-                Xs_upper_[0] = _minimum_zero_sign_sensitive(Xs_upper_[0], Xs_upper)
+            np.copyto(
+                Xs_lower_out,
+                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
+                casting="no",
+            )
+            np.copyto(
+                Xs_upper_out,
+                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
+                casting="no",
+            )
 
             term_callbacks_done[j] = True
 
             if all(term_callbacks_done) and not callback_done[0]:
                 callback_done[0] = True
 
-                assert Xs_lower_[0] is not None
-                assert Xs_upper_[0] is not None
-
-                Xs_lower = Xs_lower_[0]
-                Xs_upper = Xs_upper_[0]
-
                 # ensure that the bounds on Xs include Xs
-                Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-                Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+                np.copyto(
+                    Xs_lower_out,
+                    _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
+                    casting="no",
+                )
+                np.copyto(
+                    Xs_upper_out,
+                    _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
+                    casting="no",
+                )
 
-                return callback(Xs_lower, Xs_upper)
+                return callback(Xs_lower_out, Xs_upper_out)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a != b) = True, then
@@ -526,17 +544,19 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
         if all(term_callbacks_done) and not callback_done[0]:
             callback_done[0] = True
 
-            assert Xs_lower_[0] is not None
-            assert Xs_upper_[0] is not None
-
-            Xs_lower = Xs_lower_[0]
-            Xs_upper = Xs_upper_[0]
-
             # ensure that the bounds on Xs include Xs
-            Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-            Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+            np.copyto(
+                Xs_lower_out,
+                _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
+                casting="no",
+            )
+            np.copyto(
+                Xs_upper_out,
+                _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
+                casting="no",
+            )
 
-            return callback(Xs_lower, Xs_upper)
+            return callback(Xs_lower_out, Xs_upper_out)
 
     @override
     def __repr__(self) -> str:
@@ -655,8 +675,12 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        Xs_lower_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
-        Xs_upper_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+        Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(-np.inf)
+        )
+        Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(np.inf)
+        )
 
         term_callbacks_done = [False, False]
         callback_done = [False]
@@ -668,31 +692,35 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            if Xs_lower_[0] is None:
-                Xs_lower_[0] = Xs_lower
-            else:
-                Xs_lower_[0] = _maximum_zero_sign_sensitive(Xs_lower_[0], Xs_lower)
-            if Xs_upper_[0] is None:
-                Xs_upper_[0] = Xs_upper
-            else:
-                Xs_upper_[0] = _minimum_zero_sign_sensitive(Xs_upper_[0], Xs_upper)
+            np.copyto(
+                Xs_lower_out,
+                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
+                casting="no",
+            )
+            np.copyto(
+                Xs_upper_out,
+                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
+                casting="no",
+            )
 
             term_callbacks_done[j] = True
 
             if all(term_callbacks_done) and not callback_done[0]:
                 callback_done[0] = True
 
-                assert Xs_lower_[0] is not None
-                assert Xs_upper_[0] is not None
-
-                Xs_lower = Xs_lower_[0]
-                Xs_upper = Xs_upper_[0]
-
                 # ensure that the bounds on Xs include Xs
-                Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-                Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+                np.copyto(
+                    Xs_lower_out,
+                    _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
+                    casting="no",
+                )
+                np.copyto(
+                    Xs_upper_out,
+                    _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
+                    casting="no",
+                )
 
-                return callback(Xs_lower, Xs_upper)
+                return callback(Xs_lower_out, Xs_upper_out)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a < b) = True, then
@@ -783,17 +811,19 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
         if all(term_callbacks_done) and not callback_done[0]:
             callback_done[0] = True
 
-            assert Xs_lower_[0] is not None
-            assert Xs_upper_[0] is not None
-
-            Xs_lower = Xs_lower_[0]
-            Xs_upper = Xs_upper_[0]
-
             # ensure that the bounds on Xs include Xs
-            Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-            Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+            np.copyto(
+                Xs_lower_out,
+                _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
+                casting="no",
+            )
+            np.copyto(
+                Xs_upper_out,
+                _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
+                casting="no",
+            )
 
-            return callback(Xs_lower, Xs_upper)
+            return callback(Xs_lower_out, Xs_upper_out)
 
     @override
     def __repr__(self) -> str:
@@ -912,8 +942,12 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        Xs_lower_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
-        Xs_upper_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+        Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(-np.inf)
+        )
+        Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(np.inf)
+        )
 
         term_callbacks_done = [False, False]
         callback_done = [False]
@@ -925,31 +959,35 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            if Xs_lower_[0] is None:
-                Xs_lower_[0] = Xs_lower
-            else:
-                Xs_lower_[0] = _maximum_zero_sign_sensitive(Xs_lower_[0], Xs_lower)
-            if Xs_upper_[0] is None:
-                Xs_upper_[0] = Xs_upper
-            else:
-                Xs_upper_[0] = _minimum_zero_sign_sensitive(Xs_upper_[0], Xs_upper)
+            np.copyto(
+                Xs_lower_out,
+                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
+                casting="no",
+            )
+            np.copyto(
+                Xs_upper_out,
+                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
+                casting="no",
+            )
 
             term_callbacks_done[j] = True
 
             if all(term_callbacks_done) and not callback_done[0]:
                 callback_done[0] = True
 
-                assert Xs_lower_[0] is not None
-                assert Xs_upper_[0] is not None
-
-                Xs_lower = Xs_lower_[0]
-                Xs_upper = Xs_upper_[0]
-
                 # ensure that the bounds on Xs include Xs
-                Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-                Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+                np.copyto(
+                    Xs_lower_out,
+                    _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
+                    casting="no",
+                )
+                np.copyto(
+                    Xs_upper_out,
+                    _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
+                    casting="no",
+                )
 
-                return callback(Xs_lower, Xs_upper)
+                return callback(Xs_lower_out, Xs_upper_out)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a >= b) = True, then
@@ -1040,17 +1078,19 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
         if all(term_callbacks_done) and not callback_done[0]:
             callback_done[0] = True
 
-            assert Xs_lower_[0] is not None
-            assert Xs_upper_[0] is not None
-
-            Xs_lower = Xs_lower_[0]
-            Xs_upper = Xs_upper_[0]
-
             # ensure that the bounds on Xs include Xs
-            Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-            Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+            np.copyto(
+                Xs_lower_out,
+                _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
+                casting="no",
+            )
+            np.copyto(
+                Xs_upper_out,
+                _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
+                casting="no",
+            )
 
-            return callback(Xs_lower, Xs_upper)
+            return callback(Xs_lower_out, Xs_upper_out)
 
     @override
     def __repr__(self) -> str:
@@ -1169,8 +1209,12 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-        Xs_lower_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
-        Xs_upper_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+        Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(-np.inf)
+        )
+        Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(np.inf)
+        )
 
         term_callbacks_done = [False, False]
         callback_done = [False]
@@ -1182,31 +1226,35 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            if Xs_lower_[0] is None:
-                Xs_lower_[0] = Xs_lower
-            else:
-                Xs_lower_[0] = _maximum_zero_sign_sensitive(Xs_lower_[0], Xs_lower)
-            if Xs_upper_[0] is None:
-                Xs_upper_[0] = Xs_upper
-            else:
-                Xs_upper_[0] = _minimum_zero_sign_sensitive(Xs_upper_[0], Xs_upper)
+            np.copyto(
+                Xs_lower_out,
+                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
+                casting="no",
+            )
+            np.copyto(
+                Xs_upper_out,
+                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
+                casting="no",
+            )
 
             term_callbacks_done[j] = True
 
             if all(term_callbacks_done) and not callback_done[0]:
                 callback_done[0] = True
 
-                assert Xs_lower_[0] is not None
-                assert Xs_upper_[0] is not None
-
-                Xs_lower = Xs_lower_[0]
-                Xs_upper = Xs_upper_[0]
-
                 # ensure that the bounds on Xs include Xs
-                Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-                Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+                np.copyto(
+                    Xs_lower_out,
+                    _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
+                    casting="no",
+                )
+                np.copyto(
+                    Xs_upper_out,
+                    _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
+                    casting="no",
+                )
 
-                return callback(Xs_lower, Xs_upper)
+                return callback(Xs_lower_out, Xs_upper_out)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a <= b) = True, then
@@ -1297,17 +1345,19 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
         if all(term_callbacks_done) and not callback_done[0]:
             callback_done[0] = True
 
-            assert Xs_lower_[0] is not None
-            assert Xs_upper_[0] is not None
-
-            Xs_lower = Xs_lower_[0]
-            Xs_upper = Xs_upper_[0]
-
             # ensure that the bounds on Xs include Xs
-            Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-            Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+            np.copyto(
+                Xs_lower_out,
+                _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
+                casting="no",
+            )
+            np.copyto(
+                Xs_upper_out,
+                _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
+                casting="no",
+            )
 
-            return callback(Xs_lower, Xs_upper)
+            return callback(Xs_lower_out, Xs_upper_out)
 
     @override
     def __repr__(self) -> str:
@@ -1426,8 +1476,12 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-        Xs_lower_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
-        Xs_upper_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+        Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(-np.inf)
+        )
+        Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(np.inf)
+        )
 
         term_callbacks_done = [False, False]
         callback_done = [False]
@@ -1439,31 +1493,34 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            if Xs_lower_[0] is None:
-                Xs_lower_[0] = Xs_lower
-            else:
-                Xs_lower_[0] = _maximum_zero_sign_sensitive(Xs_lower_[0], Xs_lower)
-            if Xs_upper_[0] is None:
-                Xs_upper_[0] = Xs_upper
-            else:
-                Xs_upper_[0] = _minimum_zero_sign_sensitive(Xs_upper_[0], Xs_upper)
+            np.copyto(
+                Xs_lower_out,
+                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
+                casting="no",
+            )
+            np.copyto(
+                Xs_upper_out,
+                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
+                casting="no",
+            )
 
             term_callbacks_done[j] = True
 
             if all(term_callbacks_done) and not callback_done[0]:
                 callback_done[0] = True
 
-                assert Xs_lower_[0] is not None
-                assert Xs_upper_[0] is not None
+                np.copyto(
+                    Xs_lower_out,
+                    _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
+                    casting="no",
+                )
+                np.copyto(
+                    Xs_upper_out,
+                    _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
+                    casting="no",
+                )
 
-                Xs_lower = Xs_lower_[0]
-                Xs_upper = Xs_upper_[0]
-
-                # ensure that the bounds on Xs include Xs
-                Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-                Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
-
-                return callback(Xs_lower, Xs_upper)
+                return callback(Xs_lower_out, Xs_upper_out)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a > b) = True, then
@@ -1554,17 +1611,18 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
         if all(term_callbacks_done) and not callback_done[0]:
             callback_done[0] = True
 
-            assert Xs_lower_[0] is not None
-            assert Xs_upper_[0] is not None
+            np.copyto(
+                Xs_lower_out,
+                _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
+                casting="no",
+            )
+            np.copyto(
+                Xs_upper_out,
+                _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
+                casting="no",
+            )
 
-            Xs_lower = Xs_lower_[0]
-            Xs_upper = Xs_upper_[0]
-
-            # ensure that the bounds on Xs include Xs
-            Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-            Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
-
-            return callback(Xs_lower, Xs_upper)
+            return callback(Xs_lower_out, Xs_upper_out)
 
     @override
     def __repr__(self) -> str:

@@ -506,7 +506,7 @@ class Context(Generic[Ps, Ns, F]):
         ctx = self._context[expr]
 
         if ctx._expr_bounds is None:
-            ctx._expr_bounds = (expr_lower, expr_upper)
+            ctx._expr_bounds = (np.copy(expr_lower), np.copy(expr_upper))
         else:
             ctx._expr_bounds = (
                 _maximum_zero_sign_sensitive(ctx._expr_bounds[0], expr_lower),
@@ -571,4 +571,4 @@ class ReadyExprContext(Generic[Ps, Ns, F]):
         Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
     ) -> None:
         for callback in self._callbacks:
-            callback(Xs_lower, Xs_upper)
+            callback(np.copy(Xs_lower), np.copy(Xs_upper))

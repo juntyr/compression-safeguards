@@ -383,8 +383,12 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
         b_lower[any_nan & ~np.isnan(bv)] = -np.inf
         b_upper[any_nan & ~np.isnan(bv)] = np.inf
 
-        Xs_lower_out: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
-        Xs_upper_out: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+        Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(-np.inf)
+        )
+        Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(np.inf)
+        )
 
         term_callbacks_done = [False, False]
         callback_done = [False]
@@ -396,35 +400,35 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            if Xs_lower_out[0] is None:
-                Xs_lower_out[0] = Xs_lower
-            else:
-                Xs_lower_out[0] = _maximum_zero_sign_sensitive(
-                    Xs_lower_out[0], Xs_lower
-                )
-            if Xs_upper_out[0] is None:
-                Xs_upper_out[0] = Xs_upper
-            else:
-                Xs_upper_out[0] = _minimum_zero_sign_sensitive(
-                    Xs_upper_out[0], Xs_upper
-                )
+            np.copyto(
+                Xs_lower_out,
+                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
+                casting="no",
+            )
+            np.copyto(
+                Xs_upper_out,
+                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
+                casting="no",
+            )
 
             term_callbacks_done[j] = True
 
             if all(term_callbacks_done) and not callback_done[0]:
                 callback_done[0] = True
 
-                assert Xs_lower_out[0] is not None
-                assert Xs_upper_out[0] is not None
-
-                Xs_lower = Xs_lower_out[0]
-                Xs_upper = Xs_upper_out[0]
-
                 # ensure that the bounds on Xs include Xs
-                Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-                Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+                np.copyto(
+                    Xs_lower_out,
+                    _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
+                    casting="no",
+                )
+                np.copyto(
+                    Xs_upper_out,
+                    _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
+                    casting="no",
+                )
 
-                return callback(Xs_lower, Xs_upper)
+                return callback(Xs_lower_out, Xs_upper_out)
 
         # recurse into a and b to propagate their bounds, then combine their
         #  bounds on Xs
@@ -449,17 +453,19 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
         if all(term_callbacks_done) and not callback_done[0]:
             callback_done[0] = True
 
-            assert Xs_lower_out[0] is not None
-            assert Xs_upper_out[0] is not None
-
-            Xs_lower = Xs_lower_out[0]
-            Xs_upper = Xs_upper_out[0]
-
             # ensure that the bounds on Xs include Xs
-            Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-            Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+            np.copyto(
+                Xs_lower_out,
+                _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
+                casting="no",
+            )
+            np.copyto(
+                Xs_upper_out,
+                _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
+                casting="no",
+            )
 
-            return callback(Xs_lower, Xs_upper)
+            return callback(Xs_lower_out, Xs_upper_out)
 
     @override
     def __repr__(self) -> str:
@@ -953,8 +959,12 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
         b_lower[any_nan & ~np.isnan(bv)] = -np.inf
         b_upper[any_nan & ~np.isnan(bv)] = np.inf
 
-        Xs_lower_out: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
-        Xs_upper_out: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+        Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(-np.inf)
+        )
+        Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(np.inf)
+        )
 
         term_callbacks_done = [False, False]
         callback_done = [False]
@@ -966,35 +976,35 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            if Xs_lower_out[0] is None:
-                Xs_lower_out[0] = Xs_lower
-            else:
-                Xs_lower_out[0] = _maximum_zero_sign_sensitive(
-                    Xs_lower_out[0], Xs_lower
-                )
-            if Xs_upper_out[0] is None:
-                Xs_upper_out[0] = Xs_upper
-            else:
-                Xs_upper_out[0] = _minimum_zero_sign_sensitive(
-                    Xs_upper_out[0], Xs_upper
-                )
+            np.copyto(
+                Xs_lower_out,
+                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
+                casting="no",
+            )
+            np.copyto(
+                Xs_upper_out,
+                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
+                casting="no",
+            )
 
             term_callbacks_done[j] = True
 
             if all(term_callbacks_done) and not callback_done[0]:
                 callback_done[0] = True
 
-                assert Xs_lower_out[0] is not None
-                assert Xs_upper_out[0] is not None
-
-                Xs_lower = Xs_lower_out[0]
-                Xs_upper = Xs_upper_out[0]
-
                 # ensure that the bounds on Xs include Xs
-                Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-                Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+                np.copyto(
+                    Xs_lower_out,
+                    _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
+                    casting="no",
+                )
+                np.copyto(
+                    Xs_upper_out,
+                    _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
+                    casting="no",
+                )
 
-                return callback(Xs_lower, Xs_upper)
+                return callback(Xs_lower_out, Xs_upper_out)
 
         # recurse into a and b to propagate their bounds, then combine their
         #  bounds on Xs
@@ -1019,17 +1029,19 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
         if all(term_callbacks_done) and not callback_done[0]:
             callback_done[0] = True
 
-            assert Xs_lower_out[0] is not None
-            assert Xs_upper_out[0] is not None
-
-            Xs_lower = Xs_lower_out[0]
-            Xs_upper = Xs_upper_out[0]
-
             # ensure that the bounds on Xs include Xs
-            Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-            Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
+            np.copyto(
+                Xs_lower_out,
+                _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
+                casting="no",
+            )
+            np.copyto(
+                Xs_upper_out,
+                _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
+                casting="no",
+            )
 
-            return callback(Xs_lower, Xs_upper)
+            return callback(Xs_lower_out, Xs_upper_out)
 
     @override
     def __repr__(self) -> str:

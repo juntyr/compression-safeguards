@@ -514,8 +514,12 @@ def deferred_compute_left_associate_sum_data_bounds(
     term_callbacks_done = [False for _ in left_associative_sum]
     callback_done = [False]
 
-    Xs_lower_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
-    Xs_upper_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
+    Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+        Xs.shape, Xs.dtype.type(-np.inf)
+    )
+    Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+        Xs.shape, Xs.dtype.type(np.inf)
+    )
 
     def callback_wrapper(
         Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
@@ -524,30 +528,35 @@ def deferred_compute_left_associate_sum_data_bounds(
         j: int,
     ) -> None:
         # combine the inner data bounds
-        if Xs_lower_[0] is None:
-            Xs_lower_[0] = Xs_lower
-        else:
-            Xs_lower_[0] = _maximum_zero_sign_sensitive(Xs_lower_[0], Xs_lower)
-        if Xs_upper_[0] is None:
-            Xs_upper_[0] = Xs_upper
-        else:
-            Xs_upper_[0] = _minimum_zero_sign_sensitive(Xs_upper_[0], Xs_upper)
+        np.copyto(
+            Xs_lower_out,
+            _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
+            casting="no",
+        )
+        np.copyto(
+            Xs_upper_out,
+            _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
+            casting="no",
+        )
 
         term_callbacks_done[j] = True
 
         if all(term_callbacks_done) and not callback_done[0]:
             callback_done[0] = True
 
-            assert Xs_lower_[0] is not None
-            assert Xs_upper_[0] is not None
+            # ensure that the bounds on Xs include Xs
+            np.copyto(
+                Xs_lower_out,
+                _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
+                casting="no",
+            )
+            np.copyto(
+                Xs_upper_out,
+                _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
+                casting="no",
+            )
 
-            Xs_lower = Xs_lower_[0]
-            Xs_upper = Xs_upper_[0]
-
-            Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-            Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
-
-            return callback(Xs_lower, Xs_upper)
+            return callback(Xs_lower_out, Xs_upper_out)
 
     i = 0
     for j, (term, termv, abs_factorv) in enumerate(
@@ -576,16 +585,19 @@ def deferred_compute_left_associate_sum_data_bounds(
     if all(term_callbacks_done) and not callback_done[0]:
         callback_done[0] = True
 
-        assert Xs_lower_[0] is not None
-        assert Xs_upper_[0] is not None
+        # ensure that the bounds on Xs include Xs
+        np.copyto(
+            Xs_lower_out,
+            _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
+            casting="no",
+        )
+        np.copyto(
+            Xs_upper_out,
+            _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
+            casting="no",
+        )
 
-        Xs_lower = Xs_lower_[0]
-        Xs_upper = Xs_upper_[0]
-
-        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
-
-        return callback(Xs_lower, Xs_upper)
+        return callback(Xs_lower_out, Xs_upper_out)
 
 
 def as_left_associative_sum(

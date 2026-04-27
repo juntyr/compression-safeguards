@@ -108,20 +108,11 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
             _ensure_array(condvb_Ps).reshape(Xs.shape[:1] + (1,) * (Xs.ndim - 1)),
             Xs.shape,
         )
-        av = a.eval(Xs, late_bound)
-        bv = b.eval(Xs, late_bound)
 
         cond_callback_done = [False]
         a_callback_done = [False]
         b_callback_done = [False]
         callback_done = [False]
-
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(-np.inf)
-        )
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(np.inf)
-        )
 
         # FIXME: could this be done in a less hacky way?
         def prune_pre_visit(e: AnyExpr) -> None:
@@ -136,8 +127,12 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
         if not ((not np.all(condvb_Ps)) and b.has_data):
             prune_pre_visit(b)
 
-        Xs_lower_out = [Xs_lower]
-        Xs_upper_out = [Xs_upper]
+        Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(-np.inf)
+        )
+        Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
+            Xs.shape, Xs.dtype.type(np.inf)
+        )
 
         if cond.has_data:
             # for simplicity, we assume that the condition must always evaluate
@@ -165,11 +160,15 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
                 Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
                 Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
             ) -> None:
-                Xs_lower_out[0] = _maximum_zero_sign_sensitive(
-                    Xs_lower_out[0], Xs_lower
+                np.copyto(
+                    Xs_lower_out,
+                    _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
+                    casting="no",
                 )
-                Xs_upper_out[0] = _minimum_zero_sign_sensitive(
-                    Xs_upper_out[0], Xs_upper
+                np.copyto(
+                    Xs_upper_out,
+                    _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
+                    casting="no",
                 )
                 cond_callback_done[0] = True
                 if (
@@ -179,7 +178,7 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
                     and not callback_done[0]
                 ):
                     callback_done[0] = True
-                    return callback(Xs_lower_out[0], Xs_upper_out[0])
+                    return callback(Xs_lower_out, Xs_upper_out)
 
             cond.deferred_compute_data_bounds(
                 cond_lower, cond_upper, Xs, late_bound, ctx, wrapped_cond_callback
@@ -195,14 +194,14 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
             ) -> None:
                 # combine the data bounds
                 np.copyto(
-                    Xs_lower_out[0],
-                    _maximum_zero_sign_sensitive(Xs_lower_out[0], Xs_lower),
+                    Xs_lower_out,
+                    _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
                     where=condvb_Ns,
                     casting="no",
                 )
                 np.copyto(
-                    Xs_upper_out[0],
-                    _minimum_zero_sign_sensitive(Xs_upper_out[0], Xs_upper),
+                    Xs_upper_out,
+                    _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
                     where=condvb_Ns,
                     casting="no",
                 )
@@ -214,13 +213,19 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
                     and not callback_done[0]
                 ):
                     callback_done[0] = True
-                    return callback(Xs_lower_out[0], Xs_upper_out[0])
+                    return callback(Xs_lower_out, Xs_upper_out)
 
             # pass on the data bounds to a but only use its bounds on Xs if
             #  chosen by the condition
+            a_lower = _ensure_array(expr_lower, copy=True)
+            a_lower[~condvb_Ps] = Xs.dtype.type(-np.inf)
+
+            a_upper = _ensure_array(expr_upper, copy=True)
+            a_upper[~condvb_Ps] = Xs.dtype.type(np.inf)
+
             a.deferred_compute_data_bounds(
-                _where(condvb_Ps, expr_lower, av),
-                _where(condvb_Ps, expr_upper, av),
+                a_lower,
+                a_upper,
                 Xs,
                 late_bound,
                 ctx,
@@ -237,14 +242,14 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
             ) -> None:
                 # combine the data bounds
                 np.copyto(
-                    Xs_lower_out[0],
-                    _maximum_zero_sign_sensitive(Xs_lower_out[0], Xs_lower),
+                    Xs_lower_out,
+                    _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
                     where=~condvb_Ns,
                     casting="no",
                 )
                 np.copyto(
-                    Xs_upper_out[0],
-                    _minimum_zero_sign_sensitive(Xs_upper_out[0], Xs_upper),
+                    Xs_upper_out,
+                    _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
                     where=~condvb_Ns,
                     casting="no",
                 )
@@ -256,13 +261,19 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
                     and not callback_done[0]
                 ):
                     callback_done[0] = True
-                    return callback(Xs_lower_out[0], Xs_upper_out[0])
+                    return callback(Xs_lower_out, Xs_upper_out)
 
             # pass on the data bounds to b but only use its bounds on Xs if
             #  chosen by the condition
+            b_lower = _ensure_array(expr_lower, copy=True)
+            b_lower[condvb_Ps] = Xs.dtype.type(-np.inf)
+
+            b_upper = _ensure_array(expr_upper, copy=True)
+            b_upper[condvb_Ps] = Xs.dtype.type(np.inf)
+
             b.deferred_compute_data_bounds(
-                _where(condvb_Ps, bv, expr_lower),
-                _where(condvb_Ps, bv, expr_upper),
+                b_lower,
+                b_upper,
                 Xs,
                 late_bound,
                 ctx,
@@ -278,7 +289,7 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
             and not callback_done[0]
         ):
             callback_done[0] = True
-            return callback(Xs_lower_out[0], Xs_upper_out[0])
+            return callback(Xs_lower_out, Xs_upper_out)
 
     @override
     def __repr__(self) -> str:
