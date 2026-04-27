@@ -23,12 +23,11 @@ with atheris.instrument_imports():
         ScalarIsInf,
         ScalarIsNaN,
     )
-
-    # from compression_safeguards.safeguards._qois.expr.combinators import (
-    #     ScalarAll,
-    #     ScalarAny,
-    #     ScalarNot,
-    # )
+    from compression_safeguards.safeguards._qois.expr.combinators import (
+        ScalarAll,
+        ScalarAny,
+        ScalarNot,
+    )
     from compression_safeguards.safeguards._qois.expr.comparison import (
         ScalarEqual,
         ScalarGreater,
@@ -164,7 +163,7 @@ UNARY_EXPRESSIONS: list[Callable[[AnyExpr], AnyExpr]] = [
     ScalarAsin,
     ScalarAcos,
     ScalarAtan,
-    # ScalarNot,
+    ScalarNot,
 ]
 BINARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr], AnyExpr]] = [
     ScalarAdd,
@@ -191,8 +190,8 @@ TERNARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr, AnyExpr], AnyExpr]] = [
     lambda a, b, c: ScalarMultiply(a, ScalarMultiply(b, c)),
     lambda a, b, c: ScalarMultiply(ScalarDivide(a, b), c),
     lambda a, b, c: ScalarDivide(ScalarMultiply(a, b), c),
-    # ScalarAll,
-    # ScalarAny,
+    ScalarAll,
+    ScalarAny,
 ]
 
 
