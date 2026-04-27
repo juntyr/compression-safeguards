@@ -139,16 +139,14 @@ class ReportingExpr(Expr[AnyExpr]):
     ) -> None:
         self._reporter.enter(self._expr)
 
-        def wrapped_callback(
-            Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
-            Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
-        ) -> None:
-            self._reporter.exit(self._expr)
-            return callback(Xs_lower, Xs_upper)
-
         try:
             return self._expr.deferred_compute_data_bounds(
-                expr_lower, expr_upper, Xs, late_bound, ctx, wrapped_callback
+                expr_lower,
+                expr_upper,
+                Xs,
+                late_bound,
+                ctx,
+                callback,
             )
         finally:
             self._reporter.exit(self._expr)
