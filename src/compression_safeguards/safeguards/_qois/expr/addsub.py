@@ -17,7 +17,7 @@ from ....utils._compat import (
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_stacked_arg_within_expr_bounds
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Callback, Context, Expr
+from .abc import AnyExpr, Callback, Context, Expr, ExprContext
 from .abs import ScalarAbs
 from .constfold import ScalarFoldedConstant
 from .literal import Number
@@ -299,7 +299,7 @@ def deferred_compute_left_associate_sum_data_bounds(
         np.copyto(sum_, a, where=(b == 0), casting="no")
         return sum_
 
-    left_associative_sum = as_left_associative_sum(expr)
+    left_associative_sum = as_left_associative_sum(expr, ctx)
 
     termvs: list[np.ndarray[tuple[Ps], np.dtype[F]]] = []
     abs_factorvs: list[None | np.ndarray[tuple[Ps], np.dtype[F]]] = []
@@ -590,6 +590,7 @@ def deferred_compute_left_associate_sum_data_bounds(
 
 def as_left_associative_sum(
     expr: ScalarAdd | ScalarSubtract | ScalarLeftAssociativeSum,
+    ctx: Context,
 ) -> tuple[AnyExpr, ...]:
     terms_rev: list[AnyExpr] = []
 
@@ -602,9 +603,12 @@ def as_left_associative_sum(
 
         # rewrite ( a - b ) as ( a + (-b) ), which is bitwsie equivalent for
         #  floating-point numbers
-        terms_rev.append(
-            ScalarNegate(expr._b) if isinstance(expr, ScalarSubtract) else expr._b
-        )
+        if isinstance(expr, ScalarSubtract):
+            neg_expr = ScalarNegate(expr._b)
+            ctx.context[neg_expr] = ExprContext(1)
+            terms_rev.append(neg_expr)
+        else:
+            terms_rev.append(expr._b)
 
         if isinstance(expr._a, ScalarAdd | ScalarSubtract | ScalarLeftAssociativeSum):
             expr = expr._a

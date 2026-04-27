@@ -38,12 +38,18 @@ class Callback(Protocol, Generic[Ps, Ns, F]):  # type: ignore
 
 
 class ExprContext(Generic[Ps, Ns, F]):
+    __slots__: tuple[str, ...] = ("users", "callbacks", "expr_bounds")
     users: int
     callbacks: list[Callback[Ps, Ns, F]]
     expr_bounds: (
         None
         | tuple[np.ndarray[tuple[Ps], np.dtype[F]], np.ndarray[tuple[Ps], np.dtype[F]]]
     )
+
+    def __init__(self, users: int) -> None:
+        self.users = users
+        self.callbacks = []
+        self.expr_bounds = None
 
 
 class Context(Generic[Ps, Ns, F]):
@@ -470,17 +476,13 @@ EmptyExpr: TypeAlias = Expr[()]
 
 
 def create_context(expr: AnyExpr) -> Context:
-    context = dict()
+    context: dict = dict()
 
     def visit(e: AnyExpr) -> None:
         if e in context:
             return
 
-        ctx: ExprContext = ExprContext()
-        ctx.users = 0
-        ctx.callbacks = []
-        ctx.expr_bounds = None
-        context[e] = ctx
+        context[e] = ExprContext(0)
 
         for a in e.args:
             visit(a)

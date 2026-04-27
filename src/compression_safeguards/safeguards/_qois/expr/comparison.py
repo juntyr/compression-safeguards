@@ -177,7 +177,9 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
         #  - if av < bv, restrict a's upper and b's lower bound to not overlap
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a == b) in [True, False] and all args can be anything
-        if not a_const:
+        if a_const:
+            term_callbacks_done[0] = True
+        else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -217,7 +219,9 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             )
 
         # cont. with b as outlined above
-        if not b_const:
+        if b_const:
+            term_callbacks_done[1] = True
+        else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -436,7 +440,9 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
         #  - keep av and bv the same
         #  - we do *not* special-case -0.0 and +0.0 here
         # otherwise, (a != b) in [True, False] and all args can be anything
-        if not a_const:
+        if a_const:
+            term_callbacks_done[0] = True
+        else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -476,7 +482,9 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             )
 
         # cont. with b as outlined above
-        if not b_const:
+        if b_const:
+            term_callbacks_done[1] = True
+        else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -693,7 +701,9 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
         #  - if av >= bv, restrict a's lower and b's upper bound
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a < b) in [True, False] and all args can be anything
-        if not a_const:
+        if a_const:
+            term_callbacks_done[0] = True
+        else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -731,7 +741,9 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             )
 
         # cont. with b as outlined above
-        if not b_const:
+        if b_const:
+            term_callbacks_done[1] = True
+        else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -946,7 +958,9 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
         #  - if av < bv, restrict a's upper and b's lower bound to not overlap
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a >= b) in [True, False] and all args can be anything
-        if not a_const:
+        if a_const:
+            term_callbacks_done[0] = True
+        else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -984,7 +998,9 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             )
 
         # cont. with b as outlined above
-        if not b_const:
+        if b_const:
+            term_callbacks_done[1] = True
+        else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -1199,7 +1215,9 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
         #  - if av > bv, restrict a's lower and b's upper bound to not overlap
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a <= b) in [True, False] and all args can be anything
-        if not a_const:
+        if a_const:
+            term_callbacks_done[0] = True
+        else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -1237,7 +1255,9 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
             )
 
         # cont. with b as outlined above
-        if not b_const:
+        if b_const:
+            term_callbacks_done[1] = True
+        else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -1452,7 +1472,9 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
         #  - if av <= bv, restrict a's upper and b's lower bound
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a > b) in [True, False] and all args can be anything
-        if not a_const:
+        if a_const:
+            term_callbacks_done[0] = True
+        else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -1490,7 +1512,9 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
             )
 
         # cont. with b as outlined above
-        if not b_const:
+        if b_const:
+            term_callbacks_done[1] = True
+        else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )

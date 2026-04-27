@@ -123,6 +123,18 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
             Xs.shape, Xs.dtype.type(np.inf)
         )
 
+        def prune_pre_visit(e: AnyExpr) -> None:
+            ctx.context[e].users -= 1
+            if ctx.context[e].users > 0:
+                return
+            for a in e.args:
+                prune_pre_visit(a)
+
+        if not (np.any(condvb_Ps) and a.has_data):
+            prune_pre_visit(a)
+        if not ((not np.all(condvb_Ps)) and b.has_data):
+            prune_pre_visit(b)
+
         Xs_lower_out = [Xs_lower]
         Xs_upper_out = [Xs_upper]
 

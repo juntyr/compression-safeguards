@@ -219,7 +219,7 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
         Xs_lower_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
         Xs_upper_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
 
-        term_callbacks_done = [False, False]
+        term_callbacks_done = [False, False] + [False for _ in cs]
         callback_done = [False]
 
         def callback_wrapper(
@@ -442,7 +442,7 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
         Xs_lower_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
         Xs_upper_: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
 
-        term_callbacks_done = [False, False]
+        term_callbacks_done = [False, False] + [False for _ in cs]
         callback_done = [False]
 
         def callback_wrapper(

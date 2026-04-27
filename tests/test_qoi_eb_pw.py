@@ -320,6 +320,8 @@ def test_logarithm(check):
     check("log10(x)")
     check("log10(x + 1)")
     check("log(2, base=x)")
+    check("log(x, base=x)")
+    check("log(x-1, base=(x+1))")
 
 
 @pytest.mark.parametrize("check", CHECKS)

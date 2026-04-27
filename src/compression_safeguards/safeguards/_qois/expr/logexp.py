@@ -13,7 +13,7 @@ from ....utils._compat import (
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Callback, Context, Expr
+from .abc import AnyExpr, Callback, Context, Expr, ExprContext
 from .constfold import ScalarFoldedConstant
 
 
@@ -365,16 +365,36 @@ class ScalarLogWithBase(Expr[AnyExpr, AnyExpr]):
     ) -> None:
         from .divmul import ScalarDivide  # noqa: PLC0415
 
-        return ScalarDivide(
-            ScalarLog(
+        if self._a is self._b:
+            ln_ab = ScalarLog(
                 Logarithm.ln,
                 self._a,
-            ),
-            ScalarLog(
+            )
+
+            ctx.context[ln_ab] = ExprContext(2)
+            ctx.context[self._a].users -= 1
+
+            ln_a = ln_b = ln_ab
+        else:
+            ln_a = ScalarLog(
+                Logarithm.ln,
+                self._a,
+            )
+
+            ctx.context[ln_a] = ExprContext(1)
+
+            ln_b = ScalarLog(
                 Logarithm.ln,
                 self._b,
-            ),
-        ).deferred_compute_data_bounds(
+            )
+
+            ctx.context[ln_b] = ExprContext(1)
+
+        ln_div_ln = ScalarDivide(ln_a, ln_b)
+
+        ctx.context[ln_div_ln] = ExprContext(1)
+
+        return ln_div_ln.deferred_compute_data_bounds(
             expr_lower, expr_upper, Xs, late_bound, ctx, callback
         )
 
