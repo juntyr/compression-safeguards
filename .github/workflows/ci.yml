@@ -462,7 +462,7 @@ jobs:
       - name: Create the Pyodide venv
         run: |
           # Set up Pyodide venv
-          pyodide venv .venv-pyodide
+          pyodide venv --pip 26.0.1 .venv-pyodide
           source .venv-pyodide/bin/activate
           # Install pre-built packages (for dependencies)
           python -m pip install $(ls dist/*.whl)
