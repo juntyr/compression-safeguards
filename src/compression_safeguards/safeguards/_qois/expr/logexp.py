@@ -365,14 +365,16 @@ class ScalarLogWithBase(Expr[AnyExpr, AnyExpr]):
     ) -> None:
         from .divmul import ScalarDivide  # noqa: PLC0415
 
+        # TODO: remove rewrite, since that defeats some common subexpression
+        #       elimination and requires this context update hack
         if self._a is self._b:
             ln_ab = ScalarLog(
                 Logarithm.ln,
                 self._a,
             )
+            ctx._context[ln_ab] = ExprContext(2)
 
-            ctx.context[ln_ab] = ExprContext(2)
-            ctx.context[self._a].users -= 1
+            ctx._context[self._b]._dependents -= 1
 
             ln_a = ln_b = ln_ab
         else:
@@ -380,19 +382,16 @@ class ScalarLogWithBase(Expr[AnyExpr, AnyExpr]):
                 Logarithm.ln,
                 self._a,
             )
-
-            ctx.context[ln_a] = ExprContext(1)
+            ctx._context[ln_a] = ExprContext(1)
 
             ln_b = ScalarLog(
                 Logarithm.ln,
                 self._b,
             )
-
-            ctx.context[ln_b] = ExprContext(1)
+            ctx._context[ln_b] = ExprContext(1)
 
         ln_div_ln = ScalarDivide(ln_a, ln_b)
-
-        ctx.context[ln_div_ln] = ExprContext(1)
+        ctx._context[ln_div_ln] = ExprContext(1)
 
         return ln_div_ln.deferred_compute_data_bounds(
             expr_lower, expr_upper, Xs, late_bound, ctx, callback

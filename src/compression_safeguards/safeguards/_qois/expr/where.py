@@ -124,8 +124,8 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
         )
 
         def prune_pre_visit(e: AnyExpr) -> None:
-            ctx.context[e].users -= 1
-            if ctx.context[e].users > 0:
+            ctx._context[e]._dependents -= 1
+            if ctx._context[e]._dependents > 0:
                 return
             for a in e.args:
                 prune_pre_visit(a)

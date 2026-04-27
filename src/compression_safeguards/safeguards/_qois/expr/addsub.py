@@ -604,8 +604,10 @@ def as_left_associative_sum(
         # rewrite ( a - b ) as ( a + (-b) ), which is bitwsie equivalent for
         #  floating-point numbers
         if isinstance(expr, ScalarSubtract):
+            # TODO: remove rewrite, since that defeats some common subexpression
+            #       elimination and requires this context update hack
             neg_expr = ScalarNegate(expr._b)
-            ctx.context[neg_expr] = ExprContext(1)
+            ctx._context[neg_expr] = ExprContext(1)
             terms_rev.append(neg_expr)
         else:
             terms_rev.append(expr._b)

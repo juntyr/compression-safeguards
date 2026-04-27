@@ -1,9 +1,11 @@
 __all__ = [
     "T",
     "F",
+    "Fc",
     "Fi",
     "J",
     "Ps",
+    "Psc",
     "Ps2",
     "Ns",
     "np_sndarray",
@@ -24,6 +26,9 @@ T = TypeVar("T", bound=np.dtype[np.generic], covariant=True)
 F = TypeVar("F", bound=np.floating, covariant=True)
 """ Any numpy [`floating`][numpy.floating]-point data type (covariant). """
 
+Fc = TypeVar("Fc", bound=np.floating, contravariant=True)
+""" Any numpy [`floating`][numpy.floating]-point data type (contravariant). """
+
 Fi = TypeVar("Fi", bound=np.floating)
 """ Any numpy [`floating`][numpy.floating]-point data type (invariant). """
 
@@ -32,6 +37,9 @@ J = TypeVar("J", bound=int, covariant=True)
 
 Ps = TypeVar("Ps", bound=int, covariant=True)
 """ Any flattened pointwise array shape [X.size] (covariant). """
+
+Psc = TypeVar("Psc", bound=int, contravariant=True)
+""" Any flattened pointwise array shape [X.size] (contravariant). """
 
 Ps2 = TypeVar("Ps2", bound=tuple[int, ...], covariant=True)
 """ Any pointwise array shape X.shape (covariant). """
