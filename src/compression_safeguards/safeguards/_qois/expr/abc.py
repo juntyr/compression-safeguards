@@ -16,6 +16,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
+    _ensure_array,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
     _zeros,
@@ -505,8 +506,18 @@ class Context(Generic[Ps, Ns, F]):
     ) -> "None | ReadyExprContext[Ps, Ns, F]":
         ctx = self._context[expr]
 
+        # short circuit in case there is only one dependent
+        if ctx._dependents == 1 and len(ctx._callbacks) == 0:
+            self._context.pop(expr)
+            return ReadyExprContext(
+                expr_lower=expr_lower, expr_upper=expr_upper, callbacks=(callback,)
+            )
+
         if ctx._expr_bounds is None:
-            ctx._expr_bounds = (np.copy(expr_lower), np.copy(expr_upper))
+            ctx._expr_bounds = (
+                _ensure_array(expr_lower, copy=True),
+                _ensure_array(expr_upper, copy=True),
+            )
         else:
             _maximum_zero_sign_sensitive(
                 ctx._expr_bounds[0], expr_lower, out=ctx._expr_bounds[0]
@@ -572,5 +583,13 @@ class ReadyExprContext(Generic[Ps, Ns, F]):
         Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
         Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
     ) -> None:
+        # short circuit in case there is only one callback
+        match self._callbacks:
+            case (callback,):
+                return callback(Xs_lower, Xs_upper)
+
         for callback in self._callbacks:
-            callback(np.copy(Xs_lower), np.copy(Xs_upper))
+            callback(
+                _ensure_array(Xs_lower, copy=True),
+                _ensure_array(Xs_upper, copy=True),
+            )
