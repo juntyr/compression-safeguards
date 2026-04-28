@@ -5,7 +5,6 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
-    _ensure_array,
     _is_negative_zero,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
@@ -86,17 +85,13 @@ class ScalarLog(Expr[AnyExpr]):
         #  value
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
-            _minimum_zero_sign_sensitive(
-                argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_lower)
-            )
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _minimum_zero_sign_sensitive(
+            argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_lower)
         )
         arg_lower[np.less(argv, 0)] = -np.inf
 
-        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
-            _maximum_zero_sign_sensitive(
-                argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_upper)
-            )
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _maximum_zero_sign_sensitive(
+            argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_upper)
         )
         arg_upper[np.less(argv, 0)] = -smallest_subnormal
 
@@ -217,18 +212,14 @@ class ScalarExp(Expr[AnyExpr]):
         # exp(...) cannot be negative, so ensure the bounds on expr also cannot
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
-            _minimum_zero_sign_sensitive(
-                argv,
-                (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(
-                    _maximum_zero_sign_sensitive(Xs.dtype.type(0), expr_lower)
-                ),
-            )
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _minimum_zero_sign_sensitive(
+            argv,
+            (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(
+                _maximum_zero_sign_sensitive(Xs.dtype.type(0), expr_lower)
+            ),
         )
-        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
-            _maximum_zero_sign_sensitive(
-                argv, (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(expr_upper)
-            )
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _maximum_zero_sign_sensitive(
+            argv, (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(expr_upper)
         )
 
         # we need to force argv if expr_lower == expr_upper

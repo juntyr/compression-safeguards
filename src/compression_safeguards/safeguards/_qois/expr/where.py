@@ -160,16 +160,8 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
                 Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
                 Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
             ) -> None:
-                np.copyto(
-                    Xs_lower_out,
-                    _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
-                    casting="no",
-                )
-                np.copyto(
-                    Xs_upper_out,
-                    _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
-                    casting="no",
-                )
+                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
+                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
                 cond_callback_done[0] = True
                 if (
                     cond_callback_done[0]
@@ -193,17 +185,11 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
                 Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
             ) -> None:
                 # combine the data bounds
-                np.copyto(
-                    Xs_lower_out,
-                    _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
-                    where=condvb_Ns,
-                    casting="no",
+                _maximum_zero_sign_sensitive(
+                    Xs_lower_out, Xs_lower, out=Xs_lower_out, where=condvb_Ns
                 )
-                np.copyto(
-                    Xs_upper_out,
-                    _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
-                    where=condvb_Ns,
-                    casting="no",
+                _minimum_zero_sign_sensitive(
+                    Xs_upper_out, Xs_upper, out=Xs_upper_out, where=condvb_Ns
                 )
                 a_callback_done[0] = True
                 if (
@@ -241,17 +227,11 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
                 Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
             ) -> None:
                 # combine the data bounds
-                np.copyto(
-                    Xs_lower_out,
-                    _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
-                    where=~condvb_Ns,
-                    casting="no",
+                _maximum_zero_sign_sensitive(
+                    Xs_lower_out, Xs_lower, out=Xs_lower_out, where=~condvb_Ns
                 )
-                np.copyto(
-                    Xs_upper_out,
-                    _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
-                    where=~condvb_Ns,
-                    casting="no",
+                _minimum_zero_sign_sensitive(
+                    Xs_upper_out, Xs_upper, out=Xs_upper_out, where=~condvb_Ns
                 )
                 b_callback_done[0] = True
                 if (

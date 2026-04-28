@@ -77,95 +77,123 @@ def _symmetric_modulo(p, q):
 # wrapper around np.minimum that also works for +0.0 and -0.0
 @overload
 def _minimum_zero_sign_sensitive(
-    a: Ti, b: np.ndarray[S, np.dtype[Ti]]
+    a: Ti,
+    b: np.ndarray[S, np.dtype[Ti]],
+    out: None | np.ndarray[S, np.dtype[Ti]] = None,
+    where: None | np.ndarray[S, np.dtype[np.bool]] = None,
 ) -> np.ndarray[S, np.dtype[Ti]]: ...
 
 
 @overload
 def _minimum_zero_sign_sensitive(
-    a: np.ndarray[S, np.dtype[Ti]], b: Ti
+    a: np.ndarray[S, np.dtype[Ti]],
+    b: Ti,
+    out: None | np.ndarray[S, np.dtype[Ti]] = None,
+    where: None | np.ndarray[S, np.dtype[np.bool]] = None,
 ) -> np.ndarray[S, np.dtype[Ti]]: ...
 
 
 @overload
 def _minimum_zero_sign_sensitive(
-    a: np.ndarray[S, np.dtype[T]], b: np.ndarray[S, np.dtype[T]]
+    a: np.ndarray[S, np.dtype[T]],
+    b: np.ndarray[S, np.dtype[T]],
+    out: None | np.ndarray[S, np.dtype[T]] = None,
+    where: None | np.ndarray[S, np.dtype[np.bool]] = None,
 ) -> np.ndarray[S, np.dtype[T]]: ...
 
 
-def _minimum_zero_sign_sensitive(a, b):
+def _minimum_zero_sign_sensitive(a, b, out=None, where=None):
+    def maybe_where(w):
+        return w if where is None else where & w
+
     a = _ensure_array(a)
     b = _ensure_array(b)
-    minimum = np.minimum(a, b)
+
+    both_zero = (a == 0) & (b == 0)
+    minimum = _ensure_array(np.minimum(a, b, out=out, where=maybe_where(~both_zero)))
+
     if np.issubdtype(a.dtype, np.integer) and np.issubdtype(b.dtype, np.integer):
+        minimum[maybe_where(both_zero)] = 0
         return minimum
-    minimum_array = _ensure_array(minimum)
-    a = _broadcast_to(
-        a.astype(minimum_array.dtype, casting="safe"), minimum_array.shape
-    )
-    b = _broadcast_to(
-        b.astype(minimum_array.dtype, casting="safe"), minimum_array.shape
-    )
+
+    a = _broadcast_to(a.astype(minimum.dtype, casting="safe"), minimum.shape)
+    b = _broadcast_to(b.astype(minimum.dtype, casting="safe"), minimum.shape)
+
+    signbit_a = np.signbit(a)
+    signbit_b = np.signbit(b)
+
     np.copyto(
-        minimum_array,
+        minimum,
         a,
-        where=((minimum == 0) & (np.signbit(a) > np.signbit(b))),
+        where=maybe_where(both_zero & (signbit_a >= signbit_b)),
         casting="no",
     )
     np.copyto(
-        minimum_array,
-        b,
-        where=((minimum == 0) & (np.signbit(a) < np.signbit(b))),
-        casting="no",
+        minimum, b, where=maybe_where(both_zero & (signbit_a < signbit_b)), casting="no"
     )
-    return minimum_array
+
+    return minimum
 
 
 # wrapper around np.maximum that also works for +0.0 and -0.0
 @overload
 def _maximum_zero_sign_sensitive(
-    a: Ti, b: np.ndarray[S, np.dtype[Ti]]
+    a: Ti,
+    b: np.ndarray[S, np.dtype[Ti]],
+    out: None | np.ndarray[S, np.dtype[Ti]] = None,
+    where: None | np.ndarray[S, np.dtype[np.bool]] = None,
 ) -> np.ndarray[S, np.dtype[Ti]]: ...
 
 
 @overload
 def _maximum_zero_sign_sensitive(
-    a: np.ndarray[S, np.dtype[Ti]], b: Ti
+    a: np.ndarray[S, np.dtype[Ti]],
+    b: Ti,
+    out: None | np.ndarray[S, np.dtype[Ti]] = None,
+    where: None | np.ndarray[S, np.dtype[np.bool]] = None,
 ) -> np.ndarray[S, np.dtype[Ti]]: ...
 
 
 @overload
 def _maximum_zero_sign_sensitive(
-    a: np.ndarray[S, np.dtype[T]], b: np.ndarray[S, np.dtype[T]]
+    a: np.ndarray[S, np.dtype[T]],
+    b: np.ndarray[S, np.dtype[T]],
+    out: None | np.ndarray[S, np.dtype[T]] = None,
+    where: None | np.ndarray[S, np.dtype[np.bool]] = None,
 ) -> np.ndarray[S, np.dtype[T]]: ...
 
 
-def _maximum_zero_sign_sensitive(a, b):
+def _maximum_zero_sign_sensitive(a, b, out=None, where=None):
+    def maybe_where(w):
+        return w if where is None else where & w
+
     a = _ensure_array(a)
     b = _ensure_array(b)
-    maximum = np.maximum(a, b)
+
+    both_zero = (a == 0) & (b == 0)
+    maximum = _ensure_array(np.maximum(a, b, out=out, where=maybe_where(~both_zero)))
+
     if np.issubdtype(a.dtype, np.integer) and np.issubdtype(b.dtype, np.integer):
+        maximum[maybe_where(both_zero)] = 0
         return maximum
-    maximum_array = _ensure_array(maximum)
-    a = _broadcast_to(
-        a.astype(maximum_array.dtype, casting="safe"), maximum_array.shape
-    )
-    b = _broadcast_to(
-        b.astype(maximum_array.dtype, casting="safe"), maximum_array.shape
-    )
+
+    a = _broadcast_to(a.astype(maximum.dtype, casting="safe"), maximum.shape)
+    b = _broadcast_to(b.astype(maximum.dtype, casting="safe"), maximum.shape)
+
+    signbit_a = np.signbit(a)
+    signbit_b = np.signbit(b)
+
     np.copyto(
-        maximum_array,
+        maximum,
         a,
-        where=((maximum == 0) & (np.signbit(a) < np.signbit(b))),
+        where=maybe_where(both_zero & (signbit_a <= signbit_b)),
         casting="no",
     )
     np.copyto(
-        maximum_array,
-        b,
-        where=((maximum == 0) & (np.signbit(a) > np.signbit(b))),
-        casting="no",
+        maximum, b, where=maybe_where(both_zero & (signbit_a > signbit_b)), casting="no"
     )
-    return maximum_array
+
+    return maximum
 
 
 # wrapper around np.where but with better type hints

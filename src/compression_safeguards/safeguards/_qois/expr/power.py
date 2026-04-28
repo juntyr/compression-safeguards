@@ -113,11 +113,11 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             # apply the inverse function to get the bounds on b
             # if b_lower == bv and bv == -0.0, we need to guarantee that
             #  b_lower is also -0.0, same for b_upper
-            b_lower = _ensure_array(
-                _minimum_zero_sign_sensitive(bv, np.divide(np.log(expr_lower), av_log))
+            b_lower = _minimum_zero_sign_sensitive(
+                bv, np.divide(np.log(expr_lower), av_log)
             )
-            b_upper = _ensure_array(
-                _maximum_zero_sign_sensitive(bv, np.divide(np.log(expr_upper), av_log))
+            b_upper = _maximum_zero_sign_sensitive(
+                bv, np.divide(np.log(expr_upper), av_log)
             )
 
             # we need to force bv if expr_lower == expr_upper
@@ -208,10 +208,8 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             # apply the inverse function to get the bounds on a
             # if a_lower == av and av == -0.0, we need to guarantee that
             #  a_lower is also -0.0, same for a_upper
-            a_lower = _ensure_array(
-                _minimum_zero_sign_sensitive(
-                    av, np.power(expr_lower, np.reciprocal(bv))
-                )
+            a_lower = _minimum_zero_sign_sensitive(
+                av, np.power(expr_lower, np.reciprocal(bv))
             )
             a_upper = _maximum_zero_sign_sensitive(
                 av, np.power(expr_upper, np.reciprocal(bv))
@@ -397,15 +395,15 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
 
         # if a_lower == av and av == -0.0, we need to guarantee
         #  that a_lower is also -0.0, same for a_upper
-        a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, np.exp(a_log_lower)))
-        a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, np.exp(a_log_upper)))
+        a_lower = _minimum_zero_sign_sensitive(av, np.exp(a_log_lower))
+        a_upper = _maximum_zero_sign_sensitive(av, np.exp(a_log_upper))
 
         # if b_lower == bv and bv == -0.0, we need to guarantee
         #  that b_lower is also -0.0, same for b_upper
         b_lower = _where(_is_sign_negative_number(bv), -b_abs_upper, b_abs_lower)
-        b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
+        _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
         b_upper = _where(_is_sign_negative_number(bv), -b_abs_lower, b_abs_upper)
-        b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
+        _maximum_zero_sign_sensitive(bv, b_upper, out=b_upper)
 
         # we need to force av and bv if expr_lower == expr_upper
         np.copyto(a_lower, av, where=(expr_lower == expr_upper), casting="no")
@@ -567,16 +565,8 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            np.copyto(
-                Xs_lower_out,
-                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
-                casting="no",
-            )
-            np.copyto(
-                Xs_upper_out,
-                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
-                casting="no",
-            )
+            _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
+            _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
 
             term_callbacks_done[j] = True
 
@@ -584,16 +574,8 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
                 callback_done[0] = True
 
                 # ensure that the bounds on Xs include Xs
-                np.copyto(
-                    Xs_lower_out,
-                    _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
-                    casting="no",
-                )
-                np.copyto(
-                    Xs_upper_out,
-                    _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
-                    casting="no",
-                )
+                _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
+                _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
 
                 return callback(Xs_lower_out, Xs_upper_out)
 
@@ -621,16 +603,8 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             callback_done[0] = True
 
             # ensure that the bounds on Xs include Xs
-            np.copyto(
-                Xs_lower_out,
-                _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
-                casting="no",
-            )
-            np.copyto(
-                Xs_upper_out,
-                _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
-                casting="no",
-            )
+            _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
+            _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
 
             return callback(Xs_lower_out, Xs_upper_out)
 

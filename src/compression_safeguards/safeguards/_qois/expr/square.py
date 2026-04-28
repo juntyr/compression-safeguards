@@ -87,13 +87,13 @@ class ScalarSqrt(Expr[AnyExpr]):
         # otherwise ensure that the bounds on sqrt(...) are non-negative
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
-            _minimum_zero_sign_sensitive(argv, _sqrt_inv(expr_lower))
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _minimum_zero_sign_sensitive(
+            argv, _sqrt_inv(expr_lower)
         )
         arg_lower[np.less(argv, 0)] = -np.inf
 
-        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
-            _maximum_zero_sign_sensitive(argv, _sqrt_inv(expr_upper))
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _maximum_zero_sign_sensitive(
+            argv, _sqrt_inv(expr_upper)
         )
         arg_upper[np.less(argv, 0)] = -smallest_subnormal
 
@@ -201,7 +201,7 @@ class ScalarSquare(Expr[AnyExpr]):
             out=arg_lower,
             where=(np.less_equal(expr_lower, 0) | _is_sign_negative_number(argv)),
         )
-        arg_lower = _ensure_array(_minimum_zero_sign_sensitive(argv, arg_lower))
+        _minimum_zero_sign_sensitive(argv, arg_lower, out=arg_lower)
 
         arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(au, copy=True)
         np.negative(
@@ -209,7 +209,7 @@ class ScalarSquare(Expr[AnyExpr]):
             out=arg_upper,
             where=(np.greater(expr_lower, 0) & _is_sign_negative_number(argv)),
         )
-        arg_upper = _ensure_array(_maximum_zero_sign_sensitive(argv, arg_upper))
+        _maximum_zero_sign_sensitive(argv, arg_upper, out=arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")

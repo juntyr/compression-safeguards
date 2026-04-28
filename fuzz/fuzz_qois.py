@@ -293,9 +293,8 @@ def check_one_input(data) -> None:
 
     # ensure that expr_lower <= exprv <= expr_upper
     # and that -0.0 bounds are handled correctly
-    expr_lower = _minimum_zero_sign_sensitive(expr_lower, exprv)
-    expr_upper = _maximum_zero_sign_sensitive(exprv, expr_upper)
-    expr_lower, expr_upper = np.array(expr_lower), np.array(expr_upper)
+    _minimum_zero_sign_sensitive(expr_lower, exprv, out=expr_lower)
+    _maximum_zero_sign_sensitive(exprv, expr_upper, out=expr_upper)
 
     # compute the lower and upper bounds on the data
     # and evaluate the expression for them
@@ -337,10 +336,8 @@ def check_one_input(data) -> None:
 
     # ensure that X_lower <= X_test <= X_upper
     # and that -0.0 bounds are handled correctly
-    X_test = _maximum_zero_sign_sensitive(
-        X_lower, _minimum_zero_sign_sensitive(X_test, X_upper)
-    )
-    X_test = np.array(X_test)
+    _maximum_zero_sign_sensitive(X_lower, X_test, out=X_test)
+    _minimum_zero_sign_sensitive(X_test, X_upper, out=X_test)
 
     # evaluate the expression on X_test
     exprv_X_test = expr.eval(np.array([X_test]), late_bound=dict()).squeeze()[()]

@@ -394,8 +394,8 @@ class Expr(ABC, Generic[*Es]):
                     assert_never(data_bounds_checked)
 
             # ensure that the original data values are within the data bounds
-            Xs_lower = _minimum_zero_sign_sensitive(Xs, Xs_lower)
-            Xs_upper = _maximum_zero_sign_sensitive(Xs, Xs_upper)
+            _minimum_zero_sign_sensitive(Xs, Xs_lower, out=Xs_lower)
+            _maximum_zero_sign_sensitive(Xs, Xs_upper, out=Xs_upper)
 
             # handle rounding errors in the lower bound computation
             Xs_lower = guarantee_data_within_expr_bounds(
@@ -508,9 +508,11 @@ class Context(Generic[Ps, Ns, F]):
         if ctx._expr_bounds is None:
             ctx._expr_bounds = (np.copy(expr_lower), np.copy(expr_upper))
         else:
-            ctx._expr_bounds = (
-                _maximum_zero_sign_sensitive(ctx._expr_bounds[0], expr_lower),
-                _minimum_zero_sign_sensitive(ctx._expr_bounds[1], expr_upper),
+            _maximum_zero_sign_sensitive(
+                ctx._expr_bounds[0], expr_lower, out=ctx._expr_bounds[0]
+            )
+            _minimum_zero_sign_sensitive(
+                ctx._expr_bounds[1], expr_upper, out=ctx._expr_bounds[1]
             )
         ctx._callbacks.append(callback)
         assert len(ctx._callbacks) <= ctx._dependents

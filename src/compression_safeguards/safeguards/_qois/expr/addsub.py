@@ -528,16 +528,8 @@ def deferred_compute_left_associate_sum_data_bounds(
         j: int,
     ) -> None:
         # combine the inner data bounds
-        np.copyto(
-            Xs_lower_out,
-            _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
-            casting="no",
-        )
-        np.copyto(
-            Xs_upper_out,
-            _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
-            casting="no",
-        )
+        _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
+        _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
 
         term_callbacks_done[j] = True
 
@@ -545,16 +537,8 @@ def deferred_compute_left_associate_sum_data_bounds(
             callback_done[0] = True
 
             # ensure that the bounds on Xs include Xs
-            np.copyto(
-                Xs_lower_out,
-                _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
-                casting="no",
-            )
-            np.copyto(
-                Xs_upper_out,
-                _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
-                casting="no",
-            )
+            _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
+            _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
 
             return callback(Xs_lower_out, Xs_upper_out)
 
@@ -586,16 +570,8 @@ def deferred_compute_left_associate_sum_data_bounds(
         callback_done[0] = True
 
         # ensure that the bounds on Xs include Xs
-        np.copyto(
-            Xs_lower_out,
-            _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
-            casting="no",
-        )
-        np.copyto(
-            Xs_upper_out,
-            _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
-            casting="no",
-        )
+        _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
+        _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
 
         return callback(Xs_lower_out, Xs_upper_out)
 

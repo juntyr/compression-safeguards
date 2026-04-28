@@ -96,11 +96,11 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
         )
         # the midpoint must be in range [av, bv), unless av == bv, since we
         #  later want to be able to step from the midpoint closer towards bv
-        av_mid_bv = _maximum_zero_sign_sensitive(
-            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av)
+        _maximum_zero_sign_sensitive(
+            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av), out=av_mid_bv
         )
-        av_mid_bv = _minimum_zero_sign_sensitive(
-            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av)
+        _minimum_zero_sign_sensitive(
+            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av), out=av_mid_bv
         )
 
         # compute the next value from b towards a that can be part of a's
@@ -146,16 +146,8 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            np.copyto(
-                Xs_lower_out,
-                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
-                casting="no",
-            )
-            np.copyto(
-                Xs_upper_out,
-                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
-                casting="no",
-            )
+            _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
+            _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
 
             term_callbacks_done[j] = True
 
@@ -163,16 +155,8 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
                 callback_done[0] = True
 
                 # ensure that the bounds on Xs include Xs
-                np.copyto(
-                    Xs_lower_out,
-                    _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
-                    casting="no",
-                )
-                np.copyto(
-                    Xs_upper_out,
-                    _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
-                    casting="no",
-                )
+                _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
+                _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
 
                 return callback(Xs_lower_out, Xs_upper_out)
 
@@ -213,8 +197,8 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
 
-            a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, a_lower))
-            a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
+            _minimum_zero_sign_sensitive(av, a_lower, out=a_lower)
+            _maximum_zero_sign_sensitive(av, a_upper, out=a_upper)
 
             # recurse into arg a
             a.deferred_compute_data_bounds(
@@ -255,8 +239,8 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
 
-            b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
-            b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
+            _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
+            _maximum_zero_sign_sensitive(bv, b_upper, out=b_upper)
 
             # recurse into arg b
             b.deferred_compute_data_bounds(
@@ -272,16 +256,8 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             callback_done[0] = True
 
             # ensure that the bounds on Xs include Xs
-            np.copyto(
-                Xs_lower_out,
-                _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
-                casting="no",
-            )
-            np.copyto(
-                Xs_upper_out,
-                _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
-                casting="no",
-            )
+            _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
+            _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
 
             return callback(Xs_lower_out, Xs_upper_out)
 
@@ -369,11 +345,11 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
         )
         # the midpoint must be in range [av, bv), unless av == bv, since we
         #  later want to be able to step from the midpoint closer towards bv
-        av_mid_bv = _maximum_zero_sign_sensitive(
-            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av)
+        _maximum_zero_sign_sensitive(
+            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av), out=av_mid_bv
         )
-        av_mid_bv = _minimum_zero_sign_sensitive(
-            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av)
+        _minimum_zero_sign_sensitive(
+            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av), out=av_mid_bv
         )
 
         # compute the next value from b towards a that can be part of a's
@@ -419,16 +395,8 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            np.copyto(
-                Xs_lower_out,
-                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
-                casting="no",
-            )
-            np.copyto(
-                Xs_upper_out,
-                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
-                casting="no",
-            )
+            _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
+            _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
 
             term_callbacks_done[j] = True
 
@@ -436,16 +404,8 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
                 callback_done[0] = True
 
                 # ensure that the bounds on Xs include Xs
-                np.copyto(
-                    Xs_lower_out,
-                    _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
-                    casting="no",
-                )
-                np.copyto(
-                    Xs_upper_out,
-                    _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
-                    casting="no",
-                )
+                _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
+                _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
 
                 return callback(Xs_lower_out, Xs_upper_out)
 
@@ -486,8 +446,8 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
 
-            a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, a_lower))
-            a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
+            _minimum_zero_sign_sensitive(av, a_lower, out=a_lower)
+            _maximum_zero_sign_sensitive(av, a_upper, out=a_upper)
 
             # recurse into arg a
             a.deferred_compute_data_bounds(
@@ -528,8 +488,8 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
 
-            b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
-            b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
+            _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
+            _maximum_zero_sign_sensitive(bv, b_upper, out=b_upper)
 
             # recurse into arg b
             b.deferred_compute_data_bounds(
@@ -545,16 +505,8 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             callback_done[0] = True
 
             # ensure that the bounds on Xs include Xs
-            np.copyto(
-                Xs_lower_out,
-                _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
-                casting="no",
-            )
-            np.copyto(
-                Xs_upper_out,
-                _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
-                casting="no",
-            )
+            _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
+            _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
 
             return callback(Xs_lower_out, Xs_upper_out)
 
@@ -642,11 +594,11 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
         )
         # the midpoint must be in range [av, bv), unless av == bv, since we
         #  later want to be able to step from the midpoint closer towards bv
-        av_mid_bv = _maximum_zero_sign_sensitive(
-            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av)
+        _maximum_zero_sign_sensitive(
+            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av), out=av_mid_bv
         )
-        av_mid_bv = _minimum_zero_sign_sensitive(
-            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av)
+        _minimum_zero_sign_sensitive(
+            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av), out=av_mid_bv
         )
 
         # compute the next value from b towards a that can be part of a's
@@ -692,16 +644,8 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            np.copyto(
-                Xs_lower_out,
-                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
-                casting="no",
-            )
-            np.copyto(
-                Xs_upper_out,
-                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
-                casting="no",
-            )
+            _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
+            _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
 
             term_callbacks_done[j] = True
 
@@ -709,16 +653,8 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
                 callback_done[0] = True
 
                 # ensure that the bounds on Xs include Xs
-                np.copyto(
-                    Xs_lower_out,
-                    _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
-                    casting="no",
-                )
-                np.copyto(
-                    Xs_upper_out,
-                    _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
-                    casting="no",
-                )
+                _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
+                _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
 
                 return callback(Xs_lower_out, Xs_upper_out)
 
@@ -755,8 +691,8 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
 
-            a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, a_lower))
-            a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
+            _minimum_zero_sign_sensitive(av, a_lower, out=a_lower)
+            _maximum_zero_sign_sensitive(av, a_upper, out=a_upper)
 
             # recurse into arg a
             a.deferred_compute_data_bounds(
@@ -795,8 +731,8 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
 
-            b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
-            b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
+            _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
+            _maximum_zero_sign_sensitive(bv, b_upper, out=b_upper)
 
             # recurse into arg b
             b.deferred_compute_data_bounds(
@@ -812,16 +748,8 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             callback_done[0] = True
 
             # ensure that the bounds on Xs include Xs
-            np.copyto(
-                Xs_lower_out,
-                _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
-                casting="no",
-            )
-            np.copyto(
-                Xs_upper_out,
-                _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
-                casting="no",
-            )
+            _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
+            _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
 
             return callback(Xs_lower_out, Xs_upper_out)
 
@@ -909,11 +837,11 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
         )
         # the midpoint must be in range [av, bv), unless av == bv, since we
         #  later want to be able to step from the midpoint closer towards bv
-        av_mid_bv = _maximum_zero_sign_sensitive(
-            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av)
+        _maximum_zero_sign_sensitive(
+            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av), out=av_mid_bv
         )
-        av_mid_bv = _minimum_zero_sign_sensitive(
-            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av)
+        _minimum_zero_sign_sensitive(
+            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av), out=av_mid_bv
         )
 
         # compute the next value from b towards a that can be part of a's
@@ -959,16 +887,8 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            np.copyto(
-                Xs_lower_out,
-                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
-                casting="no",
-            )
-            np.copyto(
-                Xs_upper_out,
-                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
-                casting="no",
-            )
+            _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
+            _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
 
             term_callbacks_done[j] = True
 
@@ -976,16 +896,8 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
                 callback_done[0] = True
 
                 # ensure that the bounds on Xs include Xs
-                np.copyto(
-                    Xs_lower_out,
-                    _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
-                    casting="no",
-                )
-                np.copyto(
-                    Xs_upper_out,
-                    _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
-                    casting="no",
-                )
+                _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
+                _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
 
                 return callback(Xs_lower_out, Xs_upper_out)
 
@@ -1022,8 +934,8 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
 
-            a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, a_lower))
-            a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
+            _minimum_zero_sign_sensitive(av, a_lower, out=a_lower)
+            _maximum_zero_sign_sensitive(av, a_upper, out=a_upper)
 
             # recurse into arg a
             a.deferred_compute_data_bounds(
@@ -1062,8 +974,8 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
 
-            b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
-            b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
+            _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
+            _maximum_zero_sign_sensitive(bv, b_upper, out=b_upper)
 
             # recurse into arg b
             b.deferred_compute_data_bounds(
@@ -1079,16 +991,8 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             callback_done[0] = True
 
             # ensure that the bounds on Xs include Xs
-            np.copyto(
-                Xs_lower_out,
-                _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
-                casting="no",
-            )
-            np.copyto(
-                Xs_upper_out,
-                _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
-                casting="no",
-            )
+            _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
+            _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
 
             return callback(Xs_lower_out, Xs_upper_out)
 
@@ -1176,11 +1080,11 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
         )
         # the midpoint must be in range (av, bv], unless av == bv, since we
         #  later want to be able to step from the midpoint closer towards av
-        av_mid_bv = _maximum_zero_sign_sensitive(
-            av_mid_bv, _minimum_zero_sign_sensitive(av_nxt_bv, bv)
+        _maximum_zero_sign_sensitive(
+            av_mid_bv, _minimum_zero_sign_sensitive(av_nxt_bv, bv), out=av_mid_bv
         )
-        av_mid_bv = _minimum_zero_sign_sensitive(
-            av_mid_bv, _maximum_zero_sign_sensitive(av_nxt_bv, bv)
+        _minimum_zero_sign_sensitive(
+            av_mid_bv, _maximum_zero_sign_sensitive(av_nxt_bv, bv), out=av_mid_bv
         )
 
         # compute the next value from b towards a that can be part of a's
@@ -1226,16 +1130,8 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            np.copyto(
-                Xs_lower_out,
-                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
-                casting="no",
-            )
-            np.copyto(
-                Xs_upper_out,
-                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
-                casting="no",
-            )
+            _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
+            _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
 
             term_callbacks_done[j] = True
 
@@ -1243,16 +1139,8 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
                 callback_done[0] = True
 
                 # ensure that the bounds on Xs include Xs
-                np.copyto(
-                    Xs_lower_out,
-                    _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
-                    casting="no",
-                )
-                np.copyto(
-                    Xs_upper_out,
-                    _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
-                    casting="no",
-                )
+                _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
+                _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
 
                 return callback(Xs_lower_out, Xs_upper_out)
 
@@ -1289,8 +1177,8 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
 
-            a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, a_lower))
-            a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
+            _minimum_zero_sign_sensitive(av, a_lower, out=a_lower)
+            _maximum_zero_sign_sensitive(av, a_upper, out=a_upper)
 
             # recurse into arg a
             a.deferred_compute_data_bounds(
@@ -1326,8 +1214,8 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
-            b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
+            _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
+            _maximum_zero_sign_sensitive(bv, b_upper, out=b_upper)
 
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
@@ -1346,16 +1234,8 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
             callback_done[0] = True
 
             # ensure that the bounds on Xs include Xs
-            np.copyto(
-                Xs_lower_out,
-                _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
-                casting="no",
-            )
-            np.copyto(
-                Xs_upper_out,
-                _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
-                casting="no",
-            )
+            _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
+            _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
 
             return callback(Xs_lower_out, Xs_upper_out)
 
@@ -1443,11 +1323,11 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
         )
         # the midpoint must be in range (av, bv], unless av == bv, since we
         #  later want to be able to step from the midpoint closer towards av
-        av_mid_bv = _maximum_zero_sign_sensitive(
-            av_mid_bv, _minimum_zero_sign_sensitive(av_nxt_bv, bv)
+        _maximum_zero_sign_sensitive(
+            av_mid_bv, _minimum_zero_sign_sensitive(av_nxt_bv, bv), out=av_mid_bv
         )
-        av_mid_bv = _minimum_zero_sign_sensitive(
-            av_mid_bv, _maximum_zero_sign_sensitive(av_nxt_bv, bv)
+        _minimum_zero_sign_sensitive(
+            av_mid_bv, _maximum_zero_sign_sensitive(av_nxt_bv, bv), out=av_mid_bv
         )
 
         # compute the next value from b towards a that can be part of a's
@@ -1493,32 +1373,16 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            np.copyto(
-                Xs_lower_out,
-                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower),
-                casting="no",
-            )
-            np.copyto(
-                Xs_upper_out,
-                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper),
-                casting="no",
-            )
+            _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
+            _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
 
             term_callbacks_done[j] = True
 
             if all(term_callbacks_done) and not callback_done[0]:
                 callback_done[0] = True
 
-                np.copyto(
-                    Xs_lower_out,
-                    _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
-                    casting="no",
-                )
-                np.copyto(
-                    Xs_upper_out,
-                    _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
-                    casting="no",
-                )
+                _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
+                _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
 
                 return callback(Xs_lower_out, Xs_upper_out)
 
@@ -1555,8 +1419,8 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
 
-            a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, a_lower))
-            a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
+            _minimum_zero_sign_sensitive(av, a_lower, out=a_lower)
+            _maximum_zero_sign_sensitive(av, a_upper, out=a_upper)
 
             # recurse into arg a
             a.deferred_compute_data_bounds(
@@ -1595,8 +1459,8 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
             # TODO: an interval union could represent that the two disjoint
             #       intervals in the future
 
-            b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
-            b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
+            _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
+            _maximum_zero_sign_sensitive(bv, b_upper, out=b_upper)
 
             # recurse into arg b
             b.deferred_compute_data_bounds(
@@ -1611,16 +1475,8 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
         if all(term_callbacks_done) and not callback_done[0]:
             callback_done[0] = True
 
-            np.copyto(
-                Xs_lower_out,
-                _minimum_zero_sign_sensitive(Xs_lower_out, Xs),
-                casting="no",
-            )
-            np.copyto(
-                Xs_upper_out,
-                _maximum_zero_sign_sensitive(Xs_upper_out, Xs),
-                casting="no",
-            )
+            _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
+            _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
 
             return callback(Xs_lower_out, Xs_upper_out)
 
