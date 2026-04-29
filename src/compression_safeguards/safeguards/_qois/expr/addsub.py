@@ -529,7 +529,7 @@ def deferred_compute_left_associate_sum_data_bounds(
         zip(left_associative_sum, termvs, abs_factorvs)
     ):
         if abs_factorv is None:
-            wrapped_callback.complete_term(term=j)
+            wrapped_callback.complete_term(j)
 
             continue
 
@@ -543,7 +543,7 @@ def deferred_compute_left_associate_sum_data_bounds(
             Xs,
             late_bound,
             ctx,
-            partial(wrapped_callback, term=j),
+            partial(wrapped_callback.on_complete_term, term=j),
         )
 
         i += 1

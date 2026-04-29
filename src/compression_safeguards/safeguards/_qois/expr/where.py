@@ -1,19 +1,14 @@
 from collections.abc import Mapping
+from functools import partial
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import (
-    _broadcast_to,
-    _ensure_array,
-    _maximum_zero_sign_sensitive,
-    _minimum_zero_sign_sensitive,
-    _where,
-)
+from ....utils._compat import _broadcast_to, _ensure_array, _where
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from ..typing import F, Fi, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Callback, Context, Expr
+from .abc import AccumulateXsBoundsCallback, AnyExpr, Callback, Context, Expr
 from .constfold import ScalarFoldedConstant
 
 
@@ -109,12 +104,6 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
             Xs.shape,
         )
 
-        cond_callback_done = [False]
-        a_callback_done = [False]
-        b_callback_done = [False]
-        callback_done = [False]
-        can_override = [True]
-
         # FIXME: could this be done in a less hacky way?
         def prune_pre_visit(e: AnyExpr) -> None:
             ctx._context[e]._dependents -= 1
@@ -128,11 +117,8 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
         if not ((not np.all(condvb_Ps)) and b.has_data):
             prune_pre_visit(b)
 
-        Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(-np.inf)
-        )
-        Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(np.inf)
+        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
+            AccumulateXsBoundsCallback(Xs=Xs, terms=3, callback=callback)
         )
 
         if cond.has_data:
@@ -152,70 +138,23 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
             smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
 
             # non-zero condition values must remain non-zero
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
             cond_lower[condv > 0] = smallest_subnormal
             cond_upper[condv < 0] = -smallest_subnormal
 
-            def wrapped_cond_callback(
-                Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
-                Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
-            ) -> None:
-                if can_override[0]:
-                    np.copyto(Xs_lower_out, Xs_lower)
-                    np.copyto(Xs_upper_out, Xs_upper)
-                else:
-                    _maximum_zero_sign_sensitive(
-                        Xs_lower_out, Xs_lower, out=Xs_lower_out
-                    )
-                    _minimum_zero_sign_sensitive(
-                        Xs_upper_out, Xs_upper, out=Xs_upper_out
-                    )
-                can_override[0] = False
-                cond_callback_done[0] = True
-                if (
-                    cond_callback_done[0]
-                    and a_callback_done[0]
-                    and b_callback_done[0]
-                    and not callback_done[0]
-                ):
-                    callback_done[0] = True
-                    return callback(Xs_lower_out, Xs_upper_out)
-
             cond.deferred_compute_data_bounds(
-                cond_lower, cond_upper, Xs, late_bound, ctx, wrapped_cond_callback
+                cond_lower,
+                cond_upper,
+                Xs,
+                late_bound,
+                ctx,
+                partial(wrapped_callback.on_complete_term, term=0),
             )
         else:
-            cond_callback_done[0] = True
+            wrapped_callback.complete_term(0)
 
         if np.any(condvb_Ps) and a.has_data:
-
-            def wrapped_a_callback(
-                Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
-                Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
-            ) -> None:
-                # combine the data bounds
-                if can_override[0]:
-                    np.copyto(Xs_lower_out, Xs_lower, where=condvb_Ns)
-                    np.copyto(Xs_upper_out, Xs_upper, where=condvb_Ns)
-                else:
-                    _maximum_zero_sign_sensitive(
-                        Xs_lower_out, Xs_lower, out=Xs_lower_out, where=condvb_Ns
-                    )
-                    _minimum_zero_sign_sensitive(
-                        Xs_upper_out, Xs_upper, out=Xs_upper_out, where=condvb_Ns
-                    )
-                can_override[0] = False
-                a_callback_done[0] = True
-                if (
-                    cond_callback_done[0]
-                    and a_callback_done[0]
-                    and b_callback_done[0]
-                    and not callback_done[0]
-                ):
-                    callback_done[0] = True
-                    return callback(Xs_lower_out, Xs_upper_out)
-
             # pass on the data bounds to a but only use its bounds on Xs if
             #  chosen by the condition
             a_lower = _ensure_array(expr_lower, copy=True)
@@ -230,39 +169,12 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                wrapped_a_callback,
+                partial(wrapped_callback.on_complete_term, term=1, where=condvb_Ns),
             )
         else:
-            a_callback_done[0] = True
+            wrapped_callback.complete_term(1)
 
         if (not np.all(condvb_Ps)) and b.has_data:
-
-            def wrapped_b_callback(
-                Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
-                Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
-            ) -> None:
-                # combine the data bounds
-                if can_override[0]:
-                    np.copyto(Xs_lower_out, Xs_lower, where=~condvb_Ns)
-                    np.copyto(Xs_upper_out, Xs_upper, where=~condvb_Ns)
-                else:
-                    _maximum_zero_sign_sensitive(
-                        Xs_lower_out, Xs_lower, out=Xs_lower_out, where=~condvb_Ns
-                    )
-                    _minimum_zero_sign_sensitive(
-                        Xs_upper_out, Xs_upper, out=Xs_upper_out, where=~condvb_Ns
-                    )
-                can_override[0] = False
-                b_callback_done[0] = True
-                if (
-                    cond_callback_done[0]
-                    and a_callback_done[0]
-                    and b_callback_done[0]
-                    and not callback_done[0]
-                ):
-                    callback_done[0] = True
-                    return callback(Xs_lower_out, Xs_upper_out)
-
             # pass on the data bounds to b but only use its bounds on Xs if
             #  chosen by the condition
             b_lower = _ensure_array(expr_lower, copy=True)
@@ -277,19 +189,10 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                wrapped_b_callback,
+                partial(wrapped_callback.on_complete_term, term=2, where=~condvb_Ns),
             )
         else:
-            b_callback_done[0] = True
-
-        if (
-            cond_callback_done[0]
-            and a_callback_done[0]
-            and b_callback_done[0]
-            and not callback_done[0]
-        ):
-            callback_done[0] = True
-            return callback(Xs_lower_out, Xs_upper_out)
+            wrapped_callback.complete_term(2)
 
     @override
     def __repr__(self) -> str:

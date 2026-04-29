@@ -25,7 +25,7 @@ from ..bound import (
     guarantee_stacked_arg_within_expr_bounds,
 )
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Callback, Context, Expr
+from .abc import AccumulateXsBoundsCallback, AnyExpr, Callback, Context, Expr
 from .constfold import ScalarFoldedConstant
 from .literal import Number
 
@@ -383,42 +383,9 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
         b_lower[any_nan & ~np.isnan(bv)] = -np.inf
         b_upper[any_nan & ~np.isnan(bv)] = np.inf
 
-        Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(-np.inf)
+        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
+            AccumulateXsBoundsCallback(Xs=Xs, terms=2, callback=callback)
         )
-        Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(np.inf)
-        )
-
-        term_callbacks_done = [False, False]
-        callback_done = [False]
-        can_override = [True]
-
-        def callback_wrapper(
-            Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
-            Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
-            *,
-            j: int,
-        ) -> None:
-            # combine the inner data bounds
-            if can_override[0]:
-                np.copyto(Xs_lower_out, Xs_lower)
-                np.copyto(Xs_upper_out, Xs_upper)
-            else:
-                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
-                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
-            can_override[0] = False
-
-            term_callbacks_done[j] = True
-
-            if all(term_callbacks_done) and not callback_done[0]:
-                callback_done[0] = True
-
-                # ensure that the bounds on Xs include Xs
-                _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-                _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-                return callback(Xs_lower_out, Xs_upper_out)
 
         # recurse into a and b to propagate their bounds, then combine their
         #  bounds on Xs
@@ -428,7 +395,7 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
             Xs,
             late_bound,
             ctx,
-            partial(callback_wrapper, j=0),
+            partial(wrapped_callback.on_complete_term, term=0),
         )
 
         b.deferred_compute_data_bounds(
@@ -437,17 +404,8 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
             Xs,
             late_bound,
             ctx,
-            partial(callback_wrapper, j=1),
+            partial(wrapped_callback.on_complete_term, term=1),
         )
-
-        if all(term_callbacks_done) and not callback_done[0]:
-            callback_done[0] = True
-
-            # ensure that the bounds on Xs include Xs
-            _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-            _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-            return callback(Xs_lower_out, Xs_upper_out)
 
     @override
     def __repr__(self) -> str:
@@ -572,7 +530,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             #  - c > 0, t <= -0: el <= e <= eu <= -0 -> tl = eu, tu = el
             # if term_lower == termv and termv == -0.0, we need to guarantee
             #  that term_lower is also -0.0, same for term_upper
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
             term_lower = _ensure_array(expr_upper, copy=True)
             np.copyto(
@@ -941,42 +899,9 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
         b_lower[any_nan & ~np.isnan(bv)] = -np.inf
         b_upper[any_nan & ~np.isnan(bv)] = np.inf
 
-        Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(-np.inf)
+        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
+            AccumulateXsBoundsCallback(Xs=Xs, terms=2, callback=callback)
         )
-        Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(np.inf)
-        )
-
-        term_callbacks_done = [False, False]
-        callback_done = [False]
-        can_override = [True]
-
-        def callback_wrapper(
-            Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
-            Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
-            *,
-            j: int,
-        ) -> None:
-            # combine the inner data bounds
-            if can_override[0]:
-                np.copyto(Xs_lower_out, Xs_lower)
-                np.copyto(Xs_upper_out, Xs_upper)
-            else:
-                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
-                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
-            can_override[0] = False
-
-            term_callbacks_done[j] = True
-
-            if all(term_callbacks_done) and not callback_done[0]:
-                callback_done[0] = True
-
-                # ensure that the bounds on Xs include Xs
-                _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-                _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-                return callback(Xs_lower_out, Xs_upper_out)
 
         # recurse into a and b to propagate their bounds, then combine their
         #  bounds on Xs
@@ -986,7 +911,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             Xs,
             late_bound,
             ctx,
-            partial(callback_wrapper, j=0),
+            partial(wrapped_callback.on_complete_term, term=0),
         )
 
         b.deferred_compute_data_bounds(
@@ -995,17 +920,8 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             Xs,
             late_bound,
             ctx,
-            partial(callback_wrapper, j=1),
+            partial(wrapped_callback.on_complete_term, term=1),
         )
-
-        if all(term_callbacks_done) and not callback_done[0]:
-            callback_done[0] = True
-
-            # ensure that the bounds on Xs include Xs
-            _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-            _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-            return callback(Xs_lower_out, Xs_upper_out)
 
     @override
     def __repr__(self) -> str:

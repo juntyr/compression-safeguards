@@ -23,7 +23,7 @@ from ..bound import (
     guarantee_stacked_arg_within_expr_bounds,
 )
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Callback, Context, Expr
+from .abc import AccumulateXsBoundsCallback, AnyExpr, Callback, Context, Expr
 from .constfold import ScalarFoldedConstant
 from .literal import Number
 
@@ -155,7 +155,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             # handle NaN ** bv
             # - NaN ** +-0 = 1 -> discontinuous, force bv = +-0
             # - NaN ** (<0>) = NaN -> allow any bv != 0
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
             b_lower[np.isnan(av) & (bv == 0)] = -0.0
             b_upper[np.isnan(av) & (bv == 0)] = +0.0
@@ -248,7 +248,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             # handle av ** NaN
             # - 1 ** NaN = 1 -> discontinuous, force av = 1
             # - (<1>) ** NaN = NaN -> allow any av != 1
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
             a_lower[(av == 1) & np.isnan(bv)] = 1
             a_upper[(av == 1) & np.isnan(bv)] = 1
@@ -418,7 +418,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         b_upper[av == 1] = +np.inf
 
         # (<1>) ** NaN = NaN -> allow any av != 1
-        # TODO: an interval union could represent that the two disjoint
+        # TODO: an interval union could represent the two disjoint
         #       intervals in the future
         a_lower[(av > 1) & np.isnan(bv)] = one_plus_eps
         a_upper[(av > 1) & np.isnan(bv)] = np.inf
@@ -452,7 +452,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         b_upper[bv == 0] = +0.0
 
         # NaN ** (<0>) = NaN -> allow any av != 0
-        # TODO: an interval union could represent that the two disjoint
+        # TODO: an interval union could represent the two disjoint
         #       intervals in the future
         b_lower[np.isnan(av) & (bv > 0)] = smallest_subnormal
         b_upper[np.isnan(av) & (bv > 0)] = np.inf
@@ -548,42 +548,9 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             _where(np.less(av, 1), tl_stack[1], tu_stack[1]),
         )
 
-        Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(-np.inf)
+        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
+            AccumulateXsBoundsCallback(Xs=Xs, terms=2, callback=callback)
         )
-        Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(np.inf)
-        )
-
-        can_override = [True]
-        term_callbacks_done = [False, False]
-        callback_done = [False]
-
-        def callback_wrapper(
-            Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
-            Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
-            *,
-            j: int,
-        ) -> None:
-            # combine the inner data bounds
-            if can_override[0]:
-                np.copyto(Xs_lower_out, Xs_lower)
-                np.copyto(Xs_upper_out, Xs_upper)
-            else:
-                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
-                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
-            can_override[0] = False
-
-            term_callbacks_done[j] = True
-
-            if all(term_callbacks_done) and not callback_done[0]:
-                callback_done[0] = True
-
-                # ensure that the bounds on Xs include Xs
-                _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-                _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-                return callback(Xs_lower_out, Xs_upper_out)
 
         # recurse into a and b to propagate their bounds, then combine their
         #  bounds on Xs
@@ -593,7 +560,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             Xs,
             late_bound,
             ctx,
-            partial(callback_wrapper, j=0),
+            partial(wrapped_callback.on_complete_term, term=0),
         )
 
         b.deferred_compute_data_bounds(
@@ -602,17 +569,8 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             Xs,
             late_bound,
             ctx,
-            partial(callback_wrapper, j=1),
+            partial(wrapped_callback.on_complete_term, term=1),
         )
-
-        if all(term_callbacks_done) and not callback_done[0]:
-            callback_done[0] = True
-
-            # ensure that the bounds on Xs include Xs
-            _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-            _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-            return callback(Xs_lower_out, Xs_upper_out)
 
     @override
     def __repr__(self) -> str:

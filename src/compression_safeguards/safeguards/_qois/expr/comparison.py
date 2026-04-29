@@ -13,7 +13,7 @@ from ....utils._compat import (
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from ..typing import F, Fi, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Callback, Context, Expr
+from .abc import AccumulateXsBoundsCallback, AnyExpr, Callback, Context, Expr
 from .constfold import ScalarFoldedConstant
 
 
@@ -131,42 +131,9 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(-np.inf)
+        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
+            AccumulateXsBoundsCallback(Xs=Xs, terms=2, callback=callback)
         )
-        Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(np.inf)
-        )
-
-        term_callbacks_done = [False, False]
-        callback_done = [False]
-        can_override = [True]
-
-        def callback_wrapper(
-            Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
-            Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
-            *,
-            j: int,
-        ) -> None:
-            # combine the inner data bounds
-            if can_override[0]:
-                np.copyto(Xs_lower_out, Xs_lower)
-                np.copyto(Xs_upper_out, Xs_upper)
-            else:
-                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
-                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
-            can_override[0] = False
-
-            term_callbacks_done[j] = True
-
-            if all(term_callbacks_done) and not callback_done[0]:
-                callback_done[0] = True
-
-                # ensure that the bounds on Xs include Xs
-                _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-                _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-                return callback(Xs_lower_out, Xs_upper_out)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a == b) = True, then
@@ -178,7 +145,7 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a == b) in [True, False] and all args can be anything
         if a_const:
-            term_callbacks_done[0] = True
+            wrapped_callback.complete_term(0)
         else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -202,7 +169,7 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
             _minimum_zero_sign_sensitive(av, a_lower, out=a_lower)
@@ -215,12 +182,12 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(callback_wrapper, j=0),
+                partial(wrapped_callback.on_complete_term, term=0),
             )
 
         # cont. with b as outlined above
         if b_const:
-            term_callbacks_done[1] = True
+            wrapped_callback.complete_term(1)
         else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -244,7 +211,7 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
             _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
@@ -257,17 +224,8 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(callback_wrapper, j=1),
+                partial(wrapped_callback.on_complete_term, term=1),
             )
-
-        if all(term_callbacks_done) and not callback_done[0]:
-            callback_done[0] = True
-
-            # ensure that the bounds on Xs include Xs
-            _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-            _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-            return callback(Xs_lower_out, Xs_upper_out)
 
     @override
     def __repr__(self) -> str:
@@ -388,42 +346,9 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(-np.inf)
+        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
+            AccumulateXsBoundsCallback(Xs=Xs, terms=2, callback=callback)
         )
-        Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(np.inf)
-        )
-
-        term_callbacks_done = [False, False]
-        callback_done = [False]
-        can_override = [True]
-
-        def callback_wrapper(
-            Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
-            Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
-            *,
-            j: int,
-        ) -> None:
-            # combine the inner data bounds
-            if can_override[0]:
-                np.copyto(Xs_lower_out, Xs_lower)
-                np.copyto(Xs_upper_out, Xs_upper)
-            else:
-                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
-                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
-            can_override[0] = False
-
-            term_callbacks_done[j] = True
-
-            if all(term_callbacks_done) and not callback_done[0]:
-                callback_done[0] = True
-
-                # ensure that the bounds on Xs include Xs
-                _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-                _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-                return callback(Xs_lower_out, Xs_upper_out)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a != b) = True, then
@@ -435,7 +360,7 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
         #  - we do *not* special-case -0.0 and +0.0 here
         # otherwise, (a != b) in [True, False] and all args can be anything
         if a_const:
-            term_callbacks_done[0] = True
+            wrapped_callback.complete_term(0)
         else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -459,7 +384,7 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             )
             np.copyto(a_upper, av, where=np.less(expr_upper, 1), casting="no")
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
             _minimum_zero_sign_sensitive(av, a_lower, out=a_lower)
@@ -472,12 +397,12 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(callback_wrapper, j=0),
+                partial(wrapped_callback.on_complete_term, term=0),
             )
 
         # cont. with b as outlined above
         if b_const:
-            term_callbacks_done[1] = True
+            wrapped_callback.complete_term(1)
         else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -501,7 +426,7 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             )
             np.copyto(b_upper, bv, where=np.less(expr_upper, 1), casting="no")
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
             _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
@@ -514,17 +439,8 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(callback_wrapper, j=1),
+                partial(wrapped_callback.on_complete_term, term=1),
             )
-
-        if all(term_callbacks_done) and not callback_done[0]:
-            callback_done[0] = True
-
-            # ensure that the bounds on Xs include Xs
-            _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-            _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-            return callback(Xs_lower_out, Xs_upper_out)
 
     @override
     def __repr__(self) -> str:
@@ -645,42 +561,9 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(-np.inf)
+        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
+            AccumulateXsBoundsCallback(Xs=Xs, terms=2, callback=callback)
         )
-        Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(np.inf)
-        )
-
-        term_callbacks_done = [False, False]
-        callback_done = [False]
-        can_override = [True]
-
-        def callback_wrapper(
-            Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
-            Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
-            *,
-            j: int,
-        ) -> None:
-            # combine the inner data bounds
-            if can_override[0]:
-                np.copyto(Xs_lower_out, Xs_lower)
-                np.copyto(Xs_upper_out, Xs_upper)
-            else:
-                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
-                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
-            can_override[0] = False
-
-            term_callbacks_done[j] = True
-
-            if all(term_callbacks_done) and not callback_done[0]:
-                callback_done[0] = True
-
-                # ensure that the bounds on Xs include Xs
-                _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-                _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-                return callback(Xs_lower_out, Xs_upper_out)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a < b) = True, then
@@ -690,7 +573,7 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a < b) in [True, False] and all args can be anything
         if a_const:
-            term_callbacks_done[0] = True
+            wrapped_callback.complete_term(0)
         else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -712,7 +595,7 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
             _minimum_zero_sign_sensitive(av, a_lower, out=a_lower)
@@ -725,12 +608,12 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(callback_wrapper, j=0),
+                partial(wrapped_callback.on_complete_term, term=0),
             )
 
         # cont. with b as outlined above
         if b_const:
-            term_callbacks_done[1] = True
+            wrapped_callback.complete_term(1)
         else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -752,7 +635,7 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
             _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
@@ -765,17 +648,8 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(callback_wrapper, j=1),
+                partial(wrapped_callback.on_complete_term, term=1),
             )
-
-        if all(term_callbacks_done) and not callback_done[0]:
-            callback_done[0] = True
-
-            # ensure that the bounds on Xs include Xs
-            _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-            _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-            return callback(Xs_lower_out, Xs_upper_out)
 
     @override
     def __repr__(self) -> str:
@@ -896,42 +770,9 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(-np.inf)
+        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
+            AccumulateXsBoundsCallback(Xs=Xs, terms=2, callback=callback)
         )
-        Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(np.inf)
-        )
-
-        term_callbacks_done = [False, False]
-        callback_done = [False]
-        can_override = [True]
-
-        def callback_wrapper(
-            Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
-            Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
-            *,
-            j: int,
-        ) -> None:
-            # combine the inner data bounds
-            if can_override[0]:
-                np.copyto(Xs_lower_out, Xs_lower)
-                np.copyto(Xs_upper_out, Xs_upper)
-            else:
-                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
-                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
-            can_override[0] = False
-
-            term_callbacks_done[j] = True
-
-            if all(term_callbacks_done) and not callback_done[0]:
-                callback_done[0] = True
-
-                # ensure that the bounds on Xs include Xs
-                _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-                _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-                return callback(Xs_lower_out, Xs_upper_out)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a >= b) = True, then
@@ -941,7 +782,7 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a >= b) in [True, False] and all args can be anything
         if a_const:
-            term_callbacks_done[0] = True
+            wrapped_callback.complete_term(0)
         else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -963,7 +804,7 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
             _minimum_zero_sign_sensitive(av, a_lower, out=a_lower)
@@ -976,12 +817,12 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(callback_wrapper, j=0),
+                partial(wrapped_callback.on_complete_term, term=0),
             )
 
         # cont. with b as outlined above
         if b_const:
-            term_callbacks_done[1] = True
+            wrapped_callback.complete_term(1)
         else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -1003,7 +844,7 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
             _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
@@ -1016,17 +857,8 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(callback_wrapper, j=1),
+                partial(wrapped_callback.on_complete_term, term=1),
             )
-
-        if all(term_callbacks_done) and not callback_done[0]:
-            callback_done[0] = True
-
-            # ensure that the bounds on Xs include Xs
-            _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-            _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-            return callback(Xs_lower_out, Xs_upper_out)
 
     @override
     def __repr__(self) -> str:
@@ -1147,42 +979,9 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-        Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(-np.inf)
+        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
+            AccumulateXsBoundsCallback(Xs=Xs, terms=2, callback=callback)
         )
-        Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(np.inf)
-        )
-
-        term_callbacks_done = [False, False]
-        callback_done = [False]
-        can_override = [True]
-
-        def callback_wrapper(
-            Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
-            Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
-            *,
-            j: int,
-        ) -> None:
-            # combine the inner data bounds
-            if can_override[0]:
-                np.copyto(Xs_lower_out, Xs_lower)
-                np.copyto(Xs_upper_out, Xs_upper)
-            else:
-                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
-                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
-            can_override[0] = False
-
-            term_callbacks_done[j] = True
-
-            if all(term_callbacks_done) and not callback_done[0]:
-                callback_done[0] = True
-
-                # ensure that the bounds on Xs include Xs
-                _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-                _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-                return callback(Xs_lower_out, Xs_upper_out)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a <= b) = True, then
@@ -1192,7 +991,7 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a <= b) in [True, False] and all args can be anything
         if a_const:
-            term_callbacks_done[0] = True
+            wrapped_callback.complete_term(0)
         else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -1214,7 +1013,7 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
             _minimum_zero_sign_sensitive(av, a_lower, out=a_lower)
@@ -1227,12 +1026,12 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(callback_wrapper, j=0),
+                partial(wrapped_callback.on_complete_term, term=0),
             )
 
         # cont. with b as outlined above
         if b_const:
-            term_callbacks_done[1] = True
+            wrapped_callback.complete_term(1)
         else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -1257,7 +1056,7 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
             _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
             _maximum_zero_sign_sensitive(bv, b_upper, out=b_upper)
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
             # recurse into arg b
@@ -1267,17 +1066,8 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(callback_wrapper, j=1),
+                partial(wrapped_callback.on_complete_term, term=1),
             )
-
-        if all(term_callbacks_done) and not callback_done[0]:
-            callback_done[0] = True
-
-            # ensure that the bounds on Xs include Xs
-            _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-            _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-            return callback(Xs_lower_out, Xs_upper_out)
 
     @override
     def __repr__(self) -> str:
@@ -1398,41 +1188,9 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-        Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(-np.inf)
+        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
+            AccumulateXsBoundsCallback(Xs=Xs, terms=2, callback=callback)
         )
-        Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(np.inf)
-        )
-
-        term_callbacks_done = [False, False]
-        callback_done = [False]
-        can_override = [True]
-
-        def callback_wrapper(
-            Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
-            Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
-            *,
-            j: int,
-        ) -> None:
-            # combine the inner data bounds
-            if can_override[0]:
-                np.copyto(Xs_lower_out, Xs_lower)
-                np.copyto(Xs_upper_out, Xs_upper)
-            else:
-                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
-                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
-            can_override[0] = False
-
-            term_callbacks_done[j] = True
-
-            if all(term_callbacks_done) and not callback_done[0]:
-                callback_done[0] = True
-
-                _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-                _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-                return callback(Xs_lower_out, Xs_upper_out)
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a > b) = True, then
@@ -1442,7 +1200,7 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a > b) in [True, False] and all args can be anything
         if a_const:
-            term_callbacks_done[0] = True
+            wrapped_callback.complete_term(0)
         else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -1464,7 +1222,7 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
             _minimum_zero_sign_sensitive(av, a_lower, out=a_lower)
@@ -1477,12 +1235,12 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(callback_wrapper, j=0),
+                partial(wrapped_callback.on_complete_term, term=0),
             )
 
         # cont. with b as outlined above
         if b_const:
-            term_callbacks_done[1] = True
+            wrapped_callback.complete_term(1)
         else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -1504,7 +1262,7 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
             _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
@@ -1517,16 +1275,8 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(callback_wrapper, j=1),
+                partial(wrapped_callback.on_complete_term, term=1),
             )
-
-        if all(term_callbacks_done) and not callback_done[0]:
-            callback_done[0] = True
-
-            _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-            _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-            return callback(Xs_lower_out, Xs_upper_out)
 
     @override
     def __repr__(self) -> str:

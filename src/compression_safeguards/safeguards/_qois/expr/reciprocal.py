@@ -72,7 +72,7 @@ class ScalarReciprocal(Expr[AnyExpr]):
 
         # compute the argument bounds
         # ensure that reciprocal(...) keeps the same sign as arg
-        # TODO: an interval union could represent that the two disjoint
+        # TODO: an interval union could represent the two disjoint
         #       intervals in the future
         arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _minimum_zero_sign_sensitive(
             expr_upper, Xs.dtype.type(-0.0)

@@ -633,7 +633,7 @@ class AccumulateXsBoundsCallback(Generic[Ps, Ns, F]):
 
         self.check_for_completion()
 
-    def __call__(
+    def on_complete_term(
         self,
         Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
         Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
@@ -647,16 +647,16 @@ class AccumulateXsBoundsCallback(Generic[Ps, Ns, F]):
             np.copyto(self._Xs_upper_out, Xs_upper)
         else:
             _maximum_zero_sign_sensitive(
-                self._Xs_lower_out, Xs_lower, out=self._Xs_lower_out
+                self._Xs_lower_out, Xs_lower, out=self._Xs_lower_out, where=where
             )
             _minimum_zero_sign_sensitive(
-                self._Xs_upper_out, Xs_upper, out=self._Xs_upper_out
+                self._Xs_upper_out, Xs_upper, out=self._Xs_upper_out, where=where
             )
         self._can_override_out = False
 
-        self.complete_term(term=term)
+        self.complete_term(term)
 
-    def complete_term(self, *, term: int) -> None:
+    def complete_term(self, term: int) -> None:
         self._terms_completed[term] = True
 
         self.check_for_completion()
