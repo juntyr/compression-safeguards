@@ -140,6 +140,7 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
 
         term_callbacks_done = [False, False]
         callback_done = [False]
+        can_override = [True]
 
         def callback_wrapper(
             Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
@@ -148,8 +149,13 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
-            _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
+            if can_override[0]:
+                np.copyto(Xs_lower_out, Xs_lower)
+                np.copyto(Xs_upper_out, Xs_upper)
+            else:
+                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
+                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
+            can_override[0] = False
 
             term_callbacks_done[j] = True
 
@@ -391,6 +397,7 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
 
         term_callbacks_done = [False, False]
         callback_done = [False]
+        can_override = [True]
 
         def callback_wrapper(
             Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
@@ -399,8 +406,13 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
-            _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
+            if can_override[0]:
+                np.copyto(Xs_lower_out, Xs_lower)
+                np.copyto(Xs_upper_out, Xs_upper)
+            else:
+                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
+                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
+            can_override[0] = False
 
             term_callbacks_done[j] = True
 
@@ -642,6 +654,7 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
 
         term_callbacks_done = [False, False]
         callback_done = [False]
+        can_override = [True]
 
         def callback_wrapper(
             Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
@@ -650,8 +663,13 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
-            _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
+            if can_override[0]:
+                np.copyto(Xs_lower_out, Xs_lower)
+                np.copyto(Xs_upper_out, Xs_upper)
+            else:
+                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
+                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
+            can_override[0] = False
 
             term_callbacks_done[j] = True
 
@@ -887,6 +905,7 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
 
         term_callbacks_done = [False, False]
         callback_done = [False]
+        can_override = [True]
 
         def callback_wrapper(
             Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
@@ -895,8 +914,13 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
-            _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
+            if can_override[0]:
+                np.copyto(Xs_lower_out, Xs_lower)
+                np.copyto(Xs_upper_out, Xs_upper)
+            else:
+                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
+                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
+            can_override[0] = False
 
             term_callbacks_done[j] = True
 
@@ -1132,6 +1156,7 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
 
         term_callbacks_done = [False, False]
         callback_done = [False]
+        can_override = [True]
 
         def callback_wrapper(
             Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
@@ -1140,8 +1165,13 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
-            _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
+            if can_override[0]:
+                np.copyto(Xs_lower_out, Xs_lower)
+                np.copyto(Xs_upper_out, Xs_upper)
+            else:
+                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
+                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
+            can_override[0] = False
 
             term_callbacks_done[j] = True
 
@@ -1377,6 +1407,7 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
 
         term_callbacks_done = [False, False]
         callback_done = [False]
+        can_override = [True]
 
         def callback_wrapper(
             Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
@@ -1385,8 +1416,13 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
             j: int,
         ) -> None:
             # combine the inner data bounds
-            _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
-            _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
+            if can_override[0]:
+                np.copyto(Xs_lower_out, Xs_lower)
+                np.copyto(Xs_upper_out, Xs_upper)
+            else:
+                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
+                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
+            can_override[0] = False
 
             term_callbacks_done[j] = True
 

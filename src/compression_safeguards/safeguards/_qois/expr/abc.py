@@ -504,6 +504,13 @@ class Context(Generic[Ps, Ns, F]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         callback: Callback[Ps, Ns, F],
     ) -> "None | ReadyExprContext[Ps, Ns, F]":
+        from .data import Data, ScalarAnyDataConstant  # noqa: PLC0415
+
+        if isinstance(expr, Data | ScalarAnyDataConstant):
+            return ReadyExprContext(
+                expr_lower=expr_lower, expr_upper=expr_upper, callbacks=(callback,)
+            )
+
         ctx = self._context[expr]
 
         # short circuit in case there is only one dependent

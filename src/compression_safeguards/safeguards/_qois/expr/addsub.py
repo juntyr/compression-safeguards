@@ -511,6 +511,7 @@ def deferred_compute_left_associate_sum_data_bounds(
         ),
     )
 
+    can_override = [True]
     term_callbacks_done = [False for _ in left_associative_sum]
     callback_done = [False]
 
@@ -528,8 +529,13 @@ def deferred_compute_left_associate_sum_data_bounds(
         j: int,
     ) -> None:
         # combine the inner data bounds
-        _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
-        _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
+        if can_override[0]:
+            np.copyto(Xs_lower_out, Xs_lower)
+            np.copyto(Xs_upper_out, Xs_upper)
+        else:
+            _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
+            _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
+        can_override[0] = False
 
         term_callbacks_done[j] = True
 

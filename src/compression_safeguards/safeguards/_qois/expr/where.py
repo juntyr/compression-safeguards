@@ -113,6 +113,7 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
         a_callback_done = [False]
         b_callback_done = [False]
         callback_done = [False]
+        can_override = [True]
 
         # FIXME: could this be done in a less hacky way?
         def prune_pre_visit(e: AnyExpr) -> None:
@@ -160,8 +161,17 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
                 Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
                 Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
             ) -> None:
-                _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
-                _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
+                if can_override[0]:
+                    np.copyto(Xs_lower_out, Xs_lower)
+                    np.copyto(Xs_upper_out, Xs_upper)
+                else:
+                    _maximum_zero_sign_sensitive(
+                        Xs_lower_out, Xs_lower, out=Xs_lower_out
+                    )
+                    _minimum_zero_sign_sensitive(
+                        Xs_upper_out, Xs_upper, out=Xs_upper_out
+                    )
+                can_override[0] = False
                 cond_callback_done[0] = True
                 if (
                     cond_callback_done[0]
@@ -185,12 +195,17 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
                 Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
             ) -> None:
                 # combine the data bounds
-                _maximum_zero_sign_sensitive(
-                    Xs_lower_out, Xs_lower, out=Xs_lower_out, where=condvb_Ns
-                )
-                _minimum_zero_sign_sensitive(
-                    Xs_upper_out, Xs_upper, out=Xs_upper_out, where=condvb_Ns
-                )
+                if can_override[0]:
+                    np.copyto(Xs_lower_out, Xs_lower, where=condvb_Ns)
+                    np.copyto(Xs_upper_out, Xs_upper, where=condvb_Ns)
+                else:
+                    _maximum_zero_sign_sensitive(
+                        Xs_lower_out, Xs_lower, out=Xs_lower_out, where=condvb_Ns
+                    )
+                    _minimum_zero_sign_sensitive(
+                        Xs_upper_out, Xs_upper, out=Xs_upper_out, where=condvb_Ns
+                    )
+                can_override[0] = False
                 a_callback_done[0] = True
                 if (
                     cond_callback_done[0]
@@ -227,12 +242,17 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
                 Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
             ) -> None:
                 # combine the data bounds
-                _maximum_zero_sign_sensitive(
-                    Xs_lower_out, Xs_lower, out=Xs_lower_out, where=~condvb_Ns
-                )
-                _minimum_zero_sign_sensitive(
-                    Xs_upper_out, Xs_upper, out=Xs_upper_out, where=~condvb_Ns
-                )
+                if can_override[0]:
+                    np.copyto(Xs_lower_out, Xs_lower, where=~condvb_Ns)
+                    np.copyto(Xs_upper_out, Xs_upper, where=~condvb_Ns)
+                else:
+                    _maximum_zero_sign_sensitive(
+                        Xs_lower_out, Xs_lower, out=Xs_lower_out, where=~condvb_Ns
+                    )
+                    _minimum_zero_sign_sensitive(
+                        Xs_upper_out, Xs_upper, out=Xs_upper_out, where=~condvb_Ns
+                    )
+                can_override[0] = False
                 b_callback_done[0] = True
                 if (
                     cond_callback_done[0]
