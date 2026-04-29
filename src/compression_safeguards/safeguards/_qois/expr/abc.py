@@ -600,3 +600,83 @@ class ReadyExprContext(Generic[Ps, Ns, F]):
                 _ensure_array(Xs_lower, copy=True),
                 _ensure_array(Xs_upper, copy=True),
             )
+
+
+class AccumulateXsBoundsCallback(Generic[Ps, Ns, F]):
+    __slots__: tuple[str, ...] = (
+        "_Xs",
+        "_Xs_lower_out",
+        "_Xs_upper_out",
+        "_can_override_out",
+        "_terms_completed",
+        "_callback",
+    )
+    _Xs: np_sndarray[Ps, Ns, np.dtype[F]]
+    _Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]]
+    _Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]]
+    _can_override_out: bool
+    _terms_completed: list[bool]
+    _callback: None | Callback
+
+    def __init__(
+        self, *, Xs: np_sndarray[Ps, Ns, np.dtype[F]], terms: int, callback: Callback
+    ) -> None:
+        self._Xs = Xs
+
+        self._Xs_lower_out = np.full(Xs.shape, Xs.dtype.type(-np.inf))
+        self._Xs_upper_out = np.full(Xs.shape, Xs.dtype.type(np.inf))
+
+        self._can_override_out = True
+        self._terms_completed = [False for _ in range(terms)]
+
+        self._callback = callback
+
+        self.check_for_completion()
+
+    def __call__(
+        self,
+        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
+        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
+        *,
+        term: int,
+        where: None | np_sndarray[Ps, Ns, np.dtype[np.bool]] = None,
+    ) -> None:
+        # combine the inner data bounds
+        if self._can_override_out:
+            np.copyto(self._Xs_lower_out, Xs_lower)
+            np.copyto(self._Xs_upper_out, Xs_upper)
+        else:
+            _maximum_zero_sign_sensitive(
+                self._Xs_lower_out, Xs_lower, out=self._Xs_lower_out
+            )
+            _minimum_zero_sign_sensitive(
+                self._Xs_upper_out, Xs_upper, out=self._Xs_upper_out
+            )
+        self._can_override_out = False
+
+        self.complete_term(term=term)
+
+    def complete_term(self, *, term: int) -> None:
+        self._terms_completed[term] = True
+
+        self.check_for_completion()
+
+    def check_for_completion(self) -> None:
+        if self._callback is None:
+            return
+
+        if not all(self._terms_completed):
+            return
+
+        callback = self._callback
+        self._callback = None
+
+        # ensure that the bounds on Xs include Xs
+        _minimum_zero_sign_sensitive(
+            self._Xs_lower_out, self._Xs, out=self._Xs_lower_out
+        )
+        _maximum_zero_sign_sensitive(
+            self._Xs_upper_out, self._Xs, out=self._Xs_upper_out
+        )
+
+        return callback(self._Xs_lower_out, self._Xs_upper_out)

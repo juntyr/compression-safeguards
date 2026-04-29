@@ -17,7 +17,14 @@ from ....utils._compat import (
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_stacked_arg_within_expr_bounds
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Callback, Context, Expr, ExprContext
+from .abc import (
+    AccumulateXsBoundsCallback,
+    AnyExpr,
+    Callback,
+    Context,
+    Expr,
+    ExprContext,
+)
 from .abs import ScalarAbs
 from .constfold import ScalarFoldedConstant
 from .literal import Number
@@ -511,49 +518,18 @@ def deferred_compute_left_associate_sum_data_bounds(
         ),
     )
 
-    can_override = [True]
-    term_callbacks_done = [False for _ in left_associative_sum]
-    callback_done = [False]
-
-    Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-        Xs.shape, Xs.dtype.type(-np.inf)
+    wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
+        AccumulateXsBoundsCallback(
+            Xs=Xs, terms=len(left_associative_sum), callback=callback
+        )
     )
-    Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-        Xs.shape, Xs.dtype.type(np.inf)
-    )
-
-    def callback_wrapper(
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
-        *,
-        j: int,
-    ) -> None:
-        # combine the inner data bounds
-        if can_override[0]:
-            np.copyto(Xs_lower_out, Xs_lower)
-            np.copyto(Xs_upper_out, Xs_upper)
-        else:
-            _maximum_zero_sign_sensitive(Xs_lower_out, Xs_lower, out=Xs_lower_out)
-            _minimum_zero_sign_sensitive(Xs_upper_out, Xs_upper, out=Xs_upper_out)
-        can_override[0] = False
-
-        term_callbacks_done[j] = True
-
-        if all(term_callbacks_done) and not callback_done[0]:
-            callback_done[0] = True
-
-            # ensure that the bounds on Xs include Xs
-            _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-            _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-            return callback(Xs_lower_out, Xs_upper_out)
 
     i = 0
     for j, (term, termv, abs_factorv) in enumerate(
         zip(left_associative_sum, termvs, abs_factorvs)
     ):
         if abs_factorv is None:
-            term_callbacks_done[j] = True
+            wrapped_callback.complete_term(term=j)
 
             continue
 
@@ -567,19 +543,10 @@ def deferred_compute_left_associate_sum_data_bounds(
             Xs,
             late_bound,
             ctx,
-            partial(callback_wrapper, j=j),
+            partial(wrapped_callback, term=j),
         )
 
         i += 1
-
-    if all(term_callbacks_done) and not callback_done[0]:
-        callback_done[0] = True
-
-        # ensure that the bounds on Xs include Xs
-        _minimum_zero_sign_sensitive(Xs_lower_out, Xs, out=Xs_lower_out)
-        _maximum_zero_sign_sensitive(Xs_upper_out, Xs, out=Xs_upper_out)
-
-        return callback(Xs_lower_out, Xs_upper_out)
 
 
 def as_left_associative_sum(
