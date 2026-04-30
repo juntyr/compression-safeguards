@@ -14,16 +14,44 @@ if TYPE_CHECKING:
 
 
 class Callback(Protocol, Generic[Psc, Ns, Fc]):
+    """
+    Callback for reporting stencil-extended lower and upper bounds on the data.
+    """
+
     def __call__(
         self,
         Xs_lower: np_sndarray[Psc, Ns, np.dtype[Fc]],
         Xs_upper: np_sndarray[Psc, Ns, np.dtype[Fc]],
-    ) -> None: ...
+    ) -> None:
+        """
+        Callback that is called once the stencil-extended lower and upper bounds
+        `Xs_lower` and `Xs_upper` on the stencil-extended data `Xs` have been
+        computed.
+
+        These bounds have not yet been combined across neighbouring points
+        that contribute to the same QoI points.
+
+        Parameters
+        ----------
+        Xs_lower : np_sndarray[Ps, Ns, np.dtype[F]]
+            The stencil-extended lower bounds on the stencil-extended data `Xs`.
+        Xs_upper : np_sndarray[Ps, Ns, np.dtype[F]]
+            The stencil-extended upper bounds on the stencil-extended data `Xs`.
+        """
 
 
 class Context(Generic[Ps, Ns, F]):
+    """
+    Context for the deferred computation of bounds on the data `Xs`.
+
+    Parameters
+    ----------
+    expr : AnyExpr
+        The root expression for which the new context should be created.
+    """
+
     __slots__: tuple[str, ...] = ("_context",)
-    _context: dict["AnyExpr", "ExprContext[Ps, Ns, F]"]
+    _context: dict["AnyExpr", "_ExprContext[Ps, Ns, F]"]
 
     def __init__(self, expr: "AnyExpr") -> None:
         self._context = dict()
@@ -32,7 +60,7 @@ class Context(Generic[Ps, Ns, F]):
             if e in self._context:
                 return
 
-            self._context[e] = ExprContext(0)
+            self._context[e] = _ExprContext(0)
 
             for a in e.args:
                 visit_dependencies_once(a)
@@ -41,16 +69,48 @@ class Context(Generic[Ps, Ns, F]):
         visit_dependencies_once(expr)
         self._context[expr]._dependents += 1
 
-    def push_expr_bounds(
+    def register_expr_bounds(
         self,
         expr: "AnyExpr",
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         callback: Callback[Ps, Ns, F],
     ) -> "None | ReadyExprContext[Ps, Ns, F]":
-        from .expr.data import Data, ScalarAnyDataConstant  # noqa: PLC0415
+        """
+        Declare the lower and upper bounds `expr_lower` and `expr_upper` on the
+        `expr`ession and register a `callback` that will be called once the
+        bounds on the data `Xs` have been computed for `expr`.
 
-        if isinstance(expr, Data | ScalarAnyDataConstant):
+        Parameters
+        ----------
+        expr : AnyExpr
+            The expression for which the bounds are declared.
+        expr_lower : np.ndarray[tuple[Ps], np.dtype[F]]
+            The pointwise lower bound on the expression.
+        expr_upper : np.ndarray[tuple[Ps], np.dtype[F]]
+            The pointwise upper bound on the expression.
+        callback : Callback[Ps, Ns, F]
+            A callback that will be called once the stencil-extended lower and
+            upper bounds `Xs_lower` and `Xs_upper` on the stencil-extended data
+            `Xs` have been computed.
+
+            These bounds have not yet been combined across neighbouring points
+            that contribute to the same QoI points.
+
+        Returns
+        -------
+        None
+            if the bounds on the data for the `expr` cannot yet be computed.
+
+        Returns
+        -------
+        ReadyExprContext[Ps, Ns, F]
+            if the bounds on the data can and must now be computed.
+        """
+
+        from .expr.abc import DataExpr  # noqa: PLC0415
+
+        if isinstance(expr, DataExpr):
             return ReadyExprContext(
                 expr_lower=expr_lower, expr_upper=expr_upper, callbacks=(callback,)
             )
@@ -90,7 +150,16 @@ class Context(Generic[Ps, Ns, F]):
         )
 
 
-class ExprContext(Generic[Ps, Ns, F]):
+class _ExprContext(Generic[Ps, Ns, F]):
+    """
+    Container for the deferred computation context for one expression.
+
+    Parameters
+    ----------
+    dependents : int
+        The number of expressions that depend on this expression.
+    """
+
     __slots__: tuple[str, ...] = ("_dependents", "_callbacks", "_expr_bounds")
     _dependents: int
     _callbacks: list[Callback[Ps, Ns, F]]
@@ -106,6 +175,26 @@ class ExprContext(Generic[Ps, Ns, F]):
 
 
 class ReadyExprContext(Generic[Ps, Ns, F]):
+    """
+    Permission to eagerly compute the bounds on the data `Xs` for an expression
+    with the bounds `expr_lower` and `expr_upper`, after which the `callbacks`
+    must be called with the computed bounds `Xs_lower` and `Xs_upper`.
+
+    Parameters
+    ----------
+    expr_lower : np.ndarray[tuple[Ps], np.dtype[F]]
+        The pointwise lower bound on the expression.
+    expr_upper : np.ndarray[tuple[Ps], np.dtype[F]]
+        The pointwise upper bound on the expression.
+    callbacks : tuple[Callback[Ps, Ns, F], ...]
+        The callbacks that will be called once the stencil-extended lower and
+        upper bounds `Xs_lower` and `Xs_upper` on the stencil-extended data
+        `Xs` have been computed.
+
+        These bounds have not yet been combined across neighbouring points
+        that contribute to the same QoI points.
+    """
+
     __slots__: tuple[str, ...] = ("_expr_lower", "_expr_upper", "_callbacks")
     _expr_lower: np.ndarray[tuple[Ps], np.dtype[F]]
     _expr_upper: np.ndarray[tuple[Ps], np.dtype[F]]
@@ -123,10 +212,18 @@ class ReadyExprContext(Generic[Ps, Ns, F]):
 
     @property
     def expr_lower(self) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        """
+        The pointwise lower bound on the expression.
+        """
+
         return self._expr_lower
 
     @property
     def expr_upper(self) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        """
+        The pointwise upper bound on the expression.
+        """
+
         return self._expr_upper
 
     def apply_callbacks(
@@ -134,6 +231,21 @@ class ReadyExprContext(Generic[Ps, Ns, F]):
         Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
         Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
     ) -> None:
+        """
+        Apply the callbacks with the stencil-extended lower and upper bounds
+        `Xs_lower` and `Xs_upper` on the stencil-extended data `Xs`.
+
+        These bounds have not yet been combined across neighbouring points
+        that contribute to the same QoI points.
+
+        Parameters
+        ----------
+        Xs_lower : np_sndarray[Ps, Ns, np.dtype[F]]
+            The stencil-extended lower bounds on the stencil-extended data `Xs`.
+        Xs_upper : np_sndarray[Ps, Ns, np.dtype[F]]
+            The stencil-extended upper bounds on the stencil-extended data `Xs`.
+        """
+
         # short circuit in case there is only one callback
         match self._callbacks:
             case (callback,):
@@ -146,7 +258,34 @@ class ReadyExprContext(Generic[Ps, Ns, F]):
             )
 
 
-class AccumulateXsBoundsCallback(Generic[Ps, Ns, F]):
+class DataBoundsAccumulator(Generic[Ps, Ns, F]):
+    """
+    Accumulator for the bounds over the stencil-extended data `Xs` that are
+    derived across several expression `terms`.
+
+    Once all per-term bounds have been computed, the provided `callback` will
+    be called with the stencil-extended lower and upper bounds `Xs_lower` and
+    `Xs_upper` on the stencil-extended data `Xs`.
+
+    These bounds have not yet been combined across neighbouring points
+    that contribute to the same QoI points.
+
+    Parameters
+    ----------
+    Xs : np_sndarray[Ps, Ns, np.dtype[F]]
+        The stencil-extended data, in floating-point format, which must be
+        of shape [Ps, ...stencil_shape].
+    terms : int
+        The number of terms in the expression.
+    callback : Callback[Ps, Ns, F]
+        A callback that will be called once the stencil-extended lower and
+        upper bounds `Xs_lower` and `Xs_upper` on the stencil-extended data
+        `Xs` have been computed.
+
+        These bounds have not yet been combined across neighbouring points
+        that contribute to the same QoI points.
+    """
+
     __slots__: tuple[str, ...] = (
         "_Xs",
         "_Xs_lower_out",
@@ -163,7 +302,11 @@ class AccumulateXsBoundsCallback(Generic[Ps, Ns, F]):
     _callback: None | Callback
 
     def __init__(
-        self, *, Xs: np_sndarray[Ps, Ns, np.dtype[F]], terms: int, callback: Callback
+        self,
+        *,
+        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
+        terms: int,
+        callback: Callback[Ps, Ns, F],
     ) -> None:
         self._Xs = Xs
 
@@ -185,6 +328,30 @@ class AccumulateXsBoundsCallback(Generic[Ps, Ns, F]):
         term: int,
         where: None | np_sndarray[Ps, Ns, np.dtype[np.bool]] = None,
     ) -> None:
+        """
+        Callback that can be passed as the `callback` parameter in
+        [`Expr.compute_data_bounds`][...expr.abc.Expr.compute_data_bounds]
+        to accumulate the stencil-extended lower and upper bounds `Xs_lower`
+        and `Xs_upper` for a specific `term` into the combined lower and
+        upper bounds.
+
+        This callback automatically calls [`complete_term`][..complete_term].
+
+        Parameters
+        ----------
+        Xs_lower : np_sndarray[Ps, Ns, np.dtype[F]]
+            The stencil-extended lower bounds on the stencil-extended data
+            `Xs`, for the `term`.
+        Xs_upper : np_sndarray[Ps, Ns, np.dtype[F]]
+            The stencil-extended upper bounds on the stencil-extended data
+            `Xs`, for the `term`.
+        term : int
+            The index of the term for which the data bounds have been computed.
+        where : None | np_sndarray[Ps, Ns, np.dtype[np.bool]]
+            Optional mask to only integrate the data bounds for the `term` for
+            some elements.
+        """
+
         # combine the inner data bounds
         if self._can_override_out:
             np.copyto(self._Xs_lower_out, Xs_lower)
@@ -201,11 +368,34 @@ class AccumulateXsBoundsCallback(Generic[Ps, Ns, F]):
         self.complete_term(term)
 
     def complete_term(self, term: int) -> None:
+        """
+        Eagerly mark the `term` as completed.
+
+        This method automatically calls
+        [`check_for_completion`][..check_for_completion].
+
+        Parameters
+        ----------
+        term : int
+            The index of the term that has been completed.
+        """
+
         self._terms_completed[term] = True
 
         self.check_for_completion()
 
     def check_for_completion(self) -> None:
+        """
+        Check if all terms have been completed.
+
+        If all terms have been completed, call the callback on the accumulated
+        stencil-extended lower and upper bounds `Xs_lower` and `Xs_upper` on
+        the data `Xs`.
+
+        The callback is only called once, the first time that the completion
+        check succeeds.
+        """
+
         if self._callback is None:
             return
 

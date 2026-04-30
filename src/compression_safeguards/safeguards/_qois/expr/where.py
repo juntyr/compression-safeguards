@@ -7,7 +7,7 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import _broadcast_to, _ensure_array, _where
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
-from ..context import AccumulateXsBoundsCallback, Callback, Context
+from ..context import Callback, Context, DataBoundsAccumulator
 from ..typing import F, Fi, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
@@ -91,7 +91,7 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         # evaluate the condition, a, and b
@@ -118,8 +118,8 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
         if not ((not np.all(condvb_Ps)) and b.has_data):
             prune_pre_visit(b)
 
-        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
-            AccumulateXsBoundsCallback(Xs=Xs, terms=3, callback=callback)
+        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=3, callback=callback
         )
 
         if cond.has_data:

@@ -11,7 +11,7 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
-from ..context import Callback, Context, ExprContext
+from ..context import Callback, Context, _ExprContext
 from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
@@ -71,7 +71,7 @@ class ScalarLog(Expr[AnyExpr]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         # evaluate arg and log(arg)
@@ -201,7 +201,7 @@ class ScalarExp(Expr[AnyExpr]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         # evaluate arg and exp(arg)
@@ -352,7 +352,7 @@ class ScalarLogWithBase(Expr[AnyExpr, AnyExpr]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         from .divmul import ScalarDivide  # noqa: PLC0415
@@ -364,7 +364,7 @@ class ScalarLogWithBase(Expr[AnyExpr, AnyExpr]):
                 Logarithm.ln,
                 self._a,
             )
-            ctx._context[ln_ab] = ExprContext(2)
+            ctx._context[ln_ab] = _ExprContext(2)
 
             ctx._context[self._b]._dependents -= 1
 
@@ -374,16 +374,16 @@ class ScalarLogWithBase(Expr[AnyExpr, AnyExpr]):
                 Logarithm.ln,
                 self._a,
             )
-            ctx._context[ln_a] = ExprContext(1)
+            ctx._context[ln_a] = _ExprContext(1)
 
             ln_b = ScalarLog(
                 Logarithm.ln,
                 self._b,
             )
-            ctx._context[ln_b] = ExprContext(1)
+            ctx._context[ln_b] = _ExprContext(1)
 
         ln_div_ln = ScalarDivide(ln_a, ln_b)
-        ctx._context[ln_div_ln] = ExprContext(1)
+        ctx._context[ln_div_ln] = _ExprContext(1)
 
         return ln_div_ln.deferred_compute_data_bounds(
             expr_lower, expr_upper, Xs, late_bound, ctx, callback

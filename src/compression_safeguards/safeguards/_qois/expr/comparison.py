@@ -12,7 +12,7 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
-from ..context import AccumulateXsBoundsCallback, Callback, Context
+from ..context import Callback, Context, DataBoundsAccumulator
 from ..typing import F, Fi, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
@@ -72,7 +72,7 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         a = self._a
@@ -132,8 +132,8 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
-            AccumulateXsBoundsCallback(Xs=Xs, terms=2, callback=callback)
+        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2, callback=callback
         )
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
@@ -287,7 +287,7 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         a = self._a
@@ -347,8 +347,8 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
-            AccumulateXsBoundsCallback(Xs=Xs, terms=2, callback=callback)
+        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2, callback=callback
         )
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
@@ -502,7 +502,7 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         a = self._a
@@ -562,8 +562,8 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
-            AccumulateXsBoundsCallback(Xs=Xs, terms=2, callback=callback)
+        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2, callback=callback
         )
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
@@ -711,7 +711,7 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         a = self._a
@@ -771,8 +771,8 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
-            AccumulateXsBoundsCallback(Xs=Xs, terms=2, callback=callback)
+        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2, callback=callback
         )
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
@@ -920,7 +920,7 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         a = self._a
@@ -980,8 +980,8 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
-            AccumulateXsBoundsCallback(Xs=Xs, terms=2, callback=callback)
+        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2, callback=callback
         )
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
@@ -1129,7 +1129,7 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         a = self._a
@@ -1189,8 +1189,8 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
-            AccumulateXsBoundsCallback(Xs=Xs, terms=2, callback=callback)
+        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2, callback=callback
         )
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper

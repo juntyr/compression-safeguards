@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Mapping, Set
 from typing import TYPE_CHECKING, Any, Generic, Self, TypeAlias, assert_never, final
 from warnings import warn
 
@@ -68,6 +68,9 @@ class Expr(ABC, Generic[*Es]):
         Does this expression reference the data `x` or `X[i]`?
         """
 
+        if isinstance(self, DataExpr):
+            return True
+
         args: tuple[AnyExpr, ...] = self.args  # type: ignore
 
         return any(a.has_data for a in args)
@@ -111,34 +114,6 @@ class Expr(ABC, Generic[*Es]):
                 for a in as_:
                     has_data |= a.eval_has_data(Xs, late_bound)
                 return has_data
-
-    @final
-    def apply_array_element_offset(
-        self,
-        axis: int,
-        offset: int,
-    ) -> "AnyExpr":
-        """
-        Apply an `offset` to the array element indices along the given `axis`.
-
-        This method applies to data and late-bound constants.
-
-        Parameters
-        ----------
-        axis : int
-            The axis along which the array element indices are offset.
-        offset : int
-            The offset that is applied to the array element indices.
-
-        Returns
-        -------
-        expr : AnyExpr
-            The modified expression.
-        """
-
-        return self.with_args(
-            *(a.apply_array_element_offset(axis, offset) for a in self.args)  # type: ignore
-        )
 
     # FIXME: constant_fold based on self.args and self.with_args is blocked on
     #        not being able to relate on TypeVarTuple to another, here *Expr to
@@ -191,10 +166,46 @@ class Expr(ABC, Generic[*Es]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
-        pass
+        """
+        Compute the lower-upper bounds on the stencil-extended data `Xs` that
+        satisfy the lower-upper bounds `expr_lower` and `expr_lower` on this
+        expression. The bounds are returned to the `callback` once ready.
+
+        This method should *not* be called manually.
+
+        This method is allowed to compute slightly wrongly-rounded results
+        that are then corrected by
+        [`compute_data_bounds`][..compute_data_bounds].
+
+        If this method is known to have no rounding errors and always computes
+        the correct data bounds, it can be decorated with
+        [`@data_bounds(DataBounds.infallible)`][.....bound.data_bounds].
+
+        Parameters
+        ----------
+        expr_lower : np.ndarray[tuple[Ps], np.dtype[F]]
+            The pointwise lower bound on this expression.
+        expr_upper : np.ndarray[tuple[Ps], np.dtype[F]]
+            The pointwise upper bound on this expression.
+        Xs : np_sndarray[Ps, Ns, np.dtype[F]]
+            The stencil-extended data, in floating-point format, which must be
+            of shape [Ps, ...stencil_shape].
+        late_bound : Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]]
+            The late-bound constants parameters for this expression, with the
+            same shape and floating-point dtype as the stencil-extended data.
+        ctx : Context[Ps, Ns, F]
+            Deferred computation context.
+        callback : Callback[Ps, Ns, F]
+            A callback that will be called once the stencil-extended lower and
+            upper bounds `Xs_lower` and `Xs_upper` on the stencil-extended data
+            `Xs` have been computed.
+
+            These bounds have not yet been combined across neighbouring points
+            that contribute to the same QoI points.
+        """
 
     @final
     def deferred_compute_data_bounds(
@@ -203,10 +214,43 @@ class Expr(ABC, Generic[*Es]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
-        ready = ctx.push_expr_bounds(
+        """
+        Compute the lower-upper bounds on the stencil-extended data `Xs` that
+        satisfy the lower-upper bounds `expr_lower` and `expr_lower` on this
+        expression. The bounds are returned to the `callback` once ready.
+
+        This method calls into
+        [`compute_data_bounds_unchecked`][..compute_data_bounds_unchecked]
+        and then applies extensive rounding checks to ensure that the computed
+        bounds satisfy the bounds on this expression.
+
+        Parameters
+        ----------
+        expr_lower : np.ndarray[tuple[Ps], np.dtype[F]]
+            The pointwise lower bound on this expression.
+        expr_upper : np.ndarray[tuple[Ps], np.dtype[F]]
+            The pointwise upper bound on this expression.
+        Xs : np_sndarray[Ps, Ns, np.dtype[F]]
+            The stencil-extended data, in floating-point format, which must be
+            of shape [Ps, ...stencil_shape].
+        late_bound : Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]]
+            The late-bound constants parameters for this expression, with the
+            same shape and floating-point dtype as the stencil-extended data.
+        ctx : Context[Ps, Ns, F]
+            Deferred computation context.
+        callback : Callback[Ps, Ns, F]
+            A callback that will be called once the stencil-extended lower and
+            upper bounds `Xs_lower` and `Xs_upper` on the stencil-extended data
+            `Xs` have been computed.
+
+            These bounds have not yet been combined across neighbouring points
+            that contribute to the same QoI points.
+        """
+
+        ready = ctx.register_expr_bounds(
             self,  # type: ignore
             expr_lower,
             expr_upper,
@@ -307,3 +351,61 @@ AnyExpr: TypeAlias = Expr[*tuple["AnyExpr", ...]]
 
 EmptyExpr: TypeAlias = Expr[()]
 """ Expression with zero arguments """
+
+
+class ArrayElementExpr(EmptyExpr):
+    """
+    Expression that represents an array element.
+
+    The expression must have zero arguments.
+    """
+
+    @abstractmethod
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Self:
+        """
+        Apply an `offset` to the array element indices along the given `axis`.
+
+        Parameters
+        ----------
+        axis : int
+            The axis along which the array element indices are offset.
+        offset : int
+            The offset that is applied to the array element indices.
+
+        Returns
+        -------
+        modified : Self
+            The modified expression.
+        """
+
+
+class DataExpr(ArrayElementExpr):
+    """
+    Expression that represents data.
+
+    The expression must have zero arguments.
+    """
+
+    @property
+    @abstractmethod
+    def data_indices(self) -> Set[tuple[int, ...]]:
+        """
+        The data indices `X[is]` contained in this expression.
+        """
+
+
+class LateBoundConstantExpr(ArrayElementExpr):
+    """
+    Expression that represents a late-bound constant.
+    """
+
+    @property
+    @abstractmethod
+    def late_bound_constants(self) -> Set[Parameter]:
+        """
+        The late-bound constant parameters contained in this expression.
+        """

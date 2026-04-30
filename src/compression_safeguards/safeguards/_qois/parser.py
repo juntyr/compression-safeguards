@@ -5,7 +5,11 @@ from sly import Parser
 
 from ...utils.bindings import Parameter
 from ...utils.error import ctx
-from .expr import expr_data_indices, expr_late_bound_constants
+from .expr import (
+    apply_expr_array_element_offset,
+    expr_data_indices,
+    expr_late_bound_constants,
+)
 from .expr.abc import AnyExpr
 from .expr.abs import ScalarAbs
 from .expr.addsub import ScalarAdd, ScalarLeftAssociativeSum, ScalarSubtract
@@ -805,13 +809,16 @@ class QoIParser(Parser):
 
             coefficients = finite_difference_coefficients(
                 order,
-                tuple(grid_centre.apply_array_element_offset(axis, o) for o in offsets),
+                tuple(
+                    apply_expr_array_element_offset(grid_centre, axis, o)
+                    for o in offsets
+                ),
                 lambda a: Group(ScalarSubtract(a, grid_centre)),
                 delta_transform=delta_transform,
             )
 
         terms = [
-            ScalarMultiply(expr.apply_array_element_offset(axis, o), c)
+            ScalarMultiply(apply_expr_array_element_offset(expr, axis, o), c)
             for o, c in zip(offsets, coefficients)
         ]
         # even order=0 produces at least one term

@@ -16,7 +16,7 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_stacked_arg_within_expr_bounds
-from ..context import AccumulateXsBoundsCallback, Callback, Context, ExprContext
+from ..context import Callback, Context, DataBoundsAccumulator, _ExprContext
 from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .abs import ScalarAbs
@@ -76,7 +76,7 @@ class ScalarAdd(Expr[AnyExpr, AnyExpr]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         return deferred_compute_left_associate_sum_data_bounds(
@@ -139,7 +139,7 @@ class ScalarSubtract(Expr[AnyExpr, AnyExpr]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         return deferred_compute_left_associate_sum_data_bounds(
@@ -267,7 +267,7 @@ class ScalarLeftAssociativeSum(Expr[AnyExpr, AnyExpr, AnyExpr, *tuple[AnyExpr, .
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         return deferred_compute_left_associate_sum_data_bounds(
@@ -290,7 +290,7 @@ def deferred_compute_left_associate_sum_data_bounds(
     expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
     Xs: np_sndarray[Ps, Ns, np.dtype[F]],
     late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ctx: Context,
+    ctx: Context[Ps, Ns, F],
     callback: Callback[Ps, Ns, F],
 ) -> None:
     def _zero_add(
@@ -512,10 +512,8 @@ def deferred_compute_left_associate_sum_data_bounds(
         ),
     )
 
-    wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
-        AccumulateXsBoundsCallback(
-            Xs=Xs, terms=len(left_associative_sum), callback=callback
-        )
+    wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+        Xs=Xs, terms=len(left_associative_sum), callback=callback
     )
 
     i = 0
@@ -545,7 +543,7 @@ def deferred_compute_left_associate_sum_data_bounds(
 
 def as_left_associative_sum(
     expr: ScalarAdd | ScalarSubtract | ScalarLeftAssociativeSum,
-    ctx: Context,
+    ctx: Context[Ps, Ns, F],
 ) -> tuple[AnyExpr, ...]:
     terms_rev: list[AnyExpr] = []
 
@@ -562,7 +560,7 @@ def as_left_associative_sum(
             # TODO: remove rewrite, since that defeats some common subexpression
             #       elimination and requires this context update hack
             neg_expr = ScalarNegate(expr._b)
-            ctx._context[neg_expr] = ExprContext(1)
+            ctx._context[neg_expr] = _ExprContext(1)
             terms_rev.append(neg_expr)
         else:
             terms_rev.append(expr._b)

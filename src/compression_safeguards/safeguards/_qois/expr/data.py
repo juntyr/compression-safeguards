@@ -1,19 +1,20 @@
 from collections.abc import Mapping
+from typing import Self
 from warnings import warn
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import _broadcast_to, _ensure_array, _is_of_shape, _ones
+from ....utils._compat import _broadcast_to, _ensure_array, _is_of_shape, _ones, _zeros
 from ....utils.bindings import Parameter
 from ....utils.error import QuantityOfInterestRuntimeWarning
 from ..bound import DataBounds, data_bounds
 from ..context import Callback, Context
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, EmptyExpr
+from .abc import AnyExpr, DataExpr, LateBoundConstantExpr
 
 
-class Data(EmptyExpr):
+class Data(DataExpr):
     __slots__: tuple[str, ...] = ("_index",)
     _index: tuple[int, ...]
 
@@ -40,11 +41,6 @@ class Data(EmptyExpr):
     def with_args(self) -> "Data":
         return Data(self._index)
 
-    @property  # type: ignore
-    @override
-    def has_data(self) -> bool:
-        return True
-
     @override  # type: ignore
     def eval_has_data(
         self,
@@ -61,18 +57,19 @@ class Data(EmptyExpr):
         return data_is_not_nan
 
     @property
+    @override
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return frozenset([self._index])
 
-    @override  # type: ignore
+    @override
     def apply_array_element_offset(
         self,
         axis: int,
         offset: int,
-    ) -> "Data":
+    ) -> Self:
         index = list(self._index)
         index[axis] += offset
-        return Data(index=tuple(index))
+        return type(self)(index=tuple(index))
 
     @override
     def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
@@ -96,7 +93,7 @@ class Data(EmptyExpr):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         exprv = Xs[(...,) + self._index]
@@ -136,7 +133,7 @@ class Data(EmptyExpr):
 Data.SCALAR = Data(index=())
 
 
-class LateBoundConstant(EmptyExpr):
+class LateBoundConstant(LateBoundConstantExpr):
     __slots__: tuple[str, ...] = ("_name", "_index")
     _name: Parameter
     _index: tuple[int, ...]
@@ -171,17 +168,18 @@ class LateBoundConstant(EmptyExpr):
     def with_args(self) -> "LateBoundConstant":
         return LateBoundConstant(self._name, self._index)
 
-    @override  # type: ignore
+    @override
     def apply_array_element_offset(
         self,
         axis: int,
         offset: int,
-    ) -> "LateBoundConstant":
+    ) -> Self:
         index = list(self._index)
         index[axis] += offset
-        return LateBoundConstant(self._name, index=tuple(index))
+        return type(self)(self._name, index=tuple(index))
 
     @property
+    @override
     def late_bound_constants(self) -> frozenset[Parameter]:
         return frozenset([self.name])
 
@@ -208,7 +206,7 @@ class LateBoundConstant(EmptyExpr):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         assert False, "late-bound constants have no data bounds"
@@ -222,7 +220,7 @@ class LateBoundConstant(EmptyExpr):
 
 # scalar constant that tricks the QoIs by pretending to be data,
 # which is useful for tests and fuzzing to produce specific data-like values
-class ScalarAnyDataConstant(EmptyExpr):
+class ScalarAnyDataConstant(DataExpr):
     __slots__: tuple[str, ...] = ("_const",)
     _const: np.number
 
@@ -243,18 +241,32 @@ class ScalarAnyDataConstant(EmptyExpr):
     def with_args(self) -> "ScalarAnyDataConstant":
         return ScalarAnyDataConstant(self._const)
 
-    @property  # type: ignore
-    @override
-    def has_data(self) -> bool:
-        return True
-
     @override  # type: ignore
     def eval_has_data(
         self,
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[np.bool]]:
+        # we could just return all True here, since all data is ... data
+        # but we also currently guarantee that NaN data values stay NaN,
+        #  i.e. that the values are constant, so not really data dependent
+        # therefore, we say that only non-NaN data is actually data
+        if np.isnan(self._const):
+            return _zeros(Xs.shape[:1], dtype=np.dtype(np.bool))
         return _ones(Xs.shape[:1], dtype=np.dtype(np.bool))
+
+    @property
+    @override
+    def data_indices(self) -> frozenset[tuple[int, ...]]:
+        return frozenset()
+
+    @override
+    def apply_array_element_offset(
+        self,
+        axis: int,
+        offset: int,
+    ) -> Self:
+        return self
 
     @override
     def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
@@ -277,7 +289,7 @@ class ScalarAnyDataConstant(EmptyExpr):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         assert isinstance(self._const, Xs.dtype.type)

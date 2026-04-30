@@ -1,4 +1,4 @@
-from collections.abc import Callable, Mapping, Set
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import numpy as np
@@ -6,7 +6,7 @@ import numpy as np
 from ....utils.bindings import Parameter
 from ..context import Context
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr
+from .abc import AnyExpr, ArrayElementExpr, DataExpr, LateBoundConstantExpr
 
 
 def compute_expr_data_bounds(
@@ -16,6 +16,36 @@ def compute_expr_data_bounds(
     Xs: np_sndarray[Ps, Ns, np.dtype[F]],
     late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
 ) -> tuple[np_sndarray[Ps, Ns, np.dtype[F]], np_sndarray[Ps, Ns, np.dtype[F]]]:
+    """
+    Eagerly compute the lower-upper bounds on the stencil-extended data `Xs`
+    that satisfy the lower-upper bounds `expr_lower` and `expr_lower` on
+    the `expr`ession.
+
+    Parameters
+    ----------
+    expr : AnyExpr
+        The expression for which the data bounds are computed.
+    expr_lower : np.ndarray[tuple[Ps], np.dtype[F]]
+        The pointwise lower bound on the expression.
+    expr_upper : np.ndarray[tuple[Ps], np.dtype[F]]
+        The pointwise upper bound on the expression.
+    Xs : np_sndarray[Ps, Ns, np.dtype[F]]
+        The stencil-extended data, in floating-point format, which must be
+        of shape [Ps, ...stencil_shape].
+    late_bound : Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]]
+        The late-bound constants parameters for the expression, with the
+        same shape and floating-point dtype as the stencil-extended data.
+
+    Returns
+    -------
+    Xs_lower, Xs_upper : tuple[np_sndarray[Ps, Ns, np.dtype[F]], np_sndarray[Ps, Ns, np.dtype[F]]]
+        The stencil-extended lower and upper bounds on the stencil-extended
+        data `Xs`.
+
+        The bounds have not yet been combined across neighbouring points
+        that contribute to the same QoI points.
+    """
+
     expr = deduplicate_expr(expr)
 
     Xs_lower_out: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
@@ -160,9 +190,8 @@ def expr_data_indices(expr: AnyExpr) -> frozenset[tuple[int, ...]]:
     data_indices: set[tuple[int, ...]] = set()
 
     def visit_data_indices(e: AnyExpr) -> None:
-        if not hasattr(e, "data_indices"):
-            indices: Set[tuple[int, ...]] = e.data_indices  # type: ignore
-            data_indices.update(indices)
+        if isinstance(e, DataExpr):
+            data_indices.update(e.data_indices)
 
     pre_visit_expr(expr, visitor=visit_data_indices)
 
@@ -178,10 +207,43 @@ def expr_late_bound_constants(expr: AnyExpr) -> frozenset[Parameter]:
     late_bound_constants: set[Parameter] = set()
 
     def visit_late_bound_constants(e: AnyExpr) -> None:
-        if hasattr(e, "late_bound_constants"):
-            constants: Set[Parameter] = e.late_bound_constants  # type: ignore
-            late_bound_constants.update(constants)
+        if isinstance(e, LateBoundConstantExpr):
+            late_bound_constants.update(e.late_bound_constants)
 
     pre_visit_expr(expr, visitor=visit_late_bound_constants)
 
     return frozenset(late_bound_constants)
+
+
+def apply_expr_array_element_offset(
+    expr: AnyExpr,
+    axis: int,
+    offset: int,
+) -> AnyExpr:
+    """
+    Apply an `offset` to the array element indices along the given `axis`
+    inside the `expr`ession.
+
+    This method applies to both data and late-bound constants.
+
+    Parameters
+    ----------
+    expr : AnyExpr
+        The expression in which the array element indices will be offset.
+    axis : int
+        The axis along which the array element indices are offset.
+    offset : int
+        The offset that is applied to the array element indices.
+
+    Returns
+    -------
+    modified : AnyExpr
+        The modified expression.
+    """
+
+    def apply_array_element_offset_mapper(e: AnyExpr) -> AnyExpr:
+        if isinstance(e, ArrayElementExpr):
+            return e.apply_array_element_offset(axis, offset)
+        return e
+
+    return map_expr(expr, mapper=apply_array_element_offset_mapper)

@@ -8,7 +8,7 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import _ensure_array, _stack
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
-from ..context import AccumulateXsBoundsCallback, Callback, Context
+from ..context import Callback, Context, DataBoundsAccumulator
 from ..typing import F, Fi, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
@@ -60,7 +60,7 @@ class ScalarNot(Expr[AnyExpr]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         # evaluate arg
@@ -175,7 +175,7 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         a = self._a
@@ -212,8 +212,8 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
         for c_const_zero in cs_const_zero:
             any_constant_zero |= c_const_zero
 
-        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
-            AccumulateXsBoundsCallback(Xs=Xs, terms=2 + len(cs), callback=callback)
+        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2 + len(cs), callback=callback
         )
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
@@ -348,7 +348,7 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         a = self._a
@@ -385,8 +385,8 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
         for c_const_zero in cs_const_non_zero:
             any_constant_non_zero |= c_const_zero
 
-        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
-            AccumulateXsBoundsCallback(Xs=Xs, terms=2 + len(cs), callback=callback)
+        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2 + len(cs), callback=callback
         )
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper

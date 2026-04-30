@@ -24,7 +24,7 @@ from ..bound import (
     guarantee_arg_within_expr_bounds,
     guarantee_stacked_arg_within_expr_bounds,
 )
-from ..context import AccumulateXsBoundsCallback, Callback, Context
+from ..context import Callback, Context, DataBoundsAccumulator
 from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
@@ -82,7 +82,7 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         a_const = not self._a.has_data
@@ -384,8 +384,8 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
         b_lower[any_nan & ~np.isnan(bv)] = -np.inf
         b_upper[any_nan & ~np.isnan(bv)] = np.inf
 
-        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
-            AccumulateXsBoundsCallback(Xs=Xs, terms=2, callback=callback)
+        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2, callback=callback
         )
 
         # recurse into a and b to propagate their bounds, then combine their
@@ -488,7 +488,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         a_const = not self._a.has_data
@@ -900,8 +900,8 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
         b_lower[any_nan & ~np.isnan(bv)] = -np.inf
         b_upper[any_nan & ~np.isnan(bv)] = np.inf
 
-        wrapped_callback: AccumulateXsBoundsCallback[Ps, Ns, F] = (
-            AccumulateXsBoundsCallback(Xs=Xs, terms=2, callback=callback)
+        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2, callback=callback
         )
 
         # recurse into a and b to propagate their bounds, then combine their

@@ -87,19 +87,6 @@ class ReportingExpr(Expr[AnyExpr]):
     def with_args(self, expr: AnyExpr) -> "ReportingExpr | Number":
         return ReportingExpr(expr, self._reporter)
 
-    @property  # type: ignore[misc]
-    @override
-    def has_data(self) -> bool:
-        return self._expr.has_data
-
-    @override  # type: ignore
-    def eval_has_data(
-        self,
-        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> np.ndarray[tuple[Ps], np.dtype[np.bool]]:
-        return self._expr.eval_has_data(Xs, late_bound)
-
     @override
     def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
         fexpr = self._expr.constant_fold(dtype)
@@ -125,7 +112,7 @@ class ReportingExpr(Expr[AnyExpr]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context,
+        ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
         self._reporter.enter(self._expr)
