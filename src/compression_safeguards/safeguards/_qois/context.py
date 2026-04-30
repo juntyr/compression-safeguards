@@ -51,7 +51,7 @@ class Context(Generic[Ps, Ns, F]):
     """
 
     __slots__: tuple[str, ...] = ("_context",)
-    _context: dict["AnyExpr", "_ExprContext[Ps, Ns, F]"]
+    _context: dict["AnyExpr", "_DeferredExprContext[Ps, Ns, F]"]
 
     def __init__(self, expr: "AnyExpr") -> None:
         self._context = dict()
@@ -60,7 +60,7 @@ class Context(Generic[Ps, Ns, F]):
             if e in self._context:
                 return
 
-            self._context[e] = _ExprContext(0)
+            self._context[e] = _DeferredExprContext(0)
 
             for a in e.args:
                 visit_dependencies_once(a)
@@ -150,7 +150,7 @@ class Context(Generic[Ps, Ns, F]):
         )
 
 
-class _ExprContext(Generic[Ps, Ns, F]):
+class _DeferredExprContext(Generic[Ps, Ns, F]):
     """
     Container for the deferred computation context for one expression.
 

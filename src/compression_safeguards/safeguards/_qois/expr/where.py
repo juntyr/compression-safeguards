@@ -118,7 +118,7 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
         if not ((not np.all(condvb_Ps)) and b.has_data):
             prune_pre_visit(b)
 
-        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
             Xs=Xs, terms=3, callback=callback
         )
 
@@ -150,10 +150,10 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(wrapped_callback.on_complete_term, term=0),
+                partial(accumulator.on_complete_term, term=0),
             )
         else:
-            wrapped_callback.complete_term(0)
+            accumulator.complete_term(0)
 
         if np.any(condvb_Ps) and a.has_data:
             # pass on the data bounds to a but only use its bounds on Xs if
@@ -170,10 +170,10 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(wrapped_callback.on_complete_term, term=1, where=condvb_Ns),
+                partial(accumulator.on_complete_term, term=1, where=condvb_Ns),
             )
         else:
-            wrapped_callback.complete_term(1)
+            accumulator.complete_term(1)
 
         if (not np.all(condvb_Ps)) and b.has_data:
             # pass on the data bounds to b but only use its bounds on Xs if
@@ -190,10 +190,10 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(wrapped_callback.on_complete_term, term=2, where=~condvb_Ns),
+                partial(accumulator.on_complete_term, term=2, where=~condvb_Ns),
             )
         else:
-            wrapped_callback.complete_term(2)
+            accumulator.complete_term(2)
 
     @override
     def __repr__(self) -> str:

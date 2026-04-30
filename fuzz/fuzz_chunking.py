@@ -1,8 +1,6 @@
 import atheris
 from timeoutcontext import timeout
 
-from compression_safeguards.safeguards._qois.expr import expr_data_indices
-
 with atheris.instrument_imports():
     import sys
     import types
@@ -17,7 +15,10 @@ with atheris.instrument_imports():
     from xarray_safeguards import produce_data_array_correction
 
     from compression_safeguards.api import Safeguards
-    from compression_safeguards.safeguards._qois.expr import expr_late_bound_constants
+    from compression_safeguards.safeguards._qois.expr import (
+        expr_data_indices,
+        expr_late_bound_constants,
+    )
     from compression_safeguards.safeguards._qois.expr.hashing import (
         HashingExpr,
         _patch_for_hashing_qoi_dev_only,

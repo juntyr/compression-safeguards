@@ -212,7 +212,7 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
         for c_const_zero in cs_const_zero:
             any_constant_zero |= c_const_zero
 
-        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
             Xs=Xs, terms=2 + len(cs), callback=callback
         )
 
@@ -235,7 +235,7 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
             )
         ):
             if t_const:
-                wrapped_callback.complete_term(j)
+                accumulator.complete_term(j)
 
                 continue
 
@@ -267,7 +267,7 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(wrapped_callback.on_complete_term, term=j),
+                partial(accumulator.on_complete_term, term=j),
             )
 
     @override
@@ -385,7 +385,7 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
         for c_const_zero in cs_const_non_zero:
             any_constant_non_zero |= c_const_zero
 
-        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
             Xs=Xs, terms=2 + len(cs), callback=callback
         )
 
@@ -409,7 +409,7 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
             )
         ):
             if t_const:
-                wrapped_callback.complete_term(j)
+                accumulator.complete_term(j)
 
                 continue
 
@@ -445,7 +445,7 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(wrapped_callback.on_complete_term, term=j),
+                partial(accumulator.on_complete_term, term=j),
             )
 
     @override

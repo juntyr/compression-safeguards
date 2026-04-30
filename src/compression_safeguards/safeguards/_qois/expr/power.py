@@ -549,7 +549,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             _where(np.less(av, 1), tl_stack[1], tu_stack[1]),
         )
 
-        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
             Xs=Xs, terms=2, callback=callback
         )
 
@@ -561,7 +561,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             Xs,
             late_bound,
             ctx,
-            partial(wrapped_callback.on_complete_term, term=0),
+            partial(accumulator.on_complete_term, term=0),
         )
 
         b.deferred_compute_data_bounds(
@@ -570,7 +570,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             Xs,
             late_bound,
             ctx,
-            partial(wrapped_callback.on_complete_term, term=1),
+            partial(accumulator.on_complete_term, term=1),
         )
 
     @override

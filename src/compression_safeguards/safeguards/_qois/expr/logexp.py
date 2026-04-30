@@ -11,7 +11,7 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
-from ..context import Callback, Context, _ExprContext
+from ..context import Callback, Context, _DeferredExprContext
 from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
@@ -364,7 +364,7 @@ class ScalarLogWithBase(Expr[AnyExpr, AnyExpr]):
                 Logarithm.ln,
                 self._a,
             )
-            ctx._context[ln_ab] = _ExprContext(2)
+            ctx._context[ln_ab] = _DeferredExprContext(2)
 
             ctx._context[self._b]._dependents -= 1
 
@@ -374,16 +374,16 @@ class ScalarLogWithBase(Expr[AnyExpr, AnyExpr]):
                 Logarithm.ln,
                 self._a,
             )
-            ctx._context[ln_a] = _ExprContext(1)
+            ctx._context[ln_a] = _DeferredExprContext(1)
 
             ln_b = ScalarLog(
                 Logarithm.ln,
                 self._b,
             )
-            ctx._context[ln_b] = _ExprContext(1)
+            ctx._context[ln_b] = _DeferredExprContext(1)
 
         ln_div_ln = ScalarDivide(ln_a, ln_b)
-        ctx._context[ln_div_ln] = _ExprContext(1)
+        ctx._context[ln_div_ln] = _DeferredExprContext(1)
 
         return ln_div_ln.deferred_compute_data_bounds(
             expr_lower, expr_upper, Xs, late_bound, ctx, callback

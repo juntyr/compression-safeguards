@@ -176,6 +176,10 @@ class Expr(ABC, Generic[*Es]):
 
         This method should *not* be called manually.
 
+        This method should *not* use the `ctx` but should simply forward it to
+        all calls to [`compute_data_bounds`][..compute_data_bounds] on
+        sub-expressions.
+
         This method is allowed to compute slightly wrongly-rounded results
         that are then corrected by
         [`compute_data_bounds`][..compute_data_bounds].
@@ -355,7 +359,7 @@ EmptyExpr: TypeAlias = Expr[()]
 
 class ArrayElementExpr(EmptyExpr):
     """
-    Expression that represents an array element.
+    Expression that represents a data-like array element.
 
     The expression must have zero arguments.
     """

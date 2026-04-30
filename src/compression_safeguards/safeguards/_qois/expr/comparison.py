@@ -132,7 +132,7 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
             Xs=Xs, terms=2, callback=callback
         )
 
@@ -146,7 +146,7 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a == b) in [True, False] and all args can be anything
         if a_const:
-            wrapped_callback.complete_term(0)
+            accumulator.complete_term(0)
         else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -183,12 +183,12 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(wrapped_callback.on_complete_term, term=0),
+                partial(accumulator.on_complete_term, term=0),
             )
 
         # cont. with b as outlined above
         if b_const:
-            wrapped_callback.complete_term(1)
+            accumulator.complete_term(1)
         else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -225,7 +225,7 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(wrapped_callback.on_complete_term, term=1),
+                partial(accumulator.on_complete_term, term=1),
             )
 
     @override
@@ -347,7 +347,7 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
             Xs=Xs, terms=2, callback=callback
         )
 
@@ -361,7 +361,7 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
         #  - we do *not* special-case -0.0 and +0.0 here
         # otherwise, (a != b) in [True, False] and all args can be anything
         if a_const:
-            wrapped_callback.complete_term(0)
+            accumulator.complete_term(0)
         else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -398,12 +398,12 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(wrapped_callback.on_complete_term, term=0),
+                partial(accumulator.on_complete_term, term=0),
             )
 
         # cont. with b as outlined above
         if b_const:
-            wrapped_callback.complete_term(1)
+            accumulator.complete_term(1)
         else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -440,7 +440,7 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(wrapped_callback.on_complete_term, term=1),
+                partial(accumulator.on_complete_term, term=1),
             )
 
     @override
@@ -562,7 +562,7 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
             Xs=Xs, terms=2, callback=callback
         )
 
@@ -574,7 +574,7 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a < b) in [True, False] and all args can be anything
         if a_const:
-            wrapped_callback.complete_term(0)
+            accumulator.complete_term(0)
         else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -609,12 +609,12 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(wrapped_callback.on_complete_term, term=0),
+                partial(accumulator.on_complete_term, term=0),
             )
 
         # cont. with b as outlined above
         if b_const:
-            wrapped_callback.complete_term(1)
+            accumulator.complete_term(1)
         else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -649,7 +649,7 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(wrapped_callback.on_complete_term, term=1),
+                partial(accumulator.on_complete_term, term=1),
             )
 
     @override
@@ -771,7 +771,7 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
             Xs=Xs, terms=2, callback=callback
         )
 
@@ -783,7 +783,7 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a >= b) in [True, False] and all args can be anything
         if a_const:
-            wrapped_callback.complete_term(0)
+            accumulator.complete_term(0)
         else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -818,12 +818,12 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(wrapped_callback.on_complete_term, term=0),
+                partial(accumulator.on_complete_term, term=0),
             )
 
         # cont. with b as outlined above
         if b_const:
-            wrapped_callback.complete_term(1)
+            accumulator.complete_term(1)
         else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -858,7 +858,7 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(wrapped_callback.on_complete_term, term=1),
+                partial(accumulator.on_complete_term, term=1),
             )
 
     @override
@@ -980,7 +980,7 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
             Xs=Xs, terms=2, callback=callback
         )
 
@@ -992,7 +992,7 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a <= b) in [True, False] and all args can be anything
         if a_const:
-            wrapped_callback.complete_term(0)
+            accumulator.complete_term(0)
         else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -1027,12 +1027,12 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(wrapped_callback.on_complete_term, term=0),
+                partial(accumulator.on_complete_term, term=0),
             )
 
         # cont. with b as outlined above
         if b_const:
-            wrapped_callback.complete_term(1)
+            accumulator.complete_term(1)
         else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -1067,7 +1067,7 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(wrapped_callback.on_complete_term, term=1),
+                partial(accumulator.on_complete_term, term=1),
             )
 
     @override
@@ -1189,7 +1189,7 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
             Xs=Xs, terms=2, callback=callback
         )
 
@@ -1201,7 +1201,7 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a > b) in [True, False] and all args can be anything
         if a_const:
-            wrapped_callback.complete_term(0)
+            accumulator.complete_term(0)
         else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -1236,12 +1236,12 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(wrapped_callback.on_complete_term, term=0),
+                partial(accumulator.on_complete_term, term=0),
             )
 
         # cont. with b as outlined above
         if b_const:
-            wrapped_callback.complete_term(1)
+            accumulator.complete_term(1)
         else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
@@ -1276,7 +1276,7 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
                 Xs,
                 late_bound,
                 ctx,
-                partial(wrapped_callback.on_complete_term, term=1),
+                partial(accumulator.on_complete_term, term=1),
             )
 
     @override

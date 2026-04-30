@@ -384,7 +384,7 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
         b_lower[any_nan & ~np.isnan(bv)] = -np.inf
         b_upper[any_nan & ~np.isnan(bv)] = np.inf
 
-        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
             Xs=Xs, terms=2, callback=callback
         )
 
@@ -396,7 +396,7 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
             Xs,
             late_bound,
             ctx,
-            partial(wrapped_callback.on_complete_term, term=0),
+            partial(accumulator.on_complete_term, term=0),
         )
 
         b.deferred_compute_data_bounds(
@@ -405,7 +405,7 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
             Xs,
             late_bound,
             ctx,
-            partial(wrapped_callback.on_complete_term, term=1),
+            partial(accumulator.on_complete_term, term=1),
         )
 
     @override
@@ -900,7 +900,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
         b_lower[any_nan & ~np.isnan(bv)] = -np.inf
         b_upper[any_nan & ~np.isnan(bv)] = np.inf
 
-        wrapped_callback: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
             Xs=Xs, terms=2, callback=callback
         )
 
@@ -912,7 +912,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             Xs,
             late_bound,
             ctx,
-            partial(wrapped_callback.on_complete_term, term=0),
+            partial(accumulator.on_complete_term, term=0),
         )
 
         b.deferred_compute_data_bounds(
@@ -921,7 +921,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             Xs,
             late_bound,
             ctx,
-            partial(wrapped_callback.on_complete_term, term=1),
+            partial(accumulator.on_complete_term, term=1),
         )
 
     @override
