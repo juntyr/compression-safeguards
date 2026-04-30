@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from compression_safeguards.safeguards._qois.expr import compute_expr_data_bounds
 from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
 from compression_safeguards.safeguards._qois.expr.addsub import (
     ScalarAdd,
@@ -95,7 +96,8 @@ def test_abs():
     expr = ScalarAbs(Data.SCALAR)
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        X_lower, X_upper = expr.compute_data_bounds(
+        X_lower, X_upper = compute_expr_data_bounds(
+            expr,
             np.abs(X) - 1,
             np.abs(X) + 1,
             X,
@@ -182,7 +184,8 @@ def test_sign_same():
     expr = ScalarSign(Data.SCALAR)
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        X_lower, X_upper = expr.compute_data_bounds(
+        X_lower, X_upper = compute_expr_data_bounds(
+            expr,
             np.sign(X),
             np.sign(X),
             X,
@@ -272,7 +275,8 @@ def test_sign_one_off():
     expr = ScalarSign(Data.SCALAR)
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        X_lower, X_upper = expr.compute_data_bounds(
+        X_lower, X_upper = compute_expr_data_bounds(
+            expr,
             np.sign(X) - 1,
             np.sign(X) + 1,
             X,
@@ -361,7 +365,8 @@ def test_sign_any():
     expr = ScalarSign(Data.SCALAR)
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        X_lower, X_upper = expr.compute_data_bounds(
+        X_lower, X_upper = compute_expr_data_bounds(
+            expr,
             np.sign(X) - 2,
             np.sign(X) + 2,
             X,
@@ -450,7 +455,8 @@ def test_square():
     expr = ScalarSquare(Data.SCALAR)
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        X_lower, X_upper = expr.compute_data_bounds(
+        X_lower, X_upper = compute_expr_data_bounds(
+            expr,
             np.square(X) - 1,
             np.square(X) + 1,
             X,
@@ -537,7 +543,8 @@ def test_reciprocal():
     expr = ScalarReciprocal(Data.SCALAR)
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        X_lower, X_upper = expr.compute_data_bounds(
+        X_lower, X_upper = compute_expr_data_bounds(
+            expr,
             np.reciprocal(X) - 1,
             np.reciprocal(X) + 1,
             X,
@@ -588,7 +595,8 @@ def test_sin():
     expr = ScalarSin(Data.SCALAR)
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        X_lower, X_upper = expr.compute_data_bounds(
+        X_lower, X_upper = compute_expr_data_bounds(
+            expr,
             np.sin(X) - 1,
             np.sin(X) + 1,
             X,
@@ -677,7 +685,8 @@ def test_asin():
     expr = ScalarAsin(Data.SCALAR)
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
-        X_lower, X_upper = expr.compute_data_bounds(
+        X_lower, X_upper = compute_expr_data_bounds(
+            expr,
             np.asin(X) - 1,
             np.asin(X) + 1,
             X,
@@ -758,7 +767,7 @@ def test_fuzzer_found_bounded_hang():
     expr_lower = np.array(-1, dtype=np.float64)
     expr_upper = np.array(0, dtype=np.float64)
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower <= X
     assert X_upper == X
 
@@ -779,7 +788,7 @@ def test_fuzzer_found_subtract_inf():
 
     fmax = np.finfo(X.dtype).max
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     # bad: -inf - -inf = NaN and +inf - +inf = NaN
     assert X_lower == np.array(-fmax, dtype=np.float32)
     assert X_upper == np.array(fmax, dtype=np.float32)
@@ -801,7 +810,7 @@ def test_fuzzer_found_times_zero():
 
     smallest_subnormal = np.finfo(X.dtype).smallest_subnormal
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(-np.inf, dtype=np.float16)
     assert X_upper == np.array(-smallest_subnormal, dtype=np.float16)
 
@@ -824,7 +833,7 @@ def test_fuzzer_found_where():
     expr_lower = np.array(0.0, dtype=np.float16)
     expr_upper = np.array(np.inf, dtype=np.float16)
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(0.0, dtype=np.float16) and not np.signbit(X_lower)
     assert X_upper == np.array(0.0, dtype=np.float16) and not np.signbit(X_upper)
 
@@ -849,7 +858,7 @@ def test_fuzzer_found_inconsistent_where():
     expr_lower = np.array(_float128("-5.562684646268004075307639094889258e-309"))
     expr_upper = np.array(_float128("0.0e+000"))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(_float128("-inf"))
     assert X_upper == np.array(_float128("-1.797693134862315708145274237317044e+308"))
 
@@ -869,7 +878,7 @@ def test_fuzzer_found_cosine_monotonicity():
     expr_lower = np.array(7.3e-06, dtype=np.float16)
     expr_upper = np.array(0.9937, dtype=np.float16)
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(0.1133, dtype=np.float16)
     assert X_upper == np.array(1.57, dtype=np.float16)
 
@@ -893,7 +902,7 @@ def test_fuzzer_found_invalid_divide_rewrite():
     expr_lower = np.array(0.0, dtype=np.float64)
     expr_upper = np.array(0.0, dtype=np.float64)
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(2.9e-322, dtype=np.float64)
     assert X_upper == np.array(1.7976931348623157e308, dtype=np.float64)
 
@@ -912,7 +921,7 @@ def test_fuzzer_found_power_nan_hang():
     expr_lower = np.array(np.nan, dtype=np.float64)
     expr_upper = np.array(np.nan, dtype=np.float64)
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(-1.26836425e-30, dtype=np.float64)
     assert X_upper == np.array(-1.26836425e-30, dtype=np.float64)
 
@@ -931,7 +940,7 @@ def test_fuzzer_found_divide_tiny_hang():
     expr_lower = np.array(0.0, dtype=np.float64)
     expr_upper = np.array(0.0, dtype=np.float64)
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(2.81944e-319, dtype=np.float64)
     assert X_upper == np.array(2.81944e-319, dtype=np.float64)
 
@@ -950,7 +959,7 @@ def test_fuzzer_found_asinh_excessive_nudging():
     expr_lower = np.array(_float128(0.0))
     expr_upper = np.array(_float128(0.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(_float128(0.0))
     assert X_upper == np.array(_float128(0.0))
 
@@ -966,7 +975,7 @@ def test_fuzzer_found_excessive_nudging_log_power():
     expr_lower = np.array(0.0, dtype=np.float16)
     expr_upper = np.array(np.inf, dtype=np.float16)
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(0.0, dtype=np.float16)
     assert X_upper == np.array(0.0, dtype=np.float16)
 
@@ -1009,7 +1018,7 @@ def test_fuzzer_found_nan_power_zero():
     expr_lower = np.array(_float128(0.0))
     expr_upper = np.array(_float128(1.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(_float128(-0.5))
     assert X_upper == np.array(_float128(0.5))
 
@@ -1034,7 +1043,7 @@ def test_fuzzer_found_addsub_bound_overflow():
     expr_lower = np.array(np.float16(-57376.0))
     expr_upper = np.array(np.float16(np.inf))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(6.0e-08))
     assert X_upper == np.array(np.float16(6.0e-08))
 
@@ -1053,7 +1062,7 @@ def test_fuzzer_found_log_upper_bound_negative_zero():
     expr_lower = np.array(np.float32(7.47605e-27))
     expr_upper = np.array(np.float32(np.inf))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float32(1.0e-45))
     assert X_upper == np.array(np.float32(8.66434))
 
@@ -1075,7 +1084,7 @@ def test_fuzzer_found_excessive_nudging_one_power_nan():
     expr_lower = np.array(np.float16(0.0))
     expr_upper = np.array(np.float16(1.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(0.0))
     assert X_upper == np.array(np.float16(0.0))
 
@@ -1099,7 +1108,7 @@ def test_fuzzer_found_excessive_nudging_atan_product():
     expr_lower = expr.eval(X, dict())
     expr_upper = np.array(np.float32(5.0197614e33))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower <= np.array(np.float32(33556004.0))
     assert X_upper == np.array(np.float32(np.inf))
 
@@ -1128,7 +1137,7 @@ def test_fuzzer_found_oh_no_multiplication():
     expr_lower = np.array(np.float64(-1.4568159901474629e144))
     expr_upper = np.array(np.float64(1.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float64(-1.4568159901474651e144))
     assert X_upper == np.array(np.float64(-1.4568159901474651e144))
 
@@ -1153,7 +1162,7 @@ def test_fuzzer_found_excessive_nudging_product():
     expr_lower = np.array(np.float16(0.0))
     expr_upper = np.array(np.float16(65504.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(0.0))
     assert X_upper == np.array(np.float16(255.9))
 
@@ -1178,7 +1187,7 @@ def test_fuzzer_found_excessive_nudging_zero_product():
     expr_lower = np.array(np.float32(0.0))
     expr_upper = np.array(np.float32(1.2630801e-38))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float32(0.0))
     assert X_upper == np.array(np.float32(3.8519333e-19))
 
@@ -1203,7 +1212,7 @@ def test_fuzzer_found_excessive_nudging_division():
     expr_lower = np.array(np.float64(338.2034982942516))
     expr_upper = np.array(np.float64(3.7921287488073793e146))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float64(3.7921287488073535e146))
     assert X_upper == np.array(np.float64(3.7921287488073535e146))
 
@@ -1232,7 +1241,7 @@ def test_fuzzer_found_tan_upper_negative_zero():
     expr_lower = np.array(np.float16(-0.841))
     expr_upper = np.array(np.float16(np.inf))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(-1.57))
     assert X_upper == np.array(np.float16(-0.0))
 
@@ -1253,7 +1262,7 @@ def test_fuzzer_found_power_excessive_nudging():
     expr_lower = np.array(np.float32(13323083.0))
     expr_upper = np.array(np.float32(1.979576e14))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float32(0.99480957))
     assert X_upper == np.array(np.float32(13323083.0))
 
@@ -1280,7 +1289,7 @@ def test_fuzzer_found_sign_negative_zero_bound():
     expr_lower = np.array(np.float16(-0.0004613))
     expr_upper = np.array(np.float16(np.inf))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(-np.inf))
     assert X_upper == np.array(np.float16(-6.0e-08))
 
@@ -1461,7 +1470,7 @@ def test_fuzzer_found_power_nan_zero_in_bounds():
     expr_lower = np.array(np.float16(np.nan))
     expr_upper = np.array(np.float16(np.nan))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(-np.inf))
     assert X_upper == np.array(np.float16(-6.0e-08))
 
@@ -1483,7 +1492,7 @@ def test_fuzzer_found_power_nan_excessive_nudging():
     expr_lower = np.array(np.float64(np.nan))
     expr_upper = np.array(np.float64(np.nan))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float64(-744.4400719213812))
     assert X_upper == np.array(np.float64(-5.0e-324))
 
@@ -1505,7 +1514,7 @@ def test_fuzzer_found_asinh_power_excessive_nudging():
     expr_lower = np.array(np.float32(0.0))
     expr_upper = np.array(np.float32(0.99999994))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float32(0.0))
     assert X_upper == np.array(np.float32(2.52e-43))
 
@@ -1527,7 +1536,7 @@ def test_fuzzer_found_power_const_exponent_excessive_nudging():
     expr_lower = np.array(np.float32(0.0))
     expr_upper = np.array(np.float32(np.inf))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float32(-0.99999994))
     assert X_upper == np.array(np.float32(0.99999994))
 
@@ -1549,7 +1558,7 @@ def test_fuzzer_found_power_cos_ln_excessive_nudging():
     expr_lower = np.array(np.float32(0.0))
     expr_upper = np.array(np.float32(1.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float32(0.0))
     assert X_upper == np.array(np.float32(0.0))
 
@@ -1571,7 +1580,7 @@ def test_fuzzer_found_power_ensure_array():
     expr_lower = np.array(_float128(0.0))
     expr_upper = np.array(_float128(np.inf))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(_float128(0.0))
     assert X_upper == np.array(_float128(0.0))
 
@@ -1595,7 +1604,7 @@ def test_fuzzer_found_power_lower_bound_clamp():
     expr_lower = np.array(_float128("-1.1383000707268022330514359191511894e+004"))
     expr_upper = np.array(_float128(0.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(_float128("2.6644362440334694804167e-4944"))
     assert X_upper == np.array(_float128("2.6644362440334694804167e-4944"))
 
@@ -1621,7 +1630,7 @@ def test_fuzzer_found_power_guaranteed_bounds():
     expr_lower = np.array(np.float16(0.01535))
     expr_upper = np.array(np.float16(0.04236))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(0.01643))
     assert X_upper == np.array(np.float16(0.01646))
 
@@ -1643,7 +1652,7 @@ def test_fuzzer_found_power_one_ln():
     expr_lower = np.array(np.float16(0.1562))
     expr_upper = np.array(np.float16(1.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(0.0))
     assert X_upper == np.array(np.float16(np.inf))
 
@@ -1665,7 +1674,7 @@ def test_fuzzer_found_power_abs_abs_excessive_nudging():
     expr_lower = np.array(np.float64(1.0))
     expr_upper = np.array(np.float64(4.4417230418076605e291))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float64(-1.2682853192147052e-30))
     assert X_upper == np.array(np.float64(-1.2682853192147052e-30))
 
@@ -1687,7 +1696,7 @@ def test_fuzzer_found_power_trunc_sign():
     expr_lower = np.array(np.float16(-np.inf))
     expr_upper = np.array(np.float16(-0.841))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(-0.9995))
     assert X_upper == np.array(np.float16(-6.0e-08))
 
@@ -1709,7 +1718,7 @@ def test_fuzzer_found_power_tanh_acos_excessive_nudging():
     expr_lower = np.array(np.float32(-2.430206e09))
     expr_upper = np.array(np.float32(1.9024737e-38))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float32(0.0))
     assert X_upper == np.array(np.float32(1.2555627e-32))
 
@@ -1735,7 +1744,7 @@ def test_fuzzer_found_sum_upper_bound_negative_zero():
     expr_lower = np.array([np.float16(np.nan), np.float16(np.nan)])
     expr_upper = np.array([np.float16(np.nan), np.float16(np.nan)])
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert np.all(X_lower == np.array([np.float16(51.34), np.float16(51.34)]))
     assert np.all(X_upper == np.array([np.float16(np.inf), np.float16(np.inf)]))
 
@@ -1754,7 +1763,7 @@ def test_fuzzer_found_negative_zero_excessive_nudging():
     expr_lower = np.array(_float128(0.0))
     expr_upper = np.array(_float128(0.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(_float128(0.0))
     assert X_upper == np.array(np.finfo(_float128_dtype).max)
 
@@ -1773,7 +1782,7 @@ def test_fuzzer_found_upper_data_bounds_below():
     expr_lower = np.array(np.float16(0.0))
     expr_upper = np.array(np.float16(0.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(0.0))
     assert X_upper == np.array(np.float16(0.9995))
 
@@ -1791,7 +1800,7 @@ def test_fuzzer_found_not_data_bound():
     expr_lower = np.array(np.float64(0.0))
     expr_upper = np.array(np.float64(0.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.finfo(np.float64).smallest_subnormal)
     assert X_upper == np.array(np.float64(np.inf))
 
@@ -1810,7 +1819,7 @@ def test_fuzzer_found_asinh_less_asinh():
     expr_lower = np.array(_float128(0.0))
     expr_upper = np.array(_float128(0.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(_float128("1.65e-4963"))
     assert X_upper == np.array(_float128("1.65e-4963"))
 
@@ -1828,7 +1837,7 @@ def test_fuzzer_found_negx_less_x():
     expr_lower = np.array(np.float16(0.0))
     expr_upper = np.array(np.float16(0.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(-np.inf))
     assert X_upper == np.array(np.float16(0.0))
 
@@ -1846,7 +1855,7 @@ def test_fuzzer_found_any_zero_singularity():
     expr_lower = np.array(np.float32(8.8e-44))
     expr_upper = np.array(np.float32(1.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float32(-np.inf))
     assert X_upper == np.array(-np.finfo(np.float32).smallest_subnormal)
 
@@ -1864,7 +1873,7 @@ def test_fuzzer_found_cosh_equal_isfinite():
     expr_lower = np.array(np.float16(0.0))
     expr_upper = np.array(np.float16(0.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.float16(0.0442))
     assert X_upper == np.array(np.float16(np.inf))
 
@@ -1888,7 +1897,7 @@ def test_fuzzer_found_numpy_quaddtype_tiny_add():
     expr_lower = np.array(_float128(0.0))
     expr_upper = np.array(_float128("6.724206286224186953608055004397316e-4932"))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(_float128("1.681051571556046738402013751099329e-4932"))
     assert X_upper == np.array(_float128("3.362103143112093476804027502198658e-4932"))
 
@@ -1916,7 +1925,7 @@ def test_fuzzer_found_numpy_quaddtype_tiny_add2():
     expr_lower = np.array(_float128(0.0))
     expr_upper = np.array(_float128("6.7242062862241870125253556129287371e-4932"))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(_float128("1.6810515715560467531313389032321847e-4932"))
     assert X_upper == np.array(_float128("3.362103143112093506262677806464369e-4932"))
 
@@ -1944,7 +1953,7 @@ def test_fuzzer_found_numpy_quaddtype_tiny_add3():
     expr_lower = np.array(_float128(0.0))
     expr_upper = np.array(_float128("2.456859624266849837562439886883052e-4884"))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(_float128("1.842644718200137378171829915162289e-4884"))
     assert X_upper == np.array(_float128("2.456859624266849837562439886883052e-4884"))
 
@@ -1977,7 +1986,7 @@ def test_fuzzer_found_all_tiny_true():
     expr_lower = np.array(_float128(1.0))
     expr_upper = np.array(_float128(1.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower == np.array(np.finfo(_float128_dtype).smallest_subnormal)
     assert X_upper == np.array(_float128(1.0))
 
@@ -1996,7 +2005,7 @@ def test_fuzzer_found_atan_greater_atan():
     expr_lower = np.array(np.float32(0.0))
     expr_upper = np.array(np.float32(0.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower <= X
     assert X_upper >= X
 
@@ -2015,7 +2024,7 @@ def test_fuzzer_found_atan_greater_atan2():
     expr_lower = np.array(np.float32(0.0))
     expr_upper = np.array(np.float32(0.0))
 
-    X_lower, X_upper = expr.compute_data_bounds(expr_lower, expr_upper, X, dict())
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
     assert X_lower <= X
     assert X_upper >= X
 

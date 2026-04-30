@@ -1,4 +1,5 @@
 from collections.abc import Callable, Mapping
+from functools import partial
 from typing import overload
 
 import numpy as np
@@ -11,6 +12,7 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
+from ..context import Callback, Context, DataBoundsAccumulator
 from ..typing import F, Fi, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
@@ -29,6 +31,11 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarEqual":
@@ -57,18 +64,17 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             Xs.dtype,
         )
 
-    @override
     @checked_data_bounds
-    def compute_data_bounds_unchecked(
+    @override
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         a = self._a
         b = self._b
 
@@ -85,17 +91,19 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
         #  - since we use finite values, mid(-Inf, +Inf) = 0
-        av_mid_bv: np.ndarray[tuple[Ps], np.dtype[F]] = np.add(  # type: ignore
-            np.divide(np.nan_to_num(av), Xs.dtype.type(2)),
-            np.divide(np.nan_to_num(bv), Xs.dtype.type(2)),
+        av_mid_bv: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            np.add(
+                np.divide(np.nan_to_num(av), Xs.dtype.type(2)),
+                np.divide(np.nan_to_num(bv), Xs.dtype.type(2)),
+            )
         )
         # the midpoint must be in range [av, bv), unless av == bv, since we
         #  later want to be able to step from the midpoint closer towards bv
-        av_mid_bv = _maximum_zero_sign_sensitive(
-            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av)
+        _maximum_zero_sign_sensitive(
+            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av), out=av_mid_bv
         )
-        av_mid_bv = _minimum_zero_sign_sensitive(
-            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av)
+        _minimum_zero_sign_sensitive(
+            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av), out=av_mid_bv
         )
 
         # compute the next value from b towards a that can be part of a's
@@ -124,10 +132,9 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        xl: np_sndarray[Ps, Ns, np.dtype[F]]
-        xu: np_sndarray[Ps, Ns, np.dtype[F]]
-        Xs_lower_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
-        Xs_upper_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2, callback=callback
+        )
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a == b) = True, then
@@ -138,7 +145,9 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
         #  - if av < bv, restrict a's upper and b's lower bound to not overlap
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a == b) in [True, False] and all args can be anything
-        if not a_const:
+        if a_const:
+            accumulator.complete_term(0)
+        else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -161,22 +170,26 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
-            a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, a_lower))
-            a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
+            _minimum_zero_sign_sensitive(av, a_lower, out=a_lower)
+            _maximum_zero_sign_sensitive(av, a_upper, out=a_upper)
 
             # recurse into arg a
-            Xs_lower_, Xs_upper_ = a.compute_data_bounds(
+            a.deferred_compute_data_bounds(
                 a_lower,
                 a_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(accumulator.on_complete_term, term=0),
             )
 
         # cont. with b as outlined above
-        if not b_const:
+        if b_const:
+            accumulator.complete_term(1)
+        else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -199,39 +212,21 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
-            b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
-            b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
+            _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
+            _maximum_zero_sign_sensitive(bv, b_upper, out=b_upper)
 
             # recurse into arg b
-            xl, xu = b.compute_data_bounds(
+            b.deferred_compute_data_bounds(
                 b_lower,
                 b_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(accumulator.on_complete_term, term=1),
             )
-
-            # combine the inner data bounds
-            if Xs_lower_ is None:
-                Xs_lower_ = xl
-            else:
-                Xs_lower_ = _maximum_zero_sign_sensitive(Xs_lower_, xl)
-            if Xs_upper_ is None:
-                Xs_upper_ = xu
-            else:
-                Xs_upper_ = _minimum_zero_sign_sensitive(Xs_upper_, xu)
-
-        assert Xs_lower_ is not None
-        assert Xs_upper_ is not None
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_lower_
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_upper_
-
-        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
-
-        return Xs_lower, Xs_upper
 
     @override
     def __repr__(self) -> str:
@@ -251,6 +246,11 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarNotEqual":
@@ -279,18 +279,17 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             Xs.dtype,
         )
 
-    @override
     @checked_data_bounds
-    def compute_data_bounds_unchecked(
+    @override
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         a = self._a
         b = self._b
 
@@ -307,17 +306,19 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
         #  - since we use finite values, mid(-Inf, +Inf) = 0
-        av_mid_bv: np.ndarray[tuple[Ps], np.dtype[F]] = np.add(  # type: ignore
-            np.divide(np.nan_to_num(av), Xs.dtype.type(2)),
-            np.divide(np.nan_to_num(bv), Xs.dtype.type(2)),
+        av_mid_bv: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            np.add(
+                np.divide(np.nan_to_num(av), Xs.dtype.type(2)),
+                np.divide(np.nan_to_num(bv), Xs.dtype.type(2)),
+            )
         )
         # the midpoint must be in range [av, bv), unless av == bv, since we
         #  later want to be able to step from the midpoint closer towards bv
-        av_mid_bv = _maximum_zero_sign_sensitive(
-            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av)
+        _maximum_zero_sign_sensitive(
+            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av), out=av_mid_bv
         )
-        av_mid_bv = _minimum_zero_sign_sensitive(
-            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av)
+        _minimum_zero_sign_sensitive(
+            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av), out=av_mid_bv
         )
 
         # compute the next value from b towards a that can be part of a's
@@ -346,10 +347,9 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        xl: np_sndarray[Ps, Ns, np.dtype[F]]
-        xu: np_sndarray[Ps, Ns, np.dtype[F]]
-        Xs_lower_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
-        Xs_upper_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2, callback=callback
+        )
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a != b) = True, then
@@ -360,7 +360,9 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
         #  - keep av and bv the same
         #  - we do *not* special-case -0.0 and +0.0 here
         # otherwise, (a != b) in [True, False] and all args can be anything
-        if not a_const:
+        if a_const:
+            accumulator.complete_term(0)
+        else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -383,22 +385,26 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             )
             np.copyto(a_upper, av, where=np.less(expr_upper, 1), casting="no")
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
-            a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, a_lower))
-            a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
+            _minimum_zero_sign_sensitive(av, a_lower, out=a_lower)
+            _maximum_zero_sign_sensitive(av, a_upper, out=a_upper)
 
             # recurse into arg a
-            Xs_lower_, Xs_upper_ = a.compute_data_bounds(
+            a.deferred_compute_data_bounds(
                 a_lower,
                 a_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(accumulator.on_complete_term, term=0),
             )
 
         # cont. with b as outlined above
-        if not b_const:
+        if b_const:
+            accumulator.complete_term(1)
+        else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -421,39 +427,21 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
             )
             np.copyto(b_upper, bv, where=np.less(expr_upper, 1), casting="no")
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
-            b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
-            b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
+            _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
+            _maximum_zero_sign_sensitive(bv, b_upper, out=b_upper)
 
             # recurse into arg b
-            xl, xu = b.compute_data_bounds(
+            b.deferred_compute_data_bounds(
                 b_lower,
                 b_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(accumulator.on_complete_term, term=1),
             )
-
-            # combine the inner data bounds
-            if Xs_lower_ is None:
-                Xs_lower_ = xl
-            else:
-                Xs_lower_ = _maximum_zero_sign_sensitive(Xs_lower_, xl)
-            if Xs_upper_ is None:
-                Xs_upper_ = xu
-            else:
-                Xs_upper_ = _minimum_zero_sign_sensitive(Xs_upper_, xu)
-
-        assert Xs_lower_ is not None
-        assert Xs_upper_ is not None
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_lower_
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_upper_
-
-        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
-
-        return Xs_lower, Xs_upper
 
     @override
     def __repr__(self) -> str:
@@ -473,6 +461,11 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarLess":
@@ -501,18 +494,17 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             Xs.dtype,
         )
 
-    @override
     @checked_data_bounds
-    def compute_data_bounds_unchecked(
+    @override
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         a = self._a
         b = self._b
 
@@ -529,17 +521,19 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
         #  - since we use finite values, mid(-Inf, +Inf) = 0
-        av_mid_bv: np.ndarray[tuple[Ps], np.dtype[F]] = np.add(  # type: ignore
-            np.divide(np.nan_to_num(av), Xs.dtype.type(2)),
-            np.divide(np.nan_to_num(bv), Xs.dtype.type(2)),
+        av_mid_bv: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            np.add(
+                np.divide(np.nan_to_num(av), Xs.dtype.type(2)),
+                np.divide(np.nan_to_num(bv), Xs.dtype.type(2)),
+            )
         )
         # the midpoint must be in range [av, bv), unless av == bv, since we
         #  later want to be able to step from the midpoint closer towards bv
-        av_mid_bv = _maximum_zero_sign_sensitive(
-            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av)
+        _maximum_zero_sign_sensitive(
+            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av), out=av_mid_bv
         )
-        av_mid_bv = _minimum_zero_sign_sensitive(
-            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av)
+        _minimum_zero_sign_sensitive(
+            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av), out=av_mid_bv
         )
 
         # compute the next value from b towards a that can be part of a's
@@ -568,10 +562,9 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        xl: np_sndarray[Ps, Ns, np.dtype[F]]
-        xu: np_sndarray[Ps, Ns, np.dtype[F]]
-        Xs_lower_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
-        Xs_upper_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2, callback=callback
+        )
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a < b) = True, then
@@ -580,7 +573,9 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
         #  - if av >= bv, restrict a's lower and b's upper bound
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a < b) in [True, False] and all args can be anything
-        if not a_const:
+        if a_const:
+            accumulator.complete_term(0)
+        else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -601,22 +596,26 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
-            a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, a_lower))
-            a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
+            _minimum_zero_sign_sensitive(av, a_lower, out=a_lower)
+            _maximum_zero_sign_sensitive(av, a_upper, out=a_upper)
 
             # recurse into arg a
-            Xs_lower_, Xs_upper_ = a.compute_data_bounds(
+            a.deferred_compute_data_bounds(
                 a_lower,
                 a_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(accumulator.on_complete_term, term=0),
             )
 
         # cont. with b as outlined above
-        if not b_const:
+        if b_const:
+            accumulator.complete_term(1)
+        else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -637,39 +636,21 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
-            b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
-            b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
+            _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
+            _maximum_zero_sign_sensitive(bv, b_upper, out=b_upper)
 
             # recurse into arg b
-            xl, xu = b.compute_data_bounds(
+            b.deferred_compute_data_bounds(
                 b_lower,
                 b_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(accumulator.on_complete_term, term=1),
             )
-
-            # combine the inner data bounds
-            if Xs_lower_ is None:
-                Xs_lower_ = xl
-            else:
-                Xs_lower_ = _maximum_zero_sign_sensitive(Xs_lower_, xl)
-            if Xs_upper_ is None:
-                Xs_upper_ = xu
-            else:
-                Xs_upper_ = _minimum_zero_sign_sensitive(Xs_upper_, xu)
-
-        assert Xs_lower_ is not None
-        assert Xs_upper_ is not None
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_lower_
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_upper_
-
-        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
-
-        return Xs_lower, Xs_upper
 
     @override
     def __repr__(self) -> str:
@@ -689,6 +670,11 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarGreaterEqual":
@@ -717,18 +703,17 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             Xs.dtype,
         )
 
-    @override
     @checked_data_bounds
-    def compute_data_bounds_unchecked(
+    @override
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         a = self._a
         b = self._b
 
@@ -745,17 +730,19 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
         #  - since we use finite values, mid(-Inf, +Inf) = 0
-        av_mid_bv: np.ndarray[tuple[Ps], np.dtype[F]] = np.add(  # type: ignore
-            np.divide(np.nan_to_num(av), Xs.dtype.type(2)),
-            np.divide(np.nan_to_num(bv), Xs.dtype.type(2)),
+        av_mid_bv: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            np.add(
+                np.divide(np.nan_to_num(av), Xs.dtype.type(2)),
+                np.divide(np.nan_to_num(bv), Xs.dtype.type(2)),
+            )
         )
         # the midpoint must be in range [av, bv), unless av == bv, since we
         #  later want to be able to step from the midpoint closer towards bv
-        av_mid_bv = _maximum_zero_sign_sensitive(
-            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av)
+        _maximum_zero_sign_sensitive(
+            av_mid_bv, _minimum_zero_sign_sensitive(av, bv_nxt_av), out=av_mid_bv
         )
-        av_mid_bv = _minimum_zero_sign_sensitive(
-            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av)
+        _minimum_zero_sign_sensitive(
+            av_mid_bv, _maximum_zero_sign_sensitive(av, bv_nxt_av), out=av_mid_bv
         )
 
         # compute the next value from b towards a that can be part of a's
@@ -784,10 +771,9 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
             )
         av_nxt_bv = np.nextafter(av_nxt_bv, bv)
 
-        xl: np_sndarray[Ps, Ns, np.dtype[F]]
-        xu: np_sndarray[Ps, Ns, np.dtype[F]]
-        Xs_lower_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
-        Xs_upper_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2, callback=callback
+        )
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a >= b) = True, then
@@ -796,7 +782,9 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
         #  - if av < bv, restrict a's upper and b's lower bound to not overlap
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a >= b) in [True, False] and all args can be anything
-        if not a_const:
+        if a_const:
+            accumulator.complete_term(0)
+        else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -817,22 +805,26 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
-            a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, a_lower))
-            a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
+            _minimum_zero_sign_sensitive(av, a_lower, out=a_lower)
+            _maximum_zero_sign_sensitive(av, a_upper, out=a_upper)
 
             # recurse into arg a
-            Xs_lower_, Xs_upper_ = a.compute_data_bounds(
+            a.deferred_compute_data_bounds(
                 a_lower,
                 a_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(accumulator.on_complete_term, term=0),
             )
 
         # cont. with b as outlined above
-        if not b_const:
+        if b_const:
+            accumulator.complete_term(1)
+        else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -853,39 +845,21 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
-            b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
-            b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
+            _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
+            _maximum_zero_sign_sensitive(bv, b_upper, out=b_upper)
 
             # recurse into arg b
-            xl, xu = b.compute_data_bounds(
+            b.deferred_compute_data_bounds(
                 b_lower,
                 b_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(accumulator.on_complete_term, term=1),
             )
-
-            # combine the inner data bounds
-            if Xs_lower_ is None:
-                Xs_lower_ = xl
-            else:
-                Xs_lower_ = _maximum_zero_sign_sensitive(Xs_lower_, xl)
-            if Xs_upper_ is None:
-                Xs_upper_ = xu
-            else:
-                Xs_upper_ = _minimum_zero_sign_sensitive(Xs_upper_, xu)
-
-        assert Xs_lower_ is not None
-        assert Xs_upper_ is not None
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_lower_
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_upper_
-
-        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
-
-        return Xs_lower, Xs_upper
 
     @override
     def __repr__(self) -> str:
@@ -905,6 +879,11 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarLessEqual":
@@ -933,18 +912,17 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
             Xs.dtype,
         )
 
-    @override
     @checked_data_bounds
-    def compute_data_bounds_unchecked(
+    @override
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         a = self._a
         b = self._b
 
@@ -961,17 +939,19 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
         #  - since we use finite values, mid(-Inf, +Inf) = 0
-        av_mid_bv: np.ndarray[tuple[Ps], np.dtype[F]] = np.add(  # type: ignore
-            np.divide(np.nan_to_num(av), Xs.dtype.type(2)),
-            np.divide(np.nan_to_num(bv), Xs.dtype.type(2)),
+        av_mid_bv: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            np.add(
+                np.divide(np.nan_to_num(av), Xs.dtype.type(2)),
+                np.divide(np.nan_to_num(bv), Xs.dtype.type(2)),
+            )
         )
         # the midpoint must be in range (av, bv], unless av == bv, since we
         #  later want to be able to step from the midpoint closer towards av
-        av_mid_bv = _maximum_zero_sign_sensitive(
-            av_mid_bv, _minimum_zero_sign_sensitive(av_nxt_bv, bv)
+        _maximum_zero_sign_sensitive(
+            av_mid_bv, _minimum_zero_sign_sensitive(av_nxt_bv, bv), out=av_mid_bv
         )
-        av_mid_bv = _minimum_zero_sign_sensitive(
-            av_mid_bv, _maximum_zero_sign_sensitive(av_nxt_bv, bv)
+        _minimum_zero_sign_sensitive(
+            av_mid_bv, _maximum_zero_sign_sensitive(av_nxt_bv, bv), out=av_mid_bv
         )
 
         # compute the next value from b towards a that can be part of a's
@@ -1000,10 +980,9 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-        xl: np_sndarray[Ps, Ns, np.dtype[F]]
-        xu: np_sndarray[Ps, Ns, np.dtype[F]]
-        Xs_lower_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
-        Xs_upper_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2, callback=callback
+        )
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a <= b) = True, then
@@ -1012,7 +991,9 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
         #  - if av > bv, restrict a's lower and b's upper bound to not overlap
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a <= b) in [True, False] and all args can be anything
-        if not a_const:
+        if a_const:
+            accumulator.complete_term(0)
+        else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -1033,22 +1014,26 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
-            a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, a_lower))
-            a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
+            _minimum_zero_sign_sensitive(av, a_lower, out=a_lower)
+            _maximum_zero_sign_sensitive(av, a_upper, out=a_upper)
 
             # recurse into arg a
-            Xs_lower_, Xs_upper_ = a.compute_data_bounds(
+            a.deferred_compute_data_bounds(
                 a_lower,
                 a_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(accumulator.on_complete_term, term=0),
             )
 
         # cont. with b as outlined above
-        if not b_const:
+        if b_const:
+            accumulator.complete_term(1)
+        else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -1069,39 +1054,21 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
-            b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
+            _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
+            _maximum_zero_sign_sensitive(bv, b_upper, out=b_upper)
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
             # recurse into arg b
-            xl, xu = b.compute_data_bounds(
+            b.deferred_compute_data_bounds(
                 b_lower,
                 b_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(accumulator.on_complete_term, term=1),
             )
-
-            # combine the inner data bounds
-            if Xs_lower_ is None:
-                Xs_lower_ = xl
-            else:
-                Xs_lower_ = _maximum_zero_sign_sensitive(Xs_lower_, xl)
-            if Xs_upper_ is None:
-                Xs_upper_ = xu
-            else:
-                Xs_upper_ = _minimum_zero_sign_sensitive(Xs_upper_, xu)
-
-        assert Xs_lower_ is not None
-        assert Xs_upper_ is not None
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_lower_
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_upper_
-
-        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
-
-        return Xs_lower, Xs_upper
 
     @override
     def __repr__(self) -> str:
@@ -1121,6 +1088,11 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarGreater":
@@ -1149,18 +1121,17 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
             Xs.dtype,
         )
 
-    @override
     @checked_data_bounds
-    def compute_data_bounds_unchecked(
+    @override
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         a = self._a
         b = self._b
 
@@ -1177,17 +1148,19 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
         #  - since we use finite values, mid(-Inf, +Inf) = 0
-        av_mid_bv: np.ndarray[tuple[Ps], np.dtype[F]] = np.add(  # type: ignore
-            np.divide(np.nan_to_num(av), Xs.dtype.type(2)),
-            np.divide(np.nan_to_num(bv), Xs.dtype.type(2)),
+        av_mid_bv: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            np.add(
+                np.divide(np.nan_to_num(av), Xs.dtype.type(2)),
+                np.divide(np.nan_to_num(bv), Xs.dtype.type(2)),
+            )
         )
         # the midpoint must be in range (av, bv], unless av == bv, since we
         #  later want to be able to step from the midpoint closer towards av
-        av_mid_bv = _maximum_zero_sign_sensitive(
-            av_mid_bv, _minimum_zero_sign_sensitive(av_nxt_bv, bv)
+        _maximum_zero_sign_sensitive(
+            av_mid_bv, _minimum_zero_sign_sensitive(av_nxt_bv, bv), out=av_mid_bv
         )
-        av_mid_bv = _minimum_zero_sign_sensitive(
-            av_mid_bv, _maximum_zero_sign_sensitive(av_nxt_bv, bv)
+        _minimum_zero_sign_sensitive(
+            av_mid_bv, _maximum_zero_sign_sensitive(av_nxt_bv, bv), out=av_mid_bv
         )
 
         # compute the next value from b towards a that can be part of a's
@@ -1216,10 +1189,9 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-        xl: np_sndarray[Ps, Ns, np.dtype[F]]
-        xu: np_sndarray[Ps, Ns, np.dtype[F]]
-        Xs_lower_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
-        Xs_upper_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2, callback=callback
+        )
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, (a > b) = True, then
@@ -1228,7 +1200,9 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
         #  - if av <= bv, restrict a's upper and b's lower bound
         #  - otherwise av or bv is NaN and any non-NaN argument can be anything
         # otherwise, (a > b) in [True, False] and all args can be anything
-        if not a_const:
+        if a_const:
+            accumulator.complete_term(0)
+        else:
             a_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -1249,22 +1223,26 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
-            a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, a_lower))
-            a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, a_upper))
+            _minimum_zero_sign_sensitive(av, a_lower, out=a_lower)
+            _maximum_zero_sign_sensitive(av, a_upper, out=a_upper)
 
             # recurse into arg a
-            Xs_lower_, Xs_upper_ = a.compute_data_bounds(
+            a.deferred_compute_data_bounds(
                 a_lower,
                 a_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(accumulator.on_complete_term, term=0),
             )
 
         # cont. with b as outlined above
-        if not b_const:
+        if b_const:
+            accumulator.complete_term(1)
+        else:
             b_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
                 Xs.shape[:1], Xs.dtype.type(-np.inf)
             )
@@ -1285,39 +1263,21 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
                 casting="no",
             )
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
-            b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
-            b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
+            _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
+            _maximum_zero_sign_sensitive(bv, b_upper, out=b_upper)
 
             # recurse into arg b
-            xl, xu = b.compute_data_bounds(
+            b.deferred_compute_data_bounds(
                 b_lower,
                 b_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(accumulator.on_complete_term, term=1),
             )
-
-            # combine the inner data bounds
-            if Xs_lower_ is None:
-                Xs_lower_ = xl
-            else:
-                Xs_lower_ = _maximum_zero_sign_sensitive(Xs_lower_, xl)
-            if Xs_upper_ is None:
-                Xs_upper_ = xu
-            else:
-                Xs_upper_ = _minimum_zero_sign_sensitive(Xs_upper_, xu)
-
-        assert Xs_lower_ is not None
-        assert Xs_upper_ is not None
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_lower_
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_upper_
-
-        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
-
-        return Xs_lower, Xs_upper
 
     @override
     def __repr__(self) -> str:

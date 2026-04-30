@@ -7,6 +7,7 @@ from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import _symmetric_modulo
 from ....utils.bindings import Parameter
+from ..context import Callback, Context
 from ..typing import F, Fi, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .addsub import ScalarSubtract
@@ -30,6 +31,11 @@ class ScalarSymmetricModulo(Expr[AnyExpr, AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarSymmetricModulo":
@@ -56,16 +62,15 @@ class ScalarSymmetricModulo(Expr[AnyExpr, AnyExpr]):
         )
 
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         assert False, "cannot compute the data bounds for symmetric_modulo"
 
     @override

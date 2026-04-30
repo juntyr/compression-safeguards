@@ -6,6 +6,7 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import _ensure_array, _is_sign_negative_number
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
+from ..context import Callback, Context
 from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
@@ -22,6 +23,11 @@ class ScalarAbs(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarAbs":
@@ -43,16 +49,15 @@ class ScalarAbs(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -62,8 +67,8 @@ class ScalarAbs(Expr[AnyExpr]):
         #  - a > 0 and 0 < el <= eu -> al = el, au = eu
         #  - a < 0 and 0 < el <= eu -> al = -eu, au = -el
         #  - el <= 0 -> al = -eu, au = eu
-        # TODO: an interval union could represent that the two sometimes-
-        #       disjoint intervals in the future
+        # TODO: an interval union could represent the two sometimes-disjoint
+        #       intervals in the future
         arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
             expr_lower, copy=True
         )
@@ -81,11 +86,13 @@ class ScalarAbs(Expr[AnyExpr]):
             where=(np.greater(expr_lower, 0) & _is_sign_negative_number(argv)),
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override

@@ -1043,19 +1043,13 @@ class IntervalUnion(Generic[T, N, U]):
             # - intersection -> next is intersection
             # - no intersection -> next is next interval
             next_lower = _ensure_array(lower_ij, copy=True)
-            np.copyto(
-                next_lower,
-                _np_minimum(lower_o, lower_ij),
-                where=has_intersection_with_out,
-                casting="no",
+            _np_minimum(
+                lower_o, lower_ij, out=next_lower, where=has_intersection_with_out
             )
 
             next_upper = _ensure_array(upper_ij, copy=True)
-            np.copyto(
-                next_upper,
-                _np_maximum(upper_o, upper_ij),
-                where=has_intersection_with_out,
-                casting="no",
+            _np_maximum(
+                upper_o, upper_ij, out=next_upper, where=has_intersection_with_out
             )
 
             # update either the previous or the next output interval

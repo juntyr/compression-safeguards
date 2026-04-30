@@ -5,13 +5,13 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
-    _ensure_array,
     _is_negative_zero,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
+from ..context import Callback, Context, _DeferredExprContext
 from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
@@ -37,6 +37,11 @@ class ScalarLog(Expr[AnyExpr]):
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
+    @property
+    @override
+    def extra(self) -> tuple[Logarithm]:
+        return (self._log,)
+
     @override
     def with_args(self, a: AnyExpr) -> "ScalarLog":
         return ScalarLog(self._log, a)
@@ -60,16 +65,15 @@ class ScalarLog(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg and log(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -82,17 +86,13 @@ class ScalarLog(Expr[AnyExpr]):
         #  value
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
-            _minimum_zero_sign_sensitive(
-                argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_lower)
-            )
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _minimum_zero_sign_sensitive(
+            argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_lower)
         )
         arg_lower[np.less(argv, 0)] = -np.inf
 
-        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
-            _maximum_zero_sign_sensitive(
-                argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_upper)
-            )
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _maximum_zero_sign_sensitive(
+            argv, (LOGARITHM_EXPONENTIAL_UFUNC[self._log])(expr_upper)
         )
         arg_upper[np.less(argv, 0)] = -smallest_subnormal
 
@@ -123,11 +123,13 @@ class ScalarLog(Expr[AnyExpr]):
             expr_upper,
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -165,6 +167,11 @@ class ScalarExp(Expr[AnyExpr]):
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
 
+    @property
+    @override
+    def extra(self) -> tuple[Exponential]:
+        return (self._exp,)
+
     @override
     def with_args(self, a: AnyExpr) -> "ScalarExp":
         return ScalarExp(self._exp, a)
@@ -188,16 +195,15 @@ class ScalarExp(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg and exp(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -207,18 +213,14 @@ class ScalarExp(Expr[AnyExpr]):
         # exp(...) cannot be negative, so ensure the bounds on expr also cannot
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
         #  arg_lower is also -0.0, same for arg_upper
-        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
-            _minimum_zero_sign_sensitive(
-                argv,
-                (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(
-                    _maximum_zero_sign_sensitive(Xs.dtype.type(0), expr_lower)
-                ),
-            )
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _minimum_zero_sign_sensitive(
+            argv,
+            (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(
+                _maximum_zero_sign_sensitive(Xs.dtype.type(0), expr_lower)
+            ),
         )
-        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
-            _maximum_zero_sign_sensitive(
-                argv, (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(expr_upper)
-            )
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _maximum_zero_sign_sensitive(
+            argv, (EXPONENTIAL_LOGARITHM_UFUNC[self._exp])(expr_upper)
         )
 
         # we need to force argv if expr_lower == expr_upper
@@ -243,11 +245,13 @@ class ScalarExp(Expr[AnyExpr]):
             expr_upper,
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -297,6 +301,11 @@ class ScalarLogWithBase(Expr[AnyExpr, AnyExpr]):
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
 
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
+
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarLogWithBase":
         return ScalarLogWithBase(a, b)
@@ -337,28 +346,48 @@ class ScalarLogWithBase(Expr[AnyExpr, AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         from .divmul import ScalarDivide  # noqa: PLC0415
 
-        return ScalarDivide(
-            ScalarLog(
+        # TODO: remove rewrite, since that defeats some common subexpression
+        #       elimination and requires this context update hack
+        if self._a is self._b:
+            ln_ab = ScalarLog(
                 Logarithm.ln,
                 self._a,
-            ),
-            ScalarLog(
+            )
+            ctx._context[ln_ab] = _DeferredExprContext(2)
+
+            ctx._context[self._b]._dependents -= 1
+
+            ln_a = ln_b = ln_ab
+        else:
+            ln_a = ScalarLog(
+                Logarithm.ln,
+                self._a,
+            )
+            ctx._context[ln_a] = _DeferredExprContext(1)
+
+            ln_b = ScalarLog(
                 Logarithm.ln,
                 self._b,
-            ),
-        ).compute_data_bounds(expr_lower, expr_upper, Xs, late_bound)
+            )
+            ctx._context[ln_b] = _DeferredExprContext(1)
+
+        ln_div_ln = ScalarDivide(ln_a, ln_b)
+        ctx._context[ln_div_ln] = _DeferredExprContext(1)
+
+        return ln_div_ln.deferred_compute_data_bounds(
+            expr_lower, expr_upper, Xs, late_bound, ctx, callback
+        )
 
     @override
     def __repr__(self) -> str:

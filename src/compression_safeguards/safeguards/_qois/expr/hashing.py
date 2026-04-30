@@ -2,7 +2,7 @@ import itertools
 from collections.abc import Mapping
 from contextlib import contextmanager
 from hashlib import blake2b
-from typing import Literal
+from typing import Literal, Self
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
@@ -14,11 +14,12 @@ from ....utils.error import ctx
 from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import S, T
 from ..bound import DataBounds, data_bounds
+from ..context import Callback, Context
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, EmptyExpr
+from .abc import AnyExpr, DataExpr, LateBoundConstantExpr
 
 
-class HashingExpr(EmptyExpr):
+class HashingExpr(DataExpr, LateBoundConstantExpr):
     __slots__: tuple[str, ...] = ("_data_indices", "_late_bound_constants")
     _data_indices: frozenset[tuple[int, ...]]
     _late_bound_constants: frozenset[Parameter]
@@ -46,14 +47,14 @@ class HashingExpr(EmptyExpr):
     def args(self) -> tuple[()]:
         return ()
 
+    @property
+    @override
+    def extra(self) -> tuple[frozenset[tuple[int, ...]], frozenset[Parameter]]:
+        return (self._data_indices, self._late_bound_constants)
+
     @override
     def with_args(self) -> "HashingExpr":
         return HashingExpr(self._data_indices, self._late_bound_constants)
-
-    @property  # type: ignore
-    @override
-    def has_data(self) -> bool:
-        return True
 
     @override  # type: ignore
     def eval_has_data(
@@ -63,28 +64,28 @@ class HashingExpr(EmptyExpr):
     ) -> np.ndarray[tuple[Ps], np.dtype[np.bool]]:
         return _ones(Xs.shape[:1], dtype=np.dtype(np.bool))
 
-    @property  # type: ignore
+    @property
     @override
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return self._data_indices
 
-    @override  # type: ignore
+    @override
     def apply_array_element_offset(
         self,
         axis: int,
         offset: int,
-    ) -> "HashingExpr":
+    ) -> Self:
         data_indices = []
         for index_ in self._data_indices:
             index = list(index_)
             index[axis] += offset
             data_indices.append(tuple(index))
-        return HashingExpr(
+        return type(self)(
             data_indices=frozenset(data_indices),
             late_bound_constants=self._late_bound_constants,
         )
 
-    @property  # type: ignore
+    @property
     @override
     def late_bound_constants(self) -> frozenset[Parameter]:
         return self._late_bound_constants
@@ -124,21 +125,22 @@ class HashingExpr(EmptyExpr):
 
     @data_bounds(DataBounds.infallible)
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         X_hash: np.ndarray[tuple[Ps], np.dtype[F]] = self.eval(Xs, late_bound)
         Xs_hash: np_sndarray[Ps, Ns, np.dtype[F]] = _broadcast_to(
             X_hash.reshape(Xs.shape[:1] + (1,) * (Xs.ndim - 1)), Xs.shape
         )
-        return _ensure_array(Xs_hash, copy=True), _ensure_array(Xs_hash, copy=True)
+        return callback(
+            _ensure_array(Xs_hash, copy=True), _ensure_array(Xs_hash, copy=True)
+        )
 
     @override
     def __repr__(self) -> str:

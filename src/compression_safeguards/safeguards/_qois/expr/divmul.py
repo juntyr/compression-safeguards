@@ -1,5 +1,6 @@
 import operator
 from collections.abc import Mapping
+from functools import partial
 from math import gcd
 
 import numpy as np
@@ -23,6 +24,7 @@ from ..bound import (
     guarantee_arg_within_expr_bounds,
     guarantee_stacked_arg_within_expr_bounds,
 )
+from ..context import Callback, Context, DataBoundsAccumulator
 from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
@@ -49,6 +51,11 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
 
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
+
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarMultiply | Number":
         return ScalarMultiply(a, b)
@@ -69,16 +76,15 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         a_const = not self._a.has_data
         b_const = not self._b.has_data
         assert not (a_const and b_const), "constant multiplication has no data bounds"
@@ -135,7 +141,7 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
                 & (_is_positive_zero(constv) == _is_sign_positive_number(expr_lower))
                 & (_is_positive_zero(constv) == _is_sign_positive_number(expr_upper))
             ] = +0.0
-            term_lower = _ensure_array(_minimum_zero_sign_sensitive(termv, term_lower))
+            _minimum_zero_sign_sensitive(termv, term_lower, out=term_lower)
 
             term_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
                 expr_upper, copy=True
@@ -161,7 +167,7 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
                 & (_is_negative_zero(constv) != _is_sign_negative_number(expr_lower))
                 & (_is_negative_zero(constv) != _is_sign_negative_number(expr_upper))
             ] = -0.0
-            term_upper = _ensure_array(_maximum_zero_sign_sensitive(termv, term_upper))
+            _maximum_zero_sign_sensitive(termv, term_upper, out=term_upper)
 
             # we need to force argv if expr_lower == expr_upper and constv is
             #  finite non-zero (in other cases we explicitly expand ranges)
@@ -200,11 +206,13 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
                 expr_upper,
             )
 
-            return term.compute_data_bounds(
+            return term.deferred_compute_data_bounds(
                 term_lower,
                 term_upper,
                 Xs,
                 late_bound,
+                ctx,
+                callback,
             )
 
         # if neither a not b is const, we simplify by not allowing the sign of
@@ -298,11 +306,11 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
         b_abs_upper[any_nan & ~np.isnan(bv_abs)] = np.inf
 
         # ensure that the bounds on abs(a) and abs(b) include their values
-        a_abs_lower = _ensure_array(_minimum_zero_sign_sensitive(av_abs, a_abs_lower))
-        a_abs_upper = _ensure_array(_maximum_zero_sign_sensitive(av_abs, a_abs_upper))
+        _minimum_zero_sign_sensitive(av_abs, a_abs_lower, out=a_abs_lower)
+        _maximum_zero_sign_sensitive(av_abs, a_abs_upper, out=a_abs_upper)
 
-        b_abs_lower = _ensure_array(_minimum_zero_sign_sensitive(bv_abs, b_abs_lower))
-        b_abs_upper = _ensure_array(_maximum_zero_sign_sensitive(bv_abs, b_abs_upper))
+        _minimum_zero_sign_sensitive(bv_abs, b_abs_lower, out=b_abs_lower)
+        _maximum_zero_sign_sensitive(bv_abs, b_abs_upper, out=b_abs_upper)
 
         # stack the bounds on a and b so that we can nudge their bounds, if
         #  necessary, together
@@ -376,29 +384,29 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
         b_lower[any_nan & ~np.isnan(bv)] = -np.inf
         b_upper[any_nan & ~np.isnan(bv)] = np.inf
 
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2, callback=callback
+        )
+
         # recurse into a and b to propagate their bounds, then combine their
         #  bounds on Xs
-        Xs_lower, Xs_upper = a.compute_data_bounds(
+        a.deferred_compute_data_bounds(
             a_lower,
             a_upper,
             Xs,
             late_bound,
+            ctx,
+            partial(accumulator.on_complete_term, term=0),
         )
 
-        bl, bu = b.compute_data_bounds(
+        b.deferred_compute_data_bounds(
             b_lower,
             b_upper,
             Xs,
             late_bound,
+            ctx,
+            partial(accumulator.on_complete_term, term=1),
         )
-        Xs_lower = _maximum_zero_sign_sensitive(Xs_lower, bl)
-        Xs_upper = _minimum_zero_sign_sensitive(Xs_upper, bu)
-
-        # ensure that the bounds on Xs include Xs
-        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
-
-        return Xs_lower, Xs_upper
 
     @override
     def __repr__(self) -> str:
@@ -449,6 +457,11 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
 
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
+
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarDivide | Number":
         return ScalarDivide(a, b)
@@ -469,16 +482,15 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         a_const = not self._a.has_data
         b_const = not self._b.has_data
         assert not (a_const and b_const), "constant division has no data bounds"
@@ -519,7 +531,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             #  - c > 0, t <= -0: el <= e <= eu <= -0 -> tl = eu, tu = el
             # if term_lower == termv and termv == -0.0, we need to guarantee
             #  that term_lower is also -0.0, same for term_upper
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
             term_lower = _ensure_array(expr_upper, copy=True)
             np.copyto(
@@ -537,7 +549,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             )
             term_lower[np.isinf(constv)] = +0.0
             term_lower[np.isinf(constv) & _is_sign_negative_number(termv)] = -fmax
-            term_lower = _ensure_array(_minimum_zero_sign_sensitive(termv, term_lower))
+            _minimum_zero_sign_sensitive(termv, term_lower, out=term_lower)
 
             term_upper = _ensure_array(expr_lower, copy=True)
             np.copyto(
@@ -557,7 +569,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             )
             term_upper[np.isinf(constv)] = fmax
             term_upper[np.isinf(constv) & _is_sign_negative_number(termv)] = -0.0
-            term_upper = _ensure_array(_maximum_zero_sign_sensitive(termv, term_upper))
+            _maximum_zero_sign_sensitive(termv, term_upper, out=term_upper)
 
             # we need to force termv if expr_lower == expr_upper
             np.copyto(term_lower, termv, where=(expr_lower == expr_upper), casting="no")
@@ -581,11 +593,13 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
                 expr_upper,
             )
 
-            return term.compute_data_bounds(
+            return term.deferred_compute_data_bounds(
                 term_lower,
                 term_upper,
                 Xs,
                 late_bound,
+                ctx,
+                callback,
             )
 
         if b_const:
@@ -635,7 +649,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
                     == _is_sign_positive_number(expr_upper)
                 )
             ] = +0.0
-            term_lower = _ensure_array(_minimum_zero_sign_sensitive(termv, term_lower))
+            _minimum_zero_sign_sensitive(termv, term_lower, out=term_lower)
 
             term_upper = _ensure_array(expr_upper, copy=True)
             np.copyto(
@@ -665,7 +679,7 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
                     != _is_sign_negative_number(expr_upper)
                 )
             ] = -0.0
-            term_upper = _ensure_array(_maximum_zero_sign_sensitive(termv, term_upper))
+            _maximum_zero_sign_sensitive(termv, term_upper, out=term_upper)
 
             # we need to force termv if expr_lower == expr_upper and constv is
             #  finite non-zero (in other cases we explicitly expand ranges)
@@ -704,11 +718,13 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
                 expr_upper,
             )
 
-            return term.compute_data_bounds(
+            return term.deferred_compute_data_bounds(
                 term_lower,
                 term_upper,
                 Xs,
                 late_bound,
+                ctx,
+                callback,
             )
 
         # if neither a not b is const, we simplify by not allowing the sign of
@@ -801,11 +817,11 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
         b_abs_upper[any_nan & ~np.isnan(bv_abs)] = np.inf
 
         # ensure that the bounds on abs(a) and abs(b) include their values
-        a_abs_lower = _ensure_array(_minimum_zero_sign_sensitive(av_abs, a_abs_lower))
-        a_abs_upper = _ensure_array(_maximum_zero_sign_sensitive(av_abs, a_abs_upper))
+        _minimum_zero_sign_sensitive(av_abs, a_abs_lower, out=a_abs_lower)
+        _maximum_zero_sign_sensitive(av_abs, a_abs_upper, out=a_abs_upper)
 
-        b_abs_lower = _ensure_array(_minimum_zero_sign_sensitive(bv_abs, b_abs_lower))
-        b_abs_upper = _ensure_array(_maximum_zero_sign_sensitive(bv_abs, b_abs_upper))
+        _minimum_zero_sign_sensitive(bv_abs, b_abs_lower, out=b_abs_lower)
+        _maximum_zero_sign_sensitive(bv_abs, b_abs_upper, out=b_abs_upper)
 
         # stack the bounds on a and b so that we can nudge their bounds, if
         #  necessary, together
@@ -884,29 +900,29 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
         b_lower[any_nan & ~np.isnan(bv)] = -np.inf
         b_upper[any_nan & ~np.isnan(bv)] = np.inf
 
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2, callback=callback
+        )
+
         # recurse into a and b to propagate their bounds, then combine their
         #  bounds on Xs
-        Xs_lower, Xs_upper = a.compute_data_bounds(
+        a.deferred_compute_data_bounds(
             a_lower,
             a_upper,
             Xs,
             late_bound,
+            ctx,
+            partial(accumulator.on_complete_term, term=0),
         )
 
-        bl, bu = b.compute_data_bounds(
+        b.deferred_compute_data_bounds(
             b_lower,
             b_upper,
             Xs,
             late_bound,
+            ctx,
+            partial(accumulator.on_complete_term, term=1),
         )
-        Xs_lower = _maximum_zero_sign_sensitive(Xs_lower, bl)
-        Xs_upper = _minimum_zero_sign_sensitive(Xs_upper, bu)
-
-        # ensure that the bounds on Xs include Xs
-        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
-
-        return Xs_lower, Xs_upper
 
     @override
     def __repr__(self) -> str:

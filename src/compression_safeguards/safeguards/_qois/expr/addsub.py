@@ -1,5 +1,6 @@
 import operator
 from collections.abc import Mapping
+from functools import partial
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
@@ -15,6 +16,7 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_stacked_arg_within_expr_bounds
+from ..context import Callback, Context, DataBoundsAccumulator, _DeferredExprContext
 from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .abs import ScalarAbs
@@ -43,6 +45,11 @@ class ScalarAdd(Expr[AnyExpr, AnyExpr]):
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
 
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
+
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarAdd | Number":
         return ScalarAdd(a, b)
@@ -63,18 +70,17 @@ class ScalarAdd(Expr[AnyExpr, AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
-        return compute_left_associate_sum_data_bounds(
-            self, expr_lower, expr_upper, Xs, late_bound
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
+        return deferred_compute_left_associate_sum_data_bounds(
+            self, expr_lower, expr_upper, Xs, late_bound, ctx, callback
         )
 
     @override
@@ -102,6 +108,11 @@ class ScalarSubtract(Expr[AnyExpr, AnyExpr]):
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
 
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
+
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarSubtract | Number":
         return ScalarSubtract(a, b)
@@ -122,18 +133,17 @@ class ScalarSubtract(Expr[AnyExpr, AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
-        return compute_left_associate_sum_data_bounds(
-            self, expr_lower, expr_upper, Xs, late_bound
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
+        return deferred_compute_left_associate_sum_data_bounds(
+            self, expr_lower, expr_upper, Xs, late_bound, ctx, callback
         )
 
     @override
@@ -191,6 +201,11 @@ class ScalarLeftAssociativeSum(Expr[AnyExpr, AnyExpr, AnyExpr, *tuple[AnyExpr, .
     def args(self) -> tuple[AnyExpr, AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]:
         return (self._a, self._b, self._c, *self._ds)
 
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
+
     @override
     def with_args(  # type: ignore[override]
         self, a: AnyExpr, b: AnyExpr, c: AnyExpr, *ds: AnyExpr
@@ -246,18 +261,17 @@ class ScalarLeftAssociativeSum(Expr[AnyExpr, AnyExpr, AnyExpr, *tuple[AnyExpr, .
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
-        return compute_left_associate_sum_data_bounds(
-            self, expr_lower, expr_upper, Xs, late_bound
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
+        return deferred_compute_left_associate_sum_data_bounds(
+            self, expr_lower, expr_upper, Xs, late_bound, ctx, callback
         )
 
     @override
@@ -270,16 +284,15 @@ class ScalarLeftAssociativeSum(Expr[AnyExpr, AnyExpr, AnyExpr, *tuple[AnyExpr, .
         return f"{abc} + {' + '.join(repr(d) for d in self._ds)}"
 
 
-def compute_left_associate_sum_data_bounds(
+def deferred_compute_left_associate_sum_data_bounds(
     expr: ScalarAdd | ScalarSubtract | ScalarLeftAssociativeSum,
     expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
     expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
     Xs: np_sndarray[Ps, Ns, np.dtype[F]],
     late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-) -> tuple[
-    np_sndarray[Ps, Ns, np.dtype[F]],
-    np_sndarray[Ps, Ns, np.dtype[F]],
-]:
+    ctx: Context[Ps, Ns, F],
+    callback: Callback[Ps, Ns, F],
+) -> None:
     def _zero_add(
         a: np.ndarray[tuple[Ps], np.dtype[F]], b: np.ndarray[tuple[Ps], np.dtype[F]]
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
@@ -287,7 +300,7 @@ def compute_left_associate_sum_data_bounds(
         np.copyto(sum_, a, where=(b == 0), casting="no")
         return sum_
 
-    left_associative_sum = as_left_associative_sum(expr)
+    left_associative_sum = as_left_associative_sum(expr, ctx)
 
     termvs: list[np.ndarray[tuple[Ps], np.dtype[F]]] = []
     abs_factorvs: list[None | np.ndarray[tuple[Ps], np.dtype[F]]] = []
@@ -499,17 +512,21 @@ def compute_left_associate_sum_data_bounds(
         ),
     )
 
-    xl: np_sndarray[Ps, Ns, np.dtype[F]]
-    xu: np_sndarray[Ps, Ns, np.dtype[F]]
-    Xs_lower_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
-    Xs_upper_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
+    accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+        Xs=Xs, terms=len(left_associative_sum), callback=callback
+    )
+
     i = 0
-    for term, termv, abs_factorv in zip(left_associative_sum, termvs, abs_factorvs):
+    for j, (term, termv, abs_factorv) in enumerate(
+        zip(left_associative_sum, termvs, abs_factorvs)
+    ):
         if abs_factorv is None:
+            accumulator.complete_term(j)
+
             continue
 
         # recurse into the terms with a weighted bound
-        xl, xu = term.compute_data_bounds(
+        term.deferred_compute_data_bounds(
             # termv might be +-0.0, but tl or tu might have been nudged
             #  such that tl > termv or tu < termv
             # so guarantee once again that tl <= termv <= tu
@@ -517,33 +534,16 @@ def compute_left_associate_sum_data_bounds(
             _maximum_zero_sign_sensitive(termv, tu_stack[i]),
             Xs,
             late_bound,
+            ctx,
+            partial(accumulator.on_complete_term, term=j),
         )
 
-        # combine the inner data bounds
-        if Xs_lower_ is None:
-            Xs_lower_ = xl
-        else:
-            Xs_lower_ = _maximum_zero_sign_sensitive(Xs_lower_, xl)
-        if Xs_upper_ is None:
-            Xs_upper_ = xu
-        else:
-            Xs_upper_ = _minimum_zero_sign_sensitive(Xs_upper_, xu)
-
         i += 1
-
-    assert Xs_lower_ is not None
-    assert Xs_upper_ is not None
-    Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_lower_
-    Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_upper_
-
-    Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-    Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
-
-    return Xs_lower, Xs_upper
 
 
 def as_left_associative_sum(
     expr: ScalarAdd | ScalarSubtract | ScalarLeftAssociativeSum,
+    ctx: Context[Ps, Ns, F],
 ) -> tuple[AnyExpr, ...]:
     terms_rev: list[AnyExpr] = []
 
@@ -556,9 +556,14 @@ def as_left_associative_sum(
 
         # rewrite ( a - b ) as ( a + (-b) ), which is bitwsie equivalent for
         #  floating-point numbers
-        terms_rev.append(
-            ScalarNegate(expr._b) if isinstance(expr, ScalarSubtract) else expr._b
-        )
+        if isinstance(expr, ScalarSubtract):
+            # TODO: remove rewrite, since that defeats some common subexpression
+            #       elimination and requires this context update hack
+            neg_expr = ScalarNegate(expr._b)
+            ctx._context[neg_expr] = _DeferredExprContext(1)
+            terms_rev.append(neg_expr)
+        else:
+            terms_rev.append(expr._b)
 
         if isinstance(expr._a, ScalarAdd | ScalarSubtract | ScalarLeftAssociativeSum):
             expr = expr._a

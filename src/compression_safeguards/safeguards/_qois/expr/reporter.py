@@ -6,6 +6,7 @@ from typing_extensions import override  # MSPV 3.12
 
 from ....utils.bindings import Parameter
 from ..bound import DataBounds, data_bounds
+from ..context import Callback, Context
 from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .literal import Number
@@ -77,32 +78,14 @@ class ReportingExpr(Expr[AnyExpr]):
     def args(self) -> tuple[AnyExpr]:
         return (self._expr,)
 
+    @property
+    @override
+    def extra(self) -> tuple[Reporter]:
+        return (self._reporter,)
+
     @override
     def with_args(self, expr: AnyExpr) -> "ReportingExpr | Number":
         return ReportingExpr(expr, self._reporter)
-
-    @property  # type: ignore[misc]
-    @override
-    def expr_size(self) -> int:
-        return self._expr.expr_size
-
-    @property  # type: ignore[misc]
-    @override
-    def data_expr_size(self) -> int:
-        return self._expr.data_expr_size
-
-    @property  # type: ignore[misc]
-    @override
-    def has_data(self) -> bool:
-        return self._expr.has_data
-
-    @override  # type: ignore
-    def eval_has_data(
-        self,
-        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> np.ndarray[tuple[Ps], np.dtype[np.bool]]:
-        return self._expr.eval_has_data(Xs, late_bound)
 
     @override
     def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
@@ -123,20 +106,25 @@ class ReportingExpr(Expr[AnyExpr]):
 
     @data_bounds(DataBounds.infallible)
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         self._reporter.enter(self._expr)
+
         try:
-            return self._expr.compute_data_bounds(
-                expr_lower, expr_upper, Xs, late_bound
+            return self._expr.deferred_compute_data_bounds(
+                expr_lower,
+                expr_upper,
+                Xs,
+                late_bound,
+                ctx,
+                callback,
             )
         finally:
             self._reporter.exit(self._expr)

@@ -4,7 +4,6 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
-    _ensure_array,
     _is_sign_negative_number,
     _is_sign_positive_number,
     _maximum_zero_sign_sensitive,
@@ -12,6 +11,7 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
+from ..context import Callback, Context
 from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
@@ -28,6 +28,11 @@ class ScalarReciprocal(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarReciprocal":
@@ -52,16 +57,15 @@ class ScalarReciprocal(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg and reciprocal(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -69,25 +73,25 @@ class ScalarReciprocal(Expr[AnyExpr]):
 
         # compute the argument bounds
         # ensure that reciprocal(...) keeps the same sign as arg
-        # TODO: an interval union could represent that the two disjoint
+        # TODO: an interval union could represent the two disjoint
         #       intervals in the future
-        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
-            _minimum_zero_sign_sensitive(expr_upper, Xs.dtype.type(-0.0))
+        arg_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _minimum_zero_sign_sensitive(
+            expr_upper, Xs.dtype.type(-0.0)
         )
         np.copyto(
             arg_lower, expr_upper, where=_is_sign_positive_number(exprv), casting="no"
         )
         np.reciprocal(arg_lower, out=arg_lower)
-        arg_lower = _ensure_array(_minimum_zero_sign_sensitive(argv, arg_lower))
+        _minimum_zero_sign_sensitive(argv, arg_lower, out=arg_lower)
 
-        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
-            _maximum_zero_sign_sensitive(Xs.dtype.type(+0.0), expr_lower)
+        arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _maximum_zero_sign_sensitive(
+            Xs.dtype.type(+0.0), expr_lower
         )
         np.copyto(
             arg_upper, expr_lower, where=_is_sign_negative_number(exprv), casting="no"
         )
         np.reciprocal(arg_upper, out=arg_upper)
-        arg_upper = _ensure_array(_maximum_zero_sign_sensitive(argv, arg_upper))
+        _maximum_zero_sign_sensitive(argv, arg_upper, out=arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
@@ -111,11 +115,13 @@ class ScalarReciprocal(Expr[AnyExpr]):
             expr_upper,
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override

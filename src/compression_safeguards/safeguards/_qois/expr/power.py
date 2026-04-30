@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from functools import partial
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
@@ -21,6 +22,7 @@ from ..bound import (
     guarantee_arg_within_expr_bounds,
     guarantee_stacked_arg_within_expr_bounds,
 )
+from ..context import Callback, Context, DataBoundsAccumulator
 from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
@@ -51,6 +53,11 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
     def args(self) -> tuple[AnyExpr, AnyExpr]:
         return (self._a, self._b)
 
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
+
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarPower | Number":
         return ScalarPower(a, b)
@@ -69,18 +76,17 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         return np.power(self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound))
 
-    @override
     @checked_data_bounds
-    def compute_data_bounds_unchecked(
+    @override
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         a_const = not self._a.has_data
         b_const = not self._b.has_data
         assert not (a_const and b_const), "constant power has no data bounds"
@@ -108,11 +114,11 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             # apply the inverse function to get the bounds on b
             # if b_lower == bv and bv == -0.0, we need to guarantee that
             #  b_lower is also -0.0, same for b_upper
-            b_lower = _ensure_array(
-                _minimum_zero_sign_sensitive(bv, np.divide(np.log(expr_lower), av_log))
+            b_lower = _minimum_zero_sign_sensitive(
+                bv, np.divide(np.log(expr_lower), av_log)
             )
-            b_upper = _ensure_array(
-                _maximum_zero_sign_sensitive(bv, np.divide(np.log(expr_upper), av_log))
+            b_upper = _maximum_zero_sign_sensitive(
+                bv, np.divide(np.log(expr_upper), av_log)
             )
 
             # we need to force bv if expr_lower == expr_upper
@@ -150,7 +156,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             # handle NaN ** bv
             # - NaN ** +-0 = 1 -> discontinuous, force bv = +-0
             # - NaN ** (<0>) = NaN -> allow any bv != 0
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
             b_lower[np.isnan(av) & (bv == 0)] = -0.0
             b_upper[np.isnan(av) & (bv == 0)] = +0.0
@@ -185,11 +191,13 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
                 expr_upper,
             )
 
-            return b.compute_data_bounds(
+            return b.deferred_compute_data_bounds(
                 b_lower,
                 b_upper,
                 Xs,
                 late_bound,
+                ctx,
+                callback,
             )
 
         a_lower: np.ndarray[tuple[Ps], np.dtype[F]]
@@ -201,10 +209,8 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             # apply the inverse function to get the bounds on a
             # if a_lower == av and av == -0.0, we need to guarantee that
             #  a_lower is also -0.0, same for a_upper
-            a_lower = _ensure_array(
-                _minimum_zero_sign_sensitive(
-                    av, np.power(expr_lower, np.reciprocal(bv))
-                )
+            a_lower = _minimum_zero_sign_sensitive(
+                av, np.power(expr_lower, np.reciprocal(bv))
             )
             a_upper = _maximum_zero_sign_sensitive(
                 av, np.power(expr_upper, np.reciprocal(bv))
@@ -243,7 +249,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             # handle av ** NaN
             # - 1 ** NaN = 1 -> discontinuous, force av = 1
             # - (<1>) ** NaN = NaN -> allow any av != 1
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
             a_lower[(av == 1) & np.isnan(bv)] = 1
             a_upper[(av == 1) & np.isnan(bv)] = 1
@@ -274,11 +280,13 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
                 expr_upper,
             )
 
-            return a.compute_data_bounds(
+            return a.deferred_compute_data_bounds(
                 a_lower,
                 a_upper,
                 Xs,
                 late_bound,
+                ctx,
+                callback,
             )
 
         one_plus_eps = np.nextafter(Xs.dtype.type(1), Xs.dtype.type(2))
@@ -388,15 +396,15 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
 
         # if a_lower == av and av == -0.0, we need to guarantee
         #  that a_lower is also -0.0, same for a_upper
-        a_lower = _ensure_array(_minimum_zero_sign_sensitive(av, np.exp(a_log_lower)))
-        a_upper = _ensure_array(_maximum_zero_sign_sensitive(av, np.exp(a_log_upper)))
+        a_lower = _minimum_zero_sign_sensitive(av, np.exp(a_log_lower))
+        a_upper = _maximum_zero_sign_sensitive(av, np.exp(a_log_upper))
 
         # if b_lower == bv and bv == -0.0, we need to guarantee
         #  that b_lower is also -0.0, same for b_upper
         b_lower = _where(_is_sign_negative_number(bv), -b_abs_upper, b_abs_lower)
-        b_lower = _ensure_array(_minimum_zero_sign_sensitive(bv, b_lower))
+        _minimum_zero_sign_sensitive(bv, b_lower, out=b_lower)
         b_upper = _where(_is_sign_negative_number(bv), -b_abs_lower, b_abs_upper)
-        b_upper = _ensure_array(_maximum_zero_sign_sensitive(bv, b_upper))
+        _maximum_zero_sign_sensitive(bv, b_upper, out=b_upper)
 
         # we need to force av and bv if expr_lower == expr_upper
         np.copyto(a_lower, av, where=(expr_lower == expr_upper), casting="no")
@@ -411,7 +419,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         b_upper[av == 1] = +np.inf
 
         # (<1>) ** NaN = NaN -> allow any av != 1
-        # TODO: an interval union could represent that the two disjoint
+        # TODO: an interval union could represent the two disjoint
         #       intervals in the future
         a_lower[(av > 1) & np.isnan(bv)] = one_plus_eps
         a_upper[(av > 1) & np.isnan(bv)] = np.inf
@@ -445,7 +453,7 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         b_upper[bv == 0] = +0.0
 
         # NaN ** (<0>) = NaN -> allow any av != 0
-        # TODO: an interval union could represent that the two disjoint
+        # TODO: an interval union could represent the two disjoint
         #       intervals in the future
         b_lower[np.isnan(av) & (bv > 0)] = smallest_subnormal
         b_upper[np.isnan(av) & (bv > 0)] = np.inf
@@ -541,29 +549,29 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             _where(np.less(av, 1), tl_stack[1], tu_stack[1]),
         )
 
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2, callback=callback
+        )
+
         # recurse into a and b to propagate their bounds, then combine their
         #  bounds on Xs
-        Xs_lower, Xs_upper = a.compute_data_bounds(
+        a.deferred_compute_data_bounds(
             a_lower,
             a_upper,
             Xs,
             late_bound,
+            ctx,
+            partial(accumulator.on_complete_term, term=0),
         )
 
-        bl, bu = b.compute_data_bounds(
+        b.deferred_compute_data_bounds(
             b_lower,
             b_upper,
             Xs,
             late_bound,
+            ctx,
+            partial(accumulator.on_complete_term, term=1),
         )
-        Xs_lower = _maximum_zero_sign_sensitive(Xs_lower, bl)
-        Xs_upper = _minimum_zero_sign_sensitive(Xs_upper, bu)
-
-        # ensure that the bounds on Xs include Xs
-        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
-
-        return Xs_lower, Xs_upper
 
     @override
     def __repr__(self) -> str:

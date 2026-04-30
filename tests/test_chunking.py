@@ -6,6 +6,10 @@ import xarray as xr
 from xarray_safeguards import apply_data_array_correction, produce_data_array_correction
 
 from compression_safeguards.api import Safeguards
+from compression_safeguards.safeguards._qois.expr import (
+    expr_data_indices,
+    expr_late_bound_constants,
+)
 from compression_safeguards.safeguards._qois.expr.hashing import (
     HashingExpr,
     _patch_for_hashing_qoi_dev_only,
@@ -46,8 +50,11 @@ def check_all_boundaries(data: np.ndarray, chunks: int, constant_boundary=4.2):
                 data_shape=safeguard._qoi_expr._stencil_shape,
                 late_bound_constants=frozenset(),
             )
-            safeguard._qoi_expr._late_bound_constants = (
-                safeguard._qoi_expr._expr.late_bound_constants
+            safeguard._qoi_expr._data_indices = expr_data_indices(
+                safeguard._qoi_expr._expr
+            )
+            safeguard._qoi_expr._late_bound_constants = expr_late_bound_constants(
+                safeguard._qoi_expr._expr
             )
 
             with _patch_for_hashing_qoi_dev_only():
@@ -248,8 +255,9 @@ def test_fuzzer_found_hash():
     safeguard._qoi_expr._expr = HashingExpr.from_data_shape(
         data_shape=safeguard._qoi_expr._stencil_shape, late_bound_constants=frozenset()
     )
-    safeguard._qoi_expr._late_bound_constants = (
-        safeguard._qoi_expr._expr.late_bound_constants
+    safeguard._qoi_expr._data_indices = expr_data_indices(safeguard._qoi_expr._expr)
+    safeguard._qoi_expr._late_bound_constants = expr_late_bound_constants(
+        safeguard._qoi_expr._expr
     )
 
     with _patch_for_hashing_qoi_dev_only():
@@ -291,8 +299,9 @@ def test_fuzzer_found_hash_with_late_bound():
         data_shape=safeguard._qoi_expr._stencil_shape,
         late_bound_constants=frozenset(["foo"]),
     )
-    safeguard._qoi_expr._late_bound_constants = (
-        safeguard._qoi_expr._expr.late_bound_constants
+    safeguard._qoi_expr._data_indices = expr_data_indices(safeguard._qoi_expr._expr)
+    safeguard._qoi_expr._late_bound_constants = expr_late_bound_constants(
+        safeguard._qoi_expr._expr
     )
 
     late_bound = dict(foo=0)
@@ -364,8 +373,9 @@ def test_fuzzer_found_hash_x_max():
         data_shape=safeguard._qoi_expr._stencil_shape,
         late_bound_constants=frozenset(["foo"]),
     )
-    safeguard._qoi_expr._late_bound_constants = (
-        safeguard._qoi_expr._expr.late_bound_constants
+    safeguard._qoi_expr._data_indices = expr_data_indices(safeguard._qoi_expr._expr)
+    safeguard._qoi_expr._late_bound_constants = expr_late_bound_constants(
+        safeguard._qoi_expr._expr
     )
 
     late_bound = dict(foo=-15)
@@ -423,8 +433,9 @@ def test_fuzzer_found_hash_reflect_boundary():
         data_shape=safeguard._qoi_expr._stencil_shape,
         late_bound_constants=frozenset(["foo"]),
     )
-    safeguard._qoi_expr._late_bound_constants = (
-        safeguard._qoi_expr._expr.late_bound_constants
+    safeguard._qoi_expr._data_indices = expr_data_indices(safeguard._qoi_expr._expr)
+    safeguard._qoi_expr._late_bound_constants = expr_late_bound_constants(
+        safeguard._qoi_expr._expr
     )
 
     late_bound = dict(foo=0)
@@ -675,8 +686,9 @@ def test_fuzzer_found_global_late_bound_max():
         data_shape=safeguard._qoi_expr._stencil_shape,
         late_bound_constants=frozenset(["foo"]),
     )
-    safeguard._qoi_expr._late_bound_constants = (
-        safeguard._qoi_expr._expr.late_bound_constants
+    safeguard._qoi_expr._data_indices = expr_data_indices(safeguard._qoi_expr._expr)
+    safeguard._qoi_expr._late_bound_constants = expr_late_bound_constants(
+        safeguard._qoi_expr._expr
     )
 
     late_bound = dict(foo=0)
@@ -742,8 +754,9 @@ def test_fuzzer_found_wrapping_constant_boundary_clash():
         data_shape=safeguard._qoi_expr._stencil_shape,
         late_bound_constants=frozenset(["foo"]),
     )
-    safeguard._qoi_expr._late_bound_constants = (
-        safeguard._qoi_expr._expr.late_bound_constants
+    safeguard._qoi_expr._data_indices = expr_data_indices(safeguard._qoi_expr._expr)
+    safeguard._qoi_expr._late_bound_constants = expr_late_bound_constants(
+        safeguard._qoi_expr._expr
     )
 
     late_bound = dict(foo=0)
@@ -806,8 +819,9 @@ def test_fuzzer_found_nan_magic():
         data_shape=safeguard._qoi_expr._stencil_shape,
         late_bound_constants=frozenset(["foo"]),
     )
-    safeguard._qoi_expr._late_bound_constants = (
-        safeguard._qoi_expr._expr.late_bound_constants
+    safeguard._qoi_expr._data_indices = expr_data_indices(safeguard._qoi_expr._expr)
+    safeguard._qoi_expr._late_bound_constants = expr_late_bound_constants(
+        safeguard._qoi_expr._expr
     )
 
     late_bound = dict(foo=109)

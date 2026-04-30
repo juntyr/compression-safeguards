@@ -7,6 +7,7 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import _ensure_array
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
+from ..context import Callback, Context
 from ..typing import F, Fi, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
@@ -23,6 +24,11 @@ class ScalarIsFinite(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarIsFinite":
@@ -45,18 +51,17 @@ class ScalarIsFinite(Expr[AnyExpr]):
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         return classify_to_dtype(np.isfinite, self._a.eval(Xs, late_bound), Xs.dtype)
 
-    @override
     @checked_data_bounds
-    def compute_data_bounds_unchecked(
+    @override
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -75,11 +80,13 @@ class ScalarIsFinite(Expr[AnyExpr]):
         arg_upper[np.less_equal(expr_lower, 0)] = np.inf
         np.copyto(arg_upper, argv, where=np.less(expr_upper, 1), casting="no")
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -98,6 +105,11 @@ class ScalarIsInf(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarIsInf":
@@ -122,16 +134,15 @@ class ScalarIsInf(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -150,11 +161,13 @@ class ScalarIsInf(Expr[AnyExpr]):
         arg_upper[np.greater_equal(expr_upper, 1)] = np.inf
         np.copyto(arg_upper, argv, where=np.greater(expr_lower, 0), casting="no")
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -173,6 +186,11 @@ class ScalarIsNaN(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarIsNaN":
@@ -197,16 +215,15 @@ class ScalarIsNaN(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -225,11 +242,13 @@ class ScalarIsNaN(Expr[AnyExpr]):
         )
         np.copyto(arg_upper, argv, where=np.greater(expr_lower, 0), casting="no")
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override

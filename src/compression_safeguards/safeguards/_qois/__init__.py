@@ -12,6 +12,7 @@ from ..qois import (
     PointwiseQuantityOfInterestExpression,
     StencilQuantityOfInterestExpression,
 )
+from .expr import compute_expr_data_bounds, expr_data_indices, expr_late_bound_constants
 from .expr.abc import AnyExpr, Expr
 from .expr.array import Array
 from .expr.constfold import ScalarFoldedConstant
@@ -66,9 +67,9 @@ class PointwiseQuantityOfInterest:
                 | ctx
             )
 
-        late_bound_constants = expr.late_bound_constants
+        late_bound_constants = expr_late_bound_constants(expr)
 
-        dummy_pointwise: np.ndarray[tuple[int], np.dtype[np.float64]] = _zeros(
+        canary_pointwise: np.ndarray[tuple[int], np.dtype[np.float64]] = _zeros(
             (0,), np.dtype(np.float64)
         )
 
@@ -77,13 +78,14 @@ class PointwiseQuantityOfInterest:
         ):
             # check if the expression is well-formed and if data bounds can be
             #  computed
-            _canary_expr = expr.constant_fold(np.dtype(np.float64))
-            if isinstance(_canary_expr, Expr):
-                _canary_data_bounds = _canary_expr.compute_data_bounds(
-                    dummy_pointwise,
-                    dummy_pointwise,
-                    dummy_pointwise,
-                    {c: dummy_pointwise for c in late_bound_constants},
+            canary_expr = expr.constant_fold(np.dtype(np.float64))
+            if isinstance(canary_expr, Expr):
+                _canary_data_bounds = compute_expr_data_bounds(
+                    canary_expr,
+                    canary_pointwise,
+                    canary_pointwise,
+                    canary_pointwise,
+                    {c: canary_pointwise for c in late_bound_constants},
                 )
 
         self._expr = expr
@@ -167,7 +169,7 @@ class PointwiseQuantityOfInterest:
             X_lower_upper: tuple[
                 np_sndarray[Ps, tuple[()], np.dtype[F]],
                 np_sndarray[Ps, tuple[()], np.dtype[F]],
-            ] = expr.compute_data_bounds(qoi_lower, qoi_upper, X, late_bound)
+            ] = compute_expr_data_bounds(expr, qoi_lower, qoi_upper, X, late_bound)
             X_lower = _ensure_array(coerce_to_flat(X_lower_upper[0]))
             X_upper = _ensure_array(coerce_to_flat(X_lower_upper[1]))
         else:
@@ -211,11 +213,13 @@ class StencilQuantityOfInterest:
         "_expr",
         "_stencil_shape",
         "_stencil_I",
+        "_data_indices",
         "_late_bound_constants",
     )
     _expr: AnyExpr
     _stencil_shape: tuple[int, ...]
     _stencil_I: tuple[int, ...]
+    _data_indices: frozenset[tuple[int, ...]]
     _late_bound_constants: frozenset[Parameter]
 
     def __init__(
@@ -257,13 +261,13 @@ class StencilQuantityOfInterest:
                 | ctx
             )
 
-        late_bound_constants = expr.late_bound_constants
+        late_bound_constants = expr_late_bound_constants(expr)
 
-        dummy_pointwise: np.ndarray[tuple[int], np.dtype[np.float64]] = _zeros(
+        canary_pointwise: np.ndarray[tuple[int], np.dtype[np.float64]] = _zeros(
             (0,), np.dtype(np.float64)
         )
-        dummy_stencil: np_sndarray[int, tuple[int, ...], np.dtype[np.float64]] = _zeros(
-            (0, *stencil_shape), np.dtype(np.float64)
+        canary_stencil: np_sndarray[int, tuple[int, ...], np.dtype[np.float64]] = (
+            _zeros((0, *stencil_shape), np.dtype(np.float64))
         )
 
         with np.errstate(
@@ -271,16 +275,18 @@ class StencilQuantityOfInterest:
         ):
             # check if the expression is well-formed and if data bounds can be
             #  computed
-            _canary_expr = expr.constant_fold(np.dtype(np.float64))
-            if isinstance(_canary_expr, Expr):
-                _canary_data_bounds = _canary_expr.compute_data_bounds(
-                    dummy_pointwise,
-                    dummy_pointwise,
-                    dummy_stencil,
-                    {c: dummy_stencil for c in late_bound_constants},
+            canary_expr = expr.constant_fold(np.dtype(np.float64))
+            if isinstance(canary_expr, Expr):
+                _canary_data_bounds = compute_expr_data_bounds(
+                    canary_expr,
+                    canary_pointwise,
+                    canary_pointwise,
+                    canary_stencil,
+                    {c: canary_stencil for c in late_bound_constants},
                 )
 
         self._expr = expr
+        self._data_indices = expr_data_indices(expr)
         self._late_bound_constants = late_bound_constants
 
     @property
@@ -297,7 +303,7 @@ class StencilQuantityOfInterest:
         The set of data stencil indices `X[is]` that this QoI uses.
         """
 
-        return self._expr.data_indices
+        return self._data_indices
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def eval(
@@ -379,8 +385,8 @@ class StencilQuantityOfInterest:
         Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]]
         expr = self._expr.constant_fold(Xs.dtype)
         if isinstance(expr, Expr):
-            Xs_lower, Xs_upper = expr.compute_data_bounds(
-                qoi_lower, qoi_upper, Xs, late_bound
+            Xs_lower, Xs_upper = compute_expr_data_bounds(
+                expr, qoi_lower, qoi_upper, Xs, late_bound
             )
             Xs_lower = _ensure_array(Xs_lower)
             Xs_upper = _ensure_array(Xs_upper)

@@ -1,17 +1,14 @@
 from collections.abc import Callable, Mapping
+from functools import partial
 from typing import overload
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import (
-    _ensure_array,
-    _maximum_zero_sign_sensitive,
-    _minimum_zero_sign_sensitive,
-    _stack,
-)
+from ....utils._compat import _ensure_array, _stack
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
+from ..context import Callback, Context, DataBoundsAccumulator
 from ..typing import F, Fi, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
@@ -28,6 +25,11 @@ class ScalarNot(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarNot":
@@ -50,18 +52,17 @@ class ScalarNot(Expr[AnyExpr]):
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         return combine_to_dtype(np.logical_not, self._a.eval(Xs, late_bound), Xs.dtype)
 
-    @override
     @checked_data_bounds
-    def compute_data_bounds_unchecked(
+    @override
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -85,14 +86,16 @@ class ScalarNot(Expr[AnyExpr]):
         arg_upper[np.greater(expr_lower, 0)] = +0.0
         arg_upper[np.less(expr_upper, 1) & np.less(argv, 0)] = -smallest_subnormal
 
-        # TODO: an interval union could represent that the two disjoint
-        #       intervals in the future
+        # TODO: an interval union could represent the two disjoint intervals in
+        #       the future
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -115,6 +118,11 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]:
         return (self._a, self._b, *self._cs)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr, *cs: AnyExpr) -> "ScalarAll":
@@ -159,18 +167,17 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
             Xs.dtype,
         )
 
-    @override
     @checked_data_bounds
-    def compute_data_bounds_unchecked(
+    @override
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         a = self._a
         b = self._b
         cs = self._cs
@@ -205,10 +212,9 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
         for c_const_zero in cs_const_zero:
             any_constant_zero |= c_const_zero
 
-        xl: np_sndarray[Ps, Ns, np.dtype[F]]
-        xu: np_sndarray[Ps, Ns, np.dtype[F]]
-        Xs_lower_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
-        Xs_upper_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2 + len(cs), callback=callback
+        )
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, all(*args) = True, then
@@ -220,13 +226,17 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
         #    - all True (non-zero) args can be anything
         # only one of the two disjoint non-zero intervals is propagated
         # otherwise, all(*args) in [True, False] and all args can be anything
-        for term, tv, t_const_zero, t_const in zip(
-            (a, b, *cs),
-            (av, bv, *cvs),
-            (a_const_zero, b_const_zero, *cs_const_zero),
-            (a_const, b_const, *cs_const),
+        for j, (term, tv, t_const_zero, t_const) in enumerate(
+            zip(
+                (a, b, *cs),
+                (av, bv, *cvs),
+                (a_const_zero, b_const_zero, *cs_const_zero),
+                (a_const, b_const, *cs_const),
+            )
         ):
             if t_const:
+                accumulator.complete_term(j)
+
                 continue
 
             term_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
@@ -247,36 +257,18 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
                 np.less(expr_upper, 1) & (tv == 0) & (~any_constant_zero | t_const_zero)
             ] = +0.0
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
             # recurse into the terms
-            xl, xu = term.compute_data_bounds(
+            term.deferred_compute_data_bounds(
                 term_lower,
                 term_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(accumulator.on_complete_term, term=j),
             )
-
-            # combine the inner data bounds
-            if Xs_lower_ is None:
-                Xs_lower_ = xl
-            else:
-                Xs_lower_ = _maximum_zero_sign_sensitive(Xs_lower_, xl)
-            if Xs_upper_ is None:
-                Xs_upper_ = xu
-            else:
-                Xs_upper_ = _minimum_zero_sign_sensitive(Xs_upper_, xu)
-
-        assert Xs_lower_ is not None
-        assert Xs_upper_ is not None
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_lower_
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_upper_
-
-        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
-
-        return Xs_lower, Xs_upper
 
     @override
     def __repr__(self) -> str:
@@ -299,6 +291,11 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]:
         return (self._a, self._b, *self._cs)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr, b: AnyExpr, *cs: AnyExpr) -> "ScalarAny":
@@ -343,18 +340,17 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
             Xs.dtype,
         )
 
-    @override
     @checked_data_bounds
-    def compute_data_bounds_unchecked(
+    @override
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         a = self._a
         b = self._b
         cs = self._cs
@@ -389,10 +385,9 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
         for c_const_zero in cs_const_non_zero:
             any_constant_non_zero |= c_const_zero
 
-        xl: np_sndarray[Ps, Ns, np.dtype[F]]
-        xu: np_sndarray[Ps, Ns, np.dtype[F]]
-        Xs_lower_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
-        Xs_upper_: None | np_sndarray[Ps, Ns, np.dtype[F]] = None
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=2 + len(cs), callback=callback
+        )
 
         # by the precondition, expr_lower <= self.eval(Xs) <= expr_upper
         # if expr_lower > 0, any(*args) = True, then
@@ -405,13 +400,17 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
         # if expr_upper < 1, any(*args) = False, then
         #  all args must stay False, i.e. zero
         # otherwise, any(*args) in [True, False] and all args can be anything
-        for term, tv, t_const_non_zero, t_const in zip(
-            (a, b, *cs),
-            (av, bv, *cvs),
-            (a_const_non_zero, b_const_non_zero, *cs_const_non_zero),
-            (a_const, b_const, *cs_const),
+        for j, (term, tv, t_const_non_zero, t_const) in enumerate(
+            zip(
+                (a, b, *cs),
+                (av, bv, *cvs),
+                (a_const_non_zero, b_const_non_zero, *cs_const_non_zero),
+                (a_const, b_const, *cs_const),
+            )
         ):
             if t_const:
+                accumulator.complete_term(j)
+
                 continue
 
             term_lower: np.ndarray[tuple[Ps], np.dtype[F]] = np.full(
@@ -436,36 +435,18 @@ class ScalarAny(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
             ] = -smallest_subnormal
             term_upper[np.less(expr_upper, 1)] = +0.0
 
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
 
             # recurse into the terms
-            xl, xu = term.compute_data_bounds(
+            term.deferred_compute_data_bounds(
                 term_lower,
                 term_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(accumulator.on_complete_term, term=j),
             )
-
-            # combine the inner data bounds
-            if Xs_lower_ is None:
-                Xs_lower_ = xl
-            else:
-                Xs_lower_ = _maximum_zero_sign_sensitive(Xs_lower_, xl)
-            if Xs_upper_ is None:
-                Xs_upper_ = xu
-            else:
-                Xs_upper_ = _minimum_zero_sign_sensitive(Xs_upper_, xu)
-
-        assert Xs_lower_ is not None
-        assert Xs_upper_ is not None
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_lower_
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = Xs_upper_
-
-        Xs_lower = _minimum_zero_sign_sensitive(Xs_lower, Xs)
-        Xs_upper = _maximum_zero_sign_sensitive(Xs_upper, Xs)
-
-        return Xs_lower, Xs_upper
 
     @override
     def __repr__(self) -> str:

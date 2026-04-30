@@ -1,17 +1,13 @@
 from collections.abc import Mapping
+from functools import partial
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import (
-    _broadcast_to,
-    _ensure_array,
-    _maximum_zero_sign_sensitive,
-    _minimum_zero_sign_sensitive,
-    _where,
-)
+from ....utils._compat import _broadcast_to, _ensure_array, _where
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
+from ..context import Callback, Context, DataBoundsAccumulator
 from ..typing import F, Fi, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
@@ -32,6 +28,11 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr, AnyExpr]:
         return (self._condition, self._a, self._b)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, condition: AnyExpr, a: AnyExpr, b: AnyExpr) -> "ScalarWhere":
@@ -84,16 +85,15 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate the condition, a, and b
         cond, a, b = self._condition, self._a, self._b
         condv: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
@@ -104,14 +104,22 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
             _ensure_array(condvb_Ps).reshape(Xs.shape[:1] + (1,) * (Xs.ndim - 1)),
             Xs.shape,
         )
-        av = a.eval(Xs, late_bound)
-        bv = b.eval(Xs, late_bound)
 
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(-np.inf)
-        )
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]] = np.full(
-            Xs.shape, Xs.dtype.type(np.inf)
+        # FIXME: could this be done in a less hacky way?
+        def prune_pre_visit(e: AnyExpr) -> None:
+            ctx._context[e]._dependents -= 1
+            if ctx._context[e]._dependents > 0:
+                return
+            for a in e.args:
+                prune_pre_visit(a)
+
+        if not (np.any(condvb_Ps) and a.has_data):
+            prune_pre_visit(a)
+        if not ((not np.all(condvb_Ps)) and b.has_data):
+            prune_pre_visit(b)
+
+        accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
+            Xs=Xs, terms=3, callback=callback
         )
 
         if cond.has_data:
@@ -131,64 +139,61 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
             smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
 
             # non-zero condition values must remain non-zero
-            # TODO: an interval union could represent that the two disjoint
+            # TODO: an interval union could represent the two disjoint
             #       intervals in the future
             cond_lower[condv > 0] = smallest_subnormal
             cond_upper[condv < 0] = -smallest_subnormal
 
-            cl, cu = cond.compute_data_bounds(cond_lower, cond_upper, Xs, late_bound)
-            Xs_lower = _maximum_zero_sign_sensitive(Xs_lower, cl)
-            Xs_upper = _minimum_zero_sign_sensitive(Xs_upper, cu)
+            cond.deferred_compute_data_bounds(
+                cond_lower,
+                cond_upper,
+                Xs,
+                late_bound,
+                ctx,
+                partial(accumulator.on_complete_term, term=0),
+            )
+        else:
+            accumulator.complete_term(0)
 
         if np.any(condvb_Ps) and a.has_data:
             # pass on the data bounds to a but only use its bounds on Xs if
             #  chosen by the condition
-            al, au = a.compute_data_bounds(
-                _where(condvb_Ps, expr_lower, av),
-                _where(condvb_Ps, expr_upper, av),
+            a_lower = _ensure_array(expr_lower, copy=True)
+            a_lower[~condvb_Ps] = Xs.dtype.type(-np.inf)
+
+            a_upper = _ensure_array(expr_upper, copy=True)
+            a_upper[~condvb_Ps] = Xs.dtype.type(np.inf)
+
+            a.deferred_compute_data_bounds(
+                a_lower,
+                a_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(accumulator.on_complete_term, term=1, where=condvb_Ns),
             )
-
-            # combine the data bounds
-            np.copyto(
-                Xs_lower,
-                _maximum_zero_sign_sensitive(Xs_lower, al),
-                where=condvb_Ns,
-                casting="no",
-            )
-            np.copyto(
-                Xs_upper,
-                _minimum_zero_sign_sensitive(Xs_upper, au),
-                where=condvb_Ns,
-                casting="no",
-            )
+        else:
+            accumulator.complete_term(1)
 
         if (not np.all(condvb_Ps)) and b.has_data:
             # pass on the data bounds to b but only use its bounds on Xs if
             #  chosen by the condition
-            bl, bu = b.compute_data_bounds(
-                _where(condvb_Ps, bv, expr_lower),
-                _where(condvb_Ps, bv, expr_upper),
+            b_lower = _ensure_array(expr_lower, copy=True)
+            b_lower[condvb_Ps] = Xs.dtype.type(-np.inf)
+
+            b_upper = _ensure_array(expr_upper, copy=True)
+            b_upper[condvb_Ps] = Xs.dtype.type(np.inf)
+
+            b.deferred_compute_data_bounds(
+                b_lower,
+                b_upper,
                 Xs,
                 late_bound,
+                ctx,
+                partial(accumulator.on_complete_term, term=2, where=~condvb_Ns),
             )
-
-            # combine the data bounds
-            np.copyto(
-                Xs_lower,
-                _maximum_zero_sign_sensitive(Xs_lower, bl),
-                where=~condvb_Ns,
-                casting="no",
-            )
-            np.copyto(
-                Xs_upper,
-                _minimum_zero_sign_sensitive(Xs_upper, bu),
-                where=~condvb_Ns,
-                casting="no",
-            )
-
-        return Xs_lower, Xs_upper
+        else:
+            accumulator.complete_term(2)
 
     @override
     def __repr__(self) -> str:

@@ -12,6 +12,7 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
+from ..context import Callback, Context
 from ..typing import F, Ns, Ps, np_sndarray
 from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
@@ -28,6 +29,11 @@ class ScalarSin(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarSin":
@@ -49,16 +55,15 @@ class ScalarSin(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg and sin(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -110,7 +115,7 @@ class ScalarSin(Expr[AnyExpr]):
         np.add(arg_lower, argv, out=arg_lower)
         arg_lower[full_domain] = -fmax
         np.copyto(arg_lower, argv, where=np.isinf(argv), casting="no")
-        arg_lower = _ensure_array(_minimum_zero_sign_sensitive(argv, arg_lower))
+        _minimum_zero_sign_sensitive(argv, arg_lower, out=arg_lower)
 
         arg_upper = _ensure_array(arg_upper_diff, copy=True)
         np.negative(arg_lower_diff, out=arg_upper, where=needs_flip)
@@ -118,7 +123,7 @@ class ScalarSin(Expr[AnyExpr]):
         arg_upper[full_domain] = fmax
         np.copyto(arg_upper, argv, where=np.isinf(argv), casting="no")
         arg_upper[(arg_upper == 0) & _is_negative_zero(expr_upper)] = -0.0
-        arg_upper = _ensure_array(_maximum_zero_sign_sensitive(argv, arg_upper))
+        _maximum_zero_sign_sensitive(argv, arg_upper, out=arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
@@ -142,11 +147,13 @@ class ScalarSin(Expr[AnyExpr]):
             expr_upper,
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -165,6 +172,11 @@ class ScalarCos(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarCos":
@@ -186,16 +198,15 @@ class ScalarCos(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg and cos(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -243,14 +254,14 @@ class ScalarCos(Expr[AnyExpr]):
         np.add(arg_lower, argv, out=arg_lower)
         arg_lower[full_domain] = -fmax
         np.copyto(arg_lower, argv, where=np.isinf(argv), casting="no")
-        arg_lower = _ensure_array(_minimum_zero_sign_sensitive(argv, arg_lower))
+        _minimum_zero_sign_sensitive(argv, arg_lower, out=arg_lower)
 
         arg_upper = _ensure_array(arg_upper_diff, copy=True)
         np.negative(arg_lower_diff, out=arg_upper, where=needs_flip)
         np.add(arg_upper, argv, out=arg_upper)
         arg_upper[full_domain] = fmax
         np.copyto(arg_upper, argv, where=np.isinf(argv), casting="no")
-        arg_upper = _ensure_array(_maximum_zero_sign_sensitive(argv, arg_upper))
+        _maximum_zero_sign_sensitive(argv, arg_upper, out=arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
@@ -274,11 +285,13 @@ class ScalarCos(Expr[AnyExpr]):
             expr_upper,
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -297,6 +310,11 @@ class ScalarTan(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarTan":
@@ -318,16 +336,15 @@ class ScalarTan(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg and tan(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -364,13 +381,13 @@ class ScalarTan(Expr[AnyExpr]):
         arg_lower = _ensure_array(np.add(argv, arg_lower_diff))
         arg_lower[full_domain] = -fmax
         np.copyto(arg_lower, argv, where=np.isinf(argv), casting="no")
-        arg_lower = _ensure_array(_minimum_zero_sign_sensitive(argv, arg_lower))
+        _minimum_zero_sign_sensitive(argv, arg_lower, out=arg_lower)
 
         arg_upper = _ensure_array(np.add(argv, arg_upper_diff))
         arg_upper[full_domain] = fmax
         np.copyto(arg_upper, argv, where=np.isinf(argv), casting="no")
         arg_upper[(arg_upper == 0) & _is_negative_zero(expr_upper)] = -0.0
-        arg_upper = _ensure_array(_maximum_zero_sign_sensitive(argv, arg_upper))
+        _maximum_zero_sign_sensitive(argv, arg_upper, out=arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
@@ -394,11 +411,13 @@ class ScalarTan(Expr[AnyExpr]):
             expr_upper,
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -417,6 +436,11 @@ class ScalarAsin(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarAsin":
@@ -438,16 +462,15 @@ class ScalarAsin(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg and asin(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -467,14 +490,14 @@ class ScalarAsin(Expr[AnyExpr]):
         )
         arg_lower[np.greater(argv, 1)] = one_eps
         arg_lower[np.less(argv, -1)] = -np.inf
-        arg_lower = _ensure_array(_minimum_zero_sign_sensitive(argv, arg_lower))
+        _minimum_zero_sign_sensitive(argv, arg_lower, out=arg_lower)
 
         arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
             np.sin(_minimum_zero_sign_sensitive(expr_upper, pi_2))
         )
         arg_upper[np.greater(argv, 1)] = np.inf
         arg_upper[np.less(argv, -1)] = -one_eps
-        arg_upper = _ensure_array(_maximum_zero_sign_sensitive(argv, arg_upper))
+        _maximum_zero_sign_sensitive(argv, arg_upper, out=arg_upper)
 
         # we need to force argv if expr_lower == expr_upper and abs(argv) < 1
         np.copyto(
@@ -508,11 +531,13 @@ class ScalarAsin(Expr[AnyExpr]):
             expr_upper,
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -531,6 +556,11 @@ class ScalarAcos(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarAcos":
@@ -552,16 +582,15 @@ class ScalarAcos(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg and acos(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -582,14 +611,14 @@ class ScalarAcos(Expr[AnyExpr]):
         )
         arg_lower[np.greater(argv, 1)] = one_eps
         arg_lower[np.less(argv, -1)] = -np.inf
-        arg_lower = _ensure_array(_minimum_zero_sign_sensitive(argv, arg_lower))
+        _minimum_zero_sign_sensitive(argv, arg_lower, out=arg_lower)
 
         arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
             np.cos(_maximum_zero_sign_sensitive(Xs.dtype.type(0), expr_lower))
         )
         arg_upper[np.greater(argv, 1)] = np.inf
         arg_upper[np.less(argv, -1)] = -one_eps
-        arg_upper = _ensure_array(_maximum_zero_sign_sensitive(argv, arg_upper))
+        _maximum_zero_sign_sensitive(argv, arg_upper, out=arg_upper)
 
         # we need to force argv if expr_lower == expr_upper and abs(argv) < 1
         np.copyto(
@@ -623,11 +652,13 @@ class ScalarAcos(Expr[AnyExpr]):
             expr_upper,
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override
@@ -646,6 +677,11 @@ class ScalarAtan(Expr[AnyExpr]):
     @override
     def args(self) -> tuple[AnyExpr]:
         return (self._a,)
+
+    @property
+    @override
+    def extra(self) -> tuple[()]:
+        return ()
 
     @override
     def with_args(self, a: AnyExpr) -> "ScalarAtan":
@@ -667,16 +703,15 @@ class ScalarAtan(Expr[AnyExpr]):
 
     @checked_data_bounds
     @override
-    def compute_data_bounds_unchecked(
+    def deferred_compute_data_bounds_unchecked(
         self,
         expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> tuple[
-        np_sndarray[Ps, Ns, np.dtype[F]],
-        np_sndarray[Ps, Ns, np.dtype[F]],
-    ]:
+        ctx: Context[Ps, Ns, F],
+        callback: Callback[Ps, Ns, F],
+    ) -> None:
         # evaluate arg and atan(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
@@ -699,14 +734,14 @@ class ScalarAtan(Expr[AnyExpr]):
         )
         arg_lower[expr_lower < -atan_max] = -np.inf
         arg_lower[expr_lower > atan_max] = np.inf
-        arg_lower = _ensure_array(_minimum_zero_sign_sensitive(argv, arg_lower))
+        _minimum_zero_sign_sensitive(argv, arg_lower, out=arg_lower)
 
         arg_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
             np.tan(expr_upper)
         )
         arg_upper[expr_upper < -atan_max] = -np.inf
         arg_upper[expr_upper > atan_max] = np.inf
-        arg_upper = _ensure_array(_maximum_zero_sign_sensitive(argv, arg_upper))
+        _maximum_zero_sign_sensitive(argv, arg_upper, out=arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
@@ -730,11 +765,13 @@ class ScalarAtan(Expr[AnyExpr]):
             expr_upper,
         )
 
-        return arg.compute_data_bounds(
+        return arg.deferred_compute_data_bounds(
             arg_lower,
             arg_upper,
             Xs,
             late_bound,
+            ctx,
+            callback,
         )
 
     @override

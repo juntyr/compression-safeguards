@@ -15,6 +15,10 @@ with atheris.instrument_imports():
     from xarray_safeguards import produce_data_array_correction
 
     from compression_safeguards.api import Safeguards
+    from compression_safeguards.safeguards._qois.expr import (
+        expr_data_indices,
+        expr_late_bound_constants,
+    )
     from compression_safeguards.safeguards._qois.expr.hashing import (
         HashingExpr,
         _patch_for_hashing_qoi_dev_only,
@@ -222,8 +226,11 @@ def check_one_input(data) -> None:
                 data_shape=safeguard._qoi_expr._stencil_shape,
                 late_bound_constants=frozenset([Parameter("foo")]),
             )
-            safeguard._qoi_expr._late_bound_constants = (
-                safeguard._qoi_expr._expr.late_bound_constants
+            safeguard._qoi_expr._data_indices = expr_data_indices(
+                safeguard._qoi_expr._expr
+            )
+            safeguard._qoi_expr._late_bound_constants = expr_late_bound_constants(
+                safeguard._qoi_expr._expr
             )
     except (ValueError, TypeError, SyntaxError, TimeoutError):
         return
