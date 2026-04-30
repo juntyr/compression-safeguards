@@ -177,12 +177,13 @@ class Expr(ABC, Generic[*Es]):
         This method should *not* be called manually.
 
         This method should *not* use the `ctx` but should simply forward it to
-        all calls to [`compute_data_bounds`][..compute_data_bounds] on
+        all calls to
+        [`deferred_compute_data_bounds`][..deferred_compute_data_bounds] on
         sub-expressions.
 
         This method is allowed to compute slightly wrongly-rounded results
         that are then corrected by
-        [`compute_data_bounds`][..compute_data_bounds].
+        [`deferred_compute_data_bounds`][..deferred_compute_data_bounds].
 
         If this method is known to have no rounding errors and always computes
         the correct data bounds, it can be decorated with
@@ -227,7 +228,7 @@ class Expr(ABC, Generic[*Es]):
         expression. The bounds are returned to the `callback` once ready.
 
         This method calls into
-        [`compute_data_bounds_unchecked`][..compute_data_bounds_unchecked]
+        [`deferred_compute_data_bounds_unchecked`][..deferred_compute_data_bounds_unchecked]
         and then applies extensive rounding checks to ensure that the computed
         bounds satisfy the bounds on this expression.
 

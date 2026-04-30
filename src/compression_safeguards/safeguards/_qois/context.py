@@ -330,7 +330,7 @@ class DataBoundsAccumulator(Generic[Ps, Ns, F]):
     ) -> None:
         """
         Callback that can be passed as the `callback` parameter in
-        [`Expr.compute_data_bounds`][...expr.abc.Expr.compute_data_bounds]
+        [`Expr.deferred_compute_data_bounds`][....expr.abc.Expr.deferred_compute_data_bounds]
         to accumulate the stencil-extended lower and upper bounds `Xs_lower`
         and `Xs_upper` for a specific `term` into the combined lower and
         upper bounds.
