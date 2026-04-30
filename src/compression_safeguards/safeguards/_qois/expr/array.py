@@ -7,8 +7,9 @@ from typing_extensions import override  # MSPV 3.12
 
 from ....utils.bindings import Parameter
 from ....utils.error import ctx
+from ..context import Callback, Context
 from ..typing import Es, F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Callback, Context, Expr
+from .abc import AnyExpr, Expr
 from .addsub import ScalarLeftAssociativeSum
 from .constfold import ScalarFoldedConstant
 from .data import Data

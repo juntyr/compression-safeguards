@@ -5,6 +5,7 @@ from sly import Parser
 
 from ...utils.bindings import Parameter
 from ...utils.error import ctx
+from .expr import expr_data_indices, expr_late_bound_constants
 from .expr.abc import AnyExpr
 from .expr.abs import ScalarAbs
 from .expr.addsub import ScalarAdd, ScalarLeftAssociativeSum, ScalarSubtract
@@ -820,7 +821,7 @@ class QoIParser(Parser):
         required_axis_before = 0
         required_axis_after = 0
 
-        for idx in sum_.data_indices:
+        for idx in expr_data_indices(sum_):
             required_axis_before = max(required_axis_before, self._I[axis] - idx[axis])
             required_axis_after = max(required_axis_after, idx[axis] - self._I[axis])
 
@@ -864,7 +865,7 @@ class QoIParser(Parser):
             "`finite_difference` grid_centre must be a constant scalar array element expression, not an array",
         )
         self.assert_or_error(
-            len(p.expr.late_bound_constants) > 0,
+            len(expr_late_bound_constants(p.expr)) > 0,
             p,
             "`finite_difference` grid_centre must reference a late-bound constant",
         )
@@ -878,7 +879,7 @@ class QoIParser(Parser):
             f"`finite_difference` grid_period must not reference the data `{'x' if self._X is None else 'X'}`",
         )
         self.assert_or_error(
-            len(p.expr.late_bound_constants) == 0,
+            len(expr_late_bound_constants(p.expr)) == 0,
             p,
             "finite_difference grid_period must not reference late-bound constants",
         )

@@ -12,7 +12,8 @@ from ..qois import (
     PointwiseQuantityOfInterestExpression,
     StencilQuantityOfInterestExpression,
 )
-from .expr.abc import AnyExpr, Expr, compute_expr_data_bounds
+from .expr import compute_expr_data_bounds, expr_data_indices, expr_late_bound_constants
+from .expr.abc import AnyExpr, Expr
 from .expr.array import Array
 from .expr.constfold import ScalarFoldedConstant
 from .expr.data import Data
@@ -66,7 +67,7 @@ class PointwiseQuantityOfInterest:
                 | ctx
             )
 
-        late_bound_constants = expr.late_bound_constants
+        late_bound_constants = expr_late_bound_constants(expr)
 
         canary_pointwise: np.ndarray[tuple[int], np.dtype[np.float64]] = _zeros(
             (0,), np.dtype(np.float64)
@@ -212,11 +213,13 @@ class StencilQuantityOfInterest:
         "_expr",
         "_stencil_shape",
         "_stencil_I",
+        "_data_indices",
         "_late_bound_constants",
     )
     _expr: AnyExpr
     _stencil_shape: tuple[int, ...]
     _stencil_I: tuple[int, ...]
+    _data_indices: frozenset[tuple[int, ...]]
     _late_bound_constants: frozenset[Parameter]
 
     def __init__(
@@ -258,7 +261,7 @@ class StencilQuantityOfInterest:
                 | ctx
             )
 
-        late_bound_constants = expr.late_bound_constants
+        late_bound_constants = expr_late_bound_constants(expr)
 
         canary_pointwise: np.ndarray[tuple[int], np.dtype[np.float64]] = _zeros(
             (0,), np.dtype(np.float64)
@@ -283,6 +286,7 @@ class StencilQuantityOfInterest:
                 )
 
         self._expr = expr
+        self._data_indices = expr_data_indices(expr)
         self._late_bound_constants = late_bound_constants
 
     @property
@@ -299,7 +303,7 @@ class StencilQuantityOfInterest:
         The set of data stencil indices `X[is]` that this QoI uses.
         """
 
-        return self._expr.data_indices
+        return self._data_indices
 
     @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
     def eval(

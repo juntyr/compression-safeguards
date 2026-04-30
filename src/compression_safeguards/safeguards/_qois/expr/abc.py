@@ -1,22 +1,12 @@
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Mapping
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Generic,
-    Protocol,
-    Self,
-    TypeAlias,
-    assert_never,
-    final,
-)
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, Generic, Self, TypeAlias, assert_never, final
 from warnings import warn
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
-    _ensure_array,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
     _zeros,
@@ -24,18 +14,11 @@ from ....utils._compat import (
 from ....utils.bindings import Parameter
 from ....utils.error import QuantityOfInterestRuntimeWarning
 from ..bound import DataBounds, data_bounds_checks, guarantee_data_within_expr_bounds
-from ..typing import Es, F, Fc, Ns, Ps, Psc, np_sndarray
+from ..context import Callback, Context
+from ..typing import Es, F, Ns, Ps, np_sndarray
 
 if TYPE_CHECKING:
     from .literal import Number
-
-
-class Callback(Protocol, Generic[Psc, Ns, Fc]):
-    def __call__(
-        self,
-        Xs_lower: np_sndarray[Psc, Ns, np.dtype[Fc]],
-        Xs_upper: np_sndarray[Psc, Ns, np.dtype[Fc]],
-    ) -> None: ...
 
 
 class Expr(ABC, Generic[*Es]):
@@ -56,12 +39,15 @@ class Expr(ABC, Generic[*Es]):
     @property
     @abstractmethod
     def extra(self) -> tuple[Any, ...]:
-        pass
+        """
+        The extra parameters of this expression.
+        """
 
     @abstractmethod
     def with_args(self, *args: *Es) -> "Self | Number":
         """
-        Reconstruct this expression with different sub-expression arguments.
+        Reconstruct this expression with different sub-expression arguments
+        but with the same extra parameters.
 
         Parameters
         ----------
@@ -74,91 +60,6 @@ class Expr(ABC, Generic[*Es]):
         expr : Self
             The modified expression.
         """
-
-    @final
-    def visit_expr(self, v: Callable[["AnyExpr"], None]) -> None:
-        args: tuple[AnyExpr, ...] = self.args  # type: ignore
-        for a in args:
-            a.visit_expr(v)
-        this: AnyExpr = self  # type: ignore
-        return v(this)
-
-    @final
-    def map_expr(self, m: "Callable[[AnyExpr], AnyExpr]") -> "AnyExpr":
-        """
-        Recursively maps the expression mapping function `m` over this
-        expression and its sub-expression arguments.
-
-        Parameters
-        ----------
-        m : Callable[[AnyExpr], AnyExpr]
-            The expression mapper, which is applied to an expression whose
-            sub-expression arguments have already been mapped, i.e. the mapper
-            is *not* responsible for recursion.
-
-        Returns
-        -------
-        expr : AnyExpr
-            The mapped expression.
-        """
-
-        args: tuple[AnyExpr, ...] = self.args  # type: ignore
-        mapped_args: tuple[AnyExpr, ...] = tuple(a.map_expr(m) for a in args)
-        mapped_self: AnyExpr = self.with_args(*mapped_args)  # type: ignore
-        return m(mapped_self)
-
-    @final
-    def deduplicate_expr(
-        self,
-        cache: dict[
-            tuple[type["AnyExpr"], tuple["AnyExpr", ...], tuple[Any, ...]], "AnyExpr"
-        ],
-    ) -> "AnyExpr":
-        ty: type[AnyExpr] = type(self)  # type: ignore
-
-        args: tuple[AnyExpr, ...] = self.args  # type: ignore
-        deduplicated_args: tuple[AnyExpr, ...] = tuple(
-            a.deduplicate_expr(cache) for a in args
-        )
-
-        key = (ty, deduplicated_args, self.extra)
-
-        cached = cache.get(key, None)
-
-        if cached is not None:
-            return cached
-
-        deduplicated_self: AnyExpr = self.with_args(*deduplicated_args)  # type: ignore
-
-        cache[key] = deduplicated_self
-
-        return deduplicated_self
-
-    @final
-    @property
-    def expr_size(self) -> int:
-        """
-        The size of the expression tree, counting the number of nodes.
-        """
-
-        args: tuple[AnyExpr, ...] = self.args  # type: ignore
-
-        return sum(a.expr_size for a in args) + 1
-
-    @final
-    @property
-    def data_expr_size(self) -> int:
-        """
-        The size of the expression tree, counting the number of data-dependent
-        nodes.
-        """
-
-        args: tuple[AnyExpr, ...] = self.args  # type: ignore
-
-        if len(args) == 0:
-            return int(self.has_data)
-
-        return sum(a.expr_size for a in args if a.has_data) + 1
 
     @final
     @property
@@ -212,26 +113,6 @@ class Expr(ABC, Generic[*Es]):
                 return has_data
 
     @final
-    @property
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        """
-        The set of data indices `X[is]` that this expression uses.
-        """
-
-        args: tuple[AnyExpr, ...] = self.args  # type: ignore
-
-        match args:
-            case ():
-                return frozenset()
-            case (a,):
-                return a.data_indices
-            case _:
-                indices: set[tuple[int, ...]] = set()
-                for a in args:
-                    indices.update(a.data_indices)
-                return frozenset(indices)
-
-    @final
     def apply_array_element_offset(
         self,
         axis: int,
@@ -258,26 +139,6 @@ class Expr(ABC, Generic[*Es]):
         return self.with_args(
             *(a.apply_array_element_offset(axis, offset) for a in self.args)  # type: ignore
         )
-
-    @final
-    @property
-    def late_bound_constants(self) -> frozenset[Parameter]:
-        """
-        The set of late-bound constant parameters that this expression uses.
-        """
-
-        args: tuple[AnyExpr, ...] = self.args  # type: ignore
-
-        match args:
-            case ():
-                return frozenset()
-            case (a,):
-                return a.late_bound_constants
-            case _:
-                late_bound: set[Parameter] = set()
-                for a in args:
-                    late_bound.update(a.late_bound_constants)
-                return frozenset(late_bound)
 
     # FIXME: constant_fold based on self.args and self.with_args is blocked on
     #        not being able to relate on TypeVarTuple to another, here *Expr to
@@ -330,7 +191,7 @@ class Expr(ABC, Generic[*Es]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: "Context",
+        ctx: Context,
         callback: Callback[Ps, Ns, F],
     ) -> None:
         pass
@@ -342,7 +203,7 @@ class Expr(ABC, Generic[*Es]):
         expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: "Context",
+        ctx: Context,
         callback: Callback[Ps, Ns, F],
     ) -> None:
         ready = ctx.push_expr_bounds(
@@ -446,237 +307,3 @@ AnyExpr: TypeAlias = Expr[*tuple["AnyExpr", ...]]
 
 EmptyExpr: TypeAlias = Expr[()]
 """ Expression with zero arguments """
-
-
-def compute_expr_data_bounds(
-    expr: AnyExpr,
-    expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
-    expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
-    Xs: np_sndarray[Ps, Ns, np.dtype[F]],
-    late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-) -> tuple[np_sndarray[Ps, Ns, np.dtype[F]], np_sndarray[Ps, Ns, np.dtype[F]]]:
-    expr = expr.deduplicate_expr({})
-
-    Xs_lower_out: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
-    Xs_upper_out: list[None | np_sndarray[Ps, Ns, np.dtype[F]]] = [None]
-
-    def callback(
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
-    ) -> None:
-        Xs_lower_out[0] = Xs_lower
-        Xs_upper_out[0] = Xs_upper
-
-    expr.deferred_compute_data_bounds(
-        expr_lower, expr_upper, Xs, late_bound, Context(expr), callback
-    )
-
-    assert Xs_lower_out[0] is not None
-    assert Xs_upper_out[0] is not None
-
-    return Xs_lower_out[0], Xs_upper_out[0]
-
-
-class Context(Generic[Ps, Ns, F]):
-    __slots__: tuple[str, ...] = ("_context",)
-    _context: dict[AnyExpr, "ExprContext[Ps, Ns, F]"]
-
-    def __init__(self, expr: AnyExpr) -> None:
-        self._context = dict()
-
-        def visit_dependencies_once(e: AnyExpr) -> None:
-            if e in self._context:
-                return
-
-            self._context[e] = ExprContext(0)
-
-            for a in e.args:
-                visit_dependencies_once(a)
-                self._context[a]._dependents += 1
-
-        visit_dependencies_once(expr)
-        self._context[expr]._dependents += 1
-
-    def push_expr_bounds(
-        self,
-        expr: "AnyExpr",
-        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
-        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
-        callback: Callback[Ps, Ns, F],
-    ) -> "None | ReadyExprContext[Ps, Ns, F]":
-        from .data import Data, ScalarAnyDataConstant  # noqa: PLC0415
-
-        if isinstance(expr, Data | ScalarAnyDataConstant):
-            return ReadyExprContext(
-                expr_lower=expr_lower, expr_upper=expr_upper, callbacks=(callback,)
-            )
-
-        ctx = self._context[expr]
-
-        # short circuit in case there is only one dependent
-        if ctx._dependents == 1 and len(ctx._callbacks) == 0:
-            self._context.pop(expr)
-            return ReadyExprContext(
-                expr_lower=expr_lower, expr_upper=expr_upper, callbacks=(callback,)
-            )
-
-        if ctx._expr_bounds is None:
-            ctx._expr_bounds = (
-                _ensure_array(expr_lower, copy=True),
-                _ensure_array(expr_upper, copy=True),
-            )
-        else:
-            _maximum_zero_sign_sensitive(
-                ctx._expr_bounds[0], expr_lower, out=ctx._expr_bounds[0]
-            )
-            _minimum_zero_sign_sensitive(
-                ctx._expr_bounds[1], expr_upper, out=ctx._expr_bounds[1]
-            )
-        ctx._callbacks.append(callback)
-        assert len(ctx._callbacks) <= ctx._dependents
-
-        if len(ctx._callbacks) < ctx._dependents:
-            return None
-        self._context.pop(expr)
-
-        return ReadyExprContext(
-            expr_lower=ctx._expr_bounds[0],
-            expr_upper=ctx._expr_bounds[1],
-            callbacks=tuple(ctx._callbacks),
-        )
-
-
-class ExprContext(Generic[Ps, Ns, F]):
-    __slots__: tuple[str, ...] = ("_dependents", "_callbacks", "_expr_bounds")
-    _dependents: int
-    _callbacks: list[Callback[Ps, Ns, F]]
-    _expr_bounds: (
-        None
-        | tuple[np.ndarray[tuple[Ps], np.dtype[F]], np.ndarray[tuple[Ps], np.dtype[F]]]
-    )
-
-    def __init__(self, dependents: int) -> None:
-        self._dependents = dependents
-        self._callbacks = []
-        self._expr_bounds = None
-
-
-class ReadyExprContext(Generic[Ps, Ns, F]):
-    __slots__: tuple[str, ...] = ("_expr_lower", "_expr_upper", "_callbacks")
-    _expr_lower: np.ndarray[tuple[Ps], np.dtype[F]]
-    _expr_upper: np.ndarray[tuple[Ps], np.dtype[F]]
-    _callbacks: tuple[Callback[Ps, Ns, F], ...]
-
-    def __init__(
-        self,
-        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
-        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
-        callbacks: tuple[Callback[Ps, Ns, F], ...],
-    ) -> None:
-        self._expr_lower = expr_lower
-        self._expr_upper = expr_upper
-        self._callbacks = callbacks
-
-    @property
-    def expr_lower(self) -> np.ndarray[tuple[Ps], np.dtype[F]]:
-        return self._expr_lower
-
-    @property
-    def expr_upper(self) -> np.ndarray[tuple[Ps], np.dtype[F]]:
-        return self._expr_upper
-
-    def apply_callbacks(
-        self,
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
-    ) -> None:
-        # short circuit in case there is only one callback
-        match self._callbacks:
-            case (callback,):
-                return callback(Xs_lower, Xs_upper)
-
-        for callback in self._callbacks:
-            callback(
-                _ensure_array(Xs_lower, copy=True),
-                _ensure_array(Xs_upper, copy=True),
-            )
-
-
-class AccumulateXsBoundsCallback(Generic[Ps, Ns, F]):
-    __slots__: tuple[str, ...] = (
-        "_Xs",
-        "_Xs_lower_out",
-        "_Xs_upper_out",
-        "_can_override_out",
-        "_terms_completed",
-        "_callback",
-    )
-    _Xs: np_sndarray[Ps, Ns, np.dtype[F]]
-    _Xs_lower_out: np_sndarray[Ps, Ns, np.dtype[F]]
-    _Xs_upper_out: np_sndarray[Ps, Ns, np.dtype[F]]
-    _can_override_out: bool
-    _terms_completed: list[bool]
-    _callback: None | Callback
-
-    def __init__(
-        self, *, Xs: np_sndarray[Ps, Ns, np.dtype[F]], terms: int, callback: Callback
-    ) -> None:
-        self._Xs = Xs
-
-        self._Xs_lower_out = np.full(Xs.shape, Xs.dtype.type(-np.inf))
-        self._Xs_upper_out = np.full(Xs.shape, Xs.dtype.type(np.inf))
-
-        self._can_override_out = True
-        self._terms_completed = [False for _ in range(terms)]
-
-        self._callback = callback
-
-        self.check_for_completion()
-
-    def on_complete_term(
-        self,
-        Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
-        Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
-        *,
-        term: int,
-        where: None | np_sndarray[Ps, Ns, np.dtype[np.bool]] = None,
-    ) -> None:
-        # combine the inner data bounds
-        if self._can_override_out:
-            np.copyto(self._Xs_lower_out, Xs_lower)
-            np.copyto(self._Xs_upper_out, Xs_upper)
-        else:
-            _maximum_zero_sign_sensitive(
-                self._Xs_lower_out, Xs_lower, out=self._Xs_lower_out, where=where
-            )
-            _minimum_zero_sign_sensitive(
-                self._Xs_upper_out, Xs_upper, out=self._Xs_upper_out, where=where
-            )
-        self._can_override_out = False
-
-        self.complete_term(term)
-
-    def complete_term(self, term: int) -> None:
-        self._terms_completed[term] = True
-
-        self.check_for_completion()
-
-    def check_for_completion(self) -> None:
-        if self._callback is None:
-            return
-
-        if not all(self._terms_completed):
-            return
-
-        callback = self._callback
-        self._callback = None
-
-        # ensure that the bounds on Xs include Xs
-        _minimum_zero_sign_sensitive(
-            self._Xs_lower_out, self._Xs, out=self._Xs_lower_out
-        )
-        _maximum_zero_sign_sensitive(
-            self._Xs_upper_out, self._Xs, out=self._Xs_upper_out
-        )
-
-        return callback(self._Xs_lower_out, self._Xs_upper_out)

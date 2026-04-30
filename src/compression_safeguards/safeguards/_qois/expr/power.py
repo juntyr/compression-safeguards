@@ -22,8 +22,9 @@ from ..bound import (
     guarantee_arg_within_expr_bounds,
     guarantee_stacked_arg_within_expr_bounds,
 )
+from ..context import AccumulateXsBoundsCallback, Callback, Context
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AccumulateXsBoundsCallback, AnyExpr, Callback, Context, Expr
+from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
 from .literal import Number
 

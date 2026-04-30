@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from compression_safeguards.safeguards._qois.expr.abc import compute_expr_data_bounds
+from compression_safeguards.safeguards._qois.expr import compute_expr_data_bounds
 from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
 from compression_safeguards.safeguards._qois.expr.addsub import (
     ScalarAdd,

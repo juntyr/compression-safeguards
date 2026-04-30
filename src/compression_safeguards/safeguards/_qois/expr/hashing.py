@@ -14,8 +14,9 @@ from ....utils.error import ctx
 from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import S, T
 from ..bound import DataBounds, data_bounds
+from ..context import Callback, Context
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Callback, Context, EmptyExpr
+from .abc import AnyExpr, EmptyExpr
 
 
 class HashingExpr(EmptyExpr):
@@ -68,8 +69,7 @@ class HashingExpr(EmptyExpr):
     ) -> np.ndarray[tuple[Ps], np.dtype[np.bool]]:
         return _ones(Xs.shape[:1], dtype=np.dtype(np.bool))
 
-    @property  # type: ignore
-    @override
+    @property
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return self._data_indices
 
@@ -89,8 +89,7 @@ class HashingExpr(EmptyExpr):
             late_bound_constants=self._late_bound_constants,
         )
 
-    @property  # type: ignore
-    @override
+    @property
     def late_bound_constants(self) -> frozenset[Parameter]:
         return self._late_bound_constants
 

@@ -16,15 +16,9 @@ from ....utils._compat import (
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_stacked_arg_within_expr_bounds
+from ..context import AccumulateXsBoundsCallback, Callback, Context, ExprContext
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import (
-    AccumulateXsBoundsCallback,
-    AnyExpr,
-    Callback,
-    Context,
-    Expr,
-    ExprContext,
-)
+from .abc import AnyExpr, Expr
 from .abs import ScalarAbs
 from .constfold import ScalarFoldedConstant
 from .literal import Number

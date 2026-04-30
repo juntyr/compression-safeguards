@@ -5,8 +5,9 @@ from typing_extensions import override  # MSPV 3.12
 
 from ....utils.bindings import Parameter
 from ..bound import DataBounds, data_bounds
+from ..context import Callback, Context
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Callback, Context, Expr
+from .abc import AnyExpr, Expr
 from .literal import Number
 
 

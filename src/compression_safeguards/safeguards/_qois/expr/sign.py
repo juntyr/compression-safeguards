@@ -6,8 +6,9 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import _is_positive_zero
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
+from ..context import Callback, Context
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Callback, Context, Expr
+from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
 
 

@@ -7,8 +7,9 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import _broadcast_to, _ensure_array, _where
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
+from ..context import AccumulateXsBoundsCallback, Callback, Context
 from ..typing import F, Fi, Ns, Ps, np_sndarray
-from .abc import AccumulateXsBoundsCallback, AnyExpr, Callback, Context, Expr
+from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
 
 

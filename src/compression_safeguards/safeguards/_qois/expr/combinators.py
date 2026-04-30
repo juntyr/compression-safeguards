@@ -8,8 +8,9 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import _ensure_array, _stack
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
+from ..context import AccumulateXsBoundsCallback, Callback, Context
 from ..typing import F, Fi, Ns, Ps, np_sndarray
-from .abc import AccumulateXsBoundsCallback, AnyExpr, Callback, Context, Expr
+from .abc import AnyExpr, Expr
 from .constfold import ScalarFoldedConstant
 
 
@@ -256,8 +257,8 @@ class ScalarAll(Expr[AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
                 np.less(expr_upper, 1) & (tv == 0) & (~any_constant_zero | t_const_zero)
             ] = +0.0
 
-            # TODO: an interval union could represent the two disjoint ntervals
-            #       in the future
+            # TODO: an interval union could represent the two disjoint
+            #       intervals in the future
 
             # recurse into the terms
             term.deferred_compute_data_bounds(

@@ -8,8 +8,9 @@ from ....utils._compat import _broadcast_to, _ensure_array, _is_of_shape, _ones
 from ....utils.bindings import Parameter
 from ....utils.error import QuantityOfInterestRuntimeWarning
 from ..bound import DataBounds, data_bounds
+from ..context import Callback, Context
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Callback, Context, EmptyExpr
+from .abc import AnyExpr, EmptyExpr
 
 
 class Data(EmptyExpr):
@@ -59,8 +60,7 @@ class Data(EmptyExpr):
         np.logical_not(data_is_not_nan, out=data_is_not_nan)
         return data_is_not_nan
 
-    @property  # type: ignore
-    @override
+    @property
     def data_indices(self) -> frozenset[tuple[int, ...]]:
         return frozenset([self._index])
 
@@ -181,8 +181,7 @@ class LateBoundConstant(EmptyExpr):
         index[axis] += offset
         return LateBoundConstant(self._name, index=tuple(index))
 
-    @property  # type: ignore
-    @override
+    @property
     def late_bound_constants(self) -> frozenset[Parameter]:
         return frozenset([self.name])
 
@@ -256,11 +255,6 @@ class ScalarAnyDataConstant(EmptyExpr):
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[np.bool]]:
         return _ones(Xs.shape[:1], dtype=np.dtype(np.bool))
-
-    @property  # type: ignore
-    @override
-    def data_indices(self) -> frozenset[tuple[int, ...]]:
-        return frozenset()
 
     @override
     def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:

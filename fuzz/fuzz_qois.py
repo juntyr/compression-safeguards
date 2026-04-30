@@ -8,10 +8,8 @@ with atheris.instrument_imports():
 
     import numpy as np
 
-    from compression_safeguards.safeguards._qois.expr.abc import (
-        AnyExpr,
-        compute_expr_data_bounds,
-    )
+    from compression_safeguards.safeguards._qois.expr import compute_expr_data_bounds
+    from compression_safeguards.safeguards._qois.expr.abc import AnyExpr
     from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
     from compression_safeguards.safeguards._qois.expr.addsub import (
         ScalarAdd,

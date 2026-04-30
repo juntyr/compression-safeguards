@@ -6,8 +6,9 @@ from typing_extensions import override  # MSPV 3.12
 
 from ....utils.bindings import Parameter
 from ..bound import DataBounds, data_bounds
+from ..context import Callback, Context
 from ..typing import F, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Callback, Context, Expr
+from .abc import AnyExpr, Expr
 from .literal import Number
 
 
@@ -85,16 +86,6 @@ class ReportingExpr(Expr[AnyExpr]):
     @override
     def with_args(self, expr: AnyExpr) -> "ReportingExpr | Number":
         return ReportingExpr(expr, self._reporter)
-
-    @property  # type: ignore[misc]
-    @override
-    def expr_size(self) -> int:
-        return self._expr.expr_size
-
-    @property  # type: ignore[misc]
-    @override
-    def data_expr_size(self) -> int:
-        return self._expr.data_expr_size
 
     @property  # type: ignore[misc]
     @override
