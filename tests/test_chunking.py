@@ -3,6 +3,7 @@ from itertools import product
 import numpy as np
 import pytest
 import xarray as xr
+from numcodecs_combinators.stack import CodecStack
 from xarray_safeguards import apply_data_array_correction, produce_data_array_correction
 
 from compression_safeguards.api import Safeguards
@@ -839,3 +840,53 @@ def test_fuzzer_found_nan_magic():
             late_bound=late_bound,
         )
         np.testing.assert_array_equal(chunked_hash.values, global_hash)
+
+
+def test_chunked_coercion_to_ndarray_for_safeguards():
+    da = xr.DataArray(np.ones((2, 100, 100)), dims=["a", "b", "c"], name="da")
+    da_chunked = da.chunk(b=7, c=7)
+
+    da_prediction = CodecStack(dict(id="zero")).encode_decode_data_array(da_chunked)
+
+    produce_data_array_correction(
+        data=da_chunked,
+        prediction=da_prediction,
+        safeguards=[
+            dict(
+                kind="qoi_eb_pw",
+                qoi='x + c["$d_c"]',
+                type="rel",
+                eb=0.01,
+            )
+        ],
+    ).compute()
+
+    produce_data_array_correction(
+        data=da_chunked,
+        prediction=da_prediction,
+        safeguards=[
+            dict(
+                kind="qoi_eb_stencil",
+                qoi='x + c["$d_c"]',
+                neighbourhood=[dict(axis=-1, before=1, after=1, boundary="wrap")],
+                type="rel",
+                eb=0.01,
+            )
+        ],
+        check_chunks_first=True,
+    ).compute()
+
+    produce_data_array_correction(
+        data=da_chunked,
+        prediction=da_prediction,
+        safeguards=[
+            dict(
+                kind="qoi_eb_stencil",
+                qoi='x + c["$d_c"]',
+                neighbourhood=[dict(axis=-1, before=1, after=1, boundary="wrap")],
+                type="rel",
+                eb=0.01,
+            )
+        ],
+        check_chunks_first=False,
+    ).compute()
