@@ -842,7 +842,7 @@ def test_fuzzer_found_nan_magic():
         np.testing.assert_array_equal(chunked_hash.values, global_hash)
 
 
-def test_chunked_coersion_to_ndarray_for_safeguards():
+def test_chunked_coercion_to_ndarray_for_safeguards():
     da = xr.DataArray(np.ones((2, 100, 100)), dims=["a", "b", "c"], name="da")
     da_chunked = da.chunk(b=7, c=7)
 
