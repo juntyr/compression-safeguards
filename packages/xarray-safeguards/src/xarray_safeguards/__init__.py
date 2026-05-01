@@ -106,6 +106,7 @@ from compression_safeguards.safeguards.stencil import (
     BoundaryCondition,
     NeighbourhoodAxis,
 )
+from compression_safeguards.utils._compat import _ensure_array
 from compression_safeguards.utils.bindings import Parameter, Value
 from compression_safeguards.utils.error import (
     LateBoundParameterResolutionError,
@@ -425,6 +426,11 @@ def produce_data_array_correction(
                 "late-bound chunks and names mismatch"
             )
 
+            # ensure that we pass np.ndarray's to the compression-safeguards
+            data_chunk = _ensure_array(data_chunk)
+            prediction_chunk = _ensure_array(prediction_chunk)
+            late_bound_chunks = tuple(_ensure_array(lb) for lb in late_bound_chunks)
+
             late_bound_chunk: dict[str, Value] = dict(
                 **late_bound_global,
                 **{p: v for p, v in zip(late_bound_names, late_bound_chunks)},
@@ -503,6 +509,12 @@ def produce_data_array_correction(
             "late-bound chunks and names mismatch"
         )
         assert len(depth_) == data_chunk.ndim, "overlap depth length mismatch"
+
+        # ensure that we pass np.ndarray's to the compression-safeguards
+        data_chunk = _ensure_array(data_chunk)
+        prediction_chunk = _ensure_array(prediction_chunk)
+        data_indices_chunk = _ensure_array(data_indices_chunk)
+        late_bound_chunks = tuple(_ensure_array(lb) for lb in late_bound_chunks)
 
         late_bound_chunk: dict[str, Value] = dict(
             **late_bound_global,
@@ -644,6 +656,12 @@ def produce_data_array_correction(
             "late-bound chunks and names mismatch"
         )
         assert len(depth_) == data_chunk.ndim, "overlap depth length mismatch"
+
+        # ensure that we pass np.ndarray's to the compression-safeguards
+        data_chunk = _ensure_array(data_chunk)
+        prediction_chunk = _ensure_array(prediction_chunk)
+        data_indices_chunk = _ensure_array(data_indices_chunk)
+        late_bound_chunks = tuple(_ensure_array(lb) for lb in late_bound_chunks)
 
         late_bound_chunk: dict[str, Value] = dict(
             **late_bound_global,
