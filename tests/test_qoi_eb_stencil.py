@@ -1572,3 +1572,23 @@ def test_fuzzer_found_where_invalid_cast():
             )
         ),
     )
+
+
+def test_iterative_corrections_with_footprint_without_self():
+    data = np.array([0, 0, 0, 0])
+    decoded = np.array([1, 2, 0, 0])
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(
+                kind="qoi_eb_stencil",
+                qoi="X[I[0]+1]-X[I[0]-1]",
+                neighbourhood=[dict(axis=0, before=1, after=1, boundary="valid")],
+                type="abs",
+                eb=0,
+            )
+        ],
+        compute=dict(unstable_iterative=True),
+    )
