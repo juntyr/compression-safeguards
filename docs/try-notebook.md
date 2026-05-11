@@ -36,12 +36,7 @@ edit_uri: docs/try-notebook.md
     document.getElementById("try-notebook-name").innerText = name;
     document.getElementById("try-notebook-name").href = backlink;
 
-    document.getElementById("try-notebook-jupyterlite").src = "https://lab.climet.eu/main/notebooks/index.html?kernel=python&fromURL=" + rawUrl.href + "&pyodideKernelEnv=" + encodeURIComponent(JSON.stringify({
-      "EARTHKIT_DATA_CACHE_POLICY": "off",
-      "EARTHKIT_GEO_CACHE_POLICY": "off",
-      "EARTHKIT_GEO_REGRID_PRECOMPUTED_WEIGHTS_MEMORY_CACHE_POLICY": "off",
-      "EARTHKIT_REGRID_CACHE_POLICY": "off",
-      "EARTHKIT_REGRID_WEIGHTS_MEMORY_CACHE_POLICY": "off",
+    document.getElementById("try-notebook-jupyterlite").src = "https://lab.climet.eu/main/notebooks/index.html?kernel=python&fromURL=" + rawUrl.href + "&pyodideKernelEnv=" + encodeURIComponent(JSON.stringify({"$override": {
       "CLIMET_LAB_BOOTSTRAP_CODE": `\
 import shutil
 from pathlib import Path
@@ -72,6 +67,6 @@ for folder, files in {
 for folder in ["observations", "plots", "tables"]:
     Path(folder).mkdir(parents=True, exist_ok=True)
 `,
-    }));
+    }}));
   });
 </script>
