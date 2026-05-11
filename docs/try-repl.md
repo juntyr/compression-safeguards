@@ -13,7 +13,7 @@ edit_uri: docs/try-repl.md
 
 <script>
   window.addEventListener("load", () => {
-    document.getElementById("try-repl-jupyterlite").src = "https://lab.climet.eu/main/repl/index.html?kernel=python&toolbar=1&code=" + encodeURIComponent(`\
+    document.getElementById("try-repl-jupyterlite").src = "https://lab.climet.eu/v0.4.0/repl/index.html?kernel=python&toolbar=1&code=" + encodeURIComponent(`\
 import numpy as np
 from matplotlib import pyplot as plt
 from numcodecs import Quantize
