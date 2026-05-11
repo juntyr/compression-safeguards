@@ -159,6 +159,12 @@ def _refine_correction_iteratively(
 
     # refine while not all checks succeed
     while not np.all(check_pointwise):
+        # find the points that failed the check and have not yet been corrected
+        # first try to fix these failures with pointwise corrections
+        try_pointwise_correction = (~check_pointwise) & (
+            correction_iterative != correction_full
+        )
+
         # find points that failed the check but have already been corrected
         # for these sticky failures, expand to the failure inverse footprint,
         #  to correct all data points that may have contributed to the failure
@@ -179,7 +185,7 @@ def _refine_correction_iteratively(
 
         # determine the data points that need a correction
         needs_correction = sticky_needs_correction_inverse_footprint
-        needs_correction |= ~check_pointwise
+        needs_correction |= try_pointwise_correction
 
         # determine the data points that get a new correction
         correction_changed = correction_iterative != correction_full
@@ -198,6 +204,13 @@ def _refine_correction_iteratively(
                 late_bound=late_bound_resolved,
                 where=True,  # complete footprint
             )
+
+        # the footprint may sometimes not include itself,
+        #  e.g. for X[i+1] - X[i-1],
+        # so in these cases we make no progress with pointwise corrections and
+        #  have to wait for the sticky corrections to kick in
+        # and we definitely need to recheck these failures
+        where |= try_pointwise_correction
 
         # sanity check: we recheck at least where the check previously failed
         assert not np.any(~check_pointwise & ~where)
