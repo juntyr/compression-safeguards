@@ -38,7 +38,13 @@ from typing import Literal, TypeGuard, TypeVar, overload
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
-from ._float128 import _float128_dtype, _float128_e, _float128_pi, _float128_type
+from ._float128 import (
+    _float128,
+    _float128_dtype,
+    _float128_e,
+    _float128_pi,
+    _float128_type,
+)
 from .typing import TB, F, Fi, S, Si, T, Ti
 
 N = TypeVar("N", bound=int, covariant=True)
@@ -79,6 +85,9 @@ def _floor_modulo(p: Fi, q: Fi) -> Fi: ...
 def _floor_modulo(p, q):
     out = _ensure_array(np.mod(p, q))
     np.copysign(out, q, out=out)
+    # FIXME: https://github.com/numpy/numpy-quaddtype/issues/91
+    if out.dtype == _float128_dtype:
+        np.copysign(_float128(0), q, out=out, where=((p == 0) & np.isinf(q)))
     return out
 
 

@@ -1,4 +1,4 @@
-from itertools import product
+from itertools import chain, product, tee
 
 import numpy as np
 import pytest
@@ -10,12 +10,24 @@ from compression_safeguards.utils._compat import (
     _round_ties_even_modulo,
     _trunc_modulo,
 )
+from compression_safeguards.utils._float128 import _float128
 
 VALS = [-np.nan, -np.inf, -1.0, -0.5, -0.0, +0.0, +0.5, +1.0, +np.inf, +np.nan]
 
 
+def check_for_all_dtypes(it):
+    f16s, f32s, f64s, f128s = tee(it, 4)
+
+    return chain(
+        (np.float16(f) for f in f16s),
+        (np.float32(f) for f in f32s),
+        (np.float64(f) for f in f64s),
+        (_float128(f) for f in f128s),
+    )
+
+
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-@pytest.mark.parametrize("p,q", product(VALS, VALS))
+@pytest.mark.parametrize("p,q", check_for_all_dtypes(product(VALS, VALS)))
 def test_floor_modulo(p, q):
     r = _floor_modulo(p, q)
 
@@ -57,7 +69,7 @@ def test_floor_modulo(p, q):
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-@pytest.mark.parametrize("p,q", product(VALS, VALS))
+@pytest.mark.parametrize("p,q", check_for_all_dtypes(product(VALS, VALS)))
 def test_ceil_modulo(p, q):
     r = _ceil_modulo(p, q)
 
@@ -99,7 +111,7 @@ def test_ceil_modulo(p, q):
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-@pytest.mark.parametrize("p,q", product(VALS, VALS))
+@pytest.mark.parametrize("p,q", check_for_all_dtypes(product(VALS, VALS)))
 def test_trunc_modulo(p, q):
     r = _trunc_modulo(p, q)
 
@@ -138,7 +150,7 @@ def test_trunc_modulo(p, q):
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-@pytest.mark.parametrize("p,q", product(VALS, VALS))
+@pytest.mark.parametrize("p,q", check_for_all_dtypes(product(VALS, VALS)))
 def test_round_ties_even_modulo(p, q):
     r = _round_ties_even_modulo(p, q)
 
@@ -168,7 +180,7 @@ def test_round_ties_even_modulo(p, q):
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-@pytest.mark.parametrize("p,q", product(VALS, VALS))
+@pytest.mark.parametrize("p,q", check_for_all_dtypes(product(VALS, VALS)))
 def test_euclidean_modulo(p, q):
     r = _euclidean_modulo(p, q)
 
