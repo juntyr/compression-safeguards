@@ -168,7 +168,9 @@ def _euclidean_modulo(p: Fi, q: Fi) -> Fi: ...
 
 
 def _euclidean_modulo(p, q):
-    return _floor_modulo(p, np.abs(q))
+    # FIXME: https://github.com/numpy/numpy/issues/31421
+    #        ideally we could just use np.abs(q) here
+    return _floor_modulo(p, np.copysign(q, +1))
 
 
 # wrapper around np.minimum that also works for +0.0 and -0.0
