@@ -5,7 +5,11 @@ equivalent behaviour for all supported dtypes and provide good type hints.
 
 __all__ = [
     "_place",
-    "_symmetric_modulo",
+    "_round_ties_even",
+    "_floor_modulo",
+    "_ceil_modulo",
+    "_trunc_modulo",
+    "_round_ties_even_modulo",
     "_minimum_zero_sign_sensitive",
     "_maximum_zero_sign_sensitive",
     "_where",
@@ -55,22 +59,89 @@ def _place(
     return np.put(a, np.flatnonzero(mask), vals)
 
 
-# wrapper around np.mod(p, q) that guarantees that the result is in [-q/2, q/2]
+# round to the nearest integer, with ties to the nearest even integer
+_round_ties_even = np.rint
+
+
+# modulo based on floor division, p - q*floor(p/q),
+#  which guarantees that the result is in (-q, -0] for q<0 and [+0, +q) for q>0
 @overload
-def _symmetric_modulo(
+def _floor_modulo(
     p: np.ndarray[S, np.dtype[F]], q: np.ndarray[S, np.dtype[F]]
 ) -> np.ndarray[S, np.dtype[F]]: ...
 
 
 @overload
-def _symmetric_modulo(p: Fi, q: Fi) -> Fi: ...
+def _floor_modulo(p: Fi, q: Fi) -> Fi: ...
 
 
-def _symmetric_modulo(p, q):
+def _floor_modulo(p, q):
+    out = _ensure_array(np.mod(p, q))
+    np.copysign(out, q, out=out)
+    return out
+
+
+# modulo based on ceil division, p - q*ceil(p/q),
+#  which guarantees that the result is in [+0, +q) for q<0 and (-q, -0] for q>0
+@overload
+def _ceil_modulo(
+    p: np.ndarray[S, np.dtype[F]], q: np.ndarray[S, np.dtype[F]]
+) -> np.ndarray[S, np.dtype[F]]: ...
+
+
+@overload
+def _ceil_modulo(p: Fi, q: Fi) -> Fi: ...
+
+
+def _ceil_modulo(p, q):
+    out = _ensure_array(_floor_modulo(p, q))
+    out -= q
+    np.fmod(out, q, out=out)  # ensure that |out| < |q|
+    np.copyto(out, p, where=(np.isfinite(p) & np.isinf(q) & (np.sign(p) != np.sign(q))))
+    np.copyto(
+        out, -q, where=(np.isfinite(p) & np.isinf(q) & (np.sign(p) == np.sign(q)))
+    )
+    np.copysign(out, -q, out=out)
+    return out
+
+
+# modulo based on trunc division, p - q*trunc(p/q),
+#  which guarantees that the result is in [-q, -0] for p<0 and [+0, +q] for p>0
+@overload
+def _trunc_modulo(
+    p: np.ndarray[S, np.dtype[F]], q: np.ndarray[S, np.dtype[F]]
+) -> np.ndarray[S, np.dtype[F]]: ...
+
+
+@overload
+def _trunc_modulo(p: Fi, q: Fi) -> Fi: ...
+
+
+def _trunc_modulo(p, q):
+    out = _ensure_array(np.fmod(p, q))
+    np.copysign(out, p, out=out)
+    return out
+
+
+# modulo based on rounded division, p - q*round(p/q),
+#  which guarantees that the result is in [-q/2, q/2]
+@overload
+def _round_ties_even_modulo(
+    p: np.ndarray[S, np.dtype[F]], q: np.ndarray[S, np.dtype[F]]
+) -> np.ndarray[S, np.dtype[F]]: ...
+
+
+@overload
+def _round_ties_even_modulo(p: Fi, q: Fi) -> Fi: ...
+
+
+def _round_ties_even_modulo(p, q):
     q2 = np.divide(q, 2)
     out = _ensure_array(np.add(p, q2))
     np.mod(out, q, out=out)
     np.subtract(out, q2, out=out)
+    np.copyto(out, p, where=(np.isfinite(p) & np.isinf(q)))
+    np.copyto(out, p, where=((p == 0) & ~np.isnan(q) & (q != 0)))
     return out
 
 

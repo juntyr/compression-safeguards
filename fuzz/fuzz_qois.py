@@ -176,6 +176,11 @@ BINARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr], AnyExpr]] = [
     ScalarNotEqual,
     ScalarGreaterEqual,
     ScalarGreater,
+    # TODO: support non-constant modulo
+    # ScalarCeilModulo,
+    # ScalarFloorModulo,
+    # ScalarRoundTiesEvenModulo,
+    # ScalarTruncModulo,
 ]
 TERNARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr, AnyExpr], AnyExpr]] = [
     ScalarWhere,

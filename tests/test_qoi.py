@@ -67,6 +67,7 @@ from compression_safeguards.safeguards._qois.interval import (
 from compression_safeguards.utils._compat import (
     _is_negative_zero,
     _is_positive_zero,
+    _round_ties_even,
 )
 from compression_safeguards.utils._float128 import _float128, _float128_dtype
 
@@ -888,7 +889,7 @@ def test_fuzzer_found_asinh_overflow():
     X = np.array(_float128("-4.237431194812790058760014731131757e+4778"))
 
     expr = ScalarAsinh(Data.SCALAR)
-    assert np.rint(expr.eval(X, dict())) == np.array(_float128("-11004"))
+    assert _round_ties_even(expr.eval(X, dict())) == np.array(_float128("-11004"))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1398,8 +1399,8 @@ def test_negative_zero_ops(dtype):
     assert _is_positive_zero(np.ceil(ty(+0.0)))
     assert _is_negative_zero(np.trunc(ty(-0.0)))
     assert _is_positive_zero(np.trunc(ty(+0.0)))
-    assert _is_negative_zero(np.rint(ty(-0.0)))
-    assert _is_positive_zero(np.rint(ty(+0.0)))
+    assert _is_negative_zero(_round_ties_even(ty(-0.0)))
+    assert _is_positive_zero(_round_ties_even(ty(+0.0)))
 
     assert _is_negative_zero(np.sin(ty(-0.0)))
     assert _is_positive_zero(np.sin(ty(+0.0)))
@@ -1413,8 +1414,8 @@ def test_negative_zero_ops(dtype):
     assert _is_negative_zero(np.asin(ty(-0.0)))
     assert _is_positive_zero(np.asin(ty(+0.0)))
 
-    assert np.rint(np.acos(ty(-0.0)) * 100) == ty(157)  # pi/2 * 100
-    assert np.rint(np.acos(ty(+0.0)) * 100) == ty(157)  # pi/2 * 100
+    assert _round_ties_even(np.acos(ty(-0.0)) * 100) == ty(157)  # pi/2 * 100
+    assert _round_ties_even(np.acos(ty(+0.0)) * 100) == ty(157)  # pi/2 * 100
 
     assert _is_negative_zero(np.atan(ty(-0.0)))
     assert _is_positive_zero(np.atan(ty(+0.0)))

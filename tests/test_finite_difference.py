@@ -14,10 +14,12 @@ import numpy as np
 from compression_safeguards.safeguards._qois.expr.abc import Expr
 from compression_safeguards.safeguards._qois.expr.addsub import ScalarSubtract
 from compression_safeguards.safeguards._qois.expr.finite_difference import (
-    ScalarSymmetricModulo,
     finite_difference_coefficients,
 )
 from compression_safeguards.safeguards._qois.expr.literal import Number
+from compression_safeguards.safeguards._qois.expr.modulo import (
+    ScalarRoundTiesEvenModulo,
+)
 from compression_safeguards.utils._float128 import _float128_dtype
 
 
@@ -1244,7 +1246,7 @@ def test_central_second_order_with_spacing():
 
 def test_central_second_order_with_periodic_transform():
     def delta_transform(x, period):
-        return ScalarSymmetricModulo(x, Number(f"{period}"))
+        return ScalarRoundTiesEvenModulo(x, Number(f"{period}"))
 
     # period must be >= 2*coefficient range to allow proper sampling (no aliasing)
     assert finite_difference_coefficients_float(

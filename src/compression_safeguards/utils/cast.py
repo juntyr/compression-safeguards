@@ -18,7 +18,7 @@ from typing import assert_never
 
 import numpy as np
 
-from ._compat import _ensure_array, _is_of_dtype
+from ._compat import _ensure_array, _is_of_dtype, _round_ties_even
 from ._float128 import _float128_dtype
 from .error import TypeSetError, ctx
 from .typing import F, S, T, U
@@ -262,10 +262,10 @@ def from_float(
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         # lossy cast from floating-point to integer
-        # round first with rint (round to nearest, ties to nearest even)
-        converted: np.ndarray[S, np.dtype[T]] = _ensure_array(np.rint(x)).astype(
-            dtype, casting="unsafe"
-        )
+        # round first with round to nearest, ties to nearest even
+        converted: np.ndarray[S, np.dtype[T]] = _ensure_array(
+            _round_ties_even(x)
+        ).astype(dtype, casting="unsafe")
         converted[np.greater(x, imax.astype(x.dtype, casting="safe"))] = imax
         converted[np.less(x, imin.astype(x.dtype, casting="safe"))] = imin
         converted[np.isnan(x)] = 0

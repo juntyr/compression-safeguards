@@ -9,6 +9,7 @@ from ....utils._compat import (
     _is_positive_zero,
     _is_sign_negative_number,
     _is_sign_positive_number,
+    _round_ties_even,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
@@ -303,7 +304,7 @@ class ScalarRoundTiesEven(Expr[AnyExpr]):
         return ScalarFoldedConstant.constant_fold_unary(
             self._a,
             dtype,
-            np.rint,
+            _round_ties_even,
             ScalarRoundTiesEven,
         )
 
@@ -313,7 +314,7 @@ class ScalarRoundTiesEven(Expr[AnyExpr]):
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
-        return np.rint(self._a.eval(Xs, late_bound))
+        return _round_ties_even(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override
@@ -329,7 +330,7 @@ class ScalarRoundTiesEven(Expr[AnyExpr]):
         # evaluate arg and round_ties_even(arg)
         arg = self._a
         argv = arg.eval(Xs, late_bound)
-        exprv = np.rint(argv)
+        exprv = _round_ties_even(argv)
 
         # compute the rounded result that meets the expr bounds
         # rounding uses integer steps, so e.g. round_ties_even(...) in
@@ -359,7 +360,7 @@ class ScalarRoundTiesEven(Expr[AnyExpr]):
         # which can occur since our +-0.5 estimate doesn't account for the even
         #  tie breaking cases
         arg_lower = guarantee_arg_within_expr_bounds(
-            lambda arg_lower: np.rint(arg_lower),
+            lambda arg_lower: _round_ties_even(arg_lower),
             exprv,
             argv,
             arg_lower,
@@ -367,7 +368,7 @@ class ScalarRoundTiesEven(Expr[AnyExpr]):
             expr_upper,
         )
         arg_upper = guarantee_arg_within_expr_bounds(
-            lambda arg_upper: np.rint(arg_upper),
+            lambda arg_upper: _round_ties_even(arg_upper),
             exprv,
             argv,
             arg_upper,
