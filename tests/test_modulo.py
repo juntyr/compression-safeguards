@@ -14,6 +14,7 @@ from compression_safeguards.utils._compat import (
 VALS = [-np.nan, -np.inf, -1.0, -0.5, -0.0, +0.0, +0.5, +1.0, +np.inf, +np.nan]
 
 
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 @pytest.mark.parametrize("p,q", product(VALS, VALS))
 def test_floor_modulo(p, q):
     r = _floor_modulo(p, q)
@@ -97,6 +98,7 @@ def test_ceil_modulo(p, q):
         assert r > -q
 
 
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 @pytest.mark.parametrize("p,q", product(VALS, VALS))
 def test_trunc_modulo(p, q):
     r = _trunc_modulo(p, q)
@@ -165,6 +167,7 @@ def test_round_ties_even_modulo(p, q):
     assert r <= np.copysign(q / 2, +1)
 
 
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 @pytest.mark.parametrize("p,q", product(VALS, VALS))
 def test_euclidean_modulo(p, q):
     r = _euclidean_modulo(p, q)
