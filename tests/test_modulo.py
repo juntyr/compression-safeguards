@@ -5,6 +5,7 @@ import pytest
 
 from compression_safeguards.utils._compat import (
     _ceil_modulo,
+    _euclidean_modulo,
     _floor_modulo,
     _round_ties_even_modulo,
     _trunc_modulo,
@@ -162,3 +163,39 @@ def test_round_ties_even_modulo(p, q):
 
     assert r >= np.copysign(q / 2, -1)
     assert r <= np.copysign(q / 2, +1)
+
+
+@pytest.mark.parametrize("p,q", product(VALS, VALS))
+def test_euclidean_modulo(p, q):
+    r = _euclidean_modulo(p, q)
+
+    if np.isnan(p) or np.isnan(q):
+        assert np.isnan(r)
+        assert np.signbit(r) == np.signbit(+1)
+        return
+
+    if q == 0:
+        assert np.isnan(r)
+        assert np.signbit(r) == np.signbit(+1)
+        return
+
+    if np.isinf(p):
+        assert np.isnan(r)
+        assert np.signbit(r) == np.signbit(+1)
+        return
+
+    if p == 0:
+        assert r == 0
+        assert np.signbit(r) == np.signbit(+1)
+        return
+
+    if np.isinf(q):
+        if np.signbit(p) == np.signbit(+1):
+            assert r == p
+        else:
+            assert r == np.abs(q)
+        return
+
+    assert r >= 0
+    assert np.signbit(r) == np.signbit(+1)
+    assert r < np.abs(q)

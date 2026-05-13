@@ -10,6 +10,7 @@ __all__ = [
     "_ceil_modulo",
     "_trunc_modulo",
     "_round_ties_even_modulo",
+    "_euclidean_modulo",
     "_minimum_zero_sign_sensitive",
     "_maximum_zero_sign_sensitive",
     "_where",
@@ -143,6 +144,22 @@ def _round_ties_even_modulo(p, q):
     np.copyto(out, p, where=(np.isfinite(p) & np.isinf(q)))
     np.copyto(out, p, where=((p == 0) & ~np.isnan(q) & (q != 0)))
     return out
+
+
+# modulo based on Euclidean division, p - |q|*floor(p/|q|),
+#  which guarantees that the result is in [+0, +q)
+@overload
+def _euclidean_modulo(
+    p: np.ndarray[S, np.dtype[F]], q: np.ndarray[S, np.dtype[F]]
+) -> np.ndarray[S, np.dtype[F]]: ...
+
+
+@overload
+def _euclidean_modulo(p: Fi, q: Fi) -> Fi: ...
+
+
+def _euclidean_modulo(p, q):
+    return _floor_modulo(p, np.abs(q))
 
 
 # wrapper around np.minimum that also works for +0.0 and -0.0

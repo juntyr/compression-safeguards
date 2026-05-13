@@ -351,6 +351,7 @@ def test_modulo(check):
     check("where(1, ceil_modulo(-0.0, Inf), x)")
     check("where(1, trunc_modulo(-0.0, Inf), x)")
     check("where(1, round_ties_even_modulo(-0.0, Inf), x)")
+    check("where(1, euclidean_modulo(-0.0, Inf), x)")
 
 
 @pytest.mark.parametrize("check", CHECKS)

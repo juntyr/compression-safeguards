@@ -83,6 +83,7 @@ class QoILexer(Lexer):
         CEIL_MODULO,  # type: ignore[name-defined]  # noqa: F821
         TRUNC_MODULO,  # type: ignore[name-defined]  # noqa: F821
         ROUND_TIES_EVEN_MODULO,  # type: ignore[name-defined]  # noqa: F821
+        EUCLIDEAN_MODULO,  # type: ignore[name-defined]  # noqa: F821
         # trigonometric
         SIN,  # type: ignore[name-defined]  # noqa: F821
         COS,  # type: ignore[name-defined]  # noqa: F821
@@ -247,6 +248,7 @@ class QoILexer(Lexer):
     ID["ceil_modulo"] = CEIL_MODULO  # type: ignore[index, name-defined]  # noqa: F821
     ID["trunc_modulo"] = TRUNC_MODULO  # type: ignore[index, name-defined]  # noqa: F821
     ID["round_ties_even_modulo"] = ROUND_TIES_EVEN_MODULO  # type: ignore[index, name-defined]  # noqa: F821
+    ID["euclidean_modulo"] = EUCLIDEAN_MODULO  # type: ignore[index, name-defined]  # noqa: F821
     # trigonometric
     ID["sin"] = SIN  # type: ignore[index, name-defined]  # noqa: F821
     ID["cos"] = COS  # type: ignore[index, name-defined]  # noqa: F821
@@ -404,6 +406,7 @@ class QoILexer(Lexer):
             "CEIL_MODULO": "`ceil_modulo`",
             "TRUNC_MODULO": "`trunc_modulo`",
             "ROUND_TIES_EVEN_MODULO": "`round_ties_even_modulo`",
+            "EUCLIDEAN_MODULO": "`euclidean_modulo`",
             # trigonometric
             "SIN": "`sin`",
             "COS": "`cos`",

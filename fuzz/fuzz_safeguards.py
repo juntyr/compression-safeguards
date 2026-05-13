@@ -233,6 +233,7 @@ def generate_parameter(
             "ceil_modulo": 2,
             "trunc_modulo": 2,
             "round_ties_even_modulo": 2,
+            "euclidean_modulo": 2,
             # trigonometric
             "sin": 1,
             "cos": 1,

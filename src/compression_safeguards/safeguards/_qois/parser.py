@@ -44,6 +44,7 @@ from .expr.literal import Euler, Number, Pi
 from .expr.logexp import Exponential, Logarithm, ScalarExp, ScalarLog, ScalarLogWithBase
 from .expr.modulo import (
     ScalarCeilModulo,
+    ScalarEuclideanModulo,
     ScalarFloorModulo,
     ScalarRoundTiesEvenModulo,
     ScalarTruncModulo,
@@ -616,6 +617,15 @@ class QoIParser(Parser):
             f"`round_ties_even_modulo` does not yet support references to the data `{'x' if self._X is None else 'X'}`",
         )
         return Array.map(ScalarRoundTiesEvenModulo, p.expr0, p.expr1)
+
+    @_("EUCLIDEAN_MODULO LPAREN expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        self.assert_or_error(
+            not (p.expr0.has_data or p.expr1.has_data),
+            p,
+            f"`euclidean_modulo` does not yet support references to the data `{'x' if self._X is None else 'X'}`",
+        )
+        return Array.map(ScalarEuclideanModulo, p.expr0, p.expr1)
 
     # trigonometric
     @_("SIN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821

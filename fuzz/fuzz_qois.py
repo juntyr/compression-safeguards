@@ -181,6 +181,7 @@ BINARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr], AnyExpr]] = [
     # ScalarFloorModulo,
     # ScalarRoundTiesEvenModulo,
     # ScalarTruncModulo,
+    # ScalarEuclideanModulo,
 ]
 TERNARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr, AnyExpr], AnyExpr]] = [
     ScalarWhere,
