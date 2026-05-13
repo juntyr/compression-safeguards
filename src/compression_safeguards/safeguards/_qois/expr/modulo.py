@@ -3,7 +3,13 @@ from collections.abc import Mapping
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import _ceil_modulo, _euclidean_modulo, _round_ties_even_modulo
+from ....utils._compat import (
+    _ceil_modulo,
+    _euclidean_modulo,
+    _floor_modulo,
+    _round_ties_even_modulo,
+    _trunc_modulo,
+)
 from ....utils.bindings import Parameter
 from ..context import Callback, Context
 from ..typing import F, Fi, Ns, Ps, np_sndarray
@@ -40,7 +46,7 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
             self._a,
             self._b,
             dtype,
-            np.mod,
+            _floor_modulo,
             ScalarFloorModulo,
         )
 
@@ -50,7 +56,7 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
-        return np.mod(self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound))
+        return _floor_modulo(self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound))
 
     @override
     def deferred_compute_data_bounds_unchecked(
@@ -156,7 +162,7 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
             self._a,
             self._b,
             dtype,
-            np.fmod,
+            _trunc_modulo,
             ScalarTruncModulo,
         )
 
@@ -166,7 +172,7 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
-        return np.fmod(self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound))
+        return _trunc_modulo(self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound))
 
     @override
     def deferred_compute_data_bounds_unchecked(
