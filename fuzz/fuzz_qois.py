@@ -269,6 +269,11 @@ def check_one_input(data) -> None:
     except TimeoutError:
         # skip expressions that take too long just to build
         return
+    except NotImplementedError as err:
+        # skip unsupported p modulo q expressions with non-constant divisor q
+        if "modulo(p, q)` with non-constant divisor `q`" in str(err):
+            return
+        raise
     except RuntimeWarning as err:
         # skip expressions that try to perform a**b with excessive digits
         if ("symbolic integer evaluation" in str(err)) and (

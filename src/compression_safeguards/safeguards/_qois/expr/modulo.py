@@ -32,6 +32,11 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
         self._p = p
         self._q = q
 
+        if self._q.has_data:
+            raise NotImplementedError(
+                "`floor_modulo(p, q)` with non-constant divisor `q`"
+            )
+
     @property
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr]:
