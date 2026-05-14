@@ -355,6 +355,7 @@ def test_modulo(check):
 
     check("floor_modulo(x, 1.5)")
     check("ceil_modulo(x, 1.5)")
+    check("euclidean_modulo(x, 1.5)")
 
     with pytest.raises(
         SyntaxError,
@@ -366,6 +367,11 @@ def test_modulo(check):
         match=r"`ceil_modulo\(p, q\)` does not yet support references to the data `x` in the divisor `q`",
     ):
         check("ceil_modulo(1.5, x)")
+    with pytest.raises(
+        SyntaxError,
+        match=r"`euclidean_modulo\(p, q\)` does not yet support references to the data `x` in the divisor `q`",
+    ):
+        check("euclidean_modulo(1.5, x)")
 
 
 @pytest.mark.parametrize("check", CHECKS)
