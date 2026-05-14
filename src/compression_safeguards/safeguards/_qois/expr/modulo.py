@@ -8,6 +8,8 @@ from ....utils._compat import (
     _ensure_array,
     _euclidean_modulo,
     _floor_modulo,
+    _is_negative_zero,
+    _is_positive_zero,
     _is_sign_negative_number,
     _is_sign_positive_number,
     _maximum_zero_sign_sensitive,
@@ -120,6 +122,7 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
         ) & np.greater_equal(expr_upper, fu)
 
         fmax = np.finfo(Xs.dtype).max
+        smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
 
         # if qv is NaN, anything is allowed for pv
         # if pv is NaN, it should stay NaN
@@ -127,6 +130,8 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
         # if pv is inf, it must stay inf
         # if qv is inf and the signbits of pv and qv match, use expr bounds within the same signbit
         # if qv is inf and the signbits of pv and qv don't match, anything is allowed within as long as the mismatch stays
+        #  - if the expr bounds only include zero, pv must stay zero
+        #  - if the expr bounds exclude zero, pv must stay non-zero
         # if the full domain is ok, allow the full finite domain
         # otherwise, apply the bounds to the current repetition
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
@@ -136,7 +141,13 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
         np.add(p_lower, pv, out=p_lower)
         p_lower[full_domain] = -fmax
         p_lower[np.isposinf(qv) & _is_sign_negative_number(pv)] = -fmax
+        p_lower[
+            np.isposinf(qv) & _is_sign_negative_number(pv) & _is_positive_zero(efu)
+        ] = Xs.dtype.type(-0.0)
         p_lower[np.isneginf(qv) & _is_sign_positive_number(pv)] = Xs.dtype.type(+0.0)
+        p_lower[np.isneginf(qv) & _is_sign_positive_number(pv) & (efu < 0)] = (
+            smallest_subnormal
+        )
         _maximum_zero_sign_sensitive(
             p_lower,
             Xs.dtype.type(+0.0),
@@ -153,7 +164,13 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
         np.add(p_upper, pv, out=p_upper)
         p_upper[full_domain] = fmax
         p_upper[np.isposinf(qv) & _is_sign_negative_number(pv)] = Xs.dtype.type(-0.0)
+        p_upper[
+            np.isposinf(qv) & _is_sign_negative_number(pv) & (efl > 0)
+        ] = -smallest_subnormal
         p_upper[np.isneginf(qv) & _is_sign_positive_number(pv)] = fmax
+        p_upper[
+            np.isneginf(qv) & _is_sign_positive_number(pv) & _is_negative_zero(efl)
+        ] = Xs.dtype.type(+0.0)
         _minimum_zero_sign_sensitive(
             p_upper,
             Xs.dtype.type(-0.0),
@@ -299,6 +316,7 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
         ) & np.greater_equal(expr_upper, fu)
 
         fmax = np.finfo(Xs.dtype).max
+        smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
 
         # if qv is NaN, anything is allowed for pv
         # if pv is NaN, it should stay NaN
@@ -306,6 +324,8 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
         # if pv is inf, it must stay inf
         # if qv is inf and the signbits of pv and qv don't match, use expr bounds as long as the mismatch stays
         # if qv is inf and the signbits of pv and qv match, anything is allowed within as long as the match stays
+        #  - if the expr bounds only include zero, pv must stay zero
+        #  - if the expr bounds exclude zero, pv must stay non-zero
         # if the full domain is ok, allow the full finite domain
         # otherwise, apply the bounds to the current repetition
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
@@ -315,7 +335,13 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
         np.add(p_lower, pv, out=p_lower)
         p_lower[full_domain] = -fmax
         p_lower[np.isposinf(qv) & _is_sign_positive_number(pv)] = Xs.dtype.type(+0.0)
+        p_lower[np.isposinf(qv) & _is_sign_positive_number(pv) & (efu < 0)] = (
+            smallest_subnormal
+        )
         p_lower[np.isneginf(qv) & _is_sign_negative_number(pv)] = -fmax
+        p_lower[
+            np.isneginf(qv) & _is_sign_negative_number(pv) & _is_positive_zero(efu)
+        ] = Xs.dtype.type(-0.0)
         _maximum_zero_sign_sensitive(
             p_lower,
             Xs.dtype.type(+0.0),
@@ -332,7 +358,13 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
         np.add(p_upper, pv, out=p_upper)
         p_upper[full_domain] = fmax
         p_upper[np.isposinf(qv) & _is_sign_positive_number(pv)] = fmax
+        p_upper[
+            np.isposinf(qv) & _is_sign_positive_number(pv) & _is_negative_zero(efl)
+        ] = Xs.dtype.type(+0.0)
         p_upper[np.isneginf(qv) & _is_sign_negative_number(pv)] = Xs.dtype.type(-0.0)
+        p_upper[
+            np.isneginf(qv) & _is_sign_negative_number(pv) & (efl > 0)
+        ] = -smallest_subnormal
         _minimum_zero_sign_sensitive(
             p_upper,
             Xs.dtype.type(-0.0),

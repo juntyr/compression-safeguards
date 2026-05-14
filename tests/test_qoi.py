@@ -45,7 +45,10 @@ from compression_safeguards.safeguards._qois.expr.logexp import (
     ScalarLog,
     ScalarLogWithBase,
 )
-from compression_safeguards.safeguards._qois.expr.modulo import ScalarFloorModulo
+from compression_safeguards.safeguards._qois.expr.modulo import (
+    ScalarCeilModulo,
+    ScalarFloorModulo,
+)
 from compression_safeguards.safeguards._qois.expr.neg import ScalarNegate
 from compression_safeguards.safeguards._qois.expr.power import ScalarPower
 from compression_safeguards.safeguards._qois.expr.reciprocal import ScalarReciprocal
@@ -2060,7 +2063,7 @@ def test_fuzzer_found_floor_modulo_nudging():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_floor_modulo_bounds():
+def test_fuzzer_found_floor_modulo_quaddtype_bounds():
     X = np.array(_float128(0.0))
 
     expr = ScalarFloorModulo(
@@ -2083,3 +2086,43 @@ def test_fuzzer_found_floor_modulo_bounds():
     assert expr.eval(X_upper, dict()) == np.array(
         _float128("-1405083641183236501604461890894511e275")
     )
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_ceil_modulo_zero_inf_bounds():
+    X = np.array(np.float16(0.0))
+
+    expr = ScalarCeilModulo(ScalarAsinh(Data.SCALAR), Number("65791"))
+
+    assert _is_negative_zero(expr.eval(X, dict()))
+
+    expr_lower = np.array(np.float16(-0.0))
+    expr_upper = np.array(np.float16(2.5e-06))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert _is_positive_zero(X_lower)
+    assert _is_positive_zero(X_upper)
+
+    assert _is_negative_zero(expr.eval(X_lower, dict()))
+    assert _is_negative_zero(expr.eval(X_upper, dict()))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_floor_modulo_zero_inf_bounds():
+    X = np.array(np.float16(0.0))
+
+    expr = ScalarFloorModulo(ScalarAsinh(Data.SCALAR), Number("-65791"))
+
+    assert _is_negative_zero(expr.eval(X, dict()))
+
+    expr_lower = np.array(np.float16(-0.0))
+    expr_upper = np.array(np.float16(2.5e-06))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert _is_positive_zero(X_lower)
+    assert _is_positive_zero(X_upper)
+
+    assert _is_negative_zero(expr.eval(X_lower, dict()))
+    assert _is_negative_zero(expr.eval(X_upper, dict()))
