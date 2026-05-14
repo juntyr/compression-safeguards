@@ -2046,7 +2046,7 @@ def test_fuzzer_found_floor_modulo_nudging():
         Number("-2.2250738585072014e-308"),
     )
 
-    assert expr.eval(X, dict()) == np.array(_float128("-2.2250738585072014e-308"))
+    assert expr.eval(X, dict()) == np.array(_float128(-0.0))
 
     expr_lower = np.array(_float128("-2.2250738585072014e-308"))
     expr_upper = np.array(_float128("0.0"))
@@ -2055,14 +2055,31 @@ def test_fuzzer_found_floor_modulo_nudging():
     assert X_lower == np.array(_float128(-np.inf))
     assert X_upper == np.array(_float128(np.inf))
 
-    assert expr.eval(X_lower, dict()) == np.array(_float128("-2.2250738585072014e-308"))
-    assert expr.eval(X_upper, dict()) == np.array(_float128("-2.2250738585072014e-308"))
+    assert expr.eval(X_lower, dict()) == np.array(_float128(-0.0))
+    assert expr.eval(X_upper, dict()) == np.array(_float128(-0.0))
 
-    # FIXME: nudging maybe since x doesn't relate to any data at all?
 
-    # dtype = QuadPrecDType(backend='sleef')
-    # X = array(0.e+00, dtype=QuadPrecDType(backend='sleef')) (b'\x00\x53\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')
-    # expr = floor_modulo(any_data(QuadPrecision('4.456434754399559235752098447454098e-4932', backend='sleef')), -2.2250738585072014e-308)
-    # exprv = QuadPrecision('-2.2250738585072014e-308', backend='sleef') (b'\xE0\x7D\x86\xCF\x4C\x30\x8C\x00\x00\x00\x00\x00\x00\x00\x01\xBC')
-    # expr_lower = array(-2.2250738585072014e-308, dtype=QuadPrecDType(backend='sleef')) (b'\xE0\x7D\x86\xCF\x4C\x30\x8C\x00\x00\x00\x00\x00\x00\x00\x01\xBC')
-    # expr_upper = array(0., dtype=QuadPrecDType(backend='sleef')) (b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_floor_modulo_bounds():
+    X = np.array(_float128(0.0))
+
+    expr = ScalarFloorModulo(
+        ScalarCosh(Data.SCALAR), Number("-1.7976931345860068e+308")
+    )
+
+    assert expr.eval(X, dict()) == np.array(_float128(-0.0))
+
+    expr_lower = np.array(_float128("-1.7976931345860068e+308"))
+    expr_upper = np.array(_float128(0.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.array(_float128("-11357.216553474703894801348310092223"))
+    assert X_upper == np.array(_float128("11357.216553474703894801348310092223"))
+
+    assert expr.eval(X_lower, dict()) == np.array(
+        _float128("-1405083641183236501604461890894511e275")
+    )
+    assert expr.eval(X_upper, dict()) == np.array(
+        _float128("-1405083641183236501604461890894511e275")
+    )

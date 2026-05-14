@@ -39,7 +39,6 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
 from ._float128 import (
-    _float128,
     _float128_dtype,
     _float128_e,
     _float128_pi,
@@ -83,11 +82,33 @@ def _floor_modulo(p: Fi, q: Fi) -> Fi: ...
 
 
 def _floor_modulo(p, q):
-    out = _ensure_array(np.mod(p, q))
-    np.copysign(out, q, out=out)
-    # FIXME: https://github.com/numpy/numpy-quaddtype/issues/91
-    if out.dtype == _float128_dtype:
-        np.copysign(_float128(0), q, out=out, where=((p == 0) & np.isinf(q)))
+    if (
+        (type(p) is not _float128_type)
+        and (not isinstance(p, np.ndarray) or p.dtype != _float128_dtype)
+        and (type(q) is not _float128_type)
+        and (not isinstance(q, np.ndarray) or q.dtype != _float128_dtype)
+    ):
+        out = _ensure_array(np.mod(p, q))
+        np.copysign(out, q, out=out, where=(np.isnan(out) | (out == 0)))
+        return out
+
+    # FIXME: https://github.com/numpy/numpy-quaddtype/issues/94
+
+    out = _ensure_array(np.fmod(p, q))
+    # correct the quadrant of the remainder
+    np.add(out, q, out=out, where=((p < 0) & (q > 0)))
+    np.add(out, q, out=out, where=((p > 0) & (q < 0)))
+    # ensure that |out| < |q|
+    np.fmod(out, q, out=out)
+    # ensure correct handling for finite p and infinite q
+    np.copyto(out, p, where=(np.isfinite(p) & np.isinf(q) & (np.sign(p) == np.sign(q))))
+    np.copyto(
+        out,
+        q,
+        where=(np.isfinite(p) & np.isinf(q) & (np.sign(p) != np.sign(q)) & (p != 0)),
+    )
+    # ensure correct sign for NaNs and zeros
+    np.copysign(out, q, out=out, where=(np.isnan(out) | (out == 0)))
     return out
 
 
@@ -105,13 +126,17 @@ def _ceil_modulo(p: Fi, q: Fi) -> Fi: ...
 
 def _ceil_modulo(p, q):
     out = _ensure_array(_floor_modulo(p, q))
+    # correct the quadrant for the remainder
     out -= q
-    np.fmod(out, q, out=out)  # ensure that |out| < |q|
+    # ensure that |out| < |q|
+    np.fmod(out, q, out=out)
+    # ensure correct handling for finite p and infinite q
     np.copyto(out, p, where=(np.isfinite(p) & np.isinf(q) & (np.sign(p) != np.sign(q))))
     np.copyto(
         out, -q, where=(np.isfinite(p) & np.isinf(q) & (np.sign(p) == np.sign(q)))
     )
-    np.copysign(out, -q, out=out)
+    # ensure correct sign for NaNs and zeros
+    np.copysign(out, -q, out=out, where=(np.isnan(out) | (out == 0)))
     return out
 
 
@@ -129,7 +154,8 @@ def _trunc_modulo(p: Fi, q: Fi) -> Fi: ...
 
 def _trunc_modulo(p, q):
     out = _ensure_array(np.fmod(p, q))
-    np.copysign(out, p, out=out)
+    # ensure correct sign for NaNs and zeros
+    np.copysign(out, p, out=out, where=(np.isnan(out) | (out == 0)))
     return out
 
 
@@ -148,9 +174,13 @@ def _round_ties_even_modulo(p: Fi, q: Fi) -> Fi: ...
 def _round_ties_even_modulo(p, q):
     q2 = np.divide(q, 2)
     out = _ensure_array(np.add(p, q2))
-    np.mod(out, q, out=out)
+    # FIXME: replace with np.mod(out, q, out=out) after
+    # https://github.com/numpy/numpy-quaddtype/issues/94
+    out = _floor_modulo(out, q)
     np.subtract(out, q2, out=out)
+    # ensure correct handling for finite p and infinite q
     np.copyto(out, p, where=(np.isfinite(p) & np.isinf(q)))
+    # ensure correct handling for zero p and non-NaN remainder
     np.copyto(out, p, where=((p == 0) & ~np.isnan(q) & (q != 0)))
     return out
 
