@@ -109,7 +109,7 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
         )
 
         # floor_modulo(...) is periodic, so we need to drop to difference
-        #  bounds before applying the difference to argv to stay in the
+        #  bounds before applying the difference to pv to stay in the
         #  same period
         p_lower_diff: np.ndarray[tuple[Ps], np.dtype[F]] = np.subtract(efl, exprv)
         p_upper_diff: np.ndarray[tuple[Ps], np.dtype[F]] = np.subtract(efu, exprv)
@@ -211,6 +211,11 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
         self._p = p
         self._q = q
 
+        if self._q.has_data:
+            raise NotImplementedError(
+                "`ceil_modulo(p, q)` with non-constant divisor `q`"
+            )
+
     @property
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr]:
@@ -243,6 +248,7 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         return _ceil_modulo(self._p.eval(Xs, late_bound), self._q.eval(Xs, late_bound))
 
+    @checked_data_bounds
     @override
     def deferred_compute_data_bounds_unchecked(
         self,
@@ -253,7 +259,122 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
         ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
-        assert False, "cannot compute the data bounds for ceil_modulo"
+        p_const = not self._p.has_data
+        q_const = not self._q.has_data
+        assert q_const, (
+            "cannot compute the data bounds for ceil_modulo(p, q) with non-constant q"
+        )
+        assert not (p_const and q_const), "constant ceil_modulo has no data bounds"
+
+        # evaluate p, q and ceil_modulo(p, q)
+        p, q = self._p, self._q
+        pv = p.eval(Xs, late_bound)
+        qv = q.eval(Xs, late_bound)
+        exprv = _ceil_modulo(pv, qv)
+
+        fl: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(-qv, copy=True)
+        fl[qv < 0] = Xs.dtype.type(+0.0)
+        fu: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(-qv, copy=True)
+        fu[qv > 0] = Xs.dtype.type(-0.0)
+
+        # ensure that the bounds on ceil_modulo(...) are in
+        #  - [+0.0, -q) if q < 0
+        #  - (-q, -0.0] if q > 0
+        efl: np.ndarray[tuple[Ps], np.dtype[F]] = _maximum_zero_sign_sensitive(
+            fl, expr_lower
+        )
+        efu: np.ndarray[tuple[Ps], np.dtype[F]] = _minimum_zero_sign_sensitive(
+            expr_upper, fu
+        )
+
+        # ceil_modulo(...) is periodic, so we need to drop to difference
+        #  bounds before applying the difference to pv to stay in the
+        #  same period
+        p_lower_diff: np.ndarray[tuple[Ps], np.dtype[F]] = np.subtract(efl, exprv)
+        p_upper_diff: np.ndarray[tuple[Ps], np.dtype[F]] = np.subtract(efu, exprv)
+
+        # check for the case where any finite value would work
+        full_domain: np.ndarray[tuple[Ps], np.dtype[np.bool]] = np.less_equal(
+            expr_lower, fl
+        ) & np.greater_equal(expr_upper, fu)
+
+        fmax = np.finfo(Xs.dtype).max
+
+        # if qv is NaN, anything is allowed for pv
+        # if pv is NaN, it should stay NaN
+        # if qv is 0, anything is allowed for pv
+        # if pv is inf, it must stay inf
+        # if qv is inf and the signbits of pv and qv don't match, use expr bounds as long as the mismatch stays
+        # if qv is inf and the signbits of pv and qv match, anything is allowed within as long as the match stays
+        # if the full domain is ok, allow the full finite domain
+        # otherwise, apply the bounds to the current repetition
+        # if arg_lower == argv and argv == -0.0, we need to guarantee that
+        #  arg_lower is also -0.0, same for arg_upper
+
+        p_lower = _ensure_array(p_lower_diff, copy=True)
+        np.add(p_lower, pv, out=p_lower)
+        p_lower[full_domain] = -fmax
+        p_lower[np.isposinf(qv) & _is_sign_positive_number(pv)] = Xs.dtype.type(+0.0)
+        p_lower[np.isneginf(qv) & _is_sign_negative_number(pv)] = -fmax
+        _maximum_zero_sign_sensitive(
+            p_lower,
+            Xs.dtype.type(+0.0),
+            out=p_lower,
+            where=(np.isneginf(qv) & _is_sign_positive_number(pv)),
+        )
+        np.copyto(p_lower, pv, where=np.isinf(pv))
+        p_lower[qv == 0] = Xs.dtype.type(-np.inf)
+        np.copyto(p_lower, pv, where=np.isnan(pv))
+        p_lower[np.isnan(qv)] = Xs.dtype.type(-np.inf)
+        _minimum_zero_sign_sensitive(pv, p_lower, out=p_lower)
+
+        p_upper = _ensure_array(p_upper_diff, copy=True)
+        np.add(p_upper, pv, out=p_upper)
+        p_upper[full_domain] = fmax
+        p_upper[np.isposinf(qv) & _is_sign_positive_number(pv)] = fmax
+        p_upper[np.isneginf(qv) & _is_sign_negative_number(pv)] = Xs.dtype.type(-0.0)
+        _minimum_zero_sign_sensitive(
+            p_upper,
+            Xs.dtype.type(-0.0),
+            out=p_upper,
+            where=(np.isposinf(qv) & _is_sign_negative_number(pv)),
+        )
+        np.copyto(p_upper, pv, where=np.isinf(pv))
+        p_upper[qv == 0] = Xs.dtype.type(np.inf)
+        np.copyto(p_upper, pv, where=np.isnan(pv))
+        p_upper[np.isnan(qv)] = Xs.dtype.type(np.inf)
+        _maximum_zero_sign_sensitive(pv, p_upper, out=p_upper)
+
+        # we need to force pv if expr_lower == expr_upper
+        np.copyto(p_lower, pv, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(p_upper, pv, where=(expr_lower == expr_upper), casting="no")
+
+        # handle rounding errors in ceil_modulo early
+        p_lower = guarantee_arg_within_expr_bounds(
+            lambda p_lower: _ceil_modulo(p_lower, qv),
+            exprv,
+            pv,
+            p_lower,
+            expr_lower,
+            expr_upper,
+        )
+        p_upper = guarantee_arg_within_expr_bounds(
+            lambda p_upper: _ceil_modulo(p_upper, qv),
+            exprv,
+            pv,
+            p_upper,
+            expr_lower,
+            expr_upper,
+        )
+
+        return p.deferred_compute_data_bounds(
+            p_lower,
+            p_upper,
+            Xs,
+            late_bound,
+            ctx,
+            callback,
+        )
 
     @override
     def __repr__(self) -> str:
@@ -301,6 +422,7 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         return _trunc_modulo(self._p.eval(Xs, late_bound), self._q.eval(Xs, late_bound))
 
+    @checked_data_bounds
     @override
     def deferred_compute_data_bounds_unchecked(
         self,
@@ -361,6 +483,7 @@ class ScalarRoundTiesEvenModulo(Expr[AnyExpr, AnyExpr]):
             self._p.eval(Xs, late_bound), self._q.eval(Xs, late_bound)
         )
 
+    @checked_data_bounds
     @override
     def deferred_compute_data_bounds_unchecked(
         self,
@@ -421,6 +544,7 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
             self._p.eval(Xs, late_bound), self._q.eval(Xs, late_bound)
         )
 
+    @checked_data_bounds
     @override
     def deferred_compute_data_bounds_unchecked(
         self,

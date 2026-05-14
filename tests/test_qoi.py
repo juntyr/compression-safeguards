@@ -23,7 +23,10 @@ from compression_safeguards.safeguards._qois.expr.comparison import (
     ScalarLess,
 )
 from compression_safeguards.safeguards._qois.expr.constfold import ScalarFoldedConstant
-from compression_safeguards.safeguards._qois.expr.data import Data
+from compression_safeguards.safeguards._qois.expr.data import (
+    Data,
+    ScalarAnyDataConstant,
+)
 from compression_safeguards.safeguards._qois.expr.divmul import (
     ScalarDivide,
     ScalarMultiply,
@@ -42,6 +45,7 @@ from compression_safeguards.safeguards._qois.expr.logexp import (
     ScalarLog,
     ScalarLogWithBase,
 )
+from compression_safeguards.safeguards._qois.expr.modulo import ScalarFloorModulo
 from compression_safeguards.safeguards._qois.expr.neg import ScalarNegate
 from compression_safeguards.safeguards._qois.expr.power import ScalarPower
 from compression_safeguards.safeguards._qois.expr.reciprocal import ScalarReciprocal
@@ -2031,3 +2035,34 @@ def test_fuzzer_found_atan_greater_atan2():
 
     assert expr.eval(X_lower, dict()) == np.array(np.float32(0.0))
     assert expr.eval(X_upper, dict()) == np.array(np.float32(0.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_floor_modulo_nudging():
+    X = np.array(_float128("0.0e+00"))
+
+    expr = ScalarFloorModulo(
+        ScalarAnyDataConstant(_float128("4.456434754399559235752098447454098e-4932")),
+        Number("-2.2250738585072014e-308"),
+    )
+
+    assert expr.eval(X, dict()) == np.array(_float128("-2.2250738585072014e-308"))
+
+    expr_lower = np.array(_float128("-2.2250738585072014e-308"))
+    expr_upper = np.array(_float128("0.0"))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(_float128(-np.inf))
+    assert X_upper == np.array(_float128(np.inf))
+
+    assert expr.eval(X_lower, dict()) == np.array(_float128("-2.2250738585072014e-308"))
+    assert expr.eval(X_upper, dict()) == np.array(_float128("-2.2250738585072014e-308"))
+
+    # FIXME: nudging maybe since x doesn't relate to any data at all?
+
+    # dtype = QuadPrecDType(backend='sleef')
+    # X = array(0.e+00, dtype=QuadPrecDType(backend='sleef')) (b'\x00\x53\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')
+    # expr = floor_modulo(any_data(QuadPrecision('4.456434754399559235752098447454098e-4932', backend='sleef')), -2.2250738585072014e-308)
+    # exprv = QuadPrecision('-2.2250738585072014e-308', backend='sleef') (b'\xE0\x7D\x86\xCF\x4C\x30\x8C\x00\x00\x00\x00\x00\x00\x00\x01\xBC')
+    # expr_lower = array(-2.2250738585072014e-308, dtype=QuadPrecDType(backend='sleef')) (b'\xE0\x7D\x86\xCF\x4C\x30\x8C\x00\x00\x00\x00\x00\x00\x00\x01\xBC')
+    # expr_upper = array(0., dtype=QuadPrecDType(backend='sleef')) (b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')
