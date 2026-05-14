@@ -121,7 +121,7 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
         # if qv is 0, anything is allowed for pv
         # if pv is inf, it must stay inf
         # if qv is inf and the signbits of pv and qv match, use expr bounds within the same signbit
-        # if qv is inf anf the signbits of pv and qv don't match, anything is allowed within as long as the mismatch stays
+        # if qv is inf and the signbits of pv and qv don't match, anything is allowed within as long as the mismatch stays
         # if the full domain is ok, allow the full finite domain
         # otherwise, apply the bounds to the current repetition
         # if arg_lower == argv and argv == -0.0, we need to guarantee that
