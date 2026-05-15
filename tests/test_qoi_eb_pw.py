@@ -355,6 +355,7 @@ def test_modulo(check):
 
     check("floor_modulo(x, 1.5)")
     check("ceil_modulo(x, 1.5)")
+    check("round_ties_even_modulo(x, 1.5)")
     check("euclidean_modulo(x, 1.5)")
 
     with pytest.raises(
@@ -367,6 +368,11 @@ def test_modulo(check):
         match=r"`ceil_modulo\(p, q\)` does not yet support references to the data `x` in the divisor `q`",
     ):
         check("ceil_modulo(1.5, x)")
+    with pytest.raises(
+        SyntaxError,
+        match=r"`round_ties_even_modulo\(p, q\)` does not yet support references to the data `x` in the divisor `q`",
+    ):
+        check("round_ties_even_modulo(1.5, x)")
     with pytest.raises(
         SyntaxError,
         match=r"`euclidean_modulo\(p, q\)` does not yet support references to the data `x` in the divisor `q`",

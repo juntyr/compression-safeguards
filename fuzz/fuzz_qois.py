@@ -66,7 +66,7 @@ with atheris.instrument_imports():
         ScalarCeilModulo,
         ScalarEuclideanModulo,
         ScalarFloorModulo,
-        # ScalarRoundTiesEvenModulo,
+        ScalarRoundTiesEvenModulo,
         # ScalarTruncModulo,
     )
     from compression_safeguards.safeguards._qois.expr.neg import ScalarNegate
@@ -185,8 +185,8 @@ BINARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr], AnyExpr]] = [
     ScalarGreater,
     ScalarCeilModulo,
     ScalarFloorModulo,
+    ScalarRoundTiesEvenModulo,
     # TODO: support non-constant modulo
-    # ScalarRoundTiesEvenModulo,
     # ScalarTruncModulo,
     ScalarEuclideanModulo,
 ]
