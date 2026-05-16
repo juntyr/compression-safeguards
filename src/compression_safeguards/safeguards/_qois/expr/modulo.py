@@ -529,7 +529,7 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
         p_lower = _ensure_array(p_lower_diff, copy=True)
         np.add(p_lower, pv, out=p_lower)
         p_lower[full_domain] = -fmax
-        p_lower[np.less_equal(expr_lower, qv_neg) & (pv < qv_pos)] = -fmax
+        p_lower[(expr_lower <= qv_neg) & (expr_upper >= 0) & (pv < qv_pos)] = -fmax
         np.copyto(p_lower, pv, where=np.isinf(pv), casting="no")
         p_lower[qv == 0] = Xs.dtype.type(-np.inf)
         np.copyto(p_lower, pv, where=np.isnan(pv), casting="no")
@@ -539,7 +539,7 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
         p_upper = _ensure_array(p_upper_diff, copy=True)
         np.add(p_upper, pv, out=p_upper)
         p_upper[full_domain] = fmax
-        p_upper[np.greater_equal(expr_upper, qv_pos) & (pv > qv_neg)] = fmax
+        p_upper[(expr_lower <= 0) & (expr_upper >= qv_pos) & (pv > qv_neg)] = fmax
         np.copyto(p_upper, pv, where=np.isinf(pv), casting="no")
         p_upper[qv == 0] = Xs.dtype.type(np.inf)
         np.copyto(p_upper, pv, where=np.isnan(pv), casting="no")

@@ -1100,3 +1100,16 @@ def test_noise_found_ceil_modulo():
             dict(kind="qoi_eb_pw", qoi="ceil_modulo(x, 1.5)", type="abs", eb=1)
         ],
     )
+
+
+def test_trunc_modulo_half_full_range():
+    data = np.array([-1018.2106], dtype=np.float32)
+    decoded = np.zeros_like(data)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(kind="qoi_eb_pw", qoi="trunc_modulo(x, 1.5)", type="abs", eb=1)
+        ],
+    )
