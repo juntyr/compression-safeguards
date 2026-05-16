@@ -154,9 +154,9 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
             out=p_lower,
             where=(np.isposinf(qv) & _is_sign_positive_number(pv)),
         )
-        np.copyto(p_lower, pv, where=np.isinf(pv))
+        np.copyto(p_lower, pv, where=np.isinf(pv), casting="no")
         p_lower[qv == 0] = Xs.dtype.type(-np.inf)
-        np.copyto(p_lower, pv, where=np.isnan(pv))
+        np.copyto(p_lower, pv, where=np.isnan(pv), casting="no")
         p_lower[np.isnan(qv)] = Xs.dtype.type(-np.inf)
         _minimum_zero_sign_sensitive(pv, p_lower, out=p_lower)
 
@@ -177,9 +177,9 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
             out=p_upper,
             where=(np.isneginf(qv) & _is_sign_negative_number(pv)),
         )
-        np.copyto(p_upper, pv, where=np.isinf(pv))
+        np.copyto(p_upper, pv, where=np.isinf(pv), casting="no")
         p_upper[qv == 0] = Xs.dtype.type(np.inf)
-        np.copyto(p_upper, pv, where=np.isnan(pv))
+        np.copyto(p_upper, pv, where=np.isnan(pv), casting="no")
         p_upper[np.isnan(qv)] = Xs.dtype.type(np.inf)
         _maximum_zero_sign_sensitive(pv, p_upper, out=p_upper)
 
@@ -348,9 +348,9 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
             out=p_lower,
             where=(np.isneginf(qv) & _is_sign_positive_number(pv)),
         )
-        np.copyto(p_lower, pv, where=np.isinf(pv))
+        np.copyto(p_lower, pv, where=np.isinf(pv), casting="no")
         p_lower[qv == 0] = Xs.dtype.type(-np.inf)
-        np.copyto(p_lower, pv, where=np.isnan(pv))
+        np.copyto(p_lower, pv, where=np.isnan(pv), casting="no")
         p_lower[np.isnan(qv)] = Xs.dtype.type(-np.inf)
         _minimum_zero_sign_sensitive(pv, p_lower, out=p_lower)
 
@@ -371,9 +371,9 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
             out=p_upper,
             where=(np.isposinf(qv) & _is_sign_negative_number(pv)),
         )
-        np.copyto(p_upper, pv, where=np.isinf(pv))
+        np.copyto(p_upper, pv, where=np.isinf(pv), casting="no")
         p_upper[qv == 0] = Xs.dtype.type(np.inf)
-        np.copyto(p_upper, pv, where=np.isnan(pv))
+        np.copyto(p_upper, pv, where=np.isnan(pv), casting="no")
         p_upper[np.isnan(qv)] = Xs.dtype.type(np.inf)
         _maximum_zero_sign_sensitive(pv, p_upper, out=p_upper)
 
@@ -422,6 +422,11 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
         self._p = p
         self._q = q
 
+        if self._q.has_data:
+            raise NotImplementedError(
+                "`trunc_modulo(p, q)` with non-constant divisor `q`"
+            )
+
     @property
     @override
     def args(self) -> tuple[AnyExpr, AnyExpr]:
@@ -465,7 +470,112 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
         ctx: Context[Ps, Ns, F],
         callback: Callback[Ps, Ns, F],
     ) -> None:
-        assert False, "cannot compute the data bounds for trunc_modulo"
+        p_const = not self._p.has_data
+        q_const = not self._q.has_data
+        assert q_const, (
+            "cannot compute the data bounds for trunc_modulo(p, q) with non-constant q"
+        )
+        assert not (p_const and q_const), "constant trunc_modulo has no data bounds"
+
+        # evaluate p, q and trunc_modulo(p, q)
+        p, q = self._p, self._q
+        pv = p.eval(Xs, late_bound)
+        qv = q.eval(Xs, late_bound)
+        exprv = _trunc_modulo(pv, qv)
+
+        qv_neg = np.copysign(qv, -1)
+        qv_pos = np.copysign(qv, +1)
+
+        fl: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(qv_neg, copy=True)
+        fl[pv >= qv_pos] = Xs.dtype.type(+0.0)
+        fu: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(qv_pos, copy=True)
+        fu[pv <= qv_neg] = Xs.dtype.type(-0.0)
+
+        # ensure that the bounds on trunc_modulo(...) are in
+        #  - (-|q|, +|q|) if -|q| < pv < +|q|
+        #  - (-|q|, -0.0] if pv < -|q|
+        #  - [+0.0, +|q|) if pv > +|q|
+        efl: np.ndarray[tuple[Ps], np.dtype[F]] = _maximum_zero_sign_sensitive(
+            fl, expr_lower
+        )
+        efu: np.ndarray[tuple[Ps], np.dtype[F]] = _minimum_zero_sign_sensitive(
+            expr_upper, fu
+        )
+
+        # trunc_modulo(...) is periodic, so we need to drop to difference bounds
+        #  before applying the difference to pv to stay in the same period
+        p_lower_diff: np.ndarray[tuple[Ps], np.dtype[F]] = np.subtract(efl, exprv)
+        p_upper_diff: np.ndarray[tuple[Ps], np.dtype[F]] = np.subtract(efu, exprv)
+
+        # check for the case where any finite value would work
+        full_domain: np.ndarray[tuple[Ps], np.dtype[np.bool]] = np.less_equal(
+            expr_lower, qv_neg
+        ) & np.greater_equal(expr_upper, qv_pos)
+
+        fmax = np.finfo(Xs.dtype).max
+
+        # if qv is NaN, anything is allowed for pv
+        # if pv is NaN, it should stay NaN
+        # if qv is 0, anything is allowed for pv
+        # if pv is inf, it must stay inf
+        # if qv is inf, use expr bounds
+        # if the full domain is ok, allow the full finite domain
+        # if the positive/negative domain is ok, allow the finite domain with
+        #  the matching sign
+        # otherwise, apply the bounds to the current repetition
+        # if p_lower == pv and pv == -0.0, we need to guarantee that
+        #  p_lower is also -0.0, same for p_upper
+
+        p_lower = _ensure_array(p_lower_diff, copy=True)
+        np.add(p_lower, pv, out=p_lower)
+        p_lower[full_domain] = -fmax
+        p_lower[np.less_equal(expr_lower, qv_neg) & (pv < qv_pos)] = -fmax
+        np.copyto(p_lower, pv, where=np.isinf(pv), casting="no")
+        p_lower[qv == 0] = Xs.dtype.type(-np.inf)
+        np.copyto(p_lower, pv, where=np.isnan(pv), casting="no")
+        p_lower[np.isnan(qv)] = Xs.dtype.type(-np.inf)
+        _minimum_zero_sign_sensitive(pv, p_lower, out=p_lower)
+
+        p_upper = _ensure_array(p_upper_diff, copy=True)
+        np.add(p_upper, pv, out=p_upper)
+        p_upper[full_domain] = fmax
+        p_upper[np.greater_equal(expr_upper, qv_pos) & (pv > qv_neg)] = fmax
+        np.copyto(p_upper, pv, where=np.isinf(pv), casting="no")
+        p_upper[qv == 0] = Xs.dtype.type(np.inf)
+        np.copyto(p_upper, pv, where=np.isnan(pv), casting="no")
+        p_upper[np.isnan(qv)] = Xs.dtype.type(np.inf)
+        _maximum_zero_sign_sensitive(pv, p_upper, out=p_upper)
+
+        # we need to force pv if expr_lower == expr_upper
+        np.copyto(p_lower, pv, where=(expr_lower == expr_upper), casting="no")
+        np.copyto(p_upper, pv, where=(expr_lower == expr_upper), casting="no")
+
+        # handle rounding errors in trunc_modulo early
+        p_lower = guarantee_arg_within_expr_bounds(
+            lambda p_lower: _trunc_modulo(p_lower, qv),
+            exprv,
+            pv,
+            p_lower,
+            expr_lower,
+            expr_upper,
+        )
+        p_upper = guarantee_arg_within_expr_bounds(
+            lambda p_upper: _trunc_modulo(p_upper, qv),
+            exprv,
+            pv,
+            p_upper,
+            expr_lower,
+            expr_upper,
+        )
+
+        return p.deferred_compute_data_bounds(
+            p_lower,
+            p_upper,
+            Xs,
+            late_bound,
+            ctx,
+            callback,
+        )
 
     @override
     def __repr__(self) -> str:
@@ -583,18 +693,18 @@ class ScalarRoundTiesEvenModulo(Expr[AnyExpr, AnyExpr]):
         p_lower = _ensure_array(p_lower_diff, copy=True)
         np.add(p_lower, pv, out=p_lower)
         p_lower[full_domain] = -fmax
-        np.copyto(p_lower, pv, where=np.isinf(pv))
+        np.copyto(p_lower, pv, where=np.isinf(pv), casting="no")
         p_lower[qv == 0] = Xs.dtype.type(-np.inf)
-        np.copyto(p_lower, pv, where=np.isnan(pv))
+        np.copyto(p_lower, pv, where=np.isnan(pv), casting="no")
         p_lower[np.isnan(qv)] = Xs.dtype.type(-np.inf)
         _minimum_zero_sign_sensitive(pv, p_lower, out=p_lower)
 
         p_upper = _ensure_array(p_upper_diff, copy=True)
         np.add(p_upper, pv, out=p_upper)
         p_upper[full_domain] = fmax
-        np.copyto(p_upper, pv, where=np.isinf(pv))
+        np.copyto(p_upper, pv, where=np.isinf(pv), casting="no")
         p_upper[qv == 0] = Xs.dtype.type(np.inf)
-        np.copyto(p_upper, pv, where=np.isnan(pv))
+        np.copyto(p_upper, pv, where=np.isnan(pv), casting="no")
         p_upper[np.isnan(qv)] = Xs.dtype.type(np.inf)
         _maximum_zero_sign_sensitive(pv, p_upper, out=p_upper)
 
@@ -754,9 +864,9 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
             out=p_lower,
             where=(np.isinf(qv) & _is_sign_positive_number(pv)),
         )
-        np.copyto(p_lower, pv, where=np.isinf(pv))
+        np.copyto(p_lower, pv, where=np.isinf(pv), casting="no")
         p_lower[qv == 0] = Xs.dtype.type(-np.inf)
-        np.copyto(p_lower, pv, where=np.isnan(pv))
+        np.copyto(p_lower, pv, where=np.isnan(pv), casting="no")
         p_lower[np.isnan(qv)] = Xs.dtype.type(-np.inf)
         _minimum_zero_sign_sensitive(pv, p_lower, out=p_lower)
 
@@ -767,9 +877,9 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
         p_upper[
             np.isinf(qv) & _is_sign_negative_number(pv) & (efl > 0)
         ] = -smallest_subnormal
-        np.copyto(p_upper, pv, where=np.isinf(pv))
+        np.copyto(p_upper, pv, where=np.isinf(pv), casting="no")
         p_upper[qv == 0] = Xs.dtype.type(np.inf)
-        np.copyto(p_upper, pv, where=np.isnan(pv))
+        np.copyto(p_upper, pv, where=np.isnan(pv), casting="no")
         p_upper[np.isnan(qv)] = Xs.dtype.type(np.inf)
         _maximum_zero_sign_sensitive(pv, p_upper, out=p_upper)
 

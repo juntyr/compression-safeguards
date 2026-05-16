@@ -603,9 +603,9 @@ class QoIParser(Parser):
     @_("TRUNC_MODULO LPAREN expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         self.assert_or_error(
-            not (p.expr0.has_data or p.expr1.has_data),
+            not p.expr1.has_data,
             p,
-            f"`trunc_modulo` does not yet support references to the data `{'x' if self._X is None else 'X'}`",
+            f"`trunc_modulo(p, q)` does not yet support references to the data `{'x' if self._X is None else 'X'}` in the divisor `q`",
         )
         return Array.map(ScalarTruncModulo, p.expr0, p.expr1)
 
