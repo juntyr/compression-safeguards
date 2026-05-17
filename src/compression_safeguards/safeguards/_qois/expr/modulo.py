@@ -140,14 +140,12 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
         p_lower = _ensure_array(p_lower_diff, copy=True)
         np.add(p_lower, pv, out=p_lower)
         p_lower[full_domain] = -fmax
-        p_lower[np.isposinf(qv) & _is_sign_negative_number(pv)] = -fmax
-        p_lower[
-            np.isposinf(qv) & _is_sign_negative_number(pv) & _is_positive_zero(efu)
-        ] = Xs.dtype.type(-0.0)
-        p_lower[np.isneginf(qv) & _is_sign_positive_number(pv)] = Xs.dtype.type(+0.0)
-        p_lower[np.isneginf(qv) & _is_sign_positive_number(pv) & (efu < 0)] = (
-            smallest_subnormal
+        p_lower[np.isposinf(qv) & (pv < 0)] = -fmax
+        p_lower[np.isposinf(qv) & (pv < 0) & _is_positive_zero(efu)] = Xs.dtype.type(
+            -0.0
         )
+        p_lower[np.isneginf(qv) & (pv > 0)] = Xs.dtype.type(+0.0)
+        p_lower[np.isneginf(qv) & (pv > 0) & (efu < 0)] = smallest_subnormal
         _maximum_zero_sign_sensitive(
             p_lower,
             Xs.dtype.type(+0.0),
@@ -163,14 +161,12 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
         p_upper = _ensure_array(p_upper_diff, copy=True)
         np.add(p_upper, pv, out=p_upper)
         p_upper[full_domain] = fmax
-        p_upper[np.isposinf(qv) & _is_sign_negative_number(pv)] = Xs.dtype.type(-0.0)
-        p_upper[
-            np.isposinf(qv) & _is_sign_negative_number(pv) & (efl > 0)
-        ] = -smallest_subnormal
-        p_upper[np.isneginf(qv) & _is_sign_positive_number(pv)] = fmax
-        p_upper[
-            np.isneginf(qv) & _is_sign_positive_number(pv) & _is_negative_zero(efl)
-        ] = Xs.dtype.type(+0.0)
+        p_upper[np.isposinf(qv) & (pv < 0)] = Xs.dtype.type(-0.0)
+        p_upper[np.isposinf(qv) & (pv < 0) & (efl > 0)] = -smallest_subnormal
+        p_upper[np.isneginf(qv) & (pv > 0)] = fmax
+        p_upper[np.isneginf(qv) & (pv > 0) & _is_negative_zero(efl)] = Xs.dtype.type(
+            +0.0
+        )
         _minimum_zero_sign_sensitive(
             p_upper,
             Xs.dtype.type(-0.0),
@@ -334,14 +330,12 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
         p_lower = _ensure_array(p_lower_diff, copy=True)
         np.add(p_lower, pv, out=p_lower)
         p_lower[full_domain] = -fmax
-        p_lower[np.isposinf(qv) & _is_sign_positive_number(pv)] = Xs.dtype.type(+0.0)
-        p_lower[np.isposinf(qv) & _is_sign_positive_number(pv) & (efu < 0)] = (
-            smallest_subnormal
+        p_lower[np.isposinf(qv) & (pv > 0)] = Xs.dtype.type(+0.0)
+        p_lower[np.isposinf(qv) & (pv > 0) & (efu < 0)] = smallest_subnormal
+        p_lower[np.isneginf(qv) & (pv < 0)] = -fmax
+        p_lower[np.isneginf(qv) & (pv < 0) & _is_positive_zero(efu)] = Xs.dtype.type(
+            -0.0
         )
-        p_lower[np.isneginf(qv) & _is_sign_negative_number(pv)] = -fmax
-        p_lower[
-            np.isneginf(qv) & _is_sign_negative_number(pv) & _is_positive_zero(efu)
-        ] = Xs.dtype.type(-0.0)
         _maximum_zero_sign_sensitive(
             p_lower,
             Xs.dtype.type(+0.0),
@@ -357,14 +351,12 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
         p_upper = _ensure_array(p_upper_diff, copy=True)
         np.add(p_upper, pv, out=p_upper)
         p_upper[full_domain] = fmax
-        p_upper[np.isposinf(qv) & _is_sign_positive_number(pv)] = fmax
-        p_upper[
-            np.isposinf(qv) & _is_sign_positive_number(pv) & _is_negative_zero(efl)
-        ] = Xs.dtype.type(+0.0)
-        p_upper[np.isneginf(qv) & _is_sign_negative_number(pv)] = Xs.dtype.type(-0.0)
-        p_upper[
-            np.isneginf(qv) & _is_sign_negative_number(pv) & (efl > 0)
-        ] = -smallest_subnormal
+        p_upper[np.isposinf(qv) & (pv > 0)] = fmax
+        p_upper[np.isposinf(qv) & (pv > 0) & _is_negative_zero(efl)] = Xs.dtype.type(
+            +0.0
+        )
+        p_upper[np.isneginf(qv) & (pv < 0)] = Xs.dtype.type(-0.0)
+        p_upper[np.isneginf(qv) & (pv < 0) & (efl > 0)] = -smallest_subnormal
         _minimum_zero_sign_sensitive(
             p_upper,
             Xs.dtype.type(-0.0),
@@ -854,10 +846,8 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
         p_lower = _ensure_array(p_lower_diff, copy=True)
         np.add(p_lower, pv, out=p_lower)
         p_lower[full_domain] = -fmax
-        p_lower[np.isinf(qv) & _is_sign_negative_number(pv)] = -fmax
-        p_lower[
-            np.isinf(qv) & _is_sign_negative_number(pv) & _is_positive_zero(efu)
-        ] = Xs.dtype.type(-0.0)
+        p_lower[np.isinf(qv) & (pv < 0)] = -fmax
+        p_lower[np.isinf(qv) & (pv < 0) & _is_positive_zero(efu)] = Xs.dtype.type(-0.0)
         _maximum_zero_sign_sensitive(
             p_lower,
             Xs.dtype.type(+0.0),
@@ -873,10 +863,8 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
         p_upper = _ensure_array(p_upper_diff, copy=True)
         np.add(p_upper, pv, out=p_upper)
         p_upper[full_domain] = fmax
-        p_upper[np.isinf(qv) & _is_sign_negative_number(pv)] = Xs.dtype.type(-0.0)
-        p_upper[
-            np.isinf(qv) & _is_sign_negative_number(pv) & (efl > 0)
-        ] = -smallest_subnormal
+        p_upper[np.isinf(qv) & (pv < 0)] = Xs.dtype.type(-0.0)
+        p_upper[np.isinf(qv) & (pv < 0) & (efl > 0)] = -smallest_subnormal
         np.copyto(p_upper, pv, where=np.isinf(pv), casting="no")
         p_upper[qv == 0] = Xs.dtype.type(np.inf)
         np.copyto(p_upper, pv, where=np.isnan(pv), casting="no")

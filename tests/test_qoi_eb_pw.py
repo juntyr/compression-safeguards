@@ -345,6 +345,7 @@ def test_rounding(check):
     check("round_ties_even(x) * round_ties_even(1.5)")
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("check", CHECKS)
 def test_modulo(check):
     check("where(1, floor_modulo(-0.0, Inf), x)")
@@ -358,6 +359,36 @@ def test_modulo(check):
     check("trunc_modulo(x, 1.5)")
     check("round_ties_even_modulo(x, 1.5)")
     check("euclidean_modulo(x, 1.5)")
+
+    check("floor_modulo(x, 0.0)")
+    check("ceil_modulo(x, 0.0)")
+    check("trunc_modulo(x, 0.0)")
+    check("round_ties_even_modulo(x, 0.0)")
+    check("euclidean_modulo(x, 0.0)")
+
+    check("floor_modulo(x, -1.5)")
+    check("ceil_modulo(x, -1.5)")
+    check("trunc_modulo(x, -1.5)")
+    check("round_ties_even_modulo(x, -1.5)")
+    check("euclidean_modulo(x, -1.5)")
+
+    check("floor_modulo(x, Inf)")
+    check("ceil_modulo(x, Inf)")
+    check("trunc_modulo(x, Inf)")
+    check("round_ties_even_modulo(x, Inf)")
+    check("euclidean_modulo(x, Inf)")
+
+    check("floor_modulo(x, -Inf)")
+    check("ceil_modulo(x, -Inf)")
+    check("trunc_modulo(x, -Inf)")
+    check("round_ties_even_modulo(x, -Inf)")
+    check("euclidean_modulo(x, -Inf)")
+
+    check("floor_modulo(x, NaN)")
+    check("ceil_modulo(x, NaN)")
+    check("trunc_modulo(x, NaN)")
+    check("round_ties_even_modulo(x, NaN)")
+    check("euclidean_modulo(x, NaN)")
 
     with pytest.raises(
         SyntaxError,
