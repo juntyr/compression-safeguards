@@ -125,9 +125,10 @@ def _ceil_modulo(p: Fi, q: Fi) -> Fi: ...
 
 
 def _ceil_modulo(p, q):
-    out = _ensure_array(_floor_modulo(p, q))
-    # correct the quadrant for the remainder
-    out -= q
+    out = _ensure_array(np.fmod(p, q))
+    # correct the quadrant of the remainder
+    np.subtract(out, q, out=out, where=((p < 0) & (q < 0)))
+    np.subtract(out, q, out=out, where=((p > 0) & (q > 0)))
     # ensure that |out| < |q|
     np.fmod(out, q, out=out)
     # ensure correct handling for finite p and infinite q
