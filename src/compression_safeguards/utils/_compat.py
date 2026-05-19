@@ -180,8 +180,8 @@ def _round_ties_even_modulo(p, q):
     np.subtract(out, q2, out=out)
     # ensure correct handling for finite p and infinite q
     np.copyto(out, p, where=(np.isfinite(p) & np.isinf(q)))
-    # ensure correct handling for zero p and non-NaN remainder
-    np.copyto(out, p, where=((p == 0) & ~np.isnan(q) & (q != 0)))
+    # ensure correct handling for near-zero p and non-NaN remainder
+    np.copyto(out, p, where=((np.abs(p) < np.abs(q2)) & ~np.isnan(q) & (q != 0)))
     return out
 
 

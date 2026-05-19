@@ -48,6 +48,7 @@ from compression_safeguards.safeguards._qois.expr.logexp import (
 from compression_safeguards.safeguards._qois.expr.modulo import (
     ScalarCeilModulo,
     ScalarFloorModulo,
+    ScalarRoundTiesEvenModulo,
 )
 from compression_safeguards.safeguards._qois.expr.neg import ScalarNegate
 from compression_safeguards.safeguards._qois.expr.power import ScalarPower
@@ -2123,6 +2124,26 @@ def test_fuzzer_found_floor_modulo_zero_inf_bounds():
 
     assert _is_positive_zero(X_lower)
     assert _is_positive_zero(X_upper)
+
+    assert _is_negative_zero(expr.eval(X_lower, dict()))
+    assert _is_negative_zero(expr.eval(X_upper, dict()))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_round_ties_even_modulo_near_zero():
+    X = np.array(np.float32(-9.249943e-28))
+
+    expr = ScalarRoundTiesEvenModulo(ScalarRoundTiesEven(Data.SCALAR), Pi())
+
+    assert _is_negative_zero(expr.eval(X, dict()))
+
+    expr_lower = np.array(np.float32(-9.250028e-28))
+    expr_upper = np.array(np.float32(-0.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float32(-0.5)
+    assert X_upper == np.float32(-0.0)
 
     assert _is_negative_zero(expr.eval(X_lower, dict()))
     assert _is_negative_zero(expr.eval(X_upper, dict()))
