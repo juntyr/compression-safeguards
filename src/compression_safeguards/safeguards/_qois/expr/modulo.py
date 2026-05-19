@@ -314,7 +314,7 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
         #    - if the bounds exclude zero, only allow sign(pv) == sign(+-Inf)
         #  - if the bounds only include zero, restrict pv to zero
         #  - if the bounds exclude inf, only sign(pv) != sign(+-Inf) is allowed
-        # if the full domain is ok, allow the full finite domain
+        # if the full domain is ok, allow the full finite domain for pv
         # otherwise, apply the bounds to the current repetition
         # if p_lower == pv and pv == -0.0, we need to guarantee that
         #  p_lower is also -0.0, same for p_upper
@@ -632,22 +632,21 @@ class ScalarRoundTiesEvenModulo(Expr[AnyExpr, AnyExpr]):
         qv = q.eval(Xs, late_bound)
         exprv = _round_ties_even_modulo(pv, qv)
 
-        qv2 = np.divide(np.abs(qv), Xs.dtype.type(2))
+        qv2: np.ndarray[tuple[Ps], np.dtype[F]] = np.divide(np.abs(qv), 2)
 
-        # ensure that the bounds on round_ties_even_modulo(...) are in
-        #  [-|q/2|, +|q/2|]
-        efl: np.ndarray[tuple[Ps], np.dtype[F]] = _maximum_zero_sign_sensitive(
-            -qv2, expr_lower
-        )
-        efu: np.ndarray[tuple[Ps], np.dtype[F]] = _minimum_zero_sign_sensitive(
-            expr_upper, qv2
-        )
+        # the bounds on round_ties_even_modulo(...) are [-|q/2|, +|q/2|]
+        rem_expr_lower = _maximum_zero_sign_sensitive(-qv2, expr_lower)
+        rem_expr_upper = _minimum_zero_sign_sensitive(expr_upper, qv2)
 
         # round_ties_even_modulo(...) is periodic, so we need to drop to
         #  difference bounds before applying the difference to pv to stay in
         #  the same period
-        p_lower_diff: np.ndarray[tuple[Ps], np.dtype[F]] = np.subtract(efl, exprv)
-        p_upper_diff: np.ndarray[tuple[Ps], np.dtype[F]] = np.subtract(efu, exprv)
+        p_lower_diff: np.ndarray[tuple[Ps], np.dtype[F]] = np.subtract(
+            rem_expr_lower, exprv
+        )
+        p_upper_diff: np.ndarray[tuple[Ps], np.dtype[F]] = np.subtract(
+            rem_expr_upper, exprv
+        )
 
         # check for the case where any finite value would work
         full_domain: np.ndarray[tuple[Ps], np.dtype[np.bool]] = np.less_equal(
@@ -656,18 +655,18 @@ class ScalarRoundTiesEvenModulo(Expr[AnyExpr, AnyExpr]):
 
         fmax = np.finfo(Xs.dtype).max
 
-        # if qv is NaN, anything is allowed for pv
-        # if pv is NaN, it should stay NaN
-        # if qv is 0, anything is allowed for pv
-        # if pv is inf, it must stay inf
-        # if qv is inf, use expr bounds
-        # if the full domain is ok, allow the full finite domain
+        # round_ties_even_modulo(pv, NaN) = NaN for any pv
+        # round_ties_even_modulo(NaN, qv) = NaN, keep pv NaN
+        # round_ties_even_modulo(pv, 0) = NaN for any pv
+        # round_ties_even_modulo(+-Inf, qv) = NaN, keep pv Inf
+        # round_ties_even_modulo(pv, +-Inf) = pv, so use normal pv bounds
+        # if the full domain is ok, allow the full finite domain for pv
         # otherwise, apply the bounds to the current repetition
         # if p_lower == pv and pv == -0.0, we need to guarantee that
         #  p_lower is also -0.0, same for p_upper
 
-        p_lower = _ensure_array(p_lower_diff, copy=True)
-        np.add(p_lower, pv, out=p_lower)
+        p_lower = _ensure_array(pv, copy=True)
+        np.add(p_lower, p_lower_diff, out=p_lower)
         p_lower[full_domain] = -fmax
         np.copyto(p_lower, pv, where=np.isinf(pv), casting="no")
         p_lower[qv == 0] = Xs.dtype.type(-np.inf)
@@ -675,18 +674,14 @@ class ScalarRoundTiesEvenModulo(Expr[AnyExpr, AnyExpr]):
         p_lower[np.isnan(qv)] = Xs.dtype.type(-np.inf)
         _minimum_zero_sign_sensitive(pv, p_lower, out=p_lower)
 
-        p_upper = _ensure_array(p_upper_diff, copy=True)
-        np.add(p_upper, pv, out=p_upper)
+        p_upper = _ensure_array(pv, copy=True)
+        np.add(p_upper, p_upper_diff, out=p_upper)
         p_upper[full_domain] = fmax
         np.copyto(p_upper, pv, where=np.isinf(pv), casting="no")
         p_upper[qv == 0] = Xs.dtype.type(np.inf)
         np.copyto(p_upper, pv, where=np.isnan(pv), casting="no")
         p_upper[np.isnan(qv)] = Xs.dtype.type(np.inf)
         _maximum_zero_sign_sensitive(pv, p_upper, out=p_upper)
-
-        # we need to force pv if expr_lower == expr_upper
-        np.copyto(p_lower, pv, where=(expr_lower == expr_upper), casting="no")
-        np.copyto(p_upper, pv, where=(expr_lower == expr_upper), casting="no")
 
         # handle rounding errors in round_ties_even_modulo early
         p_lower = guarantee_arg_within_expr_bounds(
