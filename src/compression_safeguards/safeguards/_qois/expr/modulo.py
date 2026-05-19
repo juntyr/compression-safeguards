@@ -8,9 +8,7 @@ from ....utils._compat import (
     _ensure_array,
     _euclidean_modulo,
     _floor_modulo,
-    _is_negative_zero,
     _is_positive_zero,
-    _is_sign_negative_number,
     _is_sign_positive_number,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
@@ -278,62 +276,61 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
         qv = q.eval(Xs, late_bound)
         exprv = _ceil_modulo(pv, qv)
 
-        fl: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(-qv, copy=True)
-        fl[qv < 0] = Xs.dtype.type(+0.0)
-        fu: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(-qv, copy=True)
-        fu[qv > 0] = Xs.dtype.type(-0.0)
-
-        # ensure that the bounds on ceil_modulo(...) are in
+        # the bounds on ceil_modulo(...) are
         #  - [+0.0, -q) if q < 0
         #  - (-q, -0.0] if q > 0
-        efl: np.ndarray[tuple[Ps], np.dtype[F]] = _maximum_zero_sign_sensitive(
-            fl, expr_lower
-        )
-        efu: np.ndarray[tuple[Ps], np.dtype[F]] = _minimum_zero_sign_sensitive(
-            expr_upper, fu
-        )
+        rem_lower = _ensure_array(-qv, copy=True)
+        rem_lower[qv < 0] = Xs.dtype.type(+0.0)
+        rem_upper = _ensure_array(-qv, copy=True)
+        rem_upper[qv > 0] = Xs.dtype.type(-0.0)
+
+        rem_expr_lower = _maximum_zero_sign_sensitive(rem_lower, expr_lower)
+        rem_expr_upper = _minimum_zero_sign_sensitive(expr_upper, rem_upper)
 
         # ceil_modulo(...) is periodic, so we need to drop to difference
         #  bounds before applying the difference to pv to stay in the
         #  same period
-        p_lower_diff: np.ndarray[tuple[Ps], np.dtype[F]] = np.subtract(efl, exprv)
-        p_upper_diff: np.ndarray[tuple[Ps], np.dtype[F]] = np.subtract(efu, exprv)
+        p_lower_diff: np.ndarray[tuple[Ps], np.dtype[F]] = np.subtract(
+            rem_expr_lower, exprv
+        )
+        p_upper_diff: np.ndarray[tuple[Ps], np.dtype[F]] = np.subtract(
+            rem_expr_upper, exprv
+        )
 
         # check for the case where any finite value would work
         full_domain: np.ndarray[tuple[Ps], np.dtype[np.bool]] = np.less_equal(
-            expr_lower, fl
-        ) & np.greater_equal(expr_upper, fu)
+            expr_lower, rem_lower
+        ) & np.greater_equal(expr_upper, rem_upper)
 
         fmax = np.finfo(Xs.dtype).max
         smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
 
-        # if qv is NaN, anything is allowed for pv
-        # if pv is NaN, it should stay NaN
-        # if qv is 0, anything is allowed for pv
-        # if pv is inf, it must stay inf
-        # if qv is inf and the signbits of pv and qv don't match, use expr bounds as long as the mismatch stays
-        # if qv is inf and the signbits of pv and qv match, anything is allowed within as long as the match stays
-        #  - if the expr bounds only include zero, pv must stay zero
-        #  - if the expr bounds exclude zero, pv must stay non-zero
+        # ceil_modulo(pv, NaN) = NaN for any pv
+        # ceil_modulo(NaN, qv) = NaN, keep pv NaN
+        # ceil_modulo(pv, 0) = NaN for any pv
+        # ceil_modulo(+-Inf, qv) = NaN, keep pv Inf
+        # ceil_modulo(pv, +-Inf) = ??
+        #  - if the bounds include inf, sign(pv) == sign(+-Inf) is allowed
+        #    - if the bounds exclude zero, only allow sign(pv) == sign(+-Inf)
+        #  - if the bounds only include zero, restrict pv to zero
+        #  - if the bounds exclude inf, only sign(pv) != sign(+-Inf) is allowed
         # if the full domain is ok, allow the full finite domain
         # otherwise, apply the bounds to the current repetition
         # if p_lower == pv and pv == -0.0, we need to guarantee that
         #  p_lower is also -0.0, same for p_upper
 
-        p_lower = _ensure_array(p_lower_diff, copy=True)
-        np.add(p_lower, pv, out=p_lower)
+        p_lower = _ensure_array(pv, copy=True)
+        np.add(p_lower, p_lower_diff, out=p_lower)
         p_lower[full_domain] = -fmax
-        p_lower[np.isposinf(qv) & (pv > 0)] = Xs.dtype.type(+0.0)
-        p_lower[np.isposinf(qv) & (pv > 0) & (efu < 0)] = smallest_subnormal
-        p_lower[np.isneginf(qv) & (pv < 0)] = -fmax
-        p_lower[np.isneginf(qv) & (pv < 0) & _is_positive_zero(efu)] = Xs.dtype.type(
-            -0.0
-        )
+        p_lower[np.isneginf(qv) & np.isposinf(rem_expr_lower)] = -fmax
+        p_lower[np.isneginf(qv) & (rem_expr_upper == 0)] = Xs.dtype.type(-0.0)
+        p_lower[np.isposinf(qv) & (rem_expr_lower == 0)] = Xs.dtype.type(-0.0)
+        p_lower[np.isposinf(qv) & (pv > 0) & (rem_expr_upper < 0)] = smallest_subnormal
         _maximum_zero_sign_sensitive(
             p_lower,
             Xs.dtype.type(+0.0),
             out=p_lower,
-            where=(np.isneginf(qv) & _is_sign_positive_number(pv)),
+            where=(np.isneginf(qv) & ~np.isposinf(rem_expr_upper)),
         )
         np.copyto(p_lower, pv, where=np.isinf(pv), casting="no")
         p_lower[qv == 0] = Xs.dtype.type(-np.inf)
@@ -341,30 +338,24 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
         p_lower[np.isnan(qv)] = Xs.dtype.type(-np.inf)
         _minimum_zero_sign_sensitive(pv, p_lower, out=p_lower)
 
-        p_upper = _ensure_array(p_upper_diff, copy=True)
-        np.add(p_upper, pv, out=p_upper)
+        p_upper = _ensure_array(pv, copy=True)
+        np.add(p_upper, p_upper_diff, out=p_upper)
         p_upper[full_domain] = fmax
-        p_upper[np.isposinf(qv) & (pv > 0)] = fmax
-        p_upper[np.isposinf(qv) & (pv > 0) & _is_negative_zero(efl)] = Xs.dtype.type(
-            +0.0
-        )
-        p_upper[np.isneginf(qv) & (pv < 0)] = Xs.dtype.type(-0.0)
-        p_upper[np.isneginf(qv) & (pv < 0) & (efl > 0)] = -smallest_subnormal
+        p_upper[np.isneginf(qv) & (rem_expr_upper == 0)] = Xs.dtype.type(+0.0)
+        p_upper[np.isneginf(qv) & (pv < 0) & (rem_expr_lower > 0)] = -smallest_subnormal
+        p_upper[np.isposinf(qv) & np.isneginf(rem_expr_lower)] = fmax
+        p_upper[np.isposinf(qv) & (rem_expr_lower == 0)] = Xs.dtype.type(+0.0)
         _minimum_zero_sign_sensitive(
             p_upper,
             Xs.dtype.type(-0.0),
             out=p_upper,
-            where=(np.isposinf(qv) & _is_sign_negative_number(pv)),
+            where=(np.isposinf(qv) & ~np.isneginf(rem_expr_lower)),
         )
         np.copyto(p_upper, pv, where=np.isinf(pv), casting="no")
         p_upper[qv == 0] = Xs.dtype.type(np.inf)
         np.copyto(p_upper, pv, where=np.isnan(pv), casting="no")
         p_upper[np.isnan(qv)] = Xs.dtype.type(np.inf)
         _maximum_zero_sign_sensitive(pv, p_upper, out=p_upper)
-
-        # we need to force pv if expr_lower == expr_upper
-        np.copyto(p_lower, pv, where=(expr_lower == expr_upper), casting="no")
-        np.copyto(p_upper, pv, where=(expr_lower == expr_upper), casting="no")
 
         # handle rounding errors in ceil_modulo early
         p_lower = guarantee_arg_within_expr_bounds(
