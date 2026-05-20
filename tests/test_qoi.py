@@ -2147,3 +2147,23 @@ def test_fuzzer_found_round_ties_even_modulo_near_zero():
 
     assert _is_negative_zero(expr.eval(X_lower, dict()))
     assert _is_negative_zero(expr.eval(X_upper, dict()))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_round_ties_even_modulo_near_zero_float16():
+    X = np.array(np.float16(-0.1779))
+
+    expr = ScalarRoundTiesEvenModulo(ScalarTrunc(Data.SCALAR), Pi())
+
+    assert _is_negative_zero(expr.eval(X, dict()))
+
+    expr_lower = np.array(np.float16(-0.1779))
+    expr_upper = np.array(np.float16(-0.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(-0.9995)
+    assert X_upper == np.float16(-0.0)
+
+    assert _is_negative_zero(expr.eval(X_lower, dict()))
+    assert _is_negative_zero(expr.eval(X_upper, dict()))

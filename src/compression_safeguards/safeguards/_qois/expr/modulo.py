@@ -499,11 +499,13 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
         # if the positive/negative domain is ok, allow the finite domain with
         #  the matching sign
         # otherwise, apply the bounds to the current repetition
+        # propagate -0.0 and +0.0 bounds on pv to avoid nudging
         # if p_lower == pv and pv == -0.0, we need to guarantee that
         #  p_lower is also -0.0, same for p_upper
 
         p_lower = _ensure_array(p_lower_diff, copy=True)
         np.add(p_lower, pv, out=p_lower)
+        np.copyto(p_lower, efl, where=((p_lower == 0) & (efl == 0)), casting="no")
         p_lower[full_domain] = -fmax
         p_lower[(expr_lower <= qv_neg) & (expr_upper >= 0) & (pv < qv_pos)] = -fmax
         np.copyto(p_lower, pv, where=np.isinf(pv), casting="no")
@@ -514,6 +516,7 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
 
         p_upper = _ensure_array(p_upper_diff, copy=True)
         np.add(p_upper, pv, out=p_upper)
+        np.copyto(p_upper, efu, where=((p_upper == 0) & (efu == 0)), casting="no")
         p_upper[full_domain] = fmax
         p_upper[(expr_lower <= 0) & (expr_upper >= qv_pos) & (pv > qv_neg)] = fmax
         np.copyto(p_upper, pv, where=np.isinf(pv), casting="no")
@@ -662,11 +665,18 @@ class ScalarRoundTiesEvenModulo(Expr[AnyExpr, AnyExpr]):
         # round_ties_even_modulo(pv, +-Inf) = pv, so use normal pv bounds
         # if the full domain is ok, allow the full finite domain for pv
         # otherwise, apply the bounds to the current repetition
+        # propagate -0.0 and +0.0 bounds on pv to avoid nudging
         # if p_lower == pv and pv == -0.0, we need to guarantee that
         #  p_lower is also -0.0, same for p_upper
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
+        np.copyto(
+            p_lower,
+            rem_expr_lower,
+            where=((p_lower == 0) & (rem_expr_lower == 0)),
+            casting="no",
+        )
         p_lower[full_domain] = -fmax
         np.copyto(p_lower, pv, where=np.isinf(pv), casting="no")
         p_lower[qv == 0] = Xs.dtype.type(-np.inf)
@@ -676,6 +686,12 @@ class ScalarRoundTiesEvenModulo(Expr[AnyExpr, AnyExpr]):
 
         p_upper = _ensure_array(pv, copy=True)
         np.add(p_upper, p_upper_diff, out=p_upper)
+        np.copyto(
+            p_upper,
+            rem_expr_upper,
+            where=((p_upper == 0) & (rem_expr_upper == 0)),
+            casting="no",
+        )
         p_upper[full_domain] = fmax
         np.copyto(p_upper, pv, where=np.isinf(pv), casting="no")
         p_upper[qv == 0] = Xs.dtype.type(np.inf)
