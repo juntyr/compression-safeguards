@@ -457,29 +457,29 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
         qv = q.eval(Xs, late_bound)
         exprv = _trunc_modulo(pv, qv)
 
-        qv_neg = np.copysign(qv, -1)
-        qv_pos = np.copysign(qv, +1)
+        qv_neg: np.ndarray[tuple[Ps], np.dtype[F]] = np.copysign(qv, -1)
+        qv_pos: np.ndarray[tuple[Ps], np.dtype[F]] = np.copysign(qv, +1)
 
-        fl: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(qv_neg, copy=True)
-        fl[pv >= qv_pos] = Xs.dtype.type(+0.0)
-        fu: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(qv_pos, copy=True)
-        fu[pv <= qv_neg] = Xs.dtype.type(-0.0)
-
-        # ensure that the bounds on trunc_modulo(...) are in
+        # the bounds on trunc_modulo(...) are
         #  - (-|q|, +|q|) if -|q| < pv < +|q|
         #  - (-|q|, -0.0] if pv < -|q|
         #  - [+0.0, +|q|) if pv > +|q|
-        efl: np.ndarray[tuple[Ps], np.dtype[F]] = _maximum_zero_sign_sensitive(
-            fl, expr_lower
-        )
-        efu: np.ndarray[tuple[Ps], np.dtype[F]] = _minimum_zero_sign_sensitive(
-            expr_upper, fu
-        )
+        rem_lower = _ensure_array(qv_neg, copy=True)
+        rem_lower[pv >= qv_pos] = Xs.dtype.type(+0.0)
+        rem_upper = _ensure_array(qv_pos, copy=True)
+        rem_upper[pv <= qv_neg] = Xs.dtype.type(-0.0)
+
+        rem_expr_lower = _maximum_zero_sign_sensitive(rem_lower, expr_lower)
+        rem_expr_upper = _minimum_zero_sign_sensitive(expr_upper, rem_upper)
 
         # trunc_modulo(...) is periodic, so we need to drop to difference bounds
         #  before applying the difference to pv to stay in the same period
-        p_lower_diff: np.ndarray[tuple[Ps], np.dtype[F]] = np.subtract(efl, exprv)
-        p_upper_diff: np.ndarray[tuple[Ps], np.dtype[F]] = np.subtract(efu, exprv)
+        p_lower_diff: np.ndarray[tuple[Ps], np.dtype[F]] = np.subtract(
+            rem_expr_lower, exprv
+        )
+        p_upper_diff: np.ndarray[tuple[Ps], np.dtype[F]] = np.subtract(
+            rem_expr_upper, exprv
+        )
 
         # check for the case where any finite value would work for pv
         full_domain: np.ndarray[tuple[Ps], np.dtype[np.bool]] = np.less_equal(
@@ -488,22 +488,27 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
 
         fmax = np.finfo(Xs.dtype).max
 
-        # if qv is NaN, anything is allowed for pv
-        # if pv is NaN, it should stay NaN
-        # if qv is 0, anything is allowed for pv
-        # if pv is inf, it must stay inf
-        # if qv is inf, use expr bounds
-        # if the full domain is ok, allow the full finite domain
+        # trunc_modulo(pv, NaN) = NaN for any pv
+        # trunc_modulo(NaN, qv) = NaN, keep pv NaN
+        # trunc_modulo(pv, 0) = NaN for any pv
+        # trunc_modulo(+-Inf, qv) = NaN, keep pv infinite
+        # trunc_modulo(pv, +-Inf) = pv, so use normal pv bounds
+        # if the full domain is ok, allow the full finite domain for pv
         # if the positive/negative domain is ok, allow the finite domain with
-        #  the matching sign
+        #  the matching sign for pv
         # otherwise, apply the bounds to the current repetition
         # propagate -0.0 and +0.0 bounds on pv to avoid nudging
         # if p_lower == pv and pv == -0.0, we need to guarantee that
         #  p_lower is also -0.0, same for p_upper
 
-        p_lower = _ensure_array(p_lower_diff, copy=True)
-        np.add(p_lower, pv, out=p_lower)
-        np.copyto(p_lower, efl, where=((p_lower == 0) & (efl == 0)), casting="no")
+        p_lower = _ensure_array(pv, copy=True)
+        np.add(p_lower, p_lower_diff, out=p_lower)
+        np.copyto(
+            p_lower,
+            rem_expr_lower,
+            where=((p_lower == 0) & (rem_expr_lower == 0)),
+            casting="no",
+        )
         p_lower[full_domain] = -fmax
         p_lower[(expr_lower <= qv_neg) & (expr_upper >= 0) & (pv < qv_pos)] = -fmax
         np.copyto(p_lower, pv, where=np.isinf(pv), casting="no")
@@ -512,9 +517,14 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
         p_lower[np.isnan(qv)] = Xs.dtype.type(-np.inf)
         _minimum_zero_sign_sensitive(pv, p_lower, out=p_lower)
 
-        p_upper = _ensure_array(p_upper_diff, copy=True)
-        np.add(p_upper, pv, out=p_upper)
-        np.copyto(p_upper, efu, where=((p_upper == 0) & (efu == 0)), casting="no")
+        p_upper = _ensure_array(pv, copy=True)
+        np.add(p_upper, p_upper_diff, out=p_upper)
+        np.copyto(
+            p_upper,
+            rem_expr_upper,
+            where=((p_upper == 0) & (rem_expr_upper == 0)),
+            casting="no",
+        )
         p_upper[full_domain] = fmax
         p_upper[(expr_lower <= 0) & (expr_upper >= qv_pos) & (pv > qv_neg)] = fmax
         np.copyto(p_upper, pv, where=np.isinf(pv), casting="no")
@@ -522,10 +532,6 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
         np.copyto(p_upper, pv, where=np.isnan(pv), casting="no")
         p_upper[np.isnan(qv)] = Xs.dtype.type(np.inf)
         _maximum_zero_sign_sensitive(pv, p_upper, out=p_upper)
-
-        # we need to force pv if expr_lower == expr_upper
-        np.copyto(p_lower, pv, where=(expr_lower == expr_upper), casting="no")
-        np.copyto(p_upper, pv, where=(expr_lower == expr_upper), casting="no")
 
         # handle rounding errors in trunc_modulo early
         p_lower = guarantee_arg_within_expr_bounds(
