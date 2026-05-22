@@ -364,7 +364,7 @@ standard (see e.g. <https://pubs.opengroup.org/onlinepubs/9799919799/>):
 | `trunc` | [`np.trunc`][numpy.trunc] | `trunc` | `-0.0` |
 | `round_ties_even` | [`np.rint`][numpy.rint] | `rint`[^4] | `-0.0` |
 | `floor_modulo(p, q)` | [`np.mod`][numpy.mod][^11] | | as expected[^9] |
-| `ceil_modulo(p, q)` | `np.subtract(np.mod(p, q), q)`[^11] | | as expected[^10] |
+| `ceil_modulo(p, q)` | `np.mod(p, q) - q`[^11] | | as expected[^10] |
 | `trunc_modulo(p, q)` | [`np.fmod`][numpy.fmod][^11] | `fmod` | `-0.0` |
 | `round_ties_even_modulo(p, q)` | `np.mod(p + q/2, q) - q/2`[^11] | `remainder` | `-0.0` |
 | `euclidean_modulo(p, q)` | `np.mod(p, np.abs(q))`[^11] | | `+0.0` |
