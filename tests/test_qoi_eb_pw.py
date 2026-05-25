@@ -345,6 +345,78 @@ def test_rounding(check):
     check("round_ties_even(x) * round_ties_even(1.5)")
 
 
+@pytest.mark.slow
+@pytest.mark.parametrize("check", CHECKS)
+def test_modulo(check):
+    check("where(1, floor_modulo(-0.0, Inf), x)")
+    check("where(1, ceil_modulo(-0.0, Inf), x)")
+    check("where(1, trunc_modulo(-0.0, Inf), x)")
+    check("where(1, round_ties_even_modulo(-0.0, Inf), x)")
+    check("where(1, euclidean_modulo(-0.0, Inf), x)")
+
+    check("floor_modulo(x, 1.5)")
+    check("ceil_modulo(x, 1.5)")
+    check("trunc_modulo(x, 1.5)")
+    check("round_ties_even_modulo(x, 1.5)")
+    check("euclidean_modulo(x, 1.5)")
+
+    check("floor_modulo(x, 0.0)")
+    check("ceil_modulo(x, 0.0)")
+    check("trunc_modulo(x, 0.0)")
+    check("round_ties_even_modulo(x, 0.0)")
+    check("euclidean_modulo(x, 0.0)")
+
+    check("floor_modulo(x, -1.5)")
+    check("ceil_modulo(x, -1.5)")
+    check("trunc_modulo(x, -1.5)")
+    check("round_ties_even_modulo(x, -1.5)")
+    check("euclidean_modulo(x, -1.5)")
+
+    check("floor_modulo(x, Inf)")
+    check("ceil_modulo(x, Inf)")
+    check("trunc_modulo(x, Inf)")
+    check("round_ties_even_modulo(x, Inf)")
+    check("euclidean_modulo(x, Inf)")
+
+    check("floor_modulo(x, -Inf)")
+    check("ceil_modulo(x, -Inf)")
+    check("trunc_modulo(x, -Inf)")
+    check("round_ties_even_modulo(x, -Inf)")
+    check("euclidean_modulo(x, -Inf)")
+
+    check("floor_modulo(x, NaN)")
+    check("ceil_modulo(x, NaN)")
+    check("trunc_modulo(x, NaN)")
+    check("round_ties_even_modulo(x, NaN)")
+    check("euclidean_modulo(x, NaN)")
+
+    with pytest.raises(
+        SyntaxError,
+        match=r"`floor_modulo\(p, q\)` does not yet support references to the data `x` in the divisor `q`",
+    ):
+        check("floor_modulo(1.5, x)")
+    with pytest.raises(
+        SyntaxError,
+        match=r"`ceil_modulo\(p, q\)` does not yet support references to the data `x` in the divisor `q`",
+    ):
+        check("ceil_modulo(1.5, x)")
+    with pytest.raises(
+        SyntaxError,
+        match=r"`trunc_modulo\(p, q\)` does not yet support references to the data `x` in the divisor `q`",
+    ):
+        check("trunc_modulo(1.5, x)")
+    with pytest.raises(
+        SyntaxError,
+        match=r"`round_ties_even_modulo\(p, q\)` does not yet support references to the data `x` in the divisor `q`",
+    ):
+        check("round_ties_even_modulo(1.5, x)")
+    with pytest.raises(
+        SyntaxError,
+        match=r"`euclidean_modulo\(p, q\)` does not yet support references to the data `x` in the divisor `q`",
+    ):
+        check("euclidean_modulo(1.5, x)")
+
+
 @pytest.mark.parametrize("check", CHECKS)
 def test_inverse(check):
     check("1 / x")
@@ -1015,4 +1087,60 @@ def test_fuzzer_found_place_crash():
             ),
         ],
         fixed_constants=dict(__where__=np.array([[1, 0, 1]])),
+    )
+
+
+def test_noise_found_ceil_modulo():
+    data = np.array(
+        [
+            np.inf,
+            np.nan,
+            -np.inf,
+            -np.nan,
+            -1.79769313e308,
+            1.79769313e308,
+            2.22507386e-308,
+            -2.22507386e-308,
+            4.94065646e-324,
+            -4.94065646e-324,
+            0.00000000e000,
+            -0.00000000e000,
+        ]
+    )
+    decoded = np.array(
+        [
+            np.inf,
+            np.nan,
+            -np.inf,
+            -np.nan,
+            -1.79769313e308,
+            1.79769313e308,
+            9.06397924e-002,
+            2.63798335e-002,
+            1.50605902e-001,
+            7.55104308e-004,
+            -7.32944093e-002,
+            3.85991482e-002,
+        ]
+    )
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(kind="qoi_eb_pw", qoi="ceil_modulo(x, 1.5)", type="abs", eb=1)
+        ],
+    )
+
+
+def test_trunc_modulo_half_full_range():
+    data = np.array([-1018.2106], dtype=np.float32)
+    decoded = np.zeros_like(data)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(kind="qoi_eb_pw", qoi="trunc_modulo(x, 1.5)", type="abs", eb=1)
+        ],
     )

@@ -1,81 +1,13 @@
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from enum import Enum, auto
 from typing import assert_never
 
-import numpy as np
-from typing_extensions import override  # MSPV 3.12
-
-from ....utils._compat import _symmetric_modulo
-from ....utils.bindings import Parameter
-from ..context import Callback, Context
-from ..typing import F, Fi, Ns, Ps, np_sndarray
-from .abc import AnyExpr, Expr
+from .abc import AnyExpr
 from .addsub import ScalarSubtract
-from .constfold import ScalarFoldedConstant
 from .divmul import ScalarDivide, ScalarMultiply
 from .group import Group
 from .literal import Number
 from .neg import ScalarNegate
-
-
-class ScalarSymmetricModulo(Expr[AnyExpr, AnyExpr]):
-    __slots__: tuple[str, ...] = ("_a", "_b")
-    _a: AnyExpr
-    _b: AnyExpr
-
-    def __init__(self, a: AnyExpr, b: AnyExpr) -> None:
-        self._a = a
-        self._b = b
-
-    @property
-    @override
-    def args(self) -> tuple[AnyExpr, AnyExpr]:
-        return (self._a, self._b)
-
-    @property
-    @override
-    def extra(self) -> tuple[()]:
-        return ()
-
-    @override
-    def with_args(self, a: AnyExpr, b: AnyExpr) -> "ScalarSymmetricModulo":
-        return ScalarSymmetricModulo(a, b)
-
-    @override
-    def constant_fold(self, dtype: np.dtype[Fi]) -> Fi | AnyExpr:
-        return ScalarFoldedConstant.constant_fold_binary(
-            self._a,
-            self._b,
-            dtype,
-            lambda a, b: _symmetric_modulo(a, b),
-            ScalarSymmetricModulo,
-        )
-
-    @override
-    def eval(
-        self,
-        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-    ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
-        return _symmetric_modulo(
-            self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound)
-        )
-
-    @override
-    def deferred_compute_data_bounds_unchecked(
-        self,
-        expr_lower: np.ndarray[tuple[Ps], np.dtype[F]],
-        expr_upper: np.ndarray[tuple[Ps], np.dtype[F]],
-        Xs: np_sndarray[Ps, Ns, np.dtype[F]],
-        late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
-        ctx: Context[Ps, Ns, F],
-        callback: Callback[Ps, Ns, F],
-    ) -> None:
-        assert False, "cannot compute the data bounds for symmetric_modulo"
-
-    @override
-    def __repr__(self) -> str:
-        return f"symmetric_modulo({self._a!r}, {self._b!r})"
 
 
 class FiniteDifference(Enum):

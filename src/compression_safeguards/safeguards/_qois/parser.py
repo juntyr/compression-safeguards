@@ -28,7 +28,6 @@ from .expr.data import Data, LateBoundConstant
 from .expr.divmul import ScalarDivide, ScalarMultiply
 from .expr.finite_difference import (
     FiniteDifference,
-    ScalarSymmetricModulo,
     finite_difference_coefficients,
     finite_difference_offsets,
 )
@@ -43,6 +42,13 @@ from .expr.hyperbolic import (
 )
 from .expr.literal import Euler, Number, Pi
 from .expr.logexp import Exponential, Logarithm, ScalarExp, ScalarLog, ScalarLogWithBase
+from .expr.modulo import (
+    ScalarCeilModulo,
+    ScalarEuclideanModulo,
+    ScalarFloorModulo,
+    ScalarRoundTiesEvenModulo,
+    ScalarTruncModulo,
+)
 from .expr.neg import ScalarNegate
 from .expr.power import ScalarPower
 from .expr.reciprocal import ScalarReciprocal
@@ -553,11 +559,12 @@ class QoIParser(Parser):
     def expr(self, p):  # noqa: F811
         return Array.map(ScalarAbs, p.expr)
 
-    # sign and rounding
+    # sign
     @_("SIGN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map(ScalarSign, p.expr)
 
+    # rounding
     @_("FLOOR LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map(ScalarFloor, p.expr)
@@ -573,6 +580,52 @@ class QoIParser(Parser):
     @_("ROUND_TIES_EVEN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map(ScalarRoundTiesEven, p.expr)
+
+    # modulo
+    @_("FLOOR_MODULO LPAREN expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        self.assert_or_error(
+            not p.expr1.has_data,
+            p,
+            f"`floor_modulo(p, q)` does not yet support references to the data `{'x' if self._X is None else 'X'}` in the divisor `q`",
+        )
+        return Array.map(ScalarFloorModulo, p.expr0, p.expr1)
+
+    @_("CEIL_MODULO LPAREN expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        self.assert_or_error(
+            not p.expr1.has_data,
+            p,
+            f"`ceil_modulo(p, q)` does not yet support references to the data `{'x' if self._X is None else 'X'}` in the divisor `q`",
+        )
+        return Array.map(ScalarCeilModulo, p.expr0, p.expr1)
+
+    @_("TRUNC_MODULO LPAREN expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        self.assert_or_error(
+            not p.expr1.has_data,
+            p,
+            f"`trunc_modulo(p, q)` does not yet support references to the data `{'x' if self._X is None else 'X'}` in the divisor `q`",
+        )
+        return Array.map(ScalarTruncModulo, p.expr0, p.expr1)
+
+    @_("ROUND_TIES_EVEN_MODULO LPAREN expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        self.assert_or_error(
+            not p.expr1.has_data,
+            p,
+            f"`round_ties_even_modulo(p, q)` does not yet support references to the data `{'x' if self._X is None else 'X'}` in the divisor `q`",
+        )
+        return Array.map(ScalarRoundTiesEvenModulo, p.expr0, p.expr1)
+
+    @_("EUCLIDEAN_MODULO LPAREN expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        self.assert_or_error(
+            not p.expr1.has_data,
+            p,
+            f"`euclidean_modulo(p, q)` does not yet support references to the data `{'x' if self._X is None else 'X'}` in the divisor `q`",
+        )
+        return Array.map(ScalarEuclideanModulo, p.expr0, p.expr1)
 
     # trigonometric
     @_("SIN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
@@ -788,7 +841,9 @@ class QoIParser(Parser):
             (lambda e: e)
             if grid_period is None
             else (
-                lambda e: Array.map(lambda f: ScalarSymmetricModulo(f, grid_period), e)
+                lambda e: Array.map(
+                    lambda f: ScalarRoundTiesEvenModulo(f, grid_period), e
+                )
             )
         )
 

@@ -71,12 +71,19 @@ class QoILexer(Lexer):
         RECIPROCAL,  # type: ignore[name-defined]  # noqa: F821
         # absolute value
         ABS,  # type: ignore[name-defined]  # noqa: F821
-        # sign and rounding
+        # sign
         SIGN,  # type: ignore[name-defined]  # noqa: F821
+        # rounding
         FLOOR,  # type: ignore[name-defined]  # noqa: F821
         CEIL,  # type: ignore[name-defined]  # noqa: F821
         TRUNC,  # type: ignore[name-defined]  # noqa: F821
         ROUND_TIES_EVEN,  # type: ignore[name-defined]  # noqa: F821
+        # modulo
+        FLOOR_MODULO,  # type: ignore[name-defined]  # noqa: F821
+        CEIL_MODULO,  # type: ignore[name-defined]  # noqa: F821
+        TRUNC_MODULO,  # type: ignore[name-defined]  # noqa: F821
+        ROUND_TIES_EVEN_MODULO,  # type: ignore[name-defined]  # noqa: F821
+        EUCLIDEAN_MODULO,  # type: ignore[name-defined]  # noqa: F821
         # trigonometric
         SIN,  # type: ignore[name-defined]  # noqa: F821
         COS,  # type: ignore[name-defined]  # noqa: F821
@@ -229,12 +236,19 @@ class QoILexer(Lexer):
     ID["reciprocal"] = RECIPROCAL  # type: ignore[index, name-defined]  # noqa: F821
     # absolute value
     ID["abs"] = ABS  # type: ignore[index, name-defined]  # noqa: F821
-    # sign and rounding
+    # sign
     ID["sign"] = SIGN  # type: ignore[index, name-defined]  # noqa: F821
+    # rounding
     ID["floor"] = FLOOR  # type: ignore[index, name-defined]  # noqa: F821
     ID["ceil"] = CEIL  # type: ignore[index, name-defined]  # noqa: F821
     ID["trunc"] = TRUNC  # type: ignore[index, name-defined]  # noqa: F821
     ID["round_ties_even"] = ROUND_TIES_EVEN  # type: ignore[index, name-defined]  # noqa: F821
+    # modulo
+    ID["floor_modulo"] = FLOOR_MODULO  # type: ignore[index, name-defined]  # noqa: F821
+    ID["ceil_modulo"] = CEIL_MODULO  # type: ignore[index, name-defined]  # noqa: F821
+    ID["trunc_modulo"] = TRUNC_MODULO  # type: ignore[index, name-defined]  # noqa: F821
+    ID["round_ties_even_modulo"] = ROUND_TIES_EVEN_MODULO  # type: ignore[index, name-defined]  # noqa: F821
+    ID["euclidean_modulo"] = EUCLIDEAN_MODULO  # type: ignore[index, name-defined]  # noqa: F821
     # trigonometric
     ID["sin"] = SIN  # type: ignore[index, name-defined]  # noqa: F821
     ID["cos"] = COS  # type: ignore[index, name-defined]  # noqa: F821
@@ -380,12 +394,19 @@ class QoILexer(Lexer):
             "RECIPROCAL": "`reciprocal`",
             # absolute value
             "ABS": "`abs`",
-            # sign and rounding
+            # sign
             "SIGN": "`sign`",
+            # rounding
             "FLOOR": "`floor`",
             "CEIL": "`ceil`",
             "TRUNC": "`trunc`",
             "ROUND_TIES_EVEN": "`round_ties_even`",
+            # modulo
+            "FLOOR_MODULO": "`floor_modulo`",
+            "CEIL_MODULO": "`ceil_modulo`",
+            "TRUNC_MODULO": "`trunc_modulo`",
+            "ROUND_TIES_EVEN_MODULO": "`round_ties_even_modulo`",
+            "EUCLIDEAN_MODULO": "`euclidean_modulo`",
             # trigonometric
             "SIN": "`sin`",
             "COS": "`cos`",

@@ -10,7 +10,7 @@ from compression_safeguards.safeguards.stencil import BoundaryCondition
 from compression_safeguards.safeguards.stencil.qoi.eb import (
     StencilQuantityOfInterestErrorBoundSafeguard,
 )
-from compression_safeguards.utils._compat import _symmetric_modulo
+from compression_safeguards.utils._compat import _round_ties_even_modulo
 from compression_safeguards.utils.bindings import Bindings
 from compression_safeguards.utils.cast import ToFloatMode, to_float
 
@@ -604,7 +604,7 @@ def test_finite_difference_periodic_grid():
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
 def test_periodic_delta_transform(dtype):
     def delta_transform(x, period):
-        return _symmetric_modulo(x, period)
+        return _round_ties_even_modulo(x, period)
 
     dtype = np.dtype(dtype)
 
@@ -1575,8 +1575,8 @@ def test_fuzzer_found_where_invalid_cast():
 
 
 def test_iterative_corrections_with_footprint_without_self():
-    data = np.array([0, 0, 0, 0])
-    decoded = np.array([1, 2, 0, 0])
+    data = np.array([0.0, 0, 0, 0])
+    decoded = np.array([1.0, 2, 0, 0])
 
     encode_decode_mock(
         data,
@@ -1590,5 +1590,21 @@ def test_iterative_corrections_with_footprint_without_self():
                 eb=0,
             )
         ],
+        compute=dict(unstable_iterative=True),
+    )
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(
+                kind="qoi_eb_stencil",
+                qoi='(X[I[0]+1]-X[I[0]-1]) / round_ties_even_modulo(C["x"][I[0]+1]-C["x"][I[0]-1], 1)',
+                neighbourhood=[dict(axis=0, before=1, after=1, boundary="valid")],
+                type="abs",
+                eb=0,
+            )
+        ],
+        fixed_constants=dict(x=np.array([0.0, 0.5, 1.0, 1.5])),
         compute=dict(unstable_iterative=True),
     )

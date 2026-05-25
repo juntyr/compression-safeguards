@@ -349,6 +349,9 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
     > The `compression-safeguards` do not currently support global safeguards. However, we can preserve the histogram bin that each data element falls into using the `qoi_eb_pw` safeguard, which provides a stricter guarantee. For instance, the `'round_ties_even(100 * (x - c["$x_min"]) / (c["$x_max"] - c["$x_min"]))'` QoI would preserve the index amongst 100 bins. Note that we are using the late-bound constants `c["$x_min"]` and `c["$x_max"]` for the data minimum and maximum, which are automatically provided by `numcodecs-safeguards` and `xarray-safeguards`.
 
+- ... a derivative along a periodic coordinate?
+
+    > Derivatives of arbitrary order, as approximated by arbitrary-order-accurate forward / central / backwards finite differences, can be preserved using the following `qoi_eb_stencil` safeguard: `'finite_difference(x, ...)'`, where the finite difference keyword parameters have been excluded for brevity. If the spacing between points is a uniform constant, it can be specified using the `grid_spacing` parameter. If the spacing might vary, the coordinates of the data `x` can be provided as a late-bound constant with the `grid_centre` parameter. If the coordinates are periodic, e.g. a longitude with a period of 360 degrees, the optional `grid_period` parameter can be set. If you want to use a custom finite difference formula, e.g. `'(X[I[0]+5] - X[I[0] - 5]) / (C["c"][I[0]+5] - C["c"][I[0]-5])'`, with a periodic late-bound coordinate `C["c"]`, you can use the `round_ties_even_modulo` function, e.g. `'(X[I[0]+5] - X[I[0] - 5]) / round_ties_even_modulo(C["c"][I[0]+5] - C["c"][I[0]-5], 360)'`.
 
 ## Limitations
 

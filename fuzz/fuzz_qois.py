@@ -62,6 +62,13 @@ with atheris.instrument_imports():
         ScalarLog,
         ScalarLogWithBase,
     )
+    from compression_safeguards.safeguards._qois.expr.modulo import (
+        ScalarCeilModulo,
+        ScalarEuclideanModulo,
+        ScalarFloorModulo,
+        ScalarRoundTiesEvenModulo,
+        ScalarTruncModulo,
+    )
     from compression_safeguards.safeguards._qois.expr.neg import ScalarNegate
     from compression_safeguards.safeguards._qois.expr.power import ScalarPower
     from compression_safeguards.safeguards._qois.expr.reciprocal import ScalarReciprocal
@@ -176,6 +183,11 @@ BINARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr], AnyExpr]] = [
     ScalarNotEqual,
     ScalarGreaterEqual,
     ScalarGreater,
+    ScalarCeilModulo,
+    ScalarFloorModulo,
+    ScalarRoundTiesEvenModulo,
+    ScalarTruncModulo,
+    ScalarEuclideanModulo,
 ]
 TERNARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr, AnyExpr], AnyExpr]] = [
     ScalarWhere,
@@ -256,6 +268,11 @@ def check_one_input(data) -> None:
     except TimeoutError:
         # skip expressions that take too long just to build
         return
+    except NotImplementedError as err:
+        # skip unsupported p modulo q expressions with non-constant divisor q
+        if "modulo(p, q)` with non-constant divisor `q`" in str(err):
+            return
+        raise
     except RuntimeWarning as err:
         # skip expressions that try to perform a**b with excessive digits
         if ("symbolic integer evaluation" in str(err)) and (

@@ -183,6 +183,11 @@ arithmetic_functions =
   | "ceil", "(", expr, [","], ")"  (* round up, towards positive infinity *)
   | "trunc", "(", expr, [","], ")"  (* round towards zero *)
   | "round_ties_even", "(", expr, [","], ")"  (* round to nearest integer, ties to even *)
+  | "floor_modulo", "(", expr, ",", expr, [","], ")"  (* modulo with respect to floor(division) *)
+  | "ceil_modulo", "(", expr, ",", expr, [","], ")"  (* modulo with respect to ceil(division) *)
+  | "trunc_modulo", "(", expr, ",", expr, [","], ")"  (* modulo with respect to trunc(division) *)
+  | "round_ties_even_modulo", "(", expr, ",", expr, [","], ")"  (* modulo with respect to round_ties_even(division) *)
+  | "euclidean_modulo", "(", expr, ",", expr, [","], ")"  (* non-negative modulo with respect to Euclidean division *)
   | "sin", "(", expr, [","], ")"  (* sine sin(x) *)
   | "cos", "(", expr, [","], ")"  (* cosine cos(x) *)
   | "tan", "(", expr, [","], ")"  (* tangent tan(x) *)
@@ -358,6 +363,11 @@ standard (see e.g. <https://pubs.opengroup.org/onlinepubs/9799919799/>):
 | `ceil` | [`np.ceil`][numpy.ceil] | `ceil` | `-0.0` |
 | `trunc` | [`np.trunc`][numpy.trunc] | `trunc` | `-0.0` |
 | `round_ties_even` | [`np.rint`][numpy.rint] | `rint`[^4] | `-0.0` |
+| `floor_modulo(p, q)` | [`np.mod`][numpy.mod][^11] | | as expected[^9] |
+| `ceil_modulo(p, q)` | `np.mod(p, q) - q`[^11] | | as expected[^10] |
+| `trunc_modulo(p, q)` | [`np.fmod`][numpy.fmod][^11] | `fmod` | `-0.0` |
+| `round_ties_even_modulo(p, q)` | `np.mod(p + q/2, q) - q/2`[^11] | `remainder` | `-0.0` |
+| `euclidean_modulo(p, q)` | `np.mod(p, np.abs(q))`[^11] | | `+0.0` |
 | `sin` | [`np.sin`][numpy.sin] | `sin` | `-0.0` |
 | `cos` | [`np.cos`][numpy.cos] | `cos` | `1.0` |
 | `tan` | [`np.tan`][numpy.tan] | `tan` | `-0.0` |
@@ -380,6 +390,9 @@ standard (see e.g. <https://pubs.opengroup.org/onlinepubs/9799919799/>):
 [^6]: `a * -0.0 = -a * +0.0`
 [^7]: `a / -0.0 = -a / +0.0`, `-0.0 / b = +0.0 / -b`
 [^8]: `-0.0 ** (2k+1) = -0.0`, `-0.0 ** +b = +0.0` otherwise, `-0.0 ** (-2k=1) = -Inf`, `-0.0 ** -b = +Inf` otherwise, `a ** -0.0 = 1.0`
+[^9]: if `p` is zero and `q` is neither zero nor NaN, the output is `copysign(0, q)`
+[^10]: if `p` is zero and `q` is neither zero nor NaN, the output is `copysign(0, -q)`
+[^11]: with correct handling of signs and Inf and NaN, see <https://github.com/juntyr/compression-safeguards/blob/main/tests/test_modulo.py>
 
 Furthermore, the array `sum` and `matmul` functions are implemented as explicit
 sums over the array elements in natural order, e.g.

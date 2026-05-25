@@ -221,12 +221,19 @@ def generate_parameter(
             "reciprocal": 1,
             # absolute value
             "abs": 1,
-            # sign and rounding
+            # sign
             "sign": 1,
+            # rounding
             "floor": 1,
             "ceil": 1,
             "trunc": 1,
             "round_ties_even": 1,
+            # modulo
+            "floor_modulo": 2,
+            "ceil_modulo": 2,
+            "trunc_modulo": 2,
+            "round_ties_even_modulo": 2,
+            "euclidean_modulo": 2,
             # trigonometric
             "sin": 1,
             "cos": 1,

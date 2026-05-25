@@ -23,7 +23,10 @@ from compression_safeguards.safeguards._qois.expr.comparison import (
     ScalarLess,
 )
 from compression_safeguards.safeguards._qois.expr.constfold import ScalarFoldedConstant
-from compression_safeguards.safeguards._qois.expr.data import Data
+from compression_safeguards.safeguards._qois.expr.data import (
+    Data,
+    ScalarAnyDataConstant,
+)
 from compression_safeguards.safeguards._qois.expr.divmul import (
     ScalarDivide,
     ScalarMultiply,
@@ -41,6 +44,11 @@ from compression_safeguards.safeguards._qois.expr.logexp import (
     ScalarExp,
     ScalarLog,
     ScalarLogWithBase,
+)
+from compression_safeguards.safeguards._qois.expr.modulo import (
+    ScalarCeilModulo,
+    ScalarFloorModulo,
+    ScalarRoundTiesEvenModulo,
 )
 from compression_safeguards.safeguards._qois.expr.neg import ScalarNegate
 from compression_safeguards.safeguards._qois.expr.power import ScalarPower
@@ -67,6 +75,7 @@ from compression_safeguards.safeguards._qois.interval import (
 from compression_safeguards.utils._compat import (
     _is_negative_zero,
     _is_positive_zero,
+    _round_ties_even,
 )
 from compression_safeguards.utils._float128 import _float128, _float128_dtype
 
@@ -888,7 +897,7 @@ def test_fuzzer_found_asinh_overflow():
     X = np.array(_float128("-4.237431194812790058760014731131757e+4778"))
 
     expr = ScalarAsinh(Data.SCALAR)
-    assert np.rint(expr.eval(X, dict())) == np.array(_float128("-11004"))
+    assert _round_ties_even(expr.eval(X, dict())) == np.array(_float128("-11004"))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -1398,8 +1407,8 @@ def test_negative_zero_ops(dtype):
     assert _is_positive_zero(np.ceil(ty(+0.0)))
     assert _is_negative_zero(np.trunc(ty(-0.0)))
     assert _is_positive_zero(np.trunc(ty(+0.0)))
-    assert _is_negative_zero(np.rint(ty(-0.0)))
-    assert _is_positive_zero(np.rint(ty(+0.0)))
+    assert _is_negative_zero(_round_ties_even(ty(-0.0)))
+    assert _is_positive_zero(_round_ties_even(ty(+0.0)))
 
     assert _is_negative_zero(np.sin(ty(-0.0)))
     assert _is_positive_zero(np.sin(ty(+0.0)))
@@ -1413,8 +1422,8 @@ def test_negative_zero_ops(dtype):
     assert _is_negative_zero(np.asin(ty(-0.0)))
     assert _is_positive_zero(np.asin(ty(+0.0)))
 
-    assert np.rint(np.acos(ty(-0.0)) * 100) == ty(157)  # pi/2 * 100
-    assert np.rint(np.acos(ty(+0.0)) * 100) == ty(157)  # pi/2 * 100
+    assert _round_ties_even(np.acos(ty(-0.0)) * 100) == ty(157)  # pi/2 * 100
+    assert _round_ties_even(np.acos(ty(+0.0)) * 100) == ty(157)  # pi/2 * 100
 
     assert _is_negative_zero(np.atan(ty(-0.0)))
     assert _is_positive_zero(np.atan(ty(+0.0)))
@@ -2030,3 +2039,131 @@ def test_fuzzer_found_atan_greater_atan2():
 
     assert expr.eval(X_lower, dict()) == np.array(np.float32(0.0))
     assert expr.eval(X_upper, dict()) == np.array(np.float32(0.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_floor_modulo_nudging():
+    X = np.array(_float128("0.0e+00"))
+
+    expr = ScalarFloorModulo(
+        ScalarAnyDataConstant(_float128("4.456434754399559235752098447454098e-4932")),
+        Number("-2.2250738585072014e-308"),
+    )
+
+    assert expr.eval(X, dict()) == np.array(_float128(-0.0))
+
+    expr_lower = np.array(_float128("-2.2250738585072014e-308"))
+    expr_upper = np.array(_float128("0.0"))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+    assert X_lower == np.array(_float128(-np.inf))
+    assert X_upper == np.array(_float128(np.inf))
+
+    assert expr.eval(X_lower, dict()) == np.array(_float128(-0.0))
+    assert expr.eval(X_upper, dict()) == np.array(_float128(-0.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_floor_modulo_quaddtype_bounds():
+    X = np.array(_float128(0.0))
+
+    expr = ScalarFloorModulo(
+        ScalarCosh(Data.SCALAR), Number("-1.7976931345860068e+308")
+    )
+
+    assert expr.eval(X, dict()) == np.array(_float128(-0.0))
+
+    expr_lower = np.array(_float128("-1.7976931345860068e+308"))
+    expr_upper = np.array(_float128(0.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.array(_float128("-11357.216553474703894801348310092223"))
+    assert X_upper == np.array(_float128("11357.216553474703894801348310092223"))
+
+    assert expr.eval(X_lower, dict()) == np.array(
+        _float128("-1405083641183236501604461890894511e275")
+    )
+    assert expr.eval(X_upper, dict()) == np.array(
+        _float128("-1405083641183236501604461890894511e275")
+    )
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_ceil_modulo_zero_inf_bounds():
+    X = np.array(np.float16(0.0))
+
+    expr = ScalarCeilModulo(ScalarAsinh(Data.SCALAR), Number("65791"))
+
+    assert _is_negative_zero(expr.eval(X, dict()))
+
+    expr_lower = np.array(np.float16(-0.0))
+    expr_upper = np.array(np.float16(2.5e-06))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert _is_positive_zero(X_lower)
+    assert _is_positive_zero(X_upper)
+
+    assert _is_negative_zero(expr.eval(X_lower, dict()))
+    assert _is_negative_zero(expr.eval(X_upper, dict()))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_floor_modulo_zero_inf_bounds():
+    X = np.array(np.float16(0.0))
+
+    expr = ScalarFloorModulo(ScalarAsinh(Data.SCALAR), Number("-65791"))
+
+    assert _is_negative_zero(expr.eval(X, dict()))
+
+    expr_lower = np.array(np.float16(-0.0))
+    expr_upper = np.array(np.float16(2.5e-06))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert _is_positive_zero(X_lower)
+    assert _is_positive_zero(X_upper)
+
+    assert _is_negative_zero(expr.eval(X_lower, dict()))
+    assert _is_negative_zero(expr.eval(X_upper, dict()))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_round_ties_even_modulo_near_zero():
+    X = np.array(np.float32(-9.249943e-28))
+
+    expr = ScalarRoundTiesEvenModulo(ScalarRoundTiesEven(Data.SCALAR), Pi())
+
+    assert _is_negative_zero(expr.eval(X, dict()))
+
+    expr_lower = np.array(np.float32(-9.250028e-28))
+    expr_upper = np.array(np.float32(-0.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float32(-0.5)
+    assert X_upper == np.float32(-0.0)
+
+    assert _is_negative_zero(expr.eval(X_lower, dict()))
+    assert _is_negative_zero(expr.eval(X_upper, dict()))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_round_ties_even_modulo_near_zero_float16():
+    X = np.array(np.float16(-0.1779))
+
+    expr = ScalarRoundTiesEvenModulo(ScalarTrunc(Data.SCALAR), Pi())
+
+    assert _is_negative_zero(expr.eval(X, dict()))
+
+    expr_lower = np.array(np.float16(-0.1779))
+    expr_upper = np.array(np.float16(-0.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(-0.9995)
+    assert X_upper == np.float16(-0.0)
+
+    assert _is_negative_zero(expr.eval(X_lower, dict()))
+    assert _is_negative_zero(expr.eval(X_upper, dict()))

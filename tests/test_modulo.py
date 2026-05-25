@@ -1,0 +1,216 @@
+from itertools import chain, product, tee
+
+import numpy as np
+import pytest
+
+from compression_safeguards.utils._compat import (
+    _ceil_modulo,
+    _euclidean_modulo,
+    _floor_modulo,
+    _round_ties_even_modulo,
+    _trunc_modulo,
+)
+from compression_safeguards.utils._float128 import _float128
+
+VALS = [-np.nan, -np.inf, -1.0, -0.5, -0.0, +0.0, +0.5, +1.0, +np.inf, +np.nan]
+
+
+def check_for_all_dtypes(it):
+    f16s, f32s, f64s, f128s = tee(it, 4)
+
+    return chain(
+        (np.float16(f) for f in f16s),
+        (np.float32(f) for f in f32s),
+        (np.float64(f) for f in f64s),
+        (_float128(f) for f in f128s),
+    )
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+@pytest.mark.parametrize("p,q", check_for_all_dtypes(product(VALS, VALS)))
+def test_floor_modulo(p, q):
+    r = _floor_modulo(p, q)
+
+    if np.isnan(p) or np.isnan(q):
+        assert np.isnan(r)
+        assert np.signbit(r) == np.signbit(q)
+        return
+
+    if q == 0:
+        assert np.isnan(r)
+        assert np.signbit(r) == np.signbit(q)
+        return
+
+    if np.isinf(p):
+        assert np.isnan(r)
+        assert np.signbit(r) == np.signbit(q)
+        return
+
+    if p == 0:
+        assert r == 0
+        assert np.signbit(r) == np.signbit(q)
+        return
+
+    if np.isinf(q):
+        if np.signbit(p) == np.signbit(q):
+            assert r == p
+        else:
+            assert r == q
+        return
+
+    if q < 0:
+        assert r <= 0
+        assert np.signbit(r) == np.signbit(-1)
+        assert r > q
+    else:
+        assert r >= 0
+        assert np.signbit(r) == np.signbit(+1)
+        assert r < q
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+@pytest.mark.parametrize("p,q", check_for_all_dtypes(product(VALS, VALS)))
+def test_ceil_modulo(p, q):
+    r = _ceil_modulo(p, q)
+
+    if np.isnan(p) or np.isnan(q):
+        assert np.isnan(r)
+        assert np.signbit(r) != np.signbit(q)
+        return
+
+    if q == 0:
+        assert np.isnan(r)
+        assert np.signbit(r) != np.signbit(q)
+        return
+
+    if np.isinf(p):
+        assert np.isnan(r)
+        assert np.signbit(r) != np.signbit(q)
+        return
+
+    if p == 0:
+        assert r == 0
+        assert np.signbit(r) != np.signbit(q)
+        return
+
+    if np.isinf(q):
+        if np.signbit(p) == np.signbit(q):
+            assert r == -q
+        else:
+            assert r == p
+        return
+
+    if q < 0:
+        assert r >= 0
+        assert np.signbit(r) == np.signbit(+1)
+        assert r < -q
+    else:
+        assert r <= 0
+        assert np.signbit(r) == np.signbit(-1)
+        assert r > -q
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+@pytest.mark.parametrize("p,q", check_for_all_dtypes(product(VALS, VALS)))
+def test_trunc_modulo(p, q):
+    r = _trunc_modulo(p, q)
+
+    if np.isnan(p) or np.isnan(q):
+        assert np.isnan(r)
+        assert np.signbit(r) == np.signbit(p)
+        return
+
+    if q == 0:
+        assert np.isnan(r)
+        assert np.signbit(r) == np.signbit(p)
+        return
+
+    if np.isinf(p):
+        assert np.isnan(r)
+        assert np.signbit(r) == np.signbit(p)
+        return
+
+    if p == 0:
+        assert r == 0
+        assert np.signbit(r) == np.signbit(p)
+        return
+
+    if np.isinf(q):
+        assert r == p
+        return
+
+    if p < 0:
+        assert r <= 0
+        assert np.signbit(r) == np.signbit(-1)
+        assert r > np.copysign(q, -1)
+    else:
+        assert r >= 0
+        assert np.signbit(r) == np.signbit(+1)
+        assert r < np.copysign(q, +1)
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+@pytest.mark.parametrize("p,q", check_for_all_dtypes(product(VALS, VALS)))
+def test_round_ties_even_modulo(p, q):
+    r = _round_ties_even_modulo(p, q)
+
+    if np.isnan(p) or np.isnan(q):
+        assert np.isnan(r)  # any NaN
+        return
+
+    if q == 0:
+        assert np.isnan(r)  # any NaN
+        return
+
+    if np.isinf(p):
+        assert np.isnan(r)  # any NaN
+        return
+
+    if p == 0:
+        assert r == 0
+        assert np.signbit(r) == np.signbit(p)
+        return
+
+    if np.isinf(q):
+        assert r == p
+        return
+
+    assert r >= np.copysign(q / 2, -1)
+    assert r <= np.copysign(q / 2, +1)
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+@pytest.mark.parametrize("p,q", check_for_all_dtypes(product(VALS, VALS)))
+def test_euclidean_modulo(p, q):
+    r = _euclidean_modulo(p, q)
+
+    if np.isnan(p) or np.isnan(q):
+        assert np.isnan(r)
+        assert np.signbit(r) == np.signbit(+1)
+        return
+
+    if q == 0:
+        assert np.isnan(r)
+        assert np.signbit(r) == np.signbit(+1)
+        return
+
+    if np.isinf(p):
+        assert np.isnan(r)
+        assert np.signbit(r) == np.signbit(+1)
+        return
+
+    if p == 0:
+        assert r == 0
+        assert np.signbit(r) == np.signbit(+1)
+        return
+
+    if np.isinf(q):
+        if np.signbit(p) == np.signbit(+1):
+            assert r == p
+        else:
+            assert r == np.abs(q)
+        return
+
+    assert r >= 0
+    assert np.signbit(r) == np.signbit(+1)
+    assert r < np.abs(q)

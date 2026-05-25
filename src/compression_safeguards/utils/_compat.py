@@ -5,7 +5,12 @@ equivalent behaviour for all supported dtypes and provide good type hints.
 
 __all__ = [
     "_place",
-    "_symmetric_modulo",
+    "_round_ties_even",
+    "_floor_modulo",
+    "_ceil_modulo",
+    "_trunc_modulo",
+    "_round_ties_even_modulo",
+    "_euclidean_modulo",
     "_minimum_zero_sign_sensitive",
     "_maximum_zero_sign_sensitive",
     "_where",
@@ -33,7 +38,12 @@ from typing import Literal, TypeGuard, TypeVar, overload
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
-from ._float128 import _float128_dtype, _float128_e, _float128_pi, _float128_type
+from ._float128 import (
+    _float128_dtype,
+    _float128_e,
+    _float128_pi,
+    _float128_type,
+)
 from .typing import TB, F, Fi, S, Si, T, Ti
 
 N = TypeVar("N", bound=int, covariant=True)
@@ -55,23 +65,143 @@ def _place(
     return np.put(a, np.flatnonzero(mask), vals)
 
 
-# wrapper around np.mod(p, q) that guarantees that the result is in [-q/2, q/2]
+# round to the nearest integer, with ties to the nearest even integer
+_round_ties_even = np.rint
+
+
+# modulo based on floor division, p - q*floor(p/q),
+#  which guarantees that the result is in (-q, -0] for q<0 and [+0, +q) for q>0
 @overload
-def _symmetric_modulo(
+def _floor_modulo(
     p: np.ndarray[S, np.dtype[F]], q: np.ndarray[S, np.dtype[F]]
 ) -> np.ndarray[S, np.dtype[F]]: ...
 
 
 @overload
-def _symmetric_modulo(p: Fi, q: Fi) -> Fi: ...
+def _floor_modulo(p: Fi, q: Fi) -> Fi: ...
 
 
-def _symmetric_modulo(p, q):
+def _floor_modulo(p, q):
+    if (
+        (type(p) is not _float128_type)
+        and (not isinstance(p, np.ndarray) or p.dtype != _float128_dtype)
+        and (type(q) is not _float128_type)
+        and (not isinstance(q, np.ndarray) or q.dtype != _float128_dtype)
+    ):
+        out = _ensure_array(np.mod(p, q))
+        np.copysign(out, q, out=out, where=(np.isnan(out) | (out == 0)))
+        return out
+
+    # FIXME: https://github.com/numpy/numpy-quaddtype/issues/94
+
+    out = _ensure_array(np.fmod(p, q))
+    # correct the quadrant of the remainder
+    np.add(out, q, out=out, where=((p < 0) & (q > 0)))
+    np.add(out, q, out=out, where=((p > 0) & (q < 0)))
+    # ensure that |out| < |q|
+    np.fmod(out, q, out=out)
+    # ensure correct handling for finite p and infinite q
+    np.copyto(out, p, where=(np.isfinite(p) & np.isinf(q) & (np.sign(p) == np.sign(q))))
+    np.copyto(
+        out,
+        q,
+        where=(np.isfinite(p) & np.isinf(q) & (np.sign(p) != np.sign(q)) & (p != 0)),
+    )
+    # ensure correct sign for NaNs and zeros
+    np.copysign(out, q, out=out, where=(np.isnan(out) | (out == 0)))
+    return out
+
+
+# modulo based on ceil division, p - q*ceil(p/q),
+#  which guarantees that the result is in [+0, +q) for q<0 and (-q, -0] for q>0
+@overload
+def _ceil_modulo(
+    p: np.ndarray[S, np.dtype[F]], q: np.ndarray[S, np.dtype[F]]
+) -> np.ndarray[S, np.dtype[F]]: ...
+
+
+@overload
+def _ceil_modulo(p: Fi, q: Fi) -> Fi: ...
+
+
+def _ceil_modulo(p, q):
+    out = _ensure_array(np.fmod(p, q))
+    # correct the quadrant of the remainder
+    np.subtract(out, q, out=out, where=((p < 0) & (q < 0)))
+    np.subtract(out, q, out=out, where=((p > 0) & (q > 0)))
+    # ensure that |out| < |q|
+    np.fmod(out, q, out=out)
+    # ensure correct handling for finite p and infinite q
+    np.copyto(out, p, where=(np.isfinite(p) & np.isinf(q) & (np.sign(p) != np.sign(q))))
+    np.copyto(
+        out, -q, where=(np.isfinite(p) & np.isinf(q) & (np.sign(p) == np.sign(q)))
+    )
+    # ensure correct sign for NaNs and zeros
+    np.copysign(out, -q, out=out, where=(np.isnan(out) | (out == 0)))
+    return out
+
+
+# modulo based on trunc division, p - q*trunc(p/q),
+#  which guarantees that the result is in [-q, -0] for p<0 and [+0, +q] for p>0
+@overload
+def _trunc_modulo(
+    p: np.ndarray[S, np.dtype[F]], q: np.ndarray[S, np.dtype[F]]
+) -> np.ndarray[S, np.dtype[F]]: ...
+
+
+@overload
+def _trunc_modulo(p: Fi, q: Fi) -> Fi: ...
+
+
+def _trunc_modulo(p, q):
+    out = _ensure_array(np.fmod(p, q))
+    # ensure correct sign for NaNs and zeros
+    np.copysign(out, p, out=out, where=(np.isnan(out) | (out == 0)))
+    return out
+
+
+# modulo based on rounded division, p - q*round(p/q),
+#  which guarantees that the result is in [-q/2, q/2]
+@overload
+def _round_ties_even_modulo(
+    p: np.ndarray[S, np.dtype[F]], q: np.ndarray[S, np.dtype[F]]
+) -> np.ndarray[S, np.dtype[F]]: ...
+
+
+@overload
+def _round_ties_even_modulo(p: Fi, q: Fi) -> Fi: ...
+
+
+def _round_ties_even_modulo(p, q):
     q2 = np.divide(q, 2)
     out = _ensure_array(np.add(p, q2))
-    np.mod(out, q, out=out)
+    # FIXME: replace with np.mod(out, q, out=out) after
+    # https://github.com/numpy/numpy-quaddtype/issues/94
+    out = _floor_modulo(out, q)
     np.subtract(out, q2, out=out)
+    # ensure correct handling for finite p and infinite q
+    np.copyto(out, p, where=(np.isfinite(p) & np.isinf(q)))
+    # ensure correct handling for near-zero p and non-NaN remainder
+    np.copyto(out, p, where=((np.abs(p) < np.abs(q2)) & ~np.isnan(q) & (q != 0)))
     return out
+
+
+# modulo based on Euclidean division, p - |q|*floor(p/|q|),
+#  which guarantees that the result is in [+0, +q)
+@overload
+def _euclidean_modulo(
+    p: np.ndarray[S, np.dtype[F]], q: np.ndarray[S, np.dtype[F]]
+) -> np.ndarray[S, np.dtype[F]]: ...
+
+
+@overload
+def _euclidean_modulo(p: Fi, q: Fi) -> Fi: ...
+
+
+def _euclidean_modulo(p, q):
+    # FIXME: https://github.com/numpy/numpy/issues/31421
+    #        ideally we could just use np.abs(q) here
+    return _floor_modulo(p, np.copysign(q, +1))
 
 
 # wrapper around np.minimum that also works for +0.0 and -0.0
