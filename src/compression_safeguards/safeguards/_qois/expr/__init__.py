@@ -1,3 +1,4 @@
+import struct
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -116,10 +117,26 @@ def deduplicate_expr(expr: AnyExpr) -> AnyExpr:
         tuple[type[AnyExpr], tuple[AnyExpr, ...], tuple[Any, ...]], AnyExpr
     ] = {}
 
+    def safe_eq(x):
+        # floating point is weird, e.g. +0.0 == -0.0
+        # but really should not replace +0.0 with -0.0
+        # so disambiguate floating point values by their binary representations
+        if isinstance(x, np.floating):
+            return (x, x.tobytes())
+        if isinstance(x, float):
+            return (x, struct.pack("d", x))
+
+        # otherwise, the value should be fine to hash and compare directly
+        return x
+
     def deduplication_mapper(e: AnyExpr) -> AnyExpr:
         # e.args have already been deduplicated since the mapper is applied in
         #  post-order
-        key = (type(e), e.args, e.extra)
+        key = (
+            type(e),
+            tuple(safe_eq(x) for x in e.args),
+            tuple(safe_eq(x) for x in e.extra),
+        )
 
         cached = cache.get(key, None)
         if cached is not None:
@@ -247,3 +264,29 @@ def apply_expr_array_element_offset(
         return e
 
     return map_expr(expr, mapper=apply_array_element_offset_mapper)
+
+
+def expr_repr(expr: AnyExpr) -> str:
+    """
+    Compute the structural string representation of the `expr`ession.
+
+    Parameters
+    ----------
+    expr : AnyExpr
+        The expression.
+
+    Returns
+    -------
+    repr : str
+        The structural string representation.
+    """
+
+    srepr = type(expr).__name__
+
+    args = [expr_repr(a) for a in expr.args]
+    extra = [repr(a) for a in expr.extra]
+
+    if len(args) > 0 or len(extra) > 0:
+        srepr = f"{srepr}({', '.join(args + extra)})"
+
+    return srepr

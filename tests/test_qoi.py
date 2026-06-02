@@ -2169,23 +2169,28 @@ def test_fuzzer_found_round_ties_even_modulo_near_zero_float16():
     assert _is_negative_zero(expr.eval(X_upper, dict()))
 
 
+@pytest.mark.parametrize("dtype", [np.float16, np.float32, np.float64, _float128])
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_negative_zero_product_float16():
-    X = np.array(np.float16(3.34e-05))
+def test_fuzzer_found_negative_zero_product(dtype):
+    X = np.array(dtype(3.34e-05))
 
     expr = ScalarMultiply(
-        Number("0.0"), ScalarMultiply(ScalarIsFinite(Data.SCALAR), Number("-0.0"))
+        ScalarFoldedConstant(dtype(0.0)),
+        ScalarMultiply(
+            ScalarIsFinite(Data.SCALAR),
+            ScalarFoldedConstant(dtype(-0.0)),
+        ),
     )
 
     assert _is_negative_zero(expr.eval(X, dict()))
 
-    expr_lower = np.array(np.float16(-0.3142))
-    expr_upper = np.array(np.float16(-0.0))
+    expr_lower = np.array(dtype(-0.3142))
+    expr_upper = np.array(dtype(-0.0))
 
     X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
 
-    assert X_lower == np.float16(-np.inf)
-    assert X_upper == np.float16(np.inf)
+    assert X_lower == dtype(-np.inf)
+    assert X_upper == dtype(np.inf)
 
     assert _is_negative_zero(expr.eval(X_lower, dict()))
     assert _is_negative_zero(expr.eval(X_upper, dict()))

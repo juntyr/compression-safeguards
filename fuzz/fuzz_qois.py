@@ -8,7 +8,10 @@ with atheris.instrument_imports():
 
     import numpy as np
 
-    from compression_safeguards.safeguards._qois.expr import compute_expr_data_bounds
+    from compression_safeguards.safeguards._qois.expr import (
+        compute_expr_data_bounds,
+        expr_repr,
+    )
     from compression_safeguards.safeguards._qois.expr.abc import AnyExpr
     from compression_safeguards.safeguards._qois.expr.abs import ScalarAbs
     from compression_safeguards.safeguards._qois.expr.addsub import (
@@ -330,7 +333,7 @@ def check_one_input(data) -> None:
                 [
                     f"dtype = {dtype!r}",
                     f"X = {X!r} ({as_bits(X)})",
-                    f"expr = {expr!r}",
+                    f"expr = {expr!r} ({expr_repr(expr)})",
                     f"exprv = {exprv!r} ({as_bits(exprv)})",
                     f"expr_lower = {expr_lower!r} ({as_bits(expr_lower)})",
                     f"expr_upper = {expr_upper!r} ({as_bits(expr_upper)})",
@@ -400,7 +403,7 @@ def check_one_input(data) -> None:
                 [
                     f"dtype = {dtype!r}",
                     f"X = {X!r} ({as_bits(X)})",
-                    f"expr = {expr!r}",
+                    f"expr = {expr!r} ({expr_repr(X)})",
                     f"exprv = {exprv!r} ({as_bits(exprv)})",
                     f"expr_lower = {expr_lower!r} ({as_bits(expr_lower)})",
                     f"expr_upper = {expr_upper!r} ({as_bits(expr_upper)})",
