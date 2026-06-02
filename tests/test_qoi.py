@@ -2174,7 +2174,7 @@ def test_fuzzer_found_negative_zero_product_float16():
     X = np.array(np.float16(3.34e-05))
 
     expr = ScalarMultiply(
-        ScalarMultiply(Number("0.0"), ScalarIsFinite(Data.SCALAR)), Number("-0.0")
+        Number("0.0"), ScalarMultiply(ScalarIsFinite(Data.SCALAR), Number("-0.0"))
     )
 
     assert _is_negative_zero(expr.eval(X, dict()))
