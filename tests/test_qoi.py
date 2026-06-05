@@ -47,6 +47,7 @@ from compression_safeguards.safeguards._qois.expr.logexp import (
 )
 from compression_safeguards.safeguards._qois.expr.modulo import (
     ScalarCeilModulo,
+    ScalarEuclideanModulo,
     ScalarFloorModulo,
     ScalarRoundTiesEvenModulo,
 )
@@ -2194,3 +2195,26 @@ def test_fuzzer_found_negative_zero_product(dtype):
 
     assert _is_negative_zero(expr.eval(X_lower, dict()))
     assert _is_negative_zero(expr.eval(X_upper, dict()))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_euclidean_modulo():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarEuclideanModulo(
+        ScalarLog(Logarithm.log2, Data.SCALAR), ScalarFoldedConstant(np.float16(786.0))
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(782.0))
+
+    expr_lower = np.array(np.float16(0.1326))
+    expr_upper = np.array(np.float16(790.0))
+
+    # FIXME: guaranteed data bounds do not meet the expression bounds
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    assert X_upper == np.float16(0.5806)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(762.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(785.0))
