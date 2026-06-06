@@ -2210,11 +2210,10 @@ def test_fuzzer_found_euclidean_modulo():
     expr_lower = np.array(np.float16(0.1326))
     expr_upper = np.array(np.float16(790.0))
 
-    # FIXME: guaranteed data bounds do not meet the expression bounds
     X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
 
     assert X_lower == np.float16(6.0e-08)
-    assert X_upper == np.float16(0.5806)
+    assert X_upper == np.float16(0.2742)
 
     assert expr.eval(X_lower, dict()) == np.array(np.float16(762.0))
-    assert expr.eval(X_upper, dict()) == np.array(np.float16(785.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(784.0))

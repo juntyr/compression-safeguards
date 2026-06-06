@@ -12,6 +12,8 @@ from ....utils._compat import (
     _minimum_zero_sign_sensitive,
     _round_ties_even_modulo,
     _trunc_modulo,
+    _where,
+    _zeros,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
@@ -845,31 +847,64 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
+        exact_p_lower = _zeros(pv.shape, np.dtype(np.bool))
         p_lower[full_domain] = -fmax
+        exact_p_lower |= full_domain
         p_lower[np.isinf(qv) & np.isposinf(rem_expr_upper)] = -fmax
+        exact_p_lower |= np.isinf(qv) & np.isposinf(rem_expr_upper)
         p_lower[np.isinf(qv) & (rem_expr_upper == 0)] = Xs.dtype.type(-0.0)
+        exact_p_lower |= np.isinf(qv) & (rem_expr_upper == 0)
         _maximum_zero_sign_sensitive(
             p_lower,
             Xs.dtype.type(+0.0),
             out=p_lower,
             where=(np.isinf(qv) & ~np.isposinf(rem_expr_upper)),
         )
+        # if the zero boundary was within the approximate bounds, it will be
+        # exact since zero is an exact boundary and the bounds would not be
+        # inaccurate in magnitude beyond their size
+        exact_p_lower |= np.isinf(qv) & ~np.isposinf(rem_expr_upper) & (p_lower == 0)
         np.copyto(p_lower, pv, where=np.isinf(pv), casting="no")
+        exact_p_lower |= np.isinf(pv)
         p_lower[qv == 0] = Xs.dtype.type(-np.inf)
+        exact_p_lower |= qv == 0
         np.copyto(p_lower, pv, where=np.isnan(pv), casting="no")
+        exact_p_lower |= np.isnan(pv)
         p_lower[np.isnan(qv)] = Xs.dtype.type(-np.inf)
+        exact_p_lower |= np.isnan(qv)
         _minimum_zero_sign_sensitive(pv, p_lower, out=p_lower)
 
         p_upper = _ensure_array(pv, copy=True)
         np.add(p_upper, p_upper_diff, out=p_upper)
+        exact_p_upper = _zeros(pv.shape, np.dtype(np.bool))
         p_upper[full_domain] = fmax
+        exact_p_upper |= full_domain
         p_upper[np.isinf(qv) & (rem_expr_upper == 0)] = Xs.dtype.type(+0.0)
+        exact_p_upper |= np.isinf(qv) & (rem_expr_upper == 0)
         p_upper[np.isinf(qv) & (pv < 0) & (rem_expr_lower > 0)] = -smallest_subnormal
+        exact_p_upper |= np.isinf(qv) & (pv < 0) & (rem_expr_lower > 0)
         np.copyto(p_upper, pv, where=np.isinf(pv), casting="no")
+        exact_p_upper |= np.isinf(pv)
         p_upper[qv == 0] = Xs.dtype.type(np.inf)
+        exact_p_upper |= qv == 0
         np.copyto(p_upper, pv, where=np.isnan(pv), casting="no")
+        exact_p_upper |= np.isnan(pv)
         p_upper[np.isnan(qv)] = Xs.dtype.type(np.inf)
+        exact_p_upper |= np.isnan(qv)
         _maximum_zero_sign_sensitive(pv, p_upper, out=p_upper)
+
+        # if p_lower/p_upper is not exact, it may have rounding errors,
+        # so we guard against slipping into the next repetition
+        p_lower_expr_upper = _where(
+            exact_p_lower,
+            expr_upper,
+            exprv,
+        )
+        p_upper_expr_lower = _where(
+            exact_p_upper,
+            expr_lower,
+            exprv,
+        )
 
         # handle rounding errors in euclidean_modulo early
         p_lower = guarantee_arg_within_expr_bounds(
@@ -878,14 +913,14 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
             pv,
             p_lower,
             expr_lower,
-            expr_upper,
+            p_lower_expr_upper,
         )
         p_upper = guarantee_arg_within_expr_bounds(
             lambda p_upper: _euclidean_modulo(p_upper, qv),
             exprv,
             pv,
             p_upper,
-            expr_lower,
+            p_upper_expr_lower,
             expr_upper,
         )
 
