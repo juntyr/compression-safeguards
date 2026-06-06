@@ -847,6 +847,9 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
+        _maximum_zero_sign_sensitive(  # we don't allow repetition slips
+            p_lower, Xs.dtype.type(-0.0), out=p_lower, where=(pv >= 0)
+        )
         exact_p_lower = _zeros(pv.shape, np.dtype(np.bool))
         p_lower[full_domain] = -fmax
         exact_p_lower |= full_domain
@@ -876,6 +879,9 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
 
         p_upper = _ensure_array(pv, copy=True)
         np.add(p_upper, p_upper_diff, out=p_upper)
+        _minimum_zero_sign_sensitive(  # we don't allow repetition slips
+            p_upper, Xs.dtype.type(+0.0), out=p_upper, where=(pv <= 0)
+        )
         exact_p_upper = _zeros(pv.shape, np.dtype(np.bool))
         p_upper[full_domain] = fmax
         exact_p_upper |= full_domain
