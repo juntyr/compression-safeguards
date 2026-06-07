@@ -2199,7 +2199,7 @@ def test_fuzzer_found_negative_zero_product(dtype):
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_euclidean_modulo_skip():
+def test_fuzzer_found_euclidean_modulo_slip():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarEuclideanModulo(
@@ -2221,7 +2221,7 @@ def test_fuzzer_found_euclidean_modulo_skip():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_euclidean_modulo_skip_2():
+def test_fuzzer_found_euclidean_modulo_slip_2():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarEuclideanModulo(
@@ -2244,7 +2244,7 @@ def test_fuzzer_found_euclidean_modulo_skip_2():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_euclidean_modulo_skip_3():
+def test_fuzzer_found_euclidean_modulo_slip_3():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarEuclideanModulo(
@@ -2266,7 +2266,7 @@ def test_fuzzer_found_euclidean_modulo_skip_3():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_euclidean_modulo_skip_4():
+def test_fuzzer_found_euclidean_modulo_slip_4():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarEuclideanModulo(
@@ -2289,7 +2289,7 @@ def test_fuzzer_found_euclidean_modulo_skip_4():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_floor_modulo_skip():
+def test_fuzzer_found_floor_modulo_slip():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarFloorModulo(
@@ -2311,7 +2311,7 @@ def test_fuzzer_found_floor_modulo_skip():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_floor_modulo_skip_2():
+def test_fuzzer_found_floor_modulo_slip_2():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarFloorModulo(
@@ -2334,7 +2334,7 @@ def test_fuzzer_found_floor_modulo_skip_2():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_floor_modulo_skip_3():
+def test_fuzzer_found_floor_modulo_slip_3():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarFloorModulo(
@@ -2356,7 +2356,7 @@ def test_fuzzer_found_floor_modulo_skip_3():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_floor_modulo_skip_4():
+def test_fuzzer_found_floor_modulo_slip_4():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarFloorModulo(
@@ -2379,7 +2379,7 @@ def test_fuzzer_found_floor_modulo_skip_4():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_ceil_modulo_skip():
+def test_fuzzer_found_ceil_modulo_slip():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarCeilModulo(
@@ -2402,7 +2402,7 @@ def test_fuzzer_found_ceil_modulo_skip():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_ceil_modulo_skip_2():
+def test_fuzzer_found_ceil_modulo_slip_2():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarCeilModulo(
@@ -2426,7 +2426,7 @@ def test_fuzzer_found_ceil_modulo_skip_2():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_ceil_modulo_skip_3():
+def test_fuzzer_found_ceil_modulo_slip_3():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarCeilModulo(
@@ -2450,7 +2450,7 @@ def test_fuzzer_found_ceil_modulo_skip_3():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_ceil_modulo_skip_4():
+def test_fuzzer_found_ceil_modulo_slip_4():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarCeilModulo(
@@ -2473,7 +2473,7 @@ def test_fuzzer_found_ceil_modulo_skip_4():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_trunc_modulo_skip():
+def test_fuzzer_found_trunc_modulo_slip():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarTruncModulo(
@@ -2495,7 +2495,7 @@ def test_fuzzer_found_trunc_modulo_skip():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_trunc_modulo_skip_2():
+def test_fuzzer_found_trunc_modulo_slip_2():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarTruncModulo(
@@ -2518,7 +2518,7 @@ def test_fuzzer_found_trunc_modulo_skip_2():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_trunc_modulo_skip_3():
+def test_fuzzer_found_trunc_modulo_slip_3():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarTruncModulo(
@@ -2541,7 +2541,7 @@ def test_fuzzer_found_trunc_modulo_skip_3():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_trunc_modulo_skip_4():
+def test_fuzzer_found_trunc_modulo_slip_4():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarTruncModulo(
@@ -2564,7 +2564,7 @@ def test_fuzzer_found_trunc_modulo_skip_4():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_round_ties_even_modulo_skip():
+def test_fuzzer_found_round_ties_even_modulo_slip():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarRoundTiesEvenModulo(
@@ -2586,7 +2586,7 @@ def test_fuzzer_found_round_ties_even_modulo_skip():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_round_ties_even_modulo_skip_2():
+def test_fuzzer_found_round_ties_even_modulo_slip_2():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarRoundTiesEvenModulo(
@@ -2609,7 +2609,7 @@ def test_fuzzer_found_round_ties_even_modulo_skip_2():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_round_ties_even_modulo_skip_3():
+def test_fuzzer_found_round_ties_even_modulo_slip_3():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarRoundTiesEvenModulo(
@@ -2632,7 +2632,7 @@ def test_fuzzer_found_round_ties_even_modulo_skip_3():
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
-def test_fuzzer_found_round_ties_even_modulo_skip_4():
+def test_fuzzer_found_round_ties_even_modulo_slip_4():
     X = np.array(np.float16(0.0685))
 
     expr = ScalarRoundTiesEvenModulo(
