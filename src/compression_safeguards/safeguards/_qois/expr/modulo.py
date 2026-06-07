@@ -138,6 +138,12 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
+        np.copyto(  # exact bounds around zero if signs match
+            p_lower,
+            rem_expr_lower,
+            where=((np.abs(pv) < np.abs(qv)) & ((pv == 0) | ((pv > 0) == (qv > 0)))),
+            casting="no",
+        )
         _maximum_zero_sign_sensitive(  # we don't allow repetition slips
             p_lower, Xs.dtype.type(-0.0), out=p_lower, where=(pv >= 0)
         )
@@ -174,6 +180,12 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
 
         p_upper = _ensure_array(pv, copy=True)
         np.add(p_upper, p_upper_diff, out=p_upper)
+        np.copyto(  # exact bounds around zero if signs match
+            p_upper,
+            rem_expr_upper,
+            where=((np.abs(pv) < np.abs(qv)) & ((pv == 0) | ((pv > 0) == (qv > 0)))),
+            casting="no",
+        )
         _minimum_zero_sign_sensitive(  # we don't allow repetition slips
             p_upper, Xs.dtype.type(+0.0), out=p_upper, where=(pv <= 0)
         )
@@ -368,6 +380,12 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
+        np.copyto(  # exact bounds around zero if signs mismatch
+            p_lower,
+            rem_expr_lower,
+            where=((np.abs(pv) < np.abs(qv)) & ((pv == 0) | ((pv > 0) != (qv > 0)))),
+            casting="no",
+        )
         _maximum_zero_sign_sensitive(  # we don't allow repetition slips
             p_lower, Xs.dtype.type(-0.0), out=p_lower, where=(pv >= 0)
         )
@@ -404,6 +422,12 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
 
         p_upper = _ensure_array(pv, copy=True)
         np.add(p_upper, p_upper_diff, out=p_upper)
+        np.copyto(  # exact bounds around zero if signs mismatch
+            p_upper,
+            rem_expr_upper,
+            where=((np.abs(pv) < np.abs(qv)) & ((pv == 0) | ((pv > 0) != (qv > 0)))),
+            casting="no",
+        )
         _minimum_zero_sign_sensitive(  # we don't allow repetition slips
             p_upper, Xs.dtype.type(+0.0), out=p_upper, where=(pv <= 0)
         )
@@ -602,7 +626,7 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
         np.copyto(  # exact bounds around zero
             p_lower,
             rem_expr_lower,
-            where=((pv > qv_neg) & (pv < qv_pos)),
+            where=(np.abs(pv) < np.abs(qv)),
             casting="no",
         )
         _maximum_zero_sign_sensitive(  # we don't allow repetition slips
@@ -628,7 +652,7 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
         np.copyto(  # exact bounds around zero
             p_upper,
             rem_expr_upper,
-            where=((pv > qv_neg) & (pv < qv_pos)),
+            where=(np.abs(pv) < np.abs(qv)),
             casting="no",
         )
         _minimum_zero_sign_sensitive(  # we don't allow repetition slips
@@ -974,6 +998,12 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
+        np.copyto(  # exact bounds around zero if positive
+            p_lower,
+            rem_expr_lower,
+            where=((np.abs(pv) < np.abs(qv)) & (pv >= 0)),
+            casting="no",
+        )
         _maximum_zero_sign_sensitive(  # we don't allow repetition slips
             p_lower, Xs.dtype.type(-0.0), out=p_lower, where=(pv >= 0)
         )
@@ -1006,6 +1036,12 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
 
         p_upper = _ensure_array(pv, copy=True)
         np.add(p_upper, p_upper_diff, out=p_upper)
+        np.copyto(  # exact bounds around zero if positive
+            p_upper,
+            rem_expr_upper,
+            where=((np.abs(pv) < np.abs(qv)) & (pv >= 0)),
+            casting="no",
+        )
         _minimum_zero_sign_sensitive(  # we don't allow repetition slips
             p_upper, Xs.dtype.type(+0.0), out=p_upper, where=(pv <= 0)
         )
