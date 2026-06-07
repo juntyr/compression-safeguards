@@ -9,6 +9,8 @@ from ....utils._compat import (
     _is_negative_zero,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
+    _where,
+    _zeros,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
@@ -104,8 +106,6 @@ class ScalarSin(Expr[AnyExpr]):
         #  arg_lower is also -0.0, same for arg_upper
         # if expr_upper == -0.0 and arg_upper == 0, we need to guarantee that
         #  arg_upper is also -0.0
-        # FIXME: how do we handle bounds right next to the peak where the
-        #        expression bounds could be exceeded inside the interval?
         # TODO: the intervals can sometimes be extended if expr_lower <= -1 or
         #       expr_upper >= 1
         # TODO: since sin is periodic, an interval union could be used in the
@@ -128,6 +128,36 @@ class ScalarSin(Expr[AnyExpr]):
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
         np.copyto(arg_upper, argv, where=(expr_lower == expr_upper), casting="no")
+
+        argv_gradient: np.ndarray[tuple[Ps], np.dtype[F]] = np.cos(argv)
+        argv_gradient_sign: np.ndarray[tuple[Ps], np.dtype[F]] = np.sign(argv_gradient)
+        argv_gradient_sign_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            np.subtract(argv_gradient_sign, Xs.dtype.type(1.0))
+        )
+        argv_gradient_sign_lower[full_domain] = Xs.dtype.type(-1.0)
+        argv_gradient_sign_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            np.add(argv_gradient_sign, Xs.dtype.type(1.0))
+        )
+        argv_gradient_sign_upper[full_domain] = Xs.dtype.type(+1.0)
+
+        # ensure that the bounds don't slip into the next repetition by
+        # checking that the gradient sign doesn't change
+        arg_lower = guarantee_arg_within_expr_bounds(
+            lambda arg_lower: np.cos(arg_lower),
+            argv_gradient,
+            argv,
+            arg_lower,
+            argv_gradient_sign_lower,
+            argv_gradient_sign_upper,
+        )
+        arg_upper = guarantee_arg_within_expr_bounds(
+            lambda arg_upper: np.cos(arg_upper),
+            argv_gradient,
+            argv,
+            arg_upper,
+            argv_gradient_sign_lower,
+            argv_gradient_sign_upper,
+        )
 
         # handle rounding errors in sin(asin(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
@@ -243,8 +273,6 @@ class ScalarCos(Expr[AnyExpr]):
         # cps(+-inf) = NaN, so force infinite argv to have exact bounds
         # cos(finite) in [-1, +1] so allow any finite argv if the all of
         #  [-1, +1] is allowed
-        # FIXME: how do we handle bounds right next to the peak where the
-        #        expression bounds could be exceeded inside the interval?
         # TODO: the intervals can sometimes be extended if expr_lower <= -1 or
         #       expr_upper >= 1
         # TODO: since cos is periodic, an interval union could be used in the
@@ -266,6 +294,36 @@ class ScalarCos(Expr[AnyExpr]):
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
         np.copyto(arg_upper, argv, where=(expr_lower == expr_upper), casting="no")
+
+        argv_gradient: np.ndarray[tuple[Ps], np.dtype[F]] = np.sin(argv)
+        argv_gradient_sign: np.ndarray[tuple[Ps], np.dtype[F]] = np.sign(argv_gradient)
+        argv_gradient_sign_lower: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            np.subtract(argv_gradient_sign, Xs.dtype.type(1.0))
+        )
+        argv_gradient_sign_lower[full_domain] = Xs.dtype.type(-1.0)
+        argv_gradient_sign_upper: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
+            np.add(argv_gradient_sign, Xs.dtype.type(1.0))
+        )
+        argv_gradient_sign_upper[full_domain] = Xs.dtype.type(+1.0)
+
+        # ensure that the bounds don't slip into the next repetition by
+        # checking that the gradient sign doesn't change
+        arg_lower = guarantee_arg_within_expr_bounds(
+            lambda arg_lower: np.sin(arg_lower),
+            argv_gradient,
+            argv,
+            arg_lower,
+            argv_gradient_sign_lower,
+            argv_gradient_sign_upper,
+        )
+        arg_upper = guarantee_arg_within_expr_bounds(
+            lambda arg_upper: np.sin(arg_upper),
+            argv_gradient,
+            argv,
+            arg_upper,
+            argv_gradient_sign_lower,
+            argv_gradient_sign_upper,
+        )
 
         # handle rounding errors in cos(acos(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
@@ -374,24 +432,44 @@ class ScalarTan(Expr[AnyExpr]):
         #  arg_lower is also -0.0, same for arg_upper
         # if expr_upper == -0.0 and arg_upper == 0, we need to guarantee that
         #  arg_upper is also -0.0
-        # FIXME: how do we handle bounds right next to the peak where the
-        #        expression bounds could be exceeded inside the interval?
         # TODO: since tan is periodic, an interval union could be used in the
         #       future
         arg_lower = _ensure_array(np.add(argv, arg_lower_diff))
+        exact_arg_lower = _zeros(argv.shape, np.dtype(np.bool))
         arg_lower[full_domain] = -fmax
+        exact_arg_lower |= full_domain
         np.copyto(arg_lower, argv, where=np.isinf(argv), casting="no")
+        exact_arg_lower |= np.isinf(argv)
         _minimum_zero_sign_sensitive(argv, arg_lower, out=arg_lower)
 
         arg_upper = _ensure_array(np.add(argv, arg_upper_diff))
+        exact_arg_upper = _zeros(argv.shape, np.dtype(np.bool))
         arg_upper[full_domain] = fmax
+        exact_arg_upper |= full_domain
         np.copyto(arg_upper, argv, where=np.isinf(argv), casting="no")
+        exact_arg_upper |= np.isinf(argv)
         arg_upper[(arg_upper == 0) & _is_negative_zero(expr_upper)] = -0.0
+        exact_arg_upper |= (arg_upper == 0) & _is_negative_zero(expr_upper)
         _maximum_zero_sign_sensitive(argv, arg_upper, out=arg_upper)
 
         # we need to force argv if expr_lower == expr_upper
         np.copyto(arg_lower, argv, where=(expr_lower == expr_upper), casting="no")
+        exact_arg_lower |= expr_lower == expr_upper
         np.copyto(arg_upper, argv, where=(expr_lower == expr_upper), casting="no")
+        exact_arg_upper |= expr_lower == expr_upper
+
+        # if arg_lower/arg_upper is not exact, it may have rounding errors,
+        # so we guard against slipping into the next repetition
+        arg_lower_expr_upper = _where(
+            exact_arg_lower,
+            expr_upper,
+            exprv,
+        )
+        arg_upper_expr_lower = _where(
+            exact_arg_upper,
+            expr_lower,
+            exprv,
+        )
 
         # handle rounding errors in tan(atan(...)) early
         arg_lower = guarantee_arg_within_expr_bounds(
@@ -400,14 +478,14 @@ class ScalarTan(Expr[AnyExpr]):
             argv,
             arg_lower,
             expr_lower,
-            expr_upper,
+            arg_lower_expr_upper,
         )
         arg_upper = guarantee_arg_within_expr_bounds(
             lambda arg_upper: np.tan(arg_upper),
             exprv,
             argv,
             arg_upper,
-            expr_lower,
+            arg_upper_expr_lower,
             expr_upper,
         )
 

@@ -135,6 +135,8 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
         # otherwise, apply the bounds to the current repetition
         # if p_lower == pv and pv == -0.0, we need to guarantee that
         #  p_lower is also -0.0, same for p_upper
+        # TODO: since floor_modulo is periodic, an interval union could be used
+        #       in the future
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
@@ -383,6 +385,8 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
         # otherwise, apply the bounds to the current repetition
         # if p_lower == pv and pv == -0.0, we need to guarantee that
         #  p_lower is also -0.0, same for p_upper
+        # TODO: since ceil_modulo is periodic, an interval union could be used
+        #       in the future
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
@@ -632,6 +636,8 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
         # propagate -0.0 and +0.0 bounds on pv to avoid nudging
         # if p_lower == pv and pv == -0.0, we need to guarantee that
         #  p_lower is also -0.0, same for p_upper
+        # TODO: since trunc_modulo is periodic, an interval union could be used
+        #       in the future
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
@@ -839,6 +845,8 @@ class ScalarRoundTiesEvenModulo(Expr[AnyExpr, AnyExpr]):
         # propagate -0.0 and +0.0 bounds on pv to avoid nudging
         # if p_lower == pv and pv == -0.0, we need to guarantee that
         #  p_lower is also -0.0, same for p_upper
+        # TODO: since round_ties_even_modulo is periodic, an interval union
+        #       could be used in the future
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
@@ -1042,6 +1050,8 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
         # otherwise, apply the bounds to the current repetition
         # if p_lower == pv and pv == -0.0, we need to guarantee that
         #  p_lower is also -0.0, same for p_upper
+        # TODO: since euclidean_modulo is periodic, an interval union could be
+        #       used in the future
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
