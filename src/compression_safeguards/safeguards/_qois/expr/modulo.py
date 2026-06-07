@@ -605,12 +605,22 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
             where=((p_lower == 0) & (rem_expr_lower == 0)),
             casting="no",
         )
+        _maximum_zero_sign_sensitive(  # we don't allow repetition slips
+            p_lower, Xs.dtype.type(+0.0), out=p_lower, where=(pv >= qv_pos)
+        )
+        exact_p_lower = _zeros(pv.shape, np.dtype(np.bool))
         p_lower[full_domain] = -fmax
+        exact_p_lower |= full_domain
         p_lower[(expr_lower <= qv_neg) & (expr_upper >= 0) & (pv < qv_pos)] = -fmax
+        exact_p_lower |= (expr_lower <= qv_neg) & (expr_upper >= 0) & (pv < qv_pos)
         np.copyto(p_lower, pv, where=np.isinf(pv), casting="no")
+        exact_p_lower |= np.isinf(pv)
         p_lower[qv == 0] = Xs.dtype.type(-np.inf)
+        exact_p_lower |= qv == 0
         np.copyto(p_lower, pv, where=np.isnan(pv), casting="no")
+        exact_p_lower |= np.isnan(pv)
         p_lower[np.isnan(qv)] = Xs.dtype.type(-np.inf)
+        exact_p_lower |= np.isnan(qv)
         _minimum_zero_sign_sensitive(pv, p_lower, out=p_lower)
 
         p_upper = _ensure_array(pv, copy=True)
@@ -621,13 +631,36 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
             where=((p_upper == 0) & (rem_expr_upper == 0)),
             casting="no",
         )
+        _minimum_zero_sign_sensitive(  # we don't allow repetition slips
+            p_upper, Xs.dtype.type(-0.0), out=p_upper, where=(pv <= qv_neg)
+        )
+        exact_p_upper = _zeros(pv.shape, np.dtype(np.bool))
         p_upper[full_domain] = fmax
+        exact_p_upper |= full_domain
         p_upper[(expr_lower <= 0) & (expr_upper >= qv_pos) & (pv > qv_neg)] = fmax
+        exact_p_upper |= (expr_lower <= 0) & (expr_upper >= qv_pos) & (pv > qv_neg)
         np.copyto(p_upper, pv, where=np.isinf(pv), casting="no")
+        exact_p_upper |= np.isinf(pv)
         p_upper[qv == 0] = Xs.dtype.type(np.inf)
+        exact_p_upper |= qv == 0
         np.copyto(p_upper, pv, where=np.isnan(pv), casting="no")
+        exact_p_upper |= np.isnan(pv)
         p_upper[np.isnan(qv)] = Xs.dtype.type(np.inf)
+        exact_p_upper |= np.isnan(qv)
         _maximum_zero_sign_sensitive(pv, p_upper, out=p_upper)
+
+        # if p_lower/p_upper is not exact, it may have rounding errors,
+        # so we guard against slipping into the next repetition
+        p_lower_expr_upper = _where(
+            exact_p_lower,
+            expr_upper,
+            exprv,
+        )
+        p_upper_expr_lower = _where(
+            exact_p_upper,
+            expr_lower,
+            exprv,
+        )
 
         # handle rounding errors in trunc_modulo early
         p_lower = guarantee_arg_within_expr_bounds(
@@ -636,14 +669,14 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
             pv,
             p_lower,
             expr_lower,
-            expr_upper,
+            p_lower_expr_upper,
         )
         p_upper = guarantee_arg_within_expr_bounds(
             lambda p_upper: _trunc_modulo(p_upper, qv),
             exprv,
             pv,
             p_upper,
-            expr_lower,
+            p_upper_expr_lower,
             expr_upper,
         )
 
