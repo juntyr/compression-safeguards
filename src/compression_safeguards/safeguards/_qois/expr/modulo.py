@@ -599,10 +599,10 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
-        np.copyto(
+        np.copyto(  # exact bounds around zero
             p_lower,
             rem_expr_lower,
-            where=((p_lower == 0) & (rem_expr_lower == 0)),
+            where=((pv > qv_neg) & (pv < qv_pos)),
             casting="no",
         )
         _maximum_zero_sign_sensitive(  # we don't allow repetition slips
@@ -625,10 +625,10 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
 
         p_upper = _ensure_array(pv, copy=True)
         np.add(p_upper, p_upper_diff, out=p_upper)
-        np.copyto(
+        np.copyto(  # exact bounds around zero
             p_upper,
             rem_expr_upper,
-            where=((p_upper == 0) & (rem_expr_upper == 0)),
+            where=((pv > qv_neg) & (pv < qv_pos)),
             casting="no",
         )
         _minimum_zero_sign_sensitive(  # we don't allow repetition slips

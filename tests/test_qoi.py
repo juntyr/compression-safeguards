@@ -2488,10 +2488,10 @@ def test_fuzzer_found_trunc_modulo_skip():
     X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
 
     assert X_lower == np.float16(6.0e-08)
-    assert X_upper == np.float16(0.9116)  # ideally 0.912
+    assert X_upper == np.float16(0.912)
 
     assert expr.eval(X_lower, dict()) == np.array(np.float16(-24.0))
-    assert expr.eval(X_upper, dict()) == np.array(np.float16(-0.1335))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(-0.1327))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -2511,10 +2511,10 @@ def test_fuzzer_found_trunc_modulo_skip_2():
     X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
 
     assert X_lower == np.float16(6.0e-08)
-    assert X_upper == np.float16(0.9116)  # ideally 0.912
+    assert X_upper == np.float16(0.912)
 
     assert expr.eval(X_lower, dict()) == np.array(np.float16(24.0))
-    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.1335))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.1327))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -2534,10 +2534,10 @@ def test_fuzzer_found_trunc_modulo_skip_3():
     X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
 
     assert X_lower == np.float16(6.0e-08)
-    assert X_upper == np.float16(0.9116)  # ideally 0.912
+    assert X_upper == np.float16(0.912)
 
     assert expr.eval(X_lower, dict()) == np.array(np.float16(-24.0))
-    assert expr.eval(X_upper, dict()) == np.array(np.float16(-0.1335))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(-0.1327))
 
 
 @np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
@@ -2557,7 +2557,7 @@ def test_fuzzer_found_trunc_modulo_skip_4():
     X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
 
     assert X_lower == np.float16(6.0e-08)
-    assert X_upper == np.float16(0.9116)  # ideally 0.912
+    assert X_upper == np.float16(0.912)
 
     assert expr.eval(X_lower, dict()) == np.array(np.float16(24.0))
-    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.1335))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.1327))
