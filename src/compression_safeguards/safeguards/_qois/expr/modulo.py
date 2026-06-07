@@ -138,16 +138,19 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
+        exact_p_lower = _zeros(pv.shape, np.dtype(np.bool))
         np.copyto(  # exact bounds around zero if signs match
             p_lower,
             rem_expr_lower,
             where=((np.abs(pv) < np.abs(qv)) & ((pv == 0) | ((pv > 0) == (qv > 0)))),
             casting="no",
         )
+        exact_p_lower |= (np.abs(pv) < np.abs(qv)) & (
+            (pv == 0) | ((pv > 0) == (qv > 0))
+        )
         _maximum_zero_sign_sensitive(  # we don't allow repetition slips
             p_lower, Xs.dtype.type(-0.0), out=p_lower, where=(pv >= 0)
         )
-        exact_p_lower = _zeros(pv.shape, np.dtype(np.bool))
         p_lower[full_domain] = -fmax
         exact_p_lower |= full_domain
         p_lower[np.isposinf(qv) & np.isposinf(rem_expr_upper)] = -fmax
@@ -180,16 +183,19 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
 
         p_upper = _ensure_array(pv, copy=True)
         np.add(p_upper, p_upper_diff, out=p_upper)
+        exact_p_upper = _zeros(pv.shape, np.dtype(np.bool))
         np.copyto(  # exact bounds around zero if signs match
             p_upper,
             rem_expr_upper,
             where=((np.abs(pv) < np.abs(qv)) & ((pv == 0) | ((pv > 0) == (qv > 0)))),
             casting="no",
         )
+        exact_p_upper |= (np.abs(pv) < np.abs(qv)) & (
+            (pv == 0) | ((pv > 0) == (qv > 0))
+        )
         _minimum_zero_sign_sensitive(  # we don't allow repetition slips
             p_upper, Xs.dtype.type(+0.0), out=p_upper, where=(pv <= 0)
         )
-        exact_p_upper = _zeros(pv.shape, np.dtype(np.bool))
         p_upper[full_domain] = fmax
         exact_p_upper |= full_domain
         p_upper[np.isposinf(qv) & (rem_expr_upper == 0)] = Xs.dtype.type(+0.0)
@@ -380,16 +386,19 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
+        exact_p_lower = _zeros(pv.shape, np.dtype(np.bool))
         np.copyto(  # exact bounds around zero if signs mismatch
             p_lower,
             rem_expr_lower,
             where=((np.abs(pv) < np.abs(qv)) & ((pv == 0) | ((pv > 0) != (qv > 0)))),
             casting="no",
         )
+        exact_p_lower |= (np.abs(pv) < np.abs(qv)) & (
+            (pv == 0) | ((pv > 0) != (qv > 0))
+        )
         _maximum_zero_sign_sensitive(  # we don't allow repetition slips
             p_lower, Xs.dtype.type(-0.0), out=p_lower, where=(pv >= 0)
         )
-        exact_p_lower = _zeros(pv.shape, np.dtype(np.bool))
         p_lower[full_domain] = -fmax
         exact_p_lower |= full_domain
         p_lower[np.isneginf(qv) & np.isposinf(rem_expr_lower)] = -fmax
@@ -422,16 +431,19 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
 
         p_upper = _ensure_array(pv, copy=True)
         np.add(p_upper, p_upper_diff, out=p_upper)
+        exact_p_upper = _zeros(pv.shape, np.dtype(np.bool))
         np.copyto(  # exact bounds around zero if signs mismatch
             p_upper,
             rem_expr_upper,
             where=((np.abs(pv) < np.abs(qv)) & ((pv == 0) | ((pv > 0) != (qv > 0)))),
             casting="no",
         )
+        exact_p_upper |= (np.abs(pv) < np.abs(qv)) & (
+            (pv == 0) | ((pv > 0) != (qv > 0))
+        )
         _minimum_zero_sign_sensitive(  # we don't allow repetition slips
             p_upper, Xs.dtype.type(+0.0), out=p_upper, where=(pv <= 0)
         )
-        exact_p_upper = _zeros(pv.shape, np.dtype(np.bool))
         p_upper[full_domain] = fmax
         exact_p_upper |= full_domain
         p_upper[np.isneginf(qv) & (rem_expr_upper == 0)] = Xs.dtype.type(+0.0)
@@ -623,16 +635,17 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
+        exact_p_lower = _zeros(pv.shape, np.dtype(np.bool))
         np.copyto(  # exact bounds around zero
             p_lower,
             rem_expr_lower,
             where=(np.abs(pv) < np.abs(qv)),
             casting="no",
         )
+        exact_p_lower |= np.abs(pv) < np.abs(qv)
         _maximum_zero_sign_sensitive(  # we don't allow repetition slips
             p_lower, Xs.dtype.type(+0.0), out=p_lower, where=(pv >= qv_pos)
         )
-        exact_p_lower = _zeros(pv.shape, np.dtype(np.bool))
         p_lower[full_domain] = -fmax
         exact_p_lower |= full_domain
         p_lower[(expr_lower <= qv_neg) & (expr_upper >= 0) & (pv < qv_pos)] = -fmax
@@ -649,16 +662,17 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
 
         p_upper = _ensure_array(pv, copy=True)
         np.add(p_upper, p_upper_diff, out=p_upper)
+        exact_p_upper = _zeros(pv.shape, np.dtype(np.bool))
         np.copyto(  # exact bounds around zero
             p_upper,
             rem_expr_upper,
             where=(np.abs(pv) < np.abs(qv)),
             casting="no",
         )
+        exact_p_upper |= np.abs(pv) < np.abs(qv)
         _minimum_zero_sign_sensitive(  # we don't allow repetition slips
             p_upper, Xs.dtype.type(-0.0), out=p_upper, where=(pv <= qv_neg)
         )
-        exact_p_upper = _zeros(pv.shape, np.dtype(np.bool))
         p_upper[full_domain] = fmax
         exact_p_upper |= full_domain
         p_upper[(expr_lower <= 0) & (expr_upper >= qv_pos) & (pv > qv_neg)] = fmax
@@ -998,16 +1012,17 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
+        exact_p_lower = _zeros(pv.shape, np.dtype(np.bool))
         np.copyto(  # exact bounds around zero if positive
             p_lower,
             rem_expr_lower,
             where=((np.abs(pv) < np.abs(qv)) & (pv >= 0)),
             casting="no",
         )
+        exact_p_lower |= (np.abs(pv) < np.abs(qv)) & (pv >= 0)
         _maximum_zero_sign_sensitive(  # we don't allow repetition slips
             p_lower, Xs.dtype.type(-0.0), out=p_lower, where=(pv >= 0)
         )
-        exact_p_lower = _zeros(pv.shape, np.dtype(np.bool))
         p_lower[full_domain] = -fmax
         exact_p_lower |= full_domain
         p_lower[np.isinf(qv) & np.isposinf(rem_expr_upper)] = -fmax
@@ -1036,16 +1051,17 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
 
         p_upper = _ensure_array(pv, copy=True)
         np.add(p_upper, p_upper_diff, out=p_upper)
+        exact_p_upper = _zeros(pv.shape, np.dtype(np.bool))
         np.copyto(  # exact bounds around zero if positive
             p_upper,
             rem_expr_upper,
             where=((np.abs(pv) < np.abs(qv)) & (pv >= 0)),
             casting="no",
         )
+        exact_p_upper |= (np.abs(pv) < np.abs(qv)) & (pv >= 0)
         _minimum_zero_sign_sensitive(  # we don't allow repetition slips
             p_upper, Xs.dtype.type(+0.0), out=p_upper, where=(pv <= 0)
         )
-        exact_p_upper = _zeros(pv.shape, np.dtype(np.bool))
         p_upper[full_domain] = fmax
         exact_p_upper |= full_domain
         p_upper[np.isinf(qv) & (rem_expr_upper == 0)] = Xs.dtype.type(+0.0)
