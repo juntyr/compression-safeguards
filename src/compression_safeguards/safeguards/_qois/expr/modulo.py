@@ -404,7 +404,6 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
 
         p_upper = _ensure_array(pv, copy=True)
         np.add(p_upper, p_upper_diff, out=p_upper)
-        np.add(p_upper, p_upper_diff, out=p_upper)
         _minimum_zero_sign_sensitive(  # we don't allow repetition slips
             p_upper, Xs.dtype.type(+0.0), out=p_upper, where=(pv <= 0)
         )
