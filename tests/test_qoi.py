@@ -593,6 +593,8 @@ def test_sin():
             -1.0,
             -0.5,
             -0.0,
+            -0.0,
+            +0.0,
             +0.0,
             0.5,
             1.0,
@@ -602,14 +604,15 @@ def test_sin():
             np.nan,
         ]
     )
+    o = np.array(([1.0] * 7) + ([0.5] * 2) + ([1.0] * 7))
 
     expr = ScalarSin(Data.SCALAR)
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         X_lower, X_upper = compute_expr_data_bounds(
             expr,
-            np.sin(X) - 1,
-            np.sin(X) + 1,
+            np.sin(X) - o,
+            np.sin(X) + o,
             X,
             dict(),
         )
@@ -632,6 +635,8 @@ def test_sin():
                 -np.pi / 2,
                 -np.pi / 2,
                 -fmax,
+                -np.asin(0.5),
+                -np.asin(0.5),
                 -fmax,
                 0.5 + (np.asin(np.sin(0.5) - 1) - np.asin(np.sin(0.5))),
                 1.0 + (np.asin(np.sin(1.0) - 1) - np.asin(np.sin(1.0))),
@@ -657,6 +662,8 @@ def test_sin():
                 -1.0 + (np.asin(np.sin(-1.0) + 1) - np.asin(np.sin(-1.0))),
                 -0.5 + (np.asin(np.sin(-0.5) + 1) - np.asin(np.sin(-0.5))),
                 fmax,
+                np.asin(0.5),
+                np.asin(0.5),
                 fmax,
                 np.pi / 2,
                 np.pi / 2,
@@ -753,6 +760,103 @@ def test_asin():
                 1.0,
                 1.0,
                 fmax,
+                np.inf,
+                np.nan,
+            ]
+        ),
+        rtol=0.0,
+        atol=1e-14,
+        equal_nan=True,
+    )
+    assert np.all(np.isnan(valid._upper[1]))
+
+
+def test_cos():
+    X = np.array(
+        [
+            -np.nan,
+            -np.inf,
+            -42.0,
+            -2.0,
+            -1.0,
+            -0.5,
+            -0.0,
+            -0.0,
+            +0.0,
+            +0.0,
+            0.5,
+            1.0,
+            2.0,
+            42.0,
+            np.inf,
+            np.nan,
+        ]
+    )
+    o = np.array(([1.0] * 7) + ([2.0] * 2) + ([1.0] * 7))
+
+    expr = ScalarCos(Data.SCALAR)
+
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        X_lower, X_upper = compute_expr_data_bounds(
+            expr,
+            np.cos(X) - o,
+            np.cos(X) + o,
+            X,
+            dict(),
+        )
+        valid = compute_safe_data_lower_upper_interval_union(
+            X,
+            X_lower,
+            X_upper,
+        )
+
+    fmax = np.finfo(X.dtype).max
+
+    np.testing.assert_allclose(
+        valid._lower[0],
+        np.array(
+            [
+                -np.nan,
+                -np.inf,
+                -42.0 + (np.acos(np.cos(-42.0) + 1.0) - np.acos(np.cos(-42.0))),
+                -2.0 - (np.acos(-1.0) - np.acos(np.cos(-2.0))),
+                -1.0 - (np.acos(np.cos(-1.0) - 1.0) - np.acos(np.cos(-1.0))),
+                -0.5 - (np.acos(np.cos(-0.5) - 1.0) - np.acos(np.cos(-0.5))),
+                -0.0,  # TODO
+                -fmax,
+                -fmax,
+                0.0,  # TODO
+                0.5 + (np.acos(1.0) - np.acos(np.cos(0.5))),
+                1.0 + (np.acos(1.0) - np.acos(np.cos(1.0))),
+                2.0 + (np.acos(np.cos(2.0) + 1.0) - np.acos(np.cos(2.0))),
+                42.0 - (np.acos(-1.0) - np.acos(np.cos(42.0))),
+                np.inf,
+                np.nan,
+            ]
+        ),
+        rtol=0.0,
+        atol=1e-14,
+        equal_nan=True,
+    )
+    assert np.all(np.isnan(valid._lower[1]))
+    np.testing.assert_allclose(
+        valid._upper[0],
+        np.array(
+            [
+                -np.nan,
+                -np.inf,
+                -42.0 + (np.acos(-1.0) - np.acos(np.cos(-42.0))),
+                -2.0 - (np.acos(np.cos(-2.0) + 1.0) - np.acos(np.cos(-2.0))),
+                -1.0 - (np.acos(1.0) - np.acos(np.cos(-1.0))),
+                -0.5 - (np.acos(1.0) - np.acos(np.cos(-0.5))),
+                np.pi / 2,
+                fmax,
+                fmax,
+                np.pi / 2,
+                0.5 + (np.acos(np.cos(0.5) - 1.0) - np.acos(np.cos(0.5))),
+                1.0 + (np.acos(np.cos(1.0) - 1.0) - np.acos(np.cos(1.0))),
+                2.0 + (np.acos(-1.0) - np.acos(np.cos(2.0))),
+                42.0 - (np.acos(np.cos(42.0) + 1.0) - np.acos(np.cos(42.0))),
                 np.inf,
                 np.nan,
             ]
