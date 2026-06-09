@@ -1,6 +1,7 @@
 ---
 title: Try Examples using JupyterLite
 edit_uri: docs/try-notebook.md
+render_macros: true
 ---
 
 <h1>

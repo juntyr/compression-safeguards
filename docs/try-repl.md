@@ -1,5 +1,6 @@
 ---
 edit_uri: docs/try-repl.md
+render_macros: true
 ---
 
 # Try the `compression-safeguards` using JupyterLite

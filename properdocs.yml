@@ -82,6 +82,9 @@ plugins:
   - autorefs
   - macros:
       module_name: docs/hooks/macros
+      on_error_fail: true
+      on_undefined: strict
+      render_by_default: false
   - mkdocstrings-python-generator:
       source_dirs:
         - nav_heading: [API Reference]
