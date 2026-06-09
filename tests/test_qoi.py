@@ -2756,3 +2756,26 @@ def test_fuzzer_found_round_ties_even_modulo_slip_4():
 
     assert expr.eval(X_lower, dict()) == np.array(np.float16(24.0))
     assert expr.eval(X_upper, dict()) == np.array(np.float16(0.1327))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_sum_partial_overflow():
+    X = np.array(np.float32(3.4027975e38))
+
+    expr = ScalarSubtract(
+        ScalarAdd(ScalarNot(Data.SCALAR), ScalarAbs(Data.SCALAR)),
+        ScalarAbs(Data.SCALAR),
+    )
+
+    assert _is_positive_zero(expr.eval(X, dict()))
+
+    expr_lower = np.array(np.float32(0.0))
+    expr_upper = np.array(np.float32(3.3961514e38))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float32(3.4027975e38)
+    assert X_upper == np.float32(3.4027975e38)
+
+    assert _is_positive_zero(expr.eval(X_lower, dict()))
+    assert _is_positive_zero(expr.eval(X_upper, dict()))
