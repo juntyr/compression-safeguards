@@ -80,6 +80,8 @@ plugins:
   - search
   - open-in-new-tab
   - autorefs
+  - macros:
+      module_name: docs/hooks/macros
   - mkdocstrings-python-generator:
       source_dirs:
         - nav_heading: [API Reference]

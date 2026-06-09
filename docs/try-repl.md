@@ -14,20 +14,25 @@ edit_uri: docs/try-repl.md
 <script>
   window.addEventListener("load", () => {
     document.getElementById("try-repl-jupyterlite").src = "https://lab.climet.eu/v0.4.0/repl/index.html?kernel=python&toolbar=1&code=" + encodeURIComponent(`\
+# install the compression safeguards
+%pip install compression-safeguards=={{ version('compression_safeguards') }}
+%pip install numcodecs-safeguards=={{ version('numcodecs_safeguards') }}
+%pip install xarray-safeguards=={{ version('xarray_safeguards') }}\
+`) + "&code=" + encodeURIComponent(`\
 import numpy as np
 from matplotlib import pyplot as plt
 from numcodecs import Quantize
 from numcodecs_combinators.framed import FramedCodecStack
-from numcodecs_safeguards import SafeguardedCodec
-
+from numcodecs_safeguards import SafeguardedCodec\
+`) + "&code=" + encodeURIComponent(`\
 # input data
-x = np.linspace(-np.pi, np.pi)
-
+x = np.linspace(-np.pi, np.pi)\
+`) + "&code=" + encodeURIComponent(`\
 # lossy compression, here linear quantization
 codec = Quantize(digits=0, dtype=np.float64)
 enc = codec.encode(x)
-dec = codec.decode(enc)
-
+dec = codec.decode(enc)\
+`) + "&code=" + encodeURIComponent(`\
 # safeguard an absolute error over a quantity of interest,
 #  here sin(x),
 # with an absolute error bound s.t.
@@ -39,8 +44,8 @@ sg = SafeguardedCodec(
     ]
 )
 enc_sg = sg.encode(x)
-dec_sg = sg.decode(enc_sg)
-
+dec_sg = sg.decode(enc_sg)\
+`) + "&code=" + encodeURIComponent(`\
 # visually compare the lossy compressed and safeguarded data
 fig, (ax1, ax2) = plt.subplots(2)
 ax1.plot(x, np.sin(x))

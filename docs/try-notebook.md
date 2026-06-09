@@ -42,7 +42,17 @@ import shutil
 from pathlib import Path
 from urllib.request import urlopen
 
+import micropip
+import pyodide
 import pyodide_fs_mount_http
+
+if pyodide.ffi.can_run_sync():
+    # we try our best :)
+    pyodide.ffi.run_sync(micropip.install([
+        "compression-safeguards=={{ version('compression_safeguards') }}",
+        "numcodecs-safeguards=={{ version('numcodecs_safeguards') }}",
+        "xarray-safeguards=={{ version('xarray_safeguards') }}",
+    ]))
 
 with urlopen(f"https://cors.climet.eu/https://raw.githubusercontent.com/${user}/${repo}/refs/heads/${branch}/examples/observe.py") as response:
     with open("observe.py", "wb") as file:
