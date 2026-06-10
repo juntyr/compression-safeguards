@@ -12,6 +12,8 @@ from ....utils._compat import (
     _minimum_zero_sign_sensitive,
     _round_ties_even_modulo,
     _trunc_modulo,
+    _where,
+    _zeros,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
@@ -133,44 +135,111 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
         # otherwise, apply the bounds to the current repetition
         # if p_lower == pv and pv == -0.0, we need to guarantee that
         #  p_lower is also -0.0, same for p_upper
+        # TODO: since floor_modulo is periodic, an interval union could be used
+        #       in the future
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
+        exact_p_lower = _zeros(pv.shape, np.dtype(np.bool))
+        np.copyto(  # exact bounds around zero if signs match
+            p_lower,
+            rem_expr_lower,
+            where=((np.abs(pv) < np.abs(qv)) & ((pv == 0) | ((pv > 0) == (qv > 0)))),
+            casting="no",
+        )
+        exact_p_lower |= (np.abs(pv) < np.abs(qv)) & (
+            (pv == 0) | ((pv > 0) == (qv > 0))
+        )
+        _maximum_zero_sign_sensitive(  # we don't allow repetition slips
+            p_lower, Xs.dtype.type(-0.0), out=p_lower, where=(pv >= 0)
+        )
         p_lower[full_domain] = -fmax
+        exact_p_lower |= full_domain
         p_lower[np.isposinf(qv) & np.isposinf(rem_expr_upper)] = -fmax
+        exact_p_lower |= np.isposinf(qv) & np.isposinf(rem_expr_upper)
         p_lower[np.isposinf(qv) & (rem_expr_upper == 0)] = Xs.dtype.type(-0.0)
+        exact_p_lower |= np.isposinf(qv) & (rem_expr_upper == 0)
         p_lower[np.isneginf(qv) & (rem_expr_lower == 0)] = Xs.dtype.type(-0.0)
+        exact_p_lower |= np.isneginf(qv) & (rem_expr_lower == 0)
         p_lower[np.isneginf(qv) & (pv > 0) & (rem_expr_upper < 0)] = smallest_subnormal
+        exact_p_lower |= np.isneginf(qv) & (pv > 0) & (rem_expr_upper < 0)
         _maximum_zero_sign_sensitive(
             p_lower,
             Xs.dtype.type(+0.0),
             out=p_lower,
             where=(np.isposinf(qv) & ~np.isposinf(rem_expr_upper)),
         )
+        # if the zero boundary was within the approximate bounds, it will be
+        # exact since zero is an exact boundary and the bounds would not be
+        # inaccurate in magnitude beyond their size
+        exact_p_lower |= np.isposinf(qv) & ~np.isposinf(rem_expr_upper) & (p_lower == 0)
         np.copyto(p_lower, pv, where=np.isinf(pv), casting="no")
+        exact_p_lower |= np.isinf(pv)
         p_lower[qv == 0] = Xs.dtype.type(-np.inf)
+        exact_p_lower |= qv == 0
         np.copyto(p_lower, pv, where=np.isnan(pv), casting="no")
+        exact_p_lower |= np.isnan(pv)
         p_lower[np.isnan(qv)] = Xs.dtype.type(-np.inf)
+        exact_p_lower |= np.isnan(qv)
         _minimum_zero_sign_sensitive(pv, p_lower, out=p_lower)
 
         p_upper = _ensure_array(pv, copy=True)
         np.add(p_upper, p_upper_diff, out=p_upper)
+        exact_p_upper = _zeros(pv.shape, np.dtype(np.bool))
+        np.copyto(  # exact bounds around zero if signs match
+            p_upper,
+            rem_expr_upper,
+            where=((np.abs(pv) < np.abs(qv)) & ((pv == 0) | ((pv > 0) == (qv > 0)))),
+            casting="no",
+        )
+        exact_p_upper |= (np.abs(pv) < np.abs(qv)) & (
+            (pv == 0) | ((pv > 0) == (qv > 0))
+        )
+        _minimum_zero_sign_sensitive(  # we don't allow repetition slips
+            p_upper, Xs.dtype.type(+0.0), out=p_upper, where=(pv <= 0)
+        )
         p_upper[full_domain] = fmax
+        exact_p_upper |= full_domain
         p_upper[np.isposinf(qv) & (rem_expr_upper == 0)] = Xs.dtype.type(+0.0)
+        exact_p_upper |= np.isposinf(qv) & (rem_expr_upper == 0)
         p_upper[np.isposinf(qv) & (pv < 0) & (rem_expr_lower > 0)] = -smallest_subnormal
+        exact_p_upper |= np.isposinf(qv) & (pv < 0) & (rem_expr_lower > 0)
         p_upper[np.isneginf(qv) & np.isneginf(rem_expr_lower)] = fmax
+        exact_p_upper |= np.isneginf(qv) & np.isneginf(rem_expr_lower)
         p_upper[np.isneginf(qv) & (rem_expr_lower == 0)] = Xs.dtype.type(+0.0)
+        exact_p_upper |= np.isneginf(qv) & (rem_expr_lower == 0)
         _minimum_zero_sign_sensitive(
             p_upper,
             Xs.dtype.type(-0.0),
             out=p_upper,
             where=(np.isneginf(qv) & ~np.isneginf(rem_expr_lower)),
         )
+        # if the zero boundary was within the approximate bounds, it will be
+        # exact since zero is an exact boundary and the bounds would not be
+        # inaccurate in magnitude beyond their size
+        exact_p_upper |= np.isneginf(qv) & ~np.isneginf(rem_expr_lower) & (p_upper == 0)
         np.copyto(p_upper, pv, where=np.isinf(pv), casting="no")
+        exact_p_upper |= np.isinf(pv)
         p_upper[qv == 0] = Xs.dtype.type(np.inf)
+        exact_p_upper |= qv == 0
         np.copyto(p_upper, pv, where=np.isnan(pv), casting="no")
+        exact_p_upper |= np.isnan(pv)
         p_upper[np.isnan(qv)] = Xs.dtype.type(np.inf)
+        exact_p_upper |= np.isnan(qv)
         _maximum_zero_sign_sensitive(pv, p_upper, out=p_upper)
+
+        # if p_lower/p_upper is not exact, it may have rounding errors,
+        # so we guard against slipping into the next repetition
+        p_lower_expr_upper = _where(
+            exact_p_lower,
+            expr_upper,
+            exprv,
+        )
+        p_upper_expr_lower = _where(
+            exact_p_upper,
+            expr_lower,
+            exprv,
+        )
 
         # handle rounding errors in floor_modulo early
         p_lower = guarantee_arg_within_expr_bounds(
@@ -179,14 +248,14 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
             pv,
             p_lower,
             expr_lower,
-            expr_upper,
+            p_lower_expr_upper,
         )
         p_upper = guarantee_arg_within_expr_bounds(
             lambda p_upper: _floor_modulo(p_upper, qv),
             exprv,
             pv,
             p_upper,
-            expr_lower,
+            p_upper_expr_lower,
             expr_upper,
         )
 
@@ -316,44 +385,111 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
         # otherwise, apply the bounds to the current repetition
         # if p_lower == pv and pv == -0.0, we need to guarantee that
         #  p_lower is also -0.0, same for p_upper
+        # TODO: since ceil_modulo is periodic, an interval union could be used
+        #       in the future
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
+        exact_p_lower = _zeros(pv.shape, np.dtype(np.bool))
+        np.copyto(  # exact bounds around zero if signs mismatch
+            p_lower,
+            rem_expr_lower,
+            where=((np.abs(pv) < np.abs(qv)) & ((pv == 0) | ((pv > 0) != (qv > 0)))),
+            casting="no",
+        )
+        exact_p_lower |= (np.abs(pv) < np.abs(qv)) & (
+            (pv == 0) | ((pv > 0) != (qv > 0))
+        )
+        _maximum_zero_sign_sensitive(  # we don't allow repetition slips
+            p_lower, Xs.dtype.type(-0.0), out=p_lower, where=(pv >= 0)
+        )
         p_lower[full_domain] = -fmax
+        exact_p_lower |= full_domain
         p_lower[np.isneginf(qv) & np.isposinf(rem_expr_lower)] = -fmax
+        exact_p_lower |= np.isneginf(qv) & np.isposinf(rem_expr_lower)
         p_lower[np.isneginf(qv) & (rem_expr_upper == 0)] = Xs.dtype.type(-0.0)
+        exact_p_lower |= np.isneginf(qv) & (rem_expr_upper == 0)
         p_lower[np.isposinf(qv) & (rem_expr_lower == 0)] = Xs.dtype.type(-0.0)
+        exact_p_lower |= np.isposinf(qv) & (rem_expr_lower == 0)
         p_lower[np.isposinf(qv) & (pv > 0) & (rem_expr_upper < 0)] = smallest_subnormal
+        exact_p_lower |= np.isposinf(qv) & (pv > 0) & (rem_expr_upper < 0)
         _maximum_zero_sign_sensitive(
             p_lower,
             Xs.dtype.type(+0.0),
             out=p_lower,
             where=(np.isneginf(qv) & ~np.isposinf(rem_expr_upper)),
         )
+        # if the zero boundary was within the approximate bounds, it will be
+        # exact since zero is an exact boundary and the bounds would not be
+        # inaccurate in magnitude beyond their size
+        exact_p_lower |= np.isneginf(qv) & ~np.isposinf(rem_expr_upper) & (p_lower == 0)
         np.copyto(p_lower, pv, where=np.isinf(pv), casting="no")
+        exact_p_lower |= np.isinf(pv)
         p_lower[qv == 0] = Xs.dtype.type(-np.inf)
+        exact_p_lower |= qv == 0
         np.copyto(p_lower, pv, where=np.isnan(pv), casting="no")
+        exact_p_lower |= np.isnan(pv)
         p_lower[np.isnan(qv)] = Xs.dtype.type(-np.inf)
+        exact_p_lower |= np.isnan(qv)
         _minimum_zero_sign_sensitive(pv, p_lower, out=p_lower)
 
         p_upper = _ensure_array(pv, copy=True)
         np.add(p_upper, p_upper_diff, out=p_upper)
+        exact_p_upper = _zeros(pv.shape, np.dtype(np.bool))
+        np.copyto(  # exact bounds around zero if signs mismatch
+            p_upper,
+            rem_expr_upper,
+            where=((np.abs(pv) < np.abs(qv)) & ((pv == 0) | ((pv > 0) != (qv > 0)))),
+            casting="no",
+        )
+        exact_p_upper |= (np.abs(pv) < np.abs(qv)) & (
+            (pv == 0) | ((pv > 0) != (qv > 0))
+        )
+        _minimum_zero_sign_sensitive(  # we don't allow repetition slips
+            p_upper, Xs.dtype.type(+0.0), out=p_upper, where=(pv <= 0)
+        )
         p_upper[full_domain] = fmax
+        exact_p_upper |= full_domain
         p_upper[np.isneginf(qv) & (rem_expr_upper == 0)] = Xs.dtype.type(+0.0)
+        exact_p_upper |= np.isneginf(qv) & (rem_expr_upper == 0)
         p_upper[np.isneginf(qv) & (pv < 0) & (rem_expr_lower > 0)] = -smallest_subnormal
+        exact_p_upper |= np.isneginf(qv) & (pv < 0) & (rem_expr_lower > 0)
         p_upper[np.isposinf(qv) & np.isneginf(rem_expr_lower)] = fmax
+        exact_p_upper |= np.isposinf(qv) & np.isneginf(rem_expr_lower)
         p_upper[np.isposinf(qv) & (rem_expr_lower == 0)] = Xs.dtype.type(+0.0)
+        exact_p_upper |= np.isposinf(qv) & (rem_expr_lower == 0)
         _minimum_zero_sign_sensitive(
             p_upper,
             Xs.dtype.type(-0.0),
             out=p_upper,
             where=(np.isposinf(qv) & ~np.isneginf(rem_expr_lower)),
         )
+        # if the zero boundary was within the approximate bounds, it will be
+        # exact since zero is an exact boundary and the bounds would not be
+        # inaccurate in magnitude beyond their size
+        exact_p_upper |= np.isposinf(qv) & ~np.isneginf(rem_expr_lower) & (p_upper == 0)
         np.copyto(p_upper, pv, where=np.isinf(pv), casting="no")
+        exact_p_upper |= np.isinf(pv)
         p_upper[qv == 0] = Xs.dtype.type(np.inf)
+        exact_p_upper |= qv == 0
         np.copyto(p_upper, pv, where=np.isnan(pv), casting="no")
+        exact_p_upper |= np.isnan(pv)
         p_upper[np.isnan(qv)] = Xs.dtype.type(np.inf)
+        exact_p_upper |= np.isnan(qv)
         _maximum_zero_sign_sensitive(pv, p_upper, out=p_upper)
+
+        # if p_lower/p_upper is not exact, it may have rounding errors,
+        # so we guard against slipping into the next repetition
+        p_lower_expr_upper = _where(
+            exact_p_lower,
+            expr_upper,
+            exprv,
+        )
+        p_upper_expr_lower = _where(
+            exact_p_upper,
+            expr_lower,
+            exprv,
+        )
 
         # handle rounding errors in ceil_modulo early
         p_lower = guarantee_arg_within_expr_bounds(
@@ -362,14 +498,14 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
             pv,
             p_lower,
             expr_lower,
-            expr_upper,
+            p_lower_expr_upper,
         )
         p_upper = guarantee_arg_within_expr_bounds(
             lambda p_upper: _ceil_modulo(p_upper, qv),
             exprv,
             pv,
             p_upper,
-            expr_lower,
+            p_upper_expr_lower,
             expr_upper,
         )
 
@@ -500,38 +636,75 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
         # propagate -0.0 and +0.0 bounds on pv to avoid nudging
         # if p_lower == pv and pv == -0.0, we need to guarantee that
         #  p_lower is also -0.0, same for p_upper
+        # TODO: since trunc_modulo is periodic, an interval union could be used
+        #       in the future
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
-        np.copyto(
+        exact_p_lower = _zeros(pv.shape, np.dtype(np.bool))
+        np.copyto(  # exact bounds around zero
             p_lower,
             rem_expr_lower,
-            where=((p_lower == 0) & (rem_expr_lower == 0)),
+            where=(np.abs(pv) < np.abs(qv)),
             casting="no",
         )
+        exact_p_lower |= np.abs(pv) < np.abs(qv)
+        _maximum_zero_sign_sensitive(  # we don't allow repetition slips
+            p_lower, Xs.dtype.type(+0.0), out=p_lower, where=(pv >= qv_pos)
+        )
         p_lower[full_domain] = -fmax
+        exact_p_lower |= full_domain
         p_lower[(expr_lower <= qv_neg) & (expr_upper >= 0) & (pv < qv_pos)] = -fmax
+        exact_p_lower |= (expr_lower <= qv_neg) & (expr_upper >= 0) & (pv < qv_pos)
         np.copyto(p_lower, pv, where=np.isinf(pv), casting="no")
+        exact_p_lower |= np.isinf(pv)
         p_lower[qv == 0] = Xs.dtype.type(-np.inf)
+        exact_p_lower |= qv == 0
         np.copyto(p_lower, pv, where=np.isnan(pv), casting="no")
+        exact_p_lower |= np.isnan(pv)
         p_lower[np.isnan(qv)] = Xs.dtype.type(-np.inf)
+        exact_p_lower |= np.isnan(qv)
         _minimum_zero_sign_sensitive(pv, p_lower, out=p_lower)
 
         p_upper = _ensure_array(pv, copy=True)
         np.add(p_upper, p_upper_diff, out=p_upper)
-        np.copyto(
+        exact_p_upper = _zeros(pv.shape, np.dtype(np.bool))
+        np.copyto(  # exact bounds around zero
             p_upper,
             rem_expr_upper,
-            where=((p_upper == 0) & (rem_expr_upper == 0)),
+            where=(np.abs(pv) < np.abs(qv)),
             casting="no",
         )
+        exact_p_upper |= np.abs(pv) < np.abs(qv)
+        _minimum_zero_sign_sensitive(  # we don't allow repetition slips
+            p_upper, Xs.dtype.type(-0.0), out=p_upper, where=(pv <= qv_neg)
+        )
         p_upper[full_domain] = fmax
+        exact_p_upper |= full_domain
         p_upper[(expr_lower <= 0) & (expr_upper >= qv_pos) & (pv > qv_neg)] = fmax
+        exact_p_upper |= (expr_lower <= 0) & (expr_upper >= qv_pos) & (pv > qv_neg)
         np.copyto(p_upper, pv, where=np.isinf(pv), casting="no")
+        exact_p_upper |= np.isinf(pv)
         p_upper[qv == 0] = Xs.dtype.type(np.inf)
+        exact_p_upper |= qv == 0
         np.copyto(p_upper, pv, where=np.isnan(pv), casting="no")
+        exact_p_upper |= np.isnan(pv)
         p_upper[np.isnan(qv)] = Xs.dtype.type(np.inf)
+        exact_p_upper |= np.isnan(qv)
         _maximum_zero_sign_sensitive(pv, p_upper, out=p_upper)
+
+        # if p_lower/p_upper is not exact, it may have rounding errors,
+        # so we guard against slipping into the next repetition
+        p_lower_expr_upper = _where(
+            exact_p_lower,
+            expr_upper,
+            exprv,
+        )
+        p_upper_expr_lower = _where(
+            exact_p_upper,
+            expr_lower,
+            exprv,
+        )
 
         # handle rounding errors in trunc_modulo early
         p_lower = guarantee_arg_within_expr_bounds(
@@ -540,14 +713,14 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
             pv,
             p_lower,
             expr_lower,
-            expr_upper,
+            p_lower_expr_upper,
         )
         p_upper = guarantee_arg_within_expr_bounds(
             lambda p_upper: _trunc_modulo(p_upper, qv),
             exprv,
             pv,
             p_upper,
-            expr_lower,
+            p_upper_expr_lower,
             expr_upper,
         )
 
@@ -672,36 +845,71 @@ class ScalarRoundTiesEvenModulo(Expr[AnyExpr, AnyExpr]):
         # propagate -0.0 and +0.0 bounds on pv to avoid nudging
         # if p_lower == pv and pv == -0.0, we need to guarantee that
         #  p_lower is also -0.0, same for p_upper
+        # TODO: since round_ties_even_modulo is periodic, an interval union
+        #       could be used in the future
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
-        np.copyto(
+        exact_p_lower = _zeros(pv.shape, np.dtype(np.bool))
+        np.copyto(  # exact bounds around zero
             p_lower,
             rem_expr_lower,
-            where=((p_lower == 0) & (rem_expr_lower == 0)),
+            where=(np.abs(pv) < qv2),
             casting="no",
         )
+        exact_p_lower |= np.abs(pv) < qv2
+        _maximum_zero_sign_sensitive(  # we don't allow repetition slips
+            p_lower, Xs.dtype.type(+0.0), out=p_lower, where=(pv >= qv2)
+        )
         p_lower[full_domain] = -fmax
+        exact_p_lower |= full_domain
         np.copyto(p_lower, pv, where=np.isinf(pv), casting="no")
+        exact_p_lower |= np.isinf(pv)
         p_lower[qv == 0] = Xs.dtype.type(-np.inf)
+        exact_p_lower |= qv == 0
         np.copyto(p_lower, pv, where=np.isnan(pv), casting="no")
+        exact_p_lower |= np.isnan(pv)
         p_lower[np.isnan(qv)] = Xs.dtype.type(-np.inf)
+        exact_p_lower |= np.isnan(qv)
         _minimum_zero_sign_sensitive(pv, p_lower, out=p_lower)
 
         p_upper = _ensure_array(pv, copy=True)
         np.add(p_upper, p_upper_diff, out=p_upper)
-        np.copyto(
+        exact_p_upper = _zeros(pv.shape, np.dtype(np.bool))
+        np.copyto(  # exact bounds around zero
             p_upper,
             rem_expr_upper,
-            where=((p_upper == 0) & (rem_expr_upper == 0)),
+            where=(np.abs(pv) < qv2),
             casting="no",
         )
+        exact_p_upper |= np.abs(pv) < qv2
+        _minimum_zero_sign_sensitive(  # we don't allow repetition slips
+            p_upper, Xs.dtype.type(-0.0), out=p_upper, where=(pv <= -qv2)
+        )
         p_upper[full_domain] = fmax
+        exact_p_upper |= full_domain
         np.copyto(p_upper, pv, where=np.isinf(pv), casting="no")
+        exact_p_upper |= np.isinf(pv)
         p_upper[qv == 0] = Xs.dtype.type(np.inf)
+        exact_p_upper |= qv == 0
         np.copyto(p_upper, pv, where=np.isnan(pv), casting="no")
+        exact_p_upper |= np.isnan(pv)
         p_upper[np.isnan(qv)] = Xs.dtype.type(np.inf)
+        exact_p_upper |= np.isnan(qv)
         _maximum_zero_sign_sensitive(pv, p_upper, out=p_upper)
+
+        # if p_lower/p_upper is not exact, it may have rounding errors,
+        # so we guard against slipping into the next repetition
+        p_lower_expr_upper = _where(
+            exact_p_lower,
+            expr_upper,
+            exprv,
+        )
+        p_upper_expr_lower = _where(
+            exact_p_upper,
+            expr_lower,
+            exprv,
+        )
 
         # handle rounding errors in round_ties_even_modulo early
         p_lower = guarantee_arg_within_expr_bounds(
@@ -710,14 +918,14 @@ class ScalarRoundTiesEvenModulo(Expr[AnyExpr, AnyExpr]):
             pv,
             p_lower,
             expr_lower,
-            expr_upper,
+            p_lower_expr_upper,
         )
         p_upper = guarantee_arg_within_expr_bounds(
             lambda p_upper: _round_ties_even_modulo(p_upper, qv),
             exprv,
             pv,
             p_upper,
-            expr_lower,
+            p_upper_expr_lower,
             expr_upper,
         )
 
@@ -842,34 +1050,89 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
         # otherwise, apply the bounds to the current repetition
         # if p_lower == pv and pv == -0.0, we need to guarantee that
         #  p_lower is also -0.0, same for p_upper
+        # TODO: since euclidean_modulo is periodic, an interval union could be
+        #       used in the future
 
         p_lower = _ensure_array(pv, copy=True)
         np.add(p_lower, p_lower_diff, out=p_lower)
+        exact_p_lower = _zeros(pv.shape, np.dtype(np.bool))
+        np.copyto(  # exact bounds around zero if positive
+            p_lower,
+            rem_expr_lower,
+            where=((np.abs(pv) < np.abs(qv)) & (pv >= 0)),
+            casting="no",
+        )
+        exact_p_lower |= (np.abs(pv) < np.abs(qv)) & (pv >= 0)
+        _maximum_zero_sign_sensitive(  # we don't allow repetition slips
+            p_lower, Xs.dtype.type(-0.0), out=p_lower, where=(pv >= 0)
+        )
         p_lower[full_domain] = -fmax
+        exact_p_lower |= full_domain
         p_lower[np.isinf(qv) & np.isposinf(rem_expr_upper)] = -fmax
+        exact_p_lower |= np.isinf(qv) & np.isposinf(rem_expr_upper)
         p_lower[np.isinf(qv) & (rem_expr_upper == 0)] = Xs.dtype.type(-0.0)
+        exact_p_lower |= np.isinf(qv) & (rem_expr_upper == 0)
         _maximum_zero_sign_sensitive(
             p_lower,
             Xs.dtype.type(+0.0),
             out=p_lower,
             where=(np.isinf(qv) & ~np.isposinf(rem_expr_upper)),
         )
+        # if the zero boundary was within the approximate bounds, it will be
+        # exact since zero is an exact boundary and the bounds would not be
+        # inaccurate in magnitude beyond their size
+        exact_p_lower |= np.isinf(qv) & ~np.isposinf(rem_expr_upper) & (p_lower == 0)
         np.copyto(p_lower, pv, where=np.isinf(pv), casting="no")
+        exact_p_lower |= np.isinf(pv)
         p_lower[qv == 0] = Xs.dtype.type(-np.inf)
+        exact_p_lower |= qv == 0
         np.copyto(p_lower, pv, where=np.isnan(pv), casting="no")
+        exact_p_lower |= np.isnan(pv)
         p_lower[np.isnan(qv)] = Xs.dtype.type(-np.inf)
+        exact_p_lower |= np.isnan(qv)
         _minimum_zero_sign_sensitive(pv, p_lower, out=p_lower)
 
         p_upper = _ensure_array(pv, copy=True)
         np.add(p_upper, p_upper_diff, out=p_upper)
+        exact_p_upper = _zeros(pv.shape, np.dtype(np.bool))
+        np.copyto(  # exact bounds around zero if positive
+            p_upper,
+            rem_expr_upper,
+            where=((np.abs(pv) < np.abs(qv)) & (pv >= 0)),
+            casting="no",
+        )
+        exact_p_upper |= (np.abs(pv) < np.abs(qv)) & (pv >= 0)
+        _minimum_zero_sign_sensitive(  # we don't allow repetition slips
+            p_upper, Xs.dtype.type(+0.0), out=p_upper, where=(pv <= 0)
+        )
         p_upper[full_domain] = fmax
+        exact_p_upper |= full_domain
         p_upper[np.isinf(qv) & (rem_expr_upper == 0)] = Xs.dtype.type(+0.0)
+        exact_p_upper |= np.isinf(qv) & (rem_expr_upper == 0)
         p_upper[np.isinf(qv) & (pv < 0) & (rem_expr_lower > 0)] = -smallest_subnormal
+        exact_p_upper |= np.isinf(qv) & (pv < 0) & (rem_expr_lower > 0)
         np.copyto(p_upper, pv, where=np.isinf(pv), casting="no")
+        exact_p_upper |= np.isinf(pv)
         p_upper[qv == 0] = Xs.dtype.type(np.inf)
+        exact_p_upper |= qv == 0
         np.copyto(p_upper, pv, where=np.isnan(pv), casting="no")
+        exact_p_upper |= np.isnan(pv)
         p_upper[np.isnan(qv)] = Xs.dtype.type(np.inf)
+        exact_p_upper |= np.isnan(qv)
         _maximum_zero_sign_sensitive(pv, p_upper, out=p_upper)
+
+        # if p_lower/p_upper is not exact, it may have rounding errors,
+        # so we guard against slipping into the next repetition
+        p_lower_expr_upper = _where(
+            exact_p_lower,
+            expr_upper,
+            exprv,
+        )
+        p_upper_expr_lower = _where(
+            exact_p_upper,
+            expr_lower,
+            exprv,
+        )
 
         # handle rounding errors in euclidean_modulo early
         p_lower = guarantee_arg_within_expr_bounds(
@@ -878,14 +1141,14 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
             pv,
             p_lower,
             expr_lower,
-            expr_upper,
+            p_lower_expr_upper,
         )
         p_upper = guarantee_arg_within_expr_bounds(
             lambda p_upper: _euclidean_modulo(p_upper, qv),
             exprv,
             pv,
             p_upper,
-            expr_lower,
+            p_upper_expr_lower,
             expr_upper,
         )
 

@@ -47,8 +47,10 @@ from compression_safeguards.safeguards._qois.expr.logexp import (
 )
 from compression_safeguards.safeguards._qois.expr.modulo import (
     ScalarCeilModulo,
+    ScalarEuclideanModulo,
     ScalarFloorModulo,
     ScalarRoundTiesEvenModulo,
+    ScalarTruncModulo,
 )
 from compression_safeguards.safeguards._qois.expr.neg import ScalarNegate
 from compression_safeguards.safeguards._qois.expr.power import ScalarPower
@@ -591,6 +593,8 @@ def test_sin():
             -1.0,
             -0.5,
             -0.0,
+            -0.0,
+            +0.0,
             +0.0,
             0.5,
             1.0,
@@ -600,14 +604,15 @@ def test_sin():
             np.nan,
         ]
     )
+    o = np.array(([1.0] * 7) + ([0.5] * 2) + ([1.0] * 7))
 
     expr = ScalarSin(Data.SCALAR)
 
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         X_lower, X_upper = compute_expr_data_bounds(
             expr,
-            np.sin(X) - 1,
-            np.sin(X) + 1,
+            np.sin(X) - o,
+            np.sin(X) + o,
             X,
             dict(),
         )
@@ -630,6 +635,8 @@ def test_sin():
                 -np.pi / 2,
                 -np.pi / 2,
                 -fmax,
+                -np.asin(0.5),
+                -np.asin(0.5),
                 -fmax,
                 0.5 + (np.asin(np.sin(0.5) - 1) - np.asin(np.sin(0.5))),
                 1.0 + (np.asin(np.sin(1.0) - 1) - np.asin(np.sin(1.0))),
@@ -655,6 +662,8 @@ def test_sin():
                 -1.0 + (np.asin(np.sin(-1.0) + 1) - np.asin(np.sin(-1.0))),
                 -0.5 + (np.asin(np.sin(-0.5) + 1) - np.asin(np.sin(-0.5))),
                 fmax,
+                np.asin(0.5),
+                np.asin(0.5),
                 fmax,
                 np.pi / 2,
                 np.pi / 2,
@@ -751,6 +760,103 @@ def test_asin():
                 1.0,
                 1.0,
                 fmax,
+                np.inf,
+                np.nan,
+            ]
+        ),
+        rtol=0.0,
+        atol=1e-14,
+        equal_nan=True,
+    )
+    assert np.all(np.isnan(valid._upper[1]))
+
+
+def test_cos():
+    X = np.array(
+        [
+            -np.nan,
+            -np.inf,
+            -42.0,
+            -2.0,
+            -1.0,
+            -0.5,
+            -0.0,
+            -0.0,
+            +0.0,
+            +0.0,
+            0.5,
+            1.0,
+            2.0,
+            42.0,
+            np.inf,
+            np.nan,
+        ]
+    )
+    o = np.array(([1.0] * 7) + ([2.0] * 2) + ([1.0] * 7))
+
+    expr = ScalarCos(Data.SCALAR)
+
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        X_lower, X_upper = compute_expr_data_bounds(
+            expr,
+            np.cos(X) - o,
+            np.cos(X) + o,
+            X,
+            dict(),
+        )
+        valid = compute_safe_data_lower_upper_interval_union(
+            X,
+            X_lower,
+            X_upper,
+        )
+
+    fmax = np.finfo(X.dtype).max
+
+    np.testing.assert_allclose(
+        valid._lower[0],
+        np.array(
+            [
+                -np.nan,
+                -np.inf,
+                -42.0 + (np.acos(np.cos(-42.0) + 1.0) - np.acos(np.cos(-42.0))),
+                -2.0 - (np.acos(-1.0) - np.acos(np.cos(-2.0))),
+                -1.0 - (np.acos(np.cos(-1.0) - 1.0) - np.acos(np.cos(-1.0))),
+                -0.5 - (np.acos(np.cos(-0.5) - 1.0) - np.acos(np.cos(-0.5))),
+                -0.0,  # TODO
+                -fmax,
+                -fmax,
+                0.0,  # TODO
+                0.5 + (np.acos(1.0) - np.acos(np.cos(0.5))),
+                1.0 + (np.acos(1.0) - np.acos(np.cos(1.0))),
+                2.0 + (np.acos(np.cos(2.0) + 1.0) - np.acos(np.cos(2.0))),
+                42.0 - (np.acos(-1.0) - np.acos(np.cos(42.0))),
+                np.inf,
+                np.nan,
+            ]
+        ),
+        rtol=0.0,
+        atol=1e-14,
+        equal_nan=True,
+    )
+    assert np.all(np.isnan(valid._lower[1]))
+    np.testing.assert_allclose(
+        valid._upper[0],
+        np.array(
+            [
+                -np.nan,
+                -np.inf,
+                -42.0 + (np.acos(-1.0) - np.acos(np.cos(-42.0))),
+                -2.0 - (np.acos(np.cos(-2.0) + 1.0) - np.acos(np.cos(-2.0))),
+                -1.0 - (np.acos(1.0) - np.acos(np.cos(-1.0))),
+                -0.5 - (np.acos(1.0) - np.acos(np.cos(-0.5))),
+                np.pi / 2,
+                fmax,
+                fmax,
+                np.pi / 2,
+                0.5 + (np.acos(np.cos(0.5) - 1.0) - np.acos(np.cos(0.5))),
+                1.0 + (np.acos(np.cos(1.0) - 1.0) - np.acos(np.cos(1.0))),
+                2.0 + (np.acos(-1.0) - np.acos(np.cos(2.0))),
+                42.0 - (np.acos(np.cos(42.0) + 1.0) - np.acos(np.cos(42.0))),
                 np.inf,
                 np.nan,
             ]
@@ -2167,3 +2273,509 @@ def test_fuzzer_found_round_ties_even_modulo_near_zero_float16():
 
     assert _is_negative_zero(expr.eval(X_lower, dict()))
     assert _is_negative_zero(expr.eval(X_upper, dict()))
+
+
+@pytest.mark.parametrize("dtype", [np.float16, np.float32, np.float64, _float128])
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_negative_zero_product(dtype):
+    X = np.array(dtype(3.34e-05))
+
+    expr = ScalarMultiply(
+        ScalarFoldedConstant(dtype(0.0)),
+        ScalarMultiply(
+            ScalarIsFinite(Data.SCALAR),
+            ScalarFoldedConstant(dtype(-0.0)),
+        ),
+    )
+
+    assert _is_negative_zero(expr.eval(X, dict()))
+
+    expr_lower = np.array(dtype(-0.3142))
+    expr_upper = np.array(dtype(-0.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == dtype(-np.inf)
+    assert X_upper == dtype(np.inf)
+
+    assert _is_negative_zero(expr.eval(X_lower, dict()))
+    assert _is_negative_zero(expr.eval(X_upper, dict()))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_euclidean_modulo_slip():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarEuclideanModulo(
+        ScalarLog(Logarithm.log2, Data.SCALAR), ScalarFoldedConstant(np.float16(786.0))
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(782.0))
+
+    expr_lower = np.array(np.float16(0.1326))
+    expr_upper = np.array(np.float16(790.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    assert X_upper == np.float16(0.9995)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(762.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(786.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_euclidean_modulo_slip_2():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarEuclideanModulo(
+        ScalarNegate(ScalarLog(Logarithm.log2, Data.SCALAR)),
+        ScalarFoldedConstant(np.float16(786.0)),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(3.867))
+
+    expr_lower = np.array(np.float16(0.1326))
+    expr_upper = np.array(np.float16(790.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    assert X_upper == np.float16(0.912)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(24.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.1327))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_euclidean_modulo_slip_3():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarEuclideanModulo(
+        ScalarLog(Logarithm.log2, Data.SCALAR), ScalarFoldedConstant(np.float16(-786.0))
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(782.0))
+
+    expr_lower = np.array(np.float16(0.1326))
+    expr_upper = np.array(np.float16(790.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    assert X_upper == np.float16(0.9995)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(762.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(786.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_euclidean_modulo_slip_4():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarEuclideanModulo(
+        ScalarNegate(ScalarLog(Logarithm.log2, Data.SCALAR)),
+        ScalarFoldedConstant(np.float16(-786.0)),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(3.867))
+
+    expr_lower = np.array(np.float16(0.1326))
+    expr_upper = np.array(np.float16(790.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    assert X_upper == np.float16(0.912)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(24.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.1327))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_floor_modulo_slip():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarFloorModulo(
+        ScalarLog(Logarithm.log2, Data.SCALAR), ScalarFoldedConstant(np.float16(786.0))
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(782.0))
+
+    expr_lower = np.array(np.float16(0.1326))
+    expr_upper = np.array(np.float16(790.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    assert X_upper == np.float16(0.9995)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(762.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(786.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_floor_modulo_slip_2():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarFloorModulo(
+        ScalarNegate(ScalarLog(Logarithm.log2, Data.SCALAR)),
+        ScalarFoldedConstant(np.float16(786.0)),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(3.867))
+
+    expr_lower = np.array(np.float16(0.1326))
+    expr_upper = np.array(np.float16(790.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    assert X_upper == np.float16(0.912)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(24.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.1327))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_floor_modulo_slip_3():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarFloorModulo(
+        ScalarLog(Logarithm.log2, Data.SCALAR), ScalarFoldedConstant(np.float16(-786.0))
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(-3.867))
+
+    expr_lower = np.array(np.float16(-790.0))
+    expr_upper = np.array(np.float16(-0.1326))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    assert X_upper == np.float16(0.912)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(-24.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(-0.1327))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_floor_modulo_slip_4():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarFloorModulo(
+        ScalarNegate(ScalarLog(Logarithm.log2, Data.SCALAR)),
+        ScalarFoldedConstant(np.float16(-786.0)),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(-782.0))
+
+    expr_lower = np.array(np.float16(-790.0))
+    expr_upper = np.array(np.float16(-0.1326))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    assert X_upper == np.float16(0.9995)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(-762.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(-786.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_ceil_modulo_slip():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarCeilModulo(
+        ScalarLog(Logarithm.log2, Data.SCALAR),
+        ScalarFoldedConstant(np.float16(786.0)),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(-3.867))
+
+    expr_lower = np.array(np.float16(-790.0))
+    expr_upper = np.array(np.float16(-0.1326))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    assert X_upper == np.float16(0.912)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(-24.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(-0.1327))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_ceil_modulo_slip_2():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarCeilModulo(
+        ScalarNegate(ScalarLog(Logarithm.log2, Data.SCALAR)),
+        ScalarFoldedConstant(np.float16(786.0)),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(-782.0))
+
+    expr_lower = np.array(np.float16(-790.0))
+    expr_upper = np.array(np.float16(-0.1326))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    # FIXME: why the low upper bound?
+    assert X_upper == np.float16(0.2617)  # ideally 0.841
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(-762.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(-784.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_ceil_modulo_slip_3():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarCeilModulo(
+        ScalarLog(Logarithm.log2, Data.SCALAR),
+        ScalarFoldedConstant(np.float16(-786.0)),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(782.0))
+
+    expr_lower = np.array(np.float16(0.1326))
+    expr_upper = np.array(np.float16(790.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    # FIXME: why the low upper bound?
+    assert X_upper == np.float16(0.2617)  # ideally 0.841
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(762.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(784.0))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_ceil_modulo_slip_4():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarCeilModulo(
+        ScalarNegate(ScalarLog(Logarithm.log2, Data.SCALAR)),
+        ScalarFoldedConstant(np.float16(-786.0)),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(3.867))
+
+    expr_lower = np.array(np.float16(0.1326))
+    expr_upper = np.array(np.float16(790.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    assert X_upper == np.float16(0.912)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(24.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.1327))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_trunc_modulo_slip():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarTruncModulo(
+        ScalarLog(Logarithm.log2, Data.SCALAR), ScalarFoldedConstant(np.float16(786.0))
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(-3.867))
+
+    expr_lower = np.array(np.float16(-790.0))
+    expr_upper = np.array(np.float16(-0.1326))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    assert X_upper == np.float16(0.912)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(-24.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(-0.1327))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_trunc_modulo_slip_2():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarTruncModulo(
+        ScalarNegate(ScalarLog(Logarithm.log2, Data.SCALAR)),
+        ScalarFoldedConstant(np.float16(786.0)),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(3.867))
+
+    expr_lower = np.array(np.float16(0.1326))
+    expr_upper = np.array(np.float16(790.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    assert X_upper == np.float16(0.912)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(24.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.1327))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_trunc_modulo_slip_3():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarTruncModulo(
+        ScalarLog(Logarithm.log2, Data.SCALAR),
+        ScalarFoldedConstant(np.float16(-786.0)),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(-3.867))
+
+    expr_lower = np.array(np.float16(-790.0))
+    expr_upper = np.array(np.float16(-0.1326))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    assert X_upper == np.float16(0.912)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(-24.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(-0.1327))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_trunc_modulo_slip_4():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarTruncModulo(
+        ScalarNegate(ScalarLog(Logarithm.log2, Data.SCALAR)),
+        ScalarFoldedConstant(np.float16(-786.0)),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(3.867))
+
+    expr_lower = np.array(np.float16(0.1326))
+    expr_upper = np.array(np.float16(790.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    assert X_upper == np.float16(0.912)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(24.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.1327))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_round_ties_even_modulo_slip():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarRoundTiesEvenModulo(
+        ScalarLog(Logarithm.log2, Data.SCALAR), ScalarFoldedConstant(np.float16(786.0))
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(-3.867))
+
+    expr_lower = np.array(np.float16(-790.0))
+    expr_upper = np.array(np.float16(-0.1326))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    assert X_upper == np.float16(0.912)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(-24.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(-0.1327))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_round_ties_even_modulo_slip_2():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarRoundTiesEvenModulo(
+        ScalarNegate(ScalarLog(Logarithm.log2, Data.SCALAR)),
+        ScalarFoldedConstant(np.float16(786.0)),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(3.867))
+
+    expr_lower = np.array(np.float16(0.1326))
+    expr_upper = np.array(np.float16(790.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    assert X_upper == np.float16(0.912)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(24.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.1327))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_round_ties_even_modulo_slip_3():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarRoundTiesEvenModulo(
+        ScalarLog(Logarithm.log2, Data.SCALAR),
+        ScalarFoldedConstant(np.float16(-786.0)),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(-3.867))
+
+    expr_lower = np.array(np.float16(-790.0))
+    expr_upper = np.array(np.float16(-0.1326))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    assert X_upper == np.float16(0.912)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(-24.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(-0.1327))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_round_ties_even_modulo_slip_4():
+    X = np.array(np.float16(0.0685))
+
+    expr = ScalarRoundTiesEvenModulo(
+        ScalarNegate(ScalarLog(Logarithm.log2, Data.SCALAR)),
+        ScalarFoldedConstant(np.float16(-786.0)),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(3.867))
+
+    expr_lower = np.array(np.float16(0.1326))
+    expr_upper = np.array(np.float16(790.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(6.0e-08)
+    assert X_upper == np.float16(0.912)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(24.0))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.1327))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_sum_partial_overflow():
+    X = np.array(np.float32(3.4027975e38))
+
+    expr = ScalarSubtract(
+        ScalarAdd(ScalarNot(Data.SCALAR), ScalarAbs(Data.SCALAR)),
+        ScalarAbs(Data.SCALAR),
+    )
+
+    assert _is_positive_zero(expr.eval(X, dict()))
+
+    expr_lower = np.array(np.float32(0.0))
+    expr_upper = np.array(np.float32(3.3961514e38))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float32(3.4027975e38)
+    assert X_upper == np.float32(3.4027975e38)
+
+    assert _is_positive_zero(expr.eval(X_lower, dict()))
+    assert _is_positive_zero(expr.eval(X_upper, dict()))

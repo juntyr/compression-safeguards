@@ -13,6 +13,7 @@ from ....utils._compat import (
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
     _stack,
+    _zeros,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_stacked_arg_within_expr_bounds
@@ -348,6 +349,26 @@ def deferred_compute_left_associate_sum_data_bounds(
     )
     expr_upper_diff[np.isnan(expr_upper_diff)] = 0
 
+    fmax = np.finfo(Xs.dtype).max
+
+    # conservatively guarantee that the partial sum + the difference bounds
+    # cannot overflow into infinity when the original partial sum is finite
+    exprv_acc = _zeros(exprv.shape, exprv.dtype)
+    for termv in termvs:
+        exprv_acc += termv
+        _maximum_zero_sign_sensitive(
+            expr_lower_diff,
+            np.nan_to_num(-fmax - exprv_acc),
+            out=expr_lower_diff,
+            where=(np.isfinite(exprv_acc) & np.isfinite(expr_lower_diff)),
+        )
+        _minimum_zero_sign_sensitive(
+            expr_upper_diff,
+            np.nan_to_num(fmax - exprv_acc),
+            out=expr_upper_diff,
+            where=(np.isfinite(exprv_acc) & np.isfinite(expr_upper_diff)),
+        )
+
     # if exprv is NaN, expr_[lower|upper]_diff are zero
     # if expr_[lower|upper] is infinite but exprv is finite,
     #  expr_[lower|upper]_diff is the same infinity as expr_[lower|upper]
@@ -362,8 +383,6 @@ def deferred_compute_left_associate_sum_data_bounds(
     tfu: np.ndarray[tuple[Ps], np.dtype[F]] = _ensure_array(
         np.divide(expr_upper_diff, total_abs_factor)
     )
-
-    fmax = np.finfo(Xs.dtype).max
 
     # ensure that the bounds never contain both -inf and +inf since that would
     #  allow NaN to sneak in
