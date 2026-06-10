@@ -1,0 +1,70 @@
+{
+  "title": "compression-safeguards",
+  "description": "Safe, Trusted, and Fearless lossy compression with Compression Safeguards",
+  "access_right": "open",
+  "creators": [
+    {
+      "name": "Tyree, Juniper",
+      "affiliation": "University of Helsinki",
+      "orcid": "0000-0002-7923-9609"
+    },
+    {
+      "name": "Köhler, Daniel",
+      "affiliation": "University of Helsinki",
+      "orcid": "0009-0008-5470-6996"
+    },
+    {
+      "name": "Underwood, Robert",
+      "affiliation": "Argonne National Laboratory, University of Chicago",
+      "orcid": "0000-0002-1464-729X"
+    },
+    {
+      "name": "Bouvier, Clément",
+      "affiliation": "University of Helsinki",
+      "orcid": "0000-0003-2920-7585"
+    },
+    {
+      "name": "Reichelt, Tim",
+      "affiliation": "University of Oxford",
+      "orcid": "0009-0000-0224-6088"
+    },
+    {
+      "name": "Järvinen, Heikki Johannes",
+      "affiliation": "University of Helsinki",
+      "orcid": "0000-0003-1879-6804"
+    },
+    {
+      "name": "Klöwer, Milan",
+      "affiliation": "University of Oxford",
+      "orcid": "0000-0002-3920-4356"
+    }
+  ],
+  "keywords": [
+    "safeguards",
+    "compression",
+    "lossy-compression",
+    "safe",
+    "fearless"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/juntyr/compression-safeguards/tree/1.0.0b5",
+      "relation": "isSupplementTo",
+      "resource_type": "software",
+      "scheme": "url"
+    }
+  ],
+  "version": "1.0.0b5",
+  "upload_type": "software",
+  "license": "mpl-2.0",
+  "grants": [
+    {
+      "id": "10.13039/501100000780::101093054"
+    },
+    {
+      "id": "10.13039/501100000780::675191"
+    }
+  ],
+  "communities": [{ "identifier": "eu" }, { "identifier": "esiwace" }],
+  "notes": "If you use this software, please cite it using the metadata from this file."
+}
