@@ -7,6 +7,8 @@ edit_uri: docs/index.md
     Safe, Trusted, and Fearless lossy compression with Compression Safeguards
 </h1>
 
+#
+
 ---
 
 [![image](https://img.shields.io/github/actions/workflow/status/juntyr/compression-safeguards/ci.yml?branch=main)](https://github.com/juntyr/compression-safeguards/actions/workflows/ci.yml?query=branch%3Amain)
