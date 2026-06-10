@@ -55,9 +55,6 @@
     }
   ],
   "version": "1.0.0b5",
-  "custom": {
-    "code:codeRepository": "https://github.com/juntyr/compression-safeguards"
-  },
   "upload_type": "software",
   "license": "mpl-2.0",
   "grants": [
