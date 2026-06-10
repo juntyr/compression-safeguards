@@ -45,8 +45,8 @@ repository-code: 'https://github.com/juntyr/compression-safeguards'
 url: 'https://compression-safeguards.readthedocs.io/en/latest/'
 repository-artifact: 'https://pypi.org/project/compression-safeguards/'
 abstract: >-
-  Compression Safeguards - Towards Safe and Fearless Lossy
-  Compression
+  Safe, Trusted, and Fearless lossy compression with
+  Compression Safeguards
 keywords:
   - safeguards
   - compression

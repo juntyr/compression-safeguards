@@ -55,6 +55,21 @@ jobs:
         with:
           args: "format --diff --check"
 
+  citation:
+    name: Citation Metadata
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout the Repository
+        uses: actions/checkout@v6
+
+      - name: Validate CITATION.cff
+        uses: dieghernan/cff-validator@v5
+
+      - name: Validate .zenodo.json
+        uses: vsoch/zenodo-validator@00643f085e550b329ab56bc79da510ba18b2d547
+
   build:
     name: Build
     runs-on: ubuntu-latest
