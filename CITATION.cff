@@ -5,7 +5,7 @@ cff-version: 1.2.0
 title: compression-safeguards
 message: >-
   If you use this software, please cite it using the
-  metadata from this file.
+  metadata from the CITATIONS.cff file.
 type: software
 authors:
   - given-names: Juniper

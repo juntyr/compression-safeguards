@@ -66,5 +66,5 @@
     }
   ],
   "communities": [{ "identifier": "eu" }, { "identifier": "esiwace" }],
-  "notes": "If you use this software, please cite it using the metadata from this file."
+  "notes": "If you use this software, please cite it using the metadata from the CITATIONS.cff file."
 }
