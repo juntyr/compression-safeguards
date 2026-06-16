@@ -397,6 +397,9 @@ def check_one_input(data) -> None:
 
     fixed_constants = dict()
     for p in late_bound:
+        # skip built-in late-bound parameters
+        if p in ["$x", "$X", "$x_min", "$x_max"]:
+            continue
         c = data.ConsumeIntInRange(0, 5)
         if c == 0:
             fixed_constants[p] = data.ConsumeInt(1)
