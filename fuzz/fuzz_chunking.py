@@ -191,6 +191,9 @@ def check_one_input(data) -> None:
 
     late_bound = dict()
     for p in late_bound_params:
+        # skip built-in late-bound parameters
+        if p in ["$x", "$X", "$x_min", "$x_max"]:
+            continue
         c = data.ConsumeIntInRange(0, 4)
         if c == 0:
             late_bound[p] = data.ConsumeInt(1)
