@@ -18,11 +18,13 @@ VALS = [-np.nan, -np.inf, -1.0, -0.5, -0.0, +0.0, +0.5, +1.0, +np.inf, +np.nan]
 def check_for_all_dtypes(it):
     f16s, f32s, f64s, f128s = tee(it, 4)
 
-    return chain(
-        (np.float16(f) for f in f16s),
-        (np.float32(f) for f in f32s),
-        (np.float64(f) for f in f64s),
-        (_float128(f) for f in f128s),
+    return tuple(
+        chain(
+            (np.float16(f) for f in f16s),
+            (np.float32(f) for f in f32s),
+            (np.float64(f) for f in f64s),
+            (_float128(f) for f in f128s),
+        )
     )
 
 

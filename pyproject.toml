@@ -58,7 +58,7 @@ docs = [
     "Pygments~=2.19",
     "ruff~=0.14",
 ]
-doctest = ["griffe2md~=1.1", "pytest~=9.0", "pytest-codeblocks~=0.17.0"]
+doctest = ["griffe2md~=1.1", "pytest~=9.0", "pytest-codeblocks~=0.18.0"]
 examples = [
     "cdsapi~=0.7.6",
     "earthkit-data~=0.14.0",
@@ -92,7 +92,7 @@ test = [
     "google_crc32c~=1.8",
     "numcodecs-combinators~=0.2.15",
     "pytest~=9.0",
-    "pytest-asyncio~=1.3",
+    "pytest-asyncio~=1.4",
     "xarray~=2025.4",
     "zarr~=3.0",
     "zarr-any-numcodecs~=0.1.2",
