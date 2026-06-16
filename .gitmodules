@@ -1,3 +1,6 @@
+[submodule "benchmarks/climate-bench-press"]
+	path = benchmarks/climate-bench-press
+	url = https://github.com/ClimateBenchPress/compressor.git
 [submodule "examples/observations"]
 	path = examples/observations
 	url = https://gist.github.com/558052f4265e41440c2c20b58d67626f.git
