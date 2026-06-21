@@ -83,7 +83,8 @@ examples = [
     "xarray~=2025.4",
 ]
 fuzz = [
-    "atheris~=3.0",
+    "atheris==3.0; python_version == '3.11'",
+    "atheris~=3.0; python_version >= '3.12'",
     "setuptools~=80.0",
     "timeoutcontext~=2.0",
 ]
