@@ -228,6 +228,7 @@ jobs:
           - python: "3.13"
             resolution: "lowest-direct"
           - python: "3.14"
+            resolution: "lowest-direct"
     steps:
       - name: Checkout the Repository
         uses: actions/checkout@v6
