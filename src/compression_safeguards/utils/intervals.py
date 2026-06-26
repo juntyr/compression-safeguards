@@ -1370,30 +1370,30 @@ def _count_leading_zeros(
         # safe cast from integer type to a larger integer type,
         # then lossless truncation of the number of leading zeros
         return (nbits - _frexp(x.astype(np.float32, casting="safe"))[1]).astype(
-            np.uint8, casting="unsafe"
+            np.uint8, casting="same_value"
         )
 
     if nbits <= 32:
         # safe cast from integer type to a larger integer type,
         # then lossless truncation of the number of leading zeros
         return (nbits - _frexp(x.astype(np.float64, casting="safe"))[1]).astype(
-            np.uint8, casting="unsafe"
+            np.uint8, casting="same_value"
         )
 
     # nbits <= 64
     # safe cast from integer type to a larger integer type,
     _, high_exp = _frexp(
         _right_shift(x.astype(np.uint64, casting="safe"), 32).astype(
-            np.float64, casting="unsafe"
+            np.float64, casting="same_value"
         )
     )
     _, low_exp = _frexp(
         _bitwise_and(x.astype(np.uint64, casting="safe"), np.uint64(0xFFFFFFFF)).astype(
-            np.float64, casting="unsafe"
+            np.float64, casting="same_value"
         )
     )
     # then lossless truncation of the number of leading zeros
     high_exp += 32
     exp: np.ndarray[S, np.dtype[np.int32]] = _ensure_array(low_exp)
     np.copyto(exp, high_exp, where=(high_exp > 32), casting="no")
-    return (nbits - exp).astype(np.uint8, casting="unsafe")
+    return (nbits - exp).astype(np.uint8, casting="same_value")
