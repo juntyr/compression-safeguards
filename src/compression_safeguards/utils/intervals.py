@@ -21,9 +21,9 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ._compat import (
+    _bitwise_and,
     _ensure_array,
     _frexp,
-    _logical_and,
     _reshape,
     _right_shift,
     _where,
@@ -1387,7 +1387,7 @@ def _count_leading_zeros(
         )
     )
     _, low_exp = _frexp(
-        _logical_and(x.astype(np.uint64, casting="safe"), np.uint64(0xFFFFFFFF)).astype(
+        _bitwise_and(x.astype(np.uint64, casting="safe"), np.uint64(0xFFFFFFFF)).astype(
             np.float64, casting="unsafe"
         )
     )

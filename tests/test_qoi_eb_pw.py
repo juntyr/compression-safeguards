@@ -1144,3 +1144,19 @@ def test_trunc_modulo_half_full_range():
             dict(kind="qoi_eb_pw", qoi="trunc_modulo(x, 1.5)", type="abs", eb=1)
         ],
     )
+
+
+def test_fuzzer_found_cube_noise():
+    data = np.arange(100, dtype=float)
+
+    codec = SafeguardedCodec(
+        codec=FramedCodecStack(NoiseCodec(seed=1737996944)),
+        safeguards=[
+            PointwiseQuantityOfInterestErrorBoundSafeguard(
+                qoi="x**3", type="abs", eb=0.1
+            ),
+        ],
+    )
+
+    encoded = codec.encode(data)
+    codec.decode(encoded)

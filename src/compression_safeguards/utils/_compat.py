@@ -21,6 +21,7 @@ __all__ = [
     "_ones",
     "_zeros",
     "_logical_and",
+    "_bitwise_and",
     "_sliding_window_view",
     "_frexp",
     "_right_shift",
@@ -402,21 +403,16 @@ def _zeros(shape: Si, dtype: np.dtype[TB]) -> np.ndarray[Si, np.dtype[TB]]:
 
 
 # wrapper around np.logical_and with better type hints
-@overload
 def _logical_and(
     a: np.ndarray[S, np.dtype[np.bool]],
     b: Literal[True] | np.ndarray[S, np.dtype[np.bool]],
-) -> np.ndarray[S, np.dtype[np.bool]]: ...
+) -> np.ndarray[S, np.dtype[np.bool]]:
+    return np.logical_and(a, b)  # type: ignore
 
 
-@overload
-def _logical_and(
-    a: np.ndarray[S, np.dtype[Ui]], b: Ui
-) -> np.ndarray[S, np.dtype[Ui]]: ...
-
-
-def _logical_and(a, b):
-    return np.logical_and(a, b)
+# wrapper around np.bitwise_and with better type hints
+def _bitwise_and(a: np.ndarray[S, np.dtype[Ui]], b: Ui) -> np.ndarray[S, np.dtype[Ui]]:
+    return np.bitwise_and(a, b)
 
 
 # wrapper around np.lib.stride_tricks.sliding_window_view with better type hints
