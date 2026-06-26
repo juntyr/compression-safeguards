@@ -7,6 +7,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
+    _abs,
     _broadcast_to,
     _ensure_array,
     _is_negative_zero,
@@ -235,9 +236,9 @@ class ScalarMultiply(Expr[AnyExpr, AnyExpr]):
             ),
         )
 
-        av_abs = np.abs(av)
-        bv_abs = np.abs(bv)
-        exprv_abs = _ensure_array(np.abs(exprv))
+        av_abs = _abs(av)
+        bv_abs = _abs(bv)
+        exprv_abs = _ensure_array(_abs(exprv))
 
         fmax = np.finfo(Xs.dtype).max
         smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
@@ -747,9 +748,9 @@ class ScalarDivide(Expr[AnyExpr, AnyExpr]):
             ),
         )
 
-        av_abs = np.abs(av)
-        bv_abs = np.abs(bv)
-        exprv_abs = _ensure_array(np.abs(exprv))
+        av_abs = _abs(av)
+        bv_abs = _abs(bv)
+        exprv_abs = _ensure_array(_abs(exprv))
 
         fmax = np.finfo(Xs.dtype).max
         smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal

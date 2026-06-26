@@ -5,6 +5,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
+    _abs,
     _broadcast_to,
     _ensure_array,
     _is_negative_zero,
@@ -13,6 +14,7 @@ from ....utils._compat import (
     _is_sign_positive_number,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
+    _nextafter,
     _stack,
     _where,
 )
@@ -229,8 +231,8 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
             a_lower[(bv == 0)] = -np.inf
             a_upper[(bv == 0)] = np.inf
 
-            one_plus_eps = np.nextafter(Xs.dtype.type(1), Xs.dtype.type(2))
-            one_minus_eps = np.nextafter(Xs.dtype.type(1), Xs.dtype.type(0))
+            one_plus_eps = _nextafter(Xs.dtype.type(1), Xs.dtype.type(2))
+            one_minus_eps = _nextafter(Xs.dtype.type(1), Xs.dtype.type(0))
 
             # handle av ** +-inf
             # - 1 ** +-inf = 1 -> discontinuous, force av = 1
@@ -289,8 +291,8 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
                 callback,
             )
 
-        one_plus_eps = np.nextafter(Xs.dtype.type(1), Xs.dtype.type(2))
-        one_minus_eps = np.nextafter(Xs.dtype.type(1), Xs.dtype.type(0))
+        one_plus_eps = _nextafter(Xs.dtype.type(1), Xs.dtype.type(2))
+        one_minus_eps = _nextafter(Xs.dtype.type(1), Xs.dtype.type(0))
 
         expr_upper = _ensure_array(expr_upper, copy=True)
 
@@ -339,8 +341,8 @@ class ScalarPower(Expr[AnyExpr, AnyExpr]):
         )
 
         av_log = np.log(av)
-        av_log_abs = np.abs(av_log)
-        bv_abs = np.abs(bv)
+        av_log_abs = _abs(av_log)
+        bv_abs = _abs(bv)
 
         # we use |ln(a)| * |b| here instead of |ln(a ** b)| since the former
         #  behaves better when a**b is rounded to zero but a != 0

@@ -9,6 +9,7 @@ from ...utils._compat import (
     _ensure_array,
     _is_sign_negative_number,
     _is_sign_positive_number,
+    _nextafter,
 )
 from ...utils.error import QuantityOfInterestRuntimeWarning
 from .typing import Ci, F, J, Ns, Ps, Ps2, np_sndarray, np_sndarray2
@@ -240,7 +241,7 @@ def _guarantee_data_within_expr_bounds_inner(
             )
 
         # nudge the guess towards the data by 1 ULP
-        np.nextafter(Xs_bound_guess, Xs, out=Xs_bound_guess, where=bounds_exceeded)
+        _nextafter(Xs_bound_guess, Xs, out=Xs_bound_guess, where=bounds_exceeded)
 
     Xs_diff = _ensure_array(np.nan_to_num(Xs_bound_guess - Xs))
 

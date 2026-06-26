@@ -8,6 +8,7 @@ from ....utils._compat import (
     _is_negative_zero,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
+    _nextafter,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
@@ -97,7 +98,7 @@ class ScalarLog(Expr[AnyExpr]):
         arg_upper[np.less(argv, 0)] = -smallest_subnormal
 
         # an upper bound of -0.0 must be nudged downwards from 1 to 1-eps
-        arg_upper[_is_negative_zero(expr_upper)] = np.nextafter(
+        arg_upper[_is_negative_zero(expr_upper)] = _nextafter(
             np.array(Xs.dtype.type(1)), np.array(Xs.dtype.type(0))
         )
 

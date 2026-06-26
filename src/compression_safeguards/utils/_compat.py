@@ -4,6 +4,8 @@ equivalent behaviour for all supported dtypes and provide good type hints.
 """
 
 __all__ = [
+    "_abs",
+    "_nextafter",
     "_place",
     "_round_ties_even",
     "_floor_modulo",
@@ -22,6 +24,7 @@ __all__ = [
     "_zeros",
     "_logical_and",
     "_bitwise_and",
+    "_isfinite",
     "_sliding_window_view",
     "_frexp",
     "_right_shift",
@@ -36,10 +39,11 @@ __all__ = [
 ]
 
 from collections.abc import Sequence
-from typing import Literal, TypeGuard, TypeVar, overload
+from typing import TYPE_CHECKING, Literal, TypeGuard, TypeVar, overload
 
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
+from packaging.version import Version
 
 from ._float128 import (
     _float128_dtype,
@@ -51,6 +55,67 @@ from .typing import TB, F, Fi, S, Si, T, Ti, U, Ui
 
 N = TypeVar("N", bound=int, covariant=True)
 """ Any [`int`][int] (covariant). """
+
+
+@overload
+def _abs(a: Fi) -> Fi: ...
+
+
+@overload
+def _abs(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]: ...
+
+
+# wrapper around np.abs that also works for NaN
+if (Version(np.__version__) >= Version("2.5.0")) or TYPE_CHECKING:
+
+    def _abs(a):
+        return np.abs(a)
+else:
+    # https://github.com/numpy/numpy/issues/31421
+    def _abs(a):
+        return np.copysign(a, +1)
+
+
+@overload
+def _nextafter(a: Fi, b: Fi) -> Fi: ...
+
+
+@overload
+def _nextafter(
+    a: np.ndarray[S, np.dtype[Fi]],
+    b: Fi,
+    /,
+    out: None | np.ndarray[S, np.dtype[Fi]] = None,
+    *,
+    where: bool | np.ndarray[S, np.dtype[np.bool]] = True,
+) -> np.ndarray[S, np.dtype[Fi]]: ...
+
+
+@overload
+def _nextafter(
+    a: np.ndarray[S, np.dtype[F]],
+    b: np.ndarray[S, np.dtype[F]],
+    /,
+    out: None | np.ndarray[S, np.dtype[F]] = None,
+    *,
+    where: bool | np.ndarray[S, np.dtype[np.bool]] = True,
+) -> np.ndarray[S, np.dtype[F]]: ...
+
+
+# wrapper around np.nextafter that also works for signed zero float16
+if (Version(np.__version__) >= Version("2.5.0")) or TYPE_CHECKING:
+
+    def _nextafter(a, b, /, out=None, *, where=True):
+        return np.nextafter(a, b, out=out, where=where)
+else:
+    # https://github.com/numpy/numpy/issues/31472
+    def _nextafter(a, b, /, out=None, *, where=True):
+        result = np.nextafter(a, b, out=out, where=where)
+        if (type(a) is np.float16) and (a == b):
+            result = b
+        if isinstance(a, np.ndarray) and a.dtype.type == np.float16:
+            np.copyto(result, b, where=(a == b), casting="no")
+        return result
 
 
 # wrapper around np.place that also works for numpy_quaddtype
@@ -185,7 +250,7 @@ def _round_ties_even_modulo(p, q):
     # ensure correct handling for finite p and infinite q
     np.copyto(out, p, where=(np.isfinite(p) & np.isinf(q)))
     # ensure correct handling for near-zero p and non-NaN remainder
-    np.copyto(out, p, where=((np.abs(p) < np.abs(q2)) & ~np.isnan(q) & (q != 0)))
+    np.copyto(out, p, where=((_abs(p) < _abs(q2)) & ~np.isnan(q) & (q != 0)))
     return out
 
 
@@ -202,9 +267,7 @@ def _euclidean_modulo(p: Fi, q: Fi) -> Fi: ...
 
 
 def _euclidean_modulo(p, q):
-    # FIXME: https://github.com/numpy/numpy/issues/31421
-    #        ideally we could just use np.abs(q) here
-    return _floor_modulo(p, np.copysign(q, +1))
+    return _floor_modulo(p, _abs(q))
 
 
 # wrapper around np.minimum that also works for +0.0 and -0.0
@@ -413,6 +476,11 @@ def _logical_and(
 # wrapper around np.bitwise_and with better type hints
 def _bitwise_and(a: np.ndarray[S, np.dtype[Ui]], b: Ui) -> np.ndarray[S, np.dtype[Ui]]:
     return np.bitwise_and(a, b)
+
+
+# wrapper around np.isfinite with better type hints
+def _isfinite(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[np.bool]]:
+    return np.isfinite(a)  # type: ignore
 
 
 # wrapper around np.lib.stride_tricks.sliding_window_view with better type hints

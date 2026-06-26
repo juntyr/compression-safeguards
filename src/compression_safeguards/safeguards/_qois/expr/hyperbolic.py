@@ -8,6 +8,7 @@ from ....utils._compat import (
     _is_sign_negative_number,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
+    _nextafter,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds, guarantee_arg_within_expr_bounds
@@ -491,7 +492,7 @@ class ScalarAcosh(Expr[AnyExpr]):
         argv = arg.eval(Xs, late_bound)
         exprv = np.acosh(argv)
 
-        eps_one = np.nextafter(Xs.dtype.type(1), Xs.dtype.type(0))
+        eps_one = _nextafter(Xs.dtype.type(1), Xs.dtype.type(0))
 
         # apply the inverse function to get the bounds on arg
         # acosh(...) is NaN for values smaller than 1 and can then take any
@@ -599,7 +600,7 @@ class ScalarAtanh(Expr[AnyExpr]):
         argv = arg.eval(Xs, late_bound)
         exprv = np.atanh(argv)
 
-        one_eps = np.nextafter(Xs.dtype.type(1), Xs.dtype.type(2))
+        one_eps = _nextafter(Xs.dtype.type(1), Xs.dtype.type(2))
 
         # apply the inverse function to get the bounds on arg
         # atanh(...) is NaN when abs(...) > 1 and can then take any value > 1

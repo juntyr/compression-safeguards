@@ -24,6 +24,7 @@ from ._compat import (
     _bitwise_and,
     _ensure_array,
     _frexp,
+    _nextafter,
     _reshape,
     _right_shift,
     _where,
@@ -446,14 +447,14 @@ class Interval(Generic[T, N]):
         #  values
         Lower(
             np.array(
-                np.nextafter(
+                _nextafter(
                     a.dtype.type(-np.inf),  # type: ignore
                     a.dtype.type(0),
                 )
             )
         ) <= self[np.isfinite(a)] <= Upper(
             np.array(
-                np.nextafter(
+                _nextafter(
                     a.dtype.type(np.inf),  # type: ignore
                     a.dtype.type(0),
                 )
