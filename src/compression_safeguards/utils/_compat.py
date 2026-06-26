@@ -111,9 +111,9 @@ else:
     # https://github.com/numpy/numpy/issues/31472
     def _nextafter(a, b, /, out=None, *, where=True):
         result = np.nextafter(a, b, out=out, where=where)
-        if (type(a) is np.float16) and (a == b):
+        if (type(result) is np.float16) and (a == b):
             result = b
-        if isinstance(a, np.ndarray) and a.dtype.type == np.float16:
+        if isinstance(result, np.ndarray) and result.dtype.type == np.float16:
             np.copyto(result, b, where=(a == b), casting="no")
         return result
 
