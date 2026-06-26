@@ -19,7 +19,7 @@ class ScalarFoldedConstant(EmptyExpr):
     _const: np.number
 
     def __init__(self, const: np.number) -> None:
-        self._const = const[()] if isinstance(const, np.ndarray) else const  # type: ignore
+        self._const = const[()] if isinstance(const, np.ndarray) else const
 
     @staticmethod
     def from_folded(e: Ei | Fi) -> "Ei | ScalarFoldedConstant":

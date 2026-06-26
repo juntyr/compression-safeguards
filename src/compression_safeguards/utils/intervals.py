@@ -20,7 +20,15 @@ from typing import Any, Generic, Literal, Self, TypeVar
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ._compat import _ensure_array, _reshape, _where, _zeros
+from ._compat import (
+    _bitwise_and,
+    _ensure_array,
+    _frexp,
+    _reshape,
+    _right_shift,
+    _where,
+    _zeros,
+)
 from ._compat import _maximum_zero_sign_sensitive as _np_maximum
 from ._compat import _minimum_zero_sign_sensitive as _np_minimum
 from .cast import as_bits, from_total_order, to_total_order
@@ -639,7 +647,7 @@ def _maximum(dtype: np.dtype[T]) -> np.ndarray[tuple[()], np.dtype[T]]:
 
     btype = dtype.str.replace("f", "u")
     bmin = np.iinfo(btype).max  # produces -NaN (0xffff...)
-    return np.copysign(np.array(bmin, dtype=btype).view(dtype), +1)  # type: ignore
+    return np.copysign(np.array(bmin, dtype=btype).view(dtype), +1)
 
 
 class _Maximum:
@@ -919,7 +927,7 @@ class IntervalUnion(Generic[T, N, U]):
 
         uv = np.amax(n_intervals)
 
-        return IntervalUnion(_lower=out._lower[:uv], _upper=out._upper[:uv])  # type: ignore
+        return IntervalUnion(_lower=out._lower[:uv], _upper=out._upper[:uv])
 
     def union(
         self, other: "Interval[T, N] | IntervalUnion[T, N, int]"
@@ -1072,7 +1080,7 @@ class IntervalUnion(Generic[T, N, U]):
 
         uv = np.amax(n_intervals)
 
-        return IntervalUnion(_lower=out._lower[:uv], _upper=out._upper[:uv])  # type: ignore
+        return IntervalUnion(_lower=out._lower[:uv], _upper=out._upper[:uv])
 
     def preserve_only_where(
         self, where: Literal[True] | np.ndarray[tuple[N], np.dtype[np.bool]]
@@ -1360,23 +1368,31 @@ def _count_leading_zeros(
     if nbits <= 16:
         # safe cast from integer type to a larger integer type,
         # then lossless truncation of the number of leading zeros
-        return np.subtract(  # type: ignore
-            nbits, np.frexp(x.astype(np.uint32, casting="safe"))[1]
-        ).astype(np.uint8, casting="unsafe")
+        return (nbits - _frexp(x.astype(np.float32, casting="safe"))[1]).astype(
+            np.uint8, casting="unsafe"
+        )
 
     if nbits <= 32:
         # safe cast from integer type to a larger integer type,
         # then lossless truncation of the number of leading zeros
-        return np.subtract(  # type: ignore
-            nbits, np.frexp(x.astype(np.uint64, casting="safe"))[1]
-        ).astype(np.uint8, casting="unsafe")
+        return (nbits - _frexp(x.astype(np.float64, casting="safe"))[1]).astype(
+            np.uint8, casting="unsafe"
+        )
 
     # nbits <= 64
     # safe cast from integer type to a larger integer type,
-    _, high_exp = np.frexp(x.astype(np.uint64, casting="safe") >> 32)
-    _, low_exp = np.frexp(x.astype(np.uint64, casting="safe") & 0xFFFFFFFF)
+    _, high_exp = _frexp(
+        _right_shift(x.astype(np.uint64, casting="safe"), 32).astype(
+            np.float64, casting="unsafe"
+        )
+    )
+    _, low_exp = _frexp(
+        _bitwise_and(x.astype(np.uint64, casting="safe"), np.uint64(0xFFFFFFFF)).astype(
+            np.float64, casting="unsafe"
+        )
+    )
     # then lossless truncation of the number of leading zeros
     high_exp += 32
-    exp = _ensure_array(low_exp)
+    exp: np.ndarray[S, np.dtype[np.int32]] = _ensure_array(low_exp)
     np.copyto(exp, high_exp, where=(high_exp > 32), casting="no")
     return (nbits - exp).astype(np.uint8, casting="unsafe")

@@ -80,7 +80,7 @@ examples = [
     "numcodecs-zero==0.1.2",
     "scikit-image~=0.25.0",
     "tqdm~=4.0",
-    "xarray~=2025.4",
+    "xarray>=2025.4",
 ]
 fuzz = [
     "atheris==3.0; python_version == '3.11'",
@@ -94,7 +94,7 @@ test = [
     "numcodecs-combinators~=0.2.15",
     "pytest~=9.0",
     "pytest-asyncio~=1.4",
-    "xarray~=2025.4",
+    "xarray>=2025.4",
     "zarr~=3.0",
     "zarr-any-numcodecs~=0.1.2",
 ]

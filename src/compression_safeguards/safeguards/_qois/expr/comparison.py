@@ -488,7 +488,7 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         return comparison_to_dtype(
-            lambda a, b: a < b,  # type: ignore
+            lambda a, b: a < b,
             self._a.eval(Xs, late_bound),
             self._b.eval(Xs, late_bound),
             Xs.dtype,
@@ -697,7 +697,7 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         return comparison_to_dtype(
-            lambda a, b: a >= b,  # type: ignore
+            lambda a, b: a >= b,
             self._a.eval(Xs, late_bound),
             self._b.eval(Xs, late_bound),
             Xs.dtype,
@@ -906,7 +906,7 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         return comparison_to_dtype(
-            lambda a, b: a <= b,  # type: ignore
+            lambda a, b: a <= b,
             self._a.eval(Xs, late_bound),
             self._b.eval(Xs, late_bound),
             Xs.dtype,
@@ -1115,7 +1115,7 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
         return comparison_to_dtype(
-            lambda a, b: a > b,  # type: ignore
+            lambda a, b: a > b,
             self._a.eval(Xs, late_bound),
             self._b.eval(Xs, late_bound),
             Xs.dtype,
