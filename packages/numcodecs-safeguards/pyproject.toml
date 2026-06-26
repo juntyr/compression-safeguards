@@ -8,7 +8,7 @@ version = "0.1.0b5"
 dependencies = [
     "compression-safeguards==1.0.0b5",
     "leb128~=1.0.9",
-    "numcodecs>=0.13.0,<0.17",
+    "numcodecs>=0.13.0",
     "numcodecs-bitmap-index~=0.1.2",
     "numcodecs-combinators~=0.2.15",
     "numcodecs-delta~=0.1.0",
