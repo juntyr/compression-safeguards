@@ -9,6 +9,7 @@ from ....utils._compat import (
     _ensure_array,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
+    _nextafter,
 )
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
@@ -86,7 +87,7 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
         av = a.eval(Xs, late_bound)
         bv = b.eval(Xs, late_bound)
 
-        bv_nxt_av = _ensure_array(np.nextafter(bv, av))
+        bv_nxt_av = _ensure_array(_nextafter(bv, av))
 
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
@@ -130,7 +131,7 @@ class ScalarEqual(Expr[AnyExpr, AnyExpr]):
                 where=a.eval_has_data(Xs, late_bound),
                 casting="no",
             )
-        av_nxt_bv = np.nextafter(av_nxt_bv, bv)
+        av_nxt_bv = _nextafter(av_nxt_bv, bv)
 
         accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
             Xs=Xs, terms=2, callback=callback
@@ -301,7 +302,7 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
         av = a.eval(Xs, late_bound)
         bv = b.eval(Xs, late_bound)
 
-        bv_nxt_av = _ensure_array(np.nextafter(bv, av))
+        bv_nxt_av = _ensure_array(_nextafter(bv, av))
 
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
@@ -345,7 +346,7 @@ class ScalarNotEqual(Expr[AnyExpr, AnyExpr]):
                 where=a.eval_has_data(Xs, late_bound),
                 casting="no",
             )
-        av_nxt_bv = np.nextafter(av_nxt_bv, bv)
+        av_nxt_bv = _nextafter(av_nxt_bv, bv)
 
         accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
             Xs=Xs, terms=2, callback=callback
@@ -516,7 +517,7 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
         av = a.eval(Xs, late_bound)
         bv = b.eval(Xs, late_bound)
 
-        bv_nxt_av = _ensure_array(np.nextafter(bv, av))
+        bv_nxt_av = _ensure_array(_nextafter(bv, av))
 
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
@@ -560,7 +561,7 @@ class ScalarLess(Expr[AnyExpr, AnyExpr]):
                 where=a.eval_has_data(Xs, late_bound),
                 casting="no",
             )
-        av_nxt_bv = np.nextafter(av_nxt_bv, bv)
+        av_nxt_bv = _nextafter(av_nxt_bv, bv)
 
         accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
             Xs=Xs, terms=2, callback=callback
@@ -725,7 +726,7 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
         av = a.eval(Xs, late_bound)
         bv = b.eval(Xs, late_bound)
 
-        bv_nxt_av = _ensure_array(np.nextafter(bv, av))
+        bv_nxt_av = _ensure_array(_nextafter(bv, av))
 
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
@@ -769,7 +770,7 @@ class ScalarGreaterEqual(Expr[AnyExpr, AnyExpr]):
                 where=a.eval_has_data(Xs, late_bound),
                 casting="no",
             )
-        av_nxt_bv = np.nextafter(av_nxt_bv, bv)
+        av_nxt_bv = _nextafter(av_nxt_bv, bv)
 
         accumulator: DataBoundsAccumulator[Ps, Ns, F] = DataBoundsAccumulator(
             Xs=Xs, terms=2, callback=callback
@@ -934,7 +935,7 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
         av = a.eval(Xs, late_bound)
         bv = b.eval(Xs, late_bound)
 
-        av_nxt_bv = _ensure_array(np.nextafter(av, bv))
+        av_nxt_bv = _ensure_array(_nextafter(av, bv))
 
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
@@ -966,7 +967,7 @@ class ScalarLessEqual(Expr[AnyExpr, AnyExpr]):
                 where=b.eval_has_data(Xs, late_bound),
                 casting="no",
             )
-        bv_nxt_av = np.nextafter(bv_nxt_av, av)
+        bv_nxt_av = _nextafter(bv_nxt_av, av)
 
         # compute the next value from a towards b that can be part of b's
         #  safe interval
@@ -1143,7 +1144,7 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
         av = a.eval(Xs, late_bound)
         bv = b.eval(Xs, late_bound)
 
-        av_nxt_bv = _ensure_array(np.nextafter(av, bv))
+        av_nxt_bv = _ensure_array(_nextafter(av, bv))
 
         # compute a finite midpoint for a and b
         #  - if either is NaN, we won't use this midpoint
@@ -1175,7 +1176,7 @@ class ScalarGreater(Expr[AnyExpr, AnyExpr]):
                 where=b.eval_has_data(Xs, late_bound),
                 casting="no",
             )
-        bv_nxt_av = np.nextafter(bv_nxt_av, av)
+        bv_nxt_av = _nextafter(bv_nxt_av, av)
 
         # compute the next value from a towards b that can be part of b's
         #  safe interval

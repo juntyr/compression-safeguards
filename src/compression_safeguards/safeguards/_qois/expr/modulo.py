@@ -4,6 +4,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
+    _abs,
     _ceil_modulo,
     _ensure_array,
     _euclidean_modulo,
@@ -144,12 +145,10 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
         np.copyto(  # exact bounds around zero if signs match
             p_lower,
             rem_expr_lower,
-            where=((np.abs(pv) < np.abs(qv)) & ((pv == 0) | ((pv > 0) == (qv > 0)))),
+            where=((_abs(pv) < _abs(qv)) & ((pv == 0) | ((pv > 0) == (qv > 0)))),
             casting="no",
         )
-        exact_p_lower |= (np.abs(pv) < np.abs(qv)) & (
-            (pv == 0) | ((pv > 0) == (qv > 0))
-        )
+        exact_p_lower |= (_abs(pv) < _abs(qv)) & ((pv == 0) | ((pv > 0) == (qv > 0)))
         _maximum_zero_sign_sensitive(  # we don't allow repetition slips
             p_lower, Xs.dtype.type(-0.0), out=p_lower, where=(pv >= 0)
         )
@@ -189,12 +188,10 @@ class ScalarFloorModulo(Expr[AnyExpr, AnyExpr]):
         np.copyto(  # exact bounds around zero if signs match
             p_upper,
             rem_expr_upper,
-            where=((np.abs(pv) < np.abs(qv)) & ((pv == 0) | ((pv > 0) == (qv > 0)))),
+            where=((_abs(pv) < _abs(qv)) & ((pv == 0) | ((pv > 0) == (qv > 0)))),
             casting="no",
         )
-        exact_p_upper |= (np.abs(pv) < np.abs(qv)) & (
-            (pv == 0) | ((pv > 0) == (qv > 0))
-        )
+        exact_p_upper |= (_abs(pv) < _abs(qv)) & ((pv == 0) | ((pv > 0) == (qv > 0)))
         _minimum_zero_sign_sensitive(  # we don't allow repetition slips
             p_upper, Xs.dtype.type(+0.0), out=p_upper, where=(pv <= 0)
         )
@@ -394,12 +391,10 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
         np.copyto(  # exact bounds around zero if signs mismatch
             p_lower,
             rem_expr_lower,
-            where=((np.abs(pv) < np.abs(qv)) & ((pv == 0) | ((pv > 0) != (qv > 0)))),
+            where=((_abs(pv) < _abs(qv)) & ((pv == 0) | ((pv > 0) != (qv > 0)))),
             casting="no",
         )
-        exact_p_lower |= (np.abs(pv) < np.abs(qv)) & (
-            (pv == 0) | ((pv > 0) != (qv > 0))
-        )
+        exact_p_lower |= (_abs(pv) < _abs(qv)) & ((pv == 0) | ((pv > 0) != (qv > 0)))
         _maximum_zero_sign_sensitive(  # we don't allow repetition slips
             p_lower, Xs.dtype.type(-0.0), out=p_lower, where=(pv >= 0)
         )
@@ -439,12 +434,10 @@ class ScalarCeilModulo(Expr[AnyExpr, AnyExpr]):
         np.copyto(  # exact bounds around zero if signs mismatch
             p_upper,
             rem_expr_upper,
-            where=((np.abs(pv) < np.abs(qv)) & ((pv == 0) | ((pv > 0) != (qv > 0)))),
+            where=((_abs(pv) < _abs(qv)) & ((pv == 0) | ((pv > 0) != (qv > 0)))),
             casting="no",
         )
-        exact_p_upper |= (np.abs(pv) < np.abs(qv)) & (
-            (pv == 0) | ((pv > 0) != (qv > 0))
-        )
+        exact_p_upper |= (_abs(pv) < _abs(qv)) & ((pv == 0) | ((pv > 0) != (qv > 0)))
         _minimum_zero_sign_sensitive(  # we don't allow repetition slips
             p_upper, Xs.dtype.type(+0.0), out=p_upper, where=(pv <= 0)
         )
@@ -645,10 +638,10 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
         np.copyto(  # exact bounds around zero
             p_lower,
             rem_expr_lower,
-            where=(np.abs(pv) < np.abs(qv)),
+            where=(_abs(pv) < _abs(qv)),
             casting="no",
         )
-        exact_p_lower |= np.abs(pv) < np.abs(qv)
+        exact_p_lower |= _abs(pv) < _abs(qv)
         _maximum_zero_sign_sensitive(  # we don't allow repetition slips
             p_lower, Xs.dtype.type(+0.0), out=p_lower, where=(pv >= qv_pos)
         )
@@ -672,10 +665,10 @@ class ScalarTruncModulo(Expr[AnyExpr, AnyExpr]):
         np.copyto(  # exact bounds around zero
             p_upper,
             rem_expr_upper,
-            where=(np.abs(pv) < np.abs(qv)),
+            where=(_abs(pv) < _abs(qv)),
             casting="no",
         )
-        exact_p_upper |= np.abs(pv) < np.abs(qv)
+        exact_p_upper |= _abs(pv) < _abs(qv)
         _minimum_zero_sign_sensitive(  # we don't allow repetition slips
             p_upper, Xs.dtype.type(-0.0), out=p_upper, where=(pv <= qv_neg)
         )
@@ -812,7 +805,7 @@ class ScalarRoundTiesEvenModulo(Expr[AnyExpr, AnyExpr]):
         qv = q.eval(Xs, late_bound)
         exprv = _round_ties_even_modulo(pv, qv)
 
-        qv2: np.ndarray[tuple[Ps], np.dtype[F]] = np.divide(np.abs(qv), 2)
+        qv2: np.ndarray[tuple[Ps], np.dtype[F]] = np.divide(_abs(qv), 2)
 
         # the bounds on round_ties_even_modulo(...) are [-|q/2|, +|q/2|]
         rem_expr_lower = _maximum_zero_sign_sensitive(-qv2, expr_lower)
@@ -854,10 +847,10 @@ class ScalarRoundTiesEvenModulo(Expr[AnyExpr, AnyExpr]):
         np.copyto(  # exact bounds around zero
             p_lower,
             rem_expr_lower,
-            where=(np.abs(pv) < qv2),
+            where=(_abs(pv) < qv2),
             casting="no",
         )
-        exact_p_lower |= np.abs(pv) < qv2
+        exact_p_lower |= _abs(pv) < qv2
         _maximum_zero_sign_sensitive(  # we don't allow repetition slips
             p_lower, Xs.dtype.type(+0.0), out=p_lower, where=(pv >= qv2)
         )
@@ -879,10 +872,10 @@ class ScalarRoundTiesEvenModulo(Expr[AnyExpr, AnyExpr]):
         np.copyto(  # exact bounds around zero
             p_upper,
             rem_expr_upper,
-            where=(np.abs(pv) < qv2),
+            where=(_abs(pv) < qv2),
             casting="no",
         )
-        exact_p_upper |= np.abs(pv) < qv2
+        exact_p_upper |= _abs(pv) < qv2
         _minimum_zero_sign_sensitive(  # we don't allow repetition slips
             p_upper, Xs.dtype.type(-0.0), out=p_upper, where=(pv <= -qv2)
         )
@@ -1017,7 +1010,7 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
 
         # the bounds on euclidean_modulo(...) are [+0.0, |q|)
         rem_expr_lower = _maximum_zero_sign_sensitive(Xs.dtype.type(+0.0), expr_lower)
-        rem_expr_upper = _minimum_zero_sign_sensitive(expr_upper, np.abs(qv))
+        rem_expr_upper = _minimum_zero_sign_sensitive(expr_upper, _abs(qv))
 
         # euclidean_modulo(...) is periodic, so we need to drop to difference
         #  bounds before applying the difference to pv to stay in the
@@ -1032,7 +1025,7 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
         # check for the case where any finite value would work for pv
         full_domain: np.ndarray[tuple[Ps], np.dtype[np.bool]] = np.less_equal(
             expr_lower, 0
-        ) & np.greater_equal(expr_upper, np.abs(qv))
+        ) & np.greater_equal(expr_upper, _abs(qv))
 
         fmax = np.finfo(Xs.dtype).max
         smallest_subnormal = np.finfo(Xs.dtype).smallest_subnormal
@@ -1059,10 +1052,10 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
         np.copyto(  # exact bounds around zero if positive
             p_lower,
             rem_expr_lower,
-            where=((np.abs(pv) < np.abs(qv)) & (pv >= 0)),
+            where=((_abs(pv) < _abs(qv)) & (pv >= 0)),
             casting="no",
         )
-        exact_p_lower |= (np.abs(pv) < np.abs(qv)) & (pv >= 0)
+        exact_p_lower |= (_abs(pv) < _abs(qv)) & (pv >= 0)
         _maximum_zero_sign_sensitive(  # we don't allow repetition slips
             p_lower, Xs.dtype.type(-0.0), out=p_lower, where=(pv >= 0)
         )
@@ -1098,10 +1091,10 @@ class ScalarEuclideanModulo(Expr[AnyExpr, AnyExpr]):
         np.copyto(  # exact bounds around zero if positive
             p_upper,
             rem_expr_upper,
-            where=((np.abs(pv) < np.abs(qv)) & (pv >= 0)),
+            where=((_abs(pv) < _abs(qv)) & (pv >= 0)),
             casting="no",
         )
-        exact_p_upper |= (np.abs(pv) < np.abs(qv)) & (pv >= 0)
+        exact_p_upper |= (_abs(pv) < _abs(qv)) & (pv >= 0)
         _minimum_zero_sign_sensitive(  # we don't allow repetition slips
             p_upper, Xs.dtype.type(+0.0), out=p_upper, where=(pv <= 0)
         )

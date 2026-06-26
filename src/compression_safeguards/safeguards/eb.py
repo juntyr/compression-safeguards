@@ -9,7 +9,14 @@ from typing import Never, assert_never
 
 import numpy as np
 
-from ..utils._compat import _ensure_array, _where
+from ..utils._compat import (
+    _abs,
+    _ensure_array,
+    _isfinite,
+    _logical_and,
+    _nextafter,
+    _where,
+)
 from ..utils.cast import from_float, from_total_order, to_float, to_total_order
 from ..utils.error import ctx
 from ..utils.typing import F, S, T
@@ -197,7 +204,7 @@ def _compute_finite_absolute_error_bound(
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
-                eb_rel_as_abs = np.nan_to_num(np.abs(data_float) * eb)
+                eb_rel_as_abs = np.nan_to_num(_abs(data_float) * eb)
             assert np.all((eb_rel_as_abs >= 0) & np.isfinite(eb_rel_as_abs))
             return eb_rel_as_abs
         case ErrorBound.ratio:
@@ -239,7 +246,7 @@ def _compute_finite_absolute_error(
         #  here since the error bound will include the data value that together
         #  form a relative error bound
         case ErrorBound.abs | ErrorBound.rel:
-            return np.abs(np.subtract(data_float, prediction_float))
+            return _abs(np.subtract(data_float, prediction_float))
         case ErrorBound.ratio:
             err_abs: np.ndarray[S, np.dtype[F]] = _ensure_array(
                 np.divide(prediction_float, data_float)
@@ -248,7 +255,7 @@ def _compute_finite_absolute_error(
                 data_float,
                 prediction_float,
                 out=err_abs,
-                where=(np.abs(data_float) > np.abs(prediction_float)),
+                where=(_abs(data_float) > _abs(prediction_float)),
             )
             err_abs[(data_float == 0) & (prediction_float == 0)] = 0
             err_abs[np.sign(data_float) != np.sign(prediction_float)] = np.inf
@@ -348,7 +355,7 @@ def _apply_finite_error_bound(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
                 lower_outside_eb = np.greater(
-                    np.abs(
+                    _abs(
                         _where(
                             np.less(data, 0),
                             to_float(lower, ftype=data_float.dtype) / data_float,
@@ -358,7 +365,7 @@ def _apply_finite_error_bound(
                     eb_abs,
                 )
                 upper_outside_eb = np.greater(
-                    np.abs(
+                    _abs(
                         _where(
                             np.less(data, 0),
                             data_float / to_float(upper, ftype=data_float.dtype),
@@ -460,17 +467,17 @@ def _apply_finite_qoi_error_bound(
                 )
 
             # we can nudge with nextafter since the QoIs are floating-point
-            np.nextafter(
+            _nextafter(
                 lower,
                 qoi_float,
                 out=lower,
-                where=(lower_outside_eb & np.isfinite(qoi_float)),
+                where=_logical_and(lower_outside_eb, _isfinite(qoi_float)),
             )
-            np.nextafter(
+            _nextafter(
                 upper,
                 qoi_float,
                 out=upper,
-                where=(upper_outside_eb & np.isfinite(qoi_float)),
+                where=_logical_and(upper_outside_eb, _isfinite(qoi_float)),
             )
 
             # a zero-error bound must preserve exactly, e.g. even for -0.0
@@ -493,7 +500,7 @@ def _apply_finite_qoi_error_bound(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
                 lower_outside_eb = np.greater(
-                    np.abs(
+                    _abs(
                         _where(
                             qoi_float < 0,
                             lower / qoi_float,
@@ -503,7 +510,7 @@ def _apply_finite_qoi_error_bound(
                     eb_abs,
                 )
                 upper_outside_eb = np.greater(
-                    np.abs(
+                    _abs(
                         _where(
                             qoi_float < 0,
                             qoi_float / upper,
@@ -514,17 +521,17 @@ def _apply_finite_qoi_error_bound(
                 )
 
             # we can nudge with nextafter since the QoIs are floating-point
-            np.nextafter(
+            _nextafter(
                 lower,
                 qoi_float,
                 out=lower,
-                where=(lower_outside_eb & np.isfinite(qoi_float)),
+                where=_logical_and(lower_outside_eb, _isfinite(qoi_float)),
             )
-            np.nextafter(
+            _nextafter(
                 upper,
                 qoi_float,
                 out=upper,
-                where=(upper_outside_eb & np.isfinite(qoi_float)),
+                where=_logical_and(upper_outside_eb, _isfinite(qoi_float)),
             )
 
             # a ratio of 1 bound must preserve exactly, e.g. even for -0.0

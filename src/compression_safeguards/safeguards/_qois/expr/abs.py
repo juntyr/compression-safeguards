@@ -3,7 +3,7 @@ from collections.abc import Mapping
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ....utils._compat import _ensure_array, _is_sign_negative_number
+from ....utils._compat import _abs, _ensure_array, _is_sign_negative_number
 from ....utils.bindings import Parameter
 from ..bound import checked_data_bounds
 from ..context import Callback, Context
@@ -35,9 +35,7 @@ class ScalarAbs(Expr[AnyExpr]):
 
     @override
     def constant_fold(self, dtype: np.dtype[F]) -> F | AnyExpr:
-        return ScalarFoldedConstant.constant_fold_unary(
-            self._a, dtype, np.abs, ScalarAbs
-        )
+        return ScalarFoldedConstant.constant_fold_unary(self._a, dtype, _abs, ScalarAbs)
 
     @override
     def eval(
@@ -45,7 +43,7 @@ class ScalarAbs(Expr[AnyExpr]):
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
-        return np.abs(self._a.eval(Xs, late_bound))
+        return _abs(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override

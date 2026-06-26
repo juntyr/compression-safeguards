@@ -4,11 +4,13 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
+    _abs,
     _ensure_array,
     _floating_pi,
     _is_negative_zero,
     _maximum_zero_sign_sensitive,
     _minimum_zero_sign_sensitive,
+    _nextafter,
     _where,
     _zeros,
 )
@@ -556,7 +558,7 @@ class ScalarAsin(Expr[AnyExpr]):
 
         pi = _floating_pi(Xs.dtype)
         pi_2: F = np.divide(pi, 2)
-        one_eps = np.nextafter(Xs.dtype.type(1), Xs.dtype.type(2))
+        one_eps = _nextafter(Xs.dtype.type(1), Xs.dtype.type(2))
 
         # apply the inverse function to get the bounds on arg
         # asin(...) is NaN when abs(...) > 1 and can then take any value > 1
@@ -581,13 +583,13 @@ class ScalarAsin(Expr[AnyExpr]):
         np.copyto(
             arg_lower,
             argv,
-            where=((expr_lower == expr_upper) & np.less(np.abs(argv), 1)),
+            where=((expr_lower == expr_upper) & np.less(_abs(argv), 1)),
             casting="no",
         )
         np.copyto(
             arg_upper,
             argv,
-            where=((expr_lower == expr_upper) & np.less(np.abs(argv), 1)),
+            where=((expr_lower == expr_upper) & np.less(_abs(argv), 1)),
             casting="no",
         )
 
@@ -675,7 +677,7 @@ class ScalarAcos(Expr[AnyExpr]):
         exprv = np.acos(argv)
 
         pi = _floating_pi(Xs.dtype)
-        one_eps = np.nextafter(Xs.dtype.type(1), Xs.dtype.type(2))
+        one_eps = _nextafter(Xs.dtype.type(1), Xs.dtype.type(2))
 
         # apply the inverse function to get the bounds on arg
         # acos(...) is NaN when abs(...) > 1 and can then take any value > 1
@@ -702,13 +704,13 @@ class ScalarAcos(Expr[AnyExpr]):
         np.copyto(
             arg_lower,
             argv,
-            where=((expr_lower == expr_upper) & np.less(np.abs(argv), 1)),
+            where=((expr_lower == expr_upper) & np.less(_abs(argv), 1)),
             casting="no",
         )
         np.copyto(
             arg_upper,
             argv,
-            where=((expr_lower == expr_upper) & np.less(np.abs(argv), 1)),
+            where=((expr_lower == expr_upper) & np.less(_abs(argv), 1)),
             casting="no",
         )
 
@@ -799,7 +801,7 @@ class ScalarAtan(Expr[AnyExpr]):
         #  tan(pi/2) >> 0
         atan_max: F = np.atan(Xs.dtype.type(np.inf))
         if np.tan(atan_max) < 0:
-            atan_max = Xs.dtype.type(np.nextafter(atan_max, Xs.dtype.type(0)))
+            atan_max = Xs.dtype.type(_nextafter(atan_max, Xs.dtype.type(0)))
         assert np.tan(atan_max) > 0
 
         # apply the inverse function to get the bounds on arg
