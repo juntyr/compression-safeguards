@@ -22,6 +22,8 @@ __all__ = [
     "_zeros",
     "_logical_and",
     "_sliding_window_view",
+    "_frexp",
+    "_right_shift",
     "_is_sign_negative_number",
     "_is_negative_zero",
     "_is_sign_positive_number",
@@ -44,7 +46,7 @@ from ._float128 import (
     _float128_pi,
     _float128_type,
 )
-from .typing import TB, F, Fi, S, Si, T, Ti
+from .typing import TB, F, Fi, S, Si, T, Ti, U, Ui
 
 N = TypeVar("N", bound=int, covariant=True)
 """ Any [`int`][int] (covariant). """
@@ -400,11 +402,21 @@ def _zeros(shape: Si, dtype: np.dtype[TB]) -> np.ndarray[Si, np.dtype[TB]]:
 
 
 # wrapper around np.logical_and with better type hints
+@overload
 def _logical_and(
     a: np.ndarray[S, np.dtype[np.bool]],
     b: Literal[True] | np.ndarray[S, np.dtype[np.bool]],
-) -> np.ndarray[S, np.dtype[np.bool]]:
-    return a & b  # type: ignore
+) -> np.ndarray[S, np.dtype[np.bool]]: ...
+
+
+@overload
+def _logical_and(
+    a: np.ndarray[S, np.dtype[Ui]], b: Ui
+) -> np.ndarray[S, np.dtype[Ui]]: ...
+
+
+def _logical_and(a, b):
+    return np.logical_and(a, b)
 
 
 # wrapper around np.lib.stride_tricks.sliding_window_view with better type hints
@@ -422,6 +434,18 @@ def _sliding_window_view(
         axis=axis,  # type: ignore
         writeable=writeable,
     )
+
+
+# wrapper around np.frexp with better type hints
+def _frexp(
+    a: np.ndarray[S, np.dtype[F]],
+) -> tuple[np.ndarray[S, np.dtype[F]], np.ndarray[S, np.dtype[np.int32]]]:
+    return np.frexp(a)  # type: ignore
+
+
+# wrapper around np.right_shift with better type hints
+def _right_shift(a: np.ndarray[S, np.dtype[U]], s: int) -> np.ndarray[S, np.dtype[U]]:
+    return np.right_shift(a, s)  # type: ignore
 
 
 # wrapper around a < 0 that also works for -0.0 (is negative) but excludes NaNs

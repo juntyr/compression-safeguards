@@ -2,7 +2,7 @@
 Commonly used type variables.
 """
 
-__all__ = ["C", "F", "Fi", "S", "Si", "T", "Ti", "TB", "U", "JSON"]
+__all__ = ["C", "F", "Fi", "S", "Si", "T", "Ti", "TB", "U", "Ui", "JSON"]
 
 from typing import TypeAlias, TypeVar
 
@@ -34,6 +34,9 @@ TB = TypeVar("TB", bound=np.number | np.bool, covariant=True)
 
 U = TypeVar("U", bound=np.unsignedinteger, covariant=True)
 """ Any numpy [`unsignedinteger`][numpy.unsignedinteger] data type (covariant). """
+
+Ui = TypeVar("Ui", bound=np.unsignedinteger)
+""" Any numpy [`unsignedinteger`][numpy.unsignedinteger] data type (invariant). """
 
 JSON: TypeAlias = None | int | float | str | bool | list["JSON"] | dict[str, "JSON"]
 """ Types that are valid JSON and can be encoded with [`json.dumps`][json.dumps]. """

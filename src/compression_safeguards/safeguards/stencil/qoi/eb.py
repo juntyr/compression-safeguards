@@ -1131,12 +1131,14 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         # since some data elements may have no data bounds that affect them,
         #  e.g. because of the valid boundary condition, they may have infinite
         #  bounds
-        data_float_lower: np.ndarray[S, np.dtype[np.floating]] = np.amax(
-            data_windows_float_lower_flat[reverse_indices_windows], axis=1
-        ).reshape(data.shape)
-        data_float_upper: np.ndarray[S, np.dtype[np.floating]] = np.amin(
-            data_windows_float_upper_flat[reverse_indices_windows], axis=1
-        ).reshape(data.shape)
+        data_float_lower: np.ndarray[S, np.dtype[np.floating]] = _reshape(
+            np.amax(data_windows_float_lower_flat[reverse_indices_windows], axis=1),
+            data.shape,
+        )
+        data_float_upper: np.ndarray[S, np.dtype[np.floating]] = _reshape(
+            np.amin(data_windows_float_upper_flat[reverse_indices_windows], axis=1),
+            data.shape,
+        )
 
         # only preserve intervals where some (neighbouring) data point
         #  contributed (back) safety requirements
@@ -1145,9 +1147,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         return compute_safe_data_lower_upper_interval_union(
             data, data_float_lower, data_float_upper
         ).preserve_only_where(
-            (  # type: ignore
-                reverse_indices_windows[:, 0] < data_windows_float_lower.size
-            )
+            (reverse_indices_windows[:, 0] < data_windows_float_lower.size)
             # where `where` is not False, at least the isnan stays isnan rule
             #  should always be honoured, anything else would be unexpected
             | (True if where is True else where.flatten())

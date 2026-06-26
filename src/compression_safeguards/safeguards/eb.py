@@ -347,25 +347,25 @@ def _apply_finite_error_bound(
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
-                lower_outside_eb = (
+                lower_outside_eb = np.greater(
                     np.abs(
                         _where(
                             np.less(data, 0),
                             to_float(lower, ftype=data_float.dtype) / data_float,
                             data_float / to_float(lower, ftype=data_float.dtype),
                         )
-                    )
-                    > eb_abs
+                    ),
+                    eb_abs,
                 )
-                upper_outside_eb = (
+                upper_outside_eb = np.greater(
                     np.abs(
                         _where(
                             np.less(data, 0),
                             data_float / to_float(upper, ftype=data_float.dtype),
                             to_float(upper, ftype=data_float.dtype) / data_float,
                         )
-                    )
-                    > eb_abs
+                    ),
+                    eb_abs,
                 )
 
             lower = _ensure_array(
@@ -492,25 +492,25 @@ def _apply_finite_qoi_error_bound(
             with np.errstate(
                 divide="ignore", over="ignore", under="ignore", invalid="ignore"
             ):
-                lower_outside_eb = (
+                lower_outside_eb = np.greater(
                     np.abs(
                         _where(
                             qoi_float < 0,
                             lower / qoi_float,
                             qoi_float / lower,
                         )
-                    )
-                    > eb_abs
+                    ),
+                    eb_abs,
                 )
-                upper_outside_eb = (
+                upper_outside_eb = np.greater(
                     np.abs(
                         _where(
                             qoi_float < 0,
                             qoi_float / upper,
                             upper / qoi_float,
                         )
-                    )
-                    > eb_abs
+                    ),
+                    eb_abs,
                 )
 
             # we can nudge with nextafter since the QoIs are floating-point
