@@ -136,6 +136,7 @@ plugins:
             - https://docs.python.org/3.11/objects.inv
             - https://numcodecs.readthedocs.io/en/v0.16.5/objects.inv
             - https://numcodecs-combinators.readthedocs.io/en/v0.2.15/objects.inv
+            - https://numcodecs-replace.readthedocs.io/en/0.1.2/objects.inv
             - https://numcodecs-zero.readthedocs.io/en/0.1.2/objects.inv
             - https://numpy.org/doc/2.4/objects.inv
             - https://python-semver.readthedocs.io/en/3.0.0/objects.inv
