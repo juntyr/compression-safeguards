@@ -578,7 +578,9 @@ def as_left_associative_sum(
         if isinstance(expr, ScalarSubtract):
             # TODO: remove rewrite, since that defeats some common subexpression
             #       elimination and requires this context update hack
-            neg_expr = ScalarNegate(expr._b)
+            # ensure that no symbolic constant folding takes place here, which
+            #  could turn -Number(0) into Number(0), discarding the negation
+            neg_expr = ScalarNegate.unevaluated(expr._b)
             ctx._context[neg_expr] = _DeferredExprContext(1)
             terms_rev.append(neg_expr)
         else:

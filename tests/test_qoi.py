@@ -2779,3 +2779,25 @@ def test_fuzzer_found_sum_partial_overflow():
 
     assert _is_positive_zero(expr.eval(X_lower, dict()))
     assert _is_positive_zero(expr.eval(X_upper, dict()))
+
+
+def test_fuzzer_found_subtract_integer_zero():
+    X = np.array(np.float64(-2.1640841222983618e-243))
+
+    expr = ScalarSubtract(
+        ScalarTrunc(Data.SCALAR),
+        Number.ZERO,
+    )
+
+    assert _is_negative_zero(expr.eval(X, dict()))
+
+    expr_lower = np.array(np.float64(-2.1640845568163056e-243))
+    expr_upper = np.array(np.float64(-0.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float64(-0.9999999999999999)
+    assert X_upper == np.float64(-0.0)
+
+    assert _is_negative_zero(expr.eval(X_lower, dict()))
+    assert _is_negative_zero(expr.eval(X_upper, dict()))
