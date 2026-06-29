@@ -26,6 +26,12 @@ class ScalarNegate(Expr[AnyExpr]):
             return na
         return super().__new__(cls)
 
+    @classmethod
+    def unevaluated(cls, a: AnyExpr) -> "ScalarNegate":
+        negated = super().__new__(cls)
+        negated._a = a
+        return negated
+
     @property
     @override
     def args(self) -> tuple[AnyExpr]:

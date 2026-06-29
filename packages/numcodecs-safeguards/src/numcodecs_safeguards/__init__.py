@@ -124,7 +124,10 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
         or an already initialized [`Codec`][numcodecs.abc.Codec]. If you want to
         wrap a sequence or stack of codecs, you can use the
         [`numcodecs_combinators.stack.CodecStack`][numcodecs_combinators.stack.CodecStack]
-        combinator.
+        combinator, e.g. to first replace codec-unsupported values with the
+        [`numcodecs_replace.ReplaceFilterCodec`][numcodecs_replace.ReplaceFilterCodec]
+        and later restore them using the
+        [`SameValueSafeguard`][compression_safeguards.safeguards.pointwise.same.SameValueSafeguard].
 
         The codec must be deterministic during decoding (but can be
         non-deterministic during encoding) such that decoding the same bytes
