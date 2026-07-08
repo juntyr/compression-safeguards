@@ -592,6 +592,18 @@ def as_left_associative_sum(
             terms_rev.append(expr._a)
             break
 
+        # TODO: this is a rewrite in disguise and requires this context update hack
+        #  - since expr will be destructured, decrement its dependents count
+        #  - if this was the final dependent, remove expr from tracking
+        #  - otherwise we will now add new dependency edges to expr's sub-expressions
+        assert ctx._context[expr]._dependents >= 1
+        ctx._context[expr]._dependents -= 1
+        if ctx._context[expr]._dependents == 0:
+            ctx._context.pop(expr)
+        else:
+            for arg in expr.args:
+                ctx._context[arg]._dependents += 1
+
     return tuple(terms_rev[::-1])
 
 
