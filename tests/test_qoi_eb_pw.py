@@ -1160,3 +1160,19 @@ def test_fuzzer_found_cube_noise():
 
     encoded = codec.encode(data)
     codec.decode(encoded)
+
+
+def test_fuzzer_found_cosine_noise():
+    data = np.linspace(-1.0, 1.0, 100, dtype=np.float16)
+
+    codec = SafeguardedCodec(
+        codec=FramedCodecStack(NoiseCodec(seed=1021941241)),
+        safeguards=[
+            PointwiseQuantityOfInterestErrorBoundSafeguard(
+                qoi="cos(x)", type="abs", eb=0.01
+            ),
+        ],
+    )
+
+    encoded = codec.encode(data)
+    codec.decode(encoded)
