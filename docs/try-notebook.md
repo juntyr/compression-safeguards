@@ -26,7 +26,7 @@ render_macros: true
 
     const notebook = new URL(notebook_, "{{ page.canonical_url }}");
 
-    const [user, repo] = new URL("{{ config.repo_url }}").pathname.split("/");
+    const [, user, repo] = new URL("{{ config.repo_url }}").pathname.split("/");
     const tag = "{{ git.tag }}";
     const name = notebook.pathname.split("/").pop();
 
