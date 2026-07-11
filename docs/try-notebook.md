@@ -13,12 +13,15 @@ render_macros: true
 <img src="https://baseline.js.org/features/wasm-multi-memory/responsive-adaptive.svg" alt="Baseline Status: Multi-memory (WebAssembly)" style="width: 100%; height: auto;" />
 ///
 
+{{ macros_info() }}
+
 <iframe id="try-notebook-jupyterlite" width="100%" height="750px" referrerpolicy="no-referrer"></iframe>
 
 <script>
   window.addEventListener("load", () => {
     const searchParams = new URL(window.location.href).searchParams;
     const url = searchParams.get("url");
+    const notebook = new URL(searchParams.get("notebook"), "{{ page.canonical_url }}").href;
 
     if (url === null) {
       return;
@@ -37,7 +40,7 @@ render_macros: true
     document.getElementById("try-notebook-name").innerText = name;
     document.getElementById("try-notebook-name").href = backlink;
 
-    document.getElementById("try-notebook-jupyterlite").src = "https://lab.climet.eu/v0.4.0/notebooks/index.html?kernel=python&fromURL=" + rawUrl.href + "&pyodideKernelEnv=" + encodeURIComponent(JSON.stringify({"$override": {
+    document.getElementById("try-notebook-jupyterlite").src = "https://lab.climet.eu/v0.4.0/notebooks/index.html?kernel=python&fromURL=" + notebook + "&pyodideKernelEnv=" + encodeURIComponent(JSON.stringify({"$override": {
       "CLIMET_LAB_BOOTSTRAP_CODE": `\
 import shutil
 from pathlib import Path
