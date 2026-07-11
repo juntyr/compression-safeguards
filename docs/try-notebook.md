@@ -54,7 +54,7 @@ if pyodide.ffi.can_run_sync():
         "xarray-safeguards=={{ version('xarray_safeguards') }}",
     ] + {{ pyproject()['dependency-groups']['try-examples'] }}))
 
-with urlopen(f"https://cors.climet.eu/https://raw.githubusercontent.com/${user}/${repo}/refs/heads/${tag}/examples/observe.py") as response:
+with urlopen(f"https://cors.climet.eu/https://raw.githubusercontent.com/${user}/${repo}/${tag}/examples/observe.py") as response:
     with open("observe.py", "wb") as file:
         shutil.copyfileobj(response, file)
 
@@ -70,7 +70,7 @@ for folder, files in {
     "output": [],
 }.items():
     pyodide_fs_mount_http.mount_http_files(Path("data") / folder, {
-        name: f"https://media.githubusercontent.com/media/${user}/${repo}/refs/heads/${tag}/examples/data/{folder}/{name}"
+        name: f"https://media.githubusercontent.com/media/${user}/${repo}/${tag}/examples/data/{folder}/{name}"
         for name in files
     })
 
