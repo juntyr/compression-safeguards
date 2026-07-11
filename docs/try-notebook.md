@@ -52,7 +52,7 @@ if pyodide.ffi.can_run_sync():
         "compression-safeguards=={{ version('compression_safeguards') }}",
         "numcodecs-safeguards=={{ version('numcodecs_safeguards') }}",
         "xarray-safeguards=={{ version('xarray_safeguards') }}",
-    ]))
+    ] + {{ pyproject()['dependency-groups']['try-examples'] }}))
 
 with urlopen(f"https://cors.climet.eu/https://raw.githubusercontent.com/${user}/${repo}/refs/heads/${tag}/examples/observe.py") as response:
     with open("observe.py", "wb") as file:
