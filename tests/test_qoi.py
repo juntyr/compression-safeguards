@@ -35,6 +35,7 @@ from compression_safeguards.safeguards._qois.expr.hyperbolic import (
     ScalarAcosh,
     ScalarAsinh,
     ScalarCosh,
+    ScalarSinh,
     ScalarTanh,
 )
 from compression_safeguards.safeguards._qois.expr.literal import Euler, Number, Pi
@@ -2801,3 +2802,41 @@ def test_fuzzer_found_subtract_integer_zero():
 
     assert _is_negative_zero(expr.eval(X_lower, dict()))
     assert _is_negative_zero(expr.eval(X_upper, dict()))
+
+
+def test_fuzzer_found_sub_add_excessive_nudging():
+    X = np.array(np.float32(1.1921244e-07))
+
+    expr = ScalarAdd(
+        ScalarSubtract(ScalarSinh(Data.SCALAR), Euler()),
+        Euler(),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float32(2.3841858e-07))
+
+    expr_lower = np.array(np.float32(7.6e-44))
+    expr_upper = np.array(np.float32(2.3841858e-07))
+
+    # (x - e) + e should be x, but here catastrophic rounding occurs:
+    # - x is tiny
+    # - x-e+e evaluates to a tiny value that is almost 2*x
+    # - addsub distributes the lower/upper bound allowance just to x
+    # - the suggested bounds for x become [(nearly)-x; x]
+    # - the lower bounds needs to be nudged almost back to x to again
+    #   trigger catastrophic rounding, which is needed to stay within
+    #   the expr bounds
+    # - we cannot really fix this, especially since the result is correct
+    # - an improved nudging algorithm might still be able to improve
+
+    with pytest.warns(RuntimeWarning, match="data bounds required excessive nudging"):
+        X_lower, X_upper = compute_expr_data_bounds(
+            expr, expr_lower, expr_upper, X, dict()
+        )
+
+    assert X_lower == np.float32(1.1921244e-07)
+    assert X_upper == np.float32(1.1921244e-07)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float32(2.3841858e-07))
+    assert expr.eval(X_upper, dict()) == np.array(np.float32(2.3841858e-07))
+
+    pytest.xfail("excessive nudging from catastrophic rounding error")
