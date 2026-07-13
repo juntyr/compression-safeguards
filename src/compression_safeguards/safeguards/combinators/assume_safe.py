@@ -54,7 +54,7 @@ class AssumeAlwaysSafeguard(PointwiseSafeguard):
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
@@ -65,9 +65,9 @@ class AssumeAlwaysSafeguard(PointwiseSafeguard):
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Original data array, relative to which the `prediction` is checked.
-        prediction : np.ndarray[S, np.dtype[T]]
-            Prediction for the `data` array.
+            Original data array, relative to which the `approximation` is checked.
+        approximation : np.ndarray[S, np.dtype[T]]
+            Approximation of the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
         where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]

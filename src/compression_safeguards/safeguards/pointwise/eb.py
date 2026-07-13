@@ -122,20 +122,20 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check which elements in the `prediction` array satisfy the error bound.
+        Check which elements in the `approximation` array satisfy the error bound.
 
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Original data array, relative to which the `prediction` is checked.
-        prediction : np.ndarray[S, np.dtype[T]]
-            Prediction for the `data` array.
+            Original data array, relative to which the `approximation` is checked.
+        approximation : np.ndarray[S, np.dtype[T]]
+            Approximation of the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
         where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
@@ -162,8 +162,8 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
             data.dtype
         )
         data_float: np.ndarray[S, np.dtype[np.floating]] = to_float(data, ftype=ftype)
-        prediction_float: np.ndarray[S, np.dtype[np.floating]] = to_float(
-            prediction, ftype=ftype
+        approximation_float: np.ndarray[S, np.dtype[np.floating]] = to_float(
+            approximation, ftype=ftype
         )
 
         with ctx.safeguard(self), ctx.parameter("eb"):
@@ -182,13 +182,13 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
                     _check_error_bound(self._type, eb)
 
         finite_ok: np.ndarray[S, np.dtype[np.bool]] = np.less_equal(
-            _compute_finite_absolute_error(self._type, data_float, prediction_float),
+            _compute_finite_absolute_error(self._type, data_float, approximation_float),
             _compute_finite_absolute_error_bound(self._type, eb, data_float),
         )
 
         # bitwise equality for inf and NaNs (unless equal_nan)
-        same_bits = as_bits(data) == as_bits(prediction)
-        both_nan = self._equal_nan and (np.isnan(data) & np.isnan(prediction))
+        same_bits = as_bits(data) == as_bits(approximation)
+        both_nan = self._equal_nan and (np.isnan(data) & np.isnan(approximation))
 
         ok: np.ndarray[S, np.dtype[np.bool]] = _ensure_array(finite_ok)
         np.copyto(ok, same_bits, where=~np.isfinite(data), casting="no")

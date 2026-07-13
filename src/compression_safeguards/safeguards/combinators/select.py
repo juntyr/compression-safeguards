@@ -159,7 +159,7 @@ class SelectSafeguard(Safeguard):
     def check(  # type: ignore
         self,
         data: np.ndarray[S, np.dtype[T]],
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
@@ -170,9 +170,9 @@ class SelectSafeguard(Safeguard):
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Original data array, relative to which the `prediction` is checked.
-        prediction : np.ndarray[S, np.dtype[T]]
-            Prediction for the `data` array.
+            Original data array, relative to which the `approximation` is checked.
+        approximation : np.ndarray[S, np.dtype[T]]
+            Approximation of the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
         where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
@@ -207,7 +207,7 @@ class SelectSafeguard(Safeguard):
     def check_pointwise(  # type: ignore
         self,
         data: np.ndarray[S, np.dtype[T]],
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
@@ -218,9 +218,9 @@ class SelectSafeguard(Safeguard):
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Original data array, relative to which the `prediction` is checked.
-        prediction : np.ndarray[S, np.dtype[T]]
-            Prediction for the `data` array.
+            Original data array, relative to which the `approximation` is checked.
+        approximation : np.ndarray[S, np.dtype[T]]
+            Approximation of the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
         where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
@@ -396,7 +396,7 @@ class _SelectSafeguardBase(ABC):
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
@@ -404,7 +404,7 @@ class _SelectSafeguardBase(ABC):
         # if a single safeguard is selected, just forward to it
         if isinstance(self.selector, int):
             return self.safeguards[self.selector].check_pointwise(
-                data, prediction, late_bound=late_bound, where=where
+                data, approximation, late_bound=late_bound, where=where
             )
 
         with ctx.safeguardty(SelectSafeguard), ctx.parameter("selector"):
@@ -419,7 +419,10 @@ class _SelectSafeguardBase(ABC):
         # only perform the checks where selected
         oks = [
             safeguard.check_pointwise(
-                data, prediction, late_bound=late_bound, where=(selector == i) & where
+                data,
+                approximation,
+                late_bound=late_bound,
+                where=(selector == i) & where,
             )
             for i, safeguard in enumerate(self.safeguards)
         ]

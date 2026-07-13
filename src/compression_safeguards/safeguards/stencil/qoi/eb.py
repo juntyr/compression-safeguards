@@ -547,21 +547,21 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check which elements in the `prediction` array satisfy the error bound
+        Check which elements in the `approximation` array satisfy the error bound
         for the quantity of interest over a neighbourhood on the `data`.
 
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Original data array, relative to which the `prediction` is checked.
-        prediction : np.ndarray[S, np.dtype[T]]
-            Prediction for the `data` array.
+            Original data array, relative to which the `approximation` is checked.
+        approximation : np.ndarray[S, np.dtype[T]]
+            Approximation of the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
         where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
@@ -644,7 +644,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                         )
 
             data_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = data
-            prediction_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = prediction
+            approximation_boundary: np.ndarray[tuple[int, ...], np.dtype[T]] = (
+                approximation
+            )
             for axis, axis_constant_boundary in zip(
                 self._neighbourhood, constant_boundaries
             ):
@@ -656,8 +658,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     axis_constant_boundary,
                     axis.axis,
                 )
-                prediction_boundary = _pad_with_boundary(
-                    prediction_boundary,
+                approximation_boundary = _pad_with_boundary(
+                    approximation_boundary,
                     axis.boundary,
                     axis.before,
                     axis.after,
@@ -682,11 +684,11 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 )
             )
             qoi_shape: tuple[int, ...] = data_windows_float_.shape[: -len(window)]
-            prediction_windows_float_: np.ndarray[
+            approximation_windows_float_: np.ndarray[
                 tuple[int, ...], np.dtype[np.floating]
             ] = to_float(
                 _sliding_window_view(
-                    prediction_boundary,
+                    approximation_boundary,
                     window,
                     axis=tuple(axis.axis for axis in self._neighbourhood),
                     writeable=False,
@@ -697,9 +699,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             data_windows_float: np.ndarray[
                 tuple[int, *tuple[int, ...]], np.dtype[np.floating]
             ] = _reshape(data_windows_float_, (-1, *window))
-            prediction_windows_float: np.ndarray[
+            approximation_windows_float: np.ndarray[
                 tuple[int, *tuple[int, ...]], np.dtype[np.floating]
-            ] = _reshape(prediction_windows_float_, (-1, *window))
+            ] = _reshape(approximation_windows_float_, (-1, *window))
 
             late_bound_constants: dict[
                 Parameter,
@@ -751,8 +753,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             if where is not True:
                 where_flat = where[tuple(valid_slice)].flatten()
                 data_windows_float = np.compress(where_flat, data_windows_float, axis=0)
-                prediction_windows_float = np.compress(
-                    where_flat, prediction_windows_float, axis=0
+                approximation_windows_float = np.compress(
+                    where_flat, approximation_windows_float, axis=0
                 )
                 late_bound_constants = {
                     c: np.compress(where_flat, cv, axis=0)
@@ -765,9 +767,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     late_bound_constants,
                 )
             )
-            qoi_prediction: np.ndarray[tuple[int], np.dtype[np.floating]] = (
+            qoi_approximation: np.ndarray[tuple[int], np.dtype[np.floating]] = (
                 self._qoi_expr.eval(
-                    prediction_windows_float,
+                    approximation_windows_float,
                     late_bound_constants,
                 )
             )
@@ -795,15 +797,15 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     eb = np.compress(where_flat, eb, axis=0)
 
         finite_ok: np.ndarray[tuple[int], np.dtype[np.bool]] = np.less_equal(
-            _compute_finite_absolute_error(self._type, qoi_data, qoi_prediction),
+            _compute_finite_absolute_error(self._type, qoi_data, qoi_approximation),
             _compute_finite_absolute_error_bound(self._type, eb, qoi_data),
         )
 
         windows_ok_: np.ndarray[tuple[int], np.dtype[np.bool]] = _ensure_array(
             finite_ok
         )
-        np.equal(qoi_data, qoi_prediction, out=windows_ok_, where=np.isinf(qoi_data))
-        np.isnan(qoi_prediction, out=windows_ok_, where=np.isnan(qoi_data))
+        np.equal(qoi_data, qoi_approximation, out=windows_ok_, where=np.isinf(qoi_data))
+        np.isnan(qoi_approximation, out=windows_ok_, where=np.isnan(qoi_data))
 
         # the check succeeds where `where` is False
         windows_ok: np.ndarray[tuple[int], np.dtype[np.bool]]

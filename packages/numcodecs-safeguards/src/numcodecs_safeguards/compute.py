@@ -108,7 +108,7 @@ class Compute:
 def _refine_correction_iteratively(
     safeguards: Safeguards,
     data: np.ndarray[S, np.dtype[T]],
-    prediction: np.ndarray[S, np.dtype[T]],
+    approximation: np.ndarray[S, np.dtype[T]],
     correction: np.ndarray[S, np.dtype[C]],
     late_bound: Bindings,
 ) -> np.ndarray[S, np.dtype[C]]:
@@ -131,17 +131,17 @@ def _refine_correction_iteratively(
 
     # full correction
     correction_full = correction
-    corrected_full = safeguards.apply_correction(prediction, correction_full)
+    corrected_full = safeguards.apply_correction(approximation, correction_full)
 
     # iterative correction, starting with no correction at all
     correction_iterative = np.zeros_like(correction_full)
-    corrected_iterative = prediction.copy()
+    corrected_iterative = approximation.copy()
 
     # resolve the late-bound bindings using the Safeguards API, since we use
     #  lower-level APIs from now on
     late_bound_resolved = safeguards._prepare_non_chunked_bindings(
         data=data,
-        prediction=prediction,
+        approximation=approximation,
         late_bound=late_bound,
         description="checking the safeguards",
         chunked_method_name="check_chunk",
@@ -237,7 +237,7 @@ def _refine_correction_iteratively(
     # safety check that the refined correction is in fact valid
     if not safeguards.check(
         data,
-        safeguards.apply_correction(prediction, correction_iterative),
+        safeguards.apply_correction(approximation, correction_iterative),
         late_bound=late_bound,
         where=True,  # complete check check
     ):

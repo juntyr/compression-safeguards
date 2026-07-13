@@ -128,7 +128,7 @@ class AllSafeguards(Safeguard):
     def check(  # type: ignore
         self,
         data: np.ndarray[S, np.dtype[T]],
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
@@ -140,9 +140,9 @@ class AllSafeguards(Safeguard):
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Original data array, relative to which the `prediction` is checked.
-        prediction : np.ndarray[S, np.dtype[T]]
-            Prediction for the `data` array.
+            Original data array, relative to which the `approximation` is checked.
+        approximation : np.ndarray[S, np.dtype[T]]
+            Approximation of the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
         where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
@@ -164,7 +164,7 @@ class AllSafeguards(Safeguard):
     def check_pointwise(  # type: ignore
         self,
         data: np.ndarray[S, np.dtype[T]],
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
@@ -176,9 +176,9 @@ class AllSafeguards(Safeguard):
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Original data array, relative to which the `prediction` is checked.
-        prediction : np.ndarray[S, np.dtype[T]]
-            Prediction for the `data` array.
+            Original data array, relative to which the `approximation` is checked.
+        approximation : np.ndarray[S, np.dtype[T]]
+            Approximation of the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
         where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
@@ -320,7 +320,7 @@ class _AllSafeguardsBase(ABC):
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
@@ -328,11 +328,13 @@ class _AllSafeguardsBase(ABC):
         front, *tail = self.safeguards
 
         # pointwise check succeeds if all safeguards' pointwise check succeeds
-        ok = front.check_pointwise(data, prediction, late_bound=late_bound, where=where)
+        ok = front.check_pointwise(
+            data, approximation, late_bound=late_bound, where=where
+        )
 
         for safeguard in tail:
             ok &= safeguard.check_pointwise(
-                data, prediction, late_bound=late_bound, where=where
+                data, approximation, late_bound=late_bound, where=where
             )
 
         return ok

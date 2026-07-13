@@ -104,21 +104,21 @@ class SignPreservingSafeguard(PointwiseSafeguard):
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check for which elements in the `prediction` array the signs match the
+        Check for which elements in the `approximation` array the signs match the
         signs of the `data` array elements'.
 
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Original data array, relative to which the `prediction` is checked.
-        prediction : np.ndarray[S, np.dtype[T]]
-            Prediction for the `data` array.
+            Original data array, relative to which the `approximation` is checked.
+        approximation : np.ndarray[S, np.dtype[T]]
+            Approximation of the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
         where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
@@ -165,12 +165,12 @@ class SignPreservingSafeguard(PointwiseSafeguard):
         # values below (sign=-1) stay below,
         # values above (sign=+1) stay above
         # NaN values keep their sign bit
-        ok: np.ndarray[S, np.dtype[np.bool]] = _ensure_array(prediction == offset)
-        np.less(prediction, offset, out=ok, where=np.less(data, offset))
-        np.greater(prediction, offset, out=ok, where=np.greater(data, offset))
+        ok: np.ndarray[S, np.dtype[np.bool]] = _ensure_array(approximation == offset)
+        np.less(approximation, offset, out=ok, where=np.less(data, offset))
+        np.greater(approximation, offset, out=ok, where=np.greater(data, offset))
         np.copyto(
             ok,
-            np.isnan(prediction) & (np.signbit(data) == np.signbit(prediction)),
+            np.isnan(approximation) & (np.signbit(data) == np.signbit(approximation)),
             where=np.isnan(data),
             casting="no",
         )

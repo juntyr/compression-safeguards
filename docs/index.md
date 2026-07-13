@@ -213,12 +213,12 @@ from xarray_safeguards import apply_data_array_correction, produce_data_array_co
 
 # some (chunked) n-dimensional data array
 da = xr.DataArray(np.linspace(-10, 10, 21), name="da").chunk(10)
-# lossy-compressed prediction for the data, here all zeros
-da_prediction = xr.DataArray(np.zeros_like(da.values), name="da").chunk(10)
+# lossy-compressed approximation of the data, here all zeros
+da_approximation = xr.DataArray(np.zeros_like(da.values), name="da").chunk(10)
 
 da_correction = produce_data_array_correction(
     data=da,
-    prediction=da_prediction,
+    approximation=da_approximation,
     # guarantee an absolute error bound of 0.1:
     #   |x - x'| <= 0.1
     safeguards=[dict(kind="eb", type="abs", eb=0.1)],
@@ -226,15 +226,15 @@ da_correction = produce_data_array_correction(
 
 ## (a) manual correction ##
 
-da_corrected = apply_data_array_correction(da_prediction, da_correction)
+da_corrected = apply_data_array_correction(da_approximation, da_correction)
 np.testing.assert_allclose(da_corrected.values, da.values, rtol=0, atol=0.1)
 
 ## (b) automatic correction with xarray accessors ##
 
-# combine the lossy prediction and the correction into one dataset
+# combine the lossy approximation and the correction into one dataset
 #  e.g. by loading them from different files using `xarray.open_mfdataset`
 ds = xr.Dataset({
-    da_prediction.name: da_prediction,
+    da_approximation.name: da_approximation,
     da_correction.name: da_correction,
 })
 

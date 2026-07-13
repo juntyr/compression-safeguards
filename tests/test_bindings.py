@@ -12,7 +12,7 @@ from compression_safeguards.utils.error import LateBoundParameterResolutionError
 
 def test_missing_extraneous_bindings():
     data = np.array([1.0, 2.0, 3.0])
-    prediction = np.zeros(3)
+    approximation = np.zeros(3)
 
     safeguards = Safeguards(
         safeguards=[
@@ -24,17 +24,21 @@ def test_missing_extraneous_bindings():
         LateBoundParameterResolutionError,
         match="missing late-bound parameters `eb`, `zero`",
     ):
-        safeguards.compute_correction(data, prediction, late_bound=Bindings.EMPTY)
+        safeguards.compute_correction(data, approximation, late_bound=Bindings.EMPTY)
 
     with pytest.raises(
         LateBoundParameterResolutionError,
         match=r"extraneous late-bound parameter `\$x`",
     ):
         safeguards.compute_correction(
-            data, prediction, late_bound=Bindings(eb=0.1, zero=0, **{"$x": prediction})
+            data,
+            approximation,
+            late_bound=Bindings(eb=0.1, zero=0, **{"$x": approximation}),
         )
 
-    safeguards.compute_correction(data, prediction, late_bound=Bindings(eb=0.1, zero=0))
+    safeguards.compute_correction(
+        data, approximation, late_bound=Bindings(eb=0.1, zero=0)
+    )
 
 
 def test_numcodecs_missing_extraneous_bindings():

@@ -200,13 +200,13 @@ class Safeguards:
     def check(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Mapping[str | Parameter, Value] | Bindings = Bindings.EMPTY,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> bool:
         """
-        Check if the `prediction` array upholds the properties enforced by the safeguards with respect to the `data` array.
+        Check if the `approximation` array upholds the properties enforced by the safeguards with respect to the `data` array.
 
         The `data` array must contain the complete data, i.e. not just a chunk
         of data, so that non-pointwise safeguards are correctly applied. Please
@@ -217,8 +217,8 @@ class Safeguards:
         ----------
         data : np.ndarray[S, np.dtype[T]]
             The data array, relative to which the safeguards are checked.
-        prediction : np.ndarray[S, np.dtype[T]]
-            The prediction array for which the safeguards are checked.
+        approximation : np.ndarray[S, np.dtype[T]]
+            The approximation array for which the safeguards are checked.
         late_bound : Mapping[str | Parameter, Value] | Bindings
             The bindings for all late-bound parameters of the safeguards.
 
@@ -240,7 +240,7 @@ class Safeguards:
         TypeSetError
             if the `data` uses an unsupported data type.
         ValueError
-            if the `data`'s dtype or shape do not match the `prediction`'s.
+            if the `data`'s dtype or shape do not match the `approximation`'s.
         RuntimeError
             if the `data` array is chunked.
         LateBoundParameterResolutionError
@@ -252,7 +252,7 @@ class Safeguards:
 
         late_bound = self._prepare_non_chunked_bindings(
             data=data,
-            prediction=prediction,
+            approximation=approximation,
             late_bound=late_bound,
             description="checking the safeguards",
             chunked_method_name="check_chunk",
@@ -260,7 +260,7 @@ class Safeguards:
 
         for safeguard in self.safeguards:
             if not safeguard.check(
-                data, prediction, late_bound=late_bound, where=where
+                data, approximation, late_bound=late_bound, where=where
             ):
                 return False
 
@@ -269,31 +269,31 @@ class Safeguards:
     def compute_correction(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Mapping[str | Parameter, Value] | Bindings = Bindings.EMPTY,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[C]]:
         """
-        Compute the correction required to make the `prediction` array satisfy the safeguards relative to the `data` array.
+        Compute the correction required to make the `approximation` array satisfy the safeguards relative to the `data` array.
 
         The `data` array must contain the complete data, i.e. not just a chunk
         of data, so that non-pointwise safeguards are correctly applied. Please
         use the [`compute_chunked_correction`][..compute_chunked_correction]
         method instead when working with individual chunks of data.
 
-        The correction is defined as `as_bits(corrected) - as_bits(prediction)`
+        The correction is defined as `as_bits(corrected) - as_bits(approximation)`
         using wrapping unsigned integer arithmetic. It has the corresponding
         binary unsigned integer data type with the same bit size. The
         correction can be applied using [`apply_correction`][..apply_correction]
-        to get the corrected `prediction`.
+        to get the corrected `approximation`.
 
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
             The data array, relative to which the safeguards are enforced.
-        prediction : np.ndarray[S, np.dtype[T]]
-            The prediction array for which the correction is computed.
+        approximation : np.ndarray[S, np.dtype[T]]
+            The approximation array for which the correction is computed.
         late_bound : Mapping[str | Parameter, Value] | Bindings
             The bindings for all late-bound parameters of the safeguards.
 
@@ -316,7 +316,7 @@ class Safeguards:
         TypeSetError
             if the `data` uses an unsupported data type.
         ValueError
-            if the `data`'s dtype or shape do not match the `prediction`'s.
+            if the `data`'s dtype or shape do not match the `approximation`'s.
         RuntimeError
             if the `data` array is chunked.
         LateBoundParameterResolutionError
@@ -329,7 +329,7 @@ class Safeguards:
 
         late_bound = self._prepare_non_chunked_bindings(
             data=data,
-            prediction=prediction,
+            approximation=approximation,
             late_bound=late_bound,
             description="computing the safeguards correction",
             chunked_method_name="compute_chunked_correction",
@@ -338,7 +338,7 @@ class Safeguards:
         all_ok = True
         for safeguard in self.safeguards:
             if not safeguard.check(
-                data, prediction, late_bound=late_bound, where=where
+                data, approximation, late_bound=late_bound, where=where
             ):
                 all_ok = False
                 break
@@ -369,7 +369,7 @@ class Safeguards:
         combined_intervals = all_intervals[0]
         for intervals in all_intervals[1:]:
             combined_intervals = combined_intervals.intersect(intervals)
-        corrected = combined_intervals.pick(prediction)
+        corrected = combined_intervals.pick(approximation)
 
         for safeguard, intervals in zip(self.safeguards, all_intervals):
             if not np.all(intervals.contains(corrected)):
@@ -389,20 +389,20 @@ class Safeguards:
                     | ctx
                 )
 
-        prediction_bits: np.ndarray[S, np.dtype[C]] = as_bits(prediction)
+        approximation_bits: np.ndarray[S, np.dtype[C]] = as_bits(approximation)
         corrected_bits: np.ndarray[S, np.dtype[C]] = as_bits(corrected)
 
         with np.errstate(
             over="ignore",
             under="ignore",
         ):
-            return corrected_bits - prediction_bits
+            return corrected_bits - approximation_bits
 
     def _prepare_non_chunked_bindings(
         self,
         *,
         data: np.ndarray[S, np.dtype[T]],
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         late_bound: Mapping[str | Parameter, Value] | Bindings,
         description: str,
         chunked_method_name: str,
@@ -414,11 +414,11 @@ class Safeguards:
             self._stencil_safeguards
         )
 
-        with ctx.parameter("prediction"):
-            if prediction.dtype != data.dtype:
-                raise ValueError("prediction.dtype must match data.dtype") | ctx
-            if prediction.shape != data.shape:
-                raise ValueError("prediction.shape must match data.shape") | ctx
+        with ctx.parameter("approximation"):
+            if approximation.dtype != data.dtype:
+                raise ValueError("approximation.dtype must match data.dtype") | ctx
+            if approximation.shape != data.shape:
+                raise ValueError("approximation.shape must match data.shape") | ctx
 
         if len(self._stencil_safeguards) > 0 and getattr(data, "chunked", False):
             with ctx.parameter("data"):
@@ -456,27 +456,27 @@ class Safeguards:
 
     def apply_correction(
         self,
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         correction: np.ndarray[S, np.dtype[C]],
     ) -> np.ndarray[S, np.dtype[T]]:
         """
-        Apply the `correction` to the `prediction` to satisfy the safeguards for which the `correction` was computed.
+        Apply the `correction` to the `approximation` to satisfy the safeguards for which the `correction` was computed.
 
-        The `prediction` must be bitwise equivalent to the `prediction` that
+        The `approximation` must be bitwise equivalent to the `approximation` that
         was used to compute the `correction`.
 
         This method is guaranteed to work for chunked data as well, i.e.
         applying a chunk of the `correction` to the corresponding chunk of the
-        `prediction` produces the correct result.
+        `approximation` produces the correct result.
 
         The `correction` is applied with
-        `from_bits(as_bits(prediction) + correction)` using wrapping unsigned
+        `from_bits(as_bits(approximation) + correction)` using wrapping unsigned
         integer arithmetic.
 
         Parameters
         ----------
-        prediction : np.ndarray[S, np.dtype[T]]
-            The prediction array for which the correction has been computed.
+        approximation : np.ndarray[S, np.dtype[T]]
+            The approximation array for which the correction has been computed.
         correction : np.ndarray[S, np.dtype[C]]
             The correction array.
 
@@ -488,24 +488,26 @@ class Safeguards:
         Raises
         ------
         ValueError
-            if the `correction`'s shape dos not match the `prediction`'s, or if
+            if the `correction`'s shape dos not match the `approximation`'s, or if
             the `correction`'s dtype does not match the correction dtype for
-            the `prediction`'s dtype.
+            the `approximation`'s dtype.
         """
 
         with ctx.parameter("correction"):
-            if correction.dtype != self.correction_dtype_for_data(prediction.dtype):
+            if correction.dtype != self.correction_dtype_for_data(approximation.dtype):
                 raise (
                     ValueError(
                         "correction.dtype must match the correction dtype for "
-                        + "prediction.dtype"
+                        + "approximation.dtype"
                     )
                     | ctx
                 )
-            if correction.shape != prediction.shape:
-                raise ValueError("correction.shape must match prediction.shape") | ctx
+            if correction.shape != approximation.shape:
+                raise (
+                    ValueError("correction.shape must match approximation.shape") | ctx
+                )
 
-        prediction_bits: np.ndarray[S, np.dtype[C]] = as_bits(prediction)
+        approximation_bits: np.ndarray[S, np.dtype[C]] = as_bits(approximation)
         correction_bits = correction
 
         with np.errstate(
@@ -513,10 +515,10 @@ class Safeguards:
             under="ignore",
         ):
             corrected_bits: np.ndarray[S, np.dtype[C]] = np.add(
-                prediction_bits, correction_bits
+                approximation_bits, correction_bits
             )
 
-        return corrected_bits.view(prediction.dtype)
+        return corrected_bits.view(approximation.dtype)
 
     @functools.lru_cache
     def compute_required_stencil_for_chunked_correction(
@@ -688,7 +690,7 @@ class Safeguards:
     def check_chunk(
         self,
         data_chunk: np.ndarray[S, np.dtype[T]],
-        prediction_chunk: np.ndarray[S, np.dtype[T]],
+        approximation_chunk: np.ndarray[S, np.dtype[T]],
         *,
         data_shape: tuple[int, ...],
         chunk_offset: tuple[int, ...],
@@ -703,9 +705,9 @@ class Safeguards:
         where_chunk: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> bool:
         """
-        Check if the `prediction_chunk` array chunk upholds the properties enforced by the safeguards with respect to the `data_chunk` array chunk.
+        Check if the `approximation_chunk` array chunk upholds the properties enforced by the safeguards with respect to the `data_chunk` array chunk.
 
-        Both the `data_chunk` and `prediction_chunk` contain the stencil around
+        Both the `data_chunk` and `approximation_chunk` contain the stencil around
         the chunk, and the shape of this applied stencil is specified in the
         `chunk_stencil` parameter. This stencil must be compatible with the
         required stencil returned by
@@ -727,8 +729,8 @@ class Safeguards:
         data_chunk : np.ndarray[S, np.dtype[T]]
             A stencil-extended chunk from the data array, relative to which the
             safeguards are checked.
-        prediction_chunk : np.ndarray[S, np.dtype[T]]
-            The corresponding stencil-extended chunk from the prediction array
+        approximation_chunk : np.ndarray[S, np.dtype[T]]
+            The corresponding stencil-extended chunk from the approximation array
             for which the safeguards are checked.
         data_shape : tuple[int, ...]
             The shape of the entire data array, i.e. not just the chunk,
@@ -739,7 +741,7 @@ class Safeguards:
             offset is the index of the bottom left element in the entire array.
         chunk_stencil : tuple[tuple[Literal[BoundaryCondition.valid, BoundaryCondition.wrap], NeighbourhoodAxis], ...]
             The shape of the stencil neighbourhood that was applied around the
-            chunk in `data_chunk` and `prediction_chunk`.
+            chunk in `data_chunk` and `approximation_chunk`.
         late_bound_chunk : Mapping[str | Parameter, Value] | Bindings
             The bindings for all late-bound parameters of the safeguards.
 
@@ -765,7 +767,7 @@ class Safeguards:
             if the `data_chunk` uses an unsupported data type.
         ValueError
             if the `data_chunk`'s dtype or shape do not match the
-            `prediction_chunk`'s, or if the length of the `data_shape`,
+            `approximation_chunk`'s, or if the length of the `data_shape`,
             `chunk_offset`, or `chunk_stencil` do not match the dimensionality
             of the `data`.
         ValueError
@@ -782,13 +784,13 @@ class Safeguards:
 
         (
             data_chunk_,
-            prediction_chunk_,
+            approximation_chunk_,
             late_bound_chunk,
             where_chunk_,
             non_stencil_indices,
         ) = self._prepare_stencil_chunked_arrays_and_bindings(
             data_chunk=data_chunk,
-            prediction_chunk=prediction_chunk,
+            approximation_chunk=approximation_chunk,
             data_shape=data_shape,
             chunk_offset=chunk_offset,
             chunk_stencil=chunk_stencil,
@@ -810,7 +812,7 @@ class Safeguards:
         for safeguard in self._pointwise_safeguards + self._stencil_safeguards:
             all_ok &= safeguard.check_pointwise(
                 data_chunk_,
-                prediction_chunk_,
+                approximation_chunk_,
                 late_bound=late_bound_chunk,
                 where=where_chunk_,
             )[tuple(non_stencil_indices)]
@@ -823,7 +825,7 @@ class Safeguards:
     def compute_chunked_correction(
         self,
         data_chunk: np.ndarray[S, np.dtype[T]],
-        prediction_chunk: np.ndarray[S, np.dtype[T]],
+        approximation_chunk: np.ndarray[S, np.dtype[T]],
         *,
         data_shape: tuple[int, ...],
         chunk_offset: tuple[int, ...],
@@ -839,9 +841,9 @@ class Safeguards:
         where_chunk: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[tuple[int, ...], np.dtype[C]]:
         """
-        Compute the correction required to make the `prediction_chunk` array chunk satisfy the safeguards relative to the `data_chunk` array chunk.
+        Compute the correction required to make the `approximation_chunk` array chunk satisfy the safeguards relative to the `data_chunk` array chunk.
 
-        Both the `data_chunk` and `prediction_chunk` contain the stencil around
+        Both the `data_chunk` and `approximation_chunk` contain the stencil around
         the chunk, and the shape of this applied stencil is specified in the
         `chunk_stencil` parameter. This stencil must be compatible with the
         required stencil returned by
@@ -859,19 +861,19 @@ class Safeguards:
         efficient [`compute_correction`][..compute_correction] method instead.
 
         The (chunked) correction is defined as
-        `as_bits(corrected) - as_bits(prediction)` using wrapping unsigned
+        `as_bits(corrected) - as_bits(approximation)` using wrapping unsigned
         integer arithmetic. It has the corresponding binary unsigned integer
         data type with the same bit size. The chunked correction can be applied
         using [`apply_correction`][..apply_correction] to get the corrected
-        chunked `prediction`.
+        chunked `approximation`.
 
         Parameters
         ----------
         data_chunk : np.ndarray[S, np.dtype[T]]
             A stencil-extended chunk from the data array, relative to which the
             safeguards are enforced.
-        prediction_chunk : np.ndarray[S, np.dtype[T]]
-            The corresponding stencil-extended chunk from the prediction array
+        approximation_chunk : np.ndarray[S, np.dtype[T]]
+            The corresponding stencil-extended chunk from the approximation array
             for which the correction is computed.
         data_shape : tuple[int, ...]
             The shape of the entire data array, i.e. not just the chunk.
@@ -881,7 +883,7 @@ class Safeguards:
             offset is the index of the bottom left element in the entire array.
         chunk_stencil : tuple[tuple[Literal[BoundaryCondition.valid, BoundaryCondition.wrap], NeighbourhoodAxis], ...]
             The shape of the stencil neighbourhood that was applied around the
-            chunk in `data_chunk` and `prediction_chunk`.
+            chunk in `data_chunk` and `approximation_chunk`.
         any_chunk_check_failed : bool
             If any chunk failed its check, this chunk requires corrections; if
             no chunk failed its check, this chunk does not require corrections.
@@ -915,7 +917,7 @@ class Safeguards:
             if the `data_chunk` uses an unsupported data type.
         ValueError
             if the `data_chunk`'s dtype or shape do not match the
-            `prediction_chunk`'s, or if the length of the `data_shape`,
+            `approximation_chunk`'s, or if the length of the `data_shape`,
             `chunk_offset`, or `chunk_stencil` do not match the dimensionality
             of the `data`.
         ValueError
@@ -933,13 +935,13 @@ class Safeguards:
 
         (
             data_chunk_,
-            prediction_chunk_,
+            approximation_chunk_,
             late_bound_chunk,
             where_chunk_,
             non_stencil_indices,
         ) = self._prepare_stencil_chunked_arrays_and_bindings(
             data_chunk=data_chunk,
-            prediction_chunk=prediction_chunk,
+            approximation_chunk=approximation_chunk,
             data_shape=data_shape,
             chunk_offset=chunk_offset,
             chunk_stencil=chunk_stencil,
@@ -973,7 +975,7 @@ class Safeguards:
             for safeguard in self._pointwise_safeguards:
                 all_ok &= safeguard.check_pointwise(
                     data_chunk_,
-                    prediction_chunk_,
+                    approximation_chunk_,
                     late_bound=late_bound_chunk,
                     where=where_chunk_,
                 )[tuple(non_stencil_indices)]
@@ -1009,7 +1011,7 @@ class Safeguards:
         combined_intervals = all_intervals[0]
         for intervals in all_intervals[1:]:
             combined_intervals = combined_intervals.intersect(intervals)
-        corrected_chunk = combined_intervals.pick(prediction_chunk_)
+        corrected_chunk = combined_intervals.pick(approximation_chunk_)
 
         for safeguard, intervals in zip(self.safeguards, all_intervals):
             if not np.all(intervals.contains(corrected_chunk)):
@@ -1034,8 +1036,8 @@ class Safeguards:
                     | ctx
                 )
 
-        prediction_chunk_bits: np.ndarray[tuple[int, ...], np.dtype[C]] = as_bits(
-            prediction_chunk_
+        approximation_chunk_bits: np.ndarray[tuple[int, ...], np.dtype[C]] = as_bits(
+            approximation_chunk_
         )
         corrected_chunk_bits: np.ndarray[tuple[int, ...], np.dtype[C]] = as_bits(
             corrected_chunk
@@ -1045,7 +1047,7 @@ class Safeguards:
             over="ignore",
             under="ignore",
         ):
-            return (corrected_chunk_bits - prediction_chunk_bits)[
+            return (corrected_chunk_bits - approximation_chunk_bits)[
                 tuple(non_stencil_indices)
             ]
 
@@ -1053,7 +1055,7 @@ class Safeguards:
         self,
         *,
         data_chunk: np.ndarray[S, np.dtype[T]],
-        prediction_chunk: np.ndarray[S, np.dtype[T]],
+        approximation_chunk: np.ndarray[S, np.dtype[T]],
         data_shape: tuple[int, ...],
         chunk_offset: tuple[int, ...],
         chunk_stencil: tuple[
@@ -1074,15 +1076,15 @@ class Safeguards:
     ]:
         TypeSetError.check_dtype_or_raise(data_chunk.dtype, _SUPPORTED_DTYPES)
 
-        with ctx.parameter("prediction_chunk"):
-            if prediction_chunk.dtype != data_chunk.dtype:
+        with ctx.parameter("approximation_chunk"):
+            if approximation_chunk.dtype != data_chunk.dtype:
                 raise (
-                    ValueError("prediction_chunk.dtype must match data_chunk.dtype")
+                    ValueError("approximation_chunk.dtype must match data_chunk.dtype")
                     | ctx
                 )
-            if prediction_chunk.shape != data_chunk.shape:
+            if approximation_chunk.shape != data_chunk.shape:
                 raise (
-                    ValueError("prediction_chunk.shape must match data_chunk.shape")
+                    ValueError("approximation_chunk.shape must match data_chunk.shape")
                     | ctx
                 )
         with ctx.parameter("data_shape"):
@@ -1318,10 +1320,10 @@ class Safeguards:
             shift=tuple(stencil_roll),
             axis=tuple(range(data_chunk.ndim)),
         )
-        prediction_chunk_ = np.roll(
-            prediction_chunk[tuple(stencil_indices)],
+        approximation_chunk_ = np.roll(
+            approximation_chunk[tuple(stencil_indices)],
             shift=tuple(stencil_roll),
-            axis=tuple(range(prediction_chunk.ndim)),
+            axis=tuple(range(approximation_chunk.ndim)),
         )
 
         # create the late-bound bindings for the chunk
@@ -1363,7 +1365,7 @@ class Safeguards:
 
         return (
             data_chunk_,
-            prediction_chunk_,
+            approximation_chunk_,
             late_bound_chunk,
             where_chunk_,
             tuple(non_stencil_indices),

@@ -217,14 +217,14 @@ def _compute_finite_absolute_error_bound(
 def _compute_finite_absolute_error(
     type: ErrorBound,
     data_float: np.ndarray[S, np.dtype[F]],
-    prediction_float: np.ndarray[S, np.dtype[F]],
+    approximation_float: np.ndarray[S, np.dtype[F]],
 ) -> np.ndarray[S, np.dtype[F]]:
     """
     Compute the absolute error value, which is compared against the absolute
-    error bound, from the data and prediction arrays.
+    error bound, from the data and approximation arrays.
 
     The computation is only defined for finite data elements, i.e. the produced
-    error should not be used for non-finite data or prediction elements.
+    error should not be used for non-finite data or approximation elements.
 
     Parameters
     ----------
@@ -232,13 +232,13 @@ def _compute_finite_absolute_error(
         The error bound type.
     data_float : np.ndarray[S, np.dtype[F]]
         The original data array in floating-point representation.
-    prediction_float : np.ndarray[S, np.dtype[F]]
-        The prediction data array in floating-point representation.
+    approximation_float : np.ndarray[S, np.dtype[F]]
+        The approximation data array in floating-point representation.
 
     Returns
     -------
     err_abs : np.ndarray[S, np.dtype[F]]
-        The absolute error value between the original and prediction data.
+        The absolute error value between the original and approximation data.
     """
 
     match type:
@@ -246,19 +246,19 @@ def _compute_finite_absolute_error(
         #  here since the error bound will include the data value that together
         #  form a relative error bound
         case ErrorBound.abs | ErrorBound.rel:
-            return _abs(np.subtract(data_float, prediction_float))
+            return _abs(np.subtract(data_float, approximation_float))
         case ErrorBound.ratio:
             err_abs: np.ndarray[S, np.dtype[F]] = _ensure_array(
-                np.divide(prediction_float, data_float)
+                np.divide(approximation_float, data_float)
             )
             np.divide(
                 data_float,
-                prediction_float,
+                approximation_float,
                 out=err_abs,
-                where=(_abs(data_float) > _abs(prediction_float)),
+                where=(_abs(data_float) > _abs(approximation_float)),
             )
-            err_abs[(data_float == 0) & (prediction_float == 0)] = 0
-            err_abs[np.sign(data_float) != np.sign(prediction_float)] = np.inf
+            err_abs[(data_float == 0) & (approximation_float == 0)] = 0
+            err_abs[np.sign(data_float) != np.sign(approximation_float)] = np.inf
             return err_abs
         case _:
             assert_never(type)

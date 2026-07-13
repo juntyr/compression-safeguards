@@ -47,12 +47,12 @@ from xarray_safeguards import apply_data_array_correction, produce_data_array_co
 
 # some (chunked) n-dimensional data array
 da = xr.DataArray(np.linspace(-10, 10, 21), name="da").chunk(10)
-# lossy-compressed prediction for the data, here all zeros
-da_prediction = xr.DataArray(np.zeros_like(da.values), name="da").chunk(10)
+# lossy-compressed approximation of the data, here all zeros
+da_approximation = xr.DataArray(np.zeros_like(da.values), name="da").chunk(10)
 
 da_correction = produce_data_array_correction(
     data=da,
-    prediction=da_prediction,
+    approximation=da_approximation,
     # guarantee an absolute error bound of 0.1:
     #   |x - x'| <= 0.1
     safeguards=[dict(kind="eb", type="abs", eb=0.1)],
@@ -60,15 +60,15 @@ da_correction = produce_data_array_correction(
 
 ## (a) manual correction ##
 
-da_corrected = apply_data_array_correction(da_prediction, da_correction)
+da_corrected = apply_data_array_correction(da_approximation, da_correction)
 np.testing.assert_allclose(da_corrected.values, da.values, rtol=0, atol=0.1)
 
 ## (b) automatic correction with xarray accessors ##
 
-# combine the lossy prediction and the correction into one dataset
+# combine the lossy approximation and the correction into one dataset
 #  e.g. by loading them from different files using `xarray.open_mfdataset`
 ds = xr.Dataset({
-    da_prediction.name: da_prediction,
+    da_approximation.name: da_approximation,
     da_correction.name: da_correction,
 })
 
@@ -124,7 +124,7 @@ Parameter value type that includes scalar numbers and data arrays thereof.
 
 def produce_data_array_correction(
     data: xr.DataArray,
-    prediction: xr.DataArray,
+    approximation: xr.DataArray,
     *,
     safeguards: Collection[dict[str, JSON] | Safeguard],
     late_bound: Mapping[str, DataValue] = MappingProxyType(dict()),
@@ -132,9 +132,9 @@ def produce_data_array_correction(
     allow_unsafe_safeguards_override: bool = False,
 ) -> xr.DataArray:
     """
-    Produce the correction required to make the `prediction` data array satisfy the `safeguards` relative to the `data` array.
+    Produce the correction required to make the `approximation` data array satisfy the `safeguards` relative to the `data` array.
 
-    The `data` array may be chunked[^1] and the `prediction` array must use the
+    The `data` array may be chunked[^1] and the `approximation` array must use the
     same chunking. Importantly, the `data` array must contain the complete data,
     i.e. not just a sub-chunk of the data, so that non-pointwise safeguards are
     correctly applied.
@@ -142,7 +142,7 @@ def produce_data_array_correction(
     If the the `data` array is chunked, the correction is produced lazily,
     otherwise it is computed eagerly.
 
-    The `data` array must have a name and the `prediction` array must use the
+    The `data` array must have a name and the `approximation` array must use the
     same name.
 
     [^1]: At the moment, only chunking with `dask` is supported.
@@ -151,8 +151,8 @@ def produce_data_array_correction(
     ----------
     data : xr.DataArray
         The data array, relative to which the safeguards are enforced.
-    prediction : xr.DataArray
-        The prediction array for which the correction is produced.
+    approximation : xr.DataArray
+        The approximation array for which the correction is produced.
     safeguards : Collection[dict[str, JSON] | Safeguard]
         The safeguards that will be applied relative to the `data` array.
 
@@ -202,13 +202,13 @@ def produce_data_array_correction(
         if the `data` has already been corrected by safeguards, i.e. if it is
         not the original uncorrected data, which will create a printer problem.
     ValueError
-        if the `prediction` has already been corrected, which may create a
+        if the `approximation` has already been corrected, which may create a
         printer problem.
     TypeSetError
         if the `data` uses an unsupported data type.
     ValueError
         if the `data`'s dimensions, shape, dtype, chunks, or name do not match
-        the `prediction`'s, or if the data name is [`None`][None].
+        the `approximation`'s, or if the data name is [`None`][None].
     LateBoundParameterResolutionError
         if `late_bound` does not resolve all late-bound parameters of the
         safeguards or includes any extraneous parameters.
@@ -239,22 +239,22 @@ def produce_data_array_correction(
                 | ctx
             )
 
-    if "safeguards" in prediction.attrs:
+    if "safeguards" in approximation.attrs:
         if allow_unsafe_safeguards_override:
             warnings.warn("`allow_unsafe_safeguards_override`=True")
-        elif "safeguards" in prediction.attrs:
-            with ctx.parameter("prediction"):
+        elif "safeguards" in approximation.attrs:
+            with ctx.parameter("approximation"):
                 raise (
                     ValueError(
                         "computing the safeguards correction for a "
-                        + "`prediction` array that has *already* been "
+                        + "`approximation` array that has *already* been "
                         + "safeguards-corrected before is unsafe as the "
                         + "safety guarantees provided by the previously "
                         + "applied safeguards may not be provided by the newly "
                         + "applied safeguards, thus violating the earlier "
                         + "guarantees; this is also known as the printer "
                         + "problem; please manually inspect the `.safeguards` "
-                        + "property of the `prediction` array and ensure that "
+                        + "property of the `approximation` array and ensure that "
                         + "they are included in the new `safeguards` and then "
                         + "pass `allow_unsafe_safeguards_override=True` to "
                         + "this function"
@@ -269,17 +269,17 @@ def produce_data_array_correction(
 
     TypeSetError.check_dtype_or_raise(data.dtype, Safeguards.supported_dtypes())
 
-    with ctx.parameter("prediction"):
-        if prediction.dims != data.dims:
-            raise ValueError("prediction.dims must match data.dims") | ctx
-        if prediction.shape != data.shape:
-            raise ValueError("prediction.shape must match data.shape") | ctx
-        if prediction.dtype != data.dtype:
-            raise ValueError("prediction.dtype must match data.dtype") | ctx
-        if prediction.chunks != data.chunks:
-            raise ValueError("prediction.chunks must match data.chunks") | ctx
-        if prediction.name != data.name:
-            raise ValueError("prediction.name must match data.name") | ctx
+    with ctx.parameter("approximation"):
+        if approximation.dims != data.dims:
+            raise ValueError("approximation.dims must match data.dims") | ctx
+        if approximation.shape != data.shape:
+            raise ValueError("approximation.shape must match data.shape") | ctx
+        if approximation.dtype != data.dtype:
+            raise ValueError("approximation.dtype must match data.dtype") | ctx
+        if approximation.chunks != data.chunks:
+            raise ValueError("approximation.chunks must match data.chunks") | ctx
+        if approximation.name != data.name:
+            raise ValueError("approximation.name must match data.name") | ctx
     with ctx.parameter("data"):
         if data.name is None:
             raise ValueError("data.name must not be None") | ctx
@@ -369,7 +369,7 @@ def produce_data_array_correction(
             data.copy(
                 data=safeguards_.compute_correction(
                     data.values,
-                    prediction.values,
+                    approximation.values,
                     late_bound=late_bound_full,
                     where=True,
                 )
@@ -416,7 +416,7 @@ def produce_data_array_correction(
 
         def _compute_independent_chunk_correction(
             data_chunk: np.ndarray[S, np.dtype[T]],
-            prediction_chunk: np.ndarray[S, np.dtype[T]],
+            approximation_chunk: np.ndarray[S, np.dtype[T]],
             *late_bound_chunks: np.ndarray[S, np.dtype[T]],
             late_bound_names: tuple[str, ...],
             late_bound_global: dict[str, int | float | np.number],
@@ -428,7 +428,7 @@ def produce_data_array_correction(
 
             # ensure that we pass np.ndarray's to the compression-safeguards
             data_chunk = _ensure_array(data_chunk)
-            prediction_chunk = _ensure_array(prediction_chunk)
+            approximation_chunk = _ensure_array(approximation_chunk)
             late_bound_chunks = tuple(_ensure_array(lb) for lb in late_bound_chunks)
 
             late_bound_chunk: dict[str, Value] = dict(
@@ -437,14 +437,14 @@ def produce_data_array_correction(
             )
 
             return safeguards.compute_correction(
-                data_chunk, prediction_chunk, late_bound=late_bound_chunk, where=True
+                data_chunk, approximation_chunk, late_bound=late_bound_chunk, where=True
             )
 
         da_correction = (
             data.copy(
                 data=data.data.map_blocks(
                     _compute_independent_chunk_correction,
-                    prediction.data,
+                    approximation.data,
                     *chunked_late_bound.values(),
                     dtype=correction_dtype,
                     chunks=None,
@@ -493,7 +493,7 @@ def produce_data_array_correction(
 
     def _check_overlapping_stencil_chunk(
         data_chunk: np.ndarray[S, np.dtype[T]],
-        prediction_chunk: np.ndarray[S, np.dtype[T]],
+        approximation_chunk: np.ndarray[S, np.dtype[T]],
         data_indices_chunk: np.ndarray[S, np.dtype[np.intp]],
         *late_bound_chunks: np.ndarray[S, np.dtype[T]],
         late_bound_names: tuple[str, ...],
@@ -512,7 +512,7 @@ def produce_data_array_correction(
 
         # ensure that we pass np.ndarray's to the compression-safeguards
         data_chunk = _ensure_array(data_chunk)
-        prediction_chunk = _ensure_array(prediction_chunk)
+        approximation_chunk = _ensure_array(approximation_chunk)
         data_indices_chunk = _ensure_array(data_indices_chunk)
         late_bound_chunks = tuple(_ensure_array(lb) for lb in late_bound_chunks)
 
@@ -588,7 +588,7 @@ def produce_data_array_correction(
         # - map_overlap ensures we get chunks including their required stencil
         chunk_is_ok = safeguards.check_chunk(
             data_chunk,
-            prediction_chunk,
+            approximation_chunk,
             data_shape=data_shape,
             chunk_offset=chunk_offset,
             chunk_stencil=chunk_stencil,
@@ -610,7 +610,7 @@ def produce_data_array_correction(
         and dask.array.map_overlap(
             _check_overlapping_stencil_chunk,
             data.data,
-            prediction.data,
+            approximation.data,
             data_indices,
             *chunked_late_bound.values(),
             dtype=np.bool,
@@ -639,7 +639,7 @@ def produce_data_array_correction(
 
     def _compute_overlapping_stencil_chunk_correction(
         data_chunk: np.ndarray[S, np.dtype[T]],
-        prediction_chunk: np.ndarray[S, np.dtype[T]],
+        approximation_chunk: np.ndarray[S, np.dtype[T]],
         data_indices_chunk: np.ndarray[S, np.dtype[np.intp]],
         *late_bound_chunks: np.ndarray[S, np.dtype[T]],
         late_bound_names: tuple[str, ...],
@@ -659,7 +659,7 @@ def produce_data_array_correction(
 
         # ensure that we pass np.ndarray's to the compression-safeguards
         data_chunk = _ensure_array(data_chunk)
-        prediction_chunk = _ensure_array(prediction_chunk)
+        approximation_chunk = _ensure_array(approximation_chunk)
         data_indices_chunk = _ensure_array(data_indices_chunk)
         late_bound_chunks = tuple(_ensure_array(lb) for lb in late_bound_chunks)
 
@@ -741,7 +741,7 @@ def produce_data_array_correction(
         correction: np.ndarray[tuple[int, ...], np.dtype[np.unsignedinteger]] = (
             safeguards.compute_chunked_correction(
                 data_chunk,
-                prediction_chunk,
+                approximation_chunk,
                 data_shape=data_shape,
                 chunk_offset=chunk_offset,
                 chunk_stencil=chunk_stencil,
@@ -759,7 +759,7 @@ def produce_data_array_correction(
             data=dask.array.map_overlap(
                 _compute_overlapping_stencil_chunk_correction,
                 data.data,
-                prediction.data,
+                approximation.data,
                 data_indices,
                 *chunked_late_bound.values(),
                 dtype=correction_dtype,
@@ -792,20 +792,20 @@ def produce_data_array_correction(
 
 
 def apply_data_array_correction(
-    prediction: xr.DataArray,
+    approximation: xr.DataArray,
     correction: xr.DataArray,
 ) -> xr.DataArray:
     """
-    Apply the `correction` to the `prediction` array to satisfy the safeguards for which the `correction` was produced.
+    Apply the `correction` to the `approximation` array to satisfy the safeguards for which the `correction` was produced.
 
-    The `prediction` must be bitwise equivalent to the `prediction` that
+    The `approximation` must be bitwise equivalent to the `approximation` that
     was used to produce the `correction`.
 
-    The `prediction` array may be chunked[^2] and the `correction` array must
+    The `approximation` array may be chunked[^2] and the `correction` array must
     use the same chunking, though this chunking may differ from the one that
     was used to produce the `correction`.
 
-    If the the `prediction` array is chunked, the correction is applied lazily,
+    If the the `approximation` array is chunked, the correction is applied lazily,
     otherwise it its application is computed eagerly.
 
     [^2]: Any chunking supported by `xarray` is supported, including but not
@@ -814,8 +814,8 @@ def apply_data_array_correction(
 
     Parameters
     ----------
-    prediction : xr.DataArray
-        The prediction array for which the correction has been produced.
+    approximation : xr.DataArray
+        The approximation array for which the correction has been produced.
     correction : xr.DataArray
         The correction array.
 
@@ -828,8 +828,8 @@ def apply_data_array_correction(
     ------
     ValueError
         if the `correction`'s dimensions, shape, or chunks do not match the
-        `prediction`'s, or if the `correction`'s dtype does not match the
-        correction dtype for the `prediction`'s dtype.
+        `approximation`'s, or if the `correction`'s dtype does not match the
+        correction dtype for the `approximation`'s dtype.
     ValueError
         if the `correction` does not contain metadata about the safeguards that
         it was produced with.
@@ -839,12 +839,12 @@ def apply_data_array_correction(
     """
 
     with ctx.parameter("correction"):
-        if correction.dims != prediction.dims:
-            raise ValueError("correction.dims must match prediction.dims") | ctx
-        if correction.shape != prediction.shape:
-            raise ValueError("correction.shape must match prediction.shape") | ctx
-        if correction.chunks != prediction.chunks:
-            raise ValueError("correction.chunks must match prediction.chunks") | ctx
+        if correction.dims != approximation.dims:
+            raise ValueError("correction.dims must match approximation.dims") | ctx
+        if correction.shape != approximation.shape:
+            raise ValueError("correction.shape must match approximation.shape") | ctx
+        if correction.chunks != approximation.chunks:
+            raise ValueError("correction.chunks must match approximation.chunks") | ctx
 
         if "safeguards" not in correction.attrs:
             raise (
@@ -857,32 +857,34 @@ def apply_data_array_correction(
     safeguards = Safeguards.from_config(json.loads(correction.attrs["safeguards"]))
 
     with ctx.parameter("correction"):
-        if correction.dtype != safeguards.correction_dtype_for_data(prediction.dtype):
+        if correction.dtype != safeguards.correction_dtype_for_data(
+            approximation.dtype
+        ):
             raise (
                 ValueError(
                     "correction.dtype must match the correction dtype for "
-                    + "prediction.dtype"
+                    + "approximation.dtype"
                 )
                 | ctx
             )
 
     def _apply_independent_chunk_correction(
-        prediction_chunk: xr.DataArray,
+        approximation_chunk: xr.DataArray,
         correction_chunk: xr.DataArray,
         safeguards: Safeguards,
     ) -> xr.DataArray:
-        return prediction_chunk.copy(
+        return approximation_chunk.copy(
             data=safeguards.apply_correction(
-                prediction_chunk.values, correction_chunk.values
+                approximation_chunk.values, correction_chunk.values
             )
         )
 
     return xr.map_blocks(
         _apply_independent_chunk_correction,
-        prediction,
+        approximation,
         args=(correction,),
         kwargs=dict(safeguards=safeguards),
-        template=prediction,
+        template=approximation,
     ).assign_attrs(safeguards=correction.attrs["safeguards"])
 
 
