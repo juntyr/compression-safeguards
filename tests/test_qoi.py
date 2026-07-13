@@ -2863,3 +2863,26 @@ def test_fuzzer_found_log_any_data_square():
 
     assert expr.eval(X_lower, dict()) == np.array(np.float16(0.3423))
     assert expr.eval(X_upper, dict()) == np.array(np.float16(0.3423))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_log_asin_any_data():
+    X = np.array(np.float16(0.0))
+
+    expr = ScalarLogWithBase(
+        ScalarAsin(Data.SCALAR),
+        ScalarAnyDataConstant(np.float16(4.2e-06)),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(np.inf))
+
+    expr_lower = np.array(np.float16(0.0))
+    expr_upper = np.array(np.float16(np.inf))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert _is_positive_zero(X_lower)
+    assert X_upper == np.float16(0.8413)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(np.inf))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(3.94e-05))
