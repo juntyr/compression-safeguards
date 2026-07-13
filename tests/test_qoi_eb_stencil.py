@@ -1608,3 +1608,20 @@ def test_iterative_corrections_with_footprint_without_self():
         fixed_constants=dict(x=np.array([0.0, 0.5, 1.0, 1.5])),
         compute=dict(unstable_iterative=True),
     )
+
+
+def test_fuzzer_found_left_associative_sum_rewrite_context_invalidation():
+    Safeguards(
+        safeguards=[
+            dict(
+                kind="qoi_eb_stencil",
+                qoi="sum(cosh(x) - x - X)",
+                neighbourhood=[
+                    dict(axis=1, before=1, after=1, boundary="valid"),
+                    dict(axis=0, before=0, after=0, boundary="valid"),
+                ],
+                type="abs",
+                eb=0,
+            )
+        ]
+    )

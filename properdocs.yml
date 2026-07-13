@@ -100,6 +100,7 @@ plugins:
   - mkdocs-jupyter:
       ignore_h1_titles: True
       no_prompt: True
+      include_source: True
   - mkdocs-simple-hooks:
       hooks:
         on_nav: "docs.hooks.section_index:on_nav"

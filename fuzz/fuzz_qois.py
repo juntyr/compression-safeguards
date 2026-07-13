@@ -225,6 +225,7 @@ def check_one_input(data) -> None:
     try:
         with timeout(1):
             dataexpr = Data.SCALAR
+            any_true_data = False
             exprid = data.ConsumeIntInRange(
                 0,
                 len(UNARY_EXPRESSIONS)
@@ -232,8 +233,10 @@ def check_one_input(data) -> None:
                 + len(TERNARY_EXPRESSIONS)
                 - 1,
             )
+            expr: AnyExpr
             if exprid < len(UNARY_EXPRESSIONS):
-                expr: AnyExpr = (UNARY_EXPRESSIONS[exprid])(dataexpr)
+                expr = (UNARY_EXPRESSIONS[exprid])(dataexpr)
+                any_true_data = True
             elif exprid < (len(UNARY_EXPRESSIONS) + len(BINARY_EXPRESSIONS)):
                 exprs = []
                 for _ in range(2):
@@ -242,10 +245,12 @@ def check_one_input(data) -> None:
                     )
                     if i < len(NULLARY_EXPRESSIONS):
                         exprs.append((NULLARY_EXPRESSIONS[i])(data, dtype))
+                        any_true_data |= isinstance(exprs[-1], Data)
                     else:
                         exprs.append(
                             (UNARY_EXPRESSIONS[i - len(NULLARY_EXPRESSIONS)])(dataexpr)
                         )
+                        any_true_data = True
                 [expra, exprb] = exprs
                 expr = (BINARY_EXPRESSIONS[exprid - len(UNARY_EXPRESSIONS)])(
                     expra, exprb
@@ -258,10 +263,12 @@ def check_one_input(data) -> None:
                     )
                     if i < len(NULLARY_EXPRESSIONS):
                         exprs.append((NULLARY_EXPRESSIONS[i])(data, dtype))
+                        any_true_data |= isinstance(exprs[-1], Data)
                     else:
                         exprs.append(
                             (UNARY_EXPRESSIONS[i - len(NULLARY_EXPRESSIONS)])(dataexpr)
                         )
+                        any_true_data = True
                 [expra, exprb, exprc] = exprs
                 expr = (
                     TERNARY_EXPRESSIONS[
@@ -286,6 +293,12 @@ def check_one_input(data) -> None:
 
     # skip if the expression is constant
     if not expr.has_data:
+        return
+
+    # skip if the expression is effectively constant
+    # - ScalarAnyDataConstant is fake data to trigger different code paths
+    # - but nudging fails when there is no true data
+    if not any_true_data:
         return
 
     # generate the data
