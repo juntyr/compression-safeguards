@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "compression-safeguards"
 version = "1.0.0b5"
 dependencies = [
-    "numpy~=2.4",
+    "numpy>=2.4.5,==2.*",
     "numpy-quaddtype~=1.0",
     "packaging>=25.0",
     "semver~=3.0",
