@@ -2840,3 +2840,26 @@ def test_fuzzer_found_sub_add_excessive_nudging():
     assert expr.eval(X_upper, dict()) == np.array(np.float32(2.3841858e-07))
 
     pytest.xfail("excessive nudging from catastrophic rounding error")
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_log_any_data_square():
+    X = np.array(np.float16(0.0225))
+
+    expr = ScalarLogWithBase(
+        ScalarAnyDataConstant(np.float16(0.0744)),
+        ScalarSquare(Data.SCALAR),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float16(0.3423))
+
+    expr_lower = np.array(np.float16(0.0))
+    expr_upper = np.array(np.float16(0.3423))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(0.0225)
+    assert X_upper == np.float16(0.0225)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(0.3423))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(0.3423))
