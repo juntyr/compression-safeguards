@@ -163,7 +163,7 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
@@ -207,8 +207,8 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                 constant_boundary,
                 axis,
             )
-            prediction_boundary = _pad_with_boundary(
-                prediction,
+            approximation_boundary = _pad_with_boundary(
+                approximation,
                 self._boundary,
                 self._window,
                 self._window,
@@ -221,9 +221,9 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
                     data_boundary, window, axis=axis, writeable=False
                 ).reshape((-1, window))
             )
-            prediction_windows: np.ndarray[tuple[int, int], np.dtype[T]] = (
+            approximation_windows: np.ndarray[tuple[int, int], np.dtype[T]] = (
                 _sliding_window_view(
-                    prediction_boundary, window, axis=axis, writeable=False
+                    approximation_boundary, window, axis=axis, writeable=False
                 ).reshape((-1, window))
             )
 
@@ -235,18 +235,20 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
             if where is not True:
                 where_flat = where[tuple(valid_slice)].flatten()
                 data_windows = np.compress(where_flat, data_windows, axis=0)
-                prediction_windows = np.compress(where_flat, prediction_windows, axis=0)
+                approximation_windows = np.compress(
+                    where_flat, approximation_windows, axis=0
+                )
 
             data_monotonic: np.ndarray[tuple[int], np.dtype[np.float64]] = (
-                self._monotonic_sign(data_windows, is_prediction=False)  # type: ignore
+                self._monotonic_sign(data_windows, is_approximation=False)  # type: ignore
             )
-            prediction_monotonic: np.ndarray[tuple[int], np.dtype[np.float64]] = (
-                self._monotonic_sign(prediction_windows, is_prediction=True)  # type: ignore
+            approximation_monotonic: np.ndarray[tuple[int], np.dtype[np.float64]] = (
+                self._monotonic_sign(approximation_windows, is_approximation=True)  # type: ignore
             )
 
             # for monotonic windows, check that the monotonicity matches
             axis_ok_ = self._monotonic_sign_not_equal(
-                data_monotonic, prediction_monotonic
+                data_monotonic, approximation_monotonic
             )
 
             # the check succeeds where `where` is False
@@ -313,9 +315,9 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
         self,
         x: np.ndarray[S, np.dtype[T]],
         *,
-        is_prediction: bool,
+        is_approximation: bool,
     ) -> np.ndarray[tuple[int, ...], np.dtype[np.float64]]:
-        (lt, gt, eq, _is_weak) = self._monotonicity.value[int(is_prediction)]
+        (lt, gt, eq, _is_weak) = self._monotonicity.value[int(is_approximation)]
 
         # default to NaN
         monotonic: np.ndarray[tuple[int, ...], np.dtype[np.float64]] = np.full(
@@ -341,18 +343,18 @@ class MonotonicityPreservingSafeguard(StencilSafeguard):
     def _monotonic_sign_not_equal(
         self,
         data_monotonic: np.ndarray[S, np.dtype[T]],
-        prediction_monotonic: np.ndarray[S, np.dtype[T]],
+        approximation_monotonic: np.ndarray[S, np.dtype[T]],
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         match self._monotonicity:
             case Monotonicity.strict | Monotonicity.strict_with_consts:
                 return ~np.isnan(data_monotonic) & (
-                    prediction_monotonic != data_monotonic
+                    approximation_monotonic != data_monotonic
                 )
             case Monotonicity.strict_to_weak | Monotonicity.weak:
                 # having the opposite sign or no sign are both not equal
                 return ~np.isnan(data_monotonic) & (
-                    (prediction_monotonic == -data_monotonic)
-                    | np.isnan(prediction_monotonic)
+                    (approximation_monotonic == -data_monotonic)
+                    | np.isnan(approximation_monotonic)
                 )
             case _:
                 assert_never(self._monotonicity)

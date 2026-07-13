@@ -245,21 +245,21 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check which elements in the `prediction` array satisfy the error bound
+        Check which elements in the `approximation` array satisfy the error bound
         for the quantity of interest on the `data`.
 
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Original data array, relative to which the `prediction` is checked.
-        prediction : np.ndarray[S, np.dtype[T]]
-            Prediction for the `data` array.
+            Original data array, relative to which the `approximation` is checked.
+        approximation : np.ndarray[S, np.dtype[T]]
+            Approximation of the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
         where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
@@ -304,8 +304,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                 data_float: np.ndarray[tuple[int], np.dtype[np.floating]] = to_float(
                     data, ftype=ftype
                 ).flatten()
-                prediction_float: np.ndarray[tuple[int], np.dtype[np.floating]] = (
-                    to_float(prediction, ftype=ftype).flatten()
+                approximation_float: np.ndarray[tuple[int], np.dtype[np.floating]] = (
+                    to_float(approximation, ftype=ftype).flatten()
                 )
 
             late_bound_constants: dict[
@@ -323,7 +323,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             # optimization: only evaluate the QoI where necessary
             if where is not True:
                 data_float = np.extract(where, data_float)
-                prediction_float = np.extract(where, prediction_float)
+                approximation_float = np.extract(where, approximation_float)
                 late_bound_constants = {
                     c: np.extract(where, cv) for (c, cv) in late_bound_constants.items()
                 }
@@ -331,8 +331,8 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             qoi_data: np.ndarray[tuple[int], np.dtype[np.floating]] = (
                 self._qoi_expr.eval(data_float, late_bound_constants)
             )
-            qoi_prediction: np.ndarray[tuple[int], np.dtype[np.floating]] = (
-                self._qoi_expr.eval(prediction_float, late_bound_constants)
+            qoi_approximation: np.ndarray[tuple[int], np.dtype[np.floating]] = (
+                self._qoi_expr.eval(approximation_float, late_bound_constants)
             )
 
             with ctx.parameter("eb"):
@@ -354,13 +354,13 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             eb = np.extract(where, eb)
 
         finite_ok: np.ndarray[tuple[int], np.dtype[np.bool]] = np.less_equal(
-            _compute_finite_absolute_error(self._type, qoi_data, qoi_prediction),
+            _compute_finite_absolute_error(self._type, qoi_data, qoi_approximation),
             _compute_finite_absolute_error_bound(self._type, eb, qoi_data),
         )
 
         ok_: np.ndarray[tuple[int], np.dtype[np.bool]] = _ensure_array(finite_ok)
-        np.equal(qoi_data, qoi_prediction, out=ok_, where=np.isinf(qoi_data))
-        np.isnan(qoi_prediction, out=ok_, where=np.isnan(qoi_data))
+        np.equal(qoi_data, qoi_approximation, out=ok_, where=np.isinf(qoi_data))
+        np.isnan(qoi_approximation, out=ok_, where=np.isnan(qoi_data))
 
         # the check succeeds where `where` is False
         ok: np.ndarray[S, np.dtype[np.bool]]

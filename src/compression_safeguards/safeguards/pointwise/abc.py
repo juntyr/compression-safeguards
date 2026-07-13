@@ -31,21 +31,21 @@ class PointwiseSafeguard(Safeguard, ABC):
     def check(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> bool:
         """
-        Check if the `prediction` array upholds the property enforced by this
+        Check if the `approximation` array upholds the property enforced by this
         safeguard.
 
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Original data array, relative to which the `prediction` is checked.
-        prediction : np.ndarray[S, np.dtype[T]]
-            Prediction for the `data` array.
+            Original data array, relative to which the `approximation` is checked.
+        approximation : np.ndarray[S, np.dtype[T]]
+            Approximation of the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
         where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
@@ -58,28 +58,28 @@ class PointwiseSafeguard(Safeguard, ABC):
         """
 
         return bool(
-            np.all(self.check_pointwise(data, prediction, late_bound=late_bound))
+            np.all(self.check_pointwise(data, approximation, late_bound=late_bound))
         )
 
     @abstractmethod
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
-        Check which elements in the `prediction` array uphold the property
+        Check which elements in the `approximation` array uphold the property
         enforced by this safeguard.
 
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Original data array, relative to which the `prediction` is checked.
-        prediction : np.ndarray[S, np.dtype[T]]
-            Prediction for the `data` array.
+            Original data array, relative to which the `approximation` is checked.
+        approximation : np.ndarray[S, np.dtype[T]]
+            Approximation of the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
         where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]

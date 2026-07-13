@@ -370,30 +370,30 @@ def test_monotonicities_spurious():
         )
 
         # test for all possible window combinations
-        for data_window, prediction_window in product(windows, windows):
+        for data_window, approximation_window in product(windows, windows):
             data = windows[data_window]
-            prediction = windows[prediction_window]
+            approximation = windows[approximation_window]
 
             # the constant window needs to adjusted for the weak monotonicities
             #  since the implementation also checks that no overlap with
             #  adjacent elements occurs, which the weak windows have for 1.0
-            if prediction_window == "co" and data_window in ("wi", "wd"):
-                prediction = np.array([1.0, 1, 1])
+            if approximation_window == "co" and data_window in ("wi", "wd"):
+                approximation = np.array([1.0, 1, 1])
 
             # if the window activates the safeguard ...
             if data_window in active_allowed:
                 # the check has to return the expected result
                 assert safeguard.check(
-                    data, prediction, late_bound=Bindings(**{"$X": data})
-                ) == (prediction_window in active_allowed[data_window])
+                    data, approximation, late_bound=Bindings(**{"$X": data})
+                ) == (approximation_window in active_allowed[data_window])
                 assert sanity_safeguard.check(
-                    data, prediction, late_bound=Bindings.EMPTY
-                ) == (prediction_window in active_allowed[data_window])
+                    data, approximation, late_bound=Bindings.EMPTY
+                ) == (approximation_window in active_allowed[data_window])
 
                 # correcting the data must pass both checks
                 corrected = safeguard.compute_safe_intervals(
                     data, late_bound=Bindings(**{"$X": data})
-                ).pick(prediction)
+                ).pick(approximation)
                 assert safeguard.check(
                     data, corrected, late_bound=Bindings(**{"$X": data})
                 )
@@ -404,24 +404,24 @@ def test_monotonicities_spurious():
                 # the window doesn't activate the safeguard so the checks must
                 #  succeed
                 assert safeguard.check(
-                    data, prediction, late_bound=Bindings(**{"$X": data})
+                    data, approximation, late_bound=Bindings(**{"$X": data})
                 )
                 assert sanity_safeguard.check(
-                    data, prediction, late_bound=Bindings.EMPTY
+                    data, approximation, late_bound=Bindings.EMPTY
                 )
 
                 # the window doesn't activate the safeguard so the corrected
-                #  array should be bit-equivalent to the prediction array
+                #  array should be bit-equivalent to the approximation array
                 corrected = safeguard.compute_safe_intervals(
                     data, late_bound=Bindings(**{"$X": data})
-                ).pick(prediction)
+                ).pick(approximation)
                 if not np.all(
-                    (as_bits(corrected) == as_bits(prediction))
+                    (as_bits(corrected) == as_bits(approximation))
                     | np.isnan(data)
-                    | np.isnan(prediction)
+                    | np.isnan(approximation)
                 ):
                     assert False, (
-                        f"{corrected} != {prediction} for {data} and {monotonicity}"
+                        f"{corrected} != {approximation} for {data} and {monotonicity}"
                     )
 
 
@@ -438,8 +438,8 @@ def test_monotonicities_non_spurious():
 
     # mapping for each monotonicity
     # - keys: which data windows activate the safeguard
-    # - values: which prediction windows validate without correction
-    # and set of all prediction windows that can activate the safeguard
+    # - values: which approximation windows validate without correction
+    # and set of all approximation windows that can activate the safeguard
     monotonicities = {
         Monotonicity.strict: (
             dict(
@@ -494,30 +494,30 @@ def test_monotonicities_non_spurious():
         )
 
         # test for all possible window combinations
-        for data_window, prediction_window in product(windows, windows):
+        for data_window, approximation_window in product(windows, windows):
             data = windows[data_window]
-            prediction = windows[prediction_window]
+            approximation = windows[approximation_window]
 
             # the constant window needs to adjusted for the weak monotonicities
             #  since the implementation also checks that no overlap with
             #  adjacent elements occurs, which the weak windows have for 1.0
-            if prediction_window == "co" and data_window in ("wi", "wd"):
-                prediction = np.array([1.0, 1, 1])
+            if approximation_window == "co" and data_window in ("wi", "wd"):
+                approximation = np.array([1.0, 1, 1])
 
             # if the window activates the safeguard ...
-            if (data_window in active_allowed) or (prediction_window in trigger):
+            if (data_window in active_allowed) or (approximation_window in trigger):
                 # the check has to return the expected result
                 assert safeguard.check(
-                    data, prediction, late_bound=Bindings(**{"$X": data})
+                    data, approximation, late_bound=Bindings(**{"$X": data})
                 ) == (
-                    (prediction_window in active_allowed[data_window])
+                    (approximation_window in active_allowed[data_window])
                     if data_window in active_allowed
                     else False
                 )
                 assert sanity_safeguard.check(
-                    data, prediction, late_bound=Bindings.EMPTY
+                    data, approximation, late_bound=Bindings.EMPTY
                 ) == (
-                    (prediction_window in active_allowed[data_window])
+                    (approximation_window in active_allowed[data_window])
                     if data_window in active_allowed
                     else True
                 )
@@ -525,7 +525,7 @@ def test_monotonicities_non_spurious():
                 # correcting the data must pass both checks
                 corrected = safeguard.compute_safe_intervals(
                     data, late_bound=Bindings(**{"$X": data})
-                ).pick(prediction)
+                ).pick(approximation)
                 assert safeguard.check(
                     data, corrected, late_bound=Bindings(**{"$X": data})
                 )
@@ -536,17 +536,17 @@ def test_monotonicities_non_spurious():
                 # the window doesn't activate the safeguard so the checks must
                 #  succeed
                 assert safeguard.check(
-                    data, prediction, late_bound=Bindings(**{"$X": data})
+                    data, approximation, late_bound=Bindings(**{"$X": data})
                 )
                 assert sanity_safeguard.check(
-                    data, prediction, late_bound=Bindings.EMPTY
+                    data, approximation, late_bound=Bindings.EMPTY
                 )
 
                 # the window doesn't activate the safeguard, but the stencil
                 #  QoIs still impose requirements
                 corrected = safeguard.compute_safe_intervals(
                     data, late_bound=Bindings(**{"$X": data})
-                ).pick(prediction)
+                ).pick(approximation)
                 assert safeguard.check(
                     data, corrected, late_bound=Bindings(**{"$X": data})
                 )

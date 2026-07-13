@@ -179,7 +179,7 @@ def check_one_input(data) -> None:
     raw = np.frombuffer(raw, dtype=dtype)
 
     # skip all-ones raw inputs since we use that to sidechannel-communicate in
-    #  the fuzzer if a prediction is already corrected
+    #  the fuzzer if an approximation is already corrected
     if np.all(raw == 1):
         return
 
@@ -239,7 +239,7 @@ def check_one_input(data) -> None:
         return
 
     da = xr.DataArray(raw, name="da", dims=dims)
-    da_prediction = xr.DataArray(np.ones_like(raw), name="da", dims=dims)
+    da_approximation = xr.DataArray(np.ones_like(raw), name="da", dims=dims)
 
     # xarray-safeguards provides `$x_min` and `$x_max`,
     #  but the compression-safeguards do not
@@ -258,15 +258,15 @@ def check_one_input(data) -> None:
 
     if chunks is not None:
         da = da.chunk(chunks)
-        da_prediction = da_prediction.chunk(chunks)
+        da_approximation = da_approximation.chunk(chunks)
 
     try:
         global_hash = Safeguards(safeguards=[safeguard]).compute_correction(
-            data=da.values, prediction=da_prediction.values, late_bound=late_bound
+            data=da.values, approximation=da_approximation.values, late_bound=late_bound
         )
         chunked_hash = produce_data_array_correction(
             data=da,
-            prediction=da_prediction,
+            approximation=da_approximation,
             safeguards=[safeguard],
             late_bound={
                 p: v.chunk(chunks)

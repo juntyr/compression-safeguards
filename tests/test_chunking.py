@@ -23,7 +23,7 @@ from compression_safeguards.safeguards.stencil.qoi.eb import (
 
 def check_all_boundaries(data: np.ndarray, chunks: int, constant_boundary=4.2):
     da = xr.DataArray(data, name="da").chunk(chunks)
-    da_prediction = xr.DataArray(np.ones_like(data), name="da").chunk(chunks)
+    da_approximation = xr.DataArray(np.ones_like(data), name="da").chunk(chunks)
 
     for before, after, boundary in product(
         [0, 1, 2],
@@ -60,11 +60,11 @@ def check_all_boundaries(data: np.ndarray, chunks: int, constant_boundary=4.2):
 
             with _patch_for_hashing_qoi_dev_only():
                 global_hash = Safeguards(safeguards=[safeguard]).compute_correction(
-                    data=da.values, prediction=da_prediction.values
+                    data=da.values, approximation=da_approximation.values
                 )
                 chunked_hash = produce_data_array_correction(
                     data=da,
-                    prediction=da_prediction,
+                    approximation=da_approximation,
                     safeguards=[safeguard],
                 )
                 np.testing.assert_array_equal(chunked_hash.values, global_hash)
@@ -141,11 +141,11 @@ def test_edge_cases():
 
 def test_xarray_accessors():
     da = xr.DataArray(np.linspace(0, 1), name="da").chunk(10)
-    da_prediction = xr.DataArray(np.zeros_like(da.values), name="da").chunk(10)
+    da_approximation = xr.DataArray(np.zeros_like(da.values), name="da").chunk(10)
 
     da_correction = produce_data_array_correction(
         da,
-        da_prediction,
+        da_approximation,
         safeguards=[dict(kind="eb", type="abs", eb=0.1)],
         late_bound=dict(),
     )
@@ -153,7 +153,7 @@ def test_xarray_accessors():
         dict(kind="eb", type="abs", eb=0.1, equal_nan=False),
     )
 
-    ds = xr.Dataset(dict(da=da_prediction, da_correction=da_correction))
+    ds = xr.Dataset(dict(da=da_approximation, da_correction=da_correction))
 
     ds_safeguarded: xr.Dataset = ds.safeguarded
 
@@ -165,13 +165,13 @@ def test_fuzzer_found_chunked_check_invalid_block_info():
     da = xr.DataArray(
         np.array([[0, 0], [0, 0]], dtype=np.uint8), name="da", dims=["a", "b"]
     ).chunk(chunks)
-    da_prediction = xr.DataArray(
+    da_approximation = xr.DataArray(
         np.zeros_like(da.values), name="da", dims=["a", "b"]
     ).chunk(chunks)
 
     produce_data_array_correction(
         da,
-        da_prediction,
+        da_approximation,
         safeguards=[
             dict(
                 kind="qoi_eb_stencil",
@@ -193,13 +193,13 @@ def test_fuzzer_found_correction_shape_mismatch():
         name="da",
         dims=["a", "b"],
     ).chunk(chunks)
-    da_prediction = xr.DataArray(
+    da_approximation = xr.DataArray(
         np.zeros_like(da.values), name="da", dims=["a", "b"]
     ).chunk(chunks)
 
     produce_data_array_correction(
         da,
-        da_prediction,
+        da_approximation,
         safeguards=[
             dict(
                 kind="qoi_eb_stencil",
@@ -242,7 +242,7 @@ def test_fuzzer_found_hash():
         name="da",
         dims=["a", "b"],
     ).chunk(chunks)
-    da_prediction = xr.DataArray(
+    da_approximation = xr.DataArray(
         np.ones_like(da.values), name="da", dims=["a", "b"]
     ).chunk(chunks)
 
@@ -263,11 +263,11 @@ def test_fuzzer_found_hash():
 
     with _patch_for_hashing_qoi_dev_only():
         global_hash = Safeguards(safeguards=[safeguard]).compute_correction(
-            data=da.values, prediction=da_prediction.values
+            data=da.values, approximation=da_approximation.values
         )
         chunked_hash = produce_data_array_correction(
             data=da,
-            prediction=da_prediction,
+            approximation=da_approximation,
             safeguards=[safeguard],
         )
         np.testing.assert_array_equal(chunked_hash.values, global_hash)
@@ -283,7 +283,7 @@ def test_fuzzer_found_hash_with_late_bound():
         name="da",
         dims=["a", "b"],
     ).chunk(chunks)
-    da_prediction = xr.DataArray(
+    da_approximation = xr.DataArray(
         np.ones_like(da.values), name="da", dims=["a", "b"]
     ).chunk(chunks)
 
@@ -310,12 +310,12 @@ def test_fuzzer_found_hash_with_late_bound():
     with _patch_for_hashing_qoi_dev_only():
         global_hash = Safeguards(safeguards=[safeguard]).compute_correction(
             data=da.values,
-            prediction=da_prediction.values,
+            approximation=da_approximation.values,
             late_bound=late_bound,
         )
         chunked_hash = produce_data_array_correction(
             data=da,
-            prediction=da_prediction,
+            approximation=da_approximation,
             safeguards=[safeguard],
             late_bound=late_bound,
         )
@@ -351,7 +351,7 @@ def test_fuzzer_found_hash_x_max():
         name="da",
         dims=["a", "b"],
     ).chunk(chunks)
-    da_prediction = xr.DataArray(
+    da_approximation = xr.DataArray(
         np.ones_like(da.values), name="da", dims=["a", "b"]
     ).chunk(chunks)
 
@@ -384,12 +384,12 @@ def test_fuzzer_found_hash_x_max():
     with _patch_for_hashing_qoi_dev_only():
         global_hash = Safeguards(safeguards=[safeguard]).compute_correction(
             data=da.values,
-            prediction=da_prediction.values,
+            approximation=da_approximation.values,
             late_bound={**late_bound, "$x_max": np.amax(da.values)},
         )
         chunked_hash = produce_data_array_correction(
             data=da,
-            prediction=da_prediction,
+            approximation=da_approximation,
             safeguards=[safeguard],
             late_bound=late_bound,
         )
@@ -403,7 +403,7 @@ def test_fuzzer_found_hash_reflect_boundary():
         name="da",
         dims=["a", "b"],
     ).chunk(chunks)
-    da_prediction = xr.DataArray(
+    da_approximation = xr.DataArray(
         np.ones_like(da.values), name="da", dims=["a", "b"]
     ).chunk(chunks)
 
@@ -444,12 +444,12 @@ def test_fuzzer_found_hash_reflect_boundary():
     with _patch_for_hashing_qoi_dev_only():
         global_hash = Safeguards(safeguards=[safeguard]).compute_correction(
             data=da.values,
-            prediction=da_prediction.values,
+            approximation=da_approximation.values,
             late_bound=late_bound,
         )
         chunked_hash = produce_data_array_correction(
             data=da,
-            prediction=da_prediction,
+            approximation=da_approximation,
             safeguards=[safeguard],
             late_bound=late_bound,
         )
@@ -463,13 +463,13 @@ def test_fuzzer_found_all_nan_xmin():
         name="da",
         dims=["a", "b"],
     ).chunk(chunks)
-    da_prediction = xr.DataArray(
+    da_approximation = xr.DataArray(
         np.zeros_like(da.values), name="da", dims=["a", "b"]
     ).chunk(chunks)
 
     produce_data_array_correction(
         da,
-        da_prediction,
+        da_approximation,
         safeguards=[
             dict(
                 kind="qoi_eb_stencil",
@@ -487,13 +487,13 @@ def test_fuzzer_found_all_nan_xmin():
 def test_stencil_qoi_valid_boundary_late_bound_eb():
     chunks = dict(a=9)
     da = xr.DataArray(np.linspace(0, 10), name="da", dims=["a"]).chunk(chunks)
-    da_prediction = xr.DataArray(np.zeros_like(da.values), name="da", dims=["a"]).chunk(
-        chunks
-    )
+    da_approximation = xr.DataArray(
+        np.zeros_like(da.values), name="da", dims=["a"]
+    ).chunk(chunks)
 
     produce_data_array_correction(
         da,
-        da_prediction,
+        da_approximation,
         safeguards=[
             dict(
                 kind="qoi_eb_stencil",
@@ -516,7 +516,7 @@ def test_stencil_qoi_valid_boundary_late_bound_dimension():
             coords=dict(a=np.arange(25)),
             dims=["a", "b"],
         )
-        da_prediction = xr.DataArray(
+        da_approximation = xr.DataArray(
             np.zeros_like(da.values),
             name="da",
             coords=dict(a=np.arange(25)),
@@ -525,11 +525,11 @@ def test_stencil_qoi_valid_boundary_late_bound_dimension():
 
         if chunks is not None:
             da = da.chunk(chunks)
-            da_prediction = da_prediction.chunk(chunks)
+            da_approximation = da_approximation.chunk(chunks)
 
         produce_data_array_correction(
             da,
-            da_prediction,
+            da_approximation,
             safeguards=[
                 dict(
                     kind="qoi_eb_stencil",
@@ -546,13 +546,13 @@ def test_stencil_qoi_valid_boundary_late_bound_dimension():
 def test_rechunk_correction():
     chunks = dict(a=9)
     da = xr.DataArray(np.linspace(0, 10), name="da", dims=["a"]).chunk(chunks)
-    da_prediction = xr.DataArray(np.zeros_like(da.values), name="da", dims=["a"]).chunk(
-        chunks
-    )
+    da_approximation = xr.DataArray(
+        np.zeros_like(da.values), name="da", dims=["a"]
+    ).chunk(chunks)
 
     da_correction = produce_data_array_correction(
         da,
-        da_prediction,
+        da_approximation,
         safeguards=[
             dict(
                 kind="qoi_eb_stencil",
@@ -567,9 +567,9 @@ def test_rechunk_correction():
 
     rechunks = dict(a=7)
 
-    da_corrected = apply_data_array_correction(da_prediction, da_correction)
+    da_corrected = apply_data_array_correction(da_approximation, da_correction)
     da_corrected_rechunked = apply_data_array_correction(
-        da_prediction.chunk(rechunks), da_correction.chunk(rechunks)
+        da_approximation.chunk(rechunks), da_correction.chunk(rechunks)
     )
 
     np.testing.assert_array_equal(da_corrected_rechunked.values, da_corrected.values)
@@ -578,11 +578,11 @@ def test_rechunk_correction():
 def test_different_chunks_and_safeguards():
     for chunks in [None, dict(), dict(a=9)]:
         da = xr.DataArray(np.linspace(0, 10), name="da", dims=["a"])
-        da_prediction = xr.DataArray(np.zeros_like(da.values), name="da", dims=["a"])
+        da_approximation = xr.DataArray(np.zeros_like(da.values), name="da", dims=["a"])
 
         if chunks is not None:
             da = da.chunk(chunks)
-            da_prediction = da_prediction.chunk(chunks)
+            da_approximation = da_approximation.chunk(chunks)
 
         for safeguards in [
             [],
@@ -644,7 +644,7 @@ def test_different_chunks_and_safeguards():
         ]:
             produce_data_array_correction(
                 da,
-                da_prediction,
+                da_approximation,
                 safeguards=safeguards,
                 late_bound=dict(),
             ).compute()
@@ -664,7 +664,7 @@ def test_fuzzer_found_global_late_bound_max():
         name="da",
         dims=["a", "b"],
     ).chunk(chunks)
-    da_prediction = xr.DataArray(
+    da_approximation = xr.DataArray(
         np.ones_like(da.values), name="da", dims=["a", "b"]
     ).chunk(chunks)
 
@@ -697,12 +697,12 @@ def test_fuzzer_found_global_late_bound_max():
     with _patch_for_hashing_qoi_dev_only():
         global_hash = Safeguards(safeguards=[safeguard]).compute_correction(
             data=da.values,
-            prediction=da_prediction.values,
+            approximation=da_approximation.values,
             late_bound={**late_bound, "$x_max": np.nanmax(da.values)},
         )
         chunked_hash = produce_data_array_correction(
             data=da,
-            prediction=da_prediction,
+            approximation=da_approximation,
             safeguards=[safeguard],
             late_bound=late_bound,
         )
@@ -722,7 +722,7 @@ def test_fuzzer_found_wrapping_constant_boundary_clash():
         name="da",
         dims=["a", "b"],
     ).chunk(chunks)
-    da_prediction = xr.DataArray(
+    da_approximation = xr.DataArray(
         np.ones_like(da.values), name="da", dims=["a", "b"]
     ).chunk(chunks)
 
@@ -765,12 +765,12 @@ def test_fuzzer_found_wrapping_constant_boundary_clash():
     with _patch_for_hashing_qoi_dev_only():
         global_hash = Safeguards(safeguards=[safeguard]).compute_correction(
             data=da.values,
-            prediction=da_prediction.values,
+            approximation=da_approximation.values,
             late_bound={**late_bound, "$x_max": np.nanmax(da.values)},
         )
         chunked_hash = produce_data_array_correction(
             data=da,
-            prediction=da_prediction,
+            approximation=da_approximation,
             safeguards=[safeguard],
             late_bound=late_bound,
         )
@@ -801,7 +801,7 @@ def test_fuzzer_found_nan_magic():
         name="da",
         dims=["a", "b"],
     ).chunk(chunks)
-    da_prediction = xr.DataArray(
+    da_approximation = xr.DataArray(
         np.ones_like(da.values), name="da", dims=["a", "b"]
     ).chunk(chunks)
 
@@ -830,12 +830,12 @@ def test_fuzzer_found_nan_magic():
     with _patch_for_hashing_qoi_dev_only():
         global_hash = Safeguards(safeguards=[safeguard]).compute_correction(
             data=da.values,
-            prediction=da_prediction.values,
+            approximation=da_approximation.values,
             late_bound=late_bound,
         )
         chunked_hash = produce_data_array_correction(
             data=da,
-            prediction=da_prediction,
+            approximation=da_approximation,
             safeguards=[safeguard],
             late_bound=late_bound,
         )
@@ -846,11 +846,11 @@ def test_chunked_coercion_to_ndarray_for_safeguards():
     da = xr.DataArray(np.ones((2, 100, 100)), dims=["a", "b", "c"], name="da")
     da_chunked = da.chunk(b=7, c=7)
 
-    da_prediction = CodecStack(dict(id="zero")).encode_decode_data_array(da_chunked)
+    da_approximation = CodecStack(dict(id="zero")).encode_decode_data_array(da_chunked)
 
     produce_data_array_correction(
         data=da_chunked,
-        prediction=da_prediction,
+        approximation=da_approximation,
         safeguards=[
             dict(
                 kind="qoi_eb_pw",
@@ -863,7 +863,7 @@ def test_chunked_coercion_to_ndarray_for_safeguards():
 
     produce_data_array_correction(
         data=da_chunked,
-        prediction=da_prediction,
+        approximation=da_approximation,
         safeguards=[
             dict(
                 kind="qoi_eb_stencil",
@@ -878,7 +878,7 @@ def test_chunked_coercion_to_ndarray_for_safeguards():
 
     produce_data_array_correction(
         data=da_chunked,
-        prediction=da_prediction,
+        approximation=da_approximation,
         safeguards=[
             dict(
                 kind="qoi_eb_stencil",

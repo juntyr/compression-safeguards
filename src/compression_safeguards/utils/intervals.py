@@ -1145,25 +1145,25 @@ class IntervalUnion(Generic[T, N, U]):
         return _reshape(is_contained, other.shape)
 
     def _pick_simple(
-        self, prediction: np.ndarray[S, np.dtype[T]]
+        self, approximation: np.ndarray[S, np.dtype[T]]
     ) -> np.ndarray[S, np.dtype[T]]:
         # simple pick:
-        #  1. if prediction is in the interval, use it
+        #  1. if approximation is in the interval, use it
         #  2. otherwise pick the lower bound of the first interval
         pick: np.ndarray[S, np.dtype[T]] = _ensure_array(
-            self._lower[0].reshape(prediction.shape), copy=True
+            self._lower[0].reshape(approximation.shape), copy=True
         )
-        np.copyto(pick, prediction, where=self.contains(prediction), casting="no")
+        np.copyto(pick, approximation, where=self.contains(approximation), casting="no")
         return pick
 
     def _pick_random(
         self,
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         rng: np.random.Generator,
     ) -> np.ndarray[S, np.dtype[T]]:
         # random pick: pick a random member of the interval union
-        if prediction.size == 0:
-            return prediction
+        if approximation.size == 0:
+            return approximation
 
         (u, n) = self._lower.shape
         interval_width_acc = self.non_empty_width()
@@ -1206,23 +1206,23 @@ class IntervalUnion(Generic[T, N, U]):
                 where=(ut >= lt),
             )
 
-        return _reshape(pick_flat, prediction.shape)
+        return _reshape(pick_flat, approximation.shape)
 
     def _pick_more_zeros(
-        self, prediction: np.ndarray[S, np.dtype[T]]
+        self, approximation: np.ndarray[S, np.dtype[T]]
     ) -> np.ndarray[S, np.dtype[T]]:
-        if prediction.size == 0:
-            return prediction
+        if approximation.size == 0:
+            return approximation
 
         (_, n) = self._lower.shape
 
-        # (a) if prediction is in the interval, use it
-        contains_prediction = self.contains(prediction).flatten()
+        # (a) if approximation is in the interval, use it
+        contains_approximation = self.contains(approximation).flatten()
 
         # 1. convert everything to bits in total order
-        prediction_bits: np.ndarray[
+        approximation_bits: np.ndarray[
             tuple[Literal[1], int], np.dtype[np.unsignedinteger]
-        ] = _reshape(to_total_order(prediction), (1, -1))
+        ] = _reshape(to_total_order(approximation), (1, -1))
 
         lower: np.ndarray[tuple[U, N], np.dtype[np.unsignedinteger]] = to_total_order(
             self._lower
@@ -1233,11 +1233,11 @@ class IntervalUnion(Generic[T, N, U]):
         interval_nonempty = lower <= upper
 
         # 2. look at the total order binary difference between the interval
-        #    bounds and the prediction
-        #    we assume that prediction is not inside the interval, since that
+        #    bounds and the approximation
+        #    we assume that approximation is not inside the interval, since that
         #    is handled separately with the special case (a)
-        lower = lower - prediction_bits
-        upper = upper - prediction_bits
+        lower = lower - approximation_bits
+        upper = upper - approximation_bits
 
         # 3. only work with "positive" unsigned values
         negative: np.ndarray[tuple[U, N], np.dtype[np.bool]] = np.less(
@@ -1308,32 +1308,34 @@ class IntervalUnion(Generic[T, N, U]):
         # 11. undo the negation step to allow "negative" unsigned values again
         np.copyto(pick_bits, ~pick_bits + 1, where=negative, casting="no")
 
-        # 12. undo the difference with prediction and enforce the special case
-        #     from (a) that prediction values inside the interval are kept as-is
-        pick_bits += prediction_bits
-        np.copyto(pick_bits, prediction_bits, where=contains_prediction, casting="no")
+        # 12. undo the difference with approximation and enforce the special case
+        #     from (a) that approximation values inside the interval are kept as-is
+        pick_bits += approximation_bits
+        np.copyto(
+            pick_bits, approximation_bits, where=contains_approximation, casting="no"
+        )
 
         # 13. convert everything back from total-ordered bits to value space
         pick: np.ndarray[S, np.dtype[T]] = _reshape(
-            from_total_order(pick_bits, prediction.dtype), prediction.shape
+            from_total_order(pick_bits, approximation.dtype), approximation.shape
         )
         assert np.all(self.contains(pick))
 
         return pick
 
     def pick(
-        self, prediction: np.ndarray[S, np.dtype[T]]
+        self, approximation: np.ndarray[S, np.dtype[T]]
     ) -> np.ndarray[S, np.dtype[T]]:
         """
-        Pick a member of the interval union that minimises the cost of correcting the prediction to be a member of the interval union.
+        Pick a member of the interval union that minimises the cost of correcting the approximation to be a member of the interval union.
 
         The metric for minimising the correction cost is unspecified and may be
         approximate.
 
         Parameters
         ----------
-        prediction : np.ndarray[S, np.dtype[T]]
-            A prediction for a member of the interval union
+        approximation : np.ndarray[S, np.dtype[T]]
+            An approximation of a member of the interval union
 
         Returns
         -------
@@ -1341,14 +1343,14 @@ class IntervalUnion(Generic[T, N, U]):
             A member of the interval union
         """
 
-        # ensure that the prediction size and dtype match the interval union
-        assert prediction.size == self._lower.shape[1]
-        assert prediction.dtype == self._lower.dtype
+        # ensure that the approximation size and dtype match the interval union
+        assert approximation.size == self._lower.shape[1]
+        assert approximation.dtype == self._lower.dtype
 
         # ensure that every element has a non-empty interval
         assert np.all(to_total_order(self._lower[0]) <= to_total_order(self._upper[0]))
 
-        return self._pick_more_zeros(prediction)
+        return self._pick_more_zeros(approximation)
 
     @override
     def __repr__(self) -> str:

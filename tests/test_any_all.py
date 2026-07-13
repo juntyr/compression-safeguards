@@ -319,7 +319,7 @@ class SometimesSafeguard(PointwiseSafeguard):
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,

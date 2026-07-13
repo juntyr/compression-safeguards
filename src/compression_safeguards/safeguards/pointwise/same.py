@@ -105,21 +105,21 @@ class SameValueSafeguard(PointwiseSafeguard):
     def check_pointwise(
         self,
         data: np.ndarray[S, np.dtype[T]],
-        prediction: np.ndarray[S, np.dtype[T]],
+        approximation: np.ndarray[S, np.dtype[T]],
         *,
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check which elements preserve the special `value` from the `data` to
-        the `prediction` array.
+        the `approximation` array.
 
         Parameters
         ----------
         data : np.ndarray[S, np.dtype[T]]
-            Original data array, relative to which the `prediction` is checked.
-        prediction : np.ndarray[S, np.dtype[T]]
-            Prediction for the `data` array.
+            Original data array, relative to which the `approximation` is checked.
+        approximation : np.ndarray[S, np.dtype[T]]
+            Approximation of the `data` array.
         late_bound : Bindings
             Bindings for late-bound parameters, including for this safeguard.
         where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
@@ -160,17 +160,17 @@ class SameValueSafeguard(PointwiseSafeguard):
         )
 
         data_bits: np.ndarray[S, np.dtype[np.unsignedinteger]] = as_bits(data)
-        prediction_bits: np.ndarray[S, np.dtype[np.unsignedinteger]] = as_bits(
-            prediction
+        approximation_bits: np.ndarray[S, np.dtype[np.unsignedinteger]] = as_bits(
+            approximation
         )
 
         ok: np.ndarray[S, np.dtype[np.bool]]
         if self._exclusive:
             # value if and only if where value
-            ok = (data_bits == value_bits) == (prediction_bits == value_bits)
+            ok = (data_bits == value_bits) == (approximation_bits == value_bits)
         else:
             # value must stay value, everything else can be arbitrary
-            ok = (data_bits != value_bits) | (prediction_bits == value_bits)
+            ok = (data_bits != value_bits) | (approximation_bits == value_bits)
         ok = _ensure_array(ok)
         if where is not True:
             ok[~where] = True
