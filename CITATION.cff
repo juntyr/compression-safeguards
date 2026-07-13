@@ -13,10 +13,6 @@ authors:
     email: juniper.tyree@helsinki.fi
     affiliation: University of Helsinki
     orcid: 'https://orcid.org/0000-0002-7923-9609'
-  - given-names: Daniel
-    family-names: Köhler
-    affiliation: University of Helsinki
-    orcid: 'https://orcid.org/0009-0008-5470-6996'
   - given-names: Robert
     family-names: Underwood
     affiliation: 'Argonne National Laboratory, University of Chicago'
@@ -25,11 +21,23 @@ authors:
     family-names: Bouvier
     affiliation: University of Helsinki
     orcid: 'https://orcid.org/0000-0003-2920-7585'
+  - given-names: Daniel
+    family-names: Köhler
+    affiliation: University of Helsinki
+    orcid: 'https://orcid.org/0009-0008-5470-6996'
   - given-names: Tim
     family-names: Reichelt
     affiliation: University of Oxford
     orcid: 'https://orcid.org/0009-0000-0224-6088'
-  - given-names: Heikki Johannes
+  - given-names: Peter
+    family-names: Dueben
+    affiliation: European Centre for Medium-Range Weather Forecasts
+    orcid: 'https://orcid.org/0000-0002-4610-3326'
+  - given-names: Sara
+    family-names: Faghih-Naini
+    affiliation: European Centre for Medium-Range Weather Forecasts
+    orcid: 'https://orcid.org/0009-0009-1880-2822'
+  - given-names: Heikki
     family-names: Järvinen
     affiliation: University of Helsinki
     orcid: 'https://orcid.org/0000-0003-1879-6804'
@@ -52,5 +60,6 @@ keywords:
   - compression
   - lossy-compression
   - safe
+  - trusted
   - fearless
 license: MPL-2.0

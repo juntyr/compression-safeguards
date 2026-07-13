@@ -511,7 +511,7 @@ You can easily try out QPET-SPERR using the [`numcodecs-wasm-qpet-sperr`](https:
 
 Please cite this work as follows:
 
-> Tyree, J., Köhler, D., Underwood, R., Bouvier, C., Reichelt, T., Järvinen, H. J., and Klöwer, M. (2026). Compression Safeguards &ndash; Towards Safe and Fearless Lossy Compression. Available from: <https://github.com/juntyr/compression-safeguards>
+> Tyree, J., Underwood, R., Bouvier, C., Köhler, D., Reichelt, T., Dueben, P., Faghih-Naini, S., Järvinen, H., and Klöwer, M. (2026). Safe, Trusted, and Fearless lossy compression with Compression Safeguards. Available from: <https://github.com/juntyr/compression-safeguards>
 
 Please also refer to the [CITATION.cff](https://github.com/juntyr/compression-safeguards/blob/main/CITATION.cff) file and refer to <https://citation-file-format.github.io> to extract the citation in a format of your choice.
 
@@ -520,14 +520,16 @@ Please also refer to the [CITATION.cff](https://github.com/juntyr/compression-sa
 
 The `compression-safeguards`, `numcodecs-safeguards`, and `xarray-safeguards` packages have been developed as part of [ESiWACE3](https://www.esiwace.eu), the third phase of the Centre of Excellence in Simulation of Weather and Climate in Europe.
 
-Juniper Tyree and Heikki J. Järvinen are funded by the ESiWACE3 Centre of Excellence. Funded by the European Union. This work has received funding from the European High Performance Computing Joint Undertaking (JU) under grant agreement No 101093054.
-
-Daniel Köhler is funded by the University of Helsinki Doctoral School.
+Juniper Tyree, Peter Dueben, Sara Faghih-Naini, and Heikki Järvinen are funded by the ESiWACE3 Centre of Excellence. Funded by the European Union. This work has received funding from the European High Performance Computing Joint Undertaking (JU) under grant agreement No 101093054. This work received 50% complementary funding from the Research Council of Finland under grant No 359787.
 
 Robert Underwood is funded by the National Science Foundation (NSF) CSSI "FZ" project with Grant #2311875.
 
 Clément Bouvier was funded by the European Union's Destination Earth Initiative and the Research Council of Finland (grant nos. 338615 and 337549).
 
-Tim Reichelt acknowledges funding from the EU's Horizon Europe program under grant agreement number 10113184 and also acknowledges funding from UK Research and Innovation (UKRI). Tim Reichelt also received funding from ARIA and DSIT and Pillar VC under the Encode: AI for Science Fellowship.
+Daniel Köhler is funded by the University of Helsinki Doctoral School.
+
+Tim Reichelt received funding from ARIA, and DSIT, and Pillar VC under the Encode: AI for Science Fellowship.
+
+Peter Dueben acknowledges funding from the WeatherGenerator Horizon Europe project (grant No 101187947).
 
 Milan Klöwer acknowledges funding from the Natural Environment Research Council under grant number UKRI191.
