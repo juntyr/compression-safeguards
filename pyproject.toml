@@ -70,6 +70,7 @@ try-examples = [
     "numcodecs-observers==0.1.3",
     "numcodecs-pw-ratio==0.2.1",
     "numcodecs-replace==0.1.3",
+    "numcodecs-wasm-pressio==0.1.0b2",
     "numcodecs-wasm-qpet-sperr==0.2.0",
     "numcodecs-wasm-sperr==0.2.0",
     "numcodecs-wasm-sz3==0.8.1",
