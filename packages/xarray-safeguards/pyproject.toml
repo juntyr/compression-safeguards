@@ -4,9 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "xarray-safeguards"
-version = "0.1.0b5"
+version = "0.1.0b6"
 dependencies = [
-    "compression-safeguards==1.0.0b5",
+    "compression-safeguards==1.0.0b6",
     "dask>=2024.5.1",
     "numpy~=2.0",
     "typing-extensions~=4.12",
