@@ -78,6 +78,8 @@ try-examples = [
     "numcodecs-wasm-zfp==0.6.0",
     "numcodecs-wasm-zstd==0.4.0",
     "numcodecs-zero==0.1.2",
+    "numpy==2.4.6",
+    "numpy-quaddtype==1.0.0",
     "scikit-image~=0.26.0",
     "tqdm~=4.0",
     "xarray>=2025.4",

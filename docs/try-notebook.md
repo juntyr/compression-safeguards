@@ -36,7 +36,7 @@ render_macros: true
     document.getElementById("try-notebook-name").innerText = name;
     document.getElementById("try-notebook-name").href = backlink;
 
-    document.getElementById("try-notebook-jupyterlite").src = "https://lab.climet.eu/v0.4.1/notebooks/index.html?kernel=python&fromURL=" + notebook.href + "&pyodideKernelEnv=" + encodeURIComponent(JSON.stringify({"$override": {
+    document.getElementById("try-notebook-jupyterlite").src = "https://lab.climet.eu/main/notebooks/index.html?kernel=python&fromURL=" + notebook.href + "&pyodideKernelEnv=" + encodeURIComponent(JSON.stringify({"$override": {
       "CLIMET_LAB_BOOTSTRAP_CODE": `\
 import shutil
 from pathlib import Path

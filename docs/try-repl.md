@@ -14,7 +14,7 @@ render_macros: true
 
 <script>
   window.addEventListener("load", () => {
-    document.getElementById("try-repl-jupyterlite").src = "https://lab.climet.eu/v0.4.1/repl/index.html?kernel=python&toolbar=1&code=" + encodeURIComponent(`\
+    document.getElementById("try-repl-jupyterlite").src = "https://lab.climet.eu/main/repl/index.html?kernel=python&toolbar=1&code=" + encodeURIComponent(`\
 # install the compression safeguards
 %pip install compression-safeguards=={{ version('compression_safeguards') }}
 %pip install numcodecs-safeguards=={{ version('numcodecs_safeguards') }}
