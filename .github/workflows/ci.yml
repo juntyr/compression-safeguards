@@ -153,6 +153,9 @@ jobs:
             --resolution ${{ matrix.resolution }} \
             --no-build
 
+      - name: Print numpy info
+        run: uv run --no-sync python -c "import numpy; numpy.show_config(); numpy.show_runtime()"
+
       - name: Run tests
         run: uv run --no-sync pytest -v -W error -m "${{ matrix.markers }}"
 
@@ -275,6 +278,9 @@ jobs:
           mkdir -p ./corpus/qois
           mkdir -p ./corpus/chunking
 
+      - name: Print numpy info
+        run: uv run --no-sync python -c "import numpy; numpy.show_config(); numpy.show_runtime()"
+
       - name: Run the fuzzers
         run: |
           uv run --no-sync fuzz/fuzz_safeguards.py ./corpus/safeguards -max_total_time=60
@@ -381,6 +387,9 @@ jobs:
           uv run --no-sync griffe2md packages/xarray-safeguards/src/xarray_safeguards/ -o docs/xarray_safeguards.md
           find docs -type f -name "*.md" | xargs sed -i -e 's/```py/```python/g'
 
+      - name: Print numpy info
+        run: uv run --no-sync python -c "import numpy; numpy.show_config(); numpy.show_runtime()"
+
       - name: Run doctests
         run: uv run --no-sync pytest -v -W error --codeblocks docs/
 
@@ -486,6 +495,11 @@ jobs:
           python -m pip install --group test
           # Install pre-built packages (to override)
           python -m pip install $(ls dist/*.whl)
+
+      - name: Print numpy info
+        run: |
+          source .venv-pyodide/bin/activate
+          python -c "import numpy; numpy.show_config(); numpy.show_runtime()"
 
       - name: Run tests
         run: |
