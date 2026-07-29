@@ -49,6 +49,9 @@ identifiers:
   - type: doi
     value: 10.5281/zenodo.18355539
     description: Zenodo
+  - type: doi
+    value: 10.5194/egusphere-2026-4266
+    description: 2026 GMD Paper Preprint
 repository-code: 'https://github.com/juntyr/compression-safeguards'
 url: 'https://compression-safeguards.readthedocs.io/en/latest/'
 repository-artifact: 'https://pypi.org/project/compression-safeguards/'

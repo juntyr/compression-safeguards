@@ -16,10 +16,10 @@ dependencies = [
 requires-python = ">=3.11"
 authors = [{ name = "Juniper Tyree", email = "juniper.tyree@helsinki.fi" }]
 maintainers = [{ name = "Juniper Tyree", email = "juniper.tyree@helsinki.fi" }]
-description = "Fearless lossy compression using safeguards"
+description = "Safe, Trusted, and Fearless lossy compression using Safeguards"
 readme = "README.md"
 license = "MPL-2.0"
-keywords = ["safeguards", "compression", "lossy-compression", "safe", "fearless"]
+keywords = ["safeguards", "compression", "lossy-compression", "safe", "trusted", "fearless"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",

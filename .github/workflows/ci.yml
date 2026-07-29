@@ -370,13 +370,13 @@ jobs:
         run: |
           uv sync --no-install-workspace \
             --group doctest \
-            --resolution highest \
+            --resolution ${{ matrix.resolution }} \
             --no-build
 
       - name: Install the safeguards packages
         run: |
           uv pip install dist/*.whl \
-            --resolution highest \
+            --resolution ${{ matrix.resolution }} \
             --no-build
 
       - name: Compile all docs

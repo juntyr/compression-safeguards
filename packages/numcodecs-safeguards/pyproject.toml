@@ -22,10 +22,10 @@ dependencies = [
 requires-python = ">=3.11"
 authors = [{ name = "Juniper Tyree", email = "juniper.tyree@helsinki.fi" }]
 maintainers = [{ name = "Juniper Tyree", email = "juniper.tyree@helsinki.fi" }]
-description = "Fearless lossy compression in numcodecs using safeguards"
+description = "Safe, Trusted, and Fearless lossy compression in numcodecs using Safeguards"
 readme = "README.md"
 license = "MPL-2.0"
-keywords = ["numcodecs", "safeguards", "compression", "lossy-compression", "safe", "fearless"]
+keywords = ["numcodecs", "safeguards", "compression", "lossy-compression", "safe", "trusted", "fearless"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",

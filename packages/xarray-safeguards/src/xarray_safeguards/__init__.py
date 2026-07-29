@@ -1,5 +1,5 @@
 """
-# Fearless (chunked) lossy compression with `xarray-safeguards`
+# Safe, Trusted, and Fearless (chunked) lossy compression with `xarray-safeguards`
 
 Lossy compression can be *scary* as valuable information or features of the
 data may be lost.
