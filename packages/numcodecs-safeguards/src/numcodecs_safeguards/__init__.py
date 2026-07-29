@@ -1,5 +1,5 @@
 r"""
-# Fearless lossy compression with `numcodecs-safeguards`
+# Safe, Trusted, and Fearless lossy compression with `numcodecs-safeguards`
 
 Lossy compression can be *scary* as valuable information or features of the
 data may be lost.

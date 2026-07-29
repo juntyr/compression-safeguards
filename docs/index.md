@@ -511,7 +511,9 @@ You can easily try out QPET-SPERR using the [`numcodecs-wasm-qpet-sperr`](https:
 
 Please cite this work as follows:
 
-> Tyree, J., Underwood, R., Bouvier, C., Köhler, D., Reichelt, T., Dueben, P., Faghih-Naini, S., Järvinen, H., and Klöwer, M. (2026). Safe, Trusted, and Fearless lossy compression with Compression Safeguards. Available from: <https://github.com/juntyr/compression-safeguards>
+> Tyree, J., Underwood, R., Bouvier, C., Köhler, D., Reichelt, T., Dueben, P., Faghih-Naini, S., Järvinen, H., and Klöwer, M. (2026). Compression Safeguards: Building Trust into Lossy Data Compression. *EGUsphere* [preprint]. Available from: [doi:10.5194/egusphere-2026-4266](https://doi.org/10.5194/egusphere-2026-4266).
+
+> Tyree, J., Underwood, R., Bouvier, C., Köhler, D., Reichelt, T., Dueben, P., Faghih-Naini, S., Järvinen, H., and Klöwer, M. (2026). compression-safeguards [Software]. *Zenodo*. Available from: [doi:10.5281/zenodo.18355539](https://doi.org/10.5281/zenodo.18355539).
 
 Please also refer to the [CITATION.cff](https://github.com/juntyr/compression-safeguards/blob/main/CITATION.cff) file and refer to <https://citation-file-format.github.io> to extract the citation in a format of your choice.
 

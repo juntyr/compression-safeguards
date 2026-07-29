@@ -170,7 +170,7 @@ class Safeguards:
         return _SAFEGUARDS_VERSION
 
     @staticmethod
-    def supported_dtypes() -> frozenset[np.dtype[np.number]]:
+    def supported_dtypes() -> Set[np.dtype[np.number]]:
         """
         The set of numpy [`dtype`][numpy.dtype]s that the safeguards support.
         """

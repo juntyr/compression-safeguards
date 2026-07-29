@@ -66,6 +66,7 @@ nav:
           - compression-safeguards: https://pypi.org/project/compression-safeguards/
           - numcodecs-safeguards: https://pypi.org/project/numcodecs-safeguards/
           - xarray-safeguards: https://pypi.org/project/xarray-safeguards/
+      - Manuscript: https://doi.org/10.5194/egusphere-2026-4266
 
 not_in_nav: |
   try-notebook.md
