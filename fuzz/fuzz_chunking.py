@@ -31,7 +31,7 @@ with atheris.instrument_imports():
         StencilQuantityOfInterestErrorBoundSafeguard,
     )
     from compression_safeguards.utils._compat import _ensure_array
-    from compression_safeguards.utils.bindings import Parameter
+    from compression_safeguards.utils.bindings import Bindings, Parameter
     from compression_safeguards.utils.error import (
         ErrorContextMixin,
         IndexContextLayer,
@@ -117,6 +117,20 @@ def generate_parameter(
                 for p, v in signature(NeighbourhoodBoundaryAxis).parameters.items()
             }
 
+        if (
+            len(tys) == 2
+            and (tys[0] is dict or typing.get_origin(tys[0]) is dict)
+            and tys[1] is Bindings
+        ):
+            kty, vty = typing.get_args(tys[0])
+
+            return {
+                generate_parameter(data, kty, depth, late_bound_params): generate_parameter(
+                    data, vty, depth, late_bound_params
+                )
+                for _ in range(data.ConsumeIntInRange(0, 2))
+            }
+
         if len(tys) == 2 and tys[0] is str and tys[1] is Parameter:
             i = data.ConsumeIntInRange(0, 3)
             if i == 0:
@@ -153,6 +167,8 @@ def check_one_input(data) -> None:
         ).parameters.items()
         if p != "qoi"
     }
+
+    late_bound_params -= safeguard_config["early_bound"].keys()
 
     dtype: np.dtype[np.number] = np.dtype(
         sorted([d.name for d in Safeguards.supported_dtypes()])[
