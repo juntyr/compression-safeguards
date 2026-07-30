@@ -106,7 +106,9 @@ class Bindings:
             The updated bindings.
         """
 
-        return type(self)(**{str(p): v for p, v in self._bindings.items()}, **kwargs)
+        return type(self)(
+            **{**{str(p): v for p, v in self._bindings.items()}, **kwargs}
+        )
 
     def __contains__(self, param: Parameter) -> bool:
         """
