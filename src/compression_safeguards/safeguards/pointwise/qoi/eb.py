@@ -249,7 +249,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         with ctx.safeguard(self):
             with ctx.parameter("early_bound"):
-                late_bound = late_bound.update(**self._early_bound)
+                late_bound = late_bound.update(
+                    **{str(p): v for p, v in self._early_bound.items()}
+                )
 
             with ctx.parameter("qoi_dtype"):
                 ftype: np.dtype[F] = self._qoi_dtype.floating_point_dtype_for(
@@ -335,7 +337,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         with ctx.safeguard(self):
             with ctx.parameter("early_bound"):
-                late_bound = late_bound.update(**self._early_bound)
+                late_bound = late_bound.update(
+                    **{str(p): v for p, v in self._early_bound.items()}
+                )
 
             with ctx.parameter("qoi_dtype"):
                 ftype: np.dtype[np.floating] = self._qoi_dtype.floating_point_dtype_for(
@@ -467,7 +471,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         with ctx.safeguard(self):
             with ctx.parameter("early_bound"):
-                late_bound = late_bound.update(**self._early_bound)
+                late_bound = late_bound.update(
+                    **{str(p): v for p, v in self._early_bound.items()}
+                )
 
             with ctx.parameter("qoi_dtype"):
                 ftype: np.dtype[np.floating] = self._qoi_dtype.floating_point_dtype_for(

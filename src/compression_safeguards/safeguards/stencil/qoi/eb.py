@@ -469,7 +469,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         with ctx.safeguard(self):
             with ctx.parameter("early_bound"):
-                late_bound = late_bound.update(**self._early_bound)
+                late_bound = late_bound.update(
+                    **{str(p): v for p, v in self._early_bound.items()}
+                )
 
         # check that the data shape is compatible with the neighbourhood shape
         self.compute_check_neighbourhood_for_data_shape(data.shape)
@@ -655,7 +657,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         with ctx.safeguard(self):
             with ctx.parameter("early_bound"):
-                late_bound = late_bound.update(**self._early_bound)
+                late_bound = late_bound.update(
+                    **{str(p): v for p, v in self._early_bound.items()}
+                )
 
         # check that the data shape is compatible with the neighbourhood shape
         self.compute_check_neighbourhood_for_data_shape(data.shape)
@@ -938,7 +942,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
         with ctx.safeguard(self):
             with ctx.parameter("early_bound"):
-                late_bound = late_bound.update(**self._early_bound)
+                late_bound = late_bound.update(
+                    **{str(p): v for p, v in self._early_bound.items()}
+                )
 
         # check that the data shape is compatible with the neighbourhood shape
         self.compute_check_neighbourhood_for_data_shape(data.shape)

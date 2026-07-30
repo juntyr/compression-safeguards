@@ -29,7 +29,7 @@ with atheris.instrument_imports():
     )
     from compression_safeguards.safeguards.stencil import NeighbourhoodBoundaryAxis
     from compression_safeguards.utils._compat import _ensure_array
-    from compression_safeguards.utils.bindings import Parameter
+    from compression_safeguards.utils.bindings import Bindings, Parameter
     from compression_safeguards.utils.error import (
         ErrorContextMixin,
         IndexContextLayer,
@@ -142,6 +142,20 @@ def generate_parameter(
             return {
                 p: generate_parameter(data, v.annotation, depth, late_bound)
                 for p, v in signature(NeighbourhoodBoundaryAxis).parameters.items()
+            }
+
+        if (
+            len(tys) == 2
+            and (tys[0] is dict or typing.get_origin(tys[0]) is dict)
+            and tys[1] is Bindings
+        ):
+            kty, vty = typing.get_args(tys[0])
+
+            return {
+                generate_parameter(data, kty, depth, late_bound): generate_parameter(
+                    data, vty, depth, late_bound
+                )
+                for _ in range(data.ConsumeIntInRange(0, 2))
             }
 
         if len(tys) == 2 and tys[0] is str and tys[1] is Parameter:
@@ -350,13 +364,22 @@ def generate_safeguard_config(
 ):
     kind = list(SafeguardKind)[data.ConsumeIntInRange(0, len(SafeguardKind) - 1)]
 
-    return {
+    my_late_bound: set[str] = set()
+
+    config = {
         "kind": kind.name,
         **{
-            p: generate_parameter(data, v.annotation, depth, late_bound)
+            p: generate_parameter(data, v.annotation, depth, my_late_bound)
             for p, v in signature(kind.value).parameters.items()
         },
     }
+
+    if "early_bound" in config:
+        my_late_bound -= config["early_bound"].keys()
+
+    late_bound.update(my_late_bound)
+
+    return config
 
 
 def check_one_input(data) -> None:
