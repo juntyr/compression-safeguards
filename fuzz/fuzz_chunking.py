@@ -125,9 +125,9 @@ def generate_parameter(
             kty, vty = typing.get_args(tys[0])
 
             return {
-                generate_parameter(data, kty, depth, late_bound_params): generate_parameter(
-                    data, vty, depth, late_bound_params
-                )
+                generate_parameter(
+                    data, kty, depth, late_bound_params
+                ): generate_parameter(data, vty, depth, late_bound_params)
                 for _ in range(data.ConsumeIntInRange(0, 2))
             }
 
