@@ -26,7 +26,12 @@ from ....utils.cast import (
     saturating_finite_float_cast,
     to_float,
 )
-from ....utils.error import TypeCheckError, ctx, lookup_enum_or_raise
+from ....utils.error import (
+    LateBoundParameterResolutionError,  # noqa: F401, for docs cross-link
+    TypeCheckError,
+    ctx,
+    lookup_enum_or_raise,
+)
 from ....utils.intervals import Interval, IntervalUnion
 from ....utils.typing import JSON, F, S, T
 from ..._qois import StencilQuantityOfInterest
@@ -142,7 +147,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
 
     Parameters
     ----------
-    qoi : StencilExpr
+    qoi : StencilQuantityOfInterestExpression
         The non-constant expression for computing the derived quantity of
         interest over a neighbourhood tensor `X`.
     neighbourhood : Sequence[dict[str, JSON] | NeighbourhoodBoundaryAxis]

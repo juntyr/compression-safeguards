@@ -9,7 +9,7 @@ from collections.abc import Collection, Mapping, Set
 from typing import Final, Literal, Self, assert_never
 
 import numpy as np
-from semver import Version
+from semver.version import Version
 from typing_extensions import override  # MSPV 3.12
 
 from .safeguards import SafeguardKind

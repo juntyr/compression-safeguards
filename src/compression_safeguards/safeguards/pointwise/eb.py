@@ -13,7 +13,12 @@ from typing_extensions import override  # MSPV 3.12
 from ...utils._compat import _ensure_array, _logical_and
 from ...utils.bindings import Bindings, Parameter
 from ...utils.cast import ToFloatMode, as_bits, saturating_finite_float_cast, to_float
-from ...utils.error import TypeCheckError, ctx, lookup_enum_or_raise
+from ...utils.error import (
+    LateBoundParameterResolutionError,  # noqa: F401, for docs cross-link
+    TypeCheckError,
+    ctx,
+    lookup_enum_or_raise,
+)
 from ...utils.intervals import Interval, IntervalUnion, Lower, Upper
 from ...utils.typing import JSON, S, T
 from ..eb import (

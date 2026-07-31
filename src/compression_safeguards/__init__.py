@@ -281,6 +281,7 @@ decompressed = sg.apply_correction(decompressed, correction)
 ```
 """
 
+# keep in sync with docs/hooks/api_index.py
 __all__ = ["Safeguards", "SafeguardKind"]
 
 from .api import Safeguards

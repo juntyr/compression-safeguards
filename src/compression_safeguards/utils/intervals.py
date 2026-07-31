@@ -15,7 +15,7 @@ __all__ = [
     "Ui",
 ]
 
-from typing import Any, Generic, Literal, Self, TypeVar
+from typing import Any, Generic, Literal, Self, TypeVar, final
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
@@ -624,7 +624,8 @@ def _minimum(dtype: np.dtype[T]) -> np.ndarray[tuple[()], np.dtype[T]]:
     return np.array(bmin, dtype=btype).view(dtype)
 
 
-class _Minimum:
+@final
+class _MinimumMeta(type):
     __slots__: tuple[str, ...] = ()
 
     def __le__(self, interval: IndexedInterval[T, N]) -> IndexedInterval[T, N]:
@@ -636,8 +637,16 @@ class _Minimum:
         return interval
 
 
-Minimum = _Minimum()
-""" The smallest representable value """
+@final
+class Minimum(metaclass=_MinimumMeta):
+    """
+    Singleton type for the smallest representable value.
+    """
+
+    __slots__: tuple[str, ...] = ()
+
+    def __new__(cls):
+        raise TypeError(f"{cls.__name__} is a singleton")
 
 
 def _maximum(dtype: np.dtype[T]) -> np.ndarray[tuple[()], np.dtype[T]]:
@@ -651,7 +660,8 @@ def _maximum(dtype: np.dtype[T]) -> np.ndarray[tuple[()], np.dtype[T]]:
     return np.copysign(np.array(bmin, dtype=btype).view(dtype), +1)
 
 
-class _Maximum:
+@final
+class _MaximumMeta(type):
     __slots__: tuple[str, ...] = ()
 
     def __ge__(self, interval: IndexedInterval[T, N]) -> IndexedInterval[T, N]:
@@ -663,8 +673,16 @@ class _Maximum:
         return interval
 
 
-Maximum = _Maximum()
-""" The largest representable value """
+@final
+class Maximum(metaclass=_MaximumMeta):
+    """
+    Singleton type for the largest representable value.
+    """
+
+    __slots__: tuple[str, ...] = ()
+
+    def __new__(cls):
+        raise TypeError(f"{cls.__name__} is a singleton")
 
 
 class Lower:
