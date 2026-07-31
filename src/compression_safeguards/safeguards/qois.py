@@ -1,5 +1,5 @@
 """
-## Safeguarding Quantities of Interest
+Safeguarding Quantities of Interest.
 
 We are often not just interested in data itself, but also in quantities derived
 from it. For instance, we might later plot the data logarithm, compute a
