@@ -13,7 +13,12 @@ from typing_extensions import override  # MSPV 3.12
 from ....utils._compat import _ensure_array, _logical_and, _ones, _place, _reshape
 from ....utils.bindings import Bindings, Parameter
 from ....utils.cast import ToFloatMode, saturating_finite_float_cast, to_float
-from ....utils.error import TypeCheckError, ctx, lookup_enum_or_raise
+from ....utils.error import (
+    LateBoundParameterResolutionError,  # noqa: F401, for docs cross-link
+    TypeCheckError,
+    ctx,
+    lookup_enum_or_raise,
+)
 from ....utils.intervals import IntervalUnion
 from ....utils.typing import JSON, F, S, T
 from ..._qois import PointwiseQuantityOfInterest
@@ -65,7 +70,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
     Parameters
     ----------
-    qoi : PointwiseExpr
+    qoi : PointwiseQuantityOfInterestExpression
         The non-constant expression for computing the derived quantity of
         interest over a pointwise value `x`.
     type : str | ErrorBound

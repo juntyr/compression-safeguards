@@ -12,7 +12,11 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ...utils.bindings import Bindings, Parameter
-from ...utils.error import TypeCheckError, ctx
+from ...utils.error import (
+    LateBoundParameterResolutionError,  # noqa: F401, for docs cross-link
+    TypeCheckError,
+    ctx,
+)
 from ...utils.intervals import Interval, IntervalUnion
 from ...utils.typing import JSON, S, T
 from ..abc import Safeguard

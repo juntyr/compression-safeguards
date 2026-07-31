@@ -183,18 +183,24 @@ from numcodecs_safeguards import SafeguardedCodec
 # use any numcodecs-compatible codec
 # here we quantize data >= -10 with one decimal digit
 lossy_codec = FixedScaleOffset(
-    offset=-10, scale=10, dtype="float64", astype="uint8",
+    offset=-10,
+    scale=10,
+    dtype="float64",
+    astype="uint8",
 )
 
 # wrap the codec in the `SafeguardedCodec` and specify the safeguards to apply
-sg_codec = SafeguardedCodec(codec=lossy_codec, safeguards=[
-    # guarantee a relative error bound of 1%:
-    #   |x - x'| <= |x| * 0.01
-    dict(kind="eb", type="rel", eb=0.01),
-    # guarantee that the sign is preserved:
-    #   sign(x) = sign(x')
-    dict(kind="sign"),
-])
+sg_codec = SafeguardedCodec(
+    codec=lossy_codec,
+    safeguards=[
+        # guarantee a relative error bound of 1%:
+        #   |x - x'| <= |x| * 0.01
+        dict(kind="eb", type="rel", eb=0.01),
+        # guarantee that the sign is preserved:
+        #   sign(x) = sign(x')
+        dict(kind="sign"),
+    ],
+)
 
 # some n-dimensional data
 data = np.linspace(-10, 10, 21)
@@ -241,10 +247,12 @@ np.testing.assert_allclose(da_corrected.values, da.values, rtol=0, atol=0.1)
 
 # combine the lossy approximation and the correction into one dataset
 #  e.g. by loading them from different files using `xarray.open_mfdataset`
-ds = xr.Dataset({
-    da_approximation.name: da_approximation,
-    da_correction.name: da_correction,
-})
+ds = xr.Dataset(
+    {
+        da_approximation.name: da_approximation,
+        da_correction.name: da_correction,
+    }
+)
 
 # access the safeguarded dataset that applies all corrections
 ds_safeguarded: xr.Dataset = ds.safeguarded
@@ -260,8 +268,12 @@ You can also use the lower-level `compression-safeguards` API directly:
 <!--
 ```py
 import numpy as np
+
+
 def compress(data):
     return data
+
+
 def decompress(data):
     return np.zeros_like(data)
 ```
@@ -272,11 +284,13 @@ import numpy as np
 from compression_safeguards import Safeguards
 
 # create the `Safeguards`
-sg = Safeguards(safeguards=[
-    # guarantee an absolute error bound of 0.1:
-    #   |x - x'| <= 0.1
-    dict(kind="eb", type="abs", eb=0.1),
-])
+sg = Safeguards(
+    safeguards=[
+        # guarantee an absolute error bound of 0.1:
+        #   |x - x'| <= 0.1
+        dict(kind="eb", type="abs", eb=0.1),
+    ]
+)
 
 # generate some random data to compress
 data = np.random.normal(size=(10, 10, 10))

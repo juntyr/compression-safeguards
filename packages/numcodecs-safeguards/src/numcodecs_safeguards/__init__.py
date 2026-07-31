@@ -98,7 +98,7 @@ from compression_safeguards.utils.error import (
 from compression_safeguards.utils.typing import JSON
 from numcodecs.abc import Codec
 from numcodecs_combinators.abc import CodecCombinatorMixin
-from semver import Version
+from semver.version import Version
 from typing_extensions import (
     Buffer,  # MSPV 3.12
     override,  # MSPV 3.12

@@ -424,7 +424,7 @@ def lossless_cast(
 
     Returns
     -------
-    converted : np.narray[tuple[()] | S, np.dtype[T]]
+    converted : np.ndarray[tuple[()] | S, np.dtype[T]]
         The losslessly converted value or array with the given `dtype`.
 
     Raises
@@ -484,7 +484,7 @@ def saturating_finite_float_cast(
 
     Returns
     -------
-    converted : np.narray[tuple[()] | S, np.dtype[F]]
+    converted : np.ndarray[tuple[()] | S, np.dtype[F]]
         The losslessly converted value or array with the given `dtype`.
 
     Raises
