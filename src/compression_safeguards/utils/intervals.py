@@ -24,6 +24,7 @@ from ._compat import (
     _bitwise_and,
     _ensure_array,
     _frexp,
+    _logical_and,
     _nextafter,
     _reshape,
     _right_shift,
@@ -268,7 +269,12 @@ class Interval(Generic[T, N]):
     def __getitem__(self, key) -> "IndexedInterval[T, N]":
         return IndexedInterval(_lower=self._lower, _upper=self._upper, _index=key)
 
-    def preserve_inf(self, a: np.ndarray[tuple[N], np.dtype[T]]) -> Self:
+    def preserve_inf(
+        self,
+        a: np.ndarray[tuple[N], np.dtype[T]],
+        *,
+        where: Literal[True] | np.ndarray[tuple[N], np.dtype[np.bool]] = True,
+    ) -> Self:
         """
         Preserve all infinite values in `a` exactly.
 
@@ -285,6 +291,8 @@ class Interval(Generic[T, N]):
         ----------
         a : np.ndarray[tuple[N], np.dtype[T]]
             The arrays whose infinite values this interval should preserve
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only preserve infinite values where the condition is [`True`][True].
 
         Returns
         -------
@@ -296,12 +304,16 @@ class Interval(Generic[T, N]):
             return self
 
         # bitwise preserve infinite values
-        Lower(a) <= self[np.isinf(a)] <= Upper(a)
+        Lower(a) <= self[_and_where(np.isinf(a), where=where)] <= Upper(a)
 
         return self
 
     def preserve_signed_nan(
-        self, a: np.ndarray[tuple[N], np.dtype[T]], *, equal_nan: bool
+        self,
+        a: np.ndarray[tuple[N], np.dtype[T]],
+        *,
+        equal_nan: bool,
+        where: Literal[True] | np.ndarray[tuple[N], np.dtype[np.bool]] = True,
     ) -> Self:
         """
         Preserve all NaN values in `a`, preserving their sign bit.
@@ -319,6 +331,8 @@ class Interval(Generic[T, N]):
         equal_nan : bool
             Whether any NaN values matches another NaN value or if NaN values
             should be preserved exactly
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only preserve NaN values where the condition is [`True`][True].
 
         Returns
         -------
@@ -331,7 +345,7 @@ class Interval(Generic[T, N]):
 
         if not equal_nan:
             # bitwise preserve NaN values
-            Lower(a) <= self[np.isnan(a)] <= Upper(a)
+            Lower(a) <= self[_and_where(np.isnan(a), where=where)] <= Upper(a)
             return self
 
         # smallest (positive) NaN bit pattern: 0b s 1..1 0..0
@@ -348,7 +362,7 @@ class Interval(Generic[T, N]):
                 np.copysign(nan_max, -1),
                 np.copysign(nan_min, +1),
             )
-        ) <= self[np.isnan(a)] <= Upper(
+        ) <= self[_and_where(np.isnan(a), where=where)] <= Upper(
             _where(
                 np.signbit(a),
                 np.copysign(nan_min, -1),
@@ -359,7 +373,11 @@ class Interval(Generic[T, N]):
         return self
 
     def preserve_any_nan(
-        self, a: np.ndarray[tuple[N], np.dtype[T]], *, equal_nan: bool
+        self,
+        a: np.ndarray[tuple[N], np.dtype[T]],
+        *,
+        equal_nan: bool,
+        where: Literal[True] | np.ndarray[tuple[N], np.dtype[np.bool]] = True,
     ) -> "IntervalUnion[T, N, int]":
         """
         Preserve all NaN values in `a`, ignoring their sign bit.
@@ -380,6 +398,8 @@ class Interval(Generic[T, N]):
         equal_nan : bool
             Whether any NaN values matches another NaN value or if NaN values
             should be preserved exactly
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only preserve NaN values where the condition is [`True`][True].
 
         Returns
         -------
@@ -395,11 +415,13 @@ class Interval(Generic[T, N]):
 
         lower: Interval[T, N] = Interval.empty(a.dtype, n)
         # copy over the intervals for non-NaN elements
-        Lower(self._lower) <= lower[~np.isnan(a)] <= Upper(self._upper)
+        Lower(self._lower) <= lower[~_and_where(np.isnan(a), where=where)] <= Upper(
+            self._upper
+        )
 
         if (not equal_nan) or (not np.any(np.isnan(a))):
             # bitwise preserve NaN values
-            Lower(a) <= lower[np.isnan(a)] <= Upper(a)
+            Lower(a) <= lower[_and_where(np.isnan(a), where=where)] <= Upper(a)
             return lower.into_union()
 
         # smallest (positive) NaN bit pattern: 0b s 1..1 0..0
@@ -410,17 +432,22 @@ class Interval(Generic[T, N]):
         upper: Interval[T, N] = Interval.empty(a.dtype, n)
 
         # create lower interval of all negative NaNs
-        Lower(np.array(np.copysign(nan_max, -1))) <= lower[np.isnan(a)] <= Upper(
-            np.array(np.copysign(nan_min, -1))
-        )
+        Lower(np.array(np.copysign(nan_max, -1))) <= lower[
+            _and_where(np.isnan(a), where=where)
+        ] <= Upper(np.array(np.copysign(nan_min, -1)))
         # create upper interval of all positive NaNs
-        Lower(np.array(np.copysign(nan_min, +1))) <= upper[np.isnan(a)] <= Upper(
-            np.array(np.copysign(nan_max, +1))
-        )
+        Lower(np.array(np.copysign(nan_min, +1))) <= upper[
+            _and_where(np.isnan(a), where=where)
+        ] <= Upper(np.array(np.copysign(nan_max, +1)))
 
         return lower.union(upper)
 
-    def preserve_finite(self, a: np.ndarray[tuple[N], np.dtype[T]]) -> Self:
+    def preserve_finite(
+        self,
+        a: np.ndarray[tuple[N], np.dtype[T]],
+        *,
+        where: Literal[True] | np.ndarray[tuple[N], np.dtype[np.bool]] = True,
+    ) -> Self:
         """
         Preserve all finite values in `a` as finite values.
 
@@ -432,6 +459,8 @@ class Interval(Generic[T, N]):
         a : np.ndarray[tuple[N], np.dtype[T]]
             The arrays whose non-finite values this interval should preserve as
             non-finite.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only preserve finite values where the condition is [`True`][True].
 
         Returns
         -------
@@ -452,7 +481,7 @@ class Interval(Generic[T, N]):
                     a.dtype.type(0),
                 )
             )
-        ) <= self[np.isfinite(a)] <= Upper(
+        ) <= self[_and_where(np.isfinite(a), where=where)] <= Upper(
             np.array(
                 _nextafter(
                     a.dtype.type(np.inf),  # type: ignore
@@ -463,7 +492,12 @@ class Interval(Generic[T, N]):
 
         return self
 
-    def preserve_non_nan(self, a: np.ndarray[tuple[N], np.dtype[T]]) -> Self:
+    def preserve_non_nan(
+        self,
+        a: np.ndarray[tuple[N], np.dtype[T]],
+        *,
+        where: Literal[True] | np.ndarray[tuple[N], np.dtype[np.bool]] = True,
+    ) -> Self:
         """
         Preserve all non-NaN values in `a` as non-NaN values.
 
@@ -474,6 +508,8 @@ class Interval(Generic[T, N]):
         a : np.ndarray[tuple[N], np.dtype[T]]
             The arrays whose non-NaN values this interval should preserve as
             non-NaN.
+        where : Literal[True] | np.ndarray[S, np.dtype[np.bool]]
+            Only preserve non-NaN values where the condition is [`True`][True].
 
         Returns
         -------
@@ -485,9 +521,9 @@ class Interval(Generic[T, N]):
             Minimum <= self[:] <= Maximum
             return self
 
-        Lower(np.array(-np.inf, dtype=a.dtype)) <= self[~np.isnan(a)] <= Upper(
-            np.array(np.inf, dtype=a.dtype)
-        )
+        Lower(np.array(-np.inf, dtype=a.dtype)) <= self[
+            _and_where(~np.isnan(a), where=where)
+        ] <= Upper(np.array(np.inf, dtype=a.dtype))
 
         return self
 
@@ -593,6 +629,17 @@ class Interval(Generic[T, N]):
     @override
     def __repr__(self) -> str:
         return f"Interval(lower={self._lower!r}, upper={self._upper!r})"
+
+
+def _and_where(
+    x: np.ndarray[S, np.dtype[np.bool]],
+    *,
+    where: Literal[True] | np.ndarray[S, np.dtype[np.bool]],
+) -> np.ndarray[S, np.dtype[np.bool]]:
+    if where is True:
+        return x
+
+    return _logical_and(x, where)
 
 
 class IndexedInterval(Generic[T, N]):
