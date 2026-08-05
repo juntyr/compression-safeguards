@@ -41,8 +41,8 @@ class SameValueSafeguard(PointwiseSafeguard):
     may still have the value in the output. Enabling the `exclusive` flag
     enforces that an element in the output only has the special `value` if and
     only if it also has the `value` in the input, e.g. to ensure that only
-    missing values in the input have the missing value bitpattern in the
-    output.
+    values that are missing in the input have the missing value sentinel
+    bitpattern in the output.
 
     Beware that +0.0 and -0.0 are semantically equivalent in floating-point but
     have different bitwise patterns. To preserve both, two same value
@@ -57,7 +57,7 @@ class SameValueSafeguard(PointwiseSafeguard):
     ----------
     value : int | float | str | Parameter
         The value of or the late-bound parameter name for the certain `value`
-        that is preserved by this safeguard. Literal values are (unsafely) cast
+        that is preserved by this safeguard. Literal values are losslessly cast
         to the data dtype before binary comparison.
     exclusive : bool
         If [`True`][True], non-`value` elements in the data stay non-`value`
@@ -379,12 +379,12 @@ class EquivalentValueSafeguard(PointwiseSafeguard):
     missing values, pre-computed extreme values, or any other value of
     importance.
 
-    By default, elements that do *not* have the special `value` in the input
-    may still have the value in the output. Enabling the `exclusive` flag
-    enforces that an element in the output only has the special `value` if and
-    only if it also has the `value` in the input, e.g. to ensure that only
-    missing values in the input are equivalent to the missing value in the
-    output.
+    By default, elements that are *not* equivalent to the special `value` in
+    the input may still have an equivalent value in the output. Enabling the
+    `exclusive` flag enforces that an element in the output is only equivalent
+    to the special `value` if and only if it is also equivalent to the `value`
+    in the input, e.g. to ensure that only values that are missing in the input
+    are equivalent to the missing value sentinel in the output.
 
     This safeguard preserves zero `value`s as positive or negative zero
     interchangibly. To preserve their exact bit patterns, use one or two
@@ -398,7 +398,7 @@ class EquivalentValueSafeguard(PointwiseSafeguard):
     ----------
     value : int | float | str | Parameter
         The value of or the late-bound parameter name for the certain `value`
-        that is preserved by this safeguard. Literal values are (unsafely) cast
+        that is preserved by this safeguard. Literal values are losslessly cast
         to the data dtype before equivalence comparison.
     exclusive : bool
         If [`True`][True], non-`value` elements in the data stay non-`value`
@@ -659,7 +659,7 @@ class EquivalentValueSafeguard(PointwiseSafeguard):
             return (
                 valid_below.preserve_non_nan(dataf, where=np.isnan(valuef))
                 .preserve_any_nan(dataf, equal_nan=True, where=np.isnan(valuef))
-                .union(valid_above.preserve_non_nan(dataf, where=np.isnan(valuef)))
+                .union(valid_above)
                 .preserve_only_where(wheref)
             )
 
