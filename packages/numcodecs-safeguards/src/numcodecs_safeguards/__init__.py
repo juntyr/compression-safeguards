@@ -127,7 +127,7 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
         combinator, e.g. to first replace codec-unsupported values with the
         [`numcodecs_replace.ReplaceFilterCodec`][numcodecs_replace.ReplaceFilterCodec]
         and later restore them using the
-        [`SameValueSafeguard`][compression_safeguards.safeguards.pointwise.same.SameValueSafeguard].
+        [`EquivalentValueSafeguard`][compression_safeguards.safeguards.pointwise.same.EquivalentValueSafeguard].
 
         The codec must be deterministic during decoding (but can be
         non-deterministic during encoding) such that decoding the same bytes

@@ -15,21 +15,26 @@ from .codecs import (
 
 
 def check_all_codecs(data: np.ndarray):
-    for value in [0, 42, -1024, np.finfo(float).min]:
-        safeguard = dict(kind="same", value=value)
-        value = as_bits(np.full((), value, dtype=data.dtype))
+    values = [0, 42, -1024, np.finfo(float).min]
+    if np.issubdtype(data.dtype, np.floating):
+        values += [-0.0, +0.0, -np.inf, +np.inf, -np.nan, +np.nan]
 
-        decoded = encode_decode_zero(data, safeguards=[safeguard])
-        assert np.all((as_bits(data) != value) | (as_bits(decoded) == value))
+    for exclusive in [True, False]:
+        for value in values:
+            safeguard = dict(kind="same", value=value, exclusive=exclusive)
+            value = as_bits(np.full((), value, dtype=data.dtype))
 
-        decoded = encode_decode_neg(data, safeguards=[safeguard])
-        assert np.all((as_bits(data) != value) | (as_bits(decoded) == value))
+            decoded = encode_decode_zero(data, safeguards=[safeguard])
+            assert np.all((as_bits(data) != value) | (as_bits(decoded) == value))
 
-        decoded = encode_decode_identity(data, safeguards=[safeguard])
-        assert np.all((as_bits(data) != value) | (as_bits(decoded) == value))
+            decoded = encode_decode_neg(data, safeguards=[safeguard])
+            assert np.all((as_bits(data) != value) | (as_bits(decoded) == value))
 
-        decoded = encode_decode_noise(data, safeguards=[safeguard])
-        assert np.all((as_bits(data) != value) | (as_bits(decoded) == value))
+            decoded = encode_decode_identity(data, safeguards=[safeguard])
+            assert np.all((as_bits(data) != value) | (as_bits(decoded) == value))
+
+            decoded = encode_decode_noise(data, safeguards=[safeguard])
+            assert np.all((as_bits(data) != value) | (as_bits(decoded) == value))
 
 
 def test_empty():

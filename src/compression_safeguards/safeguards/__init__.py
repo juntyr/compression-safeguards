@@ -16,7 +16,7 @@ from .combinators.select import SelectSafeguard
 from .pointwise.eb import ErrorBoundSafeguard
 from .pointwise.lossless import LosslessSafeguard
 from .pointwise.qoi.eb import PointwiseQuantityOfInterestErrorBoundSafeguard
-from .pointwise.same import SameValueSafeguard
+from .pointwise.same import EquivalentValueSafeguard, SameValueSafeguard
 from .pointwise.sign import SignPreservingSafeguard
 from .stencil.qoi.eb import StencilQuantityOfInterestErrorBoundSafeguard
 
@@ -33,6 +33,10 @@ class SafeguardKind(Enum):
     # same value
     same = SameValueSafeguard
     """Enforce that a special value is exactly preserved."""
+
+    # equivalent value
+    equivalent = EquivalentValueSafeguard
+    """Enforce that a special value is equivalently preserved."""
 
     # sign
     sign = SignPreservingSafeguard
