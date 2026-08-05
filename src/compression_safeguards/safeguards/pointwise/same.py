@@ -48,10 +48,10 @@ class SameValueSafeguard(PointwiseSafeguard):
     have different bitwise patterns. To preserve both, two same value
     safeguards are needed, one for each bitpattern. Alternatively, to preserve
     both interchangibly, use one
-    [`EquivalentValueSafeguard`][EquivalentValueSafeguard] instead.
+    [`EquivalentValueSafeguard`][..EquivalentValueSafeguard] instead.
 
     Further beware that there are many NaN bit patterns. To preserve all of them,
-    use one [`EquivalentValueSafeguard`][EquivalentValueSafeguard] instead.
+    use one [`EquivalentValueSafeguard`][..EquivalentValueSafeguard] instead.
 
     Parameters
     ----------
@@ -388,10 +388,11 @@ class EquivalentValueSafeguard(PointwiseSafeguard):
 
     This safeguard preserves zero `value`s as positive or negative zero
     interchangibly. To preserve their exact bit patterns, use one or two
-    [`SameValueSafeguard`]s instead.
+    [`SameValueSafeguard`][..SameValueSafeguard]s instead.
 
     This safeguard preserves NaN `value`s as NaN values with any payload.
-    To preserve a specific bit pattern, use a [`SameValueSafeguard`] instead.
+    To preserve a specific bit pattern, use a
+    [`SameValueSafeguard`][..SameValueSafeguard] instead.
 
     Parameters
     ----------
@@ -593,11 +594,11 @@ class EquivalentValueSafeguard(PointwiseSafeguard):
 
         if not self._exclusive:
             # preserve value elements equivalently, do not constrain other
-            # elements
+            #  elements
             valid = Interval.full_like(dataf)
             Lower(valuef) <= valid[dataf == valuef] <= Upper(valuef)
             # preserve zero floating-point elements as -0.0 or +0.0
-            # interchangeably
+            #  interchangeably
             if np.issubdtype(data.dtype, np.floating) and np.any(valuef == 0):
                 neg_zero, pos_zero = data.dtype.type(-0.0), data.dtype.type(+0.0)  # type: ignore
                 Lower(np.array(neg_zero)) <= valid[
@@ -628,7 +629,7 @@ class EquivalentValueSafeguard(PointwiseSafeguard):
         Lower(valuef) <= valid_below[dataf == valuef] <= Upper(valuef)
 
         # preserve zero floating-point elements as -0.0 or +0.0
-        # interchangeably
+        #  interchangeably
         if np.issubdtype(data.dtype, np.floating) and np.any(valuef == 0):
             neg_zero, pos_zero = data.dtype.type(-0.0), data.dtype.type(+0.0)  # type: ignore
             Lower(np.array(neg_zero)) <= valid_below[
@@ -644,12 +645,13 @@ class EquivalentValueSafeguard(PointwiseSafeguard):
 
         # non-value elements must exclude value from their interval,
         #  leading to a union of two intervals, below and above value
-        Minimum <= valid_below[(dataf != valuef) & (valuef_total > total_min)] <= Upper(
-            below_upper
-        )
+        # NaN value elements are handled later
+        Minimum <= valid_below[
+            (dataf != valuef) & (valuef_total > total_min) & ~np.isnan(valuef)
+        ] <= Upper(below_upper)
 
         Lower(above_lower) <= valid_above[
-            (dataf != valuef) & (valuef_total < total_max)
+            (dataf != valuef) & (valuef_total < total_max) & ~np.isnan(valuef)
         ] <= Maximum
 
         # preserve NaN elements as NaN values with any bit pattern
