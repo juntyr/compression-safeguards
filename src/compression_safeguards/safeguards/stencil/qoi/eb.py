@@ -178,6 +178,12 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         The floating-point data type in which the quantity of interest is
         evaluated. By default, the smallest floating-point data type that can
         losslessly represent all input data values is chosen.
+    early_bound : dict[str | Parameter, int | float] | Bindings
+        Scalar early-bound parameters that can be used as constants in the
+        quantity of interest, but which do not require a late-bound parameter.
+
+        Early-bound parameters override any late-bound parameters with the same
+        names.
 
     Raises
     ------
@@ -205,6 +211,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         "_eb",
         "_qoi_dtype",
         "_qoi_expr",
+        "_early_bound",
     )
     _qoi: StencilQuantityOfInterestExpression
     _neighbourhood: tuple[NeighbourhoodBoundaryAxis, ...]
@@ -212,6 +219,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
     _eb: int | float | Parameter
     _qoi_dtype: ToFloatMode
     _qoi_expr: StencilQuantityOfInterest
+    _early_bound: dict[Parameter, int | float]
 
     kind: ClassVar[str] = "qoi_eb_stencil"
 
@@ -222,6 +230,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         type: str | ErrorBound,
         eb: int | float | str | Parameter,
         qoi_dtype: str | ToFloatMode = ToFloatMode.lossless,
+        early_bound: dict[str | Parameter, int | float] | Bindings = Bindings.EMPTY,
     ) -> None:
         with ctx.safeguard(self):
             with ctx.parameter("qoi"):
@@ -279,6 +288,23 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     else lookup_enum_or_raise(ToFloatMode, qoi_dtype)
                 )
 
+            with ctx.parameter("early_bound"):
+                TypeCheckError.check_instance_or_raise(early_bound, dict | Bindings)
+                self._early_bound = dict()
+                for param, value in (
+                    early_bound._bindings
+                    if isinstance(early_bound, Bindings)
+                    else early_bound
+                ).items():
+                    with ctx.parameter(param):
+                        TypeCheckError.check_instance_or_raise(param, str | Parameter)
+                        TypeCheckError.check_instance_or_raise(value, int | float)
+                        # TODO: remove once implied by the check above
+                        assert isinstance(value, int | float)
+                        self._early_bound[
+                            param if isinstance(param, Parameter) else Parameter(param)
+                        ] = value
+
             shape = tuple(axis.before + 1 + axis.after for axis in self._neighbourhood)
             I = tuple(axis.before for axis in self._neighbourhood)  # noqa: E741
 
@@ -310,6 +336,9 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         for axis in self._neighbourhood:
             if isinstance(axis.constant_boundary, Parameter):
                 parameters.add(axis.constant_boundary)
+
+        if len(self._early_bound) > 0:
+            parameters -= self._early_bound.keys()
 
         return frozenset(parameters)
 
@@ -437,6 +466,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             if not all values for all late-bound constants could be losslessly
             converted to the `data`'s type.
         """
+
+        with ctx.safeguard(self):
+            with ctx.parameter("early_bound"):
+                late_bound = late_bound.update(**self._early_bound)
 
         # check that the data shape is compatible with the neighbourhood shape
         self.compute_check_neighbourhood_for_data_shape(data.shape)
@@ -619,6 +652,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             if the late-bound `eb` is non-finite, i.e. infinite or NaN, or an
             invalid error bound value for the error bound `type`.
         """
+
+        with ctx.safeguard(self):
+            with ctx.parameter("early_bound"):
+                late_bound = late_bound.update(**self._early_bound)
 
         # check that the data shape is compatible with the neighbourhood shape
         self.compute_check_neighbourhood_for_data_shape(data.shape)
@@ -898,6 +935,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             if the late-bound `eb` is non-finite, i.e. infinite or NaN, or an
             invalid error bound value for the error bound `type`.
         """
+
+        with ctx.safeguard(self):
+            with ctx.parameter("early_bound"):
+                late_bound = late_bound.update(**self._early_bound)
 
         # check that the data shape is compatible with the neighbourhood shape
         self.compute_check_neighbourhood_for_data_shape(data.shape)
@@ -1500,4 +1541,5 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             type=self._type.name,
             eb=self._eb,
             qoi_dtype=self._qoi_dtype.name,
+            early_bound={str(p): v for p, v in self._early_bound.items()},
         )
