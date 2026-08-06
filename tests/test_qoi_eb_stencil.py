@@ -1625,3 +1625,129 @@ def test_fuzzer_found_left_associative_sum_rewrite_context_invalidation():
             )
         ]
     )
+
+
+def test_early_bound_params():
+    qoi = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='x * c["a"]',
+        neighbourhood=[dict(axis=0, before=0, after=0, boundary="valid")],
+        type="abs",
+        eb=0,
+    )
+    assert qoi.late_bound == {"a"}
+
+    qoi = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='x * c["a"]',
+        neighbourhood=[dict(axis=0, before=0, after=0, boundary="valid")],
+        type="abs",
+        eb=0,
+        early_bound={"a": 1},
+    )
+    assert len(qoi.late_bound) == 0
+
+    qoi = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='x * c["a"] + c["b"]',
+        neighbourhood=[dict(axis=0, before=0, after=0, boundary="valid")],
+        type="abs",
+        eb=0,
+    )
+    assert qoi.late_bound == {"a", "b"}
+
+    qoi = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='x * c["a"] + c["b"]',
+        neighbourhood=[dict(axis=0, before=0, after=0, boundary="valid")],
+        type="abs",
+        eb=0,
+        early_bound={"a": 4},
+    )
+    assert qoi.late_bound == {"b"}
+
+    qoi = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='x * c["a"] + c["b"]',
+        neighbourhood=[dict(axis=0, before=0, after=0, boundary="valid")],
+        type="abs",
+        eb=0,
+        early_bound={"b": 2},
+    )
+    assert qoi.late_bound == {"a"}
+
+    with pytest.raises(
+        TypeError,
+        match=re.escape(
+            "qoi_eb_stencil.early_bound.1: expected str | compression_safeguards.utils.bindings.Parameter"
+        ),
+    ):
+        qoi = StencilQuantityOfInterestErrorBoundSafeguard(
+            qoi='x * c["a"]',
+            neighbourhood=[dict(axis=0, before=0, after=0, boundary="valid")],
+            type="abs",
+            eb=0,
+            early_bound={1: 1},
+        )
+
+    with pytest.raises(
+        TypeError, match=re.escape("qoi_eb_stencil.early_bound.a: expected int | float")
+    ):
+        qoi = StencilQuantityOfInterestErrorBoundSafeguard(
+            qoi='x * c["a"]',
+            neighbourhood=[dict(axis=0, before=0, after=0, boundary="valid")],
+            type="abs",
+            eb=0,
+            early_bound={"a": "b"},
+        )
+
+    qoi = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='x * c["a"]',
+        neighbourhood=[dict(axis=0, before=0, after=0, boundary="valid")],
+        type="abs",
+        eb=0,
+    )
+    intervals = qoi.compute_safe_intervals(
+        np.array([np.uint16(1)]), late_bound=Bindings(a=1)
+    )
+    np.testing.assert_array_equal(intervals._lower, np.array([[1]]))
+    np.testing.assert_array_equal(intervals._upper, np.array([[1]]))
+
+    intervals = qoi.compute_safe_intervals(
+        np.array([np.uint16(1)]), late_bound=Bindings(a=0)
+    )
+    np.testing.assert_array_equal(intervals._lower, np.array([[0]]))
+    np.testing.assert_array_equal(intervals._upper, np.array([[2**16 - 1]]))
+
+    qoi = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='x * c["a"]',
+        neighbourhood=[dict(axis=0, before=0, after=0, boundary="valid")],
+        type="abs",
+        eb=0,
+        early_bound={"a": 1},
+    )
+    intervals = qoi.compute_safe_intervals(
+        np.array([np.uint16(1)]), late_bound=Bindings(a=1)
+    )
+    np.testing.assert_array_equal(intervals._lower, np.array([[1]]))
+    np.testing.assert_array_equal(intervals._upper, np.array([[1]]))
+
+    intervals = qoi.compute_safe_intervals(
+        np.array([np.uint16(1)]), late_bound=Bindings(a=0)
+    )
+    np.testing.assert_array_equal(intervals._lower, np.array([[1]]))
+    np.testing.assert_array_equal(intervals._upper, np.array([[1]]))
+
+    qoi = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi='x * c["a"]',
+        neighbourhood=[dict(axis=0, before=0, after=0, boundary="valid")],
+        type="abs",
+        eb=0,
+        early_bound={"a": 0},
+    )
+    intervals = qoi.compute_safe_intervals(
+        np.array([np.uint16(1)]), late_bound=Bindings(a=1)
+    )
+    np.testing.assert_array_equal(intervals._lower, np.array([[0]]))
+    np.testing.assert_array_equal(intervals._upper, np.array([[2**16 - 1]]))
+
+    intervals = qoi.compute_safe_intervals(
+        np.array([np.uint16(1)]), late_bound=Bindings(a=0)
+    )
+    np.testing.assert_array_equal(intervals._lower, np.array([[0]]))
+    np.testing.assert_array_equal(intervals._upper, np.array([[2**16 - 1]]))

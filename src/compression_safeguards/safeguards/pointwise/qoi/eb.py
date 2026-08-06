@@ -86,6 +86,12 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         The floating-point data type in which the quantity of interest is
         evaluated. By default, the smallest floating-point data type that can
         losslessly represent all input data values is chosen.
+    early_bound : dict[str | Parameter, int | float] | Bindings
+        Scalar early-bound parameters that can be used as constants in the
+        quantity of interest, but which do not require a late-bound parameter.
+
+        Early-bound parameters override any late-bound parameters with the same
+        names.
 
     Raises
     ------
@@ -106,12 +112,14 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         "_eb",
         "_qoi_dtype",
         "_qoi_expr",
+        "_early_bound",
     )
     _qoi: PointwiseQuantityOfInterestExpression
     _type: ErrorBound
     _eb: int | float | Parameter
     _qoi_dtype: ToFloatMode
     _qoi_expr: PointwiseQuantityOfInterest
+    _early_bound: dict[Parameter, int | float]
 
     kind: ClassVar[str] = "qoi_eb_pw"
 
@@ -121,6 +129,7 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         type: str | ErrorBound,
         eb: int | float | str | Parameter,
         qoi_dtype: str | ToFloatMode = ToFloatMode.lossless,
+        early_bound: dict[str | Parameter, int | float] | Bindings = Bindings.EMPTY,
     ) -> None:
         with ctx.safeguard(self):
             with ctx.parameter("qoi"):
@@ -154,6 +163,23 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
                     else lookup_enum_or_raise(ToFloatMode, qoi_dtype)
                 )
 
+            with ctx.parameter("early_bound"):
+                TypeCheckError.check_instance_or_raise(early_bound, dict | Bindings)
+                self._early_bound = dict()
+                for param, value in (
+                    early_bound._bindings
+                    if isinstance(early_bound, Bindings)
+                    else early_bound
+                ).items():
+                    with ctx.parameter(str(param)):
+                        TypeCheckError.check_instance_or_raise(param, str | Parameter)
+                        TypeCheckError.check_instance_or_raise(value, int | float)
+                        # TODO: remove once implied by the check above
+                        assert isinstance(value, int | float)
+                        self._early_bound[
+                            param if isinstance(param, Parameter) else Parameter(param)
+                        ] = value
+
             with ctx.parameter("qoi"):
                 self._qoi = qoi
                 self._qoi_expr = PointwiseQuantityOfInterest(qoi)
@@ -176,6 +202,9 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
 
         if isinstance(self._eb, Parameter):
             parameters = parameters.union([self._eb])
+
+        if len(self._early_bound) > 0:
+            parameters = parameters - self._early_bound.keys()
 
         return parameters
 
@@ -219,6 +248,11 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         """
 
         with ctx.safeguard(self):
+            with ctx.parameter("early_bound"):
+                late_bound = late_bound.update(
+                    **{str(p): v for p, v in self._early_bound.items()}
+                )
+
             with ctx.parameter("qoi_dtype"):
                 ftype: np.dtype[F] = self._qoi_dtype.floating_point_dtype_for(
                     data.dtype
@@ -302,6 +336,11 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         """
 
         with ctx.safeguard(self):
+            with ctx.parameter("early_bound"):
+                late_bound = late_bound.update(
+                    **{str(p): v for p, v in self._early_bound.items()}
+                )
+
             with ctx.parameter("qoi_dtype"):
                 ftype: np.dtype[np.floating] = self._qoi_dtype.floating_point_dtype_for(
                     data.dtype
@@ -431,6 +470,11 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         """
 
         with ctx.safeguard(self):
+            with ctx.parameter("early_bound"):
+                late_bound = late_bound.update(
+                    **{str(p): v for p, v in self._early_bound.items()}
+                )
+
             with ctx.parameter("qoi_dtype"):
                 ftype: np.dtype[np.floating] = self._qoi_dtype.floating_point_dtype_for(
                     data.dtype
@@ -594,4 +638,5 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
             type=self._type.name,
             eb=self._eb,
             qoi_dtype=self._qoi_dtype.name,
+            early_bound={str(p): v for p, v in self._early_bound.items()},
         )

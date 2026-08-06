@@ -1,3 +1,4 @@
+import re
 from contextlib import nullcontext as does_not_raise
 
 import numpy as np
@@ -1176,3 +1177,92 @@ def test_fuzzer_found_cosine_noise():
 
     encoded = codec.encode(data)
     codec.decode(encoded)
+
+
+def test_early_bound_params():
+    qoi = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi='x * c["a"]', type="abs", eb=0
+    )
+    assert qoi.late_bound == {"a"}
+
+    qoi = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi='x * c["a"]', type="abs", eb=0, early_bound={"a": 1}
+    )
+    assert len(qoi.late_bound) == 0
+
+    qoi = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi='x * c["a"] + c["b"]', type="abs", eb=0
+    )
+    assert qoi.late_bound == {"a", "b"}
+
+    qoi = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi='x * c["a"] + c["b"]', type="abs", eb=0, early_bound={"a": 4}
+    )
+    assert qoi.late_bound == {"b"}
+
+    qoi = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi='x * c["a"] + c["b"]', type="abs", eb=0, early_bound={"b": 2}
+    )
+    assert qoi.late_bound == {"a"}
+
+    with pytest.raises(
+        TypeError,
+        match=re.escape(
+            "qoi_eb_pw.early_bound.1: expected str | compression_safeguards.utils.bindings.Parameter"
+        ),
+    ):
+        qoi = PointwiseQuantityOfInterestErrorBoundSafeguard(
+            qoi='x * c["a"]', type="abs", eb=0, early_bound={1: 1}
+        )
+
+    with pytest.raises(
+        TypeError, match=re.escape("qoi_eb_pw.early_bound.a: expected int | float")
+    ):
+        qoi = PointwiseQuantityOfInterestErrorBoundSafeguard(
+            qoi='x * c["a"]', type="abs", eb=0, early_bound={"a": "b"}
+        )
+
+    qoi = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi='x * c["a"]', type="abs", eb=0
+    )
+    intervals = qoi.compute_safe_intervals(
+        np.array(np.uint16(1)), late_bound=Bindings(a=1)
+    )
+    np.testing.assert_array_equal(intervals._lower, np.array([[1]]))
+    np.testing.assert_array_equal(intervals._upper, np.array([[1]]))
+
+    intervals = qoi.compute_safe_intervals(
+        np.array(np.uint16(1)), late_bound=Bindings(a=0)
+    )
+    np.testing.assert_array_equal(intervals._lower, np.array([[0]]))
+    np.testing.assert_array_equal(intervals._upper, np.array([[2**16 - 1]]))
+
+    qoi = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi='x * c["a"]', type="abs", eb=0, early_bound={"a": 1}
+    )
+    intervals = qoi.compute_safe_intervals(
+        np.array(np.uint16(1)), late_bound=Bindings(a=1)
+    )
+    np.testing.assert_array_equal(intervals._lower, np.array([[1]]))
+    np.testing.assert_array_equal(intervals._upper, np.array([[1]]))
+
+    intervals = qoi.compute_safe_intervals(
+        np.array(np.uint16(1)), late_bound=Bindings(a=0)
+    )
+    np.testing.assert_array_equal(intervals._lower, np.array([[1]]))
+    np.testing.assert_array_equal(intervals._upper, np.array([[1]]))
+
+    qoi = PointwiseQuantityOfInterestErrorBoundSafeguard(
+        qoi='x * c["a"]', type="abs", eb=0, early_bound={"a": 0}
+    )
+    intervals = qoi.compute_safe_intervals(
+        np.array(np.uint16(1)), late_bound=Bindings(a=1)
+    )
+    np.testing.assert_array_equal(intervals._lower, np.array([[0]]))
+    np.testing.assert_array_equal(intervals._upper, np.array([[2**16 - 1]]))
+
+    intervals = qoi.compute_safe_intervals(
+        np.array(np.uint16(1)), late_bound=Bindings(a=0)
+    )
+    np.testing.assert_array_equal(intervals._lower, np.array([[0]]))
+    np.testing.assert_array_equal(intervals._upper, np.array([[2**16 - 1]]))
