@@ -296,7 +296,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     if isinstance(early_bound, Bindings)
                     else early_bound
                 ).items():
-                    with ctx.parameter(param):
+                    with ctx.parameter(str(param)):
                         TypeCheckError.check_instance_or_raise(param, str | Parameter)
                         TypeCheckError.check_instance_or_raise(value, int | float)
                         # TODO: remove once implied by the check above
