@@ -44,7 +44,7 @@ Repository = "https://github.com/juntyr/compression-safeguards.git"
 Issues = "https://github.com/juntyr/compression-safeguards/issues"
 
 [dependency-groups]
-dev = ["ruff~=0.14"]
+dev = ["ruff~=0.16"]
 docs = [
     "mkdocstrings[python]~=1.0",
     "mkdocstrings-python-generator==1.0.0rc1",
@@ -56,10 +56,10 @@ docs = [
     "mkdocs-open-in-new-tab~=1.0",
     "properdocs~=1.6.5",
     "properdocs-theme-readthedocs~=1.6.5",
-    "Pygments~=2.19",
-    "ruff~=0.14",
+    "Pygments~=2.20",
+    "ruff~=0.16",
 ]
-doctest = ["griffe2md~=1.1", "pytest~=9.0", "pytest-codeblocks~=0.18.0"]
+doctest = ["griffe2md~=1.5", "pytest~=9.1", "pytest-codeblocks~=0.18.0"]
 try-examples = [
     "earthkit-data~=0.14.0",
     "earthkit-plots~=0.3.1",
@@ -99,13 +99,13 @@ test = [
     "dask~=2025.4",
     "google_crc32c~=1.8",
     "numcodecs-combinators~=0.2.15",
-    "pytest~=9.0",
+    "pytest~=9.1",
     "pytest-asyncio~=1.4",
     "xarray>=2025.4",
     "zarr~=3.0",
     "zarr-any-numcodecs~=0.1.2",
 ]
-typecheck = ["mypy~=1.19"]
+typecheck = ["mypy~=2.3"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
