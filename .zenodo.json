@@ -59,7 +59,7 @@
   ],
   "related_identifiers": [
     {
-      "identifier": "https://github.com/juntyr/compression-safeguards/tree/1.0.0rc1",
+      "identifier": "https://github.com/juntyr/compression-safeguards/tree/1.0.0rc2",
       "relation": "isSupplementTo",
       "resource_type": "software",
       "scheme": "url"
@@ -71,7 +71,7 @@
       "scheme": "doi"
     }
   ],
-  "version": "1.0.0rc1",
+  "version": "1.0.0rc2",
   "upload_type": "software",
   "license": "mpl-2.0",
   "grants": [
