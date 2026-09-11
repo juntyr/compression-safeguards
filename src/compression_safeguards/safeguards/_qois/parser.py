@@ -157,7 +157,7 @@ class QoIParser(Parser):
         self.assert_or_error(
             not p.quotedparameter.is_builtin,
             p,
-            "variable name must be built-in (start with `$`)",
+            "variable name must not be built-in (start with `$`)",
         )
         self.assert_or_error(
             p.quotedparameter not in self._vars,
@@ -174,7 +174,7 @@ class QoIParser(Parser):
         self.assert_or_error(
             not p.quotedparameter.is_builtin,
             p,
-            "variable name must be built-in (start with `$`)",
+            "variable name must not be built-in (start with `$`)",
         )
         self.assert_or_error(
             p.quotedparameter not in self._vars,

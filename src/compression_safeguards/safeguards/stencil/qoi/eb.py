@@ -842,10 +842,14 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 if where is not True and eb.shape != ():
                     eb = np.compress(where_flat, eb, axis=0)
 
+        qoi_lower, qoi_upper = _apply_finite_qoi_error_bound(self._type, eb, qoi_data)
+
         finite_ok: np.ndarray[tuple[int], np.dtype[np.bool]] = np.less_equal(
             _compute_finite_absolute_error(self._type, qoi_data, qoi_approximation),
             _compute_finite_absolute_error_bound(self._type, eb, qoi_data),
         )
+        finite_ok &= np.greater_equal(qoi_approximation, qoi_lower)
+        finite_ok &= np.less_equal(qoi_approximation, qoi_upper)
 
         windows_ok_: np.ndarray[tuple[int], np.dtype[np.bool]] = _ensure_array(
             finite_ok
