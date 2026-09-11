@@ -137,7 +137,7 @@ def generate_parameter(
                 p = data.ConsumeString(2)
                 late_bound_params.add(p)
                 return p
-            return ["$x", "$x_min", "$x_max"][i - 1]
+            return ["$x", "$x_min", "$x_max", "$x_finite_min", "$x_finite_max"][i - 1]
 
         if len(tys) > 2 and str in tys and Parameter in tys:
             # ensure that str | Parameter stay together during the union pick
@@ -208,7 +208,7 @@ def check_one_input(data) -> None:
     late_bound = dict()
     for p in late_bound_params:
         # skip built-in late-bound parameters
-        if p in ["$x", "$X", "$x_min", "$x_max"]:
+        if p in ["$x", "$X", "$x_min", "$x_max", "$x_finite_min", "$x_finite_max"]:
             continue
         c = data.ConsumeIntInRange(0, 4)
         if c == 0:
@@ -257,8 +257,8 @@ def check_one_input(data) -> None:
     da = xr.DataArray(raw, name="da", dims=dims)
     da_approximation = xr.DataArray(np.ones_like(raw), name="da", dims=dims)
 
-    # xarray-safeguards provides `$x_min` and `$x_max`,
-    #  but the compression-safeguards do not
+    # xarray-safeguards provides `$x_min`, `$x_max`, `$x_finite_min`,
+    # and `$x_finite_max`, but the compression-safeguards do not
     if "$x_min" in safeguard.late_bound:
         late_bound["$x_min"] = (
             np.nanmin(da)
@@ -269,6 +269,18 @@ def check_one_input(data) -> None:
         late_bound["$x_max"] = (
             np.nanmax(da)
             if da.size > 0 and not np.all(np.isnan(da))
+            else da.dtype.type(0)
+        )
+    if "$x_finite_min" in safeguard.late_bound:
+        late_bound["$x_finite_min"] = (
+            np.nanmin(da.where(np.isfinite(da)))
+            if da.size > 0 and np.any(np.isfinite(da))
+            else da.dtype.type(0)
+        )
+    if "$x_finite_max" in safeguard.late_bound:
+        late_bound["$x_finite_max"] = (
+            np.nanmax(da.where(np.isfinite(da)))
+            if da.size > 0 and np.any(np.isfinite(da))
             else da.dtype.type(0)
         )
 

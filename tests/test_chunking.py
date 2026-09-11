@@ -385,7 +385,7 @@ def test_fuzzer_found_hash_x_max():
         global_hash = Safeguards(safeguards=[safeguard]).compute_correction(
             data=da.values,
             approximation=da_approximation.values,
-            late_bound={**late_bound, "$x_max": np.amax(da.values)},
+            late_bound={**late_bound, "$x_max": np.nanmax(da.values)},
         )
         chunked_hash = produce_data_array_correction(
             data=da,

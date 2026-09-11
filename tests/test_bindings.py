@@ -59,6 +59,24 @@ def test_numcodecs_missing_extraneous_bindings():
     codec.decode(codec.encode(data))
 
 
+def test_numcodecs_missing_extraneous_bindings_2():
+    data = np.array([1.0, 2.0, 3.0])
+
+    codec = SafeguardedCodec(
+        codec=dict(id="zero"),
+        safeguards=[
+            dict(
+                kind="qoi_eb_pw",
+                qoi='x * c["$x"] / (c["$x_finite_max"] - c["$x_finite_min"])',
+                type="abs",
+                eb=0.1,
+            )
+        ],
+    )
+
+    codec.decode(codec.encode(data))
+
+
 @pytest.mark.parametrize(
     "eb",
     [

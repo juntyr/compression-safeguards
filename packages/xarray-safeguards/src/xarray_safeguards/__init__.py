@@ -179,7 +179,9 @@ def produce_data_array_correction(
         to the safeguards, which must not be included:
 
         - `$x` and `$X`: the original `data` as a constant
-        - `$x_min` and `$x_max`: the global minimum/maximum of the data
+        - `$x_min` and `$x_max`: the global non-NaN minimum/maximum of the data
+        - `$x_finite_min` and `$x_finite_max`: the global finite
+          minimum/maximum of the data
         - `$d_DIM` for each dimension `DIM` of the `data` array
     check_chunks_first : bool
         If [`True`][True], all chunks are first checked to determine if no
@@ -289,7 +291,12 @@ def produce_data_array_correction(
     builtin_late_bound: frozenset[Parameter] = frozenset(
         safeguards_.builtin_late_bound
     ) | frozenset(
-        [Parameter("$x_min"), Parameter("$x_max")]
+        [
+            Parameter("$x_min"),
+            Parameter("$x_max"),
+            Parameter("$x_finite_min"),
+            Parameter("$x_finite_max"),
+        ]
         + [Parameter(f"$d_{d}") for d in data.dims]
     )
 
@@ -299,8 +306,9 @@ def produce_data_array_correction(
 
     LateBoundParameterResolutionError.check_or_raise(late_bound_reqs, late_bound_keys)
 
-    # create the global built-in late-bound bindings with $x_min and $x_max
-    #  and split-out the late-bound data array bindings that require chunking
+    # create the global built-in late-bound bindings with $x_min, $x_max,
+    #  $x_finite_min, and $x_finite_max,
+    # and split-out the late-bound data array bindings that require chunking
     late_bound_global: dict[str, int | float | np.number] = dict()
     late_bound_data_arrays: dict[str, xr.DataArray] = dict()
     if "$x_min" in safeguards_late_bound_reqs:
@@ -317,6 +325,20 @@ def produce_data_array_correction(
             else data.dtype.type(0)
         )
         late_bound_global["$x_max"] = da_max
+    if "$x_finite_min" in safeguards_late_bound_reqs:
+        da_finite_min = (
+            np.nanmin(data.where(np.isfinite(data)))
+            if data.size > 0 and np.any(np.isfinite(data))
+            else data.dtype.type(0)
+        )
+        late_bound_global["$x_finite_min"] = da_finite_min
+    if "$x_finite_max" in safeguards_late_bound_reqs:
+        da_finite_max = (
+            np.nanmax(data.where(np.isfinite(data)))
+            if data.size > 0 and np.any(np.isfinite(data))
+            else data.dtype.type(0)
+        )
+        late_bound_global["$x_finite_max"] = da_finite_max
     with ctx.parameter("late_bound"):
         for k, v in late_bound.items():
             with ctx.parameter(k):

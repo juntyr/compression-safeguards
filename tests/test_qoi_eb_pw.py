@@ -707,8 +707,21 @@ def test_pointwise_normalised_absolute_error(check):
 
 
 @pytest.mark.parametrize("check", CHECKS)
+def test_pointwise_normalised_absolute_error_finite(check):
+    # pointwise normalised / range-relative absolute error bound
+    check('(x - c["$x_finite_min"]) / (c["$x_finite_max"] - c["$x_finite_min"])')
+
+
+@pytest.mark.parametrize("check", CHECKS)
 def test_pointwise_histogram_index(check):
     check('round_ties_even(100 * (x - c["$x_min"]) / (c["$x_max"] - c["$x_min"]))')
+
+
+@pytest.mark.parametrize("check", CHECKS)
+def test_pointwise_histogram_index_finite(check):
+    check(
+        'round_ties_even(100 * (x - c["$x_finite_min"]) / (c["$x_finite_max"] - c["$x_finite_min"]))'
+    )
 
 
 def test_gaussian_kernel():

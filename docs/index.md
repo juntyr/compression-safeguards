@@ -328,7 +328,7 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
 - ... a pointwise normalised (NOA) or range-relative absolute error bound?
 
-    > Use the `eb` safeguard for an absolute error bound but provide a late-bound parameter for the bound value. Since the data range is tightly tied to the data itself, it makes sense to only fill in the actual when applying the safeguards to the actual data. You can either compute the range yourself and then provide it as a `late_bound` binding when computing the safeguard corrections. Alternatively, you can also use the `qoi_eb_pw` safeguard with the `'(x - c["$x_min"]) / (c["$x_max"] - c["$x_min"])'` QoI. Note that we are using the late-bound constants `c["$x_min"]` and `c["$x_max"]` for the data minimum and maximum, which are automatically provided by `numcodecs-safeguards` and `xarray-safeguards`.
+    > Use the `eb` safeguard for an absolute error bound but provide a late-bound parameter for the bound value. Since the data range is tightly tied to the data itself, it makes sense to only fill in the actual when applying the safeguards to the actual data. You can either compute the range yourself and then provide it as a `late_bound` binding when computing the safeguard corrections. Alternatively, you can also use the `qoi_eb_pw` safeguard with the `'(x - c["$x_finite_min"]) / (c["$x_finite_max"] - c["$x_finite_min"])'` QoI. Note that we are using the late-bound constants `c["$x_finite_min"]` and `c["$x_finite_max"]` for the finite data minimum and maximum, which are automatically provided by `numcodecs-safeguards` and `xarray-safeguards`.
 
 - ... a global error bound, e.g. a mean error, mean squared error, root mean square error, or peak signal to noise ratio?
 
@@ -367,7 +367,7 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
 - ... a data distribution histogram?
 
-    > The `compression-safeguards` do not currently support global safeguards. However, we can preserve the histogram bin that each data element falls into using the `qoi_eb_pw` safeguard, which provides a stricter guarantee. For instance, the `'round_ties_even(100 * (x - c["$x_min"]) / (c["$x_max"] - c["$x_min"]))'` QoI would preserve the index amongst 100 bins. Note that we are using the late-bound constants `c["$x_min"]` and `c["$x_max"]` for the data minimum and maximum, which are automatically provided by `numcodecs-safeguards` and `xarray-safeguards`.
+    > The `compression-safeguards` do not currently support global safeguards. However, we can preserve the histogram bin that each data element falls into using the `qoi_eb_pw` safeguard, which provides a stricter guarantee. For instance, the `'round_ties_even(100 * (x - c["$x_finite_min"]) / (c["$x_finite_max"] - c["$x_finite_min"]))'` QoI would preserve the index amongst 100 bins. Note that we are using the late-bound constants `c["$x_finite_min"]` and `c["$x_finite_max"]` for the finite data minimum and maximum, which are automatically provided by `numcodecs-safeguards` and `xarray-safeguards`.
 
 - ... a derivative along a periodic coordinate?
 
