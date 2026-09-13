@@ -125,7 +125,7 @@ def generate_parameter(
         if len(typing.get_args(ty)) == 1:
             return [
                 generate_parameter(data, typing.get_args(ty)[0], depth, late_bound)
-                for _ in range(data.ConsumeIntInRange(0, 3 - depth))
+                for _ in range(data.ConsumeIntInRange(0, max(0, 3 - depth)))
             ]
 
     if typing.get_origin(ty) in (typing.Union, types.UnionType):

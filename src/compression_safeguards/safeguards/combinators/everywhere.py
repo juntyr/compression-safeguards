@@ -174,7 +174,7 @@ class EverywhereSafeguard(StencilSafeguard):
     ) -> np.ndarray[S, np.dtype[np.bool]]:
         """
         Check if the contained safeguard succeeds the check across all
-        elemements and broadcast the result to all elements.
+        elements and broadcast the result to all elements.
 
         Parameters
         ----------
