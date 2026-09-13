@@ -12,6 +12,7 @@ from .abc import Safeguard
 from .combinators.all import AllSafeguards
 from .combinators.any import AnySafeguard
 from .combinators.assume_safe import AssumeAlwaysSafeguard
+from .combinators.everywhere import EverywhereSafeguard
 from .combinators.select import SelectSafeguard
 from .pointwise.eb import ErrorBoundSafeguard
 from .pointwise.lossless import LosslessSafeguard
@@ -64,6 +65,9 @@ class SafeguardKind(Enum):
 
     select = SelectSafeguard
     """Select, pointwise, which safeguard's guarantees to enforce."""
+
+    everywhere = EverywhereSafeguard
+    """All elements everywhere must be safe for any element to be safe."""
 
     @staticmethod
     def from_config(config: dict[str, JSON]) -> Safeguard:
