@@ -18,7 +18,7 @@ from typing import assert_never
 
 import numpy as np
 
-from ._compat import _ensure_array, _is_of_dtype, _round_ties_even
+from ._compat import _abs, _ensure_array, _is_of_dtype, _nextafter, _round_ties_even
 from ._float128 import _float128_dtype
 from .error import TypeSetError, ctx
 from .typing import F, S, T, U
@@ -473,6 +473,7 @@ def saturating_finite_float_cast(
     """
     Try to convert the finite `x` to the provided floating-point `dtype`.
     Under- and overflows are clamped to finite values.
+    This conversion rounds ties towards `x`-signed zero.
 
     Parameters
     ----------
@@ -513,10 +514,34 @@ def saturating_finite_float_cast(
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         xa_to = _ensure_array(xa).astype(dtype, casting="unsafe")
 
+    xa_to = _ensure_array(np.nan_to_num(xa_to, copy=False))
+
+    # round towards zero if necessary
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        if isinstance(x, int):
+            _nextafter(xa_to, dtype.type(0), where=(_abs(xa_to) > abs(x)), out=xa_to)
+        elif isinstance(x, float):
+            _nextafter(
+                xa_to, np.copysign(0.0, xa_to), where=(_abs(xa_to) > abs(x)), out=xa_to
+            )
+        else:
+            _nextafter(
+                xa_to,
+                np.copysign(dtype.type(0), xa_to),
+                where=(_abs(xa_to) > _abs(x)),
+                out=xa_to,
+            )
+
     # the above checks guarantee that there are no NaNs in xa
     if isinstance(x, int):
         assert (x < 0) == np.signbit(xa_to)
     else:
         assert np.all(np.signbit(xa) == np.signbit(xa_to))
 
-    return np.nan_to_num(xa_to)
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        if isinstance(x, int | float):
+            assert _abs(xa_to) <= abs(x)
+        else:
+            assert np.all(_abs(xa_to) <= _abs(x))
+
+    return xa_to

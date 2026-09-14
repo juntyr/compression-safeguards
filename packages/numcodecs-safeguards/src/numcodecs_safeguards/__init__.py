@@ -359,11 +359,17 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
         """
         The set of built-in late-bound constants that the numcodecs-safeguards
         provide automatically, which include the safeguards' built-ins as well
-        as `$x_min` and `$x_max`.
+        as the (finite) non-NaN global minimum/maximum `$x_min`, `$x_max`,
+        `$x_finite_min`, and `$x_finite_max`.
         """
 
         return frozenset(self._safeguards.builtin_late_bound) | frozenset(
-            [Parameter("$x_min"), Parameter("$x_max")]
+            [
+                Parameter("$x_min"),
+                Parameter("$x_max"),
+                Parameter("$x_finite_min"),
+                Parameter("$x_finite_max"),
+            ]
         )
 
     def update_fixed_constants(self, **kwargs: Value) -> "SafeguardedCodec":
@@ -437,9 +443,10 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
 
         The `buf`fer must contain the complete data, i.e. not just a chunk of
         data, so that non-pointwise safeguards are correctly applied and the
-        global minimum `$x_min` and global maximum `$x_max` can be correctly
-        provided. Please refer to the [`xarray-safeguards`][xarray_safeguards]
-        frontend for applying safeguards to chunked data.
+        global minimum `$x_min` / `$x_finite_min` and global maximum `$x_max` /
+        `$x_finite_max` can be correctly provided. Please refer to the
+        [`xarray-safeguards`][xarray_safeguards] frontend for applying
+        safeguards to chunked data.
 
         Parameters
         ----------
@@ -463,8 +470,8 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
             recreate the data's dtype and shape during decoding.
         RuntimeError
             if the `buf`fer is chunked but the safeguards use the built-in
-            late-bound parameter `$x_min` or `$x_max` for the cross-chunk
-            global minimum / maximum.
+            late-bound parameter `$x_min`, `$x_max`, `$x_finite_min`, or
+            `$x_finite_max` for the cross-chunk global minimum / maximum.
         ...
             if checking a safeguard or computing the correction for a safeguard
             raises an exception.
@@ -531,19 +538,26 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
         late_bound_reqs = self._safeguards.late_bound
 
         if getattr(data, "chunked", False) and not late_bound_reqs.isdisjoint(
-            ("$x_min", "$x_max")
+            ("$x_min", "$x_max", "$x_finite_min", "$x_finite_max")
         ):
             with ctx.parameter("data"):
                 raise (
                     RuntimeError(
                         "encoding an individual chunk in a chunked array is "
-                        "unsafe when using the $x_min or $x_max late-bound "
-                        "constants for the cross-chunk global minimum / "
-                        "maximum; instead use the xarray-safeguards frontend "
-                        "or pass the entire (not chunked) data array"
+                        "unsafe when using the $x_min, $x_max, $x_finite_min, "
+                        "or $x_finite_max late-bound constants for the "
+                        "cross-chunk global minimum / maximum; instead use the "
+                        "xarray-safeguards frontend or pass the entire (not "
+                        "chunked) data array"
                     )
                     | ctx
                 )
+
+        info = (
+            np.finfo(data.dtype)
+            if np.issubdtype(data.dtype, np.floating)
+            else np.iinfo(data.dtype)
+        )
 
         if "$x_min" in late_bound_reqs:
             late_bound = late_bound.update(
@@ -558,6 +572,26 @@ class SafeguardedCodec(Codec, CodecCombinatorMixin):
                 **{
                     "$x_max": np.nanmax(data)
                     if data.size > 0 and not np.all(np.isnan(data))
+                    else data.dtype.type(0)
+                }
+            )
+        if "$x_finite_min" in late_bound_reqs:
+            late_bound = late_bound.update(
+                **{
+                    "$x_finite_min": np.amin(
+                        data, where=np.isfinite(data), initial=info.max
+                    )
+                    if data.size > 0 and np.any(np.isfinite(data))
+                    else data.dtype.type(0)
+                }
+            )
+        if "$x_finite_max" in late_bound_reqs:
+            late_bound = late_bound.update(
+                **{
+                    "$x_finite_max": np.amax(
+                        data, where=np.isfinite(data), initial=info.min
+                    )
+                    if data.size > 0 and np.any(np.isfinite(data))
                     else data.dtype.type(0)
                 }
             )

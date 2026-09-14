@@ -397,10 +397,14 @@ class PointwiseQuantityOfInterestErrorBoundSafeguard(PointwiseSafeguard):
         if where is not True and eb.shape != ():
             eb = np.extract(where, eb)
 
+        qoi_lower, qoi_upper = _apply_finite_qoi_error_bound(self._type, eb, qoi_data)
+
         finite_ok: np.ndarray[tuple[int], np.dtype[np.bool]] = np.less_equal(
             _compute_finite_absolute_error(self._type, qoi_data, qoi_approximation),
             _compute_finite_absolute_error_bound(self._type, eb, qoi_data),
         )
+        finite_ok &= np.greater_equal(qoi_approximation, qoi_lower)
+        finite_ok &= np.less_equal(qoi_approximation, qoi_upper)
 
         ok_: np.ndarray[tuple[int], np.dtype[np.bool]] = _ensure_array(finite_ok)
         np.equal(qoi_data, qoi_approximation, out=ok_, where=np.isinf(qoi_data))

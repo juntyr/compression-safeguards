@@ -1366,6 +1366,13 @@ def test_pointwise_normalised_absolute_error(check):
     check('(x - c["$x_min"]) / (c["$x_max"] - c["$x_min"])')
 
 
+@pytest.mark.slow
+@pytest.mark.parametrize("check", CHECKS)
+def test_pointwise_normalised_absolute_error_finite(check):
+    # pointwise normalised / range-relative absolute error bound
+    check('(x - c["$x_finite_min"]) / (c["$x_finite_max"] - c["$x_finite_min"])')
+
+
 def test_late_bound_constant_boundary():
     for c in ["$x", "$X"]:
         with pytest.raises(

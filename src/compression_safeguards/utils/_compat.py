@@ -58,11 +58,11 @@ N = TypeVar("N", bound=int, covariant=True)
 
 
 @overload
-def _abs(a: Fi) -> Fi: ...
+def _abs(a: Ti) -> Ti: ...
 
 
 @overload
-def _abs(a: np.ndarray[S, np.dtype[F]]) -> np.ndarray[S, np.dtype[F]]: ...
+def _abs(a: np.ndarray[S, np.dtype[T]]) -> np.ndarray[S, np.dtype[T]]: ...
 
 
 # wrapper around np.abs that also works for NaN
@@ -73,7 +73,11 @@ if (Version(np.__version__) >= Version("2.5.0")) or TYPE_CHECKING:
 else:
     # https://github.com/numpy/numpy/issues/31421
     def _abs(a):
-        return np.copysign(a, +1)
+        if isinstance(a, np.floating) or (
+            isinstance(a, np.ndarray) and np.issubdtype(a.dtype, np.floating)
+        ):
+            return np.copysign(a, +1)
+        return np.abs(a)
 
 
 @overload

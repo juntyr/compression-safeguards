@@ -46,6 +46,7 @@ from compression_safeguards.safeguards._qois.expr.logexp import (
     ScalarLog,
     ScalarLogWithBase,
 )
+from compression_safeguards.safeguards._qois.expr.manipulation import ScalarNextafter
 from compression_safeguards.safeguards._qois.expr.modulo import (
     ScalarCeilModulo,
     ScalarEuclideanModulo,
@@ -2886,3 +2887,23 @@ def test_fuzzer_found_log_asin_any_data():
 
     assert expr.eval(X_lower, dict()) == np.array(np.float16(np.inf))
     assert expr.eval(X_upper, dict()) == np.array(np.float16(3.94e-05))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_nextafter_ceil():
+    X = np.array(np.float16(-0.1282))
+
+    expr = ScalarNextafter(ScalarCeil(Data.SCALAR), Euler())
+
+    assert expr.eval(X, dict()) == np.array(np.float16(6e-08))
+
+    expr_lower = np.array(np.float16(6.0e-08))
+    expr_upper = np.array(np.float16(6.0e-08))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float16(-0.9995)
+    assert _is_positive_zero(X_upper)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float16(6.0e-08))
+    assert expr.eval(X_upper, dict()) == np.array(np.float16(6.0e-08))

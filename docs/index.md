@@ -144,6 +144,10 @@ This package currently implements the following [safeguards][compression_safegua
 
     For each element, the guarantees of the pointwise selected safeguard are upheld. This combinator allows selecting between several safeguards with per-element granularity. It can be used to describe simple regions of interest where different safeguards, e.g. with different error bounds, are applied to different parts of the data. At the moment, only pointwise and stencil safeguards and combinations thereof can be combined by this select-combinator.
 
+- [`everywhere`][compression_safeguards.safeguards.combinators.everywhere.EverywhereSafeguard] (safe everywhere / globally):
+
+    The contained safeguard's guarantee is required to be upheld everywhere. In other words, this combinator safeguard is only satisfied for any element if its contained safeguard is satisfied for all elements everywhere. At the moment, only pointwise and stencil safeguards and combinations thereof can be combined by this everywhere-combinator. At the moment, using this safeguard forces a chunked dataset to be corrected in one single chunk, though this may be relaxed in the future.
+
 
 ## Installation
 
@@ -328,11 +332,11 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
 - ... a pointwise normalised (NOA) or range-relative absolute error bound?
 
-    > Use the `eb` safeguard for an absolute error bound but provide a late-bound parameter for the bound value. Since the data range is tightly tied to the data itself, it makes sense to only fill in the actual when applying the safeguards to the actual data. You can either compute the range yourself and then provide it as a `late_bound` binding when computing the safeguard corrections. Alternatively, you can also use the `qoi_eb_pw` safeguard with the `'(x - c["$x_min"]) / (c["$x_max"] - c["$x_min"])'` QoI. Note that we are using the late-bound constants `c["$x_min"]` and `c["$x_max"]` for the data minimum and maximum, which are automatically provided by `numcodecs-safeguards` and `xarray-safeguards`.
+    > Use the `eb` safeguard for an absolute error bound but provide a late-bound parameter for the bound value. Since the data range is tightly tied to the data itself, it makes sense to only fill in the actual when applying the safeguards to the actual data. You can either compute the range yourself and then provide it as a `late_bound` binding when computing the safeguard corrections. Alternatively, you can also use the `qoi_eb_pw` safeguard with the `'(x - c["$x_finite_min"]) / (c["$x_finite_max"] - c["$x_finite_min"])'` QoI. Note that we are using the late-bound constants `c["$x_finite_min"]` and `c["$x_finite_max"]` for the finite data minimum and maximum, which are automatically provided by `numcodecs-safeguards` and `xarray-safeguards`.
 
 - ... a global error bound, e.g. a mean error, mean squared error, root mean square error, or peak signal to noise ratio?
 
-    > The `compression-safeguards` do not currently support global safeguards. However, you can emulate a global error bound using a pointwise error bound, which provides a stricter guarantee. For all of the belowmentioned global error bounds, use the `eb` safeguard with a pointwise absolute error bound of
+    > The `compression-safeguards` do not currently support global safeguards. However, you can emulate a global error bound using a pointwise error bound that is required everywhere, which provides a stricter guarantee. For all of the belowmentioned global error bounds, use the `eb` safeguard, wrapped inside an `everywhere` combinator, with a pointwise absolute error bound of
     >
     > - $\epsilon_{abs} = |\epsilon_{ME}|$ for the mean error
     > - $\epsilon_{abs} = \sqrt{\epsilon_{MSE}}$ for the mean square error
@@ -367,7 +371,7 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
 - ... a data distribution histogram?
 
-    > The `compression-safeguards` do not currently support global safeguards. However, we can preserve the histogram bin that each data element falls into using the `qoi_eb_pw` safeguard, which provides a stricter guarantee. For instance, the `'round_ties_even(100 * (x - c["$x_min"]) / (c["$x_max"] - c["$x_min"]))'` QoI would preserve the index amongst 100 bins. Note that we are using the late-bound constants `c["$x_min"]` and `c["$x_max"]` for the data minimum and maximum, which are automatically provided by `numcodecs-safeguards` and `xarray-safeguards`.
+    > The `compression-safeguards` do not currently support global safeguards. However, we can preserve the histogram bin that each data element everywhere falls into using the `qoi_eb_pw` safeguard, which provides a stricter guarantee. For instance, the `'round_ties_even(100 * (x - c["$x_finite_min"]) / (c["$x_finite_max"] - c["$x_finite_min"]))'` QoI would preserve the index amongst 100 bins. Note that we are using the late-bound constants `c["$x_finite_min"]` and `c["$x_finite_max"]` for the finite data minimum and maximum, which are automatically provided by `numcodecs-safeguards` and `xarray-safeguards`.
 
 - ... a derivative along a periodic coordinate?
 
@@ -383,7 +387,7 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
 - *suboptimal one-shot corrections*: The `compression-safeguards` sometimes cannot provide optimal and easily compressible corrections. For instance, using a stencil safeguard that spans a local neighbourhood requires the safeguard to conservatively assume that the worst cases from each individual element could accumulate. Since the `compression-safeguards` compute the corrections for all elements simultaneously (instead of incrementally or by testing an initial correction that is repeatedly adjusted if it leads to a violation elsewhere), even a single violation can require conservative corrections for many data elements. In the future, the `compression-safeguards` API could support computing corrections incrementally such that stencil safeguards could make use of earlier[^4] already-corrected data elements and restrictions imposed by pointwise safeguards to provide better corrections for later elements. If you would like a peek at how safeguards could be applied incrementally, you can have a look at the [`incremental.ipynb`](examples/incremental.ipynb) example. A minimal form of iterative corrections can be activated with the unstable [`compute=dict(unstable_iterative=True)`][numcodecs_safeguards.compute.Compute.unstable_iterative] configuration of the [`SafeguardedCodec`][numcodecs_safeguards.SafeguardedCodec].
 
-- *no global safeguards*: The `compression-safeguards` implementation do not currently support global safeguards, such as preserving mean errors or global data distributions. In many cases, it is possible to preserve these properties using stricter pointwise safeguards, at the cost of achieving lower compression ratios. Please refer to the [How to safeguard](#how-to-safeguard) section above for further details and examples.
+- *no global safeguards*: The `compression-safeguards` implementation do not currently support global safeguards, such as preserving mean errors or global data distributions. In many cases, it is possible to preserve these properties using stricter pointwise safeguards wrapped in the anywhere combinator, at the cost of achieving lower compression ratios. Please refer to the [How to safeguard](#how-to-safeguard) section above for further details and examples.
 
 - *only real data*: The `compression-safeguards` currently only support data of the following extended[^5] real data types: `uint8`, `int8`, `uint16`, `int16`, `uint32`, `int32`, `uint64`, `int64`, `float16`, `float32`, `float64`. We appreciate contributions for supporting further, e.g. complex, data types.
 

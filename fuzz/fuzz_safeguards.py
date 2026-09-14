@@ -125,7 +125,7 @@ def generate_parameter(
         if len(typing.get_args(ty)) == 1:
             return [
                 generate_parameter(data, typing.get_args(ty)[0], depth, late_bound)
-                for _ in range(data.ConsumeIntInRange(0, 3 - depth))
+                for _ in range(data.ConsumeIntInRange(0, max(0, 3 - depth)))
             ]
 
     if typing.get_origin(ty) in (typing.Union, types.UnionType):
@@ -164,7 +164,7 @@ def generate_parameter(
                 p = data.ConsumeString(2)
                 late_bound.add(p)
                 return p
-            return ["$x", "$x_min", "$x_max"][i - 1]
+            return ["$x", "$x_min", "$x_max", "$x_finite_min", "$x_finite_max"][i - 1]
 
         if (
             len(tys) > 1
@@ -242,6 +242,8 @@ def generate_parameter(
             "ceil": 1,
             "trunc": 1,
             "round_ties_even": 1,
+            # manipulation
+            "nextafter": 2,
             # modulo
             "floor_modulo": 2,
             "ceil_modulo": 2,
@@ -421,7 +423,7 @@ def check_one_input(data) -> None:
     fixed_constants = dict()
     for p in late_bound:
         # skip built-in late-bound parameters
-        if p in ["$x", "$X", "$x_min", "$x_max"]:
+        if p in ["$x", "$X", "$x_min", "$x_max", "$x_finite_min", "$x_finite_max"]:
             continue
         c = data.ConsumeIntInRange(0, 5)
         if c == 0:

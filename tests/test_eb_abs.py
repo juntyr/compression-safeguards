@@ -102,3 +102,16 @@ def test_late_bound_eb():
     assert np.all(
         ok == np.array([True, True, False, False, False, False]).reshape(2, 3)
     )
+
+
+def test_fuzzer_found_errorbound_sign():
+    data = np.array([], dtype=np.float16)
+    decoded = np.array([], dtype=np.float16)
+
+    encode_decode_mock(
+        data,
+        decoded,
+        safeguards=[
+            dict(kind="eb", type="abs", eb=-0.0, equal_nan=False),
+        ],
+    )

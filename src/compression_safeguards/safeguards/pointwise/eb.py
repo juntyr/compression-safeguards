@@ -186,10 +186,14 @@ class ErrorBoundSafeguard(PointwiseSafeguard):
                 with ctx.late_bound_parameter(_eb):
                     _check_error_bound(self._type, eb)
 
+        lower, upper = _apply_finite_error_bound(self._type, eb, data, data_float)
+
         finite_ok: np.ndarray[S, np.dtype[np.bool]] = np.less_equal(
             _compute_finite_absolute_error(self._type, data_float, approximation_float),
             _compute_finite_absolute_error_bound(self._type, eb, data_float),
         )
+        finite_ok &= np.greater_equal(approximation, lower)
+        finite_ok &= np.less_equal(approximation, upper)
 
         # bitwise equality for inf and NaNs (unless equal_nan)
         same_bits = as_bits(data) == as_bits(approximation)
