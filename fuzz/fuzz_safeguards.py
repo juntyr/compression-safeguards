@@ -242,6 +242,8 @@ def generate_parameter(
             "ceil": 1,
             "trunc": 1,
             "round_ties_even": 1,
+            # manipulation
+            "nextafter": 2,
             # modulo
             "floor_modulo": 2,
             "ceil_modulo": 2,

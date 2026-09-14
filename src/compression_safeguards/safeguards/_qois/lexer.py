@@ -78,6 +78,8 @@ class QoILexer(Lexer):
         CEIL,  # type: ignore[name-defined]  # noqa: F821
         TRUNC,  # type: ignore[name-defined]  # noqa: F821
         ROUND_TIES_EVEN,  # type: ignore[name-defined]  # noqa: F821
+        # manipulation
+        NEXTAFTER,  # type: ignore[name-defined]  # noqa: F821
         # modulo
         FLOOR_MODULO,  # type: ignore[name-defined]  # noqa: F821
         CEIL_MODULO,  # type: ignore[name-defined]  # noqa: F821
@@ -243,6 +245,8 @@ class QoILexer(Lexer):
     ID["ceil"] = CEIL  # type: ignore[index, name-defined]  # noqa: F821
     ID["trunc"] = TRUNC  # type: ignore[index, name-defined]  # noqa: F821
     ID["round_ties_even"] = ROUND_TIES_EVEN  # type: ignore[index, name-defined]  # noqa: F821
+    # manipulation
+    ID["nextafter"] = NEXTAFTER  # type: ignore[index, name-defined]  # noqa: F821
     # modulo
     ID["floor_modulo"] = FLOOR_MODULO  # type: ignore[index, name-defined]  # noqa: F821
     ID["ceil_modulo"] = CEIL_MODULO  # type: ignore[index, name-defined]  # noqa: F821
@@ -401,6 +405,8 @@ class QoILexer(Lexer):
             "CEIL": "`ceil`",
             "TRUNC": "`trunc`",
             "ROUND_TIES_EVEN": "`round_ties_even`",
+            # manipulation
+            "NEXTAFTER": "`nextafter`",
             # modulo
             "FLOOR_MODULO": "`floor_modulo`",
             "CEIL_MODULO": "`ceil_modulo`",

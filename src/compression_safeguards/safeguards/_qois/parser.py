@@ -42,6 +42,7 @@ from .expr.hyperbolic import (
 )
 from .expr.literal import Euler, Number, Pi
 from .expr.logexp import Exponential, Logarithm, ScalarExp, ScalarLog, ScalarLogWithBase
+from .expr.manipulation import ScalarNextafter
 from .expr.modulo import (
     ScalarCeilModulo,
     ScalarEuclideanModulo,
@@ -580,6 +581,15 @@ class QoIParser(Parser):
     @_("ROUND_TIES_EVEN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
     def expr(self, p):  # noqa: F811
         return Array.map(ScalarRoundTiesEven, p.expr)
+
+    @_("NEXTAFTER LPAREN expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
+    def expr(self, p):  # noqa: F811
+        self.assert_or_error(
+            not p.expr1.has_data,
+            p,
+            f"`nextafter(from, to)` does not yet support references to the data `{'x' if self._X is None else 'X'}` in the direction `to`",
+        )
+        return Array.map(ScalarNextafter, p.expr0, p.expr1)
 
     # modulo
     @_("FLOOR_MODULO LPAREN expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821

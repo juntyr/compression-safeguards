@@ -346,6 +346,16 @@ def test_rounding(check):
     check("round_ties_even(x) * round_ties_even(1.5)")
 
 
+@pytest.mark.parametrize("check", CHECKS)
+def test_manipulation(check):
+    check("nextafter(x, 0.0)")
+    check("nextafter(x, -0.0)")
+    check("nextafter(x, Inf)")
+    check("nextafter(x, -Inf)")
+    check("nextafter(x, nextafter(Inf, 0))")
+    check("nextafter(x, nextafter(-Inf, 0))")
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize("check", CHECKS)
 def test_modulo(check):

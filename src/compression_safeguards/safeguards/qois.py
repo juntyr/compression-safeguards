@@ -339,7 +339,7 @@ The operators and functions in the above QoI grammar are evaluated using
 standard (see e.g. <https://pubs.opengroup.org/onlinepubs/9799919799/>):
 
 | QoI function | [`numpy`][numpy] ufunc | `math.h` equivalent | `-0.0` behaviour |
-| ------------ | ---------------------- | ------------------- | -------------- |
+| ------------ | ---------------------- | ------------------- | ---------------- |
 | `+a` | no-op | | `-0.0` |
 | `-a` | [`np.negative`][numpy.negative] | | `+0.0` |
 | `a + b` | [`np.add`][numpy.add] | | recessive[^5] |
@@ -363,6 +363,7 @@ standard (see e.g. <https://pubs.opengroup.org/onlinepubs/9799919799/>):
 | `ceil` | [`np.ceil`][numpy.ceil] | `ceil` | `-0.0` |
 | `trunc` | [`np.trunc`][numpy.trunc] | `trunc` | `-0.0` |
 | `round_ties_even` | [`np.rint`][numpy.rint] | `rint`[^4] | `-0.0` |
+| `nextafter` | [`np.nextafter`][numpy.nextafter] | `nextafter` | as expected |
 | `floor_modulo(p, q)` | [`np.mod`][numpy.mod][^11] | | as expected[^9] |
 | `ceil_modulo(p, q)` | `np.mod(p, q) - q`[^11] | | as expected[^10] |
 | `trunc_modulo(p, q)` | [`np.fmod`][numpy.fmod][^11] | `fmod` | `-0.0` |

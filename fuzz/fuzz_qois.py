@@ -65,6 +65,9 @@ with atheris.instrument_imports():
         ScalarLog,
         ScalarLogWithBase,
     )
+    from compression_safeguards.safeguards._qois.expr.manipulation import (
+        ScalarNextafter,
+    )
     from compression_safeguards.safeguards._qois.expr.modulo import (
         ScalarCeilModulo,
         ScalarEuclideanModulo,
@@ -191,6 +194,7 @@ BINARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr], AnyExpr]] = [
     ScalarRoundTiesEvenModulo,
     ScalarTruncModulo,
     ScalarEuclideanModulo,
+    ScalarNextafter,
 ]
 TERNARY_EXPRESSIONS: list[Callable[[AnyExpr, AnyExpr, AnyExpr], AnyExpr]] = [
     ScalarWhere,
@@ -281,6 +285,10 @@ def check_one_input(data) -> None:
     except NotImplementedError as err:
         # skip unsupported p modulo q expressions with non-constant divisor q
         if "modulo(p, q)` with non-constant divisor `q`" in str(err):
+            return
+        # skip unsupported nextafter(from, to) expressions with non-constant
+        #  direction to
+        if "`nextafter(from, to)` with non-constant direction `to`" in str(err):
             return
         raise
     except RuntimeWarning as err:
