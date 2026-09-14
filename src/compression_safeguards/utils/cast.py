@@ -517,15 +517,20 @@ def saturating_finite_float_cast(
     xa_to = _ensure_array(np.nan_to_num(xa_to, copy=False))
 
     # round towards zero if necessary
-    if isinstance(x, int | float):
-        _nextafter(xa_to, dtype.type(0), where=(_abs(xa_to) > abs(x)), out=xa_to)
-    else:
-        _nextafter(
-            xa_to,
-            np.copysign(dtype.type(0), xa_to),
-            where=(_abs(xa_to) > _abs(x)),
-            out=xa_to,
-        )
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        if isinstance(x, int):
+            _nextafter(xa_to, dtype.type(0), where=(_abs(xa_to) > abs(x)), out=xa_to)
+        elif isinstance(x, float):
+            _nextafter(
+                xa_to, np.copysign(0.0, xa_to), where=(_abs(xa_to) > abs(x)), out=xa_to
+            )
+        else:
+            _nextafter(
+                xa_to,
+                np.copysign(dtype.type(0), xa_to),
+                where=(_abs(xa_to) > _abs(x)),
+                out=xa_to,
+            )
 
     # the above checks guarantee that there are no NaNs in xa
     if isinstance(x, int):
@@ -533,9 +538,10 @@ def saturating_finite_float_cast(
     else:
         assert np.all(np.signbit(xa) == np.signbit(xa_to))
 
-    if isinstance(x, int | float):
-        assert _abs(xa_to) <= abs(x)
-    else:
-        assert np.all(_abs(xa_to) <= _abs(x))
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        if isinstance(x, int | float):
+            assert _abs(xa_to) <= abs(x)
+        else:
+            assert np.all(_abs(xa_to) <= _abs(x))
 
     return xa_to
