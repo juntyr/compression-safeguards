@@ -99,9 +99,14 @@ class ScalarNextafter(Expr[AnyExpr, AnyExpr]):
         #  nextafter(-0.0, +Inf) = +smallest_subnormal
         # and have to move a bound across zero if
         # - expr_lower = +0.0 and tov is sign negative
-        #   -> to_lower = +smallest_subnormal
+        #   -> from_lower = +smallest_subnormal
         # - expr_upper = -0.0 and tov is sign positive
-        #   -> to_lower = -smallest_subnormal
+        #   -> from_upper = -smallest_subnormal
+        # and we need to be careful to include -0.0 and +0.0 in edge cases
+        # - expr_lower = smallest_subnormal and expr_lower <= tov
+        #   -> from_lower = -0.0
+        # - expr_upper = -smallest_subnormal and expr_upper >= tov
+        #   -> from_upper = +0.0
         from_lower = _ensure_array(expr_lower, copy=True)
         _nextafter(
             expr_lower,
@@ -114,6 +119,9 @@ class ScalarNextafter(Expr[AnyExpr, AnyExpr]):
         )
         from_lower[_is_positive_zero(expr_lower) & _is_sign_negative_number(tov)] = (
             smallest_subnormal
+        )
+        from_lower[(expr_lower == smallest_subnormal) & (expr_lower <= tov)] = (
+            Xs.dtype.type(-0.0)
         )
         _nextafter(
             expr_lower, Xs.dtype.type(np.inf), out=from_lower, where=(expr_lower > tov)
@@ -138,6 +146,9 @@ class ScalarNextafter(Expr[AnyExpr, AnyExpr]):
         from_upper[
             _is_negative_zero(expr_upper) & _is_sign_positive_number(tov)
         ] = -smallest_subnormal
+        from_upper[(expr_upper == -smallest_subnormal) & (expr_upper >= tov)] = (
+            Xs.dtype.type(0.0)
+        )
 
         return self._from.deferred_compute_data_bounds(
             from_lower, from_upper, Xs, late_bound, ctx, callback
