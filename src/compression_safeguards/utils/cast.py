@@ -514,7 +514,7 @@ def saturating_finite_float_cast(
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         xa_to = _ensure_array(xa).astype(dtype, casting="unsafe")
 
-    xa_to = np.nan_to_num(xa_to, copy=False)
+    xa_to = _ensure_array(np.nan_to_num(xa_to, copy=False))
 
     # round towards zero if necessary
     if isinstance(x, int | float):
