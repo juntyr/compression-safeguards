@@ -115,6 +115,7 @@ from compression_safeguards.utils.error import (
     ctx,
 )
 from compression_safeguards.utils.typing import JSON, S, T
+from xarray.namedarray.parallelcompat import get_chunked_array_type
 
 DataValue: TypeAlias = int | float | np.number | xr.DataArray
 """
@@ -464,8 +465,9 @@ def produce_data_array_correction(
 
         da_correction = (
             data.copy(
-                data=data.data.map_blocks(
+                data=dask.array.map_blocks(
                     _compute_independent_chunk_correction,
+                    data.data,
                     approximation.data,
                     *chunked_late_bound.values(),
                     dtype=correction_dtype,
@@ -890,23 +892,30 @@ def apply_data_array_correction(
                 | ctx
             )
 
-    def _apply_independent_chunk_correction(
-        approximation_chunk: xr.DataArray,
-        correction_chunk: xr.DataArray,
-        safeguards: Safeguards,
-    ) -> xr.DataArray:
-        return approximation_chunk.copy(
-            data=safeguards.apply_correction(
-                approximation_chunk.values, correction_chunk.values
-            )
-        )
+        chunkmanager = get_chunked_array_type(approximation.data, correction.data)
 
-    return xr.map_blocks(
-        _apply_independent_chunk_correction,
-        approximation,
-        args=(correction,),
-        kwargs=dict(safeguards=safeguards),
-        template=approximation,
+    def _apply_independent_chunk_correction(
+        approximation_chunk: np.ndarray[S, np.dtype[T]],
+        correction_chunk: np.ndarray[S, np.dtype[np.unsignedinteger]],
+        safeguards: Safeguards,
+    ) -> np.ndarray[S, np.dtype[T]]:
+        # ensure that we pass np.ndarray's to the compression-safeguards
+        approximation_chunk = _ensure_array(approximation_chunk)
+        correction_chunk = _ensure_array(correction_chunk)
+
+        return safeguards.apply_correction(approximation_chunk, correction_chunk)
+
+    return approximation.copy(
+        data=chunkmanager.map_blocks(
+            _apply_independent_chunk_correction,
+            approximation.data,
+            correction.data,
+            dtype=approximation.dtype,
+            chunks=None,
+            drop_axis=None,
+            new_axis=None,
+            safeguards=safeguards,
+        )
     ).assign_attrs(safeguards=correction.attrs["safeguards"])
 
 
