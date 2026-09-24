@@ -892,6 +892,12 @@ def apply_data_array_correction(
                 | ctx
             )
 
+    if approximation.chunks is None:
+        return approximation.copy(
+            data=safeguards.apply_correction(approximation.data, correction.data)
+        ).assign_attrs(safeguards=correction.attrs["safeguards"])
+
+    with ctx.parameter("correction"):
         chunkmanager = get_chunked_array_type(approximation.data, correction.data)
 
     def _apply_independent_chunk_correction(

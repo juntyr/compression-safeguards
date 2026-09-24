@@ -280,7 +280,7 @@ def _minimum_zero_sign_sensitive(
     a: Ti,
     b: np.ndarray[S, np.dtype[Ti]],
     out: None | np.ndarray[S, np.dtype[Ti]] = None,
-    where: None | np.ndarray[S, np.dtype[np.bool]] = None,
+    where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
 ) -> np.ndarray[S, np.dtype[Ti]]: ...
 
 
@@ -289,7 +289,7 @@ def _minimum_zero_sign_sensitive(
     a: np.ndarray[S, np.dtype[Ti]],
     b: Ti,
     out: None | np.ndarray[S, np.dtype[Ti]] = None,
-    where: None | np.ndarray[S, np.dtype[np.bool]] = None,
+    where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
 ) -> np.ndarray[S, np.dtype[Ti]]: ...
 
 
@@ -298,51 +298,11 @@ def _minimum_zero_sign_sensitive(
     a: np.ndarray[S, np.dtype[T]],
     b: np.ndarray[S, np.dtype[T]],
     out: None | np.ndarray[S, np.dtype[T]] = None,
-    where: None | np.ndarray[S, np.dtype[np.bool]] = None,
+    where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
 ) -> np.ndarray[S, np.dtype[T]]: ...
 
 
-def _minimum_zero_sign_sensitive(a, b, out=None, where=None):
-    new_minimum = _minimum_zero_sign_sensitive_v2(
-        a, b, out=None if out is None else np.copy(out), where=where
-    )
-
-    def maybe_where(w):
-        return w if where is None else where & w
-
-    a = _ensure_array(a)
-    b = _ensure_array(b)
-
-    both_zero = (a == 0) & (b == 0)
-    minimum = _ensure_array(np.minimum(a, b, out=out, where=maybe_where(~both_zero)))
-
-    if np.issubdtype(a.dtype, np.integer) and np.issubdtype(b.dtype, np.integer):
-        minimum[maybe_where(both_zero)] = 0
-        np.testing.assert_equal(minimum, new_minimum, equal_nan=True)
-        return minimum
-
-    a = _broadcast_to(a.astype(minimum.dtype, casting="safe"), minimum.shape)
-    b = _broadcast_to(b.astype(minimum.dtype, casting="safe"), minimum.shape)
-
-    signbit_a = np.signbit(a)
-    signbit_b = np.signbit(b)
-
-    np.copyto(
-        minimum,
-        a,
-        where=maybe_where(both_zero & (signbit_a >= signbit_b)),
-        casting="no",
-    )
-    np.copyto(
-        minimum, b, where=maybe_where(both_zero & (signbit_a < signbit_b)), casting="no"
-    )
-
-    np.testing.assert_equal(minimum, new_minimum)
-
-    return minimum
-
-
-def _minimum_zero_sign_sensitive_v2(a, b, out=None, where=None):
+def _minimum_zero_sign_sensitive(a, b, out=None, where=True):
     minimum = _ensure_array(np.minimum(a, b, out=out, where=where))
 
     if np.issubdtype(minimum.dtype, np.integer):
@@ -350,7 +310,7 @@ def _minimum_zero_sign_sensitive_v2(a, b, out=None, where=None):
 
     np.copysign(
         minimum,
-        np.minimum(np.copysign(1, a), np.copysign(1, b), where=where, out=None),
+        np.minimum(np.copysign(1, a), np.copysign(1, b), out=None, where=where),
         out=minimum,
         where=where,
     )
@@ -364,7 +324,7 @@ def _maximum_zero_sign_sensitive(
     a: Ti,
     b: np.ndarray[S, np.dtype[Ti]],
     out: None | np.ndarray[S, np.dtype[Ti]] = None,
-    where: None | np.ndarray[S, np.dtype[np.bool]] = None,
+    where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
 ) -> np.ndarray[S, np.dtype[Ti]]: ...
 
 
@@ -373,7 +333,7 @@ def _maximum_zero_sign_sensitive(
     a: np.ndarray[S, np.dtype[Ti]],
     b: Ti,
     out: None | np.ndarray[S, np.dtype[Ti]] = None,
-    where: None | np.ndarray[S, np.dtype[np.bool]] = None,
+    where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
 ) -> np.ndarray[S, np.dtype[Ti]]: ...
 
 
@@ -382,14 +342,11 @@ def _maximum_zero_sign_sensitive(
     a: np.ndarray[S, np.dtype[T]],
     b: np.ndarray[S, np.dtype[T]],
     out: None | np.ndarray[S, np.dtype[T]] = None,
-    where: None | np.ndarray[S, np.dtype[np.bool]] = None,
+    where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
 ) -> np.ndarray[S, np.dtype[T]]: ...
 
 
-def _maximum_zero_sign_sensitive(a, b, out=None, where=None):
-    def maybe_where(w):
-        return w if where is None else where & w
-
+def _maximum_zero_sign_sensitive(a, b, out=None, where=True):
     maximum = _ensure_array(np.maximum(a, b, out=out, where=where))
 
     if np.issubdtype(maximum.dtype, np.integer):
@@ -397,7 +354,7 @@ def _maximum_zero_sign_sensitive(a, b, out=None, where=None):
 
     np.copysign(
         maximum,
-        np.maximum(np.copysign(1, a), np.copysign(1, b), where=where, out=None),
+        np.maximum(np.copysign(1, a), np.copysign(1, b), out=None, where=where),
         out=maximum,
         where=where,
     )

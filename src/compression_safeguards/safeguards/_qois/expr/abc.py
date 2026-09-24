@@ -1,19 +1,14 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Set
-from typing import TYPE_CHECKING, Any, Generic, Self, TypeAlias, assert_never, final
-from warnings import warn
+from typing import TYPE_CHECKING, Any, Generic, Self, TypeAlias, final
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
-    _maximum_zero_sign_sensitive,
-    _minimum_zero_sign_sensitive,
     _zeros,
 )
 from ....utils.bindings import Parameter
-from ....utils.error import QuantityOfInterestRuntimeWarning
-from ..bound import DataBounds, data_bounds_checks, guarantee_data_within_expr_bounds
 from ..context import Callback, Context
 from ..typing import Es, F, Ns, Ps, np_sndarray
 

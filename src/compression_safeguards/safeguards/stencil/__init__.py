@@ -401,21 +401,25 @@ def _reverse_neighbourhood_indices(
         writeable=False,
     ).reshape((-1, window_size))
 
+    # track the indices of the window indices
+    indices_windows_indices = np.arange(indices_windows.size).reshape(
+        indices_windows.shape
+    )
+
+    fill_value = indices_windows.size
+
     # skip back-contributions from data elements where the safety requirements
     #  are disabled
     if where_flat is not True:
         indices_windows = indices_windows[where_flat]
+        indices_windows_indices = indices_windows_indices[where_flat]
+
     # skip window indices that are not used
     indices_windows = indices_windows[:, window_used.flatten()]
-    indices_windows = indices_windows.flatten()
+    indices_windows_indices = indices_windows_indices[:, window_used.flatten()]
 
-    # compute the indices over the window_used (i) and indices_windows (j),
-    #  accounting for the above skips
-    is_ = np.arange(window_size)[window_used.flatten()]
-    js_ = np.arange(indices_windows.size)
-    if where_flat is not True:
-        js_ = js_[where_flat]
-    is_, js_ = np.tile(is_, js_.size), np.repeat(js_, is_.size)
+    indices_windows = indices_windows.flatten()
+    indices_windows_indices = indices_windows_indices.flatten()
 
     # sort the indices, such that windows that read the same data are together
     argindices = np.argsort(indices_windows)
@@ -440,14 +444,12 @@ def _reverse_neighbourhood_indices(
         - indices_run_starts[indices_windows_sorted_inverse]
     )
 
-    indices_max_run_length = np.amax(indices_run_offsets) + 1
+    indices_max_run_length = np.amax(indices_run_offsets, initial=-1) + 1
 
     # compute the reverse: for each data element, which windows is it in
     # i.e. for each data element, which derived elements does it contribute to
     #      and thus which data bounds affect it
-    reverse_indices_windows = np.full(
-        data_size * indices_max_run_length, indices_windows.size
-    )
+    reverse_indices_windows = np.full(data_size * indices_max_run_length, fill_value)
     # store the reverse mapping
     #  - this is complicated since each data element may be referenced by
     #    multiple windows, and we need to ensure that they don't override
@@ -457,7 +459,7 @@ def _reverse_neighbourhood_indices(
     #    to apply the same reordering to the back-references
     reverse_indices_windows[
         indices_windows_sorted * indices_max_run_length + indices_run_offsets
-    ] = (js_ * window_size + is_)[argindices]
+    ] = indices_windows_indices[argindices]
     reverse_indices_windows = reverse_indices_windows.reshape(
         data_size, indices_max_run_length
     )
