@@ -440,7 +440,13 @@ class Interval(Generic[T, N]):
             _and_where(np.isnan(a), where=where)
         ] <= Upper(np.array(np.copysign(nan_max, +1)))
 
-        return lower.union(upper)
+        # FIXME: audit for non-overlapping union
+        return IntervalUnion(
+            _lower=np.stack([lower._lower, upper._lower]),
+            _upper=np.stack([lower._upper, upper._upper]),
+        )
+
+        # return lower.union(upper)
 
     def preserve_finite(
         self,
@@ -1326,9 +1332,15 @@ class IntervalUnion(Generic[T, N, U]):
 
         # 6. if there are several intervals, pick the one with the smallest
         #    lower bound, ensuring that empty intervals are not picked
-        least = _where(interval_nonempty, lower, allbits).argmin(axis=0)
-        lower, upper = lower[least, np.arange(n)], upper[least, np.arange(n)]
-        negative = negative[least, np.arange(n)]
+        least = _where(interval_nonempty, lower, allbits).argmin(
+            axis=0
+        ) * n + np.arange(n)
+        # FIXME: pick without a quadratic intermediary (as np.arange(n) is needed)
+        lower = np.take_along_axis(lower, least, axis=None)
+        upper = np.take_along_axis(upper, least, axis=None)
+        negative = np.take_along_axis(negative, least, axis=None)
+        # lower, upper = lower[least, np.arange(n)], upper[least, np.arange(n)]
+        # negative = negative[least, np.arange(n)]
         assert np.all(lower <= upper)
 
         # 7. count the number of leading zero bits in lower and upper

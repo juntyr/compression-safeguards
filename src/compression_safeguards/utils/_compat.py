@@ -303,6 +303,10 @@ def _minimum_zero_sign_sensitive(
 
 
 def _minimum_zero_sign_sensitive(a, b, out=None, where=None):
+    new_minimum = _minimum_zero_sign_sensitive_v2(
+        a, b, out=None if out is None else np.copy(out), where=where
+    )
+
     def maybe_where(w):
         return w if where is None else where & w
 
@@ -314,6 +318,7 @@ def _minimum_zero_sign_sensitive(a, b, out=None, where=None):
 
     if np.issubdtype(a.dtype, np.integer) and np.issubdtype(b.dtype, np.integer):
         minimum[maybe_where(both_zero)] = 0
+        np.testing.assert_equal(minimum, new_minimum, equal_nan=True)
         return minimum
 
     a = _broadcast_to(a.astype(minimum.dtype, casting="safe"), minimum.shape)
@@ -330,6 +335,24 @@ def _minimum_zero_sign_sensitive(a, b, out=None, where=None):
     )
     np.copyto(
         minimum, b, where=maybe_where(both_zero & (signbit_a < signbit_b)), casting="no"
+    )
+
+    np.testing.assert_equal(minimum, new_minimum)
+
+    return minimum
+
+
+def _minimum_zero_sign_sensitive_v2(a, b, out=None, where=None):
+    minimum = _ensure_array(np.minimum(a, b, out=out, where=where))
+
+    if np.issubdtype(minimum.dtype, np.integer):
+        return minimum
+
+    np.copysign(
+        minimum,
+        np.minimum(np.copysign(1, a), np.copysign(1, b), where=where, out=None),
+        out=minimum,
+        where=where,
     )
 
     return minimum
@@ -367,30 +390,16 @@ def _maximum_zero_sign_sensitive(a, b, out=None, where=None):
     def maybe_where(w):
         return w if where is None else where & w
 
-    a = _ensure_array(a)
-    b = _ensure_array(b)
+    maximum = _ensure_array(np.maximum(a, b, out=out, where=where))
 
-    both_zero = (a == 0) & (b == 0)
-    maximum = _ensure_array(np.maximum(a, b, out=out, where=maybe_where(~both_zero)))
-
-    if np.issubdtype(a.dtype, np.integer) and np.issubdtype(b.dtype, np.integer):
-        maximum[maybe_where(both_zero)] = 0
+    if np.issubdtype(maximum.dtype, np.integer):
         return maximum
 
-    a = _broadcast_to(a.astype(maximum.dtype, casting="safe"), maximum.shape)
-    b = _broadcast_to(b.astype(maximum.dtype, casting="safe"), maximum.shape)
-
-    signbit_a = np.signbit(a)
-    signbit_b = np.signbit(b)
-
-    np.copyto(
+    np.copysign(
         maximum,
-        a,
-        where=maybe_where(both_zero & (signbit_a <= signbit_b)),
-        casting="no",
-    )
-    np.copyto(
-        maximum, b, where=maybe_where(both_zero & (signbit_a > signbit_b)), casting="no"
+        np.maximum(np.copysign(1, a), np.copysign(1, b), where=where, out=None),
+        out=maximum,
+        where=where,
     )
 
     return maximum
