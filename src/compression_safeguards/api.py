@@ -335,16 +335,16 @@ class Safeguards:
             chunked_method_name="compute_chunked_correction",
         )
 
-        all_ok = True
-        for safeguard in self.safeguards:
-            if not safeguard.check(
-                data, approximation, late_bound=late_bound, where=where
-            ):
-                all_ok = False
-                break
-
-        if all_ok:
-            return _zeros(data.shape, self.correction_dtype_for_data(data.dtype))
+        #         all_ok = True
+        #         for safeguard in self.safeguards:
+        #             if not safeguard.check(
+        #                 data, approximation, late_bound=late_bound, where=where
+        #             ):
+        #                 all_ok = False
+        #                 break
+        #
+        #         if all_ok:
+        #             return _zeros(data.shape, self.correction_dtype_for_data(data.dtype))
 
         # ensure we don't accidentally forget to handle new kinds of safeguards here
         assert len(self.safeguards) == len(self._pointwise_safeguards) + len(
@@ -372,14 +372,14 @@ class Safeguards:
         corrected = combined_intervals.pick(approximation)
 
         for safeguard, intervals in zip(self.safeguards, all_intervals):
-            if not np.all(intervals.contains(corrected)):
-                raise (
-                    SafeguardsSafetyBug(
-                        f"the safe intervals for the {safeguard!r} safeguard "
-                        + "do not contain the corrected array"
-                    )
-                    | ctx
-                )
+            #     if not np.all(intervals.contains(corrected)):
+            #         raise (
+            #             SafeguardsSafetyBug(
+            #                 f"the safe intervals for the {safeguard!r} safeguard "
+            #                 + "do not contain the corrected array"
+            #             )
+            #             | ctx
+            #         )
             if not safeguard.check(data, corrected, late_bound=late_bound, where=where):
                 raise (
                     SafeguardsSafetyBug(

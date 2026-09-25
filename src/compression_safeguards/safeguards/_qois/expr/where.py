@@ -14,15 +14,17 @@ from .constfold import ScalarFoldedConstant
 
 
 class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
-    __slots__: tuple[str, ...] = ("_condition", "_a", "_b")
+    __slots__: tuple[str, ...] = ("_condition", "_a", "_b", "_cache")
     _condition: AnyExpr
     _a: AnyExpr
     _b: AnyExpr
+    _cache: None | tuple[int, int, np.ndarray]
 
     def __init__(self, condition: AnyExpr, a: AnyExpr, b: AnyExpr):
         self._condition = condition
         self._a = a
         self._b = b
+        self._cache = None
 
     @property
     @override
@@ -77,11 +79,20 @@ class ScalarWhere(Expr[AnyExpr, AnyExpr, AnyExpr]):
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
-        return _where(
+        # if self._cache is not None:
+        #     Xs_id, late_bound_id, cached = self._cache
+        #     if (id(Xs) == Xs_id) and (id(late_bound) == late_bound_id):
+        #         return _ensure_array(cached, copy=True)
+
+        result = _where(
             self._condition.eval(Xs, late_bound) != 0,
             self._a.eval(Xs, late_bound),
             self._b.eval(Xs, late_bound),
         )
+
+        # self._cache = id(Xs), id(late_bound), _ensure_array(result, copy=True)
+
+        return result
 
     @checked_data_bounds
     @override

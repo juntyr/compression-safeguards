@@ -90,13 +90,15 @@ class ScalarAdd(Expr[AnyExpr, AnyExpr]):
 
 
 class ScalarSubtract(Expr[AnyExpr, AnyExpr]):
-    __slots__: tuple[str, ...] = ("_a", "_b")
+    __slots__: tuple[str, ...] = ("_a", "_b", "_cache")
     _a: AnyExpr
     _b: AnyExpr
+    _cache: None | tuple[int, int, np.ndarray]
 
     def __init__(self, a: AnyExpr, b: AnyExpr) -> None:
         self._a = a
         self._b = b
+        self._cache = None
 
     def __new__(cls, a: AnyExpr, b: AnyExpr) -> "ScalarSubtract | Number":  # type: ignore[misc]
         ab = Number.symbolic_fold_binary(a, b, operator.sub)
@@ -130,7 +132,16 @@ class ScalarSubtract(Expr[AnyExpr, AnyExpr]):
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
-        return np.subtract(self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound))
+        if self._cache is not None:
+            Xs_id, late_bound_id, cached = self._cache
+            if (id(Xs) == Xs_id) and (id(late_bound) == late_bound_id):
+                return _ensure_array(cached, copy=True)
+
+        result = np.subtract(self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound))
+
+        self._cache = id(Xs), id(late_bound), _ensure_array(result, copy=True)
+
+        return result
 
     @checked_data_bounds
     @override
@@ -159,11 +170,12 @@ class ScalarSubtract(Expr[AnyExpr, AnyExpr]):
 # this class avoids the deep nesting that's required to represent a
 #  left-associative sum with ScalarAdd's
 class ScalarLeftAssociativeSum(Expr[AnyExpr, AnyExpr, AnyExpr, *tuple[AnyExpr, ...]]):
-    __slots__: tuple[str, ...] = ("_a", "_b", "_c", "_ds")
+    __slots__: tuple[str, ...] = ("_a", "_b", "_c", "_ds", "_cache")
     _a: AnyExpr
     _b: AnyExpr
     _c: AnyExpr
     _ds: tuple[AnyExpr, ...]
+    _cache: None | tuple[int, int, np.ndarray]
 
     def __new__(cls, *ts: AnyExpr) -> AnyExpr | Number:  # type: ignore[misc]
         # base case: sum identity
@@ -195,6 +207,7 @@ class ScalarLeftAssociativeSum(Expr[AnyExpr, AnyExpr, AnyExpr, *tuple[AnyExpr, .
                 sum_._a = a
                 sum_._b, sum_._c, *ds = tsri
                 sum_._ds = tuple(ds)
+                sum_._cache = None
                 return sum_
 
     @property
@@ -248,6 +261,11 @@ class ScalarLeftAssociativeSum(Expr[AnyExpr, AnyExpr, AnyExpr, *tuple[AnyExpr, .
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
+        # if self._cache is not None:
+        #     Xs_id, late_bound_id, cached = self._cache
+        #     if (id(Xs) == Xs_id) and (id(late_bound) == late_bound_id):
+        #         return _ensure_array(cached, copy=True)
+
         # evaluate the sum left-associative, i.e. a + b + c = (a + b) + c
         acc: np.ndarray[tuple[Ps], np.dtype[F]] = np.add(
             self._a.eval(Xs, late_bound), self._b.eval(Xs, late_bound)
@@ -257,6 +275,8 @@ class ScalarLeftAssociativeSum(Expr[AnyExpr, AnyExpr, AnyExpr, *tuple[AnyExpr, .
 
         for d in self._ds:
             acc += d.eval(Xs, late_bound)
+
+        # self._cache = id(Xs), id(late_bound), _ensure_array(acc, copy=True)
 
         return acc
 
