@@ -12,9 +12,8 @@ from .literal import Number
 
 
 class Group(Expr[AnyExpr]):
-    __slots__: tuple[str, ...] = ("_expr", "_cache")
+    __slots__: tuple[str, ...] = ("_expr",)
     _expr: AnyExpr
-    _cache: None | tuple[int, int, np.ndarray]
 
     def __new__(cls, expr: AnyExpr) -> "Group | Number":  # type: ignore[misc]
         if isinstance(expr, Number | Group):
@@ -23,7 +22,6 @@ class Group(Expr[AnyExpr]):
         #  unwrapping would still call __init__ and create a reference loop
         this = super().__new__(cls)
         this._expr = expr
-        this._cache = None
         return this
 
     @property
@@ -55,16 +53,7 @@ class Group(Expr[AnyExpr]):
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
-        # if self._cache is not None:
-        #     Xs_id, late_bound_id, cached = self._cache
-        #     if (id(Xs) == Xs_id) and (id(late_bound) == late_bound_id):
-        #         return _ensure_array(cached, copy=True)
-
-        result = self._expr.eval(Xs, late_bound)
-
-        # self._cache = id(Xs), id(late_bound), _ensure_array(result, copy=True)
-
-        return result
+        return self._expr.eval(Xs, late_bound)
 
     @data_bounds(DataBounds.infallible)
     @override

@@ -212,7 +212,6 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         "_qoi_dtype",
         "_qoi_expr",
         "_early_bound",
-        "_cache",
     )
     _qoi: StencilQuantityOfInterestExpression
     _neighbourhood: tuple[NeighbourhoodBoundaryAxis, ...]
@@ -314,8 +313,6 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 self._qoi_expr = StencilQuantityOfInterest(
                     qoi, stencil_shape=shape, stencil_I=I
                 )
-
-            self._cache = None
 
     @property
     @override
@@ -470,13 +467,6 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             converted to the `data`'s type.
         """
 
-        if self._cache is not None:
-            data_id, late_bound_id, cached = self._cache
-            if (id(data) == data_id) and (id(late_bound) == late_bound_id):
-                return _ensure_array(cached, copy=True)
-
-        data_id, late_bound_id = id(data), id(late_bound)
-
         with ctx.safeguard(self):
             with ctx.parameter("early_bound"):
                 late_bound = late_bound.update(
@@ -591,9 +581,6 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             late_bound_constants,
         )
         qoi: np.ndarray[tuple[int, ...], np.dtype[F]] = qoi_.reshape(qoi_shape)
-
-        self._cache = data_id, late_bound_id, _ensure_array(qoi, copy=True)
-
         return qoi
 
     @override
@@ -668,19 +655,6 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             invalid error bound value for the error bound `type`.
         """
 
-        cached_qoi_data: None | np.ndarray[tuple[int, ...], np.dtype[np.floating]]
-
-        if self._cache is not None:
-            data_id, late_bound_id, cached = self._cache
-            if (id(data) == data_id) and (id(late_bound) == late_bound_id):
-                cached_qoi_data = cached
-            else:
-                cached_qoi_data = None
-        else:
-            cached_qoi_data = None
-
-        data_id, late_bound_id = id(data), id(late_bound)
-
         with ctx.safeguard(self):
             with ctx.parameter("early_bound"):
                 late_bound = late_bound.update(
@@ -722,15 +696,14 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             for axis, axis_constant_boundary in zip(
                 self._neighbourhood, constant_boundaries
             ):
-                if cached_qoi_data is None:
-                    data_boundary = _pad_with_boundary(
-                        data_boundary,
-                        axis.boundary,
-                        axis.before,
-                        axis.after,
-                        axis_constant_boundary,
-                        axis.axis,
-                    )
+                data_boundary = _pad_with_boundary(
+                    data_boundary,
+                    axis.boundary,
+                    axis.before,
+                    axis.after,
+                    axis_constant_boundary,
+                    axis.axis,
+                )
                 approximation_boundary = _pad_with_boundary(
                     approximation_boundary,
                     axis.boundary,
@@ -745,10 +718,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     data.dtype
                 )
 
-            if cached_qoi_data is None:
-                data_windows_float_: np.ndarray[
-                    tuple[int, ...], np.dtype[np.floating]
-                ] = to_float(
+            data_windows_float_: np.ndarray[tuple[int, ...], np.dtype[np.floating]] = (
+                to_float(
                     _sliding_window_view(
                         data_boundary,
                         window,
@@ -757,6 +728,8 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     ),
                     ftype=ftype,
                 )
+            )
+            qoi_shape: tuple[int, ...] = data_windows_float_.shape[: -len(window)]
             approximation_windows_float_: np.ndarray[
                 tuple[int, ...], np.dtype[np.floating]
             ] = to_float(
@@ -768,14 +741,10 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                 ),
                 ftype=ftype,
             )
-            qoi_shape: tuple[int, ...] = approximation_windows_float_.shape[
-                : -len(window)
-            ]
 
-            if cached_qoi_data is None:
-                data_windows_float: np.ndarray[
-                    tuple[int, *tuple[int, ...]], np.dtype[np.floating]
-                ] = _reshape(data_windows_float_, (-1, *window))
+            data_windows_float: np.ndarray[
+                tuple[int, *tuple[int, ...]], np.dtype[np.floating]
+            ] = _reshape(data_windows_float_, (-1, *window))
             approximation_windows_float: np.ndarray[
                 tuple[int, *tuple[int, ...]], np.dtype[np.floating]
             ] = _reshape(approximation_windows_float_, (-1, *window))
@@ -829,10 +798,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             # optimization: only evaluate the QoI where necessary
             if where is not True:
                 where_flat = where[tuple(valid_slice)].flatten()
-                if cached_qoi_data is None:
-                    data_windows_float = np.compress(
-                        where_flat, data_windows_float, axis=0
-                    )
+                data_windows_float = np.compress(where_flat, data_windows_float, axis=0)
                 approximation_windows_float = np.compress(
                     where_flat, approximation_windows_float, axis=0
                 )
@@ -841,22 +807,12 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     for (c, cv) in late_bound_constants.items()
                 }
 
-            qoi_data: np.ndarray[tuple[int], np.dtype[np.floating]]
-            if cached_qoi_data is None:
-                qoi_data = self._qoi_expr.eval(
+            qoi_data: np.ndarray[tuple[int], np.dtype[np.floating]] = (
+                self._qoi_expr.eval(
                     data_windows_float,
                     late_bound_constants,
                 )
-                if where is True:
-                    self._cache = (
-                        data_id,
-                        late_bound_id,
-                        _ensure_array(qoi_data, copy=True).reshape(qoi_shape),
-                    )
-            else:
-                qoi_data = cached_qoi_data.flatten()
-                if where is not True:
-                    qoi_data = np.compress(where_flat, qoi_data, axis=0)
+            )
             qoi_approximation: np.ndarray[tuple[int], np.dtype[np.floating]] = (
                 self._qoi_expr.eval(
                     approximation_windows_float,
@@ -988,19 +944,6 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             invalid error bound value for the error bound `type`.
         """
 
-        cached_qoi_data: None | np.ndarray[tuple[int, ...], np.dtype[np.floating]]
-
-        if self._cache is not None:
-            data_id, late_bound_id, cached = self._cache
-            if (id(data) == data_id) and (id(late_bound) == late_bound_id):
-                cached_qoi_data = cached
-            else:
-                cached_qoi_data = None
-        else:
-            cached_qoi_data = None
-
-        data_id, late_bound_id = id(data), id(late_bound)
-
         with ctx.safeguard(self):
             with ctx.parameter("early_bound"):
                 late_bound = late_bound.update(
@@ -1064,7 +1007,6 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     ftype=ftype,
                 )
             )
-            qoi_shape: tuple[int, ...] = data_windows_float_.shape[: -len(window)]
             qoi_stencil_shape: tuple[int, ...] = data_windows_float_.shape
             data_windows_float: np.ndarray[
                 tuple[int, *tuple[int, ...]], np.dtype[np.floating]
@@ -1126,23 +1068,12 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
                     for (c, cv) in late_bound_constants.items()
                 }
 
-            data_qoi: np.ndarray[tuple[int], np.dtype[np.floating]]
-
-            if cached_qoi_data is None:
-                data_qoi = self._qoi_expr.eval(
+            data_qoi: np.ndarray[tuple[int], np.dtype[np.floating]] = (
+                self._qoi_expr.eval(
                     data_windows_float,
                     late_bound_constants,
                 )
-                if where is True:
-                    self._cache = (
-                        data_id,
-                        late_bound_id,
-                        _ensure_array(data_qoi, copy=True).reshape(qoi_shape),
-                    )
-            else:
-                data_qoi = cached_qoi_data.flatten()
-                if where is not True:
-                    data_qoi = np.compress(where_flat, data_qoi, axis=0)
+            )
 
             with ctx.parameter("eb"):
                 eb_: np.ndarray[tuple[()] | tuple[int, ...], np.dtype[np.floating]] = (

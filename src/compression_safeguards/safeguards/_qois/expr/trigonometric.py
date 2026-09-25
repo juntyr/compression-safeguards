@@ -194,13 +194,11 @@ class ScalarSin(Expr[AnyExpr]):
 
 
 class ScalarCos(Expr[AnyExpr]):
-    __slots__: tuple[str, ...] = ("_a", "_cache")
+    __slots__: tuple[str, ...] = ("_a",)
     _a: AnyExpr
-    _cache: None | tuple[int, int, np.ndarray]
 
     def __init__(self, a: AnyExpr):
         self._a = a
-        self._cache = None
 
     @property
     @override
@@ -228,16 +226,7 @@ class ScalarCos(Expr[AnyExpr]):
         Xs: np_sndarray[Ps, Ns, np.dtype[F]],
         late_bound: Mapping[Parameter, np_sndarray[Ps, Ns, np.dtype[F]]],
     ) -> np.ndarray[tuple[Ps], np.dtype[F]]:
-        if self._cache is not None:
-            Xs_id, late_bound_id, cached = self._cache
-            if (id(Xs) == Xs_id) and (id(late_bound) == late_bound_id):
-                return _ensure_array(cached, copy=True)
-
-        result = np.cos(self._a.eval(Xs, late_bound))
-
-        self._cache = id(Xs), id(late_bound), _ensure_array(result, copy=True)
-
-        return result
+        return np.cos(self._a.eval(Xs, late_bound))
 
     @checked_data_bounds
     @override

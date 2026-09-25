@@ -1,14 +1,19 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Set
-from typing import TYPE_CHECKING, Any, Generic, Self, TypeAlias, final
+from typing import TYPE_CHECKING, Any, Generic, Self, TypeAlias, assert_never, final
+from warnings import warn
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
+    _maximum_zero_sign_sensitive,
+    _minimum_zero_sign_sensitive,
     _zeros,
 )
 from ....utils.bindings import Parameter
+from ....utils.error import QuantityOfInterestRuntimeWarning
+from ..bound import DataBounds, data_bounds_checks, guarantee_data_within_expr_bounds
 from ..context import Callback, Context
 from ..typing import Es, F, Ns, Ps, np_sndarray
 
@@ -263,71 +268,71 @@ class Expr(ABC, Generic[*Es]):
         expr_lower = ready.expr_lower
         expr_upper = ready.expr_upper
 
-        # if (
-        #     data_bounds_checks(self.deferred_compute_data_bounds_unchecked)
-        #     != DataBounds.infallible
-        # ):
-        #     exprv: np.ndarray[tuple[Ps], np.dtype[F]] = self.eval(Xs, late_bound)
-        #     if not np.all((expr_lower <= exprv) | np.isnan(exprv)):
-        #         warn(
-        #             "expression lower bounds are above the expression values",
-        #             category=QuantityOfInterestRuntimeWarning,
-        #         )
-        #     if not np.all((expr_upper >= exprv) | np.isnan(exprv)):
-        #         warn(
-        #             "expression upper bounds are below the expression values",
-        #             category=QuantityOfInterestRuntimeWarning,
-        #         )
-        # else:
-        #     exprv = None  # type: ignore
+        if (
+            data_bounds_checks(self.deferred_compute_data_bounds_unchecked)
+            != DataBounds.infallible
+        ):
+            exprv: np.ndarray[tuple[Ps], np.dtype[F]] = self.eval(Xs, late_bound)
+            if not np.all((expr_lower <= exprv) | np.isnan(exprv)):
+                warn(
+                    "expression lower bounds are above the expression values",
+                    category=QuantityOfInterestRuntimeWarning,
+                )
+            if not np.all((expr_upper >= exprv) | np.isnan(exprv)):
+                warn(
+                    "expression upper bounds are below the expression values",
+                    category=QuantityOfInterestRuntimeWarning,
+                )
+        else:
+            exprv = None  # type: ignore
 
         def wrapped_callback(
             Xs_lower: np_sndarray[Ps, Ns, np.dtype[F]],
             Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
         ) -> None:
-            # warn_on_bounds_exceeded: bool
+            warn_on_bounds_exceeded: bool
 
-            # match data_bounds_checked := data_bounds_checks(
-            #     self.deferred_compute_data_bounds_unchecked
-            # ):
-            #     case DataBounds.infallible:
-            #         return ready.apply_callbacks(Xs_lower, Xs_upper)
-            #     case DataBounds.unchecked:
-            #         warn_on_bounds_exceeded = False
-            #     case DataBounds.checked:
-            #         warn_on_bounds_exceeded = True
-            #     case _:
-            #         assert_never(data_bounds_checked)
+            match data_bounds_checked := data_bounds_checks(
+                self.deferred_compute_data_bounds_unchecked
+            ):
+                case DataBounds.infallible:
+                    return ready.apply_callbacks(Xs_lower, Xs_upper)
+                case DataBounds.unchecked:
+                    warn_on_bounds_exceeded = False
+                case DataBounds.checked:
+                    warn_on_bounds_exceeded = True
+                case _:
+                    assert_never(data_bounds_checked)
 
             # ensure that the original data values are within the data bounds
-            # _minimum_zero_sign_sensitive(Xs, Xs_lower, out=Xs_lower)
-            # _maximum_zero_sign_sensitive(Xs, Xs_upper, out=Xs_upper)
+            _minimum_zero_sign_sensitive(Xs, Xs_lower, out=Xs_lower)
+            _maximum_zero_sign_sensitive(Xs, Xs_upper, out=Xs_upper)
 
-            # # handle rounding errors in the lower bound computation
-            # Xs_lower = guarantee_data_within_expr_bounds(
-            #     lambda Xs_lower: self.eval(
-            #         Xs_lower,
-            #         late_bound,
-            #     ),
-            #     exprv,
-            #     Xs,
-            #     Xs_lower,
-            #     expr_lower,
-            #     expr_upper,
-            #     warn_on_bounds_exceeded=warn_on_bounds_exceeded,
-            # )
-            # Xs_upper = guarantee_data_within_expr_bounds(
-            #     lambda Xs_upper: self.eval(
-            #         Xs_upper,
-            #         late_bound,
-            #     ),
-            #     exprv,
-            #     Xs,
-            #     Xs_upper,
-            #     expr_lower,
-            #     expr_upper,
-            #     warn_on_bounds_exceeded=warn_on_bounds_exceeded,
-            # )
+            # handle rounding errors in the lower bound computation
+            Xs_lower = guarantee_data_within_expr_bounds(
+                lambda Xs_lower: self.eval(
+                    Xs_lower,
+                    late_bound,
+                ),
+                exprv,
+                Xs,
+                Xs_lower,
+                expr_lower,
+                expr_upper,
+                warn_on_bounds_exceeded=warn_on_bounds_exceeded,
+            )
+            Xs_upper = guarantee_data_within_expr_bounds(
+                lambda Xs_upper: self.eval(
+                    Xs_upper,
+                    late_bound,
+                ),
+                exprv,
+                Xs,
+                Xs_upper,
+                expr_lower,
+                expr_upper,
+                warn_on_bounds_exceeded=warn_on_bounds_exceeded,
+            )
 
             return ready.apply_callbacks(Xs_lower, Xs_upper)
 
