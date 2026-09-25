@@ -303,17 +303,26 @@ def _minimum_zero_sign_sensitive(
 
 
 def _minimum_zero_sign_sensitive(a, b, out=None, where=True):
-    minimum = _ensure_array(np.minimum(a, b, out=out, where=where))
+    # forward to np.minimum for integer output
+    if out is None:
+        if np.issubdtype(_ensure_array(a).dtype, np.integer) and np.issubdtype(
+            _ensure_array(b).dtype, np.integer
+        ):
+            return np.minimum(a, b, out=out, where=where)
+    elif np.issubdtype(out.dtype, np.integer):
+        return np.minimum(a, b, out=out, where=where)
 
-    if np.issubdtype(minimum.dtype, np.integer):
-        return minimum
-
-    np.copysign(
-        minimum,
-        np.minimum(np.copysign(1, a), np.copysign(1, b), out=None, where=where),
-        out=minimum,
-        where=where,
+    # compute the sign of the output
+    # warning: this must happen before computing the minimum,
+    #          which could override one of the inputs
+    minimum_sign = np.minimum(
+        np.copysign(1, a), np.copysign(1, b), out=None, where=where
     )
+
+    # compute the minimum and apply the sign
+    # FIXME: handle min(-1, +NaN) correctly
+    minimum = _ensure_array(np.minimum(a, b, out=out, where=where))
+    np.copysign(minimum, minimum_sign, out=minimum, where=where)
 
     return minimum
 
@@ -347,17 +356,26 @@ def _maximum_zero_sign_sensitive(
 
 
 def _maximum_zero_sign_sensitive(a, b, out=None, where=True):
-    maximum = _ensure_array(np.maximum(a, b, out=out, where=where))
+    # forward to np.maximum for integer output
+    if out is None:
+        if np.issubdtype(_ensure_array(a).dtype, np.integer) and np.issubdtype(
+            _ensure_array(b).dtype, np.integer
+        ):
+            return np.maximum(a, b, out=out, where=where)
+    elif np.issubdtype(out.dtype, np.integer):
+        return np.maximum(a, b, out=out, where=where)
 
-    if np.issubdtype(maximum.dtype, np.integer):
-        return maximum
-
-    np.copysign(
-        maximum,
-        np.maximum(np.copysign(1, a), np.copysign(1, b), out=None, where=where),
-        out=maximum,
-        where=where,
+    # compute the sign of the output
+    # warning: this must happen before computing the maximum,
+    #          which could override one of the inputs
+    maximum_sign = np.maximum(
+        np.copysign(1, a), np.copysign(1, b), out=None, where=where
     )
+
+    # compute the maximum and apply the sign
+    # FIXME: handle max(-NaN, +1) correctly
+    maximum = _ensure_array(np.maximum(a, b, out=out, where=where))
+    np.copysign(maximum, maximum_sign, out=maximum, where=where)
 
     return maximum
 
