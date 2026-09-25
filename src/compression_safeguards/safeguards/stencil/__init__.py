@@ -11,7 +11,7 @@ from typing import Literal, Self, assert_never
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ...utils._compat import _sliding_window_view
+from ...utils._compat import _reshape, _sliding_window_view
 from ...utils.bindings import Parameter
 from ...utils.error import TypeCheckError, ctx, lookup_enum_or_raise
 from ...utils.typing import JSON, TB, S
@@ -394,12 +394,17 @@ def _reverse_neighbourhood_indices(
             None if axis.constant_boundary is None else np.full((), data_size),
             axis.axis,
         )
-    indices_windows = _sliding_window_view(
-        indices_boundary,
-        window,
-        axis=tuple(axis.axis for axis in neighbourhood),
-        writeable=False,
-    ).reshape((-1, window_size))
+
+    indices_windows: np.ndarray[tuple[int, int] | tuple[int], np.dtype[np.int_]]
+    indices_windows = _reshape(
+        _sliding_window_view(
+            indices_boundary,
+            window,
+            axis=tuple(axis.axis for axis in neighbourhood),
+            writeable=False,
+        ),
+        (-1, window_size),
+    )
 
     # track the indices of the window indices
     indices_windows_indices = np.arange(indices_windows.size).reshape(
