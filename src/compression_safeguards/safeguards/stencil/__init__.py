@@ -430,6 +430,14 @@ def _reverse_neighbourhood_indices(
     argindices = np.argsort(indices_windows)
     indices_windows_sorted = indices_windows[argindices]
 
+    # indices_windows might include fill values, of value data_size, which
+    #  represent constant values that come from no data index
+    # exclude those, conveniently largest values, from indices_windows_sorted
+    #  to ensure that we only track valid data indices
+    only_fill_index = np.searchsorted(indices_windows_sorted, data_size)
+    argindices = argindices[:only_fill_index]
+    indices_windows_sorted = indices_windows_sorted[:only_fill_index]
+
     # find the starts of the runs of common indices
     indices_run_starts = np.r_[
         0, np.flatnonzero(indices_windows_sorted[1:] != indices_windows_sorted[:-1]) + 1
@@ -445,7 +453,7 @@ def _reverse_neighbourhood_indices(
     # the offsets will be
     #  [0, 0, 1, 2, 0, 0, 1]
     indices_run_offsets = (
-        np.arange(indices_windows.size)
+        np.arange(indices_windows_sorted.size)
         - indices_run_starts[indices_windows_sorted_inverse]
     )
 
