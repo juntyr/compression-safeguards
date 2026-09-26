@@ -476,5 +476,8 @@ def _reverse_neighbourhood_indices(
     reverse_indices_windows = reverse_indices_windows.reshape(
         data_size, indices_max_run_length
     )
+    # sort the back-references to ensure consistent results,
+    #  e.g. independent of chunking
+    reverse_indices_windows = np.sort(reverse_indices_windows, axis=1)
 
     return reverse_indices_windows

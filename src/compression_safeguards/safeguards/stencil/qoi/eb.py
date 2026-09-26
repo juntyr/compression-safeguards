@@ -1189,6 +1189,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         # since some data elements may have no data bounds that affect them,
         #  e.g. because of the valid boundary condition, they may have infinite
         #  bounds
+        # FIXME: does this need to be zero-sign sensitive?
         data_float_lower: np.ndarray[S, np.dtype[np.floating]] = _reshape(
             np.amax(data_windows_float_lower_flat[reverse_indices_windows], axis=1),
             data.shape,
