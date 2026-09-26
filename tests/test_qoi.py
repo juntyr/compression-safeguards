@@ -34,6 +34,7 @@ from compression_safeguards.safeguards._qois.expr.divmul import (
 from compression_safeguards.safeguards._qois.expr.hyperbolic import (
     ScalarAcosh,
     ScalarAsinh,
+    ScalarAtanh,
     ScalarCosh,
     ScalarSinh,
     ScalarTanh,
@@ -2907,3 +2908,232 @@ def test_fuzzer_found_nextafter_ceil():
 
     assert expr.eval(X_lower, dict()) == np.array(np.float16(6.0e-08))
     assert expr.eval(X_upper, dict()) == np.array(np.float16(6.0e-08))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_sign_sensitive_minmax_sign_override_1():
+    X = np.array(np.float64(8.347e-320))
+
+    expr = ScalarMultiply(
+        ScalarSin(Data.SCALAR),
+        ScalarMultiply(
+            ScalarCosh(Data.SCALAR), ScalarExp(Exponential.exp, Data.SCALAR)
+        ),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float64(8.347e-320))
+
+    expr_lower = np.array(np.float64(0.0))
+    expr_upper = np.array(np.float64(8.347e-320))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert _is_positive_zero(X_lower)
+    assert X_upper == np.float64(8.347e-320)
+
+    assert _is_positive_zero(expr.eval(X_lower, dict()))
+    assert expr.eval(X_upper, dict()) == np.array(np.float64(8.347e-320))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_sign_sensitive_minmax_sign_override_2():
+    X = np.array(np.float64(2.17069036654e-313))
+
+    expr = ScalarMultiply(
+        ScalarSign(Data.SCALAR),
+        ScalarMultiply(ScalarTrunc(Data.SCALAR), ScalarSign(Data.SCALAR)),
+    )
+
+    assert _is_positive_zero(expr.eval(X, dict()))
+
+    expr_lower = np.array(np.float64(0.0))
+    expr_upper = np.array(np.float64(0.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert _is_positive_zero(X_lower)
+    assert X_upper == np.float64(0.9999999999999999)
+
+    assert _is_positive_zero(expr.eval(X_lower, dict()))
+    assert _is_positive_zero(expr.eval(X_upper, dict()))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_sign_sensitive_minmax_sign_override_3():
+    X = np.array(np.float64(2.5632015663e-314))
+
+    expr = ScalarMultiply(
+        ScalarSin(Data.SCALAR),
+        ScalarMultiply(
+            ScalarCosh(Data.SCALAR), ScalarExp(Exponential.exp, Data.SCALAR)
+        ),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float64(2.5632015663e-314))
+
+    expr_lower = np.array(np.float64(0.0))
+    expr_upper = np.array(np.float64(2.5632015663e-314))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert _is_positive_zero(X_lower)
+    assert X_upper == np.float64(2.5632015663e-314)
+
+    assert _is_positive_zero(expr.eval(X_lower, dict()))
+    assert expr.eval(X_upper, dict()) == np.array(np.float64(2.5632015663e-314))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_sign_sensitive_minmax_sign_override_4():
+    X = np.array(np.float32(1.8e-44))
+
+    expr = ScalarMultiply(
+        ScalarAbs(Data.SCALAR),
+        ScalarMultiply(ScalarAtanh(Data.SCALAR), ScalarCosh(Data.SCALAR)),
+    )
+
+    assert _is_positive_zero(expr.eval(X, dict()))
+
+    expr_lower = np.array(np.float32(0.0))
+    expr_upper = np.array(np.float32(0.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert _is_positive_zero(X_lower)
+    assert X_upper == np.float32(1.8e-44)
+
+    assert _is_positive_zero(expr.eval(X_lower, dict()))
+    assert _is_positive_zero(expr.eval(X_upper, dict()))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_sign_sensitive_minmax_sign_override_5():
+    X = np.array(np.float32(-1.1386022e-32))
+
+    expr = ScalarMultiply(
+        ScalarDivide(
+            ScalarFoldedConstant(np.float32(2.6264566e08)), ScalarAtan(Data.SCALAR)
+        ),
+        ScalarExp(Exponential.exp2, Data.SCALAR),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float32(-np.inf))
+
+    expr_lower = np.array(np.float32(-np.inf))
+    expr_upper = np.array(np.float32(0.00072479347))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert X_lower == np.float32(-149.0)
+    assert _is_negative_zero(X_upper)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float32(-2.3531007e-37))
+    assert expr.eval(X_upper, dict()) == np.array(np.float32(-np.inf))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_sign_sensitive_minmax_sign_override_6():
+    X = np.array(np.float64(1.057e-321))
+
+    expr = ScalarMultiply(ScalarReciprocal(Data.SCALAR), ScalarCosh(Data.SCALAR))
+
+    assert expr.eval(X, dict()) == np.array(np.float64(np.inf))
+
+    expr_lower = np.array(np.float64(0.0))
+    expr_upper = np.array(np.float64(np.inf))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert _is_positive_zero(X_lower)
+    assert X_upper == np.float64(1.057e-321)
+
+    assert expr.eval(X_lower, dict()) == np.array(np.float64(np.inf))
+    assert expr.eval(X_upper, dict()) == np.array(np.float64(np.inf))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_sign_sensitive_minmax_sign_override_7():
+    X = np.array(np.float32(9.1834e-41))
+
+    expr = ScalarMultiply(
+        ScalarMultiply(Euler(), ScalarTanh(Data.SCALAR)), ScalarCosh(Data.SCALAR)
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float32(2.49632e-40))
+
+    expr_lower = np.array(np.float32(0.0))
+    expr_upper = np.array(np.float32(2.49632e-40))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert _is_positive_zero(X_lower)
+    assert X_upper == np.float32(9.1834e-41)
+
+    assert _is_positive_zero(expr.eval(X_lower, dict()))
+    assert expr.eval(X_upper, dict()) == np.array(np.float32(2.49632e-40))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_sign_sensitive_minmax_sign_override_8():
+    X = np.array(np.float64(0.0))
+
+    expr = ScalarAdd(
+        ScalarSubtract(ScalarNegate(Data.SCALAR), ScalarNegate(Data.SCALAR)),
+        ScalarNegate(Data.SCALAR),
+    )
+
+    assert _is_positive_zero(expr.eval(X, dict()))
+
+    expr_lower = np.array(np.float64(0.0))
+    expr_upper = np.array(np.float64(0.0))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert _is_positive_zero(X_lower)
+    assert _is_positive_zero(X_upper)
+
+    assert _is_positive_zero(expr.eval(X_lower, dict()))
+    assert _is_positive_zero(expr.eval(X_upper, dict()))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_sign_sensitive_minmax_sign_override_9():
+    X = np.array(np.float32(4.573e-41))
+
+    expr = ScalarMultiply(
+        ScalarAtan(Data.SCALAR),
+        ScalarMultiply(ScalarCosh(Data.SCALAR), Number("2054881068")),
+    )
+
+    assert expr.eval(X, dict()) == np.array(np.float32(9.3969653e-32))
+
+    expr_lower = np.array(np.float32(0.0))
+    expr_upper = np.array(np.float32(9.3969653e-32))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert _is_positive_zero(X_lower)
+    assert X_upper == np.float32(4.573e-41)
+
+    assert _is_positive_zero(expr.eval(X_lower, dict()))
+    assert expr.eval(X_upper, dict()) == np.array(np.float32(9.3969653e-32))
+
+
+@np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore")
+def test_fuzzer_found_sign_sensitive_minmax_sign_override_10():
+    X = np.array(np.float64(1.73e-322))
+
+    expr = ScalarMultiply(ScalarSqrt(Data.SCALAR), ScalarSign(Data.SCALAR))
+
+    assert expr.eval(X, dict()) == np.array(np.float64(1.3150018100536451e-161))
+
+    expr_lower = np.array(np.float64(0.0))
+    expr_upper = np.array(np.float64(1.3150018100536451e-161))
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert _is_positive_zero(X_lower)
+    assert X_upper == np.float64(1.73e-322)
+
+    assert _is_positive_zero(expr.eval(X_lower, dict()))
+    assert expr.eval(X_upper, dict()) == np.array(np.float64(1.3150018100536451e-161))
