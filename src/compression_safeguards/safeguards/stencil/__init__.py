@@ -427,7 +427,8 @@ def _reverse_neighbourhood_indices(
     indices_windows_indices = indices_windows_indices.flatten()
 
     # sort the indices, such that windows that read the same data are together
-    argindices = np.argsort(indices_windows)
+    # use a stable sort to ensure consistent results, independent of chunking
+    argindices = np.argsort(indices_windows, stable=True)
     indices_windows_sorted = indices_windows[argindices]
 
     # indices_windows might include fill values, of value data_size, which
@@ -476,8 +477,5 @@ def _reverse_neighbourhood_indices(
     reverse_indices_windows = reverse_indices_windows.reshape(
         data_size, indices_max_run_length
     )
-    # sort the back-references to ensure consistent results,
-    #  e.g. independent of chunking
-    reverse_indices_windows = np.sort(reverse_indices_windows, axis=1)
 
     return reverse_indices_windows
