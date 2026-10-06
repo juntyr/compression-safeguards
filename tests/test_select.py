@@ -310,3 +310,35 @@ def test_unsafely_shadowed_stencil_requirements():
         ],
         fixed_constants=dict(select=np.array([0, 1])),
     )
+
+
+def test_select_isinstance_issubclass():
+    select_pointwise = SelectSafeguard(
+        safeguards=[dict(kind="assume_safe")], selector=0
+    )
+    select_stencil = SelectSafeguard(
+        safeguards=[
+            dict(
+                kind="qoi_eb_stencil",
+                qoi="sum(X)",
+                neighbourhood=[
+                    dict(
+                        axis=0,
+                        before=1,
+                        after=1,
+                        boundary="constant",
+                        constant_boundary="$x_max",
+                    ),
+                ],
+                type="abs",
+                eb=1,
+            ),
+        ],
+        selector=0,
+    )
+
+    assert isinstance(select_pointwise, SelectSafeguard)
+    assert isinstance(select_stencil, SelectSafeguard)
+
+    assert issubclass(type(select_pointwise), SelectSafeguard)
+    assert issubclass(type(select_stencil), SelectSafeguard)

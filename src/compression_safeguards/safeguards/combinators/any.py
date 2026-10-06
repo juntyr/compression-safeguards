@@ -4,9 +4,9 @@ Logical any (or) combinator safeguard.
 
 __all__ = ["AnySafeguard"]
 
-from abc import ABC
+from abc import ABC, ABCMeta
 from collections.abc import Collection, Set
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, final
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
@@ -21,7 +21,18 @@ from ..stencil import BoundaryCondition, NeighbourhoodAxis
 from ..stencil.abc import StencilSafeguard
 
 
-class AnySafeguard(Safeguard):
+@final
+class _AnySafeguardMeta(ABCMeta):
+    @override
+    def __instancecheck__(self, instance: object) -> bool:
+        return isinstance(instance, _AnySafeguardBase)
+
+    @override
+    def __subclasscheck__(self, subclass: type) -> bool:
+        return issubclass(subclass, _AnySafeguardBase)
+
+
+class AnySafeguard(Safeguard, metaclass=_AnySafeguardMeta):
     """
     The `AnySafeguard` guarantees that, for each element, at least one of the
     combined safeguards' guarantees is upheld.
