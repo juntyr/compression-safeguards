@@ -38,8 +38,6 @@ class Safeguard(ABC):
         specific data that is to be safeguarded.
         """
 
-        return frozenset()
-
     @abstractmethod
     def check(
         self,
@@ -69,7 +67,6 @@ class Safeguard(ABC):
         ok : bool
             `True` if the check succeeded.
         """
-        pass
 
     @abstractmethod
     def get_config(self) -> dict[str, JSON]:
@@ -84,8 +81,6 @@ class Safeguard(ABC):
         config : dict[str, JSON]
             Configuration of the safeguard.
         """
-
-        pass
 
     @classmethod
     def from_config(cls, config: dict[str, JSON]) -> Self:

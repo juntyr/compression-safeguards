@@ -91,8 +91,6 @@ class PointwiseSafeguard(Safeguard, ABC):
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        pass
-
     @abstractmethod
     def compute_safe_intervals(
         self,
@@ -123,8 +121,6 @@ class PointwiseSafeguard(Safeguard, ABC):
         intervals : IntervalUnion[T, int, int]
             Union of intervals in which the safeguard's guarantees are upheld.
         """
-
-        pass
 
     @abstractmethod
     def compute_footprint(
@@ -157,8 +153,6 @@ class PointwiseSafeguard(Safeguard, ABC):
             The footprint of the `foot` array.
         """
 
-        pass
-
     @abstractmethod
     def compute_inverse_footprint(
         self,
@@ -190,5 +184,3 @@ class PointwiseSafeguard(Safeguard, ABC):
         print : np.ndarray[S, np.dtype[np.bool]]
             The inverse footprint of the `foot` array.
         """
-
-        pass
