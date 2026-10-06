@@ -4,9 +4,9 @@ Logical selector (switch case) combinator safeguard.
 
 __all__ = ["SelectSafeguard"]
 
-from abc import ABC
+from abc import ABC, ABCMeta
 from collections.abc import Collection, Set
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, final
 
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
@@ -25,7 +25,18 @@ from ..stencil import BoundaryCondition, NeighbourhoodAxis
 from ..stencil.abc import StencilSafeguard
 
 
-class SelectSafeguard(Safeguard):
+@final
+class _SelectSafeguardMeta(ABCMeta):
+    @override
+    def __instancecheck__(self, instance: object) -> bool:
+        return isinstance(instance, _SelectSafeguardBase)
+
+    @override
+    def __subclasscheck__(self, subclass: type) -> bool:
+        return issubclass(subclass, _SelectSafeguardBase)
+
+
+class SelectSafeguard(Safeguard, metaclass=_SelectSafeguardMeta):
     """
     The `SelectSafeguard` guarantees that, for each element, the guarantees of
     the pointwise selected safeguard are upheld. This combinator allows

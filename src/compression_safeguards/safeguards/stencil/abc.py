@@ -54,8 +54,6 @@ class StencilSafeguard(Safeguard, ABC):
             The shape of the data neighbourhood.
         """
 
-        pass
-
     @final
     @override
     def check(
@@ -125,8 +123,6 @@ class StencilSafeguard(Safeguard, ABC):
             Pointwise, `True` if the check succeeded for this element.
         """
 
-        pass
-
     @abstractmethod
     def compute_safe_intervals(
         self,
@@ -157,8 +153,6 @@ class StencilSafeguard(Safeguard, ABC):
         intervals : IntervalUnion[T, int, int]
             Union of intervals in which the safeguard's guarantees are upheld.
         """
-
-        pass
 
     @abstractmethod
     def compute_footprint(
@@ -193,8 +187,6 @@ class StencilSafeguard(Safeguard, ABC):
             The footprint of the `foot` array.
         """
 
-        pass
-
     @abstractmethod
     def compute_inverse_footprint(
         self,
@@ -228,5 +220,3 @@ class StencilSafeguard(Safeguard, ABC):
         print : np.ndarray[S, np.dtype[np.bool]]
             The inverse footprint of the `foot` array.
         """
-
-        pass

@@ -5,6 +5,8 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from compression_safeguards.api import Safeguards
+from compression_safeguards.safeguards.combinators.all import AllSafeguards
+from compression_safeguards.safeguards.combinators.any import AnySafeguard
 from compression_safeguards.safeguards.pointwise.abc import PointwiseSafeguard
 from compression_safeguards.safeguards.stencil.abc import StencilSafeguard
 from compression_safeguards.utils.bindings import Bindings, Parameter
@@ -294,6 +296,64 @@ def test_any_unsafely_shadowed_stencil_requirements():
         ],
         fixed_constants=dict(is_safe=np.array([True, False])),
     )
+
+
+def test_all_isinstance_issubclass():
+    all_pointwise = AllSafeguards(safeguards=[dict(kind="assume_safe")])
+    all_stencil = AllSafeguards(
+        safeguards=[
+            dict(
+                kind="qoi_eb_stencil",
+                qoi="sum(X)",
+                neighbourhood=[
+                    dict(
+                        axis=0,
+                        before=1,
+                        after=1,
+                        boundary="constant",
+                        constant_boundary="$x_max",
+                    ),
+                ],
+                type="abs",
+                eb=1,
+            ),
+        ]
+    )
+
+    assert isinstance(all_pointwise, AllSafeguards)
+    assert isinstance(all_stencil, AllSafeguards)
+
+    assert issubclass(type(all_pointwise), AllSafeguards)
+    assert issubclass(type(all_stencil), AllSafeguards)
+
+
+def test_any_isinstance_issubclass():
+    any_pointwise = AnySafeguard(safeguards=[dict(kind="assume_safe")])
+    any_stencil = AnySafeguard(
+        safeguards=[
+            dict(
+                kind="qoi_eb_stencil",
+                qoi="sum(X)",
+                neighbourhood=[
+                    dict(
+                        axis=0,
+                        before=1,
+                        after=1,
+                        boundary="constant",
+                        constant_boundary="$x_max",
+                    ),
+                ],
+                type="abs",
+                eb=1,
+            ),
+        ]
+    )
+
+    assert isinstance(any_pointwise, AnySafeguard)
+    assert isinstance(any_stencil, AnySafeguard)
+
+    assert issubclass(type(any_pointwise), AnySafeguard)
+    assert issubclass(type(any_stencil), AnySafeguard)
 
 
 # a safeguard that sometimes reports always safe and sometimes always unsafe
