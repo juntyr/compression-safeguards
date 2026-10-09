@@ -454,19 +454,19 @@ class QoIParser(Parser):
             return p.expr.index(tuple([p.index_] + p.many_comma_index))
 
     @_("comma_index many_comma_index")  # type: ignore[name-defined]  # noqa: F821
-    def many_comma_index(self, p) -> list[int | slice[int, int, int]]:
+    def many_comma_index(self, p) -> list[int | slice]:
         return [p.comma_index] + p.many_comma_index
 
     @_("COMMA")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def many_comma_index(self, p) -> list[int | slice[int, int, int]]:  # noqa: F811
+    def many_comma_index(self, p) -> list[int | slice]:  # noqa: F811
         return []
 
     @_("empty")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def many_comma_index(self, p) -> list[int | slice[int, int, int]]:  # noqa: F811
+    def many_comma_index(self, p) -> list[int | slice]:  # noqa: F811
         return []
 
     @_("COMMA index_")  # type: ignore[name-defined]  # noqa: F821
-    def comma_index(self, p) -> int | slice[int, int, int]:
+    def comma_index(self, p) -> int | slice:
         return p.index_
 
     @_("integer_expr")  # type: ignore[name-defined]  # noqa: F821
@@ -474,11 +474,11 @@ class QoIParser(Parser):
         return p.integer_expr
 
     @_("maybe_integer_expr COLON maybe_integer_expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def index_(self, p) -> slice[int, int, int]:  # noqa: F811
+    def index_(self, p) -> slice:  # noqa: F811
         return slice(p.maybe_integer_expr0, p.maybe_integer_expr1, None)
 
     @_("maybe_integer_expr COLON maybe_integer_expr COLON maybe_integer_expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def index_(self, p) -> slice[int, int, int]:  # noqa: F811
+    def index_(self, p) -> slice:  # noqa: F811
         return slice(
             p.maybe_integer_expr0, p.maybe_integer_expr1, p.maybe_integer_expr2
         )
