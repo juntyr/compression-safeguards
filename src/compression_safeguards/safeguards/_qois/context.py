@@ -1,4 +1,4 @@
-from typing import Generic, Protocol
+from typing import Generic, Literal, Protocol
 
 import numpy as np
 
@@ -326,7 +326,7 @@ class DataBoundsAccumulator(Generic[Ps, Ns, F]):
         Xs_upper: np_sndarray[Ps, Ns, np.dtype[F]],
         *,
         term: int,
-        where: None | np_sndarray[Ps, Ns, np.dtype[np.bool]] = None,
+        where: Literal[True] | np_sndarray[Ps, Ns, np.dtype[np.bool]] = True,
     ) -> None:
         """
         Callback that can be passed as the `callback` parameter in
@@ -347,7 +347,7 @@ class DataBoundsAccumulator(Generic[Ps, Ns, F]):
             `Xs`, for the `term`.
         term : int
             The index of the term for which the data bounds have been computed.
-        where : None | np_sndarray[Ps, Ns, np.dtype[np.bool]]
+        where : Literal[True] | np_sndarray[Ps, Ns, np.dtype[np.bool]]
             Optional mask to only integrate the data bounds for the `term` for
             some elements.
         """

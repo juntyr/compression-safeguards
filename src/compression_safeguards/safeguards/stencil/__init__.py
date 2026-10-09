@@ -11,7 +11,7 @@ from typing import Literal, Self, assert_never
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
-from ...utils._compat import _sliding_window_view
+from ...utils._compat import _reshape, _sliding_window_view
 from ...utils.bindings import Parameter
 from ...utils.error import TypeCheckError, ctx, lookup_enum_or_raise
 from ...utils.typing import JSON, TB, S
@@ -394,48 +394,88 @@ def _reverse_neighbourhood_indices(
             None if axis.constant_boundary is None else np.full((), data_size),
             axis.axis,
         )
-    indices_windows = _sliding_window_view(
-        indices_boundary,
-        window,
-        axis=tuple(axis.axis for axis in neighbourhood),
-        writeable=False,
-    ).reshape((-1, window_size))
+
+    indices_windows: np.ndarray[tuple[int, int] | tuple[int], np.dtype[np.int_]]
+    indices_windows = _reshape(
+        _sliding_window_view(
+            indices_boundary,
+            window,
+            axis=tuple(axis.axis for axis in neighbourhood),
+            writeable=False,
+        ),
+        (-1, window_size),
+    )
+
+    # track the indices of the window indices
+    indices_windows_indices = np.arange(indices_windows.size).reshape(
+        indices_windows.shape
+    )
+
+    fill_value = indices_windows.size
+
+    # skip back-contributions from data elements where the safety requirements
+    #  are disabled
+    if where_flat is not True:
+        indices_windows = indices_windows[where_flat]
+        indices_windows_indices = indices_windows_indices[where_flat]
+
+    # skip window indices that are not used
+    indices_windows = indices_windows[:, window_used.flatten()]
+    indices_windows_indices = indices_windows_indices[:, window_used.flatten()]
+
+    indices_windows = indices_windows.flatten()
+    indices_windows_indices = indices_windows_indices.flatten()
+
+    # sort the indices, such that windows that read the same data are together
+    # use a stable sort to ensure consistent results, independent of chunking
+    argindices = np.argsort(indices_windows, stable=True)
+    indices_windows_sorted = indices_windows[argindices]
+
+    # indices_windows might include fill values, of value data_size, which
+    #  represent constant values that come from no data index
+    # exclude those, conveniently largest values, from indices_windows_sorted
+    #  to ensure that we only track valid data indices
+    only_fill_index = np.searchsorted(indices_windows_sorted, data_size)
+    argindices = argindices[:only_fill_index]
+    indices_windows_sorted = indices_windows_sorted[:only_fill_index]
+
+    # find the starts of the runs of common indices
+    indices_run_starts = np.r_[
+        0, np.flatnonzero(indices_windows_sorted[1:] != indices_windows_sorted[:-1]) + 1
+    ]
+
+    # find the inverse mapping from sorted indices to their unique indices
+    _, indices_windows_sorted_inverse = np.unique(
+        indices_windows_sorted, return_inverse=True, sorted=True
+    )
+
+    # find the offsets inside each index run, e.g. for a sequence
+    #  [a, b, b, b, c, d, d],
+    # the offsets will be
+    #  [0, 0, 1, 2, 0, 0, 1]
+    indices_run_offsets = (
+        np.arange(indices_windows_sorted.size)
+        - indices_run_starts[indices_windows_sorted_inverse]
+    )
+
+    indices_max_run_length = np.amax(indices_run_offsets, initial=-1) + 1
 
     # compute the reverse: for each data element, which windows is it in
     # i.e. for each data element, which derived elements does it contribute to
     #      and thus which data bounds affect it
-    reverse_indices_windows = np.full(
-        (data_size, np.sum(window_used.astype(int))), indices_windows.size
+    reverse_indices_windows = np.full(data_size * indices_max_run_length, fill_value)
+    # store the reverse mapping
+    #  - this is complicated since each data element may be referenced by
+    #    multiple windows, and we need to ensure that they don't override
+    #    each other's contributions when run with vectorisation
+    #  - so we precompute a unique run-slot for each back-reference
+    #  - since we sorted the indices earlier to find the runs, we also need
+    #    to apply the same reordering to the back-references
+    reverse_indices_windows[
+        indices_windows_sorted * indices_max_run_length + indices_run_offsets
+    ] = indices_windows_indices[argindices]
+    reverse_indices_windows = reverse_indices_windows.reshape(
+        data_size, indices_max_run_length
     )
-    reverse_indices_counter = np.zeros(data_size, dtype=np.intp)
-    for i, u in enumerate(window_used.flat):
-        # skip window indices that are not used
-        if not u:
-            continue
-        # manual loop to account for potential aliasing:
-        # with a wrapping boundary, more than one j for the same window
-        #  position j could refer back to the same data element
-        for j in range(indices_windows.shape[0]):
-            # skip back-contributions from data elements where the safety
-            #  requirements are disabled
-            if (where_flat is not True) and (not where_flat[j]):
-                continue
-            idx = indices_windows[j, i]
-            if idx != data_size:
-                # lazily allocate more to account for all possible edge cases
-                if reverse_indices_counter[idx] >= reverse_indices_windows.shape[1]:
-                    new_reverse_indices_windows = np.full(
-                        (data_size, reverse_indices_windows.shape[1] * 2),
-                        indices_windows.size,
-                    )
-                    new_reverse_indices_windows[
-                        :, : reverse_indices_windows.shape[1]
-                    ] = reverse_indices_windows
-                    reverse_indices_windows = new_reverse_indices_windows
-                # update the reverse mapping
-                reverse_indices_windows[idx][reverse_indices_counter[idx]] = (
-                    j * window_used.size
-                ) + i
-                reverse_indices_counter[idx] += 1
 
     return reverse_indices_windows
