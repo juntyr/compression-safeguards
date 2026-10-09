@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from compression_safeguards.safeguards.pointwise.eb import ErrorBoundSafeguard
 from compression_safeguards.utils.bindings import Bindings
@@ -200,3 +201,30 @@ def test_late_bound_eb():
     assert np.all(
         ok == np.array([True, False, False, False, False, False]).reshape(2, 3)
     )
+
+
+def test_fuzzer_found_error_bound_rounding():
+    data = np.array(
+        [[-128], [0], [0], [-1], [-41], [91]],
+        dtype=np.int8,
+    )
+    decoded = np.array(
+        [[-32], [-1], [-41], [6], [0], [0]],
+        dtype=np.int8,
+    )
+
+    # abs(-128) = -128 in int8
+
+    with pytest.raises(
+        ValueError, match=r"eb\.eb=\$x: must be >= 1 for a ratio error bound"
+    ):
+        encode_decode_mock(
+            data,
+            decoded,
+            safeguards=[
+                dict(
+                    kind="everywhere",
+                    safeguard=dict(kind="eb", type="ratio", eb="$x", equal_nan=True),
+                )
+            ],
+        )

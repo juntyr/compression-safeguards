@@ -18,7 +18,14 @@ from typing import assert_never
 
 import numpy as np
 
-from ._compat import _abs, _ensure_array, _is_of_dtype, _nextafter, _round_ties_even
+from ._compat import (
+    _abs,
+    _ensure_array,
+    _is_of_dtype,
+    _nextafter,
+    _round_ties_even,
+    _where,
+)
 from ._float128 import _float128_dtype
 from .error import TypeSetError, ctx
 from .typing import F, S, T, U
@@ -524,6 +531,17 @@ def saturating_finite_float_cast(
             _nextafter(
                 xa_to, np.copysign(0.0, xa_to), where=(_abs(xa_to) > abs(x)), out=xa_to
             )
+        elif np.issubdtype(x.dtype, np.signedinteger):
+            # handle x = imin explicitly, since abs(imin) = imin wraps around
+            imin = np.iinfo(x.dtype).min  # type: ignore
+            _nextafter(
+                xa_to,
+                np.copysign(dtype.type(0), xa_to),
+                where=_where(
+                    x == imin, np.copysign(xa_to, -1) < imin, _abs(xa_to) > _abs(x)
+                ),
+                out=xa_to,
+            )
         else:
             _nextafter(
                 xa_to,
@@ -541,6 +559,15 @@ def saturating_finite_float_cast(
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         if isinstance(x, int | float):
             assert _abs(xa_to) <= abs(x)
+        elif np.issubdtype(x.dtype, np.signedinteger):
+            # handle x = imin explicitly, since abs(imin) = imin wraps around
+            imin = np.iinfo(x.dtype).min  # type: ignore
+            assert np.all(
+                _where(
+                    x == imin, np.copysign(xa_to, -1) >= imin, _abs(xa_to) <= _abs(x)
+                )
+            )
+
         else:
             assert np.all(_abs(xa_to) <= _abs(x))
 
