@@ -1,5 +1,7 @@
 import itertools
+from collections.abc import Callable
 from contextlib import contextmanager
+from typing import Never
 
 from sly import Parser
 
@@ -82,7 +84,7 @@ class QoIParser(Parser):
         x: Data,
         X: None | Array,
         I: None | tuple[int, ...],  # noqa: E741
-    ):
+    ) -> None:
         self._x = x
         self._X = X
         self._I = I
@@ -120,7 +122,7 @@ class QoIParser(Parser):
 
     # top-level: qoi := expr | { assign } return expr;
     @_("expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def qoi(self, p):  # noqa: F811
+    def qoi(self, p) -> AnyExpr:  # noqa: F811
         self.assert_or_error(
             not isinstance(p.expr, Array),
             p,
@@ -132,11 +134,11 @@ class QoIParser(Parser):
         return p.expr
 
     @_("many_assign return_expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def qoi(self, p):  # noqa: F811
+    def qoi(self, p) -> AnyExpr:  # noqa: F811
         return p.return_expr
 
     @_("RETURN expr SEMI")  # type: ignore[name-defined]  # noqa: F821
-    def return_expr(self, p):
+    def return_expr(self, p) -> AnyExpr:
         self.assert_or_error(
             not isinstance(p.expr, Array),
             p,
@@ -151,7 +153,7 @@ class QoIParser(Parser):
 
     # variable assignment: assign := V["id"] = expr;
     @_("VS LBRACK quotedparameter RBRACK ASSIGN expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def assign(self, p):  # noqa: F811
+    def assign(self, p) -> None:  # noqa: F811
         self.assert_or_error(
             self._X is None, p, "stencil QoI variables use upper-case `V`"
         )
@@ -168,7 +170,7 @@ class QoIParser(Parser):
         self._vars[p.quotedparameter] = Array.map(Group, p.expr)
 
     @_("VA LBRACK quotedparameter RBRACK ASSIGN expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def assign(self, p):  # noqa: F811
+    def assign(self, p) -> None:  # noqa: F811
         self.assert_or_error(
             self._X is not None, p, "pointwise QoI variables use lower-case `v`"
         )
@@ -185,152 +187,152 @@ class QoIParser(Parser):
         self._vars[p.quotedparameter] = Array.map(Group, p.expr)
 
     @_("ID ASSIGN expr SEMI")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def assign(self, p):  # noqa: F811
+    def assign(self, p) -> Never:  # noqa: F811
         self.raise_error(
             p,
             f'cannot assign to identifier `{p.ID}`, assign to a variable {"v" if self._X is None else "V"}["{p.ID}"] instead',
         )
 
     @_("assign many_assign")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def many_assign(self, p):  # noqa: F811
+    def many_assign(self, p) -> None:  # noqa: F811
         pass
 
     @_("empty")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def many_assign(self, p):  # noqa: F811
+    def many_assign(self, p) -> None:  # noqa: F811
         pass
 
     # integer literal (non-expression)
     @_("INTEGER")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def integer(self, p):  # noqa: F811
+    def integer(self, p) -> int:  # noqa: F811
         return p.INTEGER
 
     @_("PLUS INTEGER")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def integer(self, p):  # noqa: F811
+    def integer(self, p) -> int:  # noqa: F811
         return p.INTEGER
 
     @_("MINUS INTEGER")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def integer(self, p):  # noqa: F811
+    def integer(self, p) -> int:  # noqa: F811
         return -p.INTEGER
 
     # expressions
 
     # integer and floating-point literals
     @_("INTEGER")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> Number:  # noqa: F811
         return Number.from_symbolic_int(p.INTEGER)
 
     @_("FLOAT")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> Number:  # noqa: F811
         return Number(p.FLOAT)
 
     @_("INF")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> Number:  # noqa: F811
         return Number("inf")
 
     @_("NAN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> Number:  # noqa: F811
         return Number("nan")
 
     # array literal
     @_("LBRACK expr many_comma_expr RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> Array:  # noqa: F811
         with self.with_error_context(
             p, lambda err: f"invalid array literal: {err}", exception=ValueError
         ):
             return Array(*([p.expr] + p.many_comma_expr))
 
     @_("LBRACK RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> Never:  # noqa: F811
         self.raise_error(p, "invalid empty array literal")
 
     @_("comma_expr many_comma_expr")  # type: ignore[name-defined]  # noqa: F821
-    def many_comma_expr(self, p):
+    def many_comma_expr(self, p) -> list[AnyExpr]:
         return [p.comma_expr] + p.many_comma_expr
 
     @_("COMMA")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def many_comma_expr(self, p):  # noqa: F811
+    def many_comma_expr(self, p) -> list[AnyExpr]:  # noqa: F811
         return []
 
     @_("empty")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def many_comma_expr(self, p):  # noqa: F811
+    def many_comma_expr(self, p) -> list[AnyExpr]:  # noqa: F811
         return []
 
     @_("COMMA expr")  # type: ignore[name-defined]  # noqa: F821
-    def comma_expr(self, p):
+    def comma_expr(self, p) -> AnyExpr:
         return p.expr
 
     # unary operators (positive, negative):
     #  expr := OP expr
     @_("PLUS expr %prec UPLUS")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return p.expr
 
     @_("MINUS expr %prec UMINUS")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarNegate, p.expr)
 
     # binary operators (add, subtract, multiply, divide, power):
     #  expr := expr OP expr
     @_("expr PLUS expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map(ScalarAdd, p.expr0, p.expr1)
 
     @_("expr MINUS expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map(ScalarSubtract, p.expr0, p.expr1)
 
     @_("expr TIMES expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map(ScalarMultiply, p.expr0, p.expr1)
 
     @_("expr DIVIDE expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map(ScalarDivide, p.expr0, p.expr1)
 
     @_("expr POWER expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map(ScalarPower, p.expr0, p.expr1)
 
     # binary comparison operators
     #  expr := expr OP expr
     @_("expr LESS_EQUAL expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map(ScalarLessEqual, p.expr0, p.expr1)
 
     @_("expr LESS expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map(ScalarLess, p.expr0, p.expr1)
 
     @_("expr EQUAL expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map(ScalarEqual, p.expr0, p.expr1)
 
     @_("expr NOT_EQUAL expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map(ScalarNotEqual, p.expr0, p.expr1)
 
     @_("expr GREATER_EQUAL expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map(ScalarGreaterEqual, p.expr0, p.expr1)
 
     @_("expr GREATER expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map(ScalarGreater, p.expr0, p.expr1)
 
     # array transpose: expr := expr.T
     @_("expr TRANSPOSE")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> Array:  # noqa: F811
         self.assert_or_error(
             isinstance(p.expr, Array), p, "cannot transpose scalar non-array expression"
         )
@@ -338,47 +340,48 @@ class QoIParser(Parser):
 
     # group in parentheses
     @_("LPAREN expr RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(Group, p.expr)
 
     # optional trailing comma separator
     @_("COMMA")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def maybe_comma(self, p):  # noqa: F811
+    def maybe_comma(self, p) -> None:  # noqa: F811
         pass
 
     @_("empty")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def maybe_comma(self, p):  # noqa: F811
+    def maybe_comma(self, p) -> None:  # noqa: F811
         pass
 
     # constants: expr := e | pi
     @_("EULER")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> Euler:  # noqa: F811
         return Euler()
 
     @_("PI")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> Pi:  # noqa: F811
         return Pi()
 
     # data, late-bound constants, variables
     @_("XS")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> Data:  # noqa: F811
         return self._x
 
     @_("XA")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> Array:  # noqa: F811
         self.assert_or_error(
             self._X is not None,
             p,
             "data neighbourhood `X` is not available in pointwise QoIs, use pointwise `x` instead",
         )
+        assert self._X is not None  # for typing only
         return self._X
 
     @_("CS LBRACK quotedparameter RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> LateBoundConstant:  # noqa: F811
         return LateBoundConstant.like(p.quotedparameter, self._x)
 
     @_("CA LBRACK quotedparameter RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         self.assert_or_error(
             self._X is not None,
             p,
@@ -390,7 +393,7 @@ class QoIParser(Parser):
         )
 
     @_("VS LBRACK quotedparameter RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         self.assert_or_error(
             self._X is None, p, "stencil QoI variables use upper-case `V`"
         )
@@ -407,7 +410,7 @@ class QoIParser(Parser):
         return self._vars[p.quotedparameter]
 
     @_("VA LBRACK quotedparameter RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         self.assert_or_error(
             self._X is not None, p, "pointwise QoI variables use lower-case `v`"
         )
@@ -424,7 +427,7 @@ class QoIParser(Parser):
         return self._vars[p.quotedparameter]
 
     @_("STRING")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def quotedparameter(self, p):  # noqa: F811
+    def quotedparameter(self, p) -> Parameter:  # noqa: F811
         with self.with_error_context(
             p, f'invalid quoted parameter "{p.STRING}": must be a valid identifier'
         ):
@@ -432,7 +435,7 @@ class QoIParser(Parser):
 
     # array indexing
     @_("expr LBRACK IDX RBRACK %prec INDEX")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         self.assert_or_error(
             self._I is not None, p, "index `I` is not available in pointwise QoIs"
         )
@@ -443,7 +446,7 @@ class QoIParser(Parser):
             return p.expr.index(self._I)
 
     @_("expr LBRACK index_ many_comma_index RBRACK %prec INDEX")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         self.assert_or_error(
             isinstance(p.expr, Array), p, "cannot index scalar non-array expression"
         )
@@ -451,45 +454,45 @@ class QoIParser(Parser):
             return p.expr.index(tuple([p.index_] + p.many_comma_index))
 
     @_("comma_index many_comma_index")  # type: ignore[name-defined]  # noqa: F821
-    def many_comma_index(self, p):
+    def many_comma_index(self, p) -> list[int | slice[int, int, int]]:
         return [p.comma_index] + p.many_comma_index
 
     @_("COMMA")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def many_comma_index(self, p):  # noqa: F811
+    def many_comma_index(self, p) -> list[int | slice[int, int, int]]:  # noqa: F811
         return []
 
     @_("empty")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def many_comma_index(self, p):  # noqa: F811
+    def many_comma_index(self, p) -> list[int | slice[int, int, int]]:  # noqa: F811
         return []
 
     @_("COMMA index_")  # type: ignore[name-defined]  # noqa: F821
-    def comma_index(self, p):
+    def comma_index(self, p) -> int | slice[int, int, int]:
         return p.index_
 
     @_("integer_expr")  # type: ignore[name-defined]  # noqa: F821
-    def index_(self, p):
+    def index_(self, p) -> int:
         return p.integer_expr
 
     @_("maybe_integer_expr COLON maybe_integer_expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def index_(self, p):  # noqa: F811
+    def index_(self, p) -> slice[int, int, int]:  # noqa: F811
         return slice(p.maybe_integer_expr0, p.maybe_integer_expr1, None)
 
     @_("maybe_integer_expr COLON maybe_integer_expr COLON maybe_integer_expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def index_(self, p):  # noqa: F811
+    def index_(self, p) -> slice[int, int, int]:  # noqa: F811
         return slice(
             p.maybe_integer_expr0, p.maybe_integer_expr1, p.maybe_integer_expr2
         )
 
     @_("integer_expr")  # type: ignore[name-defined]  # noqa: F821
-    def maybe_integer_expr(self, p):
+    def maybe_integer_expr(self, p) -> int:
         return p.integer_expr
 
     @_("empty")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def maybe_integer_expr(self, p):  # noqa: F811
+    def maybe_integer_expr(self, p) -> None:  # noqa: F811
         return None
 
     @_("expr")  # type: ignore[name-defined]  # noqa: F821
-    def integer_expr(self, p):
+    def integer_expr(self, p) -> int:
         self.assert_or_error(
             isinstance(p.expr, Number) and p.expr.as_int() is not None,
             p,
@@ -498,10 +501,11 @@ class QoIParser(Parser):
         return p.expr.as_int()
 
     @_("IDX LBRACK index_ many_comma_index RBRACK")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         self.assert_or_error(
             self._I is not None, p, "index `I` is not available in pointwise QoIs"
         )
+        assert self._I is not None  # for typing only
         idx = Array(*tuple(Number.from_symbolic_int(i) for i in self._I))
         with self.with_error_context(
             p,
@@ -514,76 +518,76 @@ class QoIParser(Parser):
 
     # logarithms and exponentials
     @_("LN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(lambda e: ScalarLog(Logarithm.ln, e), p.expr)
 
     @_("LOG2 LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(lambda e: ScalarLog(Logarithm.log2, e), p.expr)
 
     @_("LOG10 LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(lambda e: ScalarLog(Logarithm.log10, e), p.expr)
 
     @_("LOG LPAREN expr COMMA BASE ASSIGN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map(ScalarLogWithBase, p.expr0, p.expr1)
 
     @_("EXP LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(lambda e: ScalarExp(Exponential.exp, e), p.expr)
 
     @_("EXP2 LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(lambda e: ScalarExp(Exponential.exp2, e), p.expr)
 
     @_("EXP10 LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(lambda e: ScalarExp(Exponential.exp10, e), p.expr)
 
     # exponentiation
     @_("SQRT LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarSqrt, p.expr)
 
     @_("SQUARE LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarSquare, p.expr)
 
     @_("RECIPROCAL LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarReciprocal, p.expr)
 
     # absolute value
     @_("ABS LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarAbs, p.expr)
 
     # sign
     @_("SIGN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarSign, p.expr)
 
     # rounding
     @_("FLOOR LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarFloor, p.expr)
 
     @_("CEIL LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarCeil, p.expr)
 
     @_("TRUNC LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarTrunc, p.expr)
 
     @_("ROUND_TIES_EVEN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarRoundTiesEven, p.expr)
 
     @_("NEXTAFTER LPAREN expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         self.assert_or_error(
             not p.expr1.has_data,
             p,
@@ -593,7 +597,7 @@ class QoIParser(Parser):
 
     # modulo
     @_("FLOOR_MODULO LPAREN expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         self.assert_or_error(
             not p.expr1.has_data,
             p,
@@ -602,7 +606,7 @@ class QoIParser(Parser):
         return Array.map(ScalarFloorModulo, p.expr0, p.expr1)
 
     @_("CEIL_MODULO LPAREN expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         self.assert_or_error(
             not p.expr1.has_data,
             p,
@@ -611,7 +615,7 @@ class QoIParser(Parser):
         return Array.map(ScalarCeilModulo, p.expr0, p.expr1)
 
     @_("TRUNC_MODULO LPAREN expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         self.assert_or_error(
             not p.expr1.has_data,
             p,
@@ -620,7 +624,7 @@ class QoIParser(Parser):
         return Array.map(ScalarTruncModulo, p.expr0, p.expr1)
 
     @_("ROUND_TIES_EVEN_MODULO LPAREN expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         self.assert_or_error(
             not p.expr1.has_data,
             p,
@@ -629,7 +633,7 @@ class QoIParser(Parser):
         return Array.map(ScalarRoundTiesEvenModulo, p.expr0, p.expr1)
 
     @_("EUCLIDEAN_MODULO LPAREN expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         self.assert_or_error(
             not p.expr1.has_data,
             p,
@@ -639,76 +643,76 @@ class QoIParser(Parser):
 
     # trigonometric
     @_("SIN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarSin, p.expr)
 
     @_("COS LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarCos, p.expr)
 
     @_("TAN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarTan, p.expr)
 
     @_("ASIN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarAsin, p.expr)
 
     @_("ACOS LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarAcos, p.expr)
 
     @_("ATAN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarAtan, p.expr)
 
     # hyperbolic
     @_("SINH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarSinh, p.expr)
 
     @_("COSH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarCosh, p.expr)
 
     @_("TANH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarTanh, p.expr)
 
     @_("ASINH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarAsinh, p.expr)
 
     @_("ACOSH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarAcosh, p.expr)
 
     @_("ATANH LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarAtanh, p.expr)
 
     # classification
     @_("ISFINITE LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarIsFinite, p.expr)
 
     @_("ISINF LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarIsInf, p.expr)
 
     @_("ISNAN LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarIsNaN, p.expr)
 
     # combinators
     @_("NOT LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         return Array.map(ScalarNot, p.expr)
 
     @_(  # type: ignore[name-defined, no-redef]  # noqa: F821
         "ALL LPAREN expr maybe_comma RPAREN"
     )
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> ScalarAll:  # noqa: F811
         expr = p.expr
         self.assert_or_error(
             isinstance(expr, Array) and expr.size >= 2,
@@ -727,7 +731,7 @@ class QoIParser(Parser):
     @_(  # type: ignore[name-defined, no-redef]  # noqa: F821
         "ANY LPAREN expr maybe_comma RPAREN"
     )
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> ScalarAny:  # noqa: F811
         expr = p.expr
         self.assert_or_error(
             isinstance(expr, Array) and expr.size >= 2,
@@ -744,34 +748,34 @@ class QoIParser(Parser):
         return ScalarAny(a, b, *cs)
 
     @_("WHERE LPAREN expr COMMA expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         with self.with_error_context(p, lambda err: f"{err}", exception=ValueError):
             return Array.map(ScalarWhere, p.expr0, p.expr1, p.expr2)
 
     # array operations
     @_("SIZE LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> Number:  # noqa: F811
         self.assert_or_error(
             isinstance(p.expr, Array), p, "scalar non-array expression has no size"
         )
         return Number.from_symbolic_int(p.expr.size)
 
     @_("SHAPE LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> Array:  # noqa: F811
         self.assert_or_error(
             isinstance(p.expr, Array), p, "scalar non-array expression has no shape"
         )
         return Array(*tuple(Number.from_symbolic_int(s) for s in p.expr.shape))
 
     @_("SUM LPAREN expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> AnyExpr:  # noqa: F811
         self.assert_or_error(
             isinstance(p.expr, Array), p, "cannot sum over scalar non-array expression"
         )
         return p.expr.sum()
 
     @_("MATMUL LPAREN expr COMMA expr maybe_comma RPAREN")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> Array:  # noqa: F811
         self.assert_or_error(
             isinstance(p.expr0, Array),
             p,
@@ -789,12 +793,14 @@ class QoIParser(Parser):
     @_(  # type: ignore[name-defined, no-redef]  # noqa: F821
         "FINITE_DIFFERENCE LPAREN expr COMMA ORDER ASSIGN integer COMMA ACCURACY ASSIGN integer COMMA TYPE ASSIGN integer COMMA AXIS ASSIGN integer finite_difference_grid_spacing finite_difference_grid_period RPAREN"
     )
-    def expr(self, p):  # noqa: F811
+    def expr(self, p) -> Group | Number:  # noqa: F811
         self.assert_or_error(
             self._X is not None,
             p,
             "`finite_difference` is not available in pointwise QoIs",
         )
+        assert self._X is not None  # for typing only
+        assert self._I is not None  # for typing only
 
         expr = p.expr
         self.assert_or_error(
@@ -911,7 +917,7 @@ class QoIParser(Parser):
         return Group(sum_)
 
     @_("COMMA GRID_SPACING ASSIGN expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def finite_difference_grid_spacing(self, p):  # noqa: F811
+    def finite_difference_grid_spacing(self, p) -> dict[str, AnyExpr]:  # noqa: F811
         self.assert_or_error(
             not p.expr.has_data,
             p,
@@ -925,7 +931,7 @@ class QoIParser(Parser):
         return dict(spacing=p.expr)
 
     @_("COMMA GRID_CENTRE ASSIGN expr")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def finite_difference_grid_spacing(self, p):  # noqa: F811
+    def finite_difference_grid_spacing(self, p) -> dict[str, AnyExpr]:  # noqa: F811
         self.assert_or_error(
             not p.expr.has_data,
             p,
@@ -944,7 +950,7 @@ class QoIParser(Parser):
         return dict(centre=p.expr)
 
     @_("COMMA GRID_PERIOD ASSIGN expr maybe_comma")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def finite_difference_grid_period(self, p):  # noqa: F811
+    def finite_difference_grid_period(self, p) -> AnyExpr:  # noqa: F811
         self.assert_or_error(
             not p.expr.has_data,
             p,
@@ -963,17 +969,17 @@ class QoIParser(Parser):
         return p.expr
 
     @_("maybe_comma")  # type: ignore[name-defined, no-redef]  # noqa: F821
-    def finite_difference_grid_period(self, p):  # noqa: F811
+    def finite_difference_grid_period(self, p) -> None:  # noqa: F811
         pass
 
     # empty rule
     @_("")  # type: ignore[name-defined]  # noqa: F821
-    def empty(self, p):
+    def empty(self, p) -> None:
         pass
 
     # === parser error handling ===
-    def error(self, t):
-        actions = self._lrtable.lr_action[self.state]
+    def error(self, t) -> Never:
+        actions = self._lrtable.lr_action[self.state]  # type: ignore
         options = ", ".join(QoILexer.token_to_name(a) for a in actions)
         oneof = " one of" if len(actions) > 1 else ""
 
@@ -1006,7 +1012,7 @@ class QoIParser(Parser):
             | ctx
         )
 
-    def raise_error(self, t, message):
+    def raise_error(self, t, message: str) -> Never:
         raise (
             SyntaxError(
                 message,
@@ -1020,12 +1026,14 @@ class QoIParser(Parser):
             | ctx
         )
 
-    def assert_or_error(self, check, t, message):
+    def assert_or_error(self, check: bool, t, message: str | Callable[[], str]) -> None:
         if not check:
             self.raise_error(t, message() if callable(message) else message)
 
     @contextmanager
-    def with_error_context(self, t, message, exception=Exception):
+    def with_error_context(
+        self, t, message: str | Callable[[Exception], str], exception=Exception
+    ):
         try:
             yield
         except exception as err:
