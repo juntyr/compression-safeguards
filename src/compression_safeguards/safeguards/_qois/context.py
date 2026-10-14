@@ -354,8 +354,8 @@ class DataBoundsAccumulator(Generic[Ps, Ns, F]):
 
         # combine the inner data bounds
         if self._can_override_out:
-            np.copyto(self._Xs_lower_out, Xs_lower)
-            np.copyto(self._Xs_upper_out, Xs_upper)
+            np.copyto(self._Xs_lower_out, Xs_lower, where=where)
+            np.copyto(self._Xs_upper_out, Xs_upper, where=where)
         else:
             _maximum_zero_sign_sensitive(
                 self._Xs_lower_out, Xs_lower, out=self._Xs_lower_out, where=where

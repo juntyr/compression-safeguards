@@ -1402,16 +1402,18 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         #  True, we can more efficiently check which elements are part of the
         #  inverse footprint by checking if they have any valid reverse
         #  contribution indices
-        valid_reverse_index = reverse_indices_windows != (foot_valid.size * window_size)
-
-        inverse_footprint: np.ndarray[S, np.dtype[np.bool]] = np.logical_or.reduce(
-            valid_reverse_index, axis=1
-        ).reshape(foot.shape)
-
-        inverse_footprint_2 = (
-            reverse_indices_windows[:, 0] != (foot_valid.size * window_size)
-        ).reshape(foot.shape)
-        np.testing.assert_array_equal(inverse_footprint, inverse_footprint_2)
+        # optimisation: instead of reducing over all reverse indices using
+        #  np.logical_or.reduce(valid_reverse_index, axis=1), we only check the
+        #  first one since valid contribution indices are guaranteed to come
+        #  first, i.e. if there is any contribution, there will be one at the
+        #  first index
+        inverse_footprint: np.ndarray[S, np.dtype[np.bool]]
+        if reverse_indices_windows.size == 0:
+            inverse_footprint = _zeros(foot.shape, dtype=np.dtype(np.bool))
+        else:
+            inverse_footprint = (
+                reverse_indices_windows[:, 0] != (foot_valid.size * window_size)
+            ).reshape(foot.shape)
 
         return inverse_footprint
 
