@@ -325,7 +325,7 @@ def _minimum_zero_sign_sensitive(a, b, out=None, where=True):
     one_nan = np.logical_xor(np.isnan(a), np.isnan(b))
     minimum = _ensure_array(np.minimum(a, b, out=out, where=where))
     np.copysign(
-        minimum, minimum_sign, out=minimum, where=_and_where(one_nan, where=where)
+        minimum, minimum_sign, out=minimum, where=_and_where(~one_nan, where=where)
     )
 
     return minimum
@@ -381,7 +381,7 @@ def _maximum_zero_sign_sensitive(a, b, out=None, where=True):
     one_nan = np.logical_xor(np.isnan(a), np.isnan(b))
     maximum = _ensure_array(np.maximum(a, b, out=out, where=where))
     np.copysign(
-        maximum, maximum_sign, out=maximum, where=_and_where(one_nan, where=where)
+        maximum, maximum_sign, out=maximum, where=_and_where(~one_nan, where=where)
     )
 
     return maximum
