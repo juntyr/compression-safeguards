@@ -890,3 +890,60 @@ def test_chunked_coercion_to_ndarray_for_safeguards():
         ],
         check_chunks_first=False,
     ).compute()
+
+
+def test_fuzzer_found_constant_boundary_reverse_neighbourhood():
+    chunks = dict(b=1)
+    da = xr.DataArray(
+        np.array([[26, 255], [255, 61]], dtype=np.uint8), name="da", dims=["a", "b"]
+    ).chunk(chunks)
+    da_approximation = xr.DataArray(
+        np.ones_like(da.values), name="da", dims=["a", "b"]
+    ).chunk(chunks)
+
+    safeguard = StencilQuantityOfInterestErrorBoundSafeguard(
+        qoi="x",
+        neighbourhood=[
+            dict(
+                axis=-1,
+                before=4,
+                after=0,
+                boundary="constant",
+                constant_boundary="$x_min",
+            )
+        ],
+        type="abs",
+        eb=0,
+        qoi_dtype="lossless",
+    )
+    safeguard._qoi_expr._expr = HashingExpr.from_data_shape(
+        data_shape=safeguard._qoi_expr._stencil_shape,
+        late_bound_constants=frozenset(["foo"]),
+    )
+    safeguard._qoi_expr._data_indices = expr_data_indices(safeguard._qoi_expr._expr)
+    safeguard._qoi_expr._late_bound_constants = expr_late_bound_constants(
+        safeguard._qoi_expr._expr
+    )
+
+    with _patch_for_hashing_qoi_dev_only():
+        global_hash = Safeguards(safeguards=[safeguard]).compute_correction(
+            data=da.values,
+            approximation=da_approximation.values,
+            late_bound={
+                "foo": np.array([[255, 255], [255, 255]], dtype=np.uint8),
+                "$x_min": np.uint8(26),
+            },
+        )
+        chunked_hash = produce_data_array_correction(
+            data=da,
+            approximation=da_approximation,
+            safeguards=[safeguard],
+            late_bound={
+                "foo": xr.DataArray(
+                    np.array([[255, 255], [255, 255]], dtype=np.uint8),
+                    name="foo",
+                    dims=["a", "b"],
+                )
+            },
+        )
+        np.testing.assert_array_equal(chunked_hash.values, global_hash)

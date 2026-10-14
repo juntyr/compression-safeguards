@@ -288,6 +288,8 @@ class SameValueSafeguard(PointwiseSafeguard):
             (dataf_bits != valuef_bits) & (valuef_total < total_max)
         ] <= Maximum
 
+        # we cannot use a cheaper union without intersection here because
+        # valid_below might be empty and valid_above non-empty of value = min
         return valid_below.union(valid_above).preserve_only_where(wheref)
 
     @override
@@ -663,6 +665,8 @@ class EquivalentValueSafeguard(PointwiseSafeguard):
                 .preserve_only_where(wheref)
             )
 
+        # we cannot use a cheaper union without intersection here because
+        # valid_below might be empty and valid_above non-empty of value = min
         return valid_below.union(valid_above).preserve_only_where(wheref)
 
     @override

@@ -55,7 +55,6 @@ The safeguards can be adopted easily:
 
 [^2]: See [doi:10.1109/TVCG.2023.3327186](https://doi.org/10.1109/TVCG.2023.3327186) for a general meta-compressor approach that enables progressive decompression to satisfy a compression error that is user-chosen at decompression time.
 
-
 ### Other terminology used by the compression safeguards
 
 - *safeguard*: Declares a safety requirements and enforces that it is met after (lossy) compression.
@@ -377,6 +376,7 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
     > Derivatives of arbitrary order, as approximated by arbitrary-order-accurate forward / central / backwards finite differences, can be preserved using the following `qoi_eb_stencil` safeguard: `'finite_difference(x, ...)'`, where the finite difference keyword parameters have been excluded for brevity. If the spacing between points is a uniform constant, it can be specified using the `grid_spacing` parameter. If the spacing might vary, the coordinates of the data `x` can be provided as a late-bound constant with the `grid_centre` parameter. If the coordinates are periodic, e.g. a longitude with a period of 360 degrees, the optional `grid_period` parameter can be set. If you want to use a custom finite difference formula, e.g. `'(X[I[0]+5] - X[I[0] - 5]) / (C["c"][I[0]+5] - C["c"][I[0]-5])'`, with a periodic late-bound coordinate `C["c"]`, you can use the `round_ties_even_modulo` function, e.g. `'(X[I[0]+5] - X[I[0] - 5]) / round_ties_even_modulo(C["c"][I[0]+5] - C["c"][I[0]-5], 360)'`.
 
+
 ## Limitations
 
 - *printer problem*: The `compression-safeguards` need to know about all safety requirements that they should uphold. If the data is first safeguarded with an absolute error bound, and then later the safeguards-corrected data is safeguarded with a relative error bound, the second safeguard may violate the guarantees provided by the first. Even applying the same safeguard twice in a row can violate the guarantees. This is also known as the printer problem: every time a document is copied (safeguarded) from a previously copied and printed (safeguarded) document, new artifacts are added and accumulate over time. Several safeguards should instead be combined into one using the (logical) combinator safeguards provided by the `compression-safeguards` package. Furthermore, the safeguards should always be given the original, uncompressed and unsafeguarded reference data in relation to which the safety requirements will be upheld. The `numcodecs-safeguards` and `xarray-safeguards` frontends catch some trivial cases of the printer problem, e.g. wrapping a [`SafeguardedCodec`][numcodecs_safeguards.SafeguardedCodec] inside a [`SafeguardedCodec`][numcodecs_safeguards.SafeguardedCodec] or applying safeguards to an already safeguards-corrected [`DataArray`][xarray.DataArray]. In the future, a community standard for marking lossy-compressed (and safeguarded) data with metadata could help with preventing accidental compression error accumulation.
@@ -424,7 +424,6 @@ The safeguards can also fill the role of a quantizer, which is part of many (pre
 
 You can easily try out ZFP using the [`numcodecs-wasm-zfp`](https://numcodecs-wasm.readthedocs.io/en/latest/api/numcodecs_wasm_zfp/) (for ZFP-ROUND) and [`numcodecs-wasm-zfp-classic`](https://numcodecs-wasm.readthedocs.io/en/latest/api/numcodecs_wasm_zfp/) (for ZFP) Python packages.
 
-
 #### SZ3 error compression
 
 The [SZ3](https://github.com/szcompressor/SZ3) compressor version >=3.2.0 provides the `CmprAlgo=ALGO_NOPRED` option, with which the compression error $\hat{x} - x$ of another lossy compressor can itself be lossy-compressed with e.g. an absolute error bound. Using this option, any compressor can be transformed into an error bounded compressor.
@@ -441,7 +440,6 @@ SZ3's error compression can provide higher compression ratios if most data eleme
 
 You can easily try out SZ3 using the [`numcodecs-wasm-sz3`](https://numcodecs-wasm.readthedocs.io/en/latest/api/numcodecs_wasm_sz3/) Python package.
 
-
 #### SPERR outlier correction
 
 The [SPERR](https://github.com/NCAR/SPERR) compressor bounds the pointwise absolute error of its wavelet-based lossy compression by correcting any outlier points that exceed the error bound. For each outlier, where the error bound is violated, a lossy integer correction, which represents a multiple of the absolute error bound, is stored. With this correction, outliers are corrected back within the error bounds. The SPERR compressor is tuned to produce around 2% outliers, which minimises the combined cost of compression and correction.
@@ -456,7 +454,6 @@ Note that SPERR is known to [^6] sometimes violate its pointwise absolute error 
 
 You can easily try out SPERR using the [`numcodecs-wasm-sperr`](https://numcodecs-wasm.readthedocs.io/en/latest/api/numcodecs_wasm_sperr/) Python package.
 
-
 #### EBCC residual compression
 
 The [EBCC](https://github.com/spcl/EBCC) (Error Bounded Climate-data) compressor bounds the pointwise absolute or range-relative error of its JPEG2000-based lossy compression by encoding the residual using a discrete wavelet transform. The wavelet coefficients are encoded into a hierarchical bitstream that is truncated once the global error bound is met. The EBCC compressor is tuned to minimise the combined cost of compression and the sparse residual encoding.
@@ -464,7 +461,6 @@ The [EBCC](https://github.com/spcl/EBCC) (Error Bounded Climate-data) compressor
 **TLDR:** You can use EBCC to bound a (globally constant) pointwise absolute or range-relative error, for which EBCC uses efficient residual compression. Use `compression-safeguards` to guarantee a variety of safety requirements, for *any* compressor, including EBCC.
 
 > Huang, L., Fusco, L., Scheidl, F., Zibell, J., Sprenger, M. A., Schemm, S., & Hoefler, T. (2025). Error bounded compression for weather and climate applications. *arXiv*. Available from: [doi:10.48550/arxiv.2510.22265](https://doi.org/10.48550/arxiv.2510.22265).
-
 
 #### LC
 
@@ -476,7 +472,6 @@ LC implements lossy error-bounded compression by providing specific quantizers f
 
 > Fallin, A., & Burtscher, M. (2024). Lessons learned on the path to guaranteeing the error bound in lossy quantizers. *arXiv*. Available from: [doi:10.48550/arxiv.2407.15037](https://doi.org/10.48550/arxiv.2407.15037).
 
-
 ### Preserving Quantities of Interest
 
 #### QoI-SZ3
@@ -487,7 +482,6 @@ The [QoI-SZ3](https://github.com/jpcoding/SZ3/tree/vldb_test_version) compressor
 
 > Jiao, P., Di, S., Guo, H., Zhao, K., Tian, J., Tao, D., Liang, X., & Cappello, F. (2022). Toward Quantity-of-Interest preserving lossy compression for scientific data. *Proceedings of the VLDB Endowment*, 16(4), 697–710. Available from: [doi:10.14778/3574245.3574255](https://doi.org/10.14778/3574245.3574255).
 
-
 #### QPET
 
 The [QPET](https://github.com/JLiu-1/QPET-Artifact) compressor is the successor to QoI-SZ3 and bounds the absolute or range-relative error over a derived quantity of interest by deriving approximate per-point absolute data error bounds based on the symbolic derivative over the quantity of interest. QPET supports pointwise and blockwise quantities of interest that contain addition, multiplication, exponentiation, logarithm, (non-inverse) trigonometric and hyperbolic functions, sign, or the absolute value, as well as isosurfaces. QPET can be adapted for existing compressors, e.g. as [QPET-SZ](https://github.com/JLiu-1/QPET-Artifact/tree/szfamily_qpet_revision) and [QPET-SPERR](https://github.com/JLiu-1/QPET-Artifact/tree/sperr_qpet_revision). QPET auto-tunes a new global error bound based on the per-point error bounds to (a) use fewer distinct error bounds for compressors that support per-point error bounds, e.g. in QPET-SZ (where per-point error bounds are stored as in QoI-SZ3), or (b) produce a new global error bound, e.g. in QPET-SPERR. QPET losslessly encodes outlier data points for which the approximate data error bounds result in a violation of the error bound over the quantity of interest.
@@ -497,7 +491,6 @@ The [QPET](https://github.com/JLiu-1/QPET-Artifact) compressor is the successor 
 > Liu, J., Jiao, P., Zhao, K., Liang, X., Di, S., & Cappello, F. (2025). QPET: a versatile and portable Quantity-of-Interest-Preservation Framework for Error-Bounded Lossy Compression. *Proceedings of the VLDB Endowment*, 18(8), 2440–2453. Available from: [doi:10.14778/3742728.3742739](https://doi.org/10.14778/3742728.3742739).
 
 You can easily try out QPET-SPERR using the [`numcodecs-wasm-qpet-sperr`](https://numcodecs-wasm.readthedocs.io/en/latest/api/numcodecs_wasm_qpet_sperr/) Python package.
-
 
 #### MGARD
 
@@ -518,7 +511,6 @@ You can easily try out QPET-SPERR using the [`numcodecs-wasm-qpet-sperr`](https:
 > Liang, X., Whitney, B., Chen, J., Wan, L., Liu, Q., Tao, D., Kress, J., Pugmire, D., Wolf, M., Podhorszki, N., & Klasky, S. (2021). MGARD+: Optimizing Multilevel Methods for Error-Bounded Scientific Data Reduction. *IEEE Transactions on Computers*, 71(7), 1522–1536. Available from: [doi:10.1109/tc.2021.3092201](https://doi.org/10.1109/tc.2021.3092201).
 
 > Ainsworth, M., Tugluk, O., Whitney, B., & Klasky, S. A. (2019). Multilevel Techniques for compression and reduction of Scientific Data-Quantitative Control of Accuracy in derived quantities. *SIAM Journal on Scientific Computing*, 41(4), A2146–A2171. Available from: [doi:10.1137/18m1208885](https://doi.org/10.1137/18m1208885).
-
 
 #### OptZConfig
 

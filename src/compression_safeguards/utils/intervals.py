@@ -21,10 +21,10 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ._compat import (
+    _and_where,
     _bitwise_and,
     _ensure_array,
     _frexp,
-    _logical_and,
     _nextafter,
     _reshape,
     _right_shift,
@@ -440,7 +440,14 @@ class Interval(Generic[T, N]):
             _and_where(np.isnan(a), where=where)
         ] <= Upper(np.array(np.copysign(nan_max, +1)))
 
-        return lower.union(upper)
+        # optimisation: union without intersection
+        # - lower is strictly less than upper
+        # - if lower is empty, then upper is also empty
+        # so the union of lower and upper is just their stack
+        return IntervalUnion(
+            _lower=np.stack([lower._lower, upper._lower]),
+            _upper=np.stack([lower._upper, upper._upper]),
+        )
 
     def preserve_finite(
         self,
@@ -577,7 +584,7 @@ class Interval(Generic[T, N]):
 
         Returns
         -------
-        intersection : IntervalUnion[T, N, int]
+        union : IntervalUnion[T, N, int]
             The union of `self` and `other`.
         """
 
@@ -629,17 +636,6 @@ class Interval(Generic[T, N]):
     @override
     def __repr__(self) -> str:
         return f"Interval(lower={self._lower!r}, upper={self._upper!r})"
-
-
-def _and_where(
-    x: np.ndarray[S, np.dtype[np.bool]],
-    *,
-    where: Literal[True] | np.ndarray[S, np.dtype[np.bool]],
-) -> np.ndarray[S, np.dtype[np.bool]]:
-    if where is True:
-        return x
-
-    return _logical_and(x, where)
 
 
 class IndexedInterval(Generic[T, N]):
@@ -1326,9 +1322,13 @@ class IntervalUnion(Generic[T, N, U]):
 
         # 6. if there are several intervals, pick the one with the smallest
         #    lower bound, ensuring that empty intervals are not picked
-        least = _where(interval_nonempty, lower, allbits).argmin(axis=0)
-        lower, upper = lower[least, np.arange(n)], upper[least, np.arange(n)]
-        negative = negative[least, np.arange(n)]
+        least = _where(interval_nonempty, lower, allbits).argmin(
+            axis=0
+        ) * n + np.arange(n)
+        # pick without a quadratic intermediary, as in x[least, np.arange(n)]
+        lower = np.take_along_axis(lower, least, axis=None)
+        upper = np.take_along_axis(upper, least, axis=None)
+        negative = np.take_along_axis(negative, least, axis=None)
         assert np.all(lower <= upper)
 
         # 7. count the number of leading zero bits in lower and upper
