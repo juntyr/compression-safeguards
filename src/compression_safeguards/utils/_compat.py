@@ -16,6 +16,7 @@ __all__ = [
     "_minimum_zero_sign_sensitive",
     "_maximum_zero_sign_sensitive",
     "_where",
+    "_and_where",
     "_reshape",
     "_broadcast_to",
     "_stack",
@@ -320,9 +321,12 @@ def _minimum_zero_sign_sensitive(a, b, out=None, where=True):
     )
 
     # compute the minimum and apply the sign
-    # FIXME: handle min(-1, +NaN) correctly
+    # ensure that min(-1, +NaN) = +NaN and min(+NaN, -NaN) = -NaN
+    one_nan = np.logical_xor(np.isnan(a), np.isnan(b))
     minimum = _ensure_array(np.minimum(a, b, out=out, where=where))
-    np.copysign(minimum, minimum_sign, out=minimum, where=where)
+    np.copysign(
+        minimum, minimum_sign, out=minimum, where=_and_where(one_nan, where=where)
+    )
 
     return minimum
 
@@ -373,9 +377,12 @@ def _maximum_zero_sign_sensitive(a, b, out=None, where=True):
     )
 
     # compute the maximum and apply the sign
-    # FIXME: handle max(-NaN, +1) correctly
+    # ensure that max(+1, -NaN) = -NaN and max(-NaN, +NaN) = +NaN
+    one_nan = np.logical_xor(np.isnan(a), np.isnan(b))
     maximum = _ensure_array(np.maximum(a, b, out=out, where=where))
-    np.copysign(maximum, maximum_sign, out=maximum, where=where)
+    np.copysign(
+        maximum, maximum_sign, out=maximum, where=_and_where(one_nan, where=where)
+    )
 
     return maximum
 
@@ -395,6 +402,17 @@ def _where(cond: bool, a: Ti, b: Ti) -> Ti: ...
 
 def _where(cond, a, b):
     return np.where(cond, a, b)
+
+
+def _and_where(
+    x: np.ndarray[S, np.dtype[np.bool]],
+    *,
+    where: Literal[True] | np.ndarray[S, np.dtype[np.bool]],
+) -> np.ndarray[S, np.dtype[np.bool]]:
+    if where is True:
+        return x
+
+    return _logical_and(x, where)
 
 
 # wrapper around np.reshape but with better type hints

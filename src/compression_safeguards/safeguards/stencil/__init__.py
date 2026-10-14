@@ -427,7 +427,8 @@ def _reverse_neighbourhood_indices(
     indices_windows_indices = indices_windows_indices.flatten()
 
     # sort the indices, such that windows that read the same data are together
-    # use a stable sort to ensure consistent results, independent of chunking
+    # use a stable sort to ensure consistent results, mostly even with chunking
+    # a wrapping boundary can still change the order aa|bb|cc -> caab,abbc,bcca
     argindices = np.argsort(indices_windows, stable=True)
     indices_windows_sorted = indices_windows[argindices]
 

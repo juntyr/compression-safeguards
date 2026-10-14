@@ -12,6 +12,7 @@ import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
 from ....utils._compat import (
+    _and_where,
     _ensure_array,
     _ones,
     _place,
@@ -1189,13 +1190,30 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         # since some data elements may have no data bounds that affect them,
         #  e.g. because of the valid boundary condition, they may have infinite
         #  bounds
-        # FIXME: does this need to be zero-sign sensitive?
+        # explicitly handle the signs of zeros; ignore the sign of NaNs, since
+        #  compute_safe_data_lower_upper_interval_union also ignores it
         data_float_lower: np.ndarray[S, np.dtype[np.floating]] = _reshape(
-            np.amax(data_windows_float_lower_flat[reverse_indices_windows], axis=1),
+            np.copysign(
+                np.amax(data_windows_float_lower_flat[reverse_indices_windows], axis=1),
+                np.amax(
+                    np.copysign(
+                        1, data_windows_float_lower_flat[reverse_indices_windows]
+                    ),
+                    axis=1,
+                ),
+            ),
             data.shape,
         )
         data_float_upper: np.ndarray[S, np.dtype[np.floating]] = _reshape(
-            np.amin(data_windows_float_upper_flat[reverse_indices_windows], axis=1),
+            np.copysign(
+                np.amin(data_windows_float_upper_flat[reverse_indices_windows], axis=1),
+                np.amin(
+                    np.copysign(
+                        1, data_windows_float_upper_flat[reverse_indices_windows]
+                    ),
+                    axis=1,
+                ),
+            ),
             data.shape,
         )
 
@@ -1364,7 +1382,7 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
             window_used[idxs] = True
 
         # valid foot, which includes the where condition
-        foot_valid = (foot & where)[tuple(valid_slice)]
+        foot_valid = _and_where(foot, where=where)[tuple(valid_slice)]
 
         # compute the reverse: for each data element, which windows is it in
         # i.e. for each data element, which QoI elements does it contribute to
@@ -1389,6 +1407,11 @@ class StencilQuantityOfInterestErrorBoundSafeguard(StencilSafeguard):
         inverse_footprint: np.ndarray[S, np.dtype[np.bool]] = np.logical_or.reduce(
             valid_reverse_index, axis=1
         ).reshape(foot.shape)
+
+        inverse_footprint_2 = (
+            reverse_indices_windows[:, 0] != (foot_valid.size * window_size)
+        ).reshape(foot.shape)
+        np.testing.assert_array_equal(inverse_footprint, inverse_footprint_2)
 
         return inverse_footprint
 
