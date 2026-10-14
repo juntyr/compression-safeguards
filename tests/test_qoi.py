@@ -80,6 +80,8 @@ from compression_safeguards.safeguards._qois.interval import (
 from compression_safeguards.utils._compat import (
     _is_negative_zero,
     _is_positive_zero,
+    _maximum_zero_sign_sensitive,
+    _minimum_zero_sign_sensitive,
     _round_ties_even,
 )
 from compression_safeguards.utils._float128 import _float128, _float128_dtype
@@ -3137,3 +3139,29 @@ def test_fuzzer_found_sign_sensitive_minmax_sign_override_10():
 
     assert _is_positive_zero(expr.eval(X_lower, dict()))
     assert expr.eval(X_upper, dict()) == np.array(np.float64(1.3150018100536451e-161))
+
+
+def test_fuzzer_found_sign_sensitive_minmax_expr_bounds():
+    X = np.array(np.float16(0.0))
+
+    expr = ScalarCeilModulo(ScalarSinh(Data.SCALAR), Euler())
+
+    exprv = expr.eval(X, dict())
+    assert _is_negative_zero(exprv)
+
+    expr_lower = np.array(np.float16(0.0))
+    expr_upper = np.array(np.float16(-0.0))
+
+    _minimum_zero_sign_sensitive(expr_lower, exprv, out=expr_lower)
+    _maximum_zero_sign_sensitive(exprv, expr_upper, out=expr_upper)
+
+    assert _is_negative_zero(expr_lower)
+    assert _is_negative_zero(expr_upper)
+
+    X_lower, X_upper = compute_expr_data_bounds(expr, expr_lower, expr_upper, X, dict())
+
+    assert _is_positive_zero(X_lower)
+    assert X_upper == np.float16(1.73e-322)
+
+    assert _is_negative_zero(expr.eval(X_lower, dict()))
+    assert _is_negative_zero(expr.eval(X_upper, dict()))
