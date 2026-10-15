@@ -115,6 +115,7 @@ from compression_safeguards.utils.error import (
     ctx,
 )
 from compression_safeguards.utils.typing import JSON, S, T
+from xarray.namedarray.parallelcompat import get_chunked_array_type
 
 DataValue: TypeAlias = int | float | np.number | xr.DataArray
 """
@@ -442,12 +443,13 @@ def produce_data_array_correction(
 
         da_correction = (
             data.copy(
-                data=data.data.map_blocks(
+                data=dask.array.map_blocks(
                     _compute_independent_chunk_correction,
+                    data.data,
                     approximation.data,
                     *chunked_late_bound.values(),
                     dtype=correction_dtype,
-                    chunks=None,
+                    chunks=None,  # map_blocks figures out the chunks
                     enforce_ndim=True,
                     meta=np.array((), dtype=correction_dtype),
                     late_bound_names=tuple(chunked_late_bound.keys()),
@@ -616,6 +618,7 @@ def produce_data_array_correction(
             dtype=np.bool,
             # we cannot output 1x...x1 chunks here since we later use the block
             #  info to compute the data size and chunk location
+            # map_blocks figures out the chunks
             chunks=None,
             enforce_ndim=True,
             meta=np.array((), dtype=np.bool),
@@ -623,7 +626,8 @@ def produce_data_array_correction(
             boundary=boundary,
             trim=False,
             align_arrays=False,
-            # if the stencil is larger than the smallest chunk, temporary rechunking may be necessary
+            # if the stencil is larger than the smallest chunk,
+            # temporary rechunking may be necessary
             allow_rechunk=True,
             late_bound_names=tuple(chunked_late_bound.keys()),
             late_bound_global=late_bound_global,
@@ -763,14 +767,16 @@ def produce_data_array_correction(
                 data_indices,
                 *chunked_late_bound.values(),
                 dtype=correction_dtype,
-                chunks=None,
+                # we explicitly exclide `chunks=None` here since map_overlap only
+                # figures out the correct chunks if `chunks` is not in the kwargs
                 enforce_ndim=True,
                 meta=np.array((), dtype=correction_dtype),
                 depth=depth,
                 boundary=boundary,
                 trim=False,
                 align_arrays=False,
-                # if the stencil is larger than the smallest chunk, temporary rechunking may be necessary
+                # if the stencil is larger than the smallest chunk,
+                # temporary rechunking may be necessary
                 allow_rechunk=True,
                 late_bound_names=tuple(chunked_late_bound.keys()),
                 late_bound_global=late_bound_global,
@@ -779,9 +785,7 @@ def produce_data_array_correction(
                 depth_=depth,
                 boundary_=boundary,
                 any_chunk_check_failed=any_chunk_check_failed,
-            )
-            .compute_chunk_sizes()  # shape and chunk size may be wrong, recompute
-            .rechunk(data.chunks)  # undo temporary rechunking
+            ).rechunk(data.chunks)  # undo temporary rechunking
         )
         .rename(correction_name)
         .assign_attrs(**correction_attrs)
@@ -868,23 +872,36 @@ def apply_data_array_correction(
                 | ctx
             )
 
-    def _apply_independent_chunk_correction(
-        approximation_chunk: xr.DataArray,
-        correction_chunk: xr.DataArray,
-        safeguards: Safeguards,
-    ) -> xr.DataArray:
-        return approximation_chunk.copy(
-            data=safeguards.apply_correction(
-                approximation_chunk.values, correction_chunk.values
-            )
-        )
+    if approximation.chunks is None:
+        return approximation.copy(
+            data=safeguards.apply_correction(approximation.data, correction.data)
+        ).assign_attrs(safeguards=correction.attrs["safeguards"])
 
-    return xr.map_blocks(
-        _apply_independent_chunk_correction,
-        approximation,
-        args=(correction,),
-        kwargs=dict(safeguards=safeguards),
-        template=approximation,
+    with ctx.parameter("correction"):
+        chunkmanager = get_chunked_array_type(approximation.data, correction.data)
+
+    def _apply_independent_chunk_correction(
+        approximation_chunk: np.ndarray[S, np.dtype[T]],
+        correction_chunk: np.ndarray[S, np.dtype[np.unsignedinteger]],
+        safeguards: Safeguards,
+    ) -> np.ndarray[S, np.dtype[T]]:
+        # ensure that we pass np.ndarray's to the compression-safeguards
+        approximation_chunk = _ensure_array(approximation_chunk)
+        correction_chunk = _ensure_array(correction_chunk)
+
+        return safeguards.apply_correction(approximation_chunk, correction_chunk)
+
+    return approximation.copy(
+        data=chunkmanager.map_blocks(
+            _apply_independent_chunk_correction,
+            approximation.data,
+            correction.data,
+            dtype=approximation.dtype,
+            chunks=None,  # map_blocks figures out the chunks
+            drop_axis=None,
+            new_axis=None,
+            safeguards=safeguards,
+        )
     ).assign_attrs(safeguards=correction.attrs["safeguards"])
 
 

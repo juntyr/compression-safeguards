@@ -58,6 +58,7 @@ nav:
           - Absolute error bound: examples/error-distribution.ipynb
       - Safeguards on chunked data:
           - xarray-safeguards: examples/chunked.ipynb
+          - Performance scaling: examples/vorticity-chunk-scaling.ipynb
       - Preview:
           - Incremental safeguards: examples/incremental.ipynb
   - Links:
