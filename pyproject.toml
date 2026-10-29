@@ -128,6 +128,7 @@ markers = [
     "slow: marks tests as slow [10-30s] (deselect with '-m \"not slow\"')",
     "veryslow: marks tests as very slow [>30s] (deselect with '-m \"not veryslow\"')",
 ]
+asyncio_default_fixture_loop_scope = "function"
 
 [[tool.mypy.overrides]]
 module = ["numpy_quaddtype.*", "sly.*"]
