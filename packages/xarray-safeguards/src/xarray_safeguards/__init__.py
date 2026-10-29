@@ -471,7 +471,7 @@ def produce_data_array_correction(
                     approximation.data,
                     *chunked_late_bound.values(),
                     dtype=correction_dtype,
-                    chunks=None,
+                    chunks=None,  # map_blocks figures out the chunks
                     enforce_ndim=True,
                     meta=np.array((), dtype=correction_dtype),
                     late_bound_names=tuple(chunked_late_bound.keys()),
@@ -640,6 +640,7 @@ def produce_data_array_correction(
             dtype=np.bool,
             # we cannot output 1x...x1 chunks here since we later use the block
             #  info to compute the data size and chunk location
+            # map_blocks figures out the chunks
             chunks=None,
             enforce_ndim=True,
             meta=np.array((), dtype=np.bool),
@@ -647,7 +648,8 @@ def produce_data_array_correction(
             boundary=boundary,
             trim=False,
             align_arrays=False,
-            # if the stencil is larger than the smallest chunk, temporary rechunking may be necessary
+            # if the stencil is larger than the smallest chunk,
+            # temporary rechunking may be necessary
             allow_rechunk=True,
             late_bound_names=tuple(chunked_late_bound.keys()),
             late_bound_global=late_bound_global,
@@ -787,14 +789,16 @@ def produce_data_array_correction(
                 data_indices,
                 *chunked_late_bound.values(),
                 dtype=correction_dtype,
-                chunks=None,
+                # we explicitly exclude `chunks=None` here since map_overlap only
+                # figures out the correct chunks if `chunks` is not in the kwargs
                 enforce_ndim=True,
                 meta=np.array((), dtype=correction_dtype),
                 depth=depth,
                 boundary=boundary,
                 trim=False,
                 align_arrays=False,
-                # if the stencil is larger than the smallest chunk, temporary rechunking may be necessary
+                # if the stencil is larger than the smallest chunk,
+                # temporary rechunking may be necessary
                 allow_rechunk=True,
                 late_bound_names=tuple(chunked_late_bound.keys()),
                 late_bound_global=late_bound_global,
@@ -803,9 +807,7 @@ def produce_data_array_correction(
                 depth_=depth,
                 boundary_=boundary,
                 any_chunk_check_failed=any_chunk_check_failed,
-            )
-            .compute_chunk_sizes()  # shape and chunk size may be wrong, recompute
-            .rechunk(data.chunks)  # undo temporary rechunking
+            ).rechunk(data.chunks)  # undo temporary rechunking
         )
         .rename(correction_name)
         .assign_attrs(**correction_attrs)
@@ -917,7 +919,7 @@ def apply_data_array_correction(
             approximation.data,
             correction.data,
             dtype=approximation.dtype,
-            chunks=None,
+            chunks=None,  # map_blocks figures out the chunks
             drop_axis=None,
             new_axis=None,
             safeguards=safeguards,
