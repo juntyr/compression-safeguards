@@ -767,7 +767,7 @@ def produce_data_array_correction(
                 data_indices,
                 *chunked_late_bound.values(),
                 dtype=correction_dtype,
-                # we explicitly exclide `chunks=None` here since map_overlap only
+                # we explicitly exclude `chunks=None` here since map_overlap only
                 # figures out the correct chunks if `chunks` is not in the kwargs
                 enforce_ndim=True,
                 meta=np.array((), dtype=correction_dtype),
