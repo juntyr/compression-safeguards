@@ -404,7 +404,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v7
         with:
-          python-version: 3.13.2
+          python-version: "3.13"
 
       - name: Setup Emscripten
         uses: emscripten-core/setup-emsdk@v16
@@ -460,7 +460,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v7
         with:
-          python-version: 3.13.2
+          python-version: "3.13"
 
       - name: Install pyodide-build
         run: python -m pip install pyodide-build
