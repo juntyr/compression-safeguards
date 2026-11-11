@@ -11,9 +11,10 @@ from typing import ClassVar, Literal, final
 import numpy as np
 from typing_extensions import override  # MSPV 3.12
 
+from ...utils._compat import _ones
 from ...utils.bindings import Bindings, Parameter
 from ...utils.error import TypeCheckError, ctx
-from ...utils.intervals import IntervalUnion
+from ...utils.intervals import Interval, IntervalUnion
 from ...utils.typing import JSON, S, T
 from ..abc import Safeguard
 from ..pointwise.abc import PointwiseSafeguard
@@ -37,6 +38,10 @@ class AllSafeguards(Safeguard, metaclass=_AllSafeguardsMeta):
     The `AllSafeguards` guarantees that, for each element, all of the combined
     safeguards' guarantees are upheld.
 
+    If the provided `safeguards` are empty, the combinator functions like the
+    [`AssumeAlwaysSafeguard`][...assume_safe.AssumeAlwaysSafeguard] since
+    guaranteeing all of no safeguards is trivially always safe.
+
     At the moment, only pointwise and stencil safeguards and combinations
     thereof can be combined by this all-combinator. The combinator is a
     pointwise or a stencil safeguard, depending on the safeguards it combines.
@@ -44,16 +49,14 @@ class AllSafeguards(Safeguard, metaclass=_AllSafeguardsMeta):
     Parameters
     ----------
     safeguards : Collection[dict[str, JSON] | PointwiseSafeguard | StencilSafeguard]
-        At least one safeguard configuration [`dict`][dict]s or already
-        initialized [`PointwiseSafeguard`][....pointwise.abc.PointwiseSafeguard]
+        Safeguard configuration [`dict`][dict]s or already initialized
+        [`PointwiseSafeguard`][....pointwise.abc.PointwiseSafeguard]
         or [`StencilSafeguard`][....stencil.abc.StencilSafeguard].
 
     Raises
     ------
     TypeCheckError
         if any parameter has the wrong type.
-    ValueError
-        if the `safeguards` collection is empty.
     ...
         if instantiating a safeguard raises an exception.
     """
@@ -79,11 +82,6 @@ class AllSafeguards(Safeguard, metaclass=_AllSafeguardsMeta):
         with ctx.safeguardty(cls):
             with ctx.parameter("safeguards"):
                 TypeCheckError.check_instance_or_raise(safeguards, Collection)
-
-                if len(safeguards) <= 0:
-                    raise (
-                        ValueError("can only combine over at least one safeguard") | ctx
-                    )
 
                 safeguards_: list[PointwiseSafeguard | StencilSafeguard] = []
                 safeguard: dict[str, JSON] | Safeguard
@@ -336,6 +334,9 @@ class _AllSafeguardsBase(ABC):
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
+        if len(self.safeguards) == 0:
+            return _ones(data.shape, np.dtype(np.bool))
+
         front, *tail = self.safeguards
 
         # pointwise check succeeds if all safeguards' pointwise check succeeds
@@ -357,6 +358,9 @@ class _AllSafeguardsBase(ABC):
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> IntervalUnion[T, int, int]:
+        if len(self.safeguards) == 0:
+            return Interval.full_like(data).into_union()
+
         front, *tail = self.safeguards
 
         # only the intersection of all safeguards' safe intervals is safe
@@ -378,6 +382,9 @@ class _AllSafeguardsBase(ABC):
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
+        if len(self.safeguards) == 0:
+            return np.zeros_like(foot)
+
         front, *tail = self.safeguards
 
         # since all safeguards can contribute to the footprint, the union of
@@ -398,6 +405,9 @@ class _AllSafeguardsBase(ABC):
         late_bound: Bindings,
         where: Literal[True] | np.ndarray[S, np.dtype[np.bool]] = True,
     ) -> np.ndarray[S, np.dtype[np.bool]]:
+        if len(self.safeguards) == 0:
+            return np.zeros_like(foot)
+
         front, *tail = self.safeguards
 
         # since all safeguards can contribute to the footprint, the union of
