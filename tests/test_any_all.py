@@ -2,6 +2,7 @@ from collections.abc import Set
 from typing import ClassVar, Literal
 
 import numpy as np
+import pytest
 from typing_extensions import override  # MSPV 3.12
 
 from compression_safeguards.api import Safeguards
@@ -354,6 +355,16 @@ def test_any_isinstance_issubclass():
 
     assert issubclass(type(any_pointwise), AnySafeguard)
     assert issubclass(type(any_stencil), AnySafeguard)
+
+
+def test_empty_combinator():
+    AllSafeguards(safeguards=[])
+
+    with pytest.raises(
+        ValueError,
+        match=r"any\.safeguards: can only combine over at least one safeguard",
+    ):
+        AnySafeguard(safeguards=[])
 
 
 # a safeguard that sometimes reports always safe and sometimes always unsafe
