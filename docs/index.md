@@ -525,7 +525,7 @@ You can easily try out QPET-SPERR using the [`numcodecs-wasm-qpet-sperr`](https:
 
 Please cite this work as follows:
 
-> Tyree, J., Underwood, R., Bouvier, C., Köhler, D., Reichelt, T., Dueben, P., Faghih-Naini, S., Järvinen, H., and Klöwer, M. (2026). Compression Safeguards: Building Trust into Lossy Data Compression. *EGUsphere* [preprint]. Available from: [doi:10.5194/egusphere-2026-4266](https://doi.org/10.5194/egusphere-2026-4266).
+> Tyree, J., Underwood, R., Bouvier, C., Köhler, D., Reichelt, T., Dueben, P., Faghih-Naini, S., Järvinen, H., and Klöwer, M. (2026). Compression Safeguards: building trust into lossy data compression. *Geoscientific Model Development*, 19(22), 11265–11335. Available from: [doi:10.5194/gmd-19-11265-2026](https://doi.org/10.5194/gmd-19-11265-2026).
 
 > Tyree, J., Underwood, R., Bouvier, C., Köhler, D., Reichelt, T., Dueben, P., Faghih-Naini, S., Järvinen, H., and Klöwer, M. (2026). compression-safeguards [Software]. *Zenodo*. Available from: [doi:10.5281/zenodo.18355539](https://doi.org/10.5281/zenodo.18355539).
 
