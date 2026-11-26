@@ -50,8 +50,8 @@ identifiers:
     value: 10.5281/zenodo.18355539
     description: Zenodo
   - type: doi
-    value: 10.5281/zenodo.18355539
-    description: 2026 GMD Paper
+    value: 10.5194/gmd-19-11265-2026
+    description: 2026 GMD Article
 repository-code: 'https://github.com/juntyr/compression-safeguards'
 url: 'https://compression-safeguards.readthedocs.io/en/latest/'
 repository-artifact: 'https://pypi.org/project/compression-safeguards/'

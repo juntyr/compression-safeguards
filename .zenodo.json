@@ -65,9 +65,9 @@
       "scheme": "url"
     },
     {
-      "identifier": "10.5281/zenodo.18355539",
+      "identifier": "10.5194/gmd-19-11265-2026",
       "relation": "isDescribedBy",
-      "resource_type": "publication",
+      "resource_type": "publication-article",
       "scheme": "doi"
     }
   ],
